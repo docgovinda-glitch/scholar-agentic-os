@@ -26,3 +26,7 @@ export { MLA9Formatter } from "./formatters/mla9";
 export { ChicagoFormatter } from "./formatters/chicago";
 export { HarvardFormatter } from "./formatters/harvard";
 export { VancouverFormatter } from "./formatters/vancouver";
+
+// Importers
+export { importBibTex, type BibTexImportResult } from "./importers/bibtexImporter";
+export { importRis, type RisImportResult } from "./importers/risImporter";

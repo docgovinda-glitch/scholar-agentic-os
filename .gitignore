@@ -11,5 +11,8 @@ coverage/
 .opencode
 .kilo/
 .antigravity/
+.idea/
+.vscode/
 Doctoral-Research-and-Journal-Publication-Association/
 Doctoral-Research-and-Journal-Publishation-Assistant/
+users.json
