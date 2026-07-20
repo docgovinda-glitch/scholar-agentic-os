@@ -1,2 +1,0 @@
-# System Architecture
-The platform uses a hybrid deployment model with a React frontend (Vite), Express backend for local development, and Vercel serverless functions for production. The system features a unified AIGateway for multi-provider routing.
