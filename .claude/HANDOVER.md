@@ -1,5 +1,50 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
+## 0. Repository Migration Note (2026-07-20) — READ FIRST
+
+This is a **fresh repository**, copied from an older working directory
+(`/Users/pobpkf/Documents/Doctoral-Research-and-Journal-Publication-Assistant 4.43.36 PM`)
+because that location's Claude Code session had a persistent bug where the
+`Write` tool could not create new files (reported success but the file never
+actually existed on disk, confirmed via both `Bash` and `Read`). That bug
+does **not** reproduce in this new location — new-file creation was
+verified working here before this note was written.
+
+**Do not repeat completed work.** The old repository had already been through
+multiple audit/stabilization/convergence sessions before this migration. This
+copy excluded that session's audit-report clutter (`ARCHITECTURE_SYNCHRONIZATION_REPORT.md`,
+`ENGINEERING_*_REPORT.md`, etc.) and a few non-code items (`.env`, `users.json`,
+a local AI model binary, stray duplicate scaffold folders) — none of that
+represents unfinished engineering work, just prior audit trail. If you need
+that history, it still exists at the old path above.
+
+**Verified state as of this commit** (2 commits: "Initial commit: fresh start",
+then a fix commit): 0 TypeScript errors, 330/330 tests passing, production
+build succeeds, server boots and serves real requests (health check, all 8
+scholarly agents registered and reachable via `/api/agents`).
+
+**Fixed during migration** (both bugs are resolved, not open items):
+- `src/ai/` (the AI Kernel) was accidentally omitted by an overly-broad
+  copy-exclude pattern — restored and verified.
+- `uuid` (used by `src/orchestrator/*`) was an undeclared/phantom dependency
+  that only worked in the old repo by accident (already sitting in its
+  `node_modules`) — now a proper `package.json` dependency.
+- BibTeX/RIS citation import logic, previously stuck inline in `server.ts`
+  as a workaround while file-creation was blocked, has been moved to its
+  proper home: `src/citation_compliance/importers/` (with tests).
+
+**Suggested next steps** (not started yet, from the prior session's audit):
+Knowledge Graph (`src/knowledge/graph/KnowledgeGraph.ts`) is fully
+implemented but has no adapter connecting it to any live UI or service —
+genuinely disconnected, not a quick fix; would need a product decision on
+what it should actually show before wiring it up. Beyond that, continue
+the established pattern from this project's engineering history: prefer
+deterministic Scholar Core OS processing over AI where structured data
+already exists, connect implemented-but-unreachable modules, and validate
+every change with `npx tsc --noEmit`, `npx vitest run`, and `npm run build`.
+
+---
+
 ## 1. Executive Summary
 
 - **Project Name**: Scholar Agentic Operating System
