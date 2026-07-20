@@ -1,0 +1,13 @@
+{
+  "repository_id": "scholar-agentic-os",
+  "name": "Scholar Agentic Operating System",
+  "version": "1.0.0",
+  "branch": "blackboxai/phase-6b-doc-intelligence-cycle1",
+  "type": "typescript-react-vite",
+  "primary_language": "TypeScript",
+  "frameworks": ["React", "Vite", "Express"],
+  "total_files": 50,
+  "documentation_files": 25,
+  "source_files": 25,
+  "test_files": 10
+}

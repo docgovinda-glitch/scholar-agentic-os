@@ -1,0 +1,32 @@
+services:
+  # Express Backend Service
+  - type: web
+    name: scholar-assistant-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: scholar-assistant-db
+          property: connectionString
+      - key: ENCRYPTION_KEY
+        sync: false # Needs to be set securely by admin (32-character string)
+      - key: RESEND_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY_BACKUP
+        sync: false
+
+# PostgreSQL Database Service
+databases:
+  - name: scholar-assistant-db
+    plan: free
+    databaseName: scholar_db
+    user: scholar_admin

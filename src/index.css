@@ -1,0 +1,329 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", serif;
+  --font-display: "Playfair Display", serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --color-primary: #1A365D;
+  --color-accent: #C08A3E;
+  --color-bg-base: #F8FAFC;
+  --color-card-base: #FFFFFF;
+  --color-success-base: #10B981;
+  --color-warning-base: #F59E0B;
+  --color-border-base: #E5E7EB;
+
+  /* Brand Colors definition for light theme fallback */
+  --color-brand-50: #FAF8F5;
+  --color-brand-100: #FAF6F0;
+  --color-brand-200: #FAF0E6;
+  --color-brand-300: #C08A3E;
+  --color-brand-400: #A87630;
+  --color-brand-500: #1A365D; /* Oxford Blue */
+  --color-brand-600: #122847;
+  --color-brand-650: #172D4D;
+  --color-brand-700: #0E203A;
+  --color-brand-800: #0A172B;
+  --color-brand-900: #06101F;
+  --color-brand-950: #030810;
+}
+
+/* Base style resets — override Tailwind v4 preflight height:100% to allow page scrolling */
+html, body, #root {
+  height: auto !important;
+  min-height: 100% !important;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #F8FAFC;
+  color: #1A365D;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Blueprint radial grid pattern for premium desktop canvas */
+.blueprint-canvas {
+  background-color: #F8FAFC;
+  background-image: 
+    radial-gradient(circle, rgba(26, 54, 93, 0.04) 1px, transparent 1px),
+    linear-gradient(to right, rgba(26, 54, 93, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(26, 54, 93, 0.02) 1px, transparent 1px);
+  background-size: 24px 24px, 120px 120px, 120px 120px;
+  background-position: center center;
+}
+
+/* Premium OS Card Style */
+.os-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -2px rgba(26, 54, 93, 0.04), 0 2px 6px -1px rgba(26, 54, 93, 0.02);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Premium hover lift class */
+.hover-lift {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px -4px rgba(26, 54, 93, 0.08), 0 4px 12px -2px rgba(26, 54, 93, 0.03);
+  border-color: rgba(192, 138, 62, 0.3);
+}
+
+/* Retro-modern glassmorphic effect updated for high readability light theme */
+.glass-effect {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid #E2E8F0 !important;
+  box-shadow: 0 8px 32px 0 rgba(26, 54, 93, 0.04) !important;
+  border-radius: 16px !important;
+}
+
+/* Heading font overrides */
+h1, .font-serif {
+  font-family: var(--font-serif) !important;
+}
+
+h2, h3, h4, .font-display {
+  font-family: var(--font-sans) !important;
+  font-weight: 600 !important;
+  color: #1A365D !important;
+}
+
+/* Form controls overrides */
+input[type="text"]:not(.border-0):not(.bg-transparent),
+input[type="date"]:not(.border-0):not(.bg-transparent),
+input[type="email"]:not(.border-0):not(.bg-transparent),
+input[type="password"]:not(.border-0):not(.bg-transparent),
+select:not(.border-0):not(.bg-transparent),
+textarea:not(.border-0):not(.bg-transparent) {
+  background-color: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #1A365D !important;
+  border-radius: 10px !important;
+  transition: all 0.2s ease !important;
+}
+
+input[type="text"]:focus:not(.border-0),
+input[type="date"]:focus:not(.border-0),
+input[type="email"]:focus:not(.border-0),
+input[type="password"]:focus:not(.border-0),
+select:focus:not(.border-0),
+textarea:focus:not(.border-0) {
+  border-color: #C08A3E !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(192, 138, 62, 0.15) !important;
+}
+
+/* Clean scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F8FAFC;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* ==========================================
+   GLOBAL NESTED CLASS OVERRIDES FOR GLASS-EFFECT CARDS
+   (Fixes all white-on-white/contrast bugs across modules)
+   ========================================== */
+
+.glass-effect h2,
+.glass-effect h3,
+.glass-effect h4 {
+  color: #1A365D !important;
+}
+
+.glass-effect .text-white:not(button):not(button *):not([class*="bg-[#"]):not([class*="bg-[#"] *):not([class*="bg-brand-"]):not([class*="bg-brand-"] *),
+.glass-effect h4.text-white:not(button):not(button *):not([class*="bg-[#"]):not([class*="bg-[#"] *):not([class*="bg-brand-"]):not([class*="bg-brand-"] *),
+.glass-effect h3.text-white:not(button):not(button *):not([class*="bg-[#"]):not([class*="bg-[#"] *):not([class*="bg-brand-"]):not([class*="bg-brand-"] *),
+.glass-effect h2.text-white:not(button):not(button *):not([class*="bg-[#"]):not([class*="bg-[#"] *):not([class*="bg-brand-"]):not([class*="bg-brand-"] *) {
+  color: #1A365D !important;
+}
+
+/* Explicitly preserve white text & icons inside buttons and dark background layouts */
+.glass-effect button.text-white,
+.glass-effect button .text-white,
+.glass-effect button,
+.glass-effect button .lucide,
+.glass-effect [class*="bg-[#1A365D]"] .text-white,
+.glass-effect [class*="bg-[#1A365D]"] .lucide,
+.glass-effect [class*="bg-brand-500"] .text-white,
+.glass-effect [class*="bg-brand-500"] .lucide,
+.glass-effect [class*="bg-brand-600"] .text-white,
+.glass-effect [class*="bg-brand-600"] .lucide {
+  color: #FFFFFF !important;
+}
+.glass-effect button .lucide,
+.glass-effect [class*="bg-[#1A365D]"] .lucide,
+.glass-effect [class*="bg-brand-500"] .lucide,
+.glass-effect [class*="bg-brand-600"] .lucide {
+  stroke: #FFFFFF !important;
+}
+
+.glass-effect .text-gray-300,
+.glass-effect .text-gray-400,
+.glass-effect p.text-gray-400,
+.glass-effect span.text-gray-400 {
+  color: #475569 !important; /* Highly readable Slate text */
+}
+
+.glass-effect .text-brand-200,
+.glass-effect .text-brand-300,
+.glass-effect .text-brand-400 {
+  color: #C08A3E !important; /* Gold/Bronze accent */
+  font-weight: 600;
+}
+
+.glass-effect .text-brand-500,
+.glass-effect .text-brand-600 {
+  color: #1A365D !important; /* Oxford Blue */
+}
+
+/* Map dark backgrounds inside panels to clean, warm ivory/cream backgrounds */
+.glass-effect div[class*="bg-brand-950"],
+.glass-effect div[class*="bg-brand-900"],
+.glass-effect textarea[class*="bg-brand-950"],
+.glass-effect input[class*="bg-brand-950"] {
+  background-color: #FAF8F5 !important;
+  color: #1A365D !important;
+  border-color: #E2E8F0 !important;
+}
+
+.glass-effect div[class*="bg-brand-900/40"],
+.glass-effect div[class*="bg-brand-900/30"],
+.glass-effect div[class*="bg-brand-900/20"],
+.glass-effect div[class*="bg-brand-500/10"] {
+  background-color: #FAF6F0 !important;
+  border-color: rgba(192, 138, 62, 0.15) !important;
+}
+
+/* Intercept buttons using dark brand backgrounds and convert to premium primary buttons */
+.glass-effect button[class*="bg-brand-500"],
+.glass-effect button[class*="bg-brand-600"] {
+  background-color: #1A365D !important;
+  color: #FFFFFF !important;
+  border-color: #1A365D !important;
+  transition: all 0.2s ease !important;
+}
+.glass-effect button[class*="bg-brand-500"]:hover,
+.glass-effect button[class*="bg-brand-600"]:hover {
+  background-color: #122847 !important;
+}
+
+.glass-effect button[class*="bg-brand-500/30"],
+.glass-effect button[class*="bg-brand-500/10"] {
+  background-color: #FAF8F5 !important;
+  border-color: #E2E8F0 !important;
+  color: #C08A3E !important;
+}
+
+/* Override dark/white borders inside panels to subtle borders */
+.glass-effect div[class*="border-white"],
+.glass-effect select[class*="border-white"],
+.glass-effect textarea[class*="border-white"],
+.glass-effect input[class*="border-white"],
+.glass-effect button[class*="border-white"] {
+  border-color: #E2E8F0 !important;
+}
+
+/* Custom visual helper styling */
+.text-gradient {
+  background: linear-gradient(135deg, #1A365D 20%, #C08A3E 80%);
+  -webkit-background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Intercept low-contrast 'Back' buttons and map to clean secondary buttons */
+button.border-white\/10,
+button[class*="border-white/10"] {
+  border-color: #CBD5E1 !important;
+  color: #475569 !important;
+  background-color: #FAF8F5 !important;
+}
+button.border-white\/10:hover,
+button[class*="border-white/10"]:hover {
+  background-color: #F1F5F9 !important;
+  color: #1A365D !important;
+}
+
+/* Intercept disabled primary buttons for correct high-contrast light theme */
+button:disabled {
+  background-color: #FAF6F0 !important;
+  border-color: #E2E8F0 !important;
+  color: #94A3B8 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+/* ==========================================
+   DOCTORAL MANUSCRIPT TYPOGRAPHY & ZEN MODE
+   ========================================== */
+
+.manuscript-paper {
+  background-color: #FFFFFF;
+  color: #1A365D;
+  max-width: 850px;
+  margin: 0 auto;
+  padding: 3rem 4rem;
+  box-shadow: 0 10px 30px -5px rgba(26, 54, 93, 0.08), 0 4px 10px -2px rgba(26, 54, 93, 0.04);
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 640px) {
+  .manuscript-paper {
+    padding: 1.5rem 1.5rem;
+  }
+}
+
+.manuscript-body {
+  font-family: var(--font-serif);
+  font-size: 1.125rem; /* 18px */
+  line-height: 1.85;
+  color: #2D3748;
+  letter-spacing: -0.01em;
+}
+
+.manuscript-body p {
+  margin-bottom: 1.5rem;
+  text-indent: 2rem; /* Academic paragraph indent */
+}
+
+/* Zen Mode Overlay */
+.zen-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 50 !important;
+  background-color: #F8FAFC !important;
+  overflow-y: auto !important;
+  padding: 2rem 1rem !important;
+}

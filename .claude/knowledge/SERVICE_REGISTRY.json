@@ -1,0 +1,28 @@
+{
+  "services": [
+    {
+      "service_id": "aiGateway",
+      "module_id": "ai",
+      "name": "AI Gateway",
+      "path": "src/services/aiGateway.ts",
+      "responsibilities": ["provider_routing", "generation", "streaming", "fallback"],
+      "dependencies": []
+    },
+    {
+      "service_id": "aiService",
+      "module_id": "ai",
+      "name": "AI Orchestration Service",
+      "path": "src/services/aiService.ts",
+      "responsibilities": ["prompt_building", "context_injection", "json_parsing"],
+      "dependencies": ["aiGateway", "knowledgeVaultService"]
+    },
+    {
+      "service_id": "knowledgeVaultService",
+      "module_id": "knowledge",
+      "name": "Knowledge Vault Service",
+      "path": "src/services/knowledgeVaultService.ts",
+      "responsibilities": ["file_upload", "chunking", "retrieval", "context_building"],
+      "dependencies": ["aiGateway"]
+    }
+  ]
+}

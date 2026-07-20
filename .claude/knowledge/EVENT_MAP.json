@@ -1,0 +1,28 @@
+{
+  "events": [
+    {
+      "event_id": "evt_research_topic_submitted",
+      "name": "research.topic.submitted",
+      "description": "Research topic has been submitted",
+      "source": "research_os"
+    },
+    {
+      "event_id": "evt_evidence_approved",
+      "name": "evidence.approved",
+      "description": "Evidence has been approved for use",
+      "source": "research_os"
+    },
+    {
+      "event_id": "evt_knowledge_created",
+      "name": "knowledge.created",
+      "description": "New knowledge object created",
+      "source": "knowledge_os"
+    },
+    {
+      "event_id": "evt_manuscript_drafted",
+      "name": "manuscript.drafted",
+      "description": "Manuscript section drafted",
+      "source": "writing_os"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# Frontend Stack
+React 18, Vite, TailwindCSS v4, Lucide React icons. State management relies on localStorage and top-level React state passed via props. The UI employs glassmorphism and modern dashboard aesthetics.

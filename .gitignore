@@ -1,0 +1,15 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.vercel
+.vite/
+.opencode
+.kilo/
+.antigravity/
+Doctoral-Research-and-Journal-Publication-Association/
+Doctoral-Research-and-Journal-Publishation-Assistant/

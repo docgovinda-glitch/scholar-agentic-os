@@ -1,0 +1,48 @@
+{
+  "repository_id": "scholar-agentic-os",
+  "identity": {
+    "name": "Scholar Agentic Operating System",
+    "purpose": "AI-native operating system for academic research and journal publication",
+    "maturity": "v1.0.0 LTS",
+    "branch": "blackboxai/phase-6b-doc-intelligence-cycle1"
+  },
+  "architecture": {
+    "model": "operating-system",
+    "operating_systems": [
+      {"os_id": "ai_os", "name": "AI Operating System", "status": "production"},
+      {"os_id": "research_os", "name": "Research Operating System", "status": "production"},
+      {"os_id": "knowledge_os", "name": "Knowledge Operating System", "status": "implemented"},
+      {"os_id": "writing_os", "name": "Writing Operating System", "status": "implemented"},
+      {"os_id": "publication_os", "name": "Publication Operating System", "status": "implemented"},
+      {"os_id": "workspace_os", "name": "Workspace Operating System", "status": "implemented"},
+      {"os_id": "collaboration_os", "name": "Collaboration Operating System", "status": "implemented"}
+    ],
+    "pattern": "kernel-abstraction"
+  },
+  "workflow": {
+    "build_command": "npm run build",
+    "dev_command": "npm run dev",
+    "test_command": "npm test",
+    "start_command": "npm start"
+  },
+  "priorities": [
+    {"priority_id": "pri_001", "focus": "Architecture Stabilization", "epic": "E01"},
+    {"priority_id": "pri_002", "focus": "Document Intelligence Cycle 1", "task": "T006-cycle1"},
+    {"priority_id": "pri_003", "focus": "Security Foundation", "epic": "E02"}
+  ],
+  "constraints": [
+    "preserve_architecture",
+    "extend_not_replace",
+    "backward_compatible",
+    "document_changes",
+    "test_required"
+  ],
+  "reading_order": [
+    ".claude/CLAUDE.md",
+    ".claude/PROJECT_MEMORY.md",
+    ".claude/ARCHITECTURE_RULES.md",
+    ".claude/DEVELOPMENT_GUIDELINES.md",
+    ".claude/HANDOVER.md",
+    ".claude/ROADMAP.md"
+  ]
+}
