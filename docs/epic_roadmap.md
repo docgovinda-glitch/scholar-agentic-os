@@ -1,5 +1,7 @@
 # Implementation Epic Roadmap
 
+**Status update**: T002, T003, T004, T005, and T006 below are now implemented and verified in code (event dispatch in `src/App.tsx`, `encryptDataAsync`/`hashPassword`/`verifyPassword` in `src/utils/crypto.ts`, CSRF analysis documented as not applicable in `docs/authentication_security_architecture.md`, and rate limiting in `server/middleware/authRateLimiter.ts` / `server/src/middleware/rateLimit.ts` with `server/src/__tests__/t006.rateLimit.test.ts`). T001 (dual CDM model resolution) has not been verified as resolved — no `cdmToDocument`/`documentToCdm` adapter functions were found in `src/`. The per-task "Status: READY" markers below are the original plan and are left as historical record; treat E01/E02 as substantially complete rather than "Ready to Begin."
+
 ---
 
 ## Epic E01 — Architecture Stabilization

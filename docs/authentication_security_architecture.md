@@ -97,7 +97,7 @@ Logout
 
 ## 4. Encryption & Secret Management
 
-### 4.1 Server-Side Encryption (`server.ts`, lines 41-71)
+### 4.1 Server-Side Encryption (`server.ts` has an inline `encryptServerKey`/`decryptServerKey` pair near line 78; an equivalent, separate implementation also lives in `server/utils/apiKeyCrypto.ts` — this duplication has not been consolidated)
 
 **Algorithm:** AES-256-CBC
 
@@ -265,8 +265,10 @@ function resolveApiKey(provider: string, apiKey: string, username?: string): str
 - None (CSRF not applicable, password storage resolved)
 
 ### High
-1. **No Rate Limiting**: Brute force possible on login
-2. **API Keys in Request Body**: Credentials exposed in transit
+1. **API Keys in Request Body**: Credentials exposed in transit
+
+### Resolved
+1. **Rate Limiting** (T006): `server/middleware/authRateLimiter.ts` and `server/src/middleware/rateLimit.ts` now rate-limit auth and generation endpoints (see `server/src/__tests__/t006.rateLimit.test.ts`).
 
 ### Medium
 1. **No Input Sanitization**: Usernames with special chars could cause issues

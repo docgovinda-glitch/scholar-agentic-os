@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The backend is a monolithic Express server (`server.ts`) with 12 registered endpoints serving AI generation, file parsing, external link parsing, DOI lookup, authentication, and registration workflows. The server data layer provides both legacy JSON storage and PostgreSQL migration infrastructure.
+The backend is a monolithic Express server (`server.ts`, ~27 registered routes, plus `server/routes/ai.ts`, `auth.ts`, and `parser.ts`) serving AI generation, file parsing, external link parsing, DOI lookup, authentication, and registration workflows. The server data layer provides both legacy JSON storage (`server/data/legacyUsersJson.ts`) and a working PostgreSQL layer (`server/data/db.ts`, `database_schema.sql`) — see the endpoint table below for the full inventory as last verified.
 
 ---
 
