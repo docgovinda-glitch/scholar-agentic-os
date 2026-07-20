@@ -29,16 +29,16 @@ Machine-readable semantic representation of the repository for AI assistants.
 3. `ARCHITECTURE_MAP.json` - System architecture
 4. `SERVICE_REGISTRY.json` - Service relationships
 
-## Known Gaps (as of Architecture Synchronization pass — see `REPOSITORY_TRUTH_REPORT.md`)
+## Known Gaps
 
-The JSON indexes in this directory were **not** regenerated as part of this pass and are known to be stale/incomplete:
+The JSON indexes in this directory are stale and the scripts that would regenerate them do not exist:
 
-- `knowledge.schema.json` referenced above does not exist on disk yet.
-- The indexes (`MODULE_INDEX.json`, `ARCHITECTURE_MAP.json`, `SERVICE_REGISTRY.json`, etc.) predate discovery of `src/orchestrator/`, `src/agents/`, `src/document_intelligence/`, `src/citation_compliance/`, `src/knowledge_vault/`, `src/auth/`, `src/core/manuscript/`, `src/core/project/`, and the entire `server/` backend — none of these are represented.
-- `npm run generate:knowledge` / `validate:knowledge` / `check:knowledge` currently **fail**: `package.json` references `.claude/scripts/generate-knowledge.js`, `.claude/scripts/validate-knowledge.js`, and `.claude/scripts/check-drift.js`, none of which exist.
+- `knowledge.schema.json` referenced above does not exist on disk.
+- The indexes (`MODULE_INDEX.json`, `ARCHITECTURE_MAP.json`, `SERVICE_REGISTRY.json`, etc.) predate `src/orchestrator/`, `src/agents/`, `src/document_intelligence/`, `src/citation_compliance/`, `src/knowledge_vault/`, `src/auth/`, `src/core/manuscript/`, `src/core/project/`, and the entire `server/` backend — none of these are represented.
+- `npm run generate:knowledge` / `validate:knowledge` / `check:knowledge` currently **fail**: `package.json` references `.claude/scripts/generate-knowledge.js`, `.claude/scripts/validate-knowledge.js`, and `.claude/scripts/check-drift.js`, none of which exist in `.claude/scripts/` (only an empty `lib/` subdirectory is present).
 
-Regenerating these JSON indexes is out of scope for documentation-only synchronization and should be a separate, explicitly-approved task once the human-readable docs (this README, `docs/architecture/`, `.claude/*.md`) are verified accurate — see `REPOSITORY_TRUTH_REPORT.md` and `ARCHITECTURE_SYNCHRONIZATION_REPORT.md`.
+Regenerating these JSON indexes is a separate, larger task — treat the human-readable docs (`docs/architecture/`, `.claude/*.md`, this README) as the source of truth until then, not these JSON files.
 
 ## Maintenance
 
-Run `npm run generate:knowledge` to regenerate after changes (currently non-functional — see Known Gaps above).
+Currently non-functional — see Known Gaps above. Restoring `npm run generate:knowledge` requires writing `.claude/scripts/generate-knowledge.js` (and its `validate-`/`check-drift` counterparts) from scratch.

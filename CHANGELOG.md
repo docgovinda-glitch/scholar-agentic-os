@@ -45,9 +45,12 @@
 - Event-driven ready
 
 ### Testing
-- 315 automated tests passing
+- 330 automated tests passing (18 test files)
 - Unit tests for all kernels
 - Integration tests for OS modules
+
+### Note
+- Only the AI kernel (`src/ai`) is currently consumed outside its own module (by `src/research`); the other OS kernels, the orchestrator, and the agents are implemented and tested but not yet wired into `server.ts` or the React app. See `.claude/HANDOVER.md` §0.
 
 ### Documentation
 - 5 Architecture Documents

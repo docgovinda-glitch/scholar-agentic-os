@@ -61,4 +61,4 @@ src/
 
 ## Testing
 
-Run `npm test` - all 315 tests must pass.
+Run `npm test` - all 330 tests must pass.

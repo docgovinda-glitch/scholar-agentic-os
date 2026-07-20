@@ -1,6 +1,6 @@
-# Production Deployment Guide: Doctoral Research & Journal Publication Assistant
+# Production Deployment Guide — Scholar Agentic Operating System
 
-This document outlines the environmental configurations and steps required to host the Doctoral Assistant in production environments (e.g., Render for Backend + DB, Netlify/Vercel for Frontend).
+This document outlines the environmental configurations and steps required to host Scholar in production environments (e.g., Render for Backend + DB, Netlify for Frontend). See `render.yaml` and `netlify.toml` at the repo root for the corresponding provider config.
 
 ---
 
@@ -23,7 +23,7 @@ To make the application functional, the following environment variables must be 
 
 ### 1. Database Initialization
 1. Deploy a PostgreSQL instance (e.g., via Render Database, Supabase, or AWS RDS).
-2. Execute the DDL schema commands from [database_schema.sql](file:///Users/pobpkf/antigravity/Doctoral-Research-and-Journal-Publication-Assistant/database_schema.sql) to initialize the `admin_approvals` and `model_preferences` tables.
+2. Execute the DDL schema commands from [`database_schema.sql`](database_schema.sql) to initialize the `admin_approvals` and `model_preferences` tables.
 3. Retrieve the Postgres connection string and copy it to the `DATABASE_URL` env variable.
 
 ### 2. Backend Service (Render Deployment)
@@ -36,7 +36,7 @@ To make the application functional, the following environment variables must be 
 
 ### 3. Frontend Service (Netlify Deployment)
 1. Link your repository to Netlify.
-2. The build settings should automatically read from [netlify.toml](file:///Users/pobpkf/antigravity/Doctoral-Research-and-Journal-Publication-Assistant/netlify.toml):
+2. The build settings should automatically read from [`netlify.toml`](netlify.toml):
    - **Build Command**: `npm run build`
    - **Publish Directory**: `dist`
 3. Configure Single Page Application redirection rules (configured automatically in `netlify.toml`).

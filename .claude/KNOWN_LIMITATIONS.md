@@ -34,7 +34,7 @@ This document catalogs intentional limitations and constraints in the current Sc
 **Impact**: Repository history contains experimental branches
 **Workaround**: Current branch is stable
 **Planned Resolution**: Ongoing
-**Related Tasks**: See TODO.md
+**Related Tasks**: See `ROADMAP.md` and `.claude/HANDOVER.md` §10
 
 ### Legacy User Management Code
 

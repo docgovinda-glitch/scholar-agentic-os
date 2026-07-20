@@ -71,7 +71,7 @@ interface Kernel {
 
 ## Module Boundaries
 
-> **Note**: Unlike the AI/Knowledge/Writing/Publication/Workspace/Collaboration layers, the Research layer is implemented as `ResearchIntelligenceEngine` + `ResearchDiscoveryEngine` — it does **not** currently have a `ResearchKernel` class. This is a known documentation/implementation inconsistency (see `REPOSITORY_TRUTH_REPORT.md`, finding #5); the "Research Kernel" name below refers to this engine pairing, not a literal `Kernel`-implementing class.
+> **Note**: Unlike the AI/Knowledge/Writing/Publication/Workspace/Collaboration layers, the Research layer is implemented as `ResearchIntelligenceEngine` + `ResearchDiscoveryEngine` — it does **not** currently have a `ResearchKernel` class. This is a known documentation/implementation inconsistency; the "Research Kernel" name below refers to this engine pairing, not a literal `Kernel`-implementing class.
 
 ### AI Kernel Dependencies
 - Cannot import from Research

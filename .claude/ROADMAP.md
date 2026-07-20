@@ -26,7 +26,6 @@ Scholar will transform from a tool into an ecosystem:
 ### Production-Ready Local Repository
 
 - ✅ Repository builds successfully
-- ✅ Branch: `blackboxai/phase-6b-doc-intelligence-cycle1`
 - ✅ Local development fully operational
 
 ### Completed Operating Systems
@@ -63,12 +62,12 @@ Scholar will transform from a tool into an ecosystem:
 
 ### Research Lifecycle Engine
 
-- ✅ 10-phase workflow defined
+- ✅ 10-phase workflow defined in `src/lifecycle/ResearchLifecycleEngine.ts` — not currently wired into the running app, which uses a separate lettered phase model (see `.claude/HANDOVER.md` §3)
 - ✅ State persistence implemented
 
 ### Testing Status
 
-- ✅ 315 automated tests passing
+- ✅ 330 automated tests passing (18 test files)
 - ✅ Unit tests for kernels
 - ✅ Integration tests for workflows
 
@@ -111,7 +110,7 @@ Scholar will transform from a tool into an ecosystem:
 | PWA Implementation | ✅ | Offline-first with service worker |
 | Research Lifecycle Engine | ✅ | 10-phase structured workflow |
 | Production Build | ✅ | Vite + TypeScript + Tailwind |
-| Testing Milestone | ✅ | 315 tests passing |
+| Testing Milestone | ✅ | 330 tests passing |
 
 ---
 
