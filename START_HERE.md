@@ -38,17 +38,16 @@ docs/adr/                - Architecture Decisions (read before changing architec
 .claude/                 - AI handover documentation
 ```
 
-See `REPOSITORY_TRUTH_REPORT.md` and `ARCHITECTURE_SYNCHRONIZATION_REPORT.md` at the repo root for the verified structural audit this listing is based on.
+**Important caveat**: only `src/ai` is consumed outside its own module (by `src/research`). `src/knowledge`, `src/writing`, `src/publication`, `src/workspace`, `src/collaboration`, `src/orchestrator`, and `src/agents` are fully implemented and tested but are not imported by `server.ts` or the React app — see `.claude/HANDOVER.md` §0 for details before assuming any of these are reachable from the running product.
 
 ## For AI Assistants (Claude Code)
 
 ### Required Reading Order
 1. `.claude/CLAUDE.md` — Operating procedures
-2. `.claude/PROJECT_MEMORY.md` — Historical context
-3. `.claude/ARCHITECTURE_RULES.md` — Non-negotiable rules
-4. `.claude/DEVELOPMENT_GUIDELINES.md` — Coding standards
-5. `.claude/HANDOVER.md` — Current state snapshot
-6. `.claude/ROADMAP.md` — Future priorities
+2. `.claude/ARCHITECTURE_RULES.md` — Non-negotiable rules
+3. `.claude/DEVELOPMENT_GUIDELINES.md` — Coding standards
+4. `.claude/HANDOVER.md` — Current state snapshot
+5. `.claude/ROADMAP.md` — Future priorities
 
 ### Before Making Changes
 - Understand existing patterns before introducing new ones
@@ -58,10 +57,10 @@ See `REPOSITORY_TRUTH_REPORT.md` and `ARCHITECTURE_SYNCHRONIZATION_REPORT.md` at
 
 ## Current Status
 
-- **Branch**: `blackboxai/phase-6b-doc-intelligence-cycle1`
+- **Branch**: `main`
 - **Phase**: 6 (Document Intelligence) in progress
-- **Build**: ✅ Passing
-- **Tests**: run via **Vitest** (`npm test`), not Jest — 309 `*.test.ts` files present on disk; exact pass count unverified in this pass, run `npm test` to confirm
+- **Build**: ✅ Passing (`npx tsc --noEmit`, `npm run build`)
+- **Tests**: run via **Vitest** (`npm test`) — 18 `*.test.ts` files, 330 tests, all passing as of this writing
 
 ## Next Priorities
 

@@ -27,14 +27,17 @@ Scholar is intended to become an AI-native operating system for research and sch
 
 The system acts as a scholarly research collaborator, proposing structural improvements while maintaining strict adherence to academic standards and Vedic Samhitas alignment where applicable.
 
+**Note**: this 10-phase model is defined in `src/lifecycle/ResearchLifecycleEngine.ts`, but that module isn't imported anywhere else in the codebase. The live UI runs a separate, lettered phase model (`"A" | "B" | ... | "I"`, with `G1`/`G2` sub-phases) defined in `src/types.ts` and referenced throughout `src/components/` and `src/services/aiService.ts`. See `.claude/HANDOVER.md` §3 ("Research Lifecycle") for the mapping before assuming a "phase" reference means the 10-phase list above.
+
 ---
 
 ## 3. Current Project Status
 
 ### Operating Systems
-- ✅ Phase 1-5: Implemented and functional
+- ✅ Phase 1-5: Implemented
 - ✅ Phase 6: Document Intelligence in progress
 - ⏳ Phase 7-10: Planned
+- ⚠️ Only `src/ai` (AIKernel) is consumed outside its own module (by `src/research`). `KnowledgeKernel`, `WritingKernel`, `PublicationKernel`, `WorkspaceKernel`, and `CollaborationKernel`, plus `src/orchestrator` and `src/agents`, are implemented but not imported by `server.ts` or the React app (`src/App.tsx`, `src/components/`) — treat them as standalone library code, not as active parts of the running product, until something wires them in.
 
 ### Architecture Status
 - ✅ Multi-provider AI integration (Gemini, Ollama, OpenAI-compatible endpoints)
@@ -55,17 +58,16 @@ The system acts as a scholarly research collaborator, proposing structural impro
 
 ### Repository
 - ✅ Local Git repository active
-- ✅ Branch: `blackboxai/phase-6b-doc-intelligence-cycle1`
 - ✅ Architecture documentation in `docs/architecture/`
 - ✅ ADRs documented in `docs/adr/`
 
 ### Build Status
-- ✅ Vite-based build system configured
+- ✅ Vite-based build system configured (`npx tsc --noEmit` and `npm run build` both pass)
 - ✅ TypeScript strict mode enabled
 - ✅ Tailwind CSS v4 integration
 
 ### Test Status
-- ✅ Test runner: **Vitest** (`npm test` / `npm run test:coverage`), not Jest — 309 `*.test.ts` files on disk; run `npm test` to confirm current pass count
+- ✅ Test runner: **Vitest** (`npm test` / `npm run test:coverage`), not Jest — 18 `*.test.ts` files on disk, 330 tests, all passing as of this writing (run `npm test` to reconfirm)
 
 ---
 
@@ -177,7 +179,6 @@ Before undertaking significant work, Claude should familiarize itself with:
 - `README.md` — Project overview and getting started guide
 - `docs/architecture/` — Architecture documentation
 - `docs/adr/` — Architecture decision records
-- `.claude/PROJECT_MEMORY.md` — Long-term project context
 - `.claude/HANDOVER.md` — Current state and priorities
 - `.claude/ARCHITECTURE_RULES.md` — Structural guidelines
 - `.claude/DEVELOPMENT_GUIDELINES.md` — Coding standards and workflows
