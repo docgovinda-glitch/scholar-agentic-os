@@ -1,5 +1,15 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
+## Next Session — READ THIS FIRST
+
+Three design proposals were scoped (not implemented) on 2026-07-20: a "sci-fi movie" UI aesthetic direction, a native-agent-skills audit, and an agent-roster gap analysis. Full detail, including specific file names, line counts, the per-agent audit table, and a `SkillResult` interface sketch, is in **`docs/planning/2026-07-20-session-notes.md`** — read that file before starting any of this work, rather than re-deriving the findings from scratch.
+
+- **UI redesign**: not started. Component order decided: `AppHeader`/`AppFooter` → `CommandPalette` → `ActiveAgentsPanel` → `AIControlCenter`/`AISetupWizard` → `ResearchIntelligenceDashboard`.
+- **Native skills**: not started. Key finding: `src/skills/` already exists fully-built and unconnected; the fix is wiring it up plus one new field (`escalateToAI`) on `SkillResult`, not a new framework.
+- **Agent roster**: blocked on the ARCH-3 decision (whether `src/orchestrator` and the kernel layer get wired in or archived). Do not start.
+
+---
+
 ## 0. Repository Migration Note (2026-07-20) — READ FIRST
 
 This is a **fresh repository**, copied from an older working directory
@@ -18,10 +28,14 @@ a local AI model binary, stray duplicate scaffold folders) — none of that
 represents unfinished engineering work, just prior audit trail. If you need
 that history, it still exists at the old path above.
 
-**Verified state as of this commit** (2 commits: "Initial commit: fresh start",
-then a fix commit): 0 TypeScript errors, 330/330 tests passing, production
-build succeeds, server boots and serves real requests (health check, all 8
-scholarly agents registered and reachable via `/api/agents`).
+**Verified state as of this commit**: 0 TypeScript errors, 18 test files /
+330 tests passing (`npx vitest run`), production build succeeds
+(`npm run build`), server boots and serves real requests (health check).
+Note: `/api/agents` does not exist — `server/routes/` only registers `ai.ts`,
+`auth.ts`, and `parser.ts`. The `src/agents/` scholarly agents and
+`src/orchestrator/` workflow engine are implemented but are not imported by
+`server.ts` or any route, so they are not reachable from the running app yet
+(see the kernel-wiring note below).
 
 **Fixed during migration** (both bugs are resolved, not open items):
 - `src/ai/` (the AI Kernel) was accidentally omitted by an overly-broad
@@ -37,11 +51,24 @@ scholarly agents registered and reachable via `/api/agents`).
 Knowledge Graph (`src/knowledge/graph/KnowledgeGraph.ts`) is fully
 implemented but has no adapter connecting it to any live UI or service —
 genuinely disconnected, not a quick fix; would need a product decision on
-what it should actually show before wiring it up. Beyond that, continue
-the established pattern from this project's engineering history: prefer
-deterministic Scholar Core OS processing over AI where structured data
-already exists, connect implemented-but-unreachable modules, and validate
-every change with `npx tsc --noEmit`, `npx vitest run`, and `npm run build`.
+what it should actually show before wiring it up. The same is true, more
+broadly, of most of the "Operating System" kernel layer: grepping the
+codebase for each kernel class shows `KnowledgeKernel`, `WritingKernel`,
+`PublicationKernel`, `WorkspaceKernel`, and `CollaborationKernel` are only
+referenced inside their own module (definition + barrel `index.ts`) — no
+import from `server.ts`, `server/routes/`, `src/App.tsx`, or
+`src/components/`. `AIKernel` is the exception: `src/research/` consumes it.
+`src/orchestrator/` (MultiAgentOrchestrator, WorkflowEngine) and
+`src/agents/` (the eight scholarly agents) are likewise fully implemented
+and tested but never imported by the running server or UI. None of this is
+broken — it's substantial, working library code — but earlier drafts of
+this document described it as production-integrated, which overstates its
+current reach. Treat "wire an OS kernel / agent / orchestrator into the
+live app" as real, unstarted product work, not a loose end to tidy up.
+Beyond that, continue the established pattern from this project's
+engineering history: prefer deterministic Scholar Core OS processing over
+AI where structured data already exists, and validate every change with
+`npx tsc --noEmit`, `npx vitest run`, and `npm run build`.
 
 ---
 
@@ -51,7 +78,7 @@ every change with `npx tsc --noEmit`, `npx vitest run`, and `npm run build`.
 - **Current Maturity**: v1.0.0 LTS Release
 - **Primary Purpose**: AI-native operating system for academic research and journal publication
 - **Development Stage**: Phase 6 (Document Intelligence) in progress; Phases 7-10 planned
-- **Production Readiness**: Build system stable, 315 tests passing, PWA implemented, authentication ready
+- **Production Readiness**: Build system stable, 330 tests passing, PWA implemented, authentication ready
 
 ---
 
@@ -90,8 +117,6 @@ docs/
 .claude/        # AI handover documentation (this folder)
 ```
 
-See `REPOSITORY_TRUTH_REPORT.md` (repo root) for the verified structural audit backing this listing.
-
 ### Documentation Structure
 
 - `README.md` — Project overview and quick start
@@ -121,15 +146,17 @@ Tests located in `__tests__/` directories adjacent to source code. Integration t
 
 ### Operating Systems
 
-| OS | Status | Notes |
-|----|--------|-------|
-| AI OS | ✅ Production-ready | Provider abstraction, fallback chains, caching |
-| Knowledge OS | ✅ Implemented | KnowledgeKernel, KnowledgeGraph, SemanticMemory |
-| Research OS | ✅ Production-ready | ResearchIntelligenceEngine, evidence workspace |
-| Writing OS | ✅ Implemented | Manuscript drafting, citation generation |
-| Publication OS | ✅ Implemented | Journal management, recommendations |
-| Workspace OS | ✅ Implemented | Multi-project support, lifecycle |
-| Collaboration OS | ✅ Implemented | Teams, roles, permissions |
+| OS | Status | Wired into running app? | Notes |
+|----|--------|--------------------------|-------|
+| AI OS | ✅ Implemented | Yes — consumed by `src/research/` | Provider abstraction, fallback chains, caching |
+| Knowledge OS | ✅ Implemented | No | KnowledgeKernel, KnowledgeGraph, SemanticMemory — only referenced within `src/knowledge/` |
+| Research OS | ✅ Implemented | Partially — depends on AIKernel, but not called by `server.ts`/UI | ResearchIntelligenceEngine, evidence workspace |
+| Writing OS | ✅ Implemented | No | Manuscript drafting, citation generation — only referenced within `src/writing/` |
+| Publication OS | ✅ Implemented | No | Journal management, recommendations — only referenced within `src/publication/` |
+| Workspace OS | ✅ Implemented | No | Multi-project support, lifecycle — only referenced within `src/workspace/` |
+| Collaboration OS | ✅ Implemented | No | Teams, roles, permissions — only referenced within `src/collaboration/` |
+
+The live product (`server.ts` + `src/App.tsx`/`src/components/`) actually runs on `src/services/aiGateway.ts` + `src/services/aiService.ts`, `src/auth/` (localStorage-backed), and `src/core/project` (`ProjectBuilder`) — a simpler, more conventional stack than the kernel model above describes. See the kernel-wiring note in section 0.
 
 ### Architecture
 
@@ -155,13 +182,14 @@ Tests located in `__tests__/` directories adjacent to source code. Integration t
 
 ### Research Lifecycle
 
-- ✅ 10-phase workflow defined
-- ✅ State persistence implemented
-- ✅ Evidence-controlled reasoning
+- ✅ 10-phase workflow defined in `src/lifecycle/ResearchLifecycleEngine.ts` — **but nothing imports this file outside itself**; it is not the workflow the running app actually uses.
+- ⚠️ The live UI runs a *different*, lettered phase model: `src/types.ts` defines `currentPhase: "A" | "B" | "C" | "D" | "E" | "F" | "G" | "G1" | "G2" | "H" | "I"`, and `src/components/*` + `src/services/aiService.ts` hardcode phase labels against those letters (B = Dissertation Grounding, C = Data/Source Discovery, D = Journal Discovery, E = Compliance Setup, F = Manuscript Co-Drafting, G = Quality Control, H/I = Submission Packaging & Tracking). When a doc or a user says "Phase 6" or "Phase F", confirm which of the two models they mean before acting — they are not the same numbering.
+- ✅ State persistence implemented (client-side, via `authContext.tsx` + localStorage, and server-side via `server/data/`)
+- ✅ Evidence-controlled reasoning (in the disconnected `src/knowledge/reasoning` module)
 
 ### Testing
 
-- ✅ 315 automated tests passing
+- ✅ 330 automated tests passing (18 test files)
 - ✅ Unit tests for all kernels
 - ✅ Integration tests for OS modules
 
@@ -306,7 +334,7 @@ Projects contain:
 ### Testing Framework
 - **Vitest** (`npm test` runs `vitest run`; `test:coverage` runs `vitest run --coverage`)
 - Jest appears in `devDependencies` but is not the active runner — treat as legacy/unused unless confirmed otherwise
-- Unit and integration tests, 309 `*.test.ts` files on disk (exact pass count unverified — run `npm test`)
+- Unit and integration tests, 18 `*.test.ts` files on disk, 330 tests passing
 
 ### Development Tools
 - ESLint (recommended for consistency)
@@ -318,8 +346,7 @@ Projects contain:
 
 ### Current Git Strategy
 - Local repository active
-- Branch: `blackboxai/phase-6b-doc-intelligence-cycle1`
-- Git cleanup in backlog (see TODO.md)
+- Branch: `main`
 
 ---
 
@@ -342,7 +369,7 @@ npm test
 
 ### Expected Results
 - Build completes without errors
-- All tests passing (315 tests)
+- All tests passing (330 tests)
 - No TypeScript errors in strict mode
 
 ### Current Verification Status
@@ -366,7 +393,7 @@ npm test
 - AI handover: Complete (`.claude/` folder)
 
 ### Testing Maturity
-- 315 tests passing
+- 330 tests passing
 - Unit test coverage for kernels
 - Integration test coverage
 
@@ -428,7 +455,7 @@ Production-ready foundation with active feature development.
 
 ### Priority 1: Document Intelligence Cycle 1 (In Progress)
 **Why**: Enables evidence extraction from user-uploaded documents, essential for completing the evidence pipeline.
-**Status**: Active development on branch `blackboxai/phase-6b-doc-intelligence-cycle1`
+**Status**: Active development (Document Intelligence, `src/document_intelligence/`)
 
 ### Priority 2: Architecture Stabilization (E01)
 **Why**: Unblocks security foundation and refactoring tasks.
