@@ -976,10 +976,6 @@ interface SettingsTabContentProps {
 
 function SettingsTabContent({ project, updateProject, hideIdentitySection = false }: SettingsTabContentProps) {
   const [googleId, setGoogleId] = useState(() => localStorage.getItem("phd_google_client_id") || import.meta.env.VITE_GOOGLE_CLIENT_ID || "");
-  const [facebookId, setFacebookId] = useState(() => localStorage.getItem("phd_facebook_app_id") || import.meta.env.VITE_FB_APP_ID || "");
-  const [twilioSid, setTwilioSid] = useState(() => localStorage.getItem("phd_twilio_sid") || import.meta.env.VITE_TWILIO_SID || "");
-  const [twilioToken, setTwilioToken] = useState(() => localStorage.getItem("phd_twilio_token") || import.meta.env.VITE_TWILIO_TOKEN || "");
-  const [twilioFrom, setTwilioFrom] = useState(() => localStorage.getItem("phd_twilio_from") || import.meta.env.VITE_TWILIO_FROM || "");
   const [saved, setSaved] = useState(false);
 
   const saveKey = (key: string, val: string) => {
@@ -988,11 +984,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
 
   const handleSaveAll = () => {
     saveKey("phd_google_client_id", googleId);
-    saveKey("phd_facebook_app_id", facebookId);
-    saveKey("phd_twilio_sid", twilioSid);
-    saveKey("phd_twilio_token", twilioToken);
-    saveKey("phd_twilio_from", twilioFrom);
-    
+
     updateProject({
       aiSettings: {
         ...project.aiSettings
@@ -1389,7 +1381,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
             Identity Providers & OTP Gateway Configuration
           </h3>
           <p className="text-[11px] text-[#6B665E] leading-normal font-sans">
-            Provide your developer API keys to enable real Google & Facebook sign-ins, and send real OTP codes via Twilio's WhatsApp Business sandbox.
+            Provide your developer API key to enable real Google sign-in.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1417,83 +1409,6 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
                   Warning: Google Client ID must end with `.apps.googleusercontent.com`
                 </p>
               )}
-            </div>
-
-            {/* Facebook App ID */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
-                Facebook App ID
-              </label>
-              <input
-                type="text"
-                className={`w-full bg-white border rounded-lg px-3 py-2 text-xs text-[#1A365D] focus:outline-none font-mono ${
-                  facebookId && !/^\d+$/.test(facebookId.trim())
-                    ? "border-red-400 focus:border-red-500"
-                    : "border-[#E5E7EB] focus:border-[#C08A3E]"
-                }`}
-                placeholder="e.g. 1592XXXXXXXXXX"
-                value={facebookId}
-                onChange={(e) => {
-                  setFacebookId(e.target.value);
-                  saveKey("phd_facebook_app_id", e.target.value);
-                }}
-              />
-              {facebookId && !/^\d+$/.test(facebookId.trim()) && (
-                <p className="text-[9px] text-red-500 mt-1 font-sans">
-                  Warning: Facebook App ID must be numeric.
-                </p>
-              )}
-            </div>
-
-            {/* Twilio SID */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
-                Twilio Account SID
-              </label>
-              <input
-                type="text"
-                className="w-full bg-white border border-[#E5E7EB] rounded-lg px-3 py-2 text-xs text-[#1A365D] focus:outline-none focus:border-[#C08A3E] font-mono"
-                placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxx"
-                value={twilioSid}
-                onChange={(e) => {
-                  setTwilioSid(e.target.value);
-                  saveKey("phd_twilio_sid", e.target.value);
-                }}
-              />
-            </div>
-
-            {/* Twilio Token */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
-                Twilio Auth Token
-              </label>
-              <input
-                type="password"
-                className="w-full bg-white border border-[#E5E7EB] rounded-lg px-3 py-2 text-xs text-[#1A365D] focus:outline-none focus:border-[#C08A3E] font-mono"
-                placeholder="••••••••••••••••••••••••••••••••"
-                value={twilioToken}
-                onChange={(e) => {
-                  setTwilioToken(e.target.value);
-                  saveKey("phd_twilio_token", e.target.value);
-                }}
-              />
-            </div>
-
-            {/* Twilio WhatsApp Number */}
-            <div className="space-y-1 md:col-span-2">
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
-                Twilio WhatsApp From Number
-              </label>
-              <input
-                type="text"
-                className="w-full bg-white border border-[#E5E7EB] rounded-lg px-3 py-2 text-xs text-[#1A365D] focus:outline-none focus:border-[#C08A3E] font-mono"
-                placeholder="whatsapp:+14155238886 (Twilio Sandbox sender)"
-                value={twilioFrom}
-                onChange={(e) => {
-                  setTwilioFrom(e.target.value);
-                  saveKey("phd_twilio_from", e.target.value);
-                }}
-              />
             </div>
           </div>
         </div>

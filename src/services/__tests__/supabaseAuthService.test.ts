@@ -88,6 +88,33 @@ describe("signUp", () => {
     expect(result).toEqual({ success: false, error: "User already registered" });
     expect(mockFunctionsInvoke).not.toHaveBeenCalled();
   });
+
+  it("reports success with an honest caveat when the Edge Function's own body says emailSent:false", async () => {
+    // send-approval-email always returns HTTP 200 with {success:true, emailSent,
+    // error} in its own body, regardless of whether Resend actually sent
+    // anything — supabase.functions.invoke()'s `error` only reflects
+    // transport-level failures, so signUp() must also check the body itself.
+    mockAuth.signUp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    mockFunctionsInvoke.mockResolvedValue({
+      data: { success: true, emailSent: false, error: "RESEND_API_KEY not configured on this Supabase project" },
+      error: null,
+    });
+
+    const result = await signUp({
+      username: "jdoe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      phone: "",
+      affiliation: "State University",
+      authenticId: "None",
+      password: "hunter2-hunter2",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      error: "Registered, but the admin notification email couldn't be sent: RESEND_API_KEY not configured on this Supabase project",
+    });
+  });
 });
 
 describe("signIn", () => {
@@ -201,6 +228,18 @@ describe("requestPasswordReset", () => {
       body: { username: "jdoe", email: "jane@example.com", newPassword: "new-pass" },
     });
   });
+
+  it("reports success with an honest caveat when emailSent is false in the function's own body", async () => {
+    mockFunctionsInvoke.mockResolvedValue({
+      data: { success: true, emailSent: false, error: "Resend not configured." },
+      error: null,
+    });
+    const result = await requestPasswordReset({ username: "jdoe", email: "jane@example.com", newPassword: "new-pass" });
+    expect(result).toEqual({
+      success: true,
+      error: "Reset request staged, but the admin notification email couldn't be sent: Resend not configured.",
+    });
+  });
 });
 
 describe("requestProfileUpdate", () => {
@@ -209,5 +248,17 @@ describe("requestProfileUpdate", () => {
     const result = await requestProfileUpdate({ username: "jdoe", pendingPhone: "555-0100" });
     expect(result.success).toBe(true);
     expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("reports success with an honest caveat when emailSent is false in the function's own body", async () => {
+    mockFunctionsInvoke.mockResolvedValue({
+      data: { success: true, emailSent: false, verificationKey: "UP-123456", error: "Resend not configured." },
+      error: null,
+    });
+    const result = await requestProfileUpdate({ username: "jdoe", pendingPhone: "555-0100" });
+    expect(result).toEqual({
+      success: true,
+      error: "Update request created, but the admin notification email couldn't be sent: Resend not configured.",
+    });
   });
 });

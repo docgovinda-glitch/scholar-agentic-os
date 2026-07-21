@@ -66,7 +66,7 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
     return { success: false, error: "Sign-up did not return a user record." };
   }
 
-  const { error: emailError } = await supabase.functions.invoke("send-approval-email", {
+  const { data: emailData, error: emailError } = await supabase.functions.invoke("send-approval-email", {
     body: {
       userId: data.user.id,
       username: input.username,
@@ -83,6 +83,14 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
     // shouldn't block the user's signup, but it should be visible to them
     // (mirrors server.ts's requiresClientEmail fallback messaging).
     return { success: true, error: `Registered, but admin notification failed: ${emailError.message}` };
+  }
+
+  if (emailData && emailData.emailSent === false) {
+    // The Edge Function itself always returns HTTP 200 (so `emailError`
+    // above is never set for this case) even when Resend fails internally —
+    // check its own reported emailSent field too, or a real send failure
+    // here would be invisible to the caller.
+    return { success: true, error: `Registered, but the admin notification email couldn't be sent${emailData.error ? `: ${emailData.error}` : "."}` };
   }
 
   return { success: true };
@@ -243,9 +251,15 @@ export interface RequestPasswordResetInput {
  */
 export async function requestPasswordReset(input: RequestPasswordResetInput): Promise<ServiceResult> {
   const supabase = getSupabaseClient();
-  const { error } = await supabase.functions.invoke("request-password-reset", { body: input });
+  const { data, error } = await supabase.functions.invoke("request-password-reset", { body: input });
   if (error) {
     return { success: false, error: error.message };
+  }
+  if (data && data.emailSent === false) {
+    // The reset is genuinely staged in pending_password_resets regardless of
+    // whether the admin notification email sent — not a hard failure, but
+    // the caller should know the admin may not have been notified.
+    return { success: true, error: `Reset request staged, but the admin notification email couldn't be sent${data.error ? `: ${data.error}` : "."}` };
   }
   return { success: true };
 }
@@ -263,9 +277,12 @@ export interface RequestProfileUpdateInput {
 /** Stateless, matching server.ts's current behavior exactly — this Edge Function only sends the admin/user notification emails, same as /api/request-profile-update did; it does not persist or apply the change itself. */
 export async function requestProfileUpdate(input: RequestProfileUpdateInput): Promise<ServiceResult> {
   const supabase = getSupabaseClient();
-  const { error } = await supabase.functions.invoke("request-profile-update", { body: input });
+  const { data, error } = await supabase.functions.invoke("request-profile-update", { body: input });
   if (error) {
     return { success: false, error: error.message };
+  }
+  if (data && data.emailSent === false) {
+    return { success: true, error: `Update request created, but the admin notification email couldn't be sent${data.error ? `: ${data.error}` : "."}` };
   }
   return { success: true };
 }

@@ -24,9 +24,18 @@
 //     supabaseAuthService.ts, not introduced by this component's rewire;
 //     out of scope for this pass (password-reset logic is untouched).
 //
-// Deliberately NOT covering: social login (Google/Facebook — never called
-// server.ts and doesn't call supabaseAuthService either, out of scope), the
-// API-credentials settings modal, password strength visuals.
+// Also covers, as a CURRENT-behavior baseline ahead of a follow-up pass
+// (dead-code removal + two small fixes, see .claude/HANDOVER.md):
+//   - Google OAuth login (kept and untouched by that pass).
+//   - The countryCode dropdown bug: its value is currently ignored when
+//     building the phone number passed to signUp() (fix pending).
+//   - handleForgotPasswordSubmit currently does NOT surface result.error
+//     when result.success is true — the same silent-email-failure gap as
+//     signUp(), but not yet fixed here (fix pending).
+//
+// Deliberately NOT covering: Facebook login (dead/unreachable code, being
+// removed in the same follow-up pass), the API-credentials settings modal,
+// password strength visuals.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
@@ -174,6 +183,24 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
       fireEvent.click(screen.getByText("Verify & Request Account"));
 
       expect(await screen.findByText("Email address already registered.")).toBeInTheDocument();
+    });
+
+    it("prepends the selected country code when building the phone number", async () => {
+      signUpMock.mockResolvedValue({ success: true });
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      await fillSignupForm();
+      // Change the country code away from its "+977" default before submitting.
+      const countrySelect = document.querySelector("select") as HTMLSelectElement;
+      fireEvent.change(countrySelect, { target: { value: "+91" } });
+      fireEvent.click(screen.getByText("Submit Account Request"));
+
+      const bypassEl = await screen.findByText(/Sandbox Bypass Code/);
+      const code = bypassEl.textContent!.match(/(\d{6})/)![1];
+      fireEvent.change(screen.getByPlaceholderText("Enter email code..."), { target: { value: code } });
+      fireEvent.click(screen.getByText("Verify & Request Account"));
+
+      await waitFor(() => expect(signUpMock).toHaveBeenCalled());
+      expect(signUpMock).toHaveBeenCalledWith(expect.objectContaining({ phone: "919800000000" }));
     });
   });
 
@@ -328,6 +355,65 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
       fireEvent.click(screen.getByText("Submit Reset"));
 
       expect(await screen.findByText(/Failed to submit reset request/)).toBeInTheDocument();
+    });
+
+    it("surfaces result.error alongside the success message, when set (honest email-failure caveat)", async () => {
+      seedExistingProfile("resetuser3");
+      requestPasswordResetMock.mockResolvedValue({
+        success: true,
+        error: "Reset request staged, but the admin notification email couldn't be sent.",
+      });
+
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      fireEvent.click(screen.getByText("Forgot Password?"));
+      fireEvent.change(screen.getByPlaceholderText("Enter username..."), { target: { value: "resetuser3" } });
+      fireEvent.change(screen.getByPlaceholderText("Enter registered email..."), { target: { value: "reset3@example.com" } });
+      fireEvent.change(screen.getByPlaceholderText("Enter new password..."), { target: { value: "NewPassw0rd!" } });
+      fireEvent.click(screen.getByText("Submit Reset"));
+
+      expect(await screen.findByText(/Password reset request submitted successfully/)).toBeInTheDocument();
+      expect(await screen.findByText(/admin notification email couldn't be sent/)).toBeInTheDocument();
+    });
+  });
+
+  describe("Google OAuth login (kept, untouched by the follow-up dead-code-removal pass)", () => {
+    afterEach(() => {
+      delete (window as any).google;
+    });
+
+    it("shows a clear error when no Google Client ID is configured", async () => {
+      seedExistingProfile("someoneelse");
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      fireEvent.click(screen.getByTitle("Sign in with Google"));
+      expect(
+        await screen.findByText(/Google Client ID is not configured/)
+      ).toBeInTheDocument();
+    });
+
+    it("completes a full Google sign-in and calls onProfileActive", async () => {
+      seedExistingProfile("someoneelse");
+      localStorage.setItem("phd_google_client_id", "test-client-id.apps.googleusercontent.com");
+      (globalThis as any).fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ name: "Jane Googler", email: "jane.g@example.com" }),
+      });
+
+      let capturedCallback: ((tokenResponse: any) => void) | null = null;
+      (window as any).google = {
+        accounts: {
+          oauth2: {
+            initTokenClient: (opts: any) => {
+              capturedCallback = opts.callback;
+              return { requestAccessToken: () => capturedCallback!({ access_token: "fake-token" }) };
+            },
+          },
+        },
+      };
+
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      fireEvent.click(screen.getByTitle("Sign in with Google"));
+
+      await waitFor(() => expect(onProfileActive).toHaveBeenCalledWith("Jane Googler", expect.any(Object)));
     });
   });
 });

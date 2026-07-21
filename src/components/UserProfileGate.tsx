@@ -37,18 +37,6 @@ const DEFAULT_STATE = (username: string): PaperProject => ({
   aiSettings: DEFAULT_SETTINGS
 });
 
-// Helper to normalize and compare phone numbers for verification
-function cleanPhoneNumber(num: string): string {
-  return num.replace(/[+\s()-]/g, "").replace(/^00/, "").replace(/^0/, "");
-}
-
-function comparePhoneNumbers(num1: string, num2: string): boolean {
-  const c1 = cleanPhoneNumber(num1);
-  const c2 = cleanPhoneNumber(num2);
-  if (!c1 || !c2) return false;
-  return c1 === c2 || c1.endsWith(c2) || c2.endsWith(c1);
-}
-
 export default function UserProfileGate({ onProfileActive }: UserProfileGateProps) {
   const [profiles, setProfiles] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"login" | "signup" | "activation">("login");
@@ -57,7 +45,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
   const [usernameInput, setUsernameInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberDevice, setRememberDevice] = useState(true);
 
   // New Registration Fields
   const [fullName, setFullName] = useState("");
@@ -74,31 +61,17 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Social OAuth Simulation States
-  const [socialModal, setSocialModal] = useState<"google" | "facebook" | null>(null);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState("");
-  const [customGoogleName, setCustomGoogleName] = useState("");
-  const [showCustomGoogleForm, setShowCustomGoogleForm] = useState(false);
-
-  // Real OAuth & WhatsApp OTP States
-  const [promptKeyType, setPromptKeyType] = useState<"google" | "facebook" | null>(null);
+  // Real OAuth Key Config States
+  const [promptKeyType, setPromptKeyType] = useState<"google" | null>(null);
   const [keyValueInput, setKeyValueInput] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
 
   // Unified Credentials Configuration Settings Modal
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [tempGoogleId, setTempGoogleId] = useState("");
-  const [tempFbId, setTempFbId] = useState("");
-  const [tempTwilioSid, setTempTwilioSid] = useState("");
-  const [tempTwilioToken, setTempTwilioToken] = useState("");
-  const [tempTwilioFrom, setTempTwilioFrom] = useState("");
 
   const openSettingsModal = () => {
     setTempGoogleId(localStorage.getItem("phd_google_client_id") || import.meta.env.VITE_GOOGLE_CLIENT_ID || "");
-    setTempFbId(localStorage.getItem("phd_facebook_app_id") || import.meta.env.VITE_FB_APP_ID || "");
-    setTempTwilioSid(localStorage.getItem("phd_twilio_sid") || import.meta.env.VITE_TWILIO_SID || "");
-    setTempTwilioToken(localStorage.getItem("phd_twilio_token") || import.meta.env.VITE_TWILIO_TOKEN || "");
-    setTempTwilioFrom(localStorage.getItem("phd_twilio_from") || import.meta.env.VITE_TWILIO_FROM || "");
     setModalError(null);
     setShowSettingsModal(true);
   };
@@ -135,7 +108,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
             throw new Error("Failed to fetch Google profile");
           })
           .then(data => {
-            handleSocialSignIn(data.name || data.email, data.email, "google");
+            handleSocialSignIn(data.name || data.email, data.email);
           })
           .catch(err => {
             console.error("Google OAuth callback error:", err);
@@ -241,7 +214,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     setLoading(true);
 
     const nameTrimmed = usernameInput.trim();
-    const cleanPh = phone.trim().replace(/[+\s()-]/g, "");
+    const cleanPh = `${countryCode}${phone.trim()}`.replace(/[+\s()-]/g, "");
     const defaultProject = DEFAULT_STATE(nameTrimmed);
 
     try {
@@ -358,6 +331,12 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
         }
 
         setResetSuccessMessage("Password reset request submitted successfully. Workspace is blocked until the Admin approves this request.");
+        if (result.error) {
+          // requestPasswordReset() returns success:true with an error string
+          // when the request itself is staged but the admin-notification
+          // email couldn't be sent — surface it, don't silently drop it.
+          setDebugCodeMsg(`⚠️ ${result.error}`);
+        }
       } else {
         setError(`Failed to submit reset request: ${result.error}`);
       }
@@ -395,7 +374,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                   return res.json();
                 })
                 .then(data => {
-                  handleSocialSignIn(data.name || data.email, data.email, "google");
+                  handleSocialSignIn(data.name || data.email, data.email);
                 })
                 .catch(err => {
                   console.error("Google OAuth callback error:", err);
@@ -433,56 +412,10 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     }
   };
 
-  const triggerFacebookSignIn = () => {
-    const fbAppId = localStorage.getItem("phd_facebook_app_id") || import.meta.env.VITE_FB_APP_ID || "";
-    if (!fbAppId) {
-      setPromptKeyType("facebook");
-      setKeyValueInput("");
-      return;
-    }
-
-    try {
-      if (!(window as any).FB) {
-        setError("Facebook SDK is still loading. Please try again in a moment.");
-        return;
-      }
-
-      (window as any).FB.init({
-        appId      : fbAppId,
-        cookie     : true,
-        xfbml      : true,
-        version    : "v18.0"
-      });
-
-      (window as any).FB.login((loginResponse: any) => {
-        if (loginResponse.authResponse) {
-          (window as any).FB.api("/me", { fields: "name,email" }, (apiResponse: any) => {
-            if (apiResponse && !apiResponse.error) {
-              handleSocialSignIn(apiResponse.name, apiResponse.email || `${apiResponse.id}@facebook.com`, "facebook");
-            } else {
-              setError("Failed to retrieve profile data from Facebook Graph API.");
-            }
-          });
-        } else {
-          setError("Facebook login was cancelled or not authorized.");
-        }
-      }, { scope: "email" });
-    } catch (e: any) {
-      console.error(e);
-      setError(`Facebook Login failed: ${e.message}`);
-    }
-  };
-
-
-
-  const handleSocialSignIn = async (name: string, emailStr: string, provider: "google" | "facebook") => {
+  const handleSocialSignIn = async (name: string, emailStr: string) => {
     setLoading(true);
-    setSocialModal(null);
     setError(null);
-    setShowCustomGoogleForm(false);
-    setCustomGoogleName("");
-    setCustomGoogleEmail("");
-    
+
     const username = name.trim();
     if (!username) {
       setError("Social identity display name cannot be blank.");
@@ -510,11 +443,11 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
       }
     } else {
       targetProjectState = DEFAULT_STATE(username);
-      targetProjectState.authorDetails = `${username}, PhD Scholar (${provider === "google" ? "Google" : "Facebook"} Verified)`;
-      
+      targetProjectState.authorDetails = `${username}, PhD Scholar (Google Verified)`;
+
       const newProfile: UserProfile = {
         username,
-        passcodeHash: `social_${provider}_auth_passcode`, // secure stub passcode
+        passcodeHash: "social_google_auth_passcode", // secure stub passcode
         projectState: targetProjectState,
         fullName: username,
         email: emailStr.trim() || `${username.toLowerCase().replace(/\s+/g, ".")}@example.com`,
@@ -720,7 +653,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               AI Research Operating System
             </p>
             <p className="text-[11px] text-[#6B665E] max-w-xs mx-auto leading-relaxed font-sans">
-              for Doctoral Scholars
+              for Scholars
             </p>
           </div>
         </div>
@@ -1004,20 +937,8 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 </div>
               </div>
 
-              {/* Remember checkbox & Forgot Password link */}
-              <div className="flex justify-between items-center pt-1">
-                <div className="flex items-center gap-2">
-                  <input
-                    id="remember-login"
-                    type="checkbox"
-                    checked={rememberDevice}
-                    onChange={(e) => setRememberDevice(e.target.checked)}
-                    className="w-4 h-4 rounded border-[#D1CEC7] text-[#1A365D] focus:ring-[#1A365D] accent-[#1A365D] cursor-pointer"
-                  />
-                  <label htmlFor="remember-login" className="text-[11px] font-medium text-[#6B665E] select-none cursor-pointer">
-                    Remember device
-                  </label>
-                </div>
+              {/* Forgot Password link */}
+              <div className="flex justify-end items-center pt-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -1426,52 +1347,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 </button>
               </p>
             )}
-
-            <div className="pt-1 flex justify-center gap-4">
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm("Are you sure you want to clear all configured API credentials (Google Client ID, Facebook App ID, and Twilio keys)?")) {
-                    localStorage.removeItem("phd_google_client_id");
-                    localStorage.removeItem("phd_facebook_app_id");
-                    localStorage.removeItem("phd_twilio_sid");
-                    localStorage.removeItem("phd_twilio_token");
-                    localStorage.removeItem("phd_twilio_from");
-                    setError("All configured credentials have been reset successfully.");
-                  }
-                }}
-                className="text-[10px] font-mono text-gray-400 hover:text-[#1A365D] underline cursor-pointer"
-              >
-                Clear Saved API Keys
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm("Are you sure you want to delete all scholar profiles on this device? This will erase all user workspaces permanently.")) {
-                    const savedList = localStorage.getItem(PROFILES_LIST_KEY);
-                    if (savedList) {
-                      try {
-                        const parsed = JSON.parse(savedList) as { profilesList: string[] };
-                        const list = parsed.profilesList || [];
-                        list.forEach(uname => {
-                          localStorage.removeItem(`${PROFILE_STATE_PREFIX}${uname}`);
-                        });
-                      } catch (e) {
-                        console.error("Failed to clear profiles:", e);
-                      }
-                    }
-                    localStorage.removeItem(PROFILES_LIST_KEY);
-                    setProfiles([]);
-                    setActiveTab("signup");
-                    setError("All scholar profiles have been removed from this device.");
-                  }
-                }}
-                className="text-[10px] font-mono text-red-400/80 hover:text-red-700 underline cursor-pointer"
-              >
-                Remove All Users
-              </button>
-            </div>
           </div>
         )}
       </div>
@@ -1481,19 +1356,19 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
         Secure • Encrypted • Private
       </div>
 
-      {/* Real OAuth Key Config Prompt Modals */}
+      {/* Real OAuth Key Config Prompt Modal (Google only) */}
       {promptKeyType !== null && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 backdrop-blur-sm p-4 font-sans animate-fade-in">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col p-6 space-y-4">
             <div className="flex items-center gap-2 text-[#1A365D]">
               <Key className="w-5 h-5 text-[#C08A3E]" />
               <h3 className="text-sm font-mono font-bold uppercase tracking-wider">
-                Configure {promptKeyType === "google" ? "Google Client ID" : "Facebook App ID"}
+                Configure Google Client ID
               </h3>
             </div>
-            
+
             <p className="text-xs text-gray-500 leading-normal">
-              To enable real authentication, please supply your {promptKeyType === "google" ? "Google OAuth Client ID" : "Facebook App ID"}. It will be saved securely in your browser's local storage.
+              To enable real authentication, please supply your Google OAuth Client ID. It will be saved securely in your browser's local storage.
             </p>
 
             {modalError && (
@@ -1509,41 +1384,26 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 setModalError(null);
                 const val = keyValueInput.trim();
                 if (val) {
-                  if (promptKeyType === "google" && !val.endsWith(".apps.googleusercontent.com")) {
+                  if (!val.endsWith(".apps.googleusercontent.com")) {
                     setModalError("Invalid Google Client ID. It must end with '.apps.googleusercontent.com' (e.g. xxxxxxx.apps.googleusercontent.com)");
                     return;
                   }
-                  if (promptKeyType === "facebook" && !/^\d+$/.test(val)) {
-                    setModalError("Invalid Facebook App ID. It must consist only of numbers (e.g. 1592XXXXXXXXXX)");
-                    return;
-                  }
 
-                  localStorage.setItem(
-                    promptKeyType === "google" ? "phd_google_client_id" : "phd_facebook_app_id",
-                    val
-                  );
+                  localStorage.setItem("phd_google_client_id", val);
                   setPromptKeyType(null);
-                  if (promptKeyType === "google") {
-                    triggerGoogleSignIn();
-                  } else {
-                    triggerFacebookSignIn();
-                  }
+                  triggerGoogleSignIn();
                 }
               }}
               className="space-y-4"
             >
               <div className="space-y-1">
                 <label className="block text-[9px] font-bold font-mono uppercase tracking-wider text-gray-500">
-                  {promptKeyType === "google" ? "Google Client ID" : "Facebook App ID"} *
+                  Google Client ID *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder={
-                    promptKeyType === "google"
-                      ? "xxxxxxx.apps.googleusercontent.com"
-                      : "e.g. 1592XXXXXXXXXX"
-                  }
+                  placeholder="xxxxxxx.apps.googleusercontent.com"
                   className="w-full border border-gray-200 rounded-lg p-2.5 text-xs text-gray-700 focus:outline-none focus:border-[#1A365D] font-mono"
                   value={keyValueInput}
                   onChange={(e) => {
@@ -1588,7 +1448,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
             </div>
             
             <p className="text-xs text-[#6B665E] leading-normal font-sans">
-              Configure OAuth Client IDs and Twilio API keys directly in the browser. Credentials are saved locally in your browser's secure storage.
+              Configure your Google OAuth Client ID directly in the browser. Credentials are saved locally in your browser's secure storage.
             </p>
 
             {modalError && (
@@ -1602,48 +1462,30 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               onSubmit={(e) => {
                 e.preventDefault();
                 setModalError(null);
-                
+
                 const gId = tempGoogleId.trim();
-                const fbId = tempFbId.trim();
-                 // Save to localStorage
-                 if (gId) localStorage.setItem("phd_google_client_id", gId);
-                 else localStorage.removeItem("phd_google_client_id");
- 
-                 if (fbId) localStorage.setItem("phd_facebook_app_id", fbId);
-                 else localStorage.removeItem("phd_facebook_app_id");
- 
-                 setShowSettingsModal(false);
-                 setError("Credentials updated successfully.");
-               }}
-               className="space-y-4 overflow-y-auto pr-1"
-             >
-               {/* Google Client ID */}
-               <div className="space-y-1">
-                 <label className="block text-[10px] font-bold font-mono uppercase tracking-wider text-gray-500">
-                   Google Client ID (OAuth)
-                 </label>
-                 <input
-                   type="text"
-                   placeholder="xxxxxxx.apps.googleusercontent.com"
-                   className="w-full border border-gray-200 rounded-lg p-2.5 text-xs text-gray-700 focus:outline-none focus:border-[#1A365D] font-mono"
-                   value={tempGoogleId}
-                   onChange={(e) => setTempGoogleId(e.target.value)}
-                 />
-               </div>
- 
-               {/* Facebook App ID */}
-               <div className="space-y-1">
-                 <label className="block text-[10px] font-bold font-mono uppercase tracking-wider text-gray-500">
-                   Facebook App ID
-                 </label>
-                 <input
-                   type="text"
-                   placeholder="e.g. 1592XXXXXXXXXX"
-                   className="w-full border border-gray-200 rounded-lg p-2.5 text-xs text-gray-700 focus:outline-none focus:border-[#1A365D] font-mono"
-                   value={tempFbId}
-                   onChange={(e) => setTempFbId(e.target.value)}
-                 />
-               </div>
+                // Save to localStorage
+                if (gId) localStorage.setItem("phd_google_client_id", gId);
+                else localStorage.removeItem("phd_google_client_id");
+
+                setShowSettingsModal(false);
+                setError("Credentials updated successfully.");
+              }}
+              className="space-y-4 overflow-y-auto pr-1"
+            >
+              {/* Google Client ID */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold font-mono uppercase tracking-wider text-gray-500">
+                  Google Client ID (OAuth)
+                </label>
+                <input
+                  type="text"
+                  placeholder="xxxxxxx.apps.googleusercontent.com"
+                  className="w-full border border-gray-200 rounded-lg p-2.5 text-xs text-gray-700 focus:outline-none focus:border-[#1A365D] font-mono"
+                  value={tempGoogleId}
+                  onChange={(e) => setTempGoogleId(e.target.value)}
+                />
+              </div>
 
               {/* Buttons */}
               <div className="flex gap-2 pt-2 border-t border-gray-100">
