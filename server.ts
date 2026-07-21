@@ -22,23 +22,6 @@ import { HarvardFormatter } from "./src/citation_compliance/formatters/harvard.t
 import { VancouverFormatter } from "./src/citation_compliance/formatters/vancouver.ts";
 import { importBibTex } from "./src/citation_compliance/importers/bibtexImporter.ts";
 import { importRis } from "./src/citation_compliance/importers/risImporter.ts";
-import { AgentRegistry } from "./src/agents/registry.ts";
-import { AgentExecutor } from "./src/agents/executor.ts";
-import type { AgentContext } from "./src/agents/types.ts";
-import {
-  ResearchPlannerAgent,
-  LiteratureReviewAgent,
-  KnowledgeGapAgent,
-  ResearchQuestionAgent,
-  MethodologyAdvisorAgent,
-  StatisticalAnalysisAdvisor,
-  IntegrityReviewerAgent,
-  ManuscriptWriterAgent,
-} from "./src/agents/index.ts";
-import { SkillRegistry } from "./src/skills/registry.ts";
-import { runSkill as runRegisteredSkill } from "./src/skills/executor.ts";
-import { ResearchPlanningSkill } from "./src/skills/researchPlanningSkill.ts";
-
 dotenv.config();
 
 const PORT = 3000;
@@ -494,47 +477,6 @@ app.get("/api/health", (req, res) => {
 });
 
 // ============================================================================
-// Scholarly Agents (research planner, literature review, knowledge gap,
-// research question, methodology advisor, statistical analysis, integrity
-// reviewer, manuscript writer) - previously fully implemented and tested but
-// never registered or reachable via any API. Registered once at startup and
-// exposed generically through the AgentRegistry/AgentExecutor abstractions
-// that already exist for this exact purpose, rather than one-off endpoints
-// per agent.
-// ============================================================================
-
-const agentRegistry = AgentRegistry.getInstance();
-const agentExecutor = AgentExecutor.getInstance();
-
-agentRegistry.register(new ResearchPlannerAgent());
-agentRegistry.register(new LiteratureReviewAgent());
-agentRegistry.register(new KnowledgeGapAgent());
-agentRegistry.register(new ResearchQuestionAgent());
-agentRegistry.register(new MethodologyAdvisorAgent());
-agentRegistry.register(new StatisticalAnalysisAdvisor());
-agentRegistry.register(new IntegrityReviewerAgent());
-agentRegistry.register(new ManuscriptWriterAgent());
-
-// ============================================================================
-// Native Skills Framework (src/skills/) - previously fully implemented and
-// tested but never consumed by anything outside its own module. Registered
-// once at startup, same pattern as the agents above, so AgentContext.runSkill
-// can reach real skill implementations instead of being a no-op.
-// ============================================================================
-
-const skillRegistry = SkillRegistry.getInstance();
-skillRegistry.register(new ResearchPlanningSkill());
-
-function createAgentContext(): AgentContext {
-  return {
-    log: (level, ...args) => console[level === "debug" ? "log" : level](`[Agent]`, ...args),
-    config: {},
-    emit: () => {},
-    runSkill: (skillId, input) => runRegisteredSkill(skillId, input),
-  };
-}
-
-// ============================================================================
 // Citation Style Registry (Scholar Core OS) - registered once at startup so
 // deterministic bibliography/in-text formatting is available wherever the
 // server currently asks an LLM to reformat already-known metadata.
@@ -611,39 +553,6 @@ function extractedMetadataToReference(meta: any, sourceType: string | undefined)
     publicationDate: meta?.year,
   };
 }
-
-// List available agents (id, name, description, execution modes).
-app.get("/api/agents", (req, res) => {
-  const agents = agentRegistry.list().map((metadata) => ({
-    id: metadata.id,
-    name: metadata.name,
-    description: metadata.description,
-    version: metadata.version,
-    supportedModes: metadata.supportedModes,
-  }));
-  res.json({ agents });
-});
-
-// Execute a registered agent by id with arbitrary structured input.
-app.post("/api/agents/execute", aiAbuseLimit, async (req, res) => {
-  try {
-    const { agentId, input } = req.body;
-    if (!agentId) {
-      return res.status(400).json({ error: "Missing required parameter: agentId" });
-    }
-
-    const agent = agentRegistry.get(agentId);
-    if (!agent) {
-      return res.status(404).json({ error: `No agent registered with id "${agentId}"` });
-    }
-
-    const result = await agentExecutor.execute(agent, input ?? {}, createAgentContext());
-    return res.status(result.ok ? 200 : 422).json(result);
-  } catch (err: any) {
-    console.error("Agent execution error:", err);
-    res.status(500).json({ error: err.message || "Failed to execute agent" });
-  }
-});
 
 // File Parser Endpoint (Accepts Base64 JSON Payload)
 app.post("/api/parse-file", parseFileLimit, async (req, res) => {

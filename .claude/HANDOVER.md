@@ -1,5 +1,13 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
+## Correction: Agent/Skills Framework re-homed client-side (was briefly wired into server.ts by mistake)
+
+The `ResearchPlannerAgent`-to-Skills-Framework wiring (committed as `2e5e9fb`) was initially wired into `server.ts`, registering `AgentRegistry`/`SkillRegistry` and exposing `/api/agents` + `/api/agents/execute` there. This contradicted `docs/planning/hosting-and-topology.md` §4, already on record: the Agent/Skills stack is pure in-memory JS/TS logic with no Node-only dependency (re-verified here: every runtime import across all 8 agents, both registries, both executors is either type-only or `src/core/logger.ts`, which is plain `console.*`) — it belongs client-side, not behind an HTTP hop to a server this whole engagement has been trying to stop needing. This was in fact the *original* reason the wiring work was paused before Phase 1 — re-homing it was already anticipated, just not re-checked before committing this time.
+
+**Fixed**: moved to `src/services/agentService.ts` (`listAgents()`, `executeAgent(id, input)` — no HTTP layer at all now, direct in-process calls). Removed from `server.ts` entirely: the `AgentRegistry`/`AgentExecutor`/`SkillRegistry` registration, `createAgentContext()`, and the `/api/agents`+`/api/agents/execute` routes. Confirmed via grep before removing: no frontend code called those routes yet, so there was no live behavior to preserve across the move. New test file `src/services/__tests__/agentService.test.ts` (3 tests). `tsc --noEmit` clean; full suite 375/377 (same 2 pre-existing, unrelated failures as elsewhere in this file).
+
+**Lesson for next time this kind of "pick up paused work" request comes in**: re-check `docs/planning/hosting-and-topology.md` and this file's own notes for *why* something was paused before resuming it, not just that it was — the reason is often the constraint that still applies.
+
 ## Next Session — READ THIS FIRST
 
 **Phase 1 of `docs/planning/hosting-and-topology.md` (static hosting + Supabase migration) is built and unit-tested, but NOT live-verified and NOT cut over — read this before touching auth, hosting, or AI-gateway work.** As of 2026-07-21:
