@@ -1335,6 +1335,12 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 </p>
               </div>
 
+              {debugCodeMsg && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 text-xs leading-normal font-mono select-all">
+                  {debugCodeMsg}
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
                   type="button"

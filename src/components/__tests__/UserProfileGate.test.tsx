@@ -179,6 +179,24 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
       );
     });
 
+    it("regression: shows the honest email-failure caveat on the pending screen when signUp succeeds with a warning", async () => {
+      // signUp() can return success:true with an error string when the
+      // account was created but the admin-notification email couldn't be
+      // sent (see supabaseAuthService.ts). This must actually render on the
+      // pending screen, not just be stored in state.
+      const code = await getToOtpScreenWithKnownCode();
+      signUpMock.mockResolvedValue({
+        success: true,
+        error: "Registered, but the admin notification email couldn't be sent: RESEND_API_KEY not configured.",
+      });
+
+      fireEvent.change(screen.getByPlaceholderText("Enter email code..."), { target: { value: code } });
+      fireEvent.click(screen.getByText("Verify & Request Account"));
+
+      expect(await screen.findByText("Request Pending Admin Verification")).toBeInTheDocument();
+      expect(await screen.findByText(/admin notification email couldn't be sent/)).toBeInTheDocument();
+    });
+
     it("on signUp failure, shows the error and stays on the OTP screen", async () => {
       const code = await getToOtpScreenWithKnownCode();
       signUpMock.mockResolvedValue({ success: false, error: "Email address already registered." });
