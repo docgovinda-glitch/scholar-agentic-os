@@ -152,6 +152,17 @@ export interface SkillSuccess<T> {
   ok: true;
   data: T;
   diagnostics?: SkillDiagnostics;
+  /**
+   * Set when the skill's deterministic core has done what it can, but the
+   * result would benefit from (or requires) a model call to complete —
+   * e.g. free-prose drafting or qualitative synthesis beyond what
+   * rule-based logic can produce. Absent when the deterministic result is
+   * already complete on its own.
+   */
+  escalateToAI?: {
+    reason: string;
+    suggestedPrompt?: string;
+  };
 }
 
 export interface SkillFailure {

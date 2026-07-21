@@ -35,6 +35,9 @@ import {
   IntegrityReviewerAgent,
   ManuscriptWriterAgent,
 } from "./src/agents/index.ts";
+import { SkillRegistry } from "./src/skills/registry.ts";
+import { runSkill as runRegisteredSkill } from "./src/skills/executor.ts";
+import { ResearchPlanningSkill } from "./src/skills/researchPlanningSkill.ts";
 
 dotenv.config();
 
@@ -512,11 +515,22 @@ agentRegistry.register(new StatisticalAnalysisAdvisor());
 agentRegistry.register(new IntegrityReviewerAgent());
 agentRegistry.register(new ManuscriptWriterAgent());
 
+// ============================================================================
+// Native Skills Framework (src/skills/) - previously fully implemented and
+// tested but never consumed by anything outside its own module. Registered
+// once at startup, same pattern as the agents above, so AgentContext.runSkill
+// can reach real skill implementations instead of being a no-op.
+// ============================================================================
+
+const skillRegistry = SkillRegistry.getInstance();
+skillRegistry.register(new ResearchPlanningSkill());
+
 function createAgentContext(): AgentContext {
   return {
     log: (level, ...args) => console[level === "debug" ? "log" : level](`[Agent]`, ...args),
     config: {},
     emit: () => {},
+    runSkill: (skillId, input) => runRegisteredSkill(skillId, input),
   };
 }
 
