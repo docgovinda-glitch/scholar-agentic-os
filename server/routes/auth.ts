@@ -62,7 +62,7 @@ router.post("/api/request-password-reset", authModerateLimit, async (req, res) =
     writeUsersDb(db);
 
     const apiKey = process.env.RESEND_API_KEY;
-    const adminEmail = "doc.govinda@gmail.com";
+    const adminEmail = process.env.ADMIN_EMAIL;
     const host = req.headers.host || "localhost:3000";
     const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
     const approveResetUrl = `${protocol}://${host}/api/approve-reset?user=${encodeURIComponent(
@@ -72,7 +72,7 @@ router.post("/api/request-password-reset", authModerateLimit, async (req, res) =
     let emailSent = false;
     let errorDetails = "";
 
-    if (apiKey) {
+    if (apiKey && adminEmail) {
       const emailHtml = `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #D1CEC7; border-radius: 12px; background-color: #FAF8F5; color: #1A365D;">
           <h2 style="font-family: serif; font-style: italic; color: #1A365D; border-bottom: 1px solid #D1CEC7; padding-bottom: 10px;">Scholar Password Reset Approval Request</h2>
@@ -295,7 +295,7 @@ router.post("/api/register", authModeratePerUserLimit, async (req, res) => {
     writeUsersDb(db);
 
     const apiKey = process.env.RESEND_API_KEY;
-    const adminEmail = "doc.govinda@gmail.com";
+    const adminEmail = process.env.ADMIN_EMAIL;
     const host = req.headers.host || "localhost:3000";
     const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
 
@@ -306,7 +306,7 @@ router.post("/api/register", authModeratePerUserLimit, async (req, res) => {
     let emailSent = false;
     let errorDetails = "";
 
-    if (apiKey) {
+    if (apiKey && adminEmail) {
       const emailHtml = `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #D1CEC7; border-radius: 12px; background-color: #FAF8F5; color: #1A365D;">
           <h2 style="font-family: serif; font-style: italic; color: #1A365D; border-bottom: 1px solid #D1CEC7; padding-bottom: 10px;">Scholar Access Request</h2>
@@ -447,7 +447,7 @@ router.post("/api/request-profile-update", async (req, res) => {
     const keyHash = crypto.createHash("sha256").update(verificationKey).digest("hex");
 
     const apiKey = process.env.RESEND_API_KEY;
-    const adminEmail = "doc.govinda@gmail.com";
+    const adminEmail = process.env.ADMIN_EMAIL;
     const host = req.headers.host || "scholar-agentic.vercel.app";
     const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
 
@@ -460,7 +460,7 @@ router.post("/api/request-profile-update", async (req, res) => {
     let emailSent = false;
     let errorDetails = "";
 
-    if (apiKey) {
+    if (apiKey && adminEmail) {
       const emailHtml = `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #D1CEC7; border-radius: 12px; background-color: #FAF8F5; color: #1A365D;">
           <h2 style="font-family: serif; font-style: italic; color: #1A365D; border-bottom: 1px solid #D1CEC7; padding-bottom: 10px;">Scholar Profile Update Request</h2>
@@ -556,7 +556,7 @@ router.get("/api/approve-profile-update", async (req, res) => {
       `Scholar Agentic Administrator`
   );
 
-  const targetNotifyEmail = (email as string) || "doc.govinda@gmail.com";
+  const targetNotifyEmail = (email as string) || process.env.ADMIN_EMAIL || "";
   const mailtoUrl = `mailto:${targetNotifyEmail}?subject=${mailtoSubject}&body=${mailtoBody}`;
 
   res.setHeader("Content-Type", "text/html");

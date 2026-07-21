@@ -179,7 +179,7 @@ Output Limitations:
 - No authentication middleware
 - No rate limiting
 - API keys accepted in request bodies (client-side)
-- Admin email hardcoded: `"doc.govinda@gmail.com"`
+- ~~Admin email hardcoded: `"doc.govinda@gmail.com"`~~ — **fixed**: now reads from `ADMIN_EMAIL` (env var for `server.ts`, Supabase secret for `supabase/functions/*`); see `.env.example` and `DEPLOYMENT_README.md` §1/§3.
 
 ---
 
