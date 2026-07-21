@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { User, Lock, Eye, EyeOff, ShieldCheck, Check, AlertCircle, Sparkles, GraduationCap, ArrowRight, ShieldAlert, Key, Phone, Mail, Building, Landmark, Clock, Settings } from "lucide-react";
 import { UserProfile, PaperProject } from "../types";
-import { signUp, signIn, requestPasswordReset } from "../services/supabaseAuthService";
+import { signUp, signIn, sendPasswordResetEmail, updatePassword, onPasswordRecovery } from "../services/supabaseAuthService";
 
 interface UserProfileGateProps {
   onProfileActive: (username: string, projectState: PaperProject) => void;
@@ -84,20 +84,30 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
   const [dualVerifyBypass, setDualVerifyBypass] = useState<string | null>(null);
 
   const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
-  const [resetUsername, setResetUsername] = useState("");
   const [resetEmail, setResetEmail] = useState("");
-  const [resetNewPassword, setResetNewPassword] = useState("");
   const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
+
+  // Password Recovery (Supabase's own resetPasswordForEmail/updateUser flow)
+  const [isPasswordRecoveryMode, setIsPasswordRecoveryMode] = useState(false);
+  const [newPasswordForRecovery, setNewPasswordForRecovery] = useState("");
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [recoveryDone, setRecoveryDone] = useState(false);
 
 
   // Load profiles list and check for OAuth redirect callbacks on mount
   useEffect(() => {
-    // Listen for Google OAuth redirect callback token in URL hash
+    // Listen for Google OAuth redirect callback token in URL hash. Supabase's
+    // own password-recovery redirect ALSO lands with an access_token in the
+    // hash (see onPasswordRecovery below) — it's distinguishable by
+    // type=recovery, which Google's implicit-flow hash never has. Must not
+    // strip/consume the hash for that case, or Supabase's own client-side
+    // session detection (which also needs to read it) never gets to run.
     const hash = window.location.hash;
     if (hash) {
       const params = new URLSearchParams(hash.substring(1));
       const accessToken = params.get("access_token");
-      if (accessToken) {
+      const isSupabaseRecovery = params.get("type") === "recovery";
+      if (accessToken && !isSupabaseRecovery) {
         // Remove hash from URL so it doesn't linger
         window.history.replaceState(null, "", window.location.pathname);
         
@@ -133,6 +143,17 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     } else {
       setActiveTab("signup");
     }
+
+    // Detect landing back from a password-reset email link (Supabase parses
+    // the recovery session from the URL fragment automatically and fires
+    // this event once).
+    const unsubscribe = onPasswordRecovery(() => {
+      setIsForgotPasswordMode(false);
+      setIsPasswordRecoveryMode(true);
+      setRecoveryError(null);
+      setRecoveryDone(false);
+    });
+    return unsubscribe;
   }, []);
 
   // Password Requirements Checker
@@ -297,51 +318,55 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     e.preventDefault();
     setError(null);
     setResetSuccessMessage(null);
-    setDebugCodeMsg(null);
 
-    const username = resetUsername.trim();
     const emailAddr = resetEmail.trim();
-    const newPassword = resetNewPassword;
-
-    if (!username || !emailAddr || !newPassword) {
-      setError("Please fill out all fields.");
+    if (!emailAddr) {
+      setError("Please enter your registered email.");
       return;
     }
 
     setLoading(true);
 
     try {
-      // Same admin-approval-gated reset mechanism as before (stages the new
-      // password, requires an admin to click the emailed approval link) —
-      // just relocated to the request-password-reset Edge Function. Not a
-      // behavior change: this flow is still slated to be replaced by
-      // Supabase's built-in resetPasswordForEmail in a later, separate pass
-      // (see .claude/HANDOVER.md) — untouched here.
-      const result = await requestPasswordReset({ username, email: emailAddr, newPassword });
+      // Supabase Auth's own self-service reset — replaces the old
+      // admin-approval-gated flow. Supabase enforces that the reset link
+      // only ever goes to the real email on file for a matching account,
+      // and always reports success regardless of whether the email is
+      // actually registered (avoids leaking account existence).
+      const result = await sendPasswordResetEmail(emailAddr);
 
       if (result.success) {
-        // Mark local profile as pending if it exists
-        const savedStateStr = localStorage.getItem(`${PROFILE_STATE_PREFIX}${username}`);
-        if (savedStateStr) {
-          try {
-            const profile = JSON.parse(savedStateStr) as UserProfile;
-            profile.status = "pending";
-            localStorage.setItem(`${PROFILE_STATE_PREFIX}${username}`, JSON.stringify(profile));
-          } catch (_) {}
-        }
-
-        setResetSuccessMessage("Password reset request submitted successfully. Workspace is blocked until the Admin approves this request.");
-        if (result.error) {
-          // requestPasswordReset() returns success:true with an error string
-          // when the request itself is staged but the admin-notification
-          // email couldn't be sent — surface it, don't silently drop it.
-          setDebugCodeMsg(`⚠️ ${result.error}`);
-        }
+        setResetSuccessMessage("If that email is registered, a password reset link has been sent. Check your inbox.");
       } else {
-        setError(`Failed to submit reset request: ${result.error}`);
+        setError(`Failed to send reset email: ${result.error}`);
       }
     } catch (err: any) {
       setError(err.message || "Network error requesting password reset.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePasswordRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecoveryError(null);
+
+    if (!newPasswordForRecovery) {
+      setRecoveryError("Please enter a new password.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await updatePassword(newPasswordForRecovery);
+      if (result.success) {
+        setRecoveryDone(true);
+        setNewPasswordForRecovery("");
+      } else {
+        setRecoveryError(result.error || "Failed to update password.");
+      }
+    } catch (err: any) {
+      setRecoveryError(err.message || "Network error updating password.");
     } finally {
       setLoading(false);
     }
@@ -781,15 +806,85 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 </button>
               </div>
             </form>
+          ) : isPasswordRecoveryMode ? (
+            <form onSubmit={handleUpdatePasswordRecovery} className="space-y-5 animate-fade-in">
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-950">
+                <h4 className="font-bold uppercase font-mono tracking-wider flex items-center gap-1.5">
+                  <Key className="w-4.5 h-4.5 text-amber-700" />
+                  Set New Password
+                </h4>
+                <p className="text-xs leading-normal">
+                  You've followed a password reset link. Enter a new password for your account below.
+                </p>
+              </div>
+
+              {recoveryError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-start gap-2.5">
+                  <ShieldAlert className="w-4.5 h-4.5 text-red-700 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed font-sans font-medium">{recoveryError}</span>
+                </div>
+              )}
+
+              {recoveryDone ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs leading-normal font-sans font-medium">
+                  Password updated successfully. You can now log in with your new password.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="Enter new password..."
+                      className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-4 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono"
+                      value={newPasswordForRecovery}
+                      onChange={(e) => setNewPasswordForRecovery(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                {recoveryDone ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPasswordRecoveryMode(false);
+                      setActiveTab("login");
+                      setError(null);
+                    }}
+                    className="w-full py-3 bg-[#1A365D] hover:bg-[#1A365D]/90 text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all"
+                  >
+                    Go to Login
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 bg-[#1A365D] hover:bg-[#1A365D]/90 disabled:bg-[#D1CEC7] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                  >
+                    {loading ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <span>Update Password</span>
+                    )}
+                  </button>
+                )}
+              </div>
+            </form>
           ) : isForgotPasswordMode ? (
             <form onSubmit={handleForgotPasswordSubmit} className="space-y-5 animate-fade-in">
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-950">
                 <h4 className="font-bold uppercase font-mono tracking-wider flex items-center gap-1.5">
                   <Key className="w-4.5 h-4.5 text-amber-700" />
-                  Forgot Password Request
+                  Forgot Password
                 </h4>
                 <p className="text-xs leading-normal">
-                  Password resets require manual Admin email approval. Submit your details to queue the reset.
+                  Enter your registered email and we'll send you a password reset link.
                 </p>
               </div>
 
@@ -798,30 +893,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                   {resetSuccessMessage}
                 </div>
               )}
-
-              {debugCodeMsg && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 text-xs leading-normal font-mono select-all">
-                  {debugCodeMsg}
-                </div>
-              )}
-
-              {/* Username Input */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
-                  Scholar Username
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Enter username..."
-                    className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-4 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono"
-                    value={resetUsername}
-                    onChange={(e) => setResetUsername(e.target.value)}
-                  />
-                </div>
-              </div>
 
               {/* Email Input */}
               <div className="space-y-1.5">
@@ -841,24 +912,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 </div>
               </div>
 
-              {/* New Password Input */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
-                  Proposed New Password
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
-                  <input
-                    type="password"
-                    required
-                    placeholder="Enter new password..."
-                    className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-4 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono"
-                    value={resetNewPassword}
-                    onChange={(e) => setResetNewPassword(e.target.value)}
-                  />
-                </div>
-              </div>
-
               {/* Action Buttons */}
               <div className="flex gap-3">
                 <button
@@ -867,7 +920,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     setIsForgotPasswordMode(false);
                     setError(null);
                     setResetSuccessMessage(null);
-                    setDebugCodeMsg(null);
                   }}
                   className="w-1/3 py-3 border border-[#D1CEC7] hover:bg-neutral-50 text-[10px] font-mono uppercase text-[#6B665E] rounded-xl cursor-pointer transition-all"
                 >
@@ -881,7 +933,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
-                    <span>Submit Reset</span>
+                    <span>Send Reset Link</span>
                   )}
                 </button>
               </div>

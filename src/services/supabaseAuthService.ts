@@ -1,21 +1,16 @@
 /**
  * Supabase-backed replacement for the auth/user/admin routes in server.ts
  * (Phase 1 — docs/planning/hosting-and-topology.md §4's "moves to BaaS"
- * bucket: /api/register, /api/verify-and-sync-profile, /api/check-approval,
- * /api/save-model-preferences, /api/save-api-keys, /api/request-password-reset,
- * /api/request-profile-update).
+ * bucket). Wired into UserProfileGate.tsx (registration, login, password
+ * reset); ProfileSettings.tsx and AIControlCenter.tsx still call the old
+ * Express routes — not yet cut over.
  *
- * NOT YET WIRED to the UI (UserProfileGate.tsx / ProfileSettings.tsx /
- * AIControlCenter.tsx still call the old Express routes) — see
- * .claude/HANDOVER.md for why that cutover is deliberately not done in this
- * pass. This module is complete and unit-tested against a mocked Supabase
- * client, ready to wire in once that UI-cutover work is scoped separately.
- *
- * The admin-approval actions themselves (approve-registration,
- * approve-password-reset) are NOT here — they run as Supabase Edge
- * Functions (supabase/functions/) using the service_role key, since
- * approving another user's account must never be possible from the
- * anon-key client.
+ * Password reset uses Supabase Auth's own resetPasswordForEmail/updateUser
+ * flow, not a custom admin-approval gate — see sendPasswordResetEmail's own
+ * doc comment. The registration admin-approval action (approve-registration)
+ * is NOT here — it runs as a Supabase Edge Function (supabase/functions/)
+ * using the service_role key, since approving another user's account must
+ * never be possible from the anon-key client.
  */
 
 import { getSupabaseClient } from "./supabaseClient";
@@ -236,32 +231,56 @@ export async function saveApiKeys(apiKeys: Record<string, string>): Promise<Serv
   return { success: true };
 }
 
-export interface RequestPasswordResetInput {
-  username: string;
-  email: string;
-  newPassword: string;
-}
-
 /**
- * Mirrors server.ts's admin-gated reset: stages the new password in
- * pending_password_resets (via the Edge Function, using the service_role
- * key — never writable directly by the anon client) and emails the admin
- * an approval link. The password only becomes active once
- * supabase/functions/approve-password-reset runs.
+ * Supabase Auth's own self-service reset flow — replaces the custom
+ * admin-approval-gated reset (the old request-password-reset/
+ * approve-password-reset Edge Functions and pending_password_resets table
+ * are dead code as of this switch, not yet removed). Supabase enforces that
+ * the reset link only ever goes to the real email on file for a matching
+ * account; it always resolves successfully regardless of whether the email
+ * is actually registered, to avoid leaking which emails have accounts.
  */
-export async function requestPasswordReset(input: RequestPasswordResetInput): Promise<ServiceResult> {
+export async function sendPasswordResetEmail(email: string): Promise<ServiceResult> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase.functions.invoke("request-password-reset", { body: input });
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  });
   if (error) {
     return { success: false, error: error.message };
   }
-  if (data && data.emailSent === false) {
-    // The reset is genuinely staged in pending_password_resets regardless of
-    // whether the admin notification email sent — not a hard failure, but
-    // the caller should know the admin may not have been notified.
-    return { success: true, error: `Reset request staged, but the admin notification email couldn't be sent${data.error ? `: ${data.error}` : "."}` };
+  return { success: true };
+}
+
+/**
+ * Sets a new password for the currently-active recovery session (the one
+ * Supabase establishes client-side after the user clicks the emailed reset
+ * link — see onPasswordRecovery below).
+ */
+export async function updatePassword(newPassword: string): Promise<ServiceResult> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) {
+    return { success: false, error: error.message };
   }
   return { success: true };
+}
+
+/**
+ * Registers a callback for Supabase's PASSWORD_RECOVERY auth event, which
+ * fires once when the client parses a recovery-type session from the URL
+ * fragment on page load (i.e. the user just clicked the link from
+ * sendPasswordResetEmail's email). Returns an unsubscribe function.
+ */
+export function onPasswordRecovery(callback: () => void): () => void {
+  const supabase = getSupabaseClient();
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((event) => {
+    if (event === "PASSWORD_RECOVERY") {
+      callback();
+    }
+  });
+  return () => subscription.unsubscribe();
 }
 
 export interface RequestProfileUpdateInput {

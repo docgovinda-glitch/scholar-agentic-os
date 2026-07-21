@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// (needed for sendPasswordResetEmail's use of window.location.origin — the
+// rest of this file's tests don't touch the DOM and are unaffected by jsdom.)
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Chainable query-builder mock: each method returns the same object so
@@ -22,6 +25,8 @@ const mockAuth = {
   signUp: vi.fn(),
   signInWithPassword: vi.fn(),
   getUser: vi.fn(),
+  resetPasswordForEmail: vi.fn(),
+  updateUser: vi.fn(),
 };
 const mockFrom = vi.fn();
 const mockRpc = vi.fn();
@@ -42,7 +47,8 @@ import {
   checkApproval,
   saveModelPreferences,
   saveApiKeys,
-  requestPasswordReset,
+  sendPasswordResetEmail,
+  updatePassword,
   requestProfileUpdate,
 } from "../supabaseAuthService";
 
@@ -219,26 +225,35 @@ describe("saveApiKeys", () => {
   });
 });
 
-describe("requestPasswordReset", () => {
-  it("invokes the request-password-reset Edge Function with the submitted fields", async () => {
-    mockFunctionsInvoke.mockResolvedValue({ data: {}, error: null });
-    const result = await requestPasswordReset({ username: "jdoe", email: "jane@example.com", newPassword: "new-pass" });
-    expect(result.success).toBe(true);
-    expect(mockFunctionsInvoke).toHaveBeenCalledWith("request-password-reset", {
-      body: { username: "jdoe", email: "jane@example.com", newPassword: "new-pass" },
+describe("sendPasswordResetEmail", () => {
+  it("calls Supabase's own resetPasswordForEmail with a redirect back to the app", async () => {
+    mockAuth.resetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
+    const result = await sendPasswordResetEmail("jane@example.com");
+    expect(result).toEqual({ success: true });
+    expect(mockAuth.resetPasswordForEmail).toHaveBeenCalledWith("jane@example.com", {
+      redirectTo: window.location.origin,
     });
   });
 
-  it("reports success with an honest caveat when emailSent is false in the function's own body", async () => {
-    mockFunctionsInvoke.mockResolvedValue({
-      data: { success: true, emailSent: false, error: "Resend not configured." },
-      error: null,
-    });
-    const result = await requestPasswordReset({ username: "jdoe", email: "jane@example.com", newPassword: "new-pass" });
-    expect(result).toEqual({
-      success: true,
-      error: "Reset request staged, but the admin notification email couldn't be sent: Resend not configured.",
-    });
+  it("surfaces an error if the call itself fails", async () => {
+    mockAuth.resetPasswordForEmail.mockResolvedValue({ data: null, error: { message: "Rate limit exceeded" } });
+    const result = await sendPasswordResetEmail("jane@example.com");
+    expect(result).toEqual({ success: false, error: "Rate limit exceeded" });
+  });
+});
+
+describe("updatePassword", () => {
+  it("updates the password for the active (recovery) session", async () => {
+    mockAuth.updateUser.mockResolvedValue({ data: {}, error: null });
+    const result = await updatePassword("NewPassw0rd!");
+    expect(result).toEqual({ success: true });
+    expect(mockAuth.updateUser).toHaveBeenCalledWith({ password: "NewPassw0rd!" });
+  });
+
+  it("surfaces an error if there's no active recovery session", async () => {
+    mockAuth.updateUser.mockResolvedValue({ data: null, error: { message: "Auth session missing." } });
+    const result = await updatePassword("NewPassw0rd!");
+    expect(result).toEqual({ success: false, error: "Auth session missing." });
   });
 });
 

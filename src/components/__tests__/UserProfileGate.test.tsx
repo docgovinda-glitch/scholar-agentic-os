@@ -47,7 +47,9 @@ import * as supabaseAuthService from "../../services/supabaseAuthService";
 vi.mock("../../services/supabaseAuthService", () => ({
   signUp: vi.fn(),
   signIn: vi.fn(),
-  requestPasswordReset: vi.fn(),
+  sendPasswordResetEmail: vi.fn(),
+  updatePassword: vi.fn(),
+  onPasswordRecovery: vi.fn(() => () => {}),
 }));
 
 // Vitest's jsdom environment proxies window's own-enumerable properties onto
@@ -85,14 +87,16 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
   let onProfileActive: ReturnType<typeof vi.fn<(username: string, projectState: PaperProject) => void>>;
   const signUpMock = supabaseAuthService.signUp as ReturnType<typeof vi.fn>;
   const signInMock = supabaseAuthService.signIn as ReturnType<typeof vi.fn>;
-  const requestPasswordResetMock = supabaseAuthService.requestPasswordReset as ReturnType<typeof vi.fn>;
+  const sendPasswordResetEmailMock = supabaseAuthService.sendPasswordResetEmail as ReturnType<typeof vi.fn>;
+  const updatePasswordMock = supabaseAuthService.updatePassword as ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     localStorage.clear();
     onProfileActive = vi.fn();
     signUpMock.mockReset();
     signInMock.mockReset();
-    requestPasswordResetMock.mockReset();
+    sendPasswordResetEmailMock.mockReset();
+    updatePasswordMock.mockReset();
   });
 
   afterEach(() => {
@@ -321,58 +325,97 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
     });
   });
 
-  describe("forgot password (admin-approval reset request — unchanged mechanism, relocated call)", () => {
-    it("submits a reset request and shows the success message", async () => {
-      seedExistingProfile("resetuser");
-      requestPasswordResetMock.mockResolvedValue({ success: true });
+  describe("forgot password (Supabase's own resetPasswordForEmail — replaces the old admin-approval flow)", () => {
+    it("sends a reset email and shows a generic success message (email-only, no username/new-password fields anymore)", async () => {
+      seedExistingProfile("someoneelse");
+      sendPasswordResetEmailMock.mockResolvedValue({ success: true });
 
       render(<UserProfileGate onProfileActive={onProfileActive} />);
       fireEvent.click(screen.getByText("Forgot Password?"));
-      fireEvent.change(screen.getByPlaceholderText("Enter username..."), { target: { value: "resetuser" } });
+      expect(screen.queryByPlaceholderText("Enter username...")).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("Enter new password...")).not.toBeInTheDocument();
       fireEvent.change(screen.getByPlaceholderText("Enter registered email..."), { target: { value: "reset@example.com" } });
-      fireEvent.change(screen.getByPlaceholderText("Enter new password..."), { target: { value: "NewPassw0rd!" } });
-      fireEvent.click(screen.getByText("Submit Reset"));
+      fireEvent.click(screen.getByText("Send Reset Link"));
 
-      expect(
-        await screen.findByText(/Password reset request submitted successfully/)
-      ).toBeInTheDocument();
-      expect(requestPasswordResetMock).toHaveBeenCalledWith({
-        username: "resetuser",
-        email: "reset@example.com",
-        newPassword: "NewPassw0rd!",
-      });
+      expect(await screen.findByText(/password reset link has been sent/)).toBeInTheDocument();
+      expect(sendPasswordResetEmailMock).toHaveBeenCalledWith("reset@example.com");
     });
 
-    it("shows an error when the reset request fails", async () => {
-      seedExistingProfile("resetuser2");
-      requestPasswordResetMock.mockResolvedValue({ success: false, error: "Edge Function unreachable." });
+    it("shows an error when the request itself fails", async () => {
+      seedExistingProfile("someoneelse2");
+      sendPasswordResetEmailMock.mockResolvedValue({ success: false, error: "Rate limit exceeded" });
 
       render(<UserProfileGate onProfileActive={onProfileActive} />);
       fireEvent.click(screen.getByText("Forgot Password?"));
-      fireEvent.change(screen.getByPlaceholderText("Enter username..."), { target: { value: "resetuser2" } });
       fireEvent.change(screen.getByPlaceholderText("Enter registered email..."), { target: { value: "reset2@example.com" } });
-      fireEvent.change(screen.getByPlaceholderText("Enter new password..."), { target: { value: "NewPassw0rd!" } });
-      fireEvent.click(screen.getByText("Submit Reset"));
+      fireEvent.click(screen.getByText("Send Reset Link"));
 
-      expect(await screen.findByText(/Failed to submit reset request/)).toBeInTheDocument();
+      expect(await screen.findByText(/Failed to send reset email/)).toBeInTheDocument();
+    });
+  });
+
+  describe("password recovery screen (shown after clicking the emailed reset link)", () => {
+    afterEach(() => {
+      window.location.hash = "";
     });
 
-    it("surfaces result.error alongside the success message, when set (honest email-failure caveat)", async () => {
-      seedExistingProfile("resetuser3");
-      requestPasswordResetMock.mockResolvedValue({
-        success: true,
-        error: "Reset request staged, but the admin notification email couldn't be sent.",
-      });
+    it("does not show the recovery screen until onPasswordRecovery's callback fires", () => {
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      expect(screen.queryByText("Set New Password")).not.toBeInTheDocument();
+    });
+
+    it("does NOT treat a Supabase recovery hash (type=recovery) as a Google OAuth callback", () => {
+      // Regression test: Supabase's password-recovery redirect also lands
+      // with access_token in the URL hash, same as Google's OAuth implicit
+      // flow. The pre-existing Google-callback handler used to grab any
+      // access_token unconditionally and strip the hash via
+      // history.replaceState before Supabase's own client library could
+      // read it — silently breaking password recovery. type=recovery is
+      // what disambiguates the two.
+      window.location.hash = "#access_token=fake-supabase-token&type=recovery&expires_in=3600";
+      const fetchMock = vi.fn();
+      (globalThis as any).fetch = fetchMock;
 
       render(<UserProfileGate onProfileActive={onProfileActive} />);
-      fireEvent.click(screen.getByText("Forgot Password?"));
-      fireEvent.change(screen.getByPlaceholderText("Enter username..."), { target: { value: "resetuser3" } });
-      fireEvent.change(screen.getByPlaceholderText("Enter registered email..."), { target: { value: "reset3@example.com" } });
-      fireEvent.change(screen.getByPlaceholderText("Enter new password..."), { target: { value: "NewPassw0rd!" } });
-      fireEvent.click(screen.getByText("Submit Reset"));
 
-      expect(await screen.findByText(/Password reset request submitted successfully/)).toBeInTheDocument();
-      expect(await screen.findByText(/admin notification email couldn't be sent/)).toBeInTheDocument();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("shows the recovery screen and updates the password on submit", async () => {
+      let recoveryCallback: (() => void) | null = null;
+      (supabaseAuthService.onPasswordRecovery as ReturnType<typeof vi.fn>).mockImplementation((cb: () => void) => {
+        recoveryCallback = cb;
+        return () => {};
+      });
+      updatePasswordMock.mockResolvedValue({ success: true });
+
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      recoveryCallback!();
+
+      expect(await screen.findByText("Set New Password")).toBeInTheDocument();
+      fireEvent.change(screen.getByPlaceholderText("Enter new password..."), { target: { value: "BrandNewPassw0rd!" } });
+      fireEvent.click(screen.getByText("Update Password"));
+
+      expect(await screen.findByText(/Password updated successfully/)).toBeInTheDocument();
+      expect(updatePasswordMock).toHaveBeenCalledWith("BrandNewPassw0rd!");
+    });
+
+    it("shows an error when updating the password fails", async () => {
+      let recoveryCallback: (() => void) | null = null;
+      (supabaseAuthService.onPasswordRecovery as ReturnType<typeof vi.fn>).mockImplementation((cb: () => void) => {
+        recoveryCallback = cb;
+        return () => {};
+      });
+      updatePasswordMock.mockResolvedValue({ success: false, error: "Auth session missing." });
+
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      recoveryCallback!();
+
+      await screen.findByText("Set New Password");
+      fireEvent.change(screen.getByPlaceholderText("Enter new password..."), { target: { value: "BrandNewPassw0rd!" } });
+      fireEvent.click(screen.getByText("Update Password"));
+
+      expect(await screen.findByText("Auth session missing.")).toBeInTheDocument();
     });
   });
 
