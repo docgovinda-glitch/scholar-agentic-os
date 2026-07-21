@@ -11,12 +11,14 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "migrate:users-to-supabase": "tsx scripts/migrate-users-to-supabase.ts",
     "generate:knowledge": "node .claude/scripts/generate-knowledge.js",
     "validate:knowledge": "node .claude/scripts/validate-knowledge.js",
     "check:knowledge": "node .claude/scripts/check-drift.js"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@supabase/supabase-js": "^2.110.7",
     "@tailwindcss/vite": "^4.1.14",
     "@types/pg": "^8.20.0",
     "@vitejs/plugin-react": "^5.0.4",
