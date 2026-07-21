@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { User, Lock, Eye, EyeOff, ShieldCheck, Check, AlertCircle, Sparkles, GraduationCap, ArrowRight, ShieldAlert, Key, Phone, Mail, Building, Landmark, Clock, Settings } from "lucide-react";
 import { UserProfile, PaperProject } from "../types";
+import { signUp, signIn, requestPasswordReset } from "../services/supabaseAuthService";
 
 interface UserProfileGateProps {
   onProfileActive: (username: string, projectState: PaperProject) => void;
@@ -36,14 +37,6 @@ const DEFAULT_STATE = (username: string): PaperProject => ({
   aiSettings: DEFAULT_SETTINGS
 });
 
-// Helper for client-side SHA-256 hashing (runs natively in modern browsers via SubtleCrypto)
-async function sha256(message: string): Promise<string> {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
 // Helper to normalize and compare phone numbers for verification
 function cleanPhoneNumber(num: string): string {
   return num.replace(/[+\s()-]/g, "").replace(/^00/, "").replace(/^0/, "");
@@ -75,7 +68,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
   const [authenticId, setAuthenticId] = useState("");
 
   // Activation Screen States
-  const [activationCode, setActivationCode] = useState("");
   const [pendingUser, setPendingUser] = useState<UserProfile | null>(null);
   const [debugCodeMsg, setDebugCodeMsg] = useState<string | null>(null);
   
@@ -217,61 +209,16 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     const emailOtp = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedEmailOtp(emailOtp);
 
-    let emailSent = false;
-    let bypassMsg = "";
-
-    try {
-      // 1. Dispatch Email OTP
-      try {
-        const emailRes = await fetch("/api/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: nameTrimmed,
-            email: email.trim(),
-            otp: emailOtp
-          })
-        });
-
-        if (emailRes.ok) {
-          const emailData = await emailRes.json();
-          if (emailData.emailSent) {
-            emailSent = true;
-          } else if (emailData.requiresClientEmail) {
-            const fsRes = await fetch(`https://formsubmit.co/ajax/${email.trim()}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Accept": "application/json" },
-              body: JSON.stringify({
-                _subject: "Scholar OS Registration Email Verification Code",
-                "Username": nameTrimmed,
-                "Verification OTP Code": emailOtp,
-                _template: "table"
-              })
-            });
-            if (fsRes.ok) {
-              emailSent = true;
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Failed to dispatch Email OTP via API:", err);
-      }
-
-      if (!emailSent) {
-        bypassMsg += `📧 Email OTP (Sandbox Bypass Code): ${emailOtp}\n`;
-      }
-
-      if (bypassMsg) {
-        setDualVerifyBypass(`⚠️ Credentials for Resend not fully configured on server. Please use the following bypass code for validation:\n\n${bypassMsg}`);
-      }
-
-      setShowDualVerifyScreen(true);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "An error occurred during registration. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    // No backend OTP-dispatch equivalent exists under Supabase — Supabase's
+    // own email confirmation is intentionally disabled (the admin-approval
+    // gate below replaces it; see .claude/HANDOVER.md), so there's nothing
+    // to relocate this call to. This is now a client-side-only
+    // self-verification step: the code is never actually emailed, only
+    // shown via the same sandbox-bypass message the old code fell back to
+    // whenever Resend wasn't configured.
+    setDualVerifyBypass(`⚠️ Credentials for Resend not fully configured on server. Please use the following bypass code for validation:\n\n📧 Email OTP (Sandbox Bypass Code): ${emailOtp}\n`);
+    setShowDualVerifyScreen(true);
+    setLoading(false);
   };
 
   // Handle Email OTP Verification and pending user creation
@@ -298,41 +245,28 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     const defaultProject = DEFAULT_STATE(nameTrimmed);
 
     try {
-      // 1. Submit Registration access request to Admin Queue
-      const registerRes = await fetch("/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: nameTrimmed,
-          fullName: fullName.trim(),
-          email: email.trim(),
-          phone: cleanPh,
-          affiliation: affiliation.trim(),
-          authenticId: authenticId.trim()
-        })
+      // Registers with Supabase Auth directly (creates the real account,
+      // is_approved = false) and triggers the admin-notification email via
+      // the send-approval-email Edge Function — replaces the old
+      // /api/register call + its activation-key issuance. There's no
+      // activation-key concept anymore: approval is the admin flipping
+      // is_approved directly, so the pending screen now checks approval by
+      // attempting a real login instead of comparing a key (see
+      // handleCheckApprovalAndLogin).
+      const result = await signUp({
+        username: nameTrimmed,
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phone: cleanPh,
+        affiliation: affiliation.trim(),
+        authenticId: authenticId.trim(),
+        password: passwordInput
       });
 
-      let activationKeyHash = "";
-      let bypassMsg = "";
-
-      if (registerRes.ok) {
-        const registerData = await registerRes.json();
-        activationKeyHash = registerData.activationKeyHash;
-
-        if (registerData.requiresClientEmail) {
-          bypassMsg = `Admin Approval Link: ${registerData.approveUrl}\n\n`;
-          if (registerData.activationKey) {
-            const hashed = await sha256(registerData.activationKey);
-            activationKeyHash = hashed;
-            bypassMsg += `Activation Code (sandbox bypass): ${registerData.activationKey}\n`;
-          }
-        }
-      }
-
-      if (!activationKeyHash) {
-        const fallbackKey = "SA-123456";
-        activationKeyHash = await sha256(fallbackKey);
-        bypassMsg += `Fallback Activation Key: ${fallbackKey}\n`;
+      if (!result.success) {
+        setDualVerifyError(result.error || "An error occurred finalizing the workspace registration.");
+        setLoading(false);
+        return;
       }
 
       const pendingProfile: UserProfile = {
@@ -344,8 +278,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
         phone: cleanPh,
         affiliation: affiliation.trim(),
         authenticId: authenticId.trim(),
-        status: "pending",
-        activationKeyHash
+        status: "pending"
       };
 
       // Save locally in pending state
@@ -371,8 +304,11 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
         setShowDualVerifyScreen(false);
         setPendingUser(pendingProfile);
         setActiveTab("activation");
-        if (bypassMsg) {
-          setDebugCodeMsg(`⚠️ Admin notification & approval bypass keys:\n\n${bypassMsg}`);
+        if (result.error) {
+          // signUp() returns success:true with an error string when
+          // registration itself succeeded but the admin-notification email
+          // failed to send — surfaced the same way the old bypass message was.
+          setDebugCodeMsg(`⚠️ ${result.error}`);
         }
       }, 800);
 
@@ -402,19 +338,15 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     setLoading(true);
 
     try {
-      const resetRes = await fetch("/api/request-password-reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          email: emailAddr,
-          newPasswordHash: newPassword
-        })
-      });
+      // Same admin-approval-gated reset mechanism as before (stages the new
+      // password, requires an admin to click the emailed approval link) —
+      // just relocated to the request-password-reset Edge Function. Not a
+      // behavior change: this flow is still slated to be replaced by
+      // Supabase's built-in resetPasswordForEmail in a later, separate pass
+      // (see .claude/HANDOVER.md) — untouched here.
+      const result = await requestPasswordReset({ username, email: emailAddr, newPassword });
 
-      if (resetRes.ok) {
-        const resetData = await resetRes.json();
-        
+      if (result.success) {
         // Mark local profile as pending if it exists
         const savedStateStr = localStorage.getItem(`${PROFILE_STATE_PREFIX}${username}`);
         if (savedStateStr) {
@@ -426,13 +358,8 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
         }
 
         setResetSuccessMessage("Password reset request submitted successfully. Workspace is blocked until the Admin approves this request.");
-        
-        if (resetData.requiresClientEmail) {
-          setDebugCodeMsg(`⚠️ Admin reset approval bypass link:\n\n${resetData.approveResetUrl}`);
-        }
       } else {
-        const errText = await resetRes.text();
-        setError(`Failed to submit reset request: ${errText}`);
+        setError(`Failed to submit reset request: ${result.error}`);
       }
     } catch (err: any) {
       setError(err.message || "Network error requesting password reset.");
@@ -647,54 +574,32 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     try {
       const parsedProfile = JSON.parse(savedStateStr) as UserProfile;
 
-      // 1. Verify credentials and check admin approval queue status on the server
+      // 1. Verify credentials and check admin approval status via Supabase Auth
       try {
-        const syncRes = await fetch("/api/verify-and-sync-profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: nameTrimmed,
-            password: passwordInput
-          })
-        });
+        const signInResult = await signIn({ username: nameTrimmed, password: passwordInput });
 
-        if (syncRes.ok) {
-          const syncData = await syncRes.json();
-          if (!syncData.success) {
-            if (syncData.error === "Awaiting Admin Approval" || !syncData.is_approved) {
-              setError("Awaiting Admin Approval. Your registration or password reset is currently in the Admin Queue.");
-              setLoading(false);
-              return;
-            } else {
-              setError(syncData.error || "Authentication failed.");
-              setLoading(false);
-              return;
-            }
-          }
-
-          // Sync database details back to localStorage profile
-          parsedProfile.fullName = syncData.fullName || parsedProfile.fullName;
-          parsedProfile.email = syncData.email || parsedProfile.email;
-          parsedProfile.phone = syncData.phone || parsedProfile.phone;
-          parsedProfile.affiliation = syncData.affiliation || parsedProfile.affiliation;
-          parsedProfile.authenticId = syncData.authenticId || parsedProfile.authenticId;
-          parsedProfile.passcodeHash = passwordInput; // update passcode hash (in case it was reset by admin)
-          parsedProfile.status = "approved"; // since server returned success, it is approved!
-          
-          localStorage.setItem(`${PROFILE_STATE_PREFIX}${nameTrimmed}`, JSON.stringify(parsedProfile));
-        } else {
-          // If offline or endpoint doesn't match, verify password locally
-          if (!parsedProfile.passcodeHash || parsedProfile.passcodeHash !== passwordInput) {
-            setError("Incorrect password credentials. Please verify and try again.");
+        if (!signInResult.success) {
+          if (signInResult.isApproved === false) {
+            setError("Awaiting Admin Approval. Your registration or password reset is currently in the Admin Queue.");
             setLoading(false);
             return;
-          }
-          if (parsedProfile.status === "pending") {
-            setError("Awaiting Admin Approval. (offline check)");
+          } else {
+            setError(signInResult.error || "Authentication failed.");
             setLoading(false);
             return;
           }
         }
+
+        // Sync database details back to localStorage profile
+        parsedProfile.fullName = signInResult.profile?.fullName || parsedProfile.fullName;
+        parsedProfile.email = signInResult.profile?.email || parsedProfile.email;
+        parsedProfile.phone = signInResult.profile?.phone || parsedProfile.phone;
+        parsedProfile.affiliation = signInResult.profile?.affiliation || parsedProfile.affiliation;
+        parsedProfile.authenticId = signInResult.profile?.authenticId || parsedProfile.authenticId;
+        parsedProfile.passcodeHash = passwordInput; // update passcode hash (in case it was reset by admin)
+        parsedProfile.status = "approved"; // since Supabase returned success, it is approved!
+
+        localStorage.setItem(`${PROFILE_STATE_PREFIX}${nameTrimmed}`, JSON.stringify(parsedProfile));
       } catch (syncErr) {
         console.warn("Failed to check approval status on server, falling back to local credentials:", syncErr);
         if (!parsedProfile.passcodeHash || parsedProfile.passcodeHash !== passwordInput) {
@@ -723,9 +628,11 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     }
   };
 
-  // Handle Activation Key Verification
-  const handleVerifyActivation = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Check Admin Approval Status (replaces activation-key verification —
+  // Supabase has no key-exchange concept; approval is the admin flipping
+  // is_approved directly, server-side, so "unlocking" now means attempting
+  // a real login with the credentials already collected during signup).
+  const handleCheckApprovalAndLogin = async () => {
     setError(null);
 
     if (!pendingUser) {
@@ -733,25 +640,29 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
       return;
     }
 
-    if (!activationCode.trim()) {
-      setError("Please enter your activation key.");
-      return;
-    }
-
     setLoading(true);
     try {
-      const enteredHash = await sha256(activationCode.trim());
+      const result = await signIn({ username: pendingUser.username, password: passwordInput });
 
-      if (enteredHash !== pendingUser.activationKeyHash) {
-        setError("Invalid activation key. Please wait for admin approval email or check spelling.");
+      if (!result.success) {
+        setError(
+          result.isApproved === false
+            ? "Still awaiting Admin Approval. Please wait for the admin approval email, then try again."
+            : (result.error || "Authentication failed.")
+        );
         setLoading(false);
         return;
       }
 
-      // Key matched! Update profile to approved
+      // Approved! Update profile to approved, syncing any server-side details.
       const approvedProfile: UserProfile = {
         ...pendingUser,
-        status: "approved"
+        status: "approved",
+        fullName: result.profile?.fullName || pendingUser.fullName,
+        email: result.profile?.email || pendingUser.email,
+        phone: result.profile?.phone || pendingUser.phone,
+        affiliation: result.profile?.affiliation || pendingUser.affiliation,
+        authenticId: result.profile?.authenticId || pendingUser.authenticId
       };
 
       // Save to localStorage
@@ -775,7 +686,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
     } catch (err: any) {
       console.error(err);
-      setError("An error occurred during verification. Check your browser browser support.");
+      setError("An error occurred while checking approval status.");
       setLoading(false);
     }
   };
@@ -1437,7 +1348,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
             </form>
           ) : (
             // Tab: Activation Screen (Pending approval entry)
-            <form onSubmit={handleVerifyActivation} className="space-y-5 animate-fade-in">
+            <div className="space-y-5 animate-fade-in">
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2.5 text-xs text-amber-950">
                 <h4 className="font-bold flex items-center gap-1.5 uppercase font-mono tracking-wider">
                   <Clock className="w-4.5 h-4.5 text-amber-700 animate-pulse" />
@@ -1447,28 +1358,8 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                   Your Scholar Workspace request has been submitted to the administrator.
                 </p>
                 <p className="leading-relaxed">
-                  Please check your registered email (<strong>{pendingUser?.email}</strong>) for your unique <strong>Activation Key</strong> once approved.
+                  Please check your registered email (<strong>{pendingUser?.email}</strong>) once approved, then check your status below.
                 </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
-                  Enter Admin Activation Key
-                </label>
-                <div className="relative">
-                  <Key className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
-                  <input
-                    type="text"
-                    required
-                    className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-4 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono placeholder:text-gray-400/80 uppercase tracking-widest text-center"
-                    placeholder="SA-XXXXXX"
-                    value={activationCode}
-                    onChange={(e) => {
-                      setActivationCode(e.target.value);
-                      setError(null);
-                    }}
-                  />
-                </div>
               </div>
 
               <div className="flex gap-3">
@@ -1484,8 +1375,9 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  disabled={loading || !activationCode}
+                  type="button"
+                  onClick={handleCheckApprovalAndLogin}
+                  disabled={loading}
                   className="w-2/3 py-3 bg-[#C08A3E] hover:bg-[#A3702E] disabled:bg-[#D1CEC7] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
                 >
                   {loading ? (
@@ -1493,12 +1385,12 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                   ) : (
                     <>
                       <ShieldCheck className="w-4 h-4" />
-                      <span>Activate Workspace</span>
+                      <span>Check Approval Status</span>
                     </>
                   )}
                 </button>
               </div>
-            </form>
+            </div>
           )}
         </div>
 
