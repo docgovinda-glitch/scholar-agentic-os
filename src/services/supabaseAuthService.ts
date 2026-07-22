@@ -293,15 +293,40 @@ export interface RequestProfileUpdateInput {
   pendingIdDocumentName?: string;
 }
 
+export interface RequestProfileUpdateResult extends ServiceResult {
+  emailSent?: boolean;
+  /** Plain key, present so ProfileSettings.tsx can show it as a sandbox-bypass notice exactly as server.ts's route did — never persisted, only ever surfaced transiently in the UI. */
+  verificationKey?: string;
+  /** SHA-256 of verificationKey, computed here (client-side, same algorithm ProfileSettings.tsx's own sha256() helper uses) since the request-profile-update Edge Function only returns the plain key — server.ts's old route computed this hash server-side instead; the two are equivalent, just relocated. */
+  keyHash?: string;
+}
+
+async function sha256(message: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /** Stateless, matching server.ts's current behavior exactly — this Edge Function only sends the admin/user notification emails, same as /api/request-profile-update did; it does not persist or apply the change itself. */
-export async function requestProfileUpdate(input: RequestProfileUpdateInput): Promise<ServiceResult> {
+export async function requestProfileUpdate(input: RequestProfileUpdateInput): Promise<RequestProfileUpdateResult> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.functions.invoke("request-profile-update", { body: input });
   if (error) {
     return { success: false, error: error.message };
   }
+
+  const verificationKey: string | undefined = data?.verificationKey;
+  const keyHash = verificationKey ? await sha256(verificationKey) : undefined;
+
   if (data && data.emailSent === false) {
-    return { success: true, error: `Update request created, but the admin notification email couldn't be sent${data.error ? `: ${data.error}` : "."}` };
+    return {
+      success: true,
+      error: `Update request created, but the admin notification email couldn't be sent${data.error ? `: ${data.error}` : "."}`,
+      emailSent: false,
+      verificationKey,
+      keyHash,
+    };
   }
-  return { success: true };
+  return { success: true, emailSent: data?.emailSent, verificationKey, keyHash };
 }

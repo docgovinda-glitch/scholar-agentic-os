@@ -18,6 +18,7 @@ import {
   FileDown
 } from "lucide-react";
 import { UserProfile } from "../types";
+import { requestProfileUpdate } from "../services/supabaseAuthService";
 
 const PROFILES_LIST_KEY = "phd_profiles_meta";
 const PROFILE_STATE_PREFIX = "phd_profile_state_";
@@ -195,26 +196,20 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
     setLoading(true);
 
     try {
-      const res = await fetch("/api/request-profile-update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: currentUser,
-          pendingEmail: emailChanged ? emailVal : undefined,
-          pendingPhone: phoneChanged ? phoneVal : undefined,
-          pendingFullName: fullNameChanged ? fullNameVal : undefined,
-          pendingAffiliation: affiliationChanged ? affiliationVal : undefined,
-          pendingAuthenticId: authenticIdChanged ? authenticIdVal : undefined,
-          pendingIdDocumentName: docChanged ? newIdDocName : undefined
-        })
+      const data = await requestProfileUpdate({
+        username: currentUser,
+        pendingEmail: emailChanged ? emailVal : undefined,
+        pendingPhone: phoneChanged ? phoneVal : undefined,
+        pendingFullName: fullNameChanged ? fullNameVal : undefined,
+        pendingAffiliation: affiliationChanged ? affiliationVal : undefined,
+        pendingAuthenticId: authenticIdChanged ? authenticIdVal : undefined,
+        pendingIdDocumentName: docChanged ? newIdDocName : undefined
       });
 
-      if (!res.ok) {
-        throw new Error(await res.text() || "Failed to submit request to server");
+      if (!data.success) {
+        throw new Error(data.error || "Failed to submit request to server");
       }
 
-      const data = await res.json();
-      
       // Update local storage profile state
       const updatedProfile: UserProfile = {
         ...profile,
@@ -227,17 +222,17 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
         pendingIdDocumentName: docChanged ? newIdDocName : undefined,
         pendingUpdateKeyHash: data.keyHash
       };
-      
+
       localStorage.setItem(`${PROFILE_STATE_PREFIX}${currentUser}`, JSON.stringify(updatedProfile));
       setProfile(updatedProfile);
-      
+
       if (data.emailSent) {
         setSuccess("Profile change request submitted. Verification key sent to administrator.");
       } else {
         setSuccess("Profile change request submitted.");
         setBypassNotice(`sandbox bypass verification key: ${data.verificationKey}`);
       }
-      
+
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Failed to submit change request. Please try again.");

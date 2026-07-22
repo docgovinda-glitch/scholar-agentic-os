@@ -21,6 +21,7 @@ import {
   DollarSign
 } from "lucide-react";
 import AIGateway from "../services/aiGateway";
+import { saveModelPreferences, saveApiKeys } from "../services/supabaseAuthService";
 
 interface AIControlCenterProps {
   project: PaperProject;
@@ -155,37 +156,29 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
     const user = localStorage.getItem("phd_active_session_username") || "";
     if (user) {
       try {
-        await fetch("/api/save-model-preferences", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: user,
-            preferences: {
-              provider: project.aiSettings?.provider || "gemini",
-              openaiModel: project.aiSettings?.openaiModel || "",
-              claudeModel: project.aiSettings?.claudeModel || "",
-              deepseekModel: project.aiSettings?.deepseekModel || "",
-              qwenModel: project.aiSettings?.qwenModel || "",
-              cohereModel: project.aiSettings?.cohereModel || ""
-            }
-          })
+        const prefsResult = await saveModelPreferences({
+          provider: project.aiSettings?.provider || "gemini",
+          openaiModel: project.aiSettings?.openaiModel || "",
+          claudeModel: project.aiSettings?.claudeModel || "",
+          deepseekModel: project.aiSettings?.deepseekModel || "",
+          qwenModel: project.aiSettings?.qwenModel || "",
+          cohereModel: project.aiSettings?.cohereModel || ""
         });
+        if (!prefsResult.success) {
+          console.error("Failed to sync model preferences to Supabase:", prefsResult.error);
+        }
 
-        await fetch("/api/save-api-keys", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: user,
-            apiKeys: {
-              gemini: geminiKey,
-              openai: openaiKey,
-              claude: claudeKey,
-              deepseek: deepseekKey,
-              qwen: qwenKey,
-              cohere: cohereKey
-            }
-          })
+        const apiKeysResult = await saveApiKeys({
+          gemini: geminiKey,
+          openai: openaiKey,
+          claude: claudeKey,
+          deepseek: deepseekKey,
+          qwen: qwenKey,
+          cohere: cohereKey
         });
+        if (!apiKeysResult.success) {
+          console.error("Failed to sync API keys to Supabase:", apiKeysResult.error);
+        }
       } catch (err) {
         console.error("Failed to sync AI settings to server database:", err);
       }

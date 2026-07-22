@@ -271,9 +271,23 @@ describe("requestProfileUpdate", () => {
       error: null,
     });
     const result = await requestProfileUpdate({ username: "jdoe", pendingPhone: "555-0100" });
-    expect(result).toEqual({
-      success: true,
-      error: "Update request created, but the admin notification email couldn't be sent: Resend not configured.",
+    expect(result.success).toBe(true);
+    expect(result.error).toBe("Update request created, but the admin notification email couldn't be sent: Resend not configured.");
+    expect(result.emailSent).toBe(false);
+    expect(result.verificationKey).toBe("UP-123456");
+  });
+
+  it("computes a keyHash from the Edge Function's plain verificationKey, matching the SHA-256 the old server.ts route computed server-side", async () => {
+    mockFunctionsInvoke.mockResolvedValue({
+      data: { success: true, emailSent: true, verificationKey: "UP-654321" },
+      error: null,
     });
+    const result = await requestProfileUpdate({ username: "jdoe", pendingPhone: "555-0100" });
+
+    expect(result.keyHash).toBeDefined();
+    expect(result.keyHash).toHaveLength(64); // SHA-256 hex digest length
+    // Deterministic: hashing the same key again must produce the identical digest.
+    const again = await requestProfileUpdate({ username: "jdoe", pendingPhone: "555-0100" });
+    expect(again.keyHash).toBe(result.keyHash);
   });
 });
