@@ -1,4 +1,5 @@
-import { CitationMetadata, CitationAuthor, CitationValidationError, ExtractionAuditItem } from "../types";
+import { CitationMetadata, CitationAuthor, CitationValidationError } from "../types";
+import { lookupByIdentifier, type CitationLookupResult } from "./citationEnrichmentService";
 
 export function formatAuthorList(authors: CitationAuthor[], style: "APA" | "MLA" | "Chicago" | "IEEE" | "BibTeX" | "Harvard" | "Vancouver"): string {
   if (!authors || authors.length === 0) return "Anonymous";
@@ -131,57 +132,92 @@ export function generateCitation(meta: CitationMetadata, format: string): string
   }
 }
 
-export async function simulateLookup(identifier: string, type: string): Promise<Partial<CitationMetadata>> {
-  await new Promise(r => setTimeout(r, 800));
+function citationLookupResultsToMetadata(matches: CitationLookupResult[], type: string): Partial<CitationMetadata> {
+  if (matches.length === 0) return {};
 
-  const audit: ExtractionAuditItem[] = [
-    { field: "Title", value: "Deep Semantic Retrieval and Verification for Doctoral-Level Literature Synthesis", source: "Crossref DOI", confidence: 98, verified: true },
-    { field: "Authors", value: "Sharma, A.; Rostova, E.", source: "ORCID Registry", confidence: 99, verified: true },
-    { field: "Journal", value: "Journal of Academic Informatics & AI", source: "ISSN Portal", confidence: 95, verified: true },
-    { field: "Publication Year", value: "2026", source: "Publisher Metadata", confidence: 100, verified: true }
-  ];
+  const primary = matches[0];
+  const secondary = matches[1];
+  const pick = (a?: string, b?: string) => (a && a.trim()) || (b && b.trim()) || undefined;
+  const normalizedType = type.trim().toUpperCase();
 
-  return {
-    title: "Deep Semantic Retrieval and Verification for Doctoral-Level Literature Synthesis",
-    abstract: "This paper introduces a high-density reference management architecture optimized for AI-driven academic synthesis, crossref verification, and automated formatting compliance.",
-    sourceType: type === "ISBN" ? "Book" : type === "YouTube" ? "YouTube Video" : "Journal Article",
-    authors: [
-      { id: "1", firstName: "Aravind", lastName: "Sharma", order: 1, corresponding: true, affiliation: "Stanford University", orcid: "0000-0002-1825-0097" },
-      { id: "2", firstName: "Elena", lastName: "Rostova", order: 2, affiliation: "Oxford University", orcid: "0000-0003-4921-8832" }
-    ],
-    publicationDetails: {
-      journalName: "Journal of Academic Informatics & AI",
-      volume: "18",
-      issue: "4",
-      pages: "312-330",
-      publisher: "Oxford University Press"
-    },
-    dates: {
-      publicationDate: "2026-03-15",
-      accessDate: new Date().toISOString().split("T")[0]
-    },
-    identifiers: {
-      doi: type === "DOI" ? identifier : "10.1038/s41586-026-0012-z",
-      url: type === "URL" ? identifier : "https://nature.com/articles/s41586-026-0012-z"
-    },
-    reliability: {
-      peerReviewed: "Yes",
-      evidenceLevel: "High",
-      publicationType: "Primary",
-      openAccess: true,
-      factChecked: true
-    },
-    verification: {
-      doiLookup: true,
-      crossref: true,
-      openAlex: true,
-      pubmed: true,
-      brokenUrl: false,
-      duplicate: false,
-      missingMetadata: false
-    },
-    extractionAudit: audit
+  const metadata: Partial<CitationMetadata> = {};
+
+  if (primary.title) metadata.title = primary.title;
+
+  const abstract = pick(primary.abstract, secondary?.abstract);
+  if (abstract) metadata.abstract = abstract;
+
+  const authorSource = primary.authors.length > 0 ? primary : secondary?.authors.length ? secondary : undefined;
+  if (authorSource) {
+    metadata.authors = authorSource.authors.map((a, i) => ({
+      id: `lookup-author-${i}`,
+      firstName: a.firstName,
+      lastName: a.lastName,
+      order: i + 1,
+    }));
+  }
+
+  const journalName = pick(primary.journalName, secondary?.journalName);
+  const publisher = pick(primary.publisher, secondary?.publisher);
+  const volume = pick(primary.volume, secondary?.volume);
+  const issue = pick(primary.issue, secondary?.issue);
+  const issn = pick(primary.issn, secondary?.issn);
+  const eissn = pick(primary.eissn, secondary?.eissn);
+  if (journalName || publisher || volume || issue || issn || eissn) {
+    metadata.publicationDetails = { journalName, publisher, volume, issue, issn, eissn };
+  }
+
+  const year = pick(primary.year, secondary?.year);
+  if (year) {
+    metadata.dates = { publicationDate: year, accessDate: new Date().toISOString().split("T")[0] };
+  }
+
+  const doi = pick(primary.doi, secondary?.doi);
+  const openAlexId = matches.find((m) => m.openAlexId)?.openAlexId;
+  if (doi || openAlexId) {
+    metadata.identifiers = { doi, openAlexId: openAlexId || undefined };
+  }
+
+  metadata.verification = {
+    doiLookup: normalizedType === "DOI",
+    crossref: matches.some((m) => m.source === "Crossref"),
+    openAlex: matches.some((m) => m.source === "OpenAlex"),
+    pubmed: matches.some((m) => m.source === "PubMed"),
   };
+
+  metadata.sourceType = normalizedType === "ISBN" ? "Book" : "Journal Article";
+
+  // Note: `reliability` (peerReviewed/evidenceLevel/publicationType) is deliberately
+  // never set here. OpenAlex's open_access.is_oa would be a real signal for the
+  // `openAccess` sub-field, but CitationReliability requires the other three fields
+  // together and none of them has an honest value derivable from these sources —
+  // same discipline as aiService.ts's enrichCitationMetadata: don't guess two fields
+  // just to attach a real value to a third.
+
+  return metadata;
+}
+
+/**
+ * Real lookup against Crossref/OpenAlex (DOI), PubMed (PMID), OpenAlex directly (its
+ * own IDs), or Open Library (ISBN) — replaces a hardcoded stub that returned identical
+ * fabricated content (fake ORCIDs, a fake DOI, fake author affiliations) for every
+ * identifier and type, and — worse — presented that fabricated data as independently
+ * "verified" with fake confidence scores. Same defect pattern already fixed for
+ * discoverDataSources/discoverJournals/enrichCitationMetadata; same conventions reused
+ * (citationEnrichmentService.ts: Promise.allSettled tolerance, AbortSignal.timeout,
+ * the word-overlap match-guard from the Crossref-tombstone-record finding).
+ *
+ * Honesty note: only DOI/PMID/OpenAlex-ID/ISBN have a real, free, CORS-clean
+ * structured lookup available — every other identifier type this UI offers (URL
+ * Import, SSRN, Zenodo, ResearchGate, Google Books, YouTube, Podcast) and arXiv
+ * (explicitly out of scope) return an empty result rather than fabricating anything;
+ * see citationEnrichmentService.ts's lookupByIdentifier for why. When nothing is
+ * found or the type isn't supported, this returns `{}` — an honest no-op, not a
+ * fallback to invented content.
+ */
+export async function simulateLookup(identifier: string, type: string): Promise<Partial<CitationMetadata>> {
+  const { matches } = await lookupByIdentifier(identifier, type);
+  return citationLookupResultsToMetadata(matches, type);
 }
 
 export function validateCitationRecord(meta: CitationMetadata, existingRecords?: CitationMetadata[]): CitationValidationError[] {
