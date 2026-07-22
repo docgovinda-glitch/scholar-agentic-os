@@ -2,6 +2,8 @@
 
 **Status: PENDING ARCHITECTURE DECISION — NOT APPROVED, NOT IMPLEMENTED.** Depends on `hosting-and-topology.md` being confirmed first — every tier below assumes the client-side-only topology described there. See that document's §7 for the proposed (not decided) sequencing of these tiers relative to everything else.
 
+> **Amended (2026-07-22)**: "client-side-only" above should be read as "client-side by default, with one accepted exception" — a thin, stateless fetch/search proxy, scoped narrowly per `.claude/HANDOVER.md`'s Standing Boundary Rule. That exception was accepted for retrieval (scholarly/data/search — see `target-workflow.md` §5/§7), not for AI-provider traffic. Whether OpenAI's CORS gap (line below) ever gets routed through that same proxy remains a separate, undecided question — see the note at that line.
+
 Full implementation of all five tiers is the eventual target, but see §6 for why they shouldn't all be built at once, and `hosting-and-topology.md` §7 for the proposed order.
 
 ---
@@ -65,7 +67,7 @@ Tiers 1, 2, 3, and 5 all reuse the same underlying provider-adapter architecture
 **Setup flow**: same shape as Tier 2 — in-app link to the provider, instructions for generating a key, paste into settings.
 
 **Per-provider CORS status (needs verification, not assumed)** — this is the same open question raised in `hosting-and-topology.md` §4, restated here because it's most consequential for this tier:
-- **OpenAI**: least certain. Historically the most restrictive provider about direct browser CORS access to its API. This should be the first thing verified once building starts — if it doesn't support direct calls, either a thin serverless proxy is needed specifically for OpenAI (still consistent with "no self-managed server" — see the stateless-function distinction in `hosting-and-topology.md` §4), or OpenAI support is deprioritized for this tier.
+- **OpenAI**: least certain. Historically the most restrictive provider about direct browser CORS access to its API. This should be the first thing verified once building starts — if it doesn't support direct calls, either a thin serverless proxy is needed specifically for OpenAI (still consistent with "no self-managed server" — see the stateless-function distinction in `hosting-and-topology.md` §4), or OpenAI support is deprioritized for this tier. **Not resolved by the 2026-07-22 fetch/search proxy decision**: that decision accepted a proxy for retrieval sources specifically; reusing it for OpenAI traffic too would be a natural-seeming extension once it exists, but it's exactly the kind of scope-creep the Standing Boundary Rule (`.claude/HANDOVER.md`) exists to catch — it needs its own explicit go-ahead, not silent inclusion.
 - **Anthropic**: historically requires the caller to send an explicit `anthropic-dangerous-direct-browser-access` header to permit direct browser calls — the header's existence itself confirms it's supported, just opt-in (Anthropic's way of making the "your key is now exposed client-side" tradeoff explicit).
 - **Google Gemini**: reasonably confident this works direct-from-browser (a commonly used pattern for this API); confirm against current docs.
 
