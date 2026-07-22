@@ -12,6 +12,7 @@
 
 import { ADMIN_EMAIL } from "../_shared/adminClient.ts";
 import { sendEmail, brandedEmailHtml } from "../_shared/resend.ts";
+import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
 interface RequestBody {
   username: string;
@@ -24,13 +25,16 @@ interface RequestBody {
 }
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
   const body: RequestBody = await req.json();
   const { username, pendingEmail, pendingPhone, pendingFullName, pendingAffiliation, pendingAuthenticId, pendingIdDocumentName } = body;
 
   if (!username) {
     return new Response(JSON.stringify({ error: "Username is required" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
 
@@ -63,6 +67,6 @@ Deno.serve(async (req) => {
 
   return new Response(JSON.stringify({ success: true, emailSent: sent, verificationKey, error }), {
     status: 200,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
   });
 });

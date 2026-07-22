@@ -8,6 +8,7 @@
 
 import { ADMIN_EMAIL } from "../_shared/adminClient.ts";
 import { sendEmail, brandedEmailHtml } from "../_shared/resend.ts";
+import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
 interface RequestBody {
   userId: string;
@@ -20,6 +21,9 @@ interface RequestBody {
 }
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
   const body: RequestBody = await req.json();
   const { userId, username, fullName, email, phone, affiliation, authenticId } = body;
 
@@ -52,7 +56,7 @@ Deno.serve(async (req) => {
   });
 
   return new Response(JSON.stringify({ success: true, emailSent: sent, error }), {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
     status: 200,
   });
 });
