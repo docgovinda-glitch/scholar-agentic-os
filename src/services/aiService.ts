@@ -2,6 +2,7 @@ import { PaperProject, GroundingMap, DiscoveredDataSource, RecommendJournal, Com
 import { decryptData } from "../utils/crypto";
 import AIGateway from "./aiGateway";
 import { isVaultActive, getActiveVaultContext, buildCitationPrompt, getRelevantChunksContext } from "./knowledgeVaultService";
+import { discoverLiterature } from "./literatureRetrievalService";
 import { APA7Formatter } from "../citation_compliance/formatters/apa7";
 import { IEEEFormatter } from "../citation_compliance/formatters/ieee";
 import { MLA9Formatter } from "../citation_compliance/formatters/mla9";
@@ -545,43 +546,38 @@ Generate a comprehensive "Dissertation Grounding Map" in JSON format. ${vaultAct
 }
 
 // Phase C: Research Data Discovery
+//
+// Real retrieval against Crossref, OpenAlex, PubMed, and Semantic Scholar — replaces
+// the prior LLM-naming behavior (asking a model to *name* sources from memory, with
+// no verification step). That was recorded as a defect, not a weaker-but-valid version
+// of "restricted to authoritative sources" — see docs/planning/target-workflow.md §0/§2.
+// arXiv and generic web search are out of scope here; both need the accepted
+// fetch/search proxy (HANDOVER.md's Standing Boundary Rule), not a client-side call.
 export async function discoverDataSources(project: PaperProject): Promise<{ sources: DiscoveredDataSource[] }> {
-  const systemInstruction = `You are an advanced, scholarly Research Data & Literature Discovery system.
-Your purpose is to systematically identify, verify, and organize 3 to 4 open, free, authentic, and official databases, registries, and major literature repositories (e.g. Scopus, Web of Science, IEEE Xplore, PubMed, Google Scholar, DOAJ, Harvard Dataverse) matching the research methodology.
-These sources will be used to systematically compile and verify at least 100 authentic, verified, and relevant scholarly references during the drafting phase.
-Provide real, authentic public source names and verify their reliability. Never suggest fictional or simulated databases. Label reliability and limitations objectively.`;
+  const query = [project.title, project.keywords].filter(Boolean).join(" ").trim() || project.field?.trim() || "";
+  const { results } = await discoverLiterature(query);
 
-  const prompt = `Based on the following research parameters:
-- Title: ${project.title || "Untitled Paper"}
-- Methodology: ${project.methodology || ""}
-- Discipline: ${project.field || ""}
-- Keywords: ${project.keywords || ""}
+  const sources: DiscoveredDataSource[] = results.map((r) => {
+    const byline = [r.authors, r.year && `(${r.year})`, r.venue].filter(Boolean).join(" ");
+    const abstractSnippet = r.abstract
+      ? `${r.abstract.slice(0, 300)}${r.abstract.length > 300 ? "…" : ""}`
+      : `Abstract not provided by ${r.source}.`;
 
-Generate 3 to 4 high-quality public data and literature source recommendations to systematically gather relevant literature. Include both quantitative and qualitative options if appropriate.
-Return strictly valid JSON in this format:
-{
-  "sources": [
-    {
-      "name": "Exact Name of Public Source or Literature Repository (e.g. World Bank Open Data, DOAJ, Google Scholar)",
-      "url": "Authentic portal URL or locator identifier",
-      "type": "Quantitative" or "Qualitative" or "Mixed",
-      "relevance": "Direct explanation of how this repository helps systematically identify and organize at least 100 relevant scholarly sources for the methodology",
-      "reliability": "Assessment of data governance, official standing, peer-recognized trust",
-      "limitations": "Inherent limitations of this public dataset or literature source (e.g., temporal coverage, paywalls, self-reporting biases)"
-    }
-  ]
-}`;
-
-  const responseText = await generateWithSettings({
-    systemInstruction,
-    prompt,
-    temperature: 0.3,
-    responseMimeType: "application/json",
-    aiSettings: project.aiSettings,
-    taskType: "data-discovery"
+    return {
+      name: r.title,
+      url: r.url,
+      // Per-paper methodology (quantitative/qualitative) isn't part of the standard
+      // bibliographic metadata any of these four APIs expose — "Mixed" is a documented,
+      // honest default, not a real classification.
+      type: "Mixed",
+      relevance: byline ? `${byline} — ${abstractSnippet}` : abstractSnippet,
+      reliability: `Indexed in ${r.source}${r.citationCount != null ? `; cited ${r.citationCount} time${r.citationCount === 1 ? "" : "s"}` : ""}.`,
+      limitations: `Retrieved directly from ${r.source}'s public API — review the full text and verify citation accuracy before relying on it academically.`,
+      approved: false,
+    };
   });
 
-  return safeParseJSON<{ sources: DiscoveredDataSource[] }>(responseText);
+  return { sources };
 }
 
 // Phase D: Journal Discovery
