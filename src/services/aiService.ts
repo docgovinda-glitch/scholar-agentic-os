@@ -4,6 +4,7 @@ import AIGateway from "./aiGateway";
 import { isVaultActive, getActiveVaultContext, buildCitationPrompt, getRelevantChunksContext } from "./knowledgeVaultService";
 import { discoverLiterature } from "./literatureRetrievalService";
 import { discoverJournalCandidates } from "./journalRetrievalService";
+import { lookupCitation, type CitationLookupResult } from "./citationEnrichmentService";
 import { APA7Formatter } from "../citation_compliance/formatters/apa7";
 import { IEEEFormatter } from "../citation_compliance/formatters/ieee";
 import { MLA9Formatter } from "../citation_compliance/formatters/mla9";
@@ -1453,42 +1454,94 @@ export async function runCitationAIAction(
   return responseText;
 }
 
+// Real lookup against Crossref + OpenAlex — replaces a hardcoded stub that returned
+// identical fabricated content (fake abstract, fake "named entities" like "Stanford
+// University"/"Crossref API") regardless of the actual paper. Worse than the LLM-
+// naming defect fixed elsewhere in this file: this wasn't even model-based, so no
+// input ever changed the output. See docs/planning/target-workflow.md §0/§2 for the
+// underlying "real retrieval, not fabrication" standard this now follows.
+//
+// Honesty note: only fields Crossref/OpenAlex actually expose are filled in
+// (abstract, authors, journal/publisher, dates, identifiers, open-access status).
+// Fields no bibliographic-metadata API can supply — full-text-derived summaries,
+// key findings, SDG/UNESCO/OECD classification, named-entity extraction — are left
+// completely untouched rather than invented; that would require real full-text
+// analysis of the user's own uploaded document, a different (legitimate) feature
+// this pass doesn't attempt. Existing, already-confirmed fields are never
+// overwritten — this only fills genuine gaps.
 export async function enrichCitationMetadata(meta: Partial<CitationMetadata>, rawText?: string, aiSettings?: AISettings): Promise<Partial<CitationMetadata>> {
-  await new Promise(r => setTimeout(r, 1000));
-  return {
-    ...meta,
-    abstract: meta.abstract || "This enriched doctoral study investigates automated literature synthesis and cross-disciplinary knowledge retrieval architectures. Findings demonstrate significant improvements in citation precision and auditability.",
-    extraction: {
-      ...meta.extraction,
-      executiveSummary: "Executive synthesis demonstrates that high-density reference management systems accelerate literature review completion by over 40% while eliminating manual citation formatting errors.",
-      keyFindings: [
-        "Cascading identifier lookups achieve 98.4% metadata verification accuracy across DOIs and ORCIDs.",
-        "Automated retraction detection prevents inadvertent citation of discredited biomedical literature.",
-        "Inline multi-format generators reduce manuscript re-formatting overhead during journal resubmission."
-      ],
-      researchQuestions: [
-        "How can AI-assisted reference extraction maintain academic integrity without manual data entry?",
-        "What architectural patterns optimize real-time multi-style citation compilation in React web workbenches?"
-      ],
-      methodology: "Quantitative comparative analysis of 1,200 research articles processed across 17 distinct ingestion pathways.",
-      limitations: "Analysis currently simulates external API latency and relies on structured JSON responses.",
-      recommendations: "Future research should explore direct integration with institutional university repositories and Zotero live sync protocols."
-    },
-    classification: {
-      ...meta.classification,
-      researchType: "Quantitative",
-      methodology: "Empirical Systems Design",
-      sampleSize: "N = 1,200 sources",
-      sdgMapping: ["SDG 4: Quality Education", "SDG 9: Industry, Innovation and Infrastructure"],
-      unescoClassification: "1203 Computer Sciences",
-      oecdClassification: "1.02 Computer and information sciences"
-    },
-    aiKnowledge: {
-      ...meta.aiKnowledge,
-      mainConcepts: ["Academic Informatics", "Semantic Extraction", "Citation Grounding", "Knowledge Graph Architecture"],
-      namedEntities: ["Stanford University", "Oxford University Press", "Crossref API", "OpenAlex Catalog"],
-      topics: ["Literature Synthesis", "Reference Management", "AI Assistant Design"]
+  const doi = meta.identifiers?.doi;
+  const title = meta.title;
+
+  let lookup: { matches: CitationLookupResult[]; sourceErrors: string[] };
+  try {
+    lookup = await lookupCitation({ doi, title });
+  } catch {
+    // No DOI and no title to search on — nothing to look up. Honest no-op.
+    return meta;
+  }
+
+  if (lookup.matches.length === 0) {
+    // No real match found in either source. Honest no-op — never fabricate a
+    // fallback the way the old stub did.
+    return meta;
+  }
+
+  const crossrefMatch = lookup.matches.find((m) => m.source === "Crossref");
+  const openAlexMatch = lookup.matches.find((m) => m.source === "OpenAlex");
+  const primary = crossrefMatch || openAlexMatch!;
+  const secondary = crossrefMatch ? openAlexMatch : undefined;
+  const pick = (a?: string, b?: string) => (a && a.trim()) || (b && b.trim()) || undefined;
+
+  const enriched: Partial<CitationMetadata> = { ...meta };
+
+  enriched.abstract = meta.abstract || pick(primary.abstract, secondary?.abstract);
+
+  if (!meta.authors || meta.authors.length === 0) {
+    const authorSource = primary.authors.length > 0 ? primary : secondary?.authors.length ? secondary : undefined;
+    if (authorSource) {
+      enriched.authors = authorSource.authors.map((a, i) => ({
+        id: `enriched-author-${i}`,
+        firstName: a.firstName,
+        lastName: a.lastName,
+        order: i + 1,
+      }));
     }
+  }
+
+  enriched.publicationDetails = {
+    ...meta.publicationDetails,
+    journalName: meta.publicationDetails?.journalName || pick(primary.journalName, secondary?.journalName),
+    publisher: meta.publicationDetails?.publisher || pick(primary.publisher, secondary?.publisher),
+    volume: meta.publicationDetails?.volume || pick(primary.volume, secondary?.volume),
+    issue: meta.publicationDetails?.issue || pick(primary.issue, secondary?.issue),
+    issn: meta.publicationDetails?.issn || pick(primary.issn, secondary?.issn),
+    eissn: meta.publicationDetails?.eissn || pick(primary.eissn, secondary?.eissn),
   };
+
+  enriched.dates = {
+    ...meta.dates,
+    publicationDate: meta.dates?.publicationDate || pick(primary.year, secondary?.year),
+  };
+
+  enriched.identifiers = {
+    ...meta.identifiers,
+    doi: meta.identifiers?.doi || pick(primary.doi, secondary?.doi),
+    openAlexId: meta.identifiers?.openAlexId || openAlexMatch?.openAlexId || undefined,
+  };
+
+  const isOpenAccess = primary.isOpenAccess ?? secondary?.isOpenAccess ?? null;
+  if (meta.reliability && isOpenAccess !== null) {
+    enriched.reliability = { ...meta.reliability, openAccess: meta.reliability.openAccess ?? isOpenAccess };
+  }
+
+  enriched.verification = {
+    ...meta.verification,
+    doiLookup: Boolean(doi),
+    crossref: Boolean(crossrefMatch),
+    openAlex: Boolean(openAlexMatch),
+  };
+
+  return enriched;
 }
 
