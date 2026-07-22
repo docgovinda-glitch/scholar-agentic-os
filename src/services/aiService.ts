@@ -3,6 +3,7 @@ import { decryptData } from "../utils/crypto";
 import AIGateway from "./aiGateway";
 import { isVaultActive, getActiveVaultContext, buildCitationPrompt, getRelevantChunksContext } from "./knowledgeVaultService";
 import { discoverLiterature } from "./literatureRetrievalService";
+import { discoverJournalCandidates } from "./journalRetrievalService";
 import { APA7Formatter } from "../citation_compliance/formatters/apa7";
 import { IEEEFormatter } from "../citation_compliance/formatters/ieee";
 import { MLA9Formatter } from "../citation_compliance/formatters/mla9";
@@ -581,45 +582,40 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
 }
 
 // Phase D: Journal Discovery
+//
+// Real retrieval against Crossref, OpenAlex Sources, and DOAJ — replaces the prior
+// LLM-naming behavior (asking a model to *name* journals from memory, with an
+// instruction not to hallucinate but no verification step). Same defect pattern
+// already fixed for discoverDataSources — see docs/planning/target-workflow.md §0/§2.
+// Honesty note: no metadata source here can verify "not predatory" as a fact — what's
+// real is that results are limited to journals actually indexed by these three
+// reputable registries, and fields none of them expose for a given journal (e.g.
+// peer-review process for a non-DOAJ subscription journal) are reported as explicitly
+// unavailable, never invented.
 export async function discoverJournals(project: PaperProject): Promise<{ journals: RecommendJournal[] }> {
-  const systemInstruction = `You are an academic Publishing Strategist and Bibliometric expert. 
-Your objective is to find 3 to 4 candidate peer-reviewed academic journals indexed in Scopus, Web of Science, or DOAJ. 
-Provide authentic, well-known academic journals. Focus on journals that do not charge high APC (Article Processing Charge) fees (prefer diamond open access or standard subscription journals with no submission fees if possible). 
-Identify predatory indicators and rule out predatory journals entirely.`;
+  // Query priority is deliberately field-first here, unlike discoverDataSources'
+  // title+keywords-first approach — empirically verified 2026-07-22 (real browser
+  // requests): Crossref's /journals and OpenAlex's /sources search far stricter than
+  // their /works equivalents, returning zero results for combined multi-concept
+  // queries (e.g. "diabetes dietary intervention" — three perfectly coherent words —
+  // matched nothing) where a single canonical discipline term reliably does. A
+  // journal is matched by its field/discipline, not by a paper's specific keywords.
+  const firstKeyword = project.keywords?.split(",")[0]?.trim();
+  const query = project.field?.trim() || firstKeyword || project.title?.trim() || "";
+  const { results } = await discoverJournalCandidates(query);
 
-  const prompt = `Identify candidate journals for:
-- Paper Title: ${project.title || "A dissertation-grounded study"}
-- Keywords: ${project.keywords || ""}
-- Target Field: ${project.field || ""}
-- Desired Journal Scope/Vibe: ${project.preferredJournalScope || ""}
-- Article Type: ${project.articleType || ""}
+  const journals: RecommendJournal[] = results.map((r) => ({
+    name: r.name,
+    publisher: r.publisher,
+    scopeFit: r.scopeFit,
+    ranking: r.ranking,
+    feeStatus: r.feeStatus,
+    submissionOpenness: r.submissionOpenness,
+    reviewContext: r.reviewContext,
+    whyFit: r.whyFit,
+  }));
 
-Generate a shortlist of exactly 3 to 4 reputable journals. Return strictly valid JSON matching this format:
-{
-  "journals": [
-    {
-      "name": "Official Journal Name (e.g., Journal of Cleaner Production)",
-      "publisher": "Academic Publisher (e.g., Elsevier, Springer, Oxford University Press)",
-      "scopeFit": "Critical analysis of why this paper fits the journal's aims and scope",
-      "ranking": "Realistic indexing and rankings (e.g., Scopus Q1, WoS JIF, ABDC, SJR rating)",
-      "feeStatus": "Accurate publication/APC fees (e.g. No APC to publish under standard subscription, or $0 Open Access, or specific APC)",
-      "submissionOpenness": "General turnaround speed and open call info",
-      "reviewContext": "Likely peer review context (double-blind, constructive, rigorous, etc.)",
-      "whyFit": "Main strategic reason for choosing this journal"
-    }
-  ]
-}`;
-
-  const responseText = await generateWithSettings({
-    systemInstruction,
-    prompt,
-    temperature: 0.3,
-    responseMimeType: "application/json",
-    aiSettings: project.aiSettings,
-    taskType: "journal-match"
-  });
-
-  return safeParseJSON<{ journals: RecommendJournal[] }>(responseText);
+  return { journals };
 }
 
 // Phase E: Journal Requirements Compliance Setup
