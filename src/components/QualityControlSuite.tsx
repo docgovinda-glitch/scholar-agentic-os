@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import { PaperProject, QCReport } from "../types";
 import { ShieldCheck, Sparkles, RefreshCcw, CheckSquare, AlertTriangle, Play, HelpCircle, ArrowRight, CheckCircle2, Info, AlertCircle } from "lucide-react";
 import { runQualityControl } from "../services/aiService";
+import { executeAgent } from "../services/agentService";
+import { buildIntegrityReviewerInput } from "../services/integrityReviewAdapter";
+import type { IntegrityReviewReport } from "../agents/integrityReviewer";
 
 interface QualityControlSuiteProps {
   project: PaperProject;
@@ -18,6 +21,33 @@ export default function QualityControlSuite({
 }: QualityControlSuiteProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Stage 10 (target-workflow.md) — IntegrityReviewerAgent, wired through
+  // agentService.executeAgent(), additive to the existing runQualityControl
+  // flow above (not replacing it — the two produce differently-shaped
+  // reports and this project's rule is never to remove working
+  // functionality without being asked).
+  const [integrityLoading, setIntegrityLoading] = useState(false);
+  const [integrityError, setIntegrityError] = useState<string | null>(null);
+  const [integrityReport, setIntegrityReport] = useState<IntegrityReviewReport | null>(null);
+
+  const runIntegrityReview = async () => {
+    setIntegrityLoading(true);
+    setIntegrityError(null);
+    try {
+      const input = buildIntegrityReviewerInput(project);
+      const result = await executeAgent("integrity-reviewer", input);
+      if (result.ok) {
+        setIntegrityReport(result.data as IntegrityReviewReport);
+      } else {
+        setIntegrityError(result.error?.message || "Integrity review failed.");
+      }
+    } catch (err: any) {
+      setIntegrityError(err.message || "An error occurred while running the integrity review.");
+    } finally {
+      setIntegrityLoading(false);
+    }
+  };
 
   const loadStandardQCReport = () => {
     setError(null);
@@ -124,6 +154,52 @@ export default function QualityControlSuite({
           </div>
         </div>
       )}
+
+      {/* Stage 10 — IntegrityReviewerAgent, wired through agentService.executeAgent(),
+          additive and independent of the runQualityControl flow above/below —
+          available regardless of whether a qcReport has been generated yet. */}
+      <div className="glass-effect rounded-xl p-5 border border-gray-200 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-[#1A365D] font-serif uppercase tracking-wider">
+              Integrity & Ethics Review (Agent)
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Runs the Research Integrity & Ethics Reviewer agent directly against your compiled manuscript text.
+            </p>
+          </div>
+          <button
+            onClick={runIntegrityReview}
+            disabled={integrityLoading}
+            className="px-4 py-2 bg-[#1A365D] hover:bg-[#122847] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            {integrityLoading ? "Running…" : "Run Integrity & Ethics Review"}
+          </button>
+        </div>
+
+        {integrityError && (
+          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">{integrityError}</p>
+        )}
+
+        {integrityReport && (
+          <div className="space-y-3 text-xs text-gray-700">
+            <p className="font-semibold">{integrityReport.executiveSummary}</p>
+            <p>
+              Publication readiness:{" "}
+              <span className={integrityReport.publicationReadiness ? "text-emerald-700 font-bold" : "text-red-700 font-bold"}>
+                {integrityReport.publicationReadiness ? "Ready" : "Not ready"}
+              </span>
+            </p>
+            {integrityReport.recommendations.length > 0 && (
+              <ul className="list-disc list-inside space-y-1">
+                {integrityReport.recommendations.map((rec, i) => (
+                  <li key={i}>{rec}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
       {!report && !loading ? (
         <div className="p-8 text-center glass-effect rounded-2xl border border-gray-200 space-y-4">
