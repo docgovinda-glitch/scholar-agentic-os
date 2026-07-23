@@ -3,6 +3,7 @@ import { decryptData } from "../utils/crypto";
 import AIGateway from "./aiGateway";
 import { isVaultActive, getActiveVaultContext, buildCitationPrompt, getRelevantChunksContext } from "./knowledgeVaultService";
 import { discoverLiterature, discoverStatisticalData } from "./literatureRetrievalService";
+import { searchProxy } from "./searchProxyService";
 import { discoverJournalCandidates } from "./journalRetrievalService";
 import { lookupCitation, type CitationLookupResult } from "./citationEnrichmentService";
 import { APA7Formatter } from "../citation_compliance/formatters/apa7";
@@ -599,7 +600,23 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
   }
 
   const query = [project.title, project.keywords].filter(Boolean).join(" ").trim() || project.field?.trim() || "";
-  const { results } = await discoverLiterature(query);
+
+  // Literature, statistical, and authoritative-web-search (Tavily proxy) run in
+  // parallel and are tolerated independently — mirrors the Promise.allSettled
+  // pattern discoverLiterature/discoverStatisticalData already use across their
+  // own sub-sources. discoverLiterature is the one exception that still
+  // propagates a rejection (see below): it's the primary/required source, the
+  // other two are supplements that must never block it or each other.
+  const [literatureSettled, statisticalSettled, searchProxySettled] = await Promise.allSettled([
+    discoverLiterature(query),
+    discoverStatisticalData(query),
+    searchProxy(query),
+  ]);
+
+  if (literatureSettled.status === "rejected") {
+    throw literatureSettled.reason;
+  }
+  const { results } = literatureSettled.value;
 
   const literatureSources: DiscoveredDataSource[] = results.map((r) => {
     const byline = [r.authors, r.year && `(${r.year})`, r.venue].filter(Boolean).join(" ");
@@ -621,7 +638,7 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
     };
   });
 
-  const { results: statisticalResults } = await discoverStatisticalData(query);
+  const statisticalResults = statisticalSettled.status === "fulfilled" ? statisticalSettled.value.results : [];
   const statisticalSources: DiscoveredDataSource[] = statisticalResults.map((r) => ({
     name: r.name,
     url: r.url,
@@ -638,7 +655,32 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
     status: "pending",
   }));
 
-  return { sources: [...literatureSources, ...statisticalSources] };
+  // Authoritative-web-search results (Tavily, restricted server-side to
+  // .gov/.edu/.org/.int by default — see supabase/functions/search-proxy).
+  // Reaches government/NGO/institutional web content none of the APIs above
+  // index. Never throws (see searchProxyService.ts); a failure here just
+  // means an empty results array, tolerated the same way statistical-data
+  // failures already are.
+  const webSearchResults = searchProxySettled.status === "fulfilled" ? searchProxySettled.value.results : [];
+  const webSearchSources: DiscoveredDataSource[] = webSearchResults.map((r) => {
+    const contentSnippet = r.content
+      ? `${r.content.slice(0, 300)}${r.content.length > 300 ? "…" : ""}`
+      : "No content preview provided.";
+
+    return {
+      name: r.title,
+      url: r.url,
+      // No methodology signal is available from a generic web page — "Mixed" is
+      // the same honest, disclosed default used for literature results above.
+      type: "Mixed",
+      relevance: contentSnippet,
+      reliability: `Retrieved via authoritative-domain-restricted web search (relevance score ${r.score.toFixed(2)}).`,
+      limitations: "Retrieved via generic web search restricted to .gov/.edu/.org/.int domains — not a specialized bibliographic or statistical API. Verify authorship, currency, and accuracy directly on the source page before relying on it academically.",
+      status: "pending",
+    };
+  });
+
+  return { sources: [...literatureSources, ...statisticalSources, ...webSearchSources] };
 }
 
 // Phase D: Journal Discovery

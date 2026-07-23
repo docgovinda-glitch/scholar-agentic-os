@@ -16,6 +16,11 @@ vi.mock("../literatureRetrievalService", () => ({
   discoverStatisticalData: mockDiscoverStatisticalData,
 }));
 
+const { mockSearchProxy } = vi.hoisted(() => ({ mockSearchProxy: vi.fn() }));
+vi.mock("../searchProxyService", () => ({
+  searchProxy: mockSearchProxy,
+}));
+
 import { discoverDataSources } from "../aiService";
 
 function literatureResult(overrides: Partial<LiteratureResult> = {}): LiteratureResult {
@@ -34,9 +39,10 @@ function literatureResult(overrides: Partial<LiteratureResult> = {}): Literature
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Default: no statistical matches, so existing literature-only tests (which don't
-  // set this up themselves) keep seeing exactly their original expected output.
+  // Default: no statistical/web-search matches, so existing tests that don't set
+  // these up themselves keep seeing exactly their original expected output.
   mockDiscoverStatisticalData.mockResolvedValue({ results: [], sourceErrors: [] });
+  mockSearchProxy.mockResolvedValue({ results: [] });
 });
 
 describe("discoverDataSources — real retrieval (post-fix behavior)", () => {
@@ -149,12 +155,51 @@ describe("discoverDataSources — real retrieval (post-fix behavior)", () => {
     expect(result.sources[0].name).toBe("A Study of Testing");
   });
 
+  it("appends authoritative-web-search (Tavily proxy) results after literature and statistical sources", async () => {
+    mockDiscoverLiterature.mockResolvedValue({ results: [literatureResult()], sourceErrors: [] });
+    mockDiscoverStatisticalData.mockResolvedValue({
+      results: [{ name: "Population, total", url: "https://data.worldbank.org/indicator/SP.POP.TOTL", description: "Total population by country.", source: "World Bank" }],
+      sourceErrors: [],
+    });
+    mockSearchProxy.mockResolvedValue({
+      results: [
+        { title: "WHO Data Portal", url: "https://www.who.int/data", content: "Global health statistics and indicators.", score: 0.87 },
+      ],
+    });
+
+    const project = { ...DEFAULT_STATE("tester"), title: "Some Title" };
+    const result = await discoverDataSources(project);
+
+    expect(mockSearchProxy).toHaveBeenCalledWith("Some Title");
+    expect(result.sources).toHaveLength(3);
+    // Literature first, then statistical, then web-search — matching existing ordering.
+    expect(result.sources.map((s) => s.name)).toEqual(["A Study of Testing", "Population, total", "WHO Data Portal"]);
+
+    const webSource = result.sources.find((s) => s.name === "WHO Data Portal")!;
+    expect(webSource.url).toBe("https://www.who.int/data");
+    expect(webSource.relevance).toContain("Global health statistics and indicators.");
+    expect(webSource.status).toBe("pending");
+    expect(webSource.limitations).toContain(".gov/.edu/.org/.int");
+  });
+
+  it("still returns literature and statistical sources when the search proxy finds nothing or fails", async () => {
+    mockDiscoverLiterature.mockResolvedValue({ results: [literatureResult()], sourceErrors: [] });
+    mockSearchProxy.mockResolvedValue({ results: [], error: "Search proxy request failed: timeout" });
+
+    const project = { ...DEFAULT_STATE("tester"), title: "Some Title" };
+    const result = await discoverDataSources(project);
+
+    expect(result.sources).toHaveLength(1);
+    expect(result.sources[0].name).toBe("A Study of Testing");
+  });
+
   it("skips agent-driven discovery entirely for research-proposal projects — per target-workflow.md, agents never add data for this format", async () => {
     const project = { ...DEFAULT_STATE("tester"), title: "Some Title", outputFormat: "research-proposal" as const };
     const result = await discoverDataSources(project);
 
     expect(mockDiscoverLiterature).not.toHaveBeenCalled();
     expect(mockDiscoverStatisticalData).not.toHaveBeenCalled();
+    expect(mockSearchProxy).not.toHaveBeenCalled();
     expect(result.sources).toEqual([]);
   });
 
