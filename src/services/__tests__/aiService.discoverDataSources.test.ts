@@ -60,7 +60,7 @@ describe("discoverDataSources — real retrieval (post-fix behavior)", () => {
       name: "A Study of Testing",
       url: "https://doi.org/10.1234/test",
       type: "Mixed",
-      approved: false,
+      status: "pending",
     });
     expect(result.sources[0].relevance).toContain("Ada Lovelace");
     expect(result.sources[0].relevance).toContain("This paper studies testing in great detail.");
@@ -131,7 +131,7 @@ describe("discoverDataSources — real retrieval (post-fix behavior)", () => {
     expect(wbSource.relevance).toContain("Total population by country.");
     expect(wbSource.reliability).toContain("World Bank");
     expect(wbSource.limitations).toContain("no server-side keyword search");
-    expect(wbSource.approved).toBe(false);
+    expect(wbSource.status).toBe("pending");
 
     const oecdSource = result.sources.find((s) => s.name === "Trade in goods")!;
     expect(oecdSource.type).toBe("Quantitative");

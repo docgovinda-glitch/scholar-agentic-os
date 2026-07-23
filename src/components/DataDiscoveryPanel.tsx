@@ -64,7 +64,7 @@ export default function DataDiscoveryPanel({
           relevance: "Provides the complete, authoritative English translation of the Treaties of Münster and Osnabrück (1648) for primary-text hermeneutic analysis of Westphalian sovereignty.",
           reliability: "Highly reputable academic digital library maintained by Yale Law School.",
           limitations: "Focuses strictly on the legal/diplomatic texts, requiring external interpretive frameworks for ontological analysis.",
-          approved: true
+          status: "pending"
         },
         {
           name: "SuttaCentral (Early Buddhist Texts and Pali Canon Archive)",
@@ -73,7 +73,7 @@ export default function DataDiscoveryPanel({
           relevance: "Offers side-by-side translation and primary text mapping of Pali Suttas to analyze the Buddhist ontological and moral conceptualization of Dhamma (cosmic-social order).",
           reliability: "Comprehensive, peer-curated repository of early Buddhist literature with multi-language translation alignments.",
           limitations: "Requires highly specialized hermeneutic retrieval to avoid mapping anachronistic modern IR categories onto ancient text structures.",
-          approved: true
+          status: "pending"
         },
         {
           name: "Rigveda Sanskrit-English Concordance (Sacred Texts Archive)",
@@ -82,7 +82,7 @@ export default function DataDiscoveryPanel({
           relevance: "Contains full translations (e.g., Wilson, Griffith) of the Rigveda to locate and examine occurrences of 'Rta' (cosmic order) and 'Satya' (truth) as relational metaphysical realities.",
           reliability: "Broadly referenced, open-access archive of cultural and philosophical texts.",
           limitations: "Nineteenth-century translations must be cross-referenced with modern Sanskrit scholarship (e.g., Kangle, Radhakrishnan) to ensure philological accuracy.",
-          approved: true
+          status: "pending"
         }
       ];
     } else {
@@ -94,7 +94,7 @@ export default function DataDiscoveryPanel({
           relevance: "Provides extensive peer-curated qualitative studies and quantitative compliance disclosures tracing major Indian companies' corporate governance records.",
           reliability: "Globally recognized, peer-vouched academic depository supported by Harvard of high permanence.",
           limitations: "Mainly features public company filings; missing localized village-level ecological impact surveys.",
-          approved: true
+          status: "pending"
         },
         {
           name: "World Bank Open Data (World Governance Indicators)",
@@ -103,7 +103,7 @@ export default function DataDiscoveryPanel({
           relevance: "Supplies crucial national tracking parameters assessing governmental accountability, rule of law and social stability indexes.",
           reliability: "Premier institutional data pool compiled quarterly across official international bureaus.",
           limitations: "Large data sets are aggregated at national tiers, meaning minor regional micro-trends are omitted.",
-          approved: true
+          status: "pending"
         },
         {
           name: "DOAJ (Directory of Indian Philosophical & Management Research)",
@@ -112,7 +112,7 @@ export default function DataDiscoveryPanel({
           relevance: "Indexes peer-reviewed research papers mapping Eastern ethic paradigms (Arthasastra, Vedic trusteeship) onto modern stakeholder management.",
           reliability: "Strictly cataloged peer-reviewed open access repository ensuring academic validity.",
           limitations: "Relies entirely on text keywords, making retrieval sensitive to translation variations of terms like 'Dharma' or 'Rajadharma'.",
-          approved: true
+          status: "pending"
         }
       ];
     }
@@ -133,11 +133,9 @@ export default function DataDiscoveryPanel({
         ...project,
         dissertationMaterials: (project.dissertationMaterials || "") + uploadedContext
       });
-      const sources: DiscoveredDataSource[] = (data.sources || []).map((s: any) => ({
-        ...s,
-        approved: false,
-      }));
-      updateProject({ dataSources: sources });
+      // discoverDataSources already marks every result "pending" — trust its contract
+      // rather than re-asserting an approval state here.
+      updateProject({ dataSources: data.sources || [] });
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Failed to discover datasets. Check your API settings.");
@@ -230,14 +228,32 @@ export default function DataDiscoveryPanel({
     setUploadedFiles(prev => prev.filter(f => f.name !== name));
   };
 
-  const toggleApprove = (index: number) => {
+  // Approval gate (target-workflow.md Stage 6): agent-found sources land "pending"
+  // and require explicit approval before drafting will use them
+  // (buildApprovedDataSourcesContext in aiService.ts only reads "approved" ones).
+  // Rejecting a pending source removes it outright — there's no persisted
+  // "rejected" state, per the accepted design.
+  const approveSource = (index: number) => {
     if (!project.dataSources) return;
     const updated = [...project.dataSources];
-    updated[index].approved = !updated[index].approved;
+    updated[index] = { ...updated[index], status: "approved" };
     updateProject({ dataSources: updated });
   };
 
-  const approvedCount = project.dataSources?.filter((s) => s.approved).length || 0;
+  const revokeApproval = (index: number) => {
+    if (!project.dataSources) return;
+    const updated = [...project.dataSources];
+    updated[index] = { ...updated[index], status: "pending" };
+    updateProject({ dataSources: updated });
+  };
+
+  const rejectSource = (index: number) => {
+    if (!project.dataSources) return;
+    const updated = project.dataSources.filter((_, i) => i !== index);
+    updateProject({ dataSources: updated });
+  };
+
+  const approvedCount = project.dataSources?.filter((s) => s.status === "approved").length || 0;
 
   // Research proposals skip primary/secondary data collection entirely, and agents
   // never add data sources for this format (target-workflow.md Stage 6) — a proposal
@@ -462,7 +478,7 @@ export default function DataDiscoveryPanel({
               <div>
                 <h4 className="text-sm font-bold text-[#1A365D] font-serif">Auditor Authorization Panel</h4>
                 <p className="text-xs text-gray-500 font-sans">
-                  Review each dataset. Unapproved sources remain excluded from downstream writing co-agents.
+                  Review each dataset. Pending sources are excluded from downstream drafting until approved.
                 </p>
               </div>
               <div className="px-3 py-1.5 bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-mono rounded-lg shrink-0 font-bold">
@@ -475,23 +491,30 @@ export default function DataDiscoveryPanel({
                 <div
                   key={index}
                   className={`bg-white border rounded-xl p-5 transition-all duration-200 flex flex-col justify-between shadow-sm ${
-                    source.approved
+                    source.status === "approved"
                       ? "border-emerald-300 shadow-emerald-50"
-                      : "border-[#E2E8F0] hover:border-[#C08A3E]/30"
+                      : "border-amber-200 hover:border-[#C08A3E]/30"
                   }`}
                 >
                   <div className="space-y-3">
                     <div className="flex justify-between items-start gap-4">
                       <div className="min-w-0">
-                        <span className={`text-[10px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded ${
-                          source.type === "Quantitative"
-                            ? "bg-blue-100 text-blue-800"
-                            : source.type === "Mixed"
-                            ? "bg-purple-100 text-purple-800"
-                            : "bg-indigo-100 text-indigo-800"
-                        }`}>
-                          {source.type} Source
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-[10px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded ${
+                            source.type === "Quantitative"
+                              ? "bg-blue-100 text-blue-800"
+                              : source.type === "Mixed"
+                              ? "bg-purple-100 text-purple-800"
+                              : "bg-indigo-100 text-indigo-800"
+                          }`}>
+                            {source.type} Source
+                          </span>
+                          {source.status === "pending" && (
+                            <span className="text-[10px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                              Pending Approval
+                            </span>
+                          )}
+                        </div>
                         <h3 className="text-sm font-bold text-[#1A365D] font-serif mt-2 leading-snug">{source.name}</h3>
                         <a
                           href={source.url}
@@ -503,13 +526,13 @@ export default function DataDiscoveryPanel({
                         </a>
                       </div>
                       <button
-                        onClick={() => toggleApprove(index)}
+                        onClick={() => (source.status === "approved" ? revokeApproval(index) : approveSource(index))}
                         className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0 cursor-pointer ${
-                          source.approved
+                          source.status === "approved"
                             ? "bg-emerald-500 text-white shadow-sm"
                             : "bg-[#E2E8F0] hover:bg-[#D1D9E6] text-gray-400"
                         }`}
-                        title={source.approved ? "Revoke" : "Approve"}
+                        title={source.status === "approved" ? "Revoke" : "Approve"}
                       >
                         <Check className="w-4 h-4" />
                       </button>
@@ -534,17 +557,30 @@ export default function DataDiscoveryPanel({
                     </div>
                   </div>
 
-                  <div className="flex justify-end pt-4 mt-4 border-t border-[#E2E8F0]">
-                    <button
-                      onClick={() => toggleApprove(index)}
-                      className={`text-xs font-mono py-1.5 px-3 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider ${
-                        source.approved
-                          ? "bg-red-50 text-red-600 hover:bg-red-100"
-                          : "bg-[#1A365D] text-white hover:bg-[#122847]"
-                      }`}
-                    >
-                      {source.approved ? "Revoke Approval" : "Approve Source"}
-                    </button>
+                  <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-[#E2E8F0]">
+                    {source.status === "approved" ? (
+                      <button
+                        onClick={() => revokeApproval(index)}
+                        className="text-xs font-mono py-1.5 px-3 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider bg-red-50 text-red-600 hover:bg-red-100"
+                      >
+                        Revoke
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => rejectSource(index)}
+                          className="text-xs font-mono py-1.5 px-3 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider bg-red-50 text-red-600 hover:bg-red-100"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => approveSource(index)}
+                          className="text-xs font-mono py-1.5 px-3 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider bg-[#1A365D] text-white hover:bg-[#122847]"
+                        >
+                          Approve
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

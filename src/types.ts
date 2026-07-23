@@ -28,6 +28,12 @@ export const DEFAULT_STATE = (username: string): PaperProject => ({
   sections: {},
 });
 
+// Stage 6 (target-workflow.md) — agent-found sources land as "pending" and require
+// explicit user approval before they're usable downstream (cited/inserted into a
+// draft). There is no "rejected" persisted state — rejecting a pending source
+// removes it from the array entirely, per the accepted design.
+export type DataSourceApprovalStatus = "pending" | "approved";
+
 export interface DiscoveredDataSource {
   name: string;
   url: string;
@@ -35,7 +41,7 @@ export interface DiscoveredDataSource {
   relevance: string;
   reliability: string;
   limitations: string;
-  approved: boolean;
+  status: DataSourceApprovalStatus;
 }
 
 export interface GroundingMap {

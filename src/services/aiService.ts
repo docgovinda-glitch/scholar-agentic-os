@@ -106,6 +106,30 @@ function getVerifiedCitationTags(project: PaperProject): string[] {
     .filter((tag): tag is string => Boolean(tag));
 }
 
+/**
+ * Approval gate for Phase C's agent-found sources (target-workflow.md Stage 6):
+ * discoverDataSources marks every result "pending," and only sources the user has
+ * explicitly flipped to "approved" (DataDiscoveryPanel.tsx) are ever included here —
+ * mirrors how the Knowledge Vault's own isActive/status gate (getActiveVaultContext)
+ * already works, giving this the same real downstream teeth. Returns "" when there
+ * are no approved sources, so it's always safe to splice into a prompt unconditionally.
+ */
+export function buildApprovedDataSourcesContext(project: PaperProject): string {
+  const approved = (project.dataSources || []).filter((s) => s.status === "approved");
+  if (approved.length === 0) return "";
+
+  const entries = approved
+    .map((s) => `- ${s.name} (${s.url}) — ${s.relevance}`)
+    .join("\n");
+
+  return `
+--- APPROVED DATA & LITERATURE SOURCES (Phase C, user-approved) ---
+The user has reviewed and approved these ${approved.length} discovered source(s) for use in this manuscript. Cite or reference them where relevant. Do not cite any Phase C source not listed here — unapproved/pending sources must not be used.
+${entries}
+--- END APPROVED DATA & LITERATURE SOURCES ---
+`;
+}
+
 // ============================================================================
 // Deterministic Citation Consistency Analysis (Scholar Core OS)
 //
@@ -593,7 +617,7 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
       relevance: byline ? `${byline} — ${abstractSnippet}` : abstractSnippet,
       reliability: `Indexed in ${r.source}${r.citationCount != null ? `; cited ${r.citationCount} time${r.citationCount === 1 ? "" : "s"}` : ""}.`,
       limitations: `Retrieved directly from ${r.source}'s public API — review the full text and verify citation accuracy before relying on it academically.`,
-      approved: false,
+      status: "pending",
     };
   });
 
@@ -611,7 +635,7 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
       r.source === "World Bank"
         ? "Matched by keyword against the indicator's name/description — the World Bank Indicators API has no server-side keyword search. Query specific countries/years directly for actual values; none are fetched here."
         : "Matched by keyword against the dataflow's name/description — the OECD SDMX API has no server-side keyword search. This links to the raw SDMX structure endpoint (machine-readable) — browse data-explorer.oecd.org and search by name for a human-friendly view. Query specific dimensions for actual values; none are fetched here.",
-    approved: false,
+    status: "pending",
   }));
 
   return { sources: [...literatureSources, ...statisticalSources] };
@@ -726,6 +750,7 @@ Every scripture support MUST use authentic sources and specify genuine verses an
   const vaultContext = vaultActive ? getActiveVaultContext(projectState.knowledgeVault) : "";
   const citationBlock = vaultActive ? buildCitationPrompt(projectState.knowledgeVault) : "";
   const relevantChunks = vaultActive ? getRelevantChunksContext(sectionOutline || sectionName, projectState.knowledgeVault) : "";
+  const approvedDataSourcesContext = buildApprovedDataSourcesContext(projectState);
 
   // Grounding Policy: the compiled bibliography and citation tags are verified,
   // deterministically-formatted structured data (Scholar Core OS output) -
@@ -777,6 +802,7 @@ ${vaultActive ? vaultContext : ""}
 ${vaultActive ? citationBlock : ""}
 ${vaultActive ? relevantChunks : ""}
 ${verifiedBibliographyBlock}
+${approvedDataSourcesContext}
 
 --- Section Instructions ---
 Outline/Subsections requested:
@@ -883,6 +909,7 @@ Every scripture support MUST use authentic sources and specify genuine verses an
   const vaultContext = vaultActive ? getActiveVaultContext(projectState.knowledgeVault) : "";
   const citationBlock = vaultActive ? buildCitationPrompt(projectState.knowledgeVault) : "";
   const relevantChunks = vaultActive ? getRelevantChunksContext(sectionOutline || sectionName, projectState.knowledgeVault) : "";
+  const approvedDataSourcesContext = buildApprovedDataSourcesContext(projectState);
 
   // Grounding Policy: reuse verified, deterministically-formatted bibliography
   // data instead of asking the AI to invent or reconstruct citation details
@@ -931,6 +958,7 @@ ${vaultActive ? vaultContext : ""}
 ${vaultActive ? citationBlock : ""}
 ${vaultActive ? relevantChunks : ""}
 ${verifiedBibliographyBlock}
+${approvedDataSourcesContext}
 
 Outline/Subsections:
 ${sectionOutline || "Standard flow for " + sectionName}
@@ -1010,6 +1038,7 @@ ${buildBibliography(projectState)}
 
 These ${verifiedTags.length} source(s) are verified and already correctly formatted in ${projectState.complianceRules?.citationStyle || "APA 7th"}. When citing any of these sources, reuse their exact citation tag (${verifiedTags.join(", ")}) and bibliographic details above rather than reconstructing them.
 ` : "";
+  const approvedDataSourcesContext = buildApprovedDataSourcesContext(projectState);
 
   const systemInstruction = `You are an elite, human-sounding Senior AI/ML Academic Systems Architect & Manuscript Re-Drafting Agent.
 Your objective is to revise, re-write, and optimize the draft of the "${sectionName}" section based on a rigorous peer-review Quality Control (QC) audit report and custom revision instructions.
@@ -1037,6 +1066,7 @@ Target Journal: ${projectState.targetJournal?.name || "Academic Journal"}
 ${groundingInfo}
 ${styleProfileContext}
 ${verifiedBibliographyBlock}
+${approvedDataSourcesContext}
 
 --- Quality Control (QC) Report Findings ---
 Compliance Score: ${qcReport.complianceScore}/100
