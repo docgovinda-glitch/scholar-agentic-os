@@ -26,6 +26,16 @@ vi.mock("../arxivProxyService", () => ({
   arxivProxy: mockArxivProxy,
 }));
 
+const { mockWhoProxy } = vi.hoisted(() => ({ mockWhoProxy: vi.fn() }));
+vi.mock("../whoProxyService", () => ({
+  whoProxy: mockWhoProxy,
+}));
+
+const { mockImfProxy } = vi.hoisted(() => ({ mockImfProxy: vi.fn() }));
+vi.mock("../imfProxyService", () => ({
+  imfProxy: mockImfProxy,
+}));
+
 import { discoverDataSources } from "../aiService";
 
 function literatureResult(overrides: Partial<LiteratureResult> = {}): LiteratureResult {
@@ -49,6 +59,8 @@ beforeEach(() => {
   mockDiscoverStatisticalData.mockResolvedValue({ results: [], sourceErrors: [] });
   mockSearchProxy.mockResolvedValue({ results: [] });
   mockArxivProxy.mockResolvedValue({ results: [] });
+  mockWhoProxy.mockResolvedValue({ results: [] });
+  mockImfProxy.mockResolvedValue({ results: [] });
 });
 
 describe("discoverDataSources — real retrieval (post-fix behavior)", () => {
@@ -207,6 +219,8 @@ describe("discoverDataSources — real retrieval (post-fix behavior)", () => {
     expect(mockDiscoverStatisticalData).not.toHaveBeenCalled();
     expect(mockSearchProxy).not.toHaveBeenCalled();
     expect(mockArxivProxy).not.toHaveBeenCalled();
+    expect(mockWhoProxy).not.toHaveBeenCalled();
+    expect(mockImfProxy).not.toHaveBeenCalled();
     expect(result.sources).toEqual([]);
   });
 
@@ -265,6 +279,65 @@ describe("discoverDataSources — real retrieval (post-fix behavior)", () => {
   it("still returns literature, statistical, and web-search sources when the arXiv proxy finds nothing or fails", async () => {
     mockDiscoverLiterature.mockResolvedValue({ results: [literatureResult()], sourceErrors: [] });
     mockArxivProxy.mockResolvedValue({ results: [], error: "arXiv proxy request failed: timeout" });
+
+    const project = { ...DEFAULT_STATE("tester"), title: "Some Title" };
+    const result = await discoverDataSources(project);
+
+    expect(result.sources).toHaveLength(1);
+    expect(result.sources[0].name).toBe("A Study of Testing");
+  });
+
+  it("appends WHO and IMF indicators after literature, statistical, web-search, and arXiv sources", async () => {
+    mockDiscoverLiterature.mockResolvedValue({ results: [literatureResult()], sourceErrors: [] });
+    mockArxivProxy.mockResolvedValue({
+      results: [{ id: "http://arxiv.org/abs/2401.00001v1", title: "A Preprint on Testing", authors: ["Ada Lovelace"], abstract: "", published: "2024-01-01T00:00:00Z", url: "http://arxiv.org/abs/2401.00001v1" }],
+    });
+    mockWhoProxy.mockResolvedValue({
+      results: [{ id: "MALARIA001", title: "Malaria - number of reported deaths", url: "https://www.who.int/data/gho/data/indicators/indicator-details/GHO/MALARIA001", description: "" }],
+    });
+    mockImfProxy.mockResolvedValue({
+      results: [{ id: "NGDP_RPCH", title: "Real GDP growth", url: "https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH", description: "Gross domestic product is the most commonly used single measure of economic activity." }],
+    });
+
+    const project = { ...DEFAULT_STATE("tester"), title: "Some Title" };
+    const result = await discoverDataSources(project);
+
+    expect(mockWhoProxy).toHaveBeenCalledWith("Some Title");
+    expect(mockImfProxy).toHaveBeenCalledWith("Some Title");
+    expect(result.sources).toHaveLength(4);
+    // Literature, arXiv, then WHO, then IMF — matching existing append ordering.
+    expect(result.sources.map((s) => s.name)).toEqual(["A Study of Testing", "A Preprint on Testing", "Malaria - number of reported deaths", "Real GDP growth"]);
+
+    const whoSource = result.sources.find((s) => s.name === "Malaria - number of reported deaths")!;
+    expect(whoSource.url).toBe("https://www.who.int/data/gho/data/indicators/indicator-details/GHO/MALARIA001");
+    expect(whoSource.type).toBe("Quantitative");
+    expect(whoSource.status).toBe("pending");
+    expect(whoSource.reliability).toContain("WHO");
+
+    const imfSource = result.sources.find((s) => s.name === "Real GDP growth")!;
+    expect(imfSource.url).toBe("https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH");
+    expect(imfSource.type).toBe("Quantitative");
+    expect(imfSource.relevance).toContain("Gross domestic product");
+    expect(imfSource.status).toBe("pending");
+    expect(imfSource.reliability).toContain("IMF");
+  });
+
+  it("labels a missing WHO description honestly instead of fabricating one", async () => {
+    mockDiscoverLiterature.mockResolvedValue({ results: [], sourceErrors: [] });
+    mockWhoProxy.mockResolvedValue({
+      results: [{ id: "MALARIA001", title: "Malaria - number of reported deaths", url: "https://who.int/x", description: "" }],
+    });
+
+    const project = { ...DEFAULT_STATE("tester"), title: "Some Title" };
+    const result = await discoverDataSources(project);
+
+    expect(result.sources[0].relevance).toContain("No description provided by WHO GHO");
+  });
+
+  it("still returns other sources when the WHO or IMF proxies find nothing or fail", async () => {
+    mockDiscoverLiterature.mockResolvedValue({ results: [literatureResult()], sourceErrors: [] });
+    mockWhoProxy.mockResolvedValue({ results: [], error: "WHO proxy request failed: timeout" });
+    mockImfProxy.mockResolvedValue({ results: [], error: "IMF proxy request failed: timeout" });
 
     const project = { ...DEFAULT_STATE("tester"), title: "Some Title" };
     const result = await discoverDataSources(project);

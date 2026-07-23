@@ -5,6 +5,8 @@ import { isVaultActive, getActiveVaultContext, buildCitationPrompt, getRelevantC
 import { discoverLiterature, discoverStatisticalData } from "./literatureRetrievalService";
 import { searchProxy } from "./searchProxyService";
 import { arxivProxy } from "./arxivProxyService";
+import { whoProxy } from "./whoProxyService";
+import { imfProxy } from "./imfProxyService";
 import { discoverJournalCandidates } from "./journalRetrievalService";
 import { lookupCitation, type CitationLookupResult } from "./citationEnrichmentService";
 import { APA7Formatter } from "../citation_compliance/formatters/apa7";
@@ -609,11 +611,13 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
   // own sub-sources. discoverLiterature is the one exception that still
   // propagates a rejection (see below): it's the primary/required source, the
   // other two are supplements that must never block it or each other.
-  const [literatureSettled, statisticalSettled, searchProxySettled, arxivSettled] = await Promise.allSettled([
+  const [literatureSettled, statisticalSettled, searchProxySettled, arxivSettled, whoSettled, imfSettled] = await Promise.allSettled([
     discoverLiterature(query),
     discoverStatisticalData(query),
     searchProxy(query),
     arxivProxy(query),
+    whoProxy(query),
+    imfProxy(query),
   ]);
 
   if (literatureSettled.status === "rejected") {
@@ -708,7 +712,44 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
     };
   });
 
-  return { sources: [...literatureSources, ...statisticalSources, ...webSearchSources, ...arxivSources] };
+  // WHO GHO indicators (supabase/functions/who-proxy — required, the GHO
+  // OData API sends no CORS headers). Never throws (see whoProxyService.ts);
+  // a failure here just means an empty results array, tolerated the same way
+  // every other supplementary source above already is.
+  const whoResults = whoSettled.status === "fulfilled" ? whoSettled.value.results : [];
+  const whoSources: DiscoveredDataSource[] = whoResults.map((r) => ({
+    name: r.title,
+    url: r.url,
+    // Truthful classification, not a disclosed default — WHO GHO indicators
+    // are quantitative health statistics by nature (same reasoning as the
+    // World Bank/OECD statistical sources above).
+    type: "Quantitative",
+    // WHO GHO's Indicator metadata provides no description field at all —
+    // honestly reported as unavailable rather than fabricated.
+    relevance: "No description provided by WHO GHO — see the indicator detail page for full context.",
+    reliability: "Official health indicator published by the WHO Global Health Observatory.",
+    limitations: "Matched by keyword against the indicator's name only — the GHO OData API exposes no description field. Visit the indicator detail page for definitions, methodology, and actual values; none are fetched here.",
+    status: "pending",
+  }));
+
+  // IMF DataMapper indicators (supabase/functions/imf-proxy — required, the
+  // DataMapper API sends no CORS headers). Never throws (see
+  // imfProxyService.ts); a failure here just means an empty results array,
+  // tolerated the same way every other supplementary source above already is.
+  const imfResults = imfSettled.status === "fulfilled" ? imfSettled.value.results : [];
+  const imfSources: DiscoveredDataSource[] = imfResults.map((r) => ({
+    name: r.title,
+    url: r.url,
+    // Truthful classification, not a disclosed default — IMF DataMapper
+    // indicators are quantitative macroeconomic statistics by nature.
+    type: "Quantitative",
+    relevance: r.description || "No description provided by IMF DataMapper.",
+    reliability: "Official macroeconomic indicator published by the IMF DataMapper.",
+    limitations: "Matched by keyword against the indicator's name/description — the IMF DataMapper API has no server-side keyword search. This links to the raw machine-readable data endpoint (same honest choice already made for OECD's SDMX endpoint above) — query the indicator directly for actual country/year values; none are fetched here.",
+    status: "pending",
+  }));
+
+  return { sources: [...literatureSources, ...statisticalSources, ...webSearchSources, ...arxivSources, ...whoSources, ...imfSources] };
 }
 
 // Phase D: Journal Discovery
