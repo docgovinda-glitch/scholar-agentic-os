@@ -32,6 +32,7 @@ import { ResearchPlanningSkill } from "../skills/researchPlanningSkill";
 import { LiteratureReviewSkill } from "../skills/literatureReviewSkill";
 import { KnowledgeGapSkill } from "../skills/knowledgeGapSkill";
 import { ResearchQuestionSkill } from "../skills/researchQuestionSkill";
+import { MethodologyAdvisorSkill } from "../skills/methodologyAdvisorSkill";
 
 const agentRegistry = AgentRegistry.getInstance();
 const agentExecutor = AgentExecutor.getInstance();
@@ -50,6 +51,7 @@ skillRegistry.register(new ResearchPlanningSkill());
 skillRegistry.register(new LiteratureReviewSkill());
 skillRegistry.register(new KnowledgeGapSkill());
 skillRegistry.register(new ResearchQuestionSkill());
+skillRegistry.register(new MethodologyAdvisorSkill());
 
 function createAgentContext(): AgentContext {
   return {
