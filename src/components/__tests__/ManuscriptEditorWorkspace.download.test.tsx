@@ -36,24 +36,32 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderWorkspace(overrides: Partial<PaperProject> = {}) {
+function renderWorkspace(overrides: Partial<PaperProject> = {}, updateProject = vi.fn()) {
   const project: PaperProject = { ...DEFAULT_STATE("jdoe"), sections: { Introduction: "Real drafted intro text." }, ...overrides };
   render(
     <ManuscriptEditorWorkspace
       project={project}
-      updateProject={vi.fn()}
+      updateProject={updateProject}
       onNext={vi.fn()}
       onBack={vi.fn()}
       isFocusMode={false}
       onToggleFocusMode={vi.fn()}
     />
   );
+  return { project };
 }
 
-describe("ManuscriptEditorWorkspace — Stage 12 download buttons", () => {
-  it("calls the real downloadDocx export when 'Download .DOCX' is clicked", async () => {
+const CONFIRMED_DISCLOSURE = {
+  sectionsIncluded: ["Introduction"],
+  modelsUsed: ["gemini (gemini-pro)"],
+  disclosureText: "Already-confirmed disclosure text.",
+  confirmedAt: "2026-07-23T00:00:00.000Z",
+};
+
+describe("ManuscriptEditorWorkspace — Stage 12 download buttons (disclosure already confirmed)", () => {
+  it("calls the real downloadDocx export when 'Download .DOCX' is clicked and disclosure is already confirmed", async () => {
     mockDownloadDocx.mockResolvedValue(undefined);
-    renderWorkspace();
+    renderWorkspace({ aiUseDisclosure: CONFIRMED_DISCLOSURE });
 
     fireEvent.click(screen.getByText("Download .DOCX"));
 
@@ -61,9 +69,9 @@ describe("ManuscriptEditorWorkspace — Stage 12 download buttons", () => {
     expect(mockDownloadPdf).not.toHaveBeenCalled();
   });
 
-  it("calls the real downloadPdf export when 'Download .PDF' is clicked", async () => {
+  it("calls the real downloadPdf export when 'Download .PDF' is clicked and disclosure is already confirmed", async () => {
     mockDownloadPdf.mockResolvedValue(undefined);
-    renderWorkspace();
+    renderWorkspace({ aiUseDisclosure: CONFIRMED_DISCLOSURE });
 
     fireEvent.click(screen.getByText("Download .PDF"));
 
@@ -74,11 +82,54 @@ describe("ManuscriptEditorWorkspace — Stage 12 download buttons", () => {
   it("surfaces an error via alert and resets the loading state when the export throws", async () => {
     mockDownloadDocx.mockRejectedValue(new Error("Export failed"));
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
-    renderWorkspace();
+    renderWorkspace({ aiUseDisclosure: CONFIRMED_DISCLOSURE });
 
     fireEvent.click(screen.getByText("Download .DOCX"));
 
     await waitFor(() => expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("Export failed")));
     alertSpy.mockRestore();
+  });
+});
+
+describe("ManuscriptEditorWorkspace — Stage 9 AI-use disclosure gate", () => {
+  it("shows the disclosure review modal instead of downloading when no disclosure has been confirmed yet", async () => {
+    renderWorkspace();
+
+    fireEvent.click(screen.getByText("Download .DOCX"));
+
+    expect(await screen.findByText("AI-Use Disclosure — Review Before Export")).toBeInTheDocument();
+    expect(mockDownloadDocx).not.toHaveBeenCalled();
+  });
+
+  it("confirming the disclosure stores it on the project (with confirmedAt) and then proceeds with the download", async () => {
+    mockDownloadDocx.mockResolvedValue(undefined);
+    const updateProject = vi.fn();
+    renderWorkspace({}, updateProject);
+
+    fireEvent.click(screen.getByText("Download .DOCX"));
+    await screen.findByText("AI-Use Disclosure — Review Before Export");
+
+    fireEvent.click(screen.getByText("Confirm & Continue to Export"));
+
+    await waitFor(() => expect(updateProject).toHaveBeenCalled());
+    const updateArg = updateProject.mock.calls[0][0];
+    expect(updateArg.aiUseDisclosure.confirmedAt).toBeTruthy();
+    expect(updateArg.aiUseDisclosure.sectionsIncluded).toEqual(["Introduction"]);
+
+    await waitFor(() => expect(mockDownloadDocx).toHaveBeenCalled());
+  });
+
+  it("cancelling the disclosure modal closes it without downloading or storing anything", async () => {
+    const updateProject = vi.fn();
+    renderWorkspace({}, updateProject);
+
+    fireEvent.click(screen.getByText("Download .PDF"));
+    await screen.findByText("AI-Use Disclosure — Review Before Export");
+
+    fireEvent.click(screen.getByText("Cancel"));
+
+    expect(screen.queryByText("AI-Use Disclosure — Review Before Export")).not.toBeInTheDocument();
+    expect(mockDownloadPdf).not.toHaveBeenCalled();
+    expect(updateProject).not.toHaveBeenCalled();
   });
 });

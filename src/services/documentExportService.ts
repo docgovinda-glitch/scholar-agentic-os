@@ -70,6 +70,8 @@ export interface ExportDocumentModel {
   abstract: string | null;
   bodySections: ExportBodySection[];
   references: ExportReference[];
+  /** Stage 9 confirmed AI-use disclosure text, or null if not yet confirmed — never included unconfirmed. */
+  disclosureText: string | null;
 }
 
 function isTitlePageKey(key: string): boolean {
@@ -132,6 +134,7 @@ export function buildExportDocumentModel(project: PaperProject): ExportDocumentM
     abstract,
     bodySections,
     references,
+    disclosureText: project.aiUseDisclosure?.confirmedAt ? project.aiUseDisclosure.disclosureText : null,
   };
 }
 
@@ -223,6 +226,13 @@ export async function exportToDocx(project: PaperProject): Promise<Blob> {
     children.push(...paragraphsFor(section.content));
   }
 
+  // AI-use disclosure (Stage 9) — placed immediately before references, per
+  // Elsevier's published convention for this declaration's placement.
+  if (model.disclosureText) {
+    children.push(heading("AI-Use Disclosure"));
+    children.push(...paragraphsFor(model.disclosureText));
+  }
+
   // References
   children.push(heading("References"));
   if (model.references.length > 0) {
@@ -291,6 +301,11 @@ export async function exportToPdf(project: PaperProject): Promise<Blob> {
   for (const section of model.bodySections) {
     content.push({ text: section.heading, style: "heading1", pageBreak: "before" });
     content.push({ text: section.content });
+  }
+
+  if (model.disclosureText) {
+    content.push({ text: "AI-Use Disclosure", style: "heading1", pageBreak: "before" });
+    content.push({ text: model.disclosureText });
   }
 
   content.push({ text: "References", style: "heading1", pageBreak: "before" });

@@ -69,6 +69,8 @@ export default function ManuscriptDraftingWorkspace({
     "Our current economic paradigms assume wealth is an end unto itself, stripping stewardship of moral consequence. Yet, as Kautilyan statecraft and Vedic trusteeship frameworks demonstrate, enterprise can only be legitimized when framed as 'Lokasangraha'—a sacred trust designated for the collective preservation and holistic nourishment of the social fabric."
   );
   const [includeScriptures, setIncludeScriptures] = useState(true);
+  // Stage 9 (target-workflow.md) humanize pass — off by default, user-toggled.
+  const [humanize, setHumanize] = useState(false);
   const [customInstruction, setCustomInstruction] = useState("");
   const [showDiff, setShowDiff] = useState(false);
   const [diffPrev, setDiffPrev] = useState<string | null>(null);
@@ -300,6 +302,7 @@ export default function ManuscriptDraftingWorkspace({
         userStyleSample: styleSample,
         includeScriptures: includeScriptures,
         draftInstruction: customInstruction,
+        humanize,
       });
       const updatedSections = { ...project.sections };
       if (existing) {
@@ -377,6 +380,7 @@ export default function ManuscriptDraftingWorkspace({
         userStyleSample: styleSample,
         includeScriptures: includeScriptures,
         draftInstruction: `The scholar has asked to refine, edit, or adjust this section with the following instruction: "${userMsg.content}".\n\nHere is the current draft of this section:\n\n${currentText}\n\nRe-draft this section to address the user's instructions while maintaining high academic quality and rigor. Support the project target of citing at least 100 authentic, verified scholarly references where appropriate. Write strictly in ready-to-publish academic prose without any conversational preamble or conversational text.`,
+        humanize,
       });
 
       const refinedText = response.draftText || "";
@@ -863,6 +867,22 @@ export default function ManuscriptDraftingWorkspace({
                     checked={includeScriptures}
                     onChange={(e) => setIncludeScriptures(e.target.checked)}
                     className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div>
+                    <span className="text-xs font-bold font-mono text-blue-800 uppercase block">Humanize Prose</span>
+                    <p className="text-[10px] text-blue-700 leading-normal mt-0.5">
+                      Post-process the draft to reduce formulaic AI-writing patterns (stock transitions, hollow topic sentences, passive voice, uniform sentence length, hedging)
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    id="humanize-toggle"
+                    checked={humanize}
+                    onChange={(e) => setHumanize(e.target.checked)}
+                    className="w-4 h-4 accent-blue-500 rounded cursor-pointer"
                   />
                 </div>
 

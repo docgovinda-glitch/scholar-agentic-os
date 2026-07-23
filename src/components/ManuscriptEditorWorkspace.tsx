@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 import { draftSection as aiDraftSection } from "../services/aiService";
 import { downloadDocx, downloadPdf } from "../services/documentExportService";
+import { buildDefaultDisclosure } from "../services/aiDisclosureService";
+import AIDisclosureReviewModal from "./AIDisclosureReviewModal";
 import { APA7Formatter } from "../citation_compliance/formatters/apa7";
 import type { CanonicalReference, ReferenceAuthor } from "../citation_compliance/model/reference";
 
@@ -118,6 +120,9 @@ export default function ManuscriptEditorWorkspace({
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(sectionsList));
   const [downloadingDocx, setDownloadingDocx] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  // Stage 9 (target-workflow.md) AI-use disclosure gate — must be confirmed before export unlocks.
+  const [showDisclosureModal, setShowDisclosureModal] = useState(false);
+  const [pendingDownloadFormat, setPendingDownloadFormat] = useState<"docx" | "pdf" | null>(null);
   const [drawerTab, setDrawerTab] = useState<"citations" | "checker" | "vault">("citations");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -125,8 +130,8 @@ export default function ManuscriptEditorWorkspace({
 
   // Bind custom events from Command Palette
   useEffect(() => {
-    const handleDownloadDocx = () => downloadAsDocx();
-    const handleDownloadPdf = () => downloadAsPdf();
+    const handleDownloadDocx = () => requestDownload("docx");
+    const handleDownloadPdf = () => requestDownload("pdf");
 
     window.addEventListener("trigger-download-docx", handleDownloadDocx);
     window.addEventListener("trigger-download-pdf", handleDownloadPdf);
@@ -401,6 +406,40 @@ export default function ManuscriptEditorWorkspace({
     }
   };
 
+  // Stage 9 (target-workflow.md) — gate export on a confirmed AI-use disclosure.
+  // Once confirmed for this project, subsequent downloads proceed directly;
+  // re-review is only re-triggered if the user explicitly wants it (not built
+  // here — out of scope beyond the initial confirm-before-export gate).
+  const requestDownload = (format: "docx" | "pdf") => {
+    if (project.aiUseDisclosure?.confirmedAt) {
+      format === "docx" ? downloadAsDocx() : downloadAsPdf();
+      return;
+    }
+    setPendingDownloadFormat(format);
+    setShowDisclosureModal(true);
+  };
+
+  const handleDisclosureConfirm = (finalText: string) => {
+    const { sectionsIncluded, modelsUsed } = buildDefaultDisclosure(project);
+    updateProject({
+      aiUseDisclosure: {
+        sectionsIncluded,
+        modelsUsed,
+        disclosureText: finalText,
+        confirmedAt: new Date().toISOString(),
+      },
+    });
+    setShowDisclosureModal(false);
+    if (pendingDownloadFormat === "docx") downloadAsDocx();
+    if (pendingDownloadFormat === "pdf") downloadAsPdf();
+    setPendingDownloadFormat(null);
+  };
+
+  const handleDisclosureCancel = () => {
+    setShowDisclosureModal(false);
+    setPendingDownloadFormat(null);
+  };
+
   const isApproved = project.manuscriptApproved === true;
 
   return (
@@ -448,7 +487,7 @@ export default function ManuscriptEditorWorkspace({
       <div className="flex flex-wrap items-center gap-3 bg-[#FAF8F5] border border-[#E2E8F0] rounded-xl p-3">
         <span className="text-[10px] font-mono font-bold text-[#8C887F] uppercase tracking-wider">Download:</span>
         <button
-          onClick={downloadAsDocx}
+          onClick={() => requestDownload("docx")}
           disabled={downloadingDocx}
           className="px-3.5 py-1.5 bg-[#1A365D] hover:bg-[#122847] text-white rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
         >
@@ -456,7 +495,7 @@ export default function ManuscriptEditorWorkspace({
           Download .DOCX
         </button>
         <button
-          onClick={downloadAsPdf}
+          onClick={() => requestDownload("pdf")}
           disabled={downloadingPdf}
           className="px-3.5 py-1.5 bg-[#C08A3E] hover:bg-[#A87630] text-white rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
         >
@@ -970,6 +1009,15 @@ export default function ManuscriptEditorWorkspace({
           Proceed to Submission Pack →
         </button>
       </div>
+
+      <AIDisclosureReviewModal
+        open={showDisclosureModal}
+        sectionsIncluded={buildDefaultDisclosure(project).sectionsIncluded}
+        modelsUsed={buildDefaultDisclosure(project).modelsUsed}
+        initialText={project.aiUseDisclosure?.disclosureText || buildDefaultDisclosure(project).disclosureText}
+        onConfirm={handleDisclosureConfirm}
+        onCancel={handleDisclosureCancel}
+      />
     </div>
   );
 }

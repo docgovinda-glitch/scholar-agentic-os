@@ -13,6 +13,7 @@ import { ChicagoFormatter } from "../citation_compliance/formatters/chicago";
 import { HarvardFormatter } from "../citation_compliance/formatters/harvard";
 import { VancouverFormatter } from "../citation_compliance/formatters/vancouver";
 import type { CanonicalReference, ReferenceAuthor } from "../citation_compliance/model/reference";
+import { humanizeText } from "../skills/humanizeSkill";
 
 // ============================================================================
 // Bibliography Compilation (Scholar Core OS bridge)
@@ -764,8 +765,10 @@ export async function draftSection(params: {
   userStyleSample: string;
   includeScriptures: boolean;
   draftInstruction: string;
+  /** Stage 9 (target-workflow.md) optional post-processing pass — off by default, never forced on. */
+  humanize?: boolean;
 }): Promise<{ draftText: string }> {
-  const { projectState, sectionName, sectionOutline, userStyleSample, includeScriptures, draftInstruction } = params;
+  const { projectState, sectionName, sectionOutline, userStyleSample, includeScriptures, draftInstruction, humanize } = params;
 
   const groundingInfo = projectState.groundingMap ? `
 --- Dissertation Anchors & Key Constructs ---
@@ -873,7 +876,17 @@ Write the draft section in full, ready-to-publish academic prose. Do not leave p
     taskType: "drafting"
   });
 
-  return { draftText: responseText };
+  if (!humanize) {
+    return { draftText: responseText };
+  }
+
+  try {
+    const humanizedText = await humanizeText(responseText, projectState.aiSettings);
+    return { draftText: humanizedText };
+  } catch (e) {
+    console.warn("Humanize pass failed, returning original draft text:", e);
+    return { draftText: responseText };
+  }
 }
 
 // Phase F: Manuscript Section Co-Drafting Streaming Agent
@@ -885,8 +898,10 @@ export async function draftSectionStream(params: {
   includeScriptures: boolean;
   draftInstruction: string;
   onToken: (token: string) => void;
+  /** Stage 9 (target-workflow.md) optional post-processing pass — off by default, never forced on. */
+  humanize?: boolean;
 }): Promise<AIResponse> {
-  const { projectState, sectionName, sectionOutline, userStyleSample, includeScriptures, draftInstruction, onToken } = params;
+  const { projectState, sectionName, sectionOutline, userStyleSample, includeScriptures, draftInstruction, onToken, humanize } = params;
 
   const groundingInfo = projectState.groundingMap ? `
 --- Dissertation Anchors & Key Constructs ---
@@ -1024,7 +1039,17 @@ Write the draft section in full academic prose.`;
 
   logAIUsage(response.provider, response.model || "unknown", response.inputWords, response.outputWords, "drafting");
 
-  return response;
+  if (!humanize) {
+    return response;
+  }
+
+  try {
+    const humanizedText = await humanizeText(response.text, projectState.aiSettings);
+    return { ...response, text: humanizedText };
+  } catch (e) {
+    console.warn("Humanize pass failed, returning original streamed draft text:", e);
+    return response;
+  }
 }
 
 // Phase G1: QC-Based Redrafting Streaming Agent

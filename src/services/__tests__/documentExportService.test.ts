@@ -119,6 +119,30 @@ describe("buildExportDocumentModel", () => {
     expect(model.references).toEqual([{ name: "Real Approved Source", url: "https://example.org/a" }]);
   });
 
+  it("Stage 9: includes disclosureText only when aiUseDisclosure.confirmedAt is set", () => {
+    const unconfirmed: PaperProject = {
+      ...DEFAULT_STATE("tester"),
+      aiUseDisclosure: { sectionsIncluded: ["Introduction"], modelsUsed: ["gemini (gemini-pro)"], disclosureText: "Draft disclosure text." },
+    };
+    expect(buildExportDocumentModel(unconfirmed).disclosureText).toBeNull();
+
+    const confirmed: PaperProject = {
+      ...DEFAULT_STATE("tester"),
+      aiUseDisclosure: {
+        sectionsIncluded: ["Introduction"],
+        modelsUsed: ["gemini (gemini-pro)"],
+        disclosureText: "Confirmed disclosure text.",
+        confirmedAt: "2026-07-23T00:00:00.000Z",
+      },
+    };
+    expect(buildExportDocumentModel(confirmed).disclosureText).toBe("Confirmed disclosure text.");
+  });
+
+  it("Stage 9: disclosureText is null when no aiUseDisclosure exists at all", () => {
+    const project: PaperProject = { ...DEFAULT_STATE("tester") };
+    expect(buildExportDocumentModel(project).disclosureText).toBeNull();
+  });
+
   it("falls back to the default academic section structure when complianceRules isn't set", () => {
     const project: PaperProject = { ...DEFAULT_STATE("tester"), sections: { Introduction: "Intro text." } };
 

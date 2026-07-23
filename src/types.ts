@@ -77,6 +77,22 @@ export interface ComplianceRules {
   coverLetterNecessity: string;
 }
 
+// Stage 9 (target-workflow.md) — AI-use disclosure, distinct from
+// ComplianceRules.ethicalDisclosure above (a journal's *requirement text*
+// for a different kind of ethics statement). This is the actual confirmed
+// record of which sections were AI-drafted and which models were used,
+// shown to the user for review/edit and required before Stage 12 export.
+export interface AIUseDisclosure {
+  /** Section names with drafted content at the time the disclosure was generated/confirmed. */
+  sectionsIncluded: string[];
+  /** Distinct "provider (model)" strings drawn from real usageLogs entries, never invented. */
+  modelsUsed: string[];
+  /** User-editable disclosure text, defaulted from a template, shown for review before export. */
+  disclosureText: string;
+  /** ISO timestamp set only on explicit user confirmation — absence means not yet confirmed, and export stays locked. */
+  confirmedAt?: string;
+}
+
 export interface QCReport {
   complianceScore: number;
   rigorScore: number;
@@ -630,6 +646,9 @@ export interface PaperProject {
 
   // Manuscript editor approval
   manuscriptApproved?: boolean;
+
+  // Stage 9 (target-workflow.md) — AI-use disclosure, required before Stage 12 export
+  aiUseDisclosure?: AIUseDisclosure;
 
   // Knowledge Vault
   knowledgeVault?: KnowledgeVault;
