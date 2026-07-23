@@ -1,5 +1,26 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
+## RESUME HERE TOMORROW (as of 2026-07-23, supersedes the 2026-07-22 section below)
+
+**Today in one paragraph**: Stage 12 (final document export) shipped — `src/services/documentExportService.ts` generates real `.docx` (via `docx@9.7.1`) and real, selectable-text PDF (via `pdfmake@0.3.11`, declarative layout, not jsPDF+html2canvas), wired into `ManuscriptEditorWorkspace.tsx`'s existing Download buttons, replacing what turned out to be fake pre-existing implementations (an HTML file renamed `.doc`, and a `window.print()` dialog for "PDF"). Live verification (real project, one approved + one pending source, one drafted section) confirmed both files are genuine, readable, and correctly gate references to `status === "approved"` only. One real bug was found and fixed mid-build: pdfmake 0.3.x's `getBlob()`/`getBuffer()` are `async` Promise-returning methods, not the callback-style API assumed from initial research — the first implementation silently hung forever. Committed as `7d9f6a4`. `docs/planning/target-workflow.md` §Stage 12 updated to 🟢 Done with this detail.
+
+**Full 12-stage gap map (target-workflow.md's stage numbering), as of this session:**
+- 🟢 **Done**: Stage 1 (Research Intake), Stage 3 (Research Planning field-mapping), Stage 4 (Output-format selection, `outputFormats.ts`), Stage 6 (scholarly literature + statistical data retrieval, research-proposal data-skip gate, agent-found-source approval gate, Tavily search-proxy wiring), Stage 11 (Redrafting — `QCBasedRedraftingSuite.tsx` chat-driven + `ManuscriptEditorWorkspace.tsx` manual editing, though manual editing is plain `<textarea>`, not rich-text), Stage 12 (Final export — this session).
+- 🟡 **Partial**: Stage 5 (conditional field gating — done for the format selector, not verified end-to-end against every downstream form), Stage 8 (Compliance/requirements — `complianceRules.sectionStructure` is real structured data; `formattingRules` remains free text, so exact margins/fonts/journal-specific layout still can't drive Stage 12's output — flagged as a known gap in `target-workflow.md` §Stage 12).
+- 🔴 **Not started / open**: Stage 2 (Literature Review depth beyond basic retrieval), Stage 7 (Manuscript Refinement template system — explicitly untouched this session per instruction), Stage 9 (Publication Preparation / AI-use disclosure — "does not exist anywhere," placement proposed but unbuilt), Stage 10 (Publication Submission), arXiv-proxy retrieval (deferred, not blocked on any decision — separate task from the rest of Stage 6), WHO-direct/IMF-direct retrieval (same — deferred, not blocked).
+
+**Open threads, not yet started:**
+- `extractRequirements` fabrication fix — still needs a vendor/proxy decision before it can proceed.
+- arXiv proxy (Stage 6 remainder) — deferred, not blocked, separate task.
+- Stage 8 structured-requirements parsing (margins/fonts/section structure from real journal guidelines) — needed before Stage 12 can move past hardcoded academic defaults.
+- Removal of the dead `request-password-reset`/`approve-password-reset` Edge Functions and `pending_password_resets` table — still deliberately deferred until a custom domain is verified with Resend.
+
+**Nothing is broken right now.** Every item above is a deliberate deferral or a known, explicitly-scoped-out gap — not a bug needing urgent attention.
+
+**Suggestion for next session, not a decision already made**: Stage 8's structured-requirements parsing looks like the natural next piece, since it directly unblocks Stage 12 producing journal-accurate layout instead of fixed defaults — but confirm before starting.
+
+---
+
 ## RESUME HERE TOMORROW (as of 2026-07-22)
 
 **Today in one paragraph**: the Supabase auth cutover finished completely — `UserProfileGate.tsx`, `ProfileSettings.tsx`, and `AIControlCenter.tsx` all now talk to Supabase directly instead of the old `/api/*` Express routes, with a real Edge Function CORS bug found and fixed along the way. Separately, all 4 known LLM-fabrication instances in `aiService.ts`/`citationService.ts` (`discoverDataSources`, `discoverJournals`, `enrichCitationMetadata`, `simulateLookup`) were replaced with real Crossref/OpenAlex/PubMed/Semantic Scholar/DOAJ retrieval. The password-reset switch, blocked since yesterday on a `500 unexpected_failure` from `/auth/v1/recover`, got root-caused today: it's Resend's shared sandbox sender only accepting deliveries to the Resend account's own registered address, not a Supabase or code problem — confirmed by a direct test, code is done. On the planning side, `target-workflow.md` picked up empirical CORS test results that settled the client-side-vs-proxy architecture question (a narrow fetch/search proxy exception, formally scoped), dropped Google Scholar from retrieval scope, added an authoritative-web-search design section, and a Terms & Conditions mandatory-acceptance-gate spec plus a first (explicitly not-legal-advice) draft.
