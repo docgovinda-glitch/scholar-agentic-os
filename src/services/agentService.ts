@@ -35,6 +35,7 @@ import { ResearchQuestionSkill } from "../skills/researchQuestionSkill";
 import { MethodologyAdvisorSkill } from "../skills/methodologyAdvisorSkill";
 import { StatisticalAnalysisSkill } from "../skills/statisticalAnalysisSkill";
 import { IntegrityReviewerSkill } from "../skills/integrityReviewerSkill";
+import { ManuscriptWriterSkill } from "../skills/manuscriptWriterSkill";
 
 const agentRegistry = AgentRegistry.getInstance();
 const agentExecutor = AgentExecutor.getInstance();
@@ -56,6 +57,7 @@ skillRegistry.register(new ResearchQuestionSkill());
 skillRegistry.register(new MethodologyAdvisorSkill());
 skillRegistry.register(new StatisticalAnalysisSkill());
 skillRegistry.register(new IntegrityReviewerSkill());
+skillRegistry.register(new ManuscriptWriterSkill());
 
 function createAgentContext(): AgentContext {
   return {
