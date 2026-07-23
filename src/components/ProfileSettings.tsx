@@ -399,6 +399,14 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
   };
 
   if (!profile) {
+    if (error) {
+      return (
+        <div className="p-4 bg-red-50 border border-red-200 text-[#9C2E2E] rounded-xl flex items-start gap-3 text-xs font-mono">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div>{error}</div>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center p-12">
         <Loader2 className="w-6 h-6 text-[#1A365D] animate-spin" />

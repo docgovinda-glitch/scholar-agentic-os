@@ -69,15 +69,13 @@ describe("ProfileSettings — characterization", () => {
     expect(screen.getByText("ID-0001")).toBeInTheDocument();
   });
 
-  it("gets stuck on the loading spinner when the profile isn't found in localStorage", () => {
-    // Real, pre-existing quirk: the component DOES call setError("User profile
-    // not found.") in this case, but its top-level early return is keyed on
-    // `!profile` alone — since `profile` stays null, the component renders
-    // only the loading spinner forever, and that error text is never actually
-    // shown. Locking in the current (odd) behavior, not the intended one.
+  it("shows the 'User profile not found.' error instead of a permanent spinner when the profile isn't found in localStorage", () => {
+    // Fixed: the `!profile` early return now checks `error` first and shows
+    // it directly, only falling back to the spinner when there's genuinely
+    // no error yet (still loading).
     render(<ProfileSettings currentUser="nobody" />);
-    expect(screen.queryByText("User profile not found.")).not.toBeInTheDocument();
-    expect(document.querySelector(".animate-spin")).toBeInTheDocument();
+    expect(screen.getByText("User profile not found.")).toBeInTheDocument();
+    expect(document.querySelector(".animate-spin")).not.toBeInTheDocument();
   });
 
   it("submits a profile-update request with only the changed fields, and stores the returned keyHash", async () => {
