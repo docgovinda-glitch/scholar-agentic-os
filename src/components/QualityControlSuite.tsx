@@ -185,9 +185,9 @@ export default function QualityControlSuite({
           <div className="space-y-3 text-xs text-gray-700">
             <p className="font-semibold">{integrityReport.executiveSummary}</p>
             <p>
-              Publication readiness:{" "}
-              <span className={integrityReport.publicationReadiness ? "text-emerald-700 font-bold" : "text-red-700 font-bold"}>
-                {integrityReport.publicationReadiness ? "Ready" : "Not ready"}
+              Structural completeness:{" "}
+              <span className={integrityReport.structuralCompleteness >= 75 ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
+                {integrityReport.structuralCompleteness}%
               </span>
             </p>
             {integrityReport.recommendations.length > 0 && (

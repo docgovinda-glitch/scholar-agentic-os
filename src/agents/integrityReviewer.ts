@@ -49,7 +49,17 @@ export interface IntegrityReviewReport {
   blockingIssues: IntegrityIssue[];
   warnings: IntegrityIssue[];
   recommendations: string[];
-  publicationReadiness: boolean;
+  /**
+   * 0-100 percentage of a fixed structural/heading-presence checklist found
+   * in manuscriptText (Abstract, Introduction, Methods, Results, Discussion,
+   * Limitations, Conflict of Interest, Data Availability, Ethics/IRB
+   * approval) — replaces the previous publicationReadiness boolean, which
+   * was always true because nothing ever fed it real signal. This is a
+   * coarse structural/completeness scan, not semantic peer-review judgment
+   * of the manuscript's actual scientific content — see executiveSummary,
+   * which discloses this explicitly.
+   */
+  structuralCompleteness: number;
   confidence: number;
 }
 

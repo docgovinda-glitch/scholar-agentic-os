@@ -171,25 +171,22 @@ describe("IntegrityReviewerAgent -> IntegrityReviewerSkill (native skill round t
     expect(result.data.detectedIssues.find((i) => i.id === "ip-stats-1")).toMatchObject({ severity: "medium", category: "reporting" });
   });
 
-  it("[flagged, not fixed in this pass] reportingCompliance is an identical hardcoded stub regardless of manuscriptText — same category as the recommendedDatasets fabrication, arguably worse (falsely implies a real evaluation of the actual manuscript)", async () => {
+  it("[fixed 2026-07-23] reportingCompliance now varies with manuscriptText instead of returning an identical hardcoded stub", async () => {
     const agent = new IntegrityReviewerAgent();
 
     const emptyResult = await agent.execute({}, createContext());
-    const withTextResult = await agent.execute({ manuscriptText: "A completely different, unrelated manuscript with no real sections at all." }, createContext());
+    const withTextResult = await agent.execute({ manuscriptText: "=== SECTION: Abstract ===\nAn abstract.\n=== SECTION: Introduction ===\nAn introduction." }, createContext());
 
     expect(emptyResult.ok).toBe(true);
     expect(withTextResult.ok).toBe(true);
     if (!emptyResult.ok || !withTextResult.ok) return;
-    // Identical regardless of wildly different (or absent) manuscript text.
-    expect(emptyResult.data.reportingCompliance).toEqual(withTextResult.data.reportingCompliance);
-    expect(emptyResult.data.reportingCompliance).toEqual([
-      { guideline: "CONSORT", compliantItems: ["Abstract", "Introduction", "Methods"], missingItems: ["Limitations", "Data Availability"], completionPercentage: 75 },
-      { guideline: "STROBE", compliantItems: ["Abstract", "Introduction", "Methods"], missingItems: ["Limitations", "Data Availability"], completionPercentage: 75 },
-      { guideline: "PRISMA", compliantItems: ["Abstract", "Introduction", "Methods"], missingItems: ["Limitations", "Data Availability"], completionPercentage: 75 },
-    ]);
+    // No longer identical — varies with what's actually found in manuscriptText.
+    expect(emptyResult.data.reportingCompliance).not.toEqual(withTextResult.data.reportingCompliance);
+    expect(emptyResult.data.reportingCompliance[0].completionPercentage).toBe(0);
+    expect(withTextResult.data.reportingCompliance[0].compliantItems).toEqual(expect.arrayContaining(["Abstract", "Introduction"]));
   });
 
-  it("classifies critical/high severity issues as blocking and medium/low as warnings, gating publicationReadiness", async () => {
+  it("classifies critical/high severity issues as blocking and medium/low as warnings, gating structuralCompleteness (0% with no manuscriptText)", async () => {
     const agent = new IntegrityReviewerAgent();
     const review = literatureReview({
       researchGaps: [{ id: "g1", description: "gap", relatedThemes: [], suggestedSearchTerms: [], evidenceSupport: [] }],
@@ -201,7 +198,9 @@ describe("IntegrityReviewerAgent -> IntegrityReviewerSkill (native skill round t
     if (!result.ok) return;
     expect(result.data.warnings.length).toBeGreaterThan(0);
     expect(result.data.blockingIssues).toEqual([]);
-    expect(result.data.publicationReadiness).toBe(true);
+    // No manuscriptText was provided here — structuralCompleteness is 0%,
+    // honestly reflecting that nothing was found (there was no text to scan).
+    expect(result.data.structuralCompleteness).toBe(0);
   });
 
   it("computes scores by category with penalties from critical/high/medium counts", async () => {
@@ -227,7 +226,7 @@ describe("IntegrityReviewerAgent -> IntegrityReviewerSkill (native skill round t
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.detectedIssues).toEqual([]);
-    expect(result.data.publicationReadiness).toBe(true);
+    expect(result.data.structuralCompleteness).toBe(0); // no manuscriptText provided, nothing to scan
     expect(result.data.integrityScore).toBe(0.9);
   });
 });

@@ -59,7 +59,7 @@ describe("QualityControlSuite — Stage 10 IntegrityReviewerAgent path (new)", (
         reportingCompliance: [{ guideline: "PRISMA", compliantItems: ["Abstract"], missingItems: ["Limitations"], completionPercentage: 75 }],
         detectedIssues: [], blockingIssues: [], warnings: [],
         recommendations: ["Address all critical and high severity issues before submission"],
-        publicationReadiness: true, confidence: 0.95,
+        structuralCompleteness: 90, confidence: 0.95,
       },
       diagnostics: { modeUsed: "deterministic", executionTimeMs: 5 },
     });
@@ -74,7 +74,7 @@ describe("QualityControlSuite — Stage 10 IntegrityReviewerAgent path (new)", (
     expect(mockRunQualityControl).not.toHaveBeenCalled();
   });
 
-  it("renders the returned IntegrityReviewReport's executive summary and publication-readiness after a successful run", async () => {
+  it("renders the returned IntegrityReviewReport's executive summary and structural-completeness percentage after a successful run", async () => {
     mockExecuteAgent.mockResolvedValue({
       ok: true,
       data: {
@@ -83,7 +83,7 @@ describe("QualityControlSuite — Stage 10 IntegrityReviewerAgent path (new)", (
         reportingCompliance: [],
         detectedIssues: [], blockingIssues: [], warnings: [],
         recommendations: [],
-        publicationReadiness: true, confidence: 0.95,
+        structuralCompleteness: 90, confidence: 0.95,
       },
       diagnostics: { modeUsed: "deterministic", executionTimeMs: 5 },
     });
