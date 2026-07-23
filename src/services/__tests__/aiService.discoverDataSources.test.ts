@@ -21,6 +21,11 @@ vi.mock("../searchProxyService", () => ({
   searchProxy: mockSearchProxy,
 }));
 
+const { mockArxivProxy } = vi.hoisted(() => ({ mockArxivProxy: vi.fn() }));
+vi.mock("../arxivProxyService", () => ({
+  arxivProxy: mockArxivProxy,
+}));
+
 import { discoverDataSources } from "../aiService";
 
 function literatureResult(overrides: Partial<LiteratureResult> = {}): LiteratureResult {
@@ -43,6 +48,7 @@ beforeEach(() => {
   // these up themselves keep seeing exactly their original expected output.
   mockDiscoverStatisticalData.mockResolvedValue({ results: [], sourceErrors: [] });
   mockSearchProxy.mockResolvedValue({ results: [] });
+  mockArxivProxy.mockResolvedValue({ results: [] });
 });
 
 describe("discoverDataSources — real retrieval (post-fix behavior)", () => {
@@ -200,7 +206,71 @@ describe("discoverDataSources — real retrieval (post-fix behavior)", () => {
     expect(mockDiscoverLiterature).not.toHaveBeenCalled();
     expect(mockDiscoverStatisticalData).not.toHaveBeenCalled();
     expect(mockSearchProxy).not.toHaveBeenCalled();
+    expect(mockArxivProxy).not.toHaveBeenCalled();
     expect(result.sources).toEqual([]);
+  });
+
+  it("appends arXiv preprints (arxiv-proxy) after literature, statistical, and web-search sources", async () => {
+    mockDiscoverLiterature.mockResolvedValue({ results: [literatureResult()], sourceErrors: [] });
+    mockDiscoverStatisticalData.mockResolvedValue({
+      results: [{ name: "Population, total", url: "https://data.worldbank.org/indicator/SP.POP.TOTL", description: "Total population by country.", source: "World Bank" }],
+      sourceErrors: [],
+    });
+    mockSearchProxy.mockResolvedValue({
+      results: [{ title: "WHO Data Portal", url: "https://www.who.int/data", content: "Global health statistics and indicators.", score: 0.87 }],
+    });
+    mockArxivProxy.mockResolvedValue({
+      results: [
+        {
+          id: "http://arxiv.org/abs/2401.00001v1",
+          title: "A Preprint on Testing",
+          authors: ["Ada Lovelace", "Charles Babbage"],
+          abstract: "This preprint studies testing methodology in depth.",
+          published: "2024-01-01T00:00:00Z",
+          url: "http://arxiv.org/abs/2401.00001v1",
+        },
+      ],
+    });
+
+    const project = { ...DEFAULT_STATE("tester"), title: "Some Title" };
+    const result = await discoverDataSources(project);
+
+    expect(mockArxivProxy).toHaveBeenCalledWith("Some Title");
+    expect(result.sources).toHaveLength(4);
+    // Literature, then statistical, then web-search, then arXiv — matching existing ordering.
+    expect(result.sources.map((s) => s.name)).toEqual(["A Study of Testing", "Population, total", "WHO Data Portal", "A Preprint on Testing"]);
+
+    const arxivSource = result.sources.find((s) => s.name === "A Preprint on Testing")!;
+    expect(arxivSource.url).toBe("http://arxiv.org/abs/2401.00001v1");
+    expect(arxivSource.type).toBe("Mixed");
+    expect(arxivSource.relevance).toContain("Ada Lovelace, Charles Babbage");
+    expect(arxivSource.relevance).toContain("This preprint studies testing methodology in depth.");
+    expect(arxivSource.reliability).toContain("not yet peer-reviewed");
+    expect(arxivSource.limitations).toContain("not peer-reviewed");
+    expect(arxivSource.status).toBe("pending");
+  });
+
+  it("labels a missing arXiv abstract honestly instead of fabricating one", async () => {
+    mockDiscoverLiterature.mockResolvedValue({ results: [], sourceErrors: [] });
+    mockArxivProxy.mockResolvedValue({
+      results: [{ id: "http://arxiv.org/abs/2401.00002v1", title: "Untitled Preprint", authors: [], abstract: "", published: "2024-01-02T00:00:00Z", url: "http://arxiv.org/abs/2401.00002v1" }],
+    });
+
+    const project = { ...DEFAULT_STATE("tester"), title: "Some Title" };
+    const result = await discoverDataSources(project);
+
+    expect(result.sources[0].relevance).toBe("Abstract not provided by arXiv.");
+  });
+
+  it("still returns literature, statistical, and web-search sources when the arXiv proxy finds nothing or fails", async () => {
+    mockDiscoverLiterature.mockResolvedValue({ results: [literatureResult()], sourceErrors: [] });
+    mockArxivProxy.mockResolvedValue({ results: [], error: "arXiv proxy request failed: timeout" });
+
+    const project = { ...DEFAULT_STATE("tester"), title: "Some Title" };
+    const result = await discoverDataSources(project);
+
+    expect(result.sources).toHaveLength(1);
+    expect(result.sources[0].name).toBe("A Study of Testing");
   });
 
   it("still queries agents normally for every other format", async () => {

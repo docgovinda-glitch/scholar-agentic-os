@@ -4,6 +4,7 @@ import AIGateway from "./aiGateway";
 import { isVaultActive, getActiveVaultContext, buildCitationPrompt, getRelevantChunksContext } from "./knowledgeVaultService";
 import { discoverLiterature, discoverStatisticalData } from "./literatureRetrievalService";
 import { searchProxy } from "./searchProxyService";
+import { arxivProxy } from "./arxivProxyService";
 import { discoverJournalCandidates } from "./journalRetrievalService";
 import { lookupCitation, type CitationLookupResult } from "./citationEnrichmentService";
 import { APA7Formatter } from "../citation_compliance/formatters/apa7";
@@ -608,10 +609,11 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
   // own sub-sources. discoverLiterature is the one exception that still
   // propagates a rejection (see below): it's the primary/required source, the
   // other two are supplements that must never block it or each other.
-  const [literatureSettled, statisticalSettled, searchProxySettled] = await Promise.allSettled([
+  const [literatureSettled, statisticalSettled, searchProxySettled, arxivSettled] = await Promise.allSettled([
     discoverLiterature(query),
     discoverStatisticalData(query),
     searchProxy(query),
+    arxivProxy(query),
   ]);
 
   if (literatureSettled.status === "rejected") {
@@ -681,7 +683,32 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
     };
   });
 
-  return { sources: [...literatureSources, ...statisticalSources, ...webSearchSources] };
+  // arXiv preprints (supabase/functions/arxiv-proxy — required, arXiv's export
+  // API sends no CORS headers). Never throws (see arxivProxyService.ts); a
+  // failure here just means an empty results array, tolerated the same way
+  // statistical-data and web-search failures already are above.
+  const arxivResults = arxivSettled.status === "fulfilled" ? arxivSettled.value.results : [];
+  const arxivSources: DiscoveredDataSource[] = arxivResults.map((r) => {
+    const byline = r.authors.length > 0 ? r.authors.join(", ") : "";
+    const abstractSnippet = r.abstract
+      ? `${r.abstract.slice(0, 300)}${r.abstract.length > 300 ? "…" : ""}`
+      : "Abstract not provided by arXiv.";
+
+    return {
+      name: r.title,
+      url: r.url,
+      // arXiv preprints span all methodologies and arXiv's metadata doesn't
+      // classify by method — "Mixed" is the same honest, disclosed default
+      // used for literature and web-search results above.
+      type: "Mixed",
+      relevance: byline ? `${byline} — ${abstractSnippet}` : abstractSnippet,
+      reliability: "Preprint from arXiv — not yet peer-reviewed.",
+      limitations: "Retrieved directly from arXiv's public API as a preprint — not peer-reviewed; verify against the published version (if any) before relying on it academically.",
+      status: "pending",
+    };
+  });
+
+  return { sources: [...literatureSources, ...statisticalSources, ...webSearchSources, ...arxivSources] };
 }
 
 // Phase D: Journal Discovery
