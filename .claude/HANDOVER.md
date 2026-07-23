@@ -5,7 +5,7 @@
 **Today in one paragraph**: the Supabase auth cutover finished completely — `UserProfileGate.tsx`, `ProfileSettings.tsx`, and `AIControlCenter.tsx` all now talk to Supabase directly instead of the old `/api/*` Express routes, with a real Edge Function CORS bug found and fixed along the way. Separately, all 4 known LLM-fabrication instances in `aiService.ts`/`citationService.ts` (`discoverDataSources`, `discoverJournals`, `enrichCitationMetadata`, `simulateLookup`) were replaced with real Crossref/OpenAlex/PubMed/Semantic Scholar/DOAJ retrieval. The password-reset switch, blocked since yesterday on a `500 unexpected_failure` from `/auth/v1/recover`, got root-caused today: it's Resend's shared sandbox sender only accepting deliveries to the Resend account's own registered address, not a Supabase or code problem — confirmed by a direct test, code is done. On the planning side, `target-workflow.md` picked up empirical CORS test results that settled the client-side-vs-proxy architecture question (a narrow fetch/search proxy exception, formally scoped), dropped Google Scholar from retrieval scope, added an authoritative-web-search design section, and a Terms & Conditions mandatory-acceptance-gate spec plus a first (explicitly not-legal-advice) draft.
 
 **Open threads, not yet started:**
-- Native-skills agent-wiring rollout — 1 of 8 agents (`ResearchPlannerAgent`) wired to `src/skills/`, the other 7 not started; also blocks the flagged `recommendJournals()` fabrication fix (`LiteratureReviewAgent`), which needs this rollout to resume first.
+- ~~Native-skills agent-wiring rollout — 1 of 8 agents...~~ **Superseded (2026-07-23): COMPLETE.** All 8 agents now wired to `src/skills/` — see the dedicated section below for the full rundown (3 fabrication fixes, 3 flagged-not-fixed findings).
 - `extractRequirements` fabrication fix — needs a vendor/proxy decision before it can proceed (flagged during the fabrication audit, not yet actioned).
 - Three known-but-unfixed UI bugs, all characterization-tested and deliberately left alone as out of scope for the swaps that found them: `ProfileSettings.tsx`'s admin approve/reject success message being immediately overwritten by `loadProfileData()`'s `setSuccess(null)`; the permanent loading spinner shown instead of the "User profile not found." error text when `!profile`; and a phone-number double-prefix bug (`+9779779800000001`-style) found during live re-verification.
 - Removal of the now-dead `request-password-reset`/`approve-password-reset` Edge Functions and the `pending_password_resets` table — deliberately deferred until a custom domain is verified with Resend (not urgent, not a bug).
@@ -172,11 +172,35 @@ The `ResearchPlannerAgent`-to-Skills-Framework wiring (committed as `2e5e9fb`) w
    - Deployed via `supabase functions deploy <name> --use-api` (no Docker, same pattern as the original go-live).
 6. **Commits**: `380aea2` (the cutover itself) and `39d47d5` (the Edge Function CORS fix), kept separate per the established one-fix-per-commit pattern this session.
 
-**Still paused, unchanged, not part of any of the above**: the native-skills agent-wiring rollout (`ResearchPlannerAgent` wired to `src/skills/`, 1 of 8 agents, still uncommitted — deliberately kept separate from every commit made during this Supabase work). Remains blocked until the hosting picture (including the UI cutover above) is fully settled.
+~~**Still paused, unchanged, not part of any of the above**: the native-skills agent-wiring rollout...~~ **Superseded (2026-07-23): COMPLETE — see the dedicated section below.**
 
 **Next proposed step after live provisioning is done (not started): Phase 2 — AI Gateway Tiers 2 and 3** (free-tier BYOK, heavy BYOK), per `docs/planning/hosting-and-topology.md` §7's proposed sequencing — lowest technical risk of the remaining AI Gateway work, reusing `src/services/aiGateway.ts`'s existing provider adapters. Do not start until Phase 1's live verification and the UI-cutover risk (item 2 above) are resolved.
 
-**Also still paused, unchanged**: the in-progress native-skills agent-wiring rollout (`ResearchPlannerAgent` wired to `src/skills/`, 1 of 8 agents, uncommitted) — `createAgentContext()` lives in `server.ts`, which this hosting migration will eventually eliminate; don't wire the remaining 7 agents until the hosting picture is fully settled. See `docs/planning/2026-07-20-session-notes.md` for that work and the still-open UI redesign / agent-roster (blocked on ARCH-3) proposals.
+~~**Also still paused, unchanged**: the in-progress native-skills agent-wiring rollout...~~ **Superseded (2026-07-23): COMPLETE — see the dedicated section below.**
+
+---
+
+## Native-Skills Agent Rollout — COMPLETE (2026-07-23)
+
+All 8 scholarly agents are now wired to the Skills Framework, following the exact pattern proven on `ResearchPlannerAgent` (`2e5e9fb`/`f0bfdee`): characterization tests against current behavior first, deterministic logic extracted verbatim into a new `src/skills/*Skill.ts`, agent's `execute()` rewritten to delegate via `context.runSkill(skillId, input)` with a `!context.runSkill` regression guard, tests updated to exercise the real `SkillRegistry`/`SkillExecutor` round trip (not mocked), `tsc --noEmit` + full suite clean after every single agent, and a real (non-mocked) live-verification script run and deleted before each commit. One agent per commit throughout, matching the established discipline.
+
+**Agents wired, in order**: `LiteratureReviewAgent` → `KnowledgeGapAgent` → `ResearchQuestionAgent` → `MethodologyAdvisorAgent` → `StatisticalAnalysisAdvisor` → `IntegrityReviewerAgent` → `ManuscriptWriterAgent` (plus `ResearchPlannerAgent`, already done in the prior pass this rollout resumed from).
+
+**Fabrication audit, run agent-by-agent as part of this rollout** — 3 more confirmed instances found and fixed, 3 more found and flagged (not fixed):
+
+- **Fixed (reused the already-built `journalRetrievalService.discoverJournalCandidates` — real Crossref/OpenAlex/DOAJ retrieval, no new service needed)**:
+  - `LiteratureReviewAgent.recommendJournals()` — was hardcoded `["Nature", "Science", "IEEE Transactions"]`. Now queries discipline-first, research-question fallback, honest `[]` on failure. Live-verified (real topic "renewable energy policy" → real journal names).
+  - `KnowledgeGapAgent.generateRecommendations()`'s `journals` field — same stub, same fix. Query from the research plan's project summary, falling back to the literature review's first gap's search terms. Live-verified (real topic "marine biodiversity conservation" → a real journal name).
+- **Flagged, not fixed — added to `target-workflow.md`'s fabrication-audit list (§10), each needs its own dedicated future task**:
+  - `ResearchQuestionAgent`'s `recommendedDatasets: ["dataset-1"]` — hardcoded single-item stub. No existing dataset-discovery retrieval service to reuse (unlike the journal cases) — building one is new-feature work, not a same-effort swap.
+  - `IntegrityReviewerAgent.evaluateReportingCompliance()` — returns an **identical** hardcoded CONSORT/STROBE/PRISMA compliance report (same 75% completion, same compliant/missing items) regardless of `manuscriptText` — never actually inspects it. Arguably worse than the journal-list cases since it falsely implies a real evaluation of the user's actual manuscript. Needs real text/structure analysis of `manuscriptText`, not external retrieval — `aiService.ts`'s `analyzeManuscriptStructure` is the closest existing deterministic analog but operates on a different input shape (`PaperProject.sections`/`complianceRules`, not a plain string), so it isn't a direct reuse either.
+  - (Audited `MethodologyAdvisorAgent` and `StatisticalAnalysisAdvisor` too — no fabrication found in either; their `recommend*` methods are generic methodology/software-category advice, the same "legitimate judgment task" category `target-workflow.md` §10 already ruled out, not fabricated verified facts. `ManuscriptWriterAgent` was already following the honest-gap pattern *before* this rollout touched it — untouched, real placeholder text like "to be determined"/"to be completed" when an upstream artifact isn't attached yet, never invented content.)
+
+**Not touched, deliberately, per this rollout's own scope**: the search-vendor decision, the fetch/search proxy work, Stage 4-6 work (already done in an earlier pass today), and UI bug cleanup — none of that was in scope here and none of it was touched.
+
+**Commits** (one per agent, `docs/planning/target-workflow.md` updated once at the very end covering all three findings from this pass, not per-agent): `b3d349f` (LiteratureReviewAgent), `a8dbf3a` (KnowledgeGapAgent), `ff8fd7b` (ResearchQuestionAgent), `8edfdb9` (MethodologyAdvisorAgent), `c53afec` (StatisticalAnalysisAdvisor), `765d503` (IntegrityReviewerAgent), `f148bb8` (ManuscriptWriterAgent).
+
+**Still not done, unchanged by this rollout**: `agentService.ts`'s `executeAgent()`/`listAgents()` are still not called from any UI component — this whole stack (all 8 agents + skills) remains reachable only via direct in-process calls (tests, or a script like the live-verification ones used throughout this pass), not from the running app. Wiring a real UI surface to it is a separate, not-yet-scoped future task.
 
 ---
 
