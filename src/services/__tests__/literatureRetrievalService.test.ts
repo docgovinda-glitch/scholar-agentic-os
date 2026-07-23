@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { discoverLiterature } from "../literatureRetrievalService";
+import {
+  discoverLiterature,
+  discoverStatisticalData,
+  __resetStatisticalDataCacheForTests,
+} from "../literatureRetrievalService";
 
 function jsonResponse(body: unknown, ok = true, status = 200) {
   return {
@@ -180,5 +184,139 @@ describe("literatureRetrievalService — per-source parsing", () => {
 
     await expect(discoverLiterature("   ")).rejects.toThrow(/Cannot discover literature/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+function worldBankIndicatorBody(indicators: Array<{ id: string; name: string; sourceNote?: string }>) {
+  return [{ total: indicators.length }, indicators];
+}
+
+function oecdDataflowBody(flows: Array<{ id: string; agencyID: string; version: string; name: string; description?: string }>) {
+  return { data: { dataflows: flows } };
+}
+
+describe("literatureRetrievalService — statistical data (World Bank / OECD)", () => {
+  beforeEach(() => {
+    __resetStatisticalDataCacheForTests();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("matches World Bank indicators and OECD dataflows by keyword against name/description, merged and deduped", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("api.worldbank.org")) {
+        return jsonResponse(
+          worldBankIndicatorBody([
+            { id: "SP.POP.TOTL", name: "Population, total", sourceNote: "Total population is based on the de facto definition." },
+            { id: "NY.GDP.MKTP.CD", name: "GDP (current US$)", sourceNote: "GDP at purchaser's prices." },
+          ])
+        );
+      }
+      if (url.includes("sdmx.oecd.org")) {
+        return jsonResponse(
+          oecdDataflowBody([
+            { id: "DF_POP", agencyID: "OECD.ELS.SAE", version: "1.0", name: "Population statistics", description: "<p>Annual population statistics by country.</p>" },
+            { id: "DF_TRADE", agencyID: "OECD.SDD.TPS", version: "2.0", name: "Trade in goods", description: "Bilateral trade flows." },
+          ])
+        );
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { results, sourceErrors } = await discoverStatisticalData("population statistics");
+
+    expect(sourceErrors).toEqual([]);
+    const names = results.map((r) => r.name);
+    expect(names).toEqual(expect.arrayContaining(["Population, total", "Population statistics"]));
+    // "Trade in goods" and "GDP (current US$)" don't match "population statistics" — shouldn't appear.
+    expect(names).not.toContain("Trade in goods");
+    expect(names).not.toContain("GDP (current US$)");
+
+    const wb = results.find((r) => r.source === "World Bank")!;
+    expect(wb.url).toBe("https://data.worldbank.org/indicator/SP.POP.TOTL");
+    expect(wb.description).toContain("de facto definition");
+
+    const oecd = results.find((r) => r.source === "OECD")!;
+    expect(oecd.url).toBe("https://sdmx.oecd.org/public/rest/dataflow/OECD.ELS.SAE/DF_POP/1.0");
+    // HTML tags stripped from the description.
+    expect(oecd.description).toBe("Annual population statistics by country.");
+    expect(oecd.description).not.toContain("<p>");
+  });
+
+  it("excludes non-OECD-agency dataflows (e.g. Eurostat-hosted entries in the same registry)", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("api.worldbank.org")) return jsonResponse(worldBankIndicatorBody([]));
+      if (url.includes("sdmx.oecd.org")) {
+        return jsonResponse(
+          oecdDataflowBody([
+            { id: "DF_EDU", agencyID: "ESTAT", version: "1.0", name: "Education statistics", description: "Eurostat education data." },
+          ])
+        );
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { results } = await discoverStatisticalData("education statistics");
+    expect(results).toEqual([]);
+  });
+
+  it("caches the fetched catalogs across repeated calls instead of re-fetching every time", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("api.worldbank.org")) return jsonResponse(worldBankIndicatorBody([{ id: "X", name: "Test indicator" }]));
+      if (url.includes("sdmx.oecd.org")) return jsonResponse(oecdDataflowBody([]));
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await discoverStatisticalData("test");
+    await discoverStatisticalData("test");
+
+    const wbCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("api.worldbank.org"));
+    const oecdCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("sdmx.oecd.org"));
+    expect(wbCalls).toHaveLength(1);
+    expect(oecdCalls).toHaveLength(1);
+  });
+
+  it("tolerates one source failing and still returns the other's matches", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("api.worldbank.org")) throw new Error("network error");
+      if (url.includes("sdmx.oecd.org")) {
+        return jsonResponse(
+          oecdDataflowBody([{ id: "DF_POP", agencyID: "OECD.ELS.SAE", version: "1.0", name: "Population statistics", description: "" }])
+        );
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { results, sourceErrors } = await discoverStatisticalData("population");
+
+    expect(results).toHaveLength(1);
+    expect(results[0].source).toBe("OECD");
+    expect(sourceErrors.some((e) => e.startsWith("World Bank:"))).toBe(true);
+  });
+
+  it("never throws — returns empty results with no source errors when the query is empty", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { results, sourceErrors } = await discoverStatisticalData("   ");
+    expect(results).toEqual([]);
+    expect(sourceErrors).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("never throws even when both sources fail — returns empty results with source errors recorded", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({}, false, 500));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { results, sourceErrors } = await discoverStatisticalData("population");
+    expect(results).toEqual([]);
+    expect(sourceErrors).toHaveLength(2);
   });
 });

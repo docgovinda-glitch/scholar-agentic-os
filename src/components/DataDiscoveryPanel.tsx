@@ -239,6 +239,45 @@ export default function DataDiscoveryPanel({
 
   const approvedCount = project.dataSources?.filter((s) => s.approved).length || 0;
 
+  // Research proposals skip primary/secondary data collection entirely, and agents
+  // never add data sources for this format (target-workflow.md Stage 6) — a proposal
+  // describes planned, not yet executed, research, so there's nothing to collect or
+  // discover sources for yet. Gated the same way Stage 5's conditional fields are,
+  // on project.outputFormat. discoverDataSources itself also gates this server-side;
+  // this is the matching UI-level skip so the stage isn't even offered.
+  if (project.outputFormat === "research-proposal") {
+    return (
+      <div id="data-discovery" className="space-y-6">
+        <div className="p-8 text-center bg-white border border-[#E2E8F0] rounded-2xl space-y-4">
+          <div className="w-12 h-12 bg-[#1A365D]/10 border border-[#1A365D]/20 rounded-full flex items-center justify-center mx-auto">
+            <Database className="w-6 h-6 text-[#1A365D]" />
+          </div>
+          <div className="max-w-md mx-auto space-y-2">
+            <h3 className="text-sm font-bold text-[#1A365D] font-serif">This stage skips primary data for research proposals</h3>
+            <p className="text-xs text-gray-500 font-sans">
+              A research proposal describes planned, not yet executed, research — there's no primary or secondary
+              data to collect yet, and agents don't add data sources for this format either.
+            </p>
+          </div>
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={onBack}
+              className="px-4 py-2 border border-[#E2E8F0] hover:bg-[#FAF9F6] text-[#1A365D] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
+            >
+              ← Back to Grounding
+            </button>
+            <button
+              onClick={onNext}
+              className="px-6 py-2.5 bg-[#1A365D] hover:bg-[#122847] font-bold text-white text-xs rounded-lg transition-all duration-200 shadow-sm cursor-pointer font-mono uppercase tracking-wider"
+            >
+              Continue →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div id="data-discovery" className="space-y-6">
       {/* Header */}

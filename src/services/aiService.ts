@@ -2,7 +2,7 @@ import { PaperProject, GroundingMap, DiscoveredDataSource, RecommendJournal, Com
 import { decryptData } from "../utils/crypto";
 import AIGateway from "./aiGateway";
 import { isVaultActive, getActiveVaultContext, buildCitationPrompt, getRelevantChunksContext } from "./knowledgeVaultService";
-import { discoverLiterature } from "./literatureRetrievalService";
+import { discoverLiterature, discoverStatisticalData } from "./literatureRetrievalService";
 import { discoverJournalCandidates } from "./journalRetrievalService";
 import { lookupCitation, type CitationLookupResult } from "./citationEnrichmentService";
 import { APA7Formatter } from "../citation_compliance/formatters/apa7";
@@ -549,17 +549,35 @@ Generate a comprehensive "Dissertation Grounding Map" in JSON format. ${vaultAct
 
 // Phase C: Research Data Discovery
 //
-// Real retrieval against Crossref, OpenAlex, PubMed, and Semantic Scholar — replaces
-// the prior LLM-naming behavior (asking a model to *name* sources from memory, with
-// no verification step). That was recorded as a defect, not a weaker-but-valid version
+// Real retrieval against Crossref, OpenAlex, PubMed, and Semantic Scholar (scholarly
+// literature) plus World Bank and OECD (statistical/open data) — replaces the prior
+// LLM-naming behavior (asking a model to *name* sources from memory, with no
+// verification step). That was recorded as a defect, not a weaker-but-valid version
 // of "restricted to authoritative sources" — see docs/planning/target-workflow.md §0/§2.
-// arXiv and generic web search are out of scope here; both need the accepted
-// fetch/search proxy (HANDOVER.md's Standing Boundary Rule), not a client-side call.
+// arXiv, WHO GHO, IMF DataMapper, and generic web search are out of scope here; all
+// need the accepted fetch/search proxy (HANDOVER.md's Standing Boundary Rule), not a
+// client-side call.
+//
+// Statistical-data retrieval is deliberately best-effort: discoverStatisticalData
+// never throws (see literatureRetrievalService.ts), so a total failure there still
+// leaves the literature results intact — statistical sources are a supplement, not
+// a requirement, unlike the literature call above which this function still
+// propagates a rejection from if every literature source fails.
+//
+// Research proposals are the one exception to all of the above (target-workflow.md
+// Stage 6): they're the only format that skips primary data and the only format
+// where agents don't add it, since a proposal describes planned, not yet executed,
+// research — there's nothing yet to discover sources for. Gated the same way Stage
+// 5's conditional fields are, on project.outputFormat.
 export async function discoverDataSources(project: PaperProject): Promise<{ sources: DiscoveredDataSource[] }> {
+  if (project.outputFormat === "research-proposal") {
+    return { sources: [] };
+  }
+
   const query = [project.title, project.keywords].filter(Boolean).join(" ").trim() || project.field?.trim() || "";
   const { results } = await discoverLiterature(query);
 
-  const sources: DiscoveredDataSource[] = results.map((r) => {
+  const literatureSources: DiscoveredDataSource[] = results.map((r) => {
     const byline = [r.authors, r.year && `(${r.year})`, r.venue].filter(Boolean).join(" ");
     const abstractSnippet = r.abstract
       ? `${r.abstract.slice(0, 300)}${r.abstract.length > 300 ? "…" : ""}`
@@ -579,7 +597,24 @@ export async function discoverDataSources(project: PaperProject): Promise<{ sour
     };
   });
 
-  return { sources };
+  const { results: statisticalResults } = await discoverStatisticalData(query);
+  const statisticalSources: DiscoveredDataSource[] = statisticalResults.map((r) => ({
+    name: r.name,
+    url: r.url,
+    // Unlike literature results above, this is a truthful classification, not a
+    // disclosed default — World Bank indicators and OECD dataflows are quantitative
+    // statistical series by nature.
+    type: "Quantitative",
+    relevance: r.description || `Statistical indicator/dataflow published by ${r.source}.`,
+    reliability: `Official statistical indicator/dataflow published by ${r.source}.`,
+    limitations:
+      r.source === "World Bank"
+        ? "Matched by keyword against the indicator's name/description — the World Bank Indicators API has no server-side keyword search. Query specific countries/years directly for actual values; none are fetched here."
+        : "Matched by keyword against the dataflow's name/description — the OECD SDMX API has no server-side keyword search. This links to the raw SDMX structure endpoint (machine-readable) — browse data-explorer.oecd.org and search by name for a human-friendly view. Query specific dimensions for actual values; none are fetched here.",
+    approved: false,
+  }));
+
+  return { sources: [...literatureSources, ...statisticalSources] };
 }
 
 // Phase D: Journal Discovery
