@@ -11,6 +11,7 @@ export const DEFAULT_STATE = (username: string): PaperProject => ({
   keywords: "",
   preferredJournalScope: "",
   articleType: "",
+  outputFormat: "",
   dissertationMaterials: "",
   styleAspiration: "",
   authorDetails: "",
@@ -534,6 +535,20 @@ export interface KnowledgeVault {
   lastUpdated: string;
 }
 
+// Stage 4 (target-workflow.md) — document-genre selection, asked immediately after
+// workspace launch and before Stage 5's research-input fields. Distinct from
+// `articleType` below, which is a methodology axis ("what kind of study"), not a
+// document-genre axis ("what kind of document"). Empty string = not yet selected,
+// same "unset" convention as `articleType`/other string fields on this interface.
+export type OutputFormat =
+  | "journal-article"
+  | "research-paper"
+  | "term-paper"
+  | "newspaper-article"
+  | "book-chapter"
+  | "report"
+  | "research-proposal";
+
 export interface PaperProject {
   id: string;
   title: string;
@@ -545,6 +560,8 @@ export interface PaperProject {
   keywords: string;
   preferredJournalScope: string;
   articleType: string;
+  outputFormat: OutputFormat | "";
+  targetReferenceCount?: number; // Soft target (target-workflow.md Stage 5) — warn, never block
   dissertationMaterials: string;
   styleAspiration: string;
   authorDetails: string;

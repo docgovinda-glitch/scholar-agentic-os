@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { PaperProject, WORKFLOW_PHASES, PROFILE_STATE_PREFIX, DEFAULT_STATE, UserProfile } from "./types";
 import ResearchIntakeWizard from "./components/ResearchIntakeWizard";
+import OutputFormatSelector from "./components/OutputFormatSelector";
 import GroundingMapDisplay from "./components/GroundingMapDisplay";
 import DataDiscoveryPanel from "./components/DataDiscoveryPanel";
 import JournalDiscoveryPanel from "./components/JournalDiscoveryPanel";
@@ -411,6 +412,8 @@ function App() {
         keywords: "",
         preferredJournalScope: "",
         articleType: "Theoretical/Conceptual",
+        outputFormat: "" as const,
+        targetReferenceCount: undefined,
         dissertationMaterials: "",
         styleAspiration: "",
         currentPhase: "A" as const,
@@ -725,7 +728,12 @@ function App() {
             {/* Main Panel Content */}
             <div className="flex-grow w-full rounded-3xl p-5 md:p-6 shadow-sm border border-[#E5E7EB] bg-[#FFFFFF] min-h-[500px]">
               <ErrorBoundary>
-                {project.currentPhase === "A" && (
+                {project.currentPhase === "A" && !project.outputFormat && (
+                  <OutputFormatSelector
+                    onSelect={(format) => updateProject({ outputFormat: format })}
+                  />
+                )}
+                {project.currentPhase === "A" && project.outputFormat && (
                   <ResearchIntakeWizard
                     project={project}
                     updateProject={updateProject}

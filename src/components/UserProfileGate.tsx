@@ -29,6 +29,7 @@ const DEFAULT_STATE = (username: string): PaperProject => ({
   keywords: "",
   preferredJournalScope: "",
   articleType: "Theoretical/Conceptual",
+  outputFormat: "",
   dissertationMaterials: "",
   styleAspiration: "",
   authorDetails: `${username}, Academic Researcher`,

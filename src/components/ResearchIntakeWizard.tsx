@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { PaperProject, AISettings } from "../types";
+import { PaperProject, AISettings, OutputFormat } from "../types";
 import { FileText, Sparkles, BookOpen, AlertCircle, Play, Check, HelpCircle, Loader2 } from "lucide-react";
-import { 
-  suggestTopic, 
-  improveTitle, 
-  generateTitleVariations, 
-  suggestObjectives, 
-  suggestMethodology, 
+import {
+  suggestTopic,
+  improveTitle,
+  generateTitleVariations,
+  suggestObjectives,
+  suggestMethodology,
   checkRQsQuality,
   suggestFullBlueprint
 } from "../services/aiService";
+import { OUTPUT_FORMAT_FIELD_CONFIG, OUTPUT_FORMAT_OPTIONS } from "../config/outputFormats";
 
 interface ResearchIntakeWizardProps {
   project: PaperProject;
@@ -171,6 +172,38 @@ export default function ResearchIntakeWizard({
   const [methodologyLoading, setMethodologyLoading] = useState(false);
   const [methodologyAdvice, setMethodologyAdvice] = useState<{ methodology: string; confidence: string; rationale: string } | null>(null);
 
+  // Stage 4/5 field gating (target-workflow.md §3) — falls back to research-paper's
+  // (all-fields-shown) config defensively; App.tsx only mounts this component once
+  // project.outputFormat is set, so the fallback should never actually be exercised.
+  const formatConfig = OUTPUT_FORMAT_FIELD_CONFIG[project.outputFormat as OutputFormat] ?? OUTPUT_FORMAT_FIELD_CONFIG["research-paper"];
+  const formatOption = OUTPUT_FORMAT_OPTIONS.find((o) => o.id === project.outputFormat);
+
+  if (formatConfig.needsDedicatedIntake) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white border border-[#E5E7EB] rounded-3xl p-8 shadow-sm space-y-4 text-center">
+          <AlertCircle className="w-8 h-8 text-amber-500 mx-auto" />
+          <h2 className="text-lg font-bold text-[#1A365D] font-serif">
+            {formatOption?.label ?? "This format"} needs a dedicated intake flow
+          </h2>
+          <p className="text-xs text-[#6B665E] font-sans max-w-lg mx-auto leading-relaxed">
+            The standard research-input fields (research questions, objectives, research gap, methodology) don't
+            fit a {(formatOption?.label ?? "this format").toLowerCase()} — it needs its own fields instead
+            (headline/angle, target publication or section, word count, audience, quotes/sources). That dedicated
+            flow isn't built yet (see <code>docs/planning/target-workflow.md</code> §3).
+          </p>
+          <button
+            type="button"
+            onClick={() => updateProject({ outputFormat: "" })}
+            className="px-4 py-2 bg-[#1A365D] hover:bg-[#1A365D]/90 text-white font-mono text-[10px] uppercase font-bold rounded-lg cursor-pointer transition-all"
+          >
+            ← Choose a Different Format
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const updateAuthorField = (updates: Partial<PaperProject>) => {
     const nextState = {
       ...project,
@@ -235,12 +268,14 @@ export default function ResearchIntakeWizard({
   };
 
   const isFormValid = () => {
+    const fields = formatConfig.fields;
     return (
       project.title.trim() !== "" &&
-      project.objectives.trim() !== "" &&
-      project.researchQuestions.trim() !== "" &&
-      project.researchGap.trim() !== "" &&
-      project.field.trim() !== ""
+      project.field.trim() !== "" &&
+      (fields.objectives !== "required" || project.objectives.trim() !== "") &&
+      (fields.researchQuestions !== "required" || project.researchQuestions.trim() !== "") &&
+      (fields.researchGap !== "required" || project.researchGap.trim() !== "") &&
+      (fields.methodology !== "required" || project.methodology.trim() !== "")
     );
   };
 
@@ -430,7 +465,21 @@ export default function ResearchIntakeWizard({
 
   return (
     <div className="space-y-6">
-      
+
+      {/* Stage 4 selection context banner */}
+      <div className="flex items-center justify-between gap-3 p-3 bg-[#FAF8F5] border border-[#E5E7EB] rounded-xl">
+        <span className="text-xs font-mono text-[#1A365D]">
+          Output format: <strong>{formatOption?.label ?? project.outputFormat}</strong>
+        </span>
+        <button
+          type="button"
+          onClick={() => updateProject({ outputFormat: "" })}
+          className="text-[10px] font-mono uppercase font-bold text-[#C08A3E] hover:underline cursor-pointer"
+        >
+          Change Format
+        </button>
+      </div>
+
       {/* 1. Dashboard Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
@@ -674,13 +723,14 @@ export default function ResearchIntakeWizard({
           </div>
 
           {/* Card Block 2: Objectives */}
+          {formatConfig.fields.objectives !== "hidden" && (
           <div className="space-y-2">
             <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
-              Research Objectives *
+              Research Objectives {formatConfig.fields.objectives === "required" ? "*" : ""}
             </label>
             <textarea
               rows={3}
-              required
+              required={formatConfig.fields.objectives === "required"}
               disabled={blueprintLoading}
               className={`w-full p-3 text-xs bg-white border border-[#E5E7EB] rounded-lg focus:outline-none text-[#1A365D] ${blueprintLoading ? "animate-pulse text-gray-400" : ""}`}
               placeholder={blueprintLoading ? "⚡ AI is drafting suggested objectives..." : "Outline the core objective parameters of this study..."}
@@ -721,15 +771,17 @@ export default function ResearchIntakeWizard({
               </div>
             )}
           </div>
+          )}
 
           {/* Card Block 3: Research Questions */}
+          {formatConfig.fields.researchQuestions !== "hidden" && (
           <div className="space-y-2">
             <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
-              Research Questions *
+              Research Questions {formatConfig.fields.researchQuestions === "required" ? "*" : ""}
             </label>
             <textarea
               rows={3}
-              required
+              required={formatConfig.fields.researchQuestions === "required"}
               disabled={blueprintLoading}
               className={`w-full p-3 text-xs bg-white border border-[#E5E7EB] rounded-lg focus:outline-none text-[#1A365D] ${blueprintLoading ? "animate-pulse text-gray-400" : ""}`}
               placeholder={blueprintLoading ? "⚡ AI is drafting suggested research questions..." : "1. What is the impact of...? 2. To what extent...?"}
@@ -771,6 +823,7 @@ export default function ResearchIntakeWizard({
               </div>
             )}
           </div>
+          )}
 
           {/* Card Block 4: Methodology */}
           <div className="space-y-3">
@@ -809,11 +862,11 @@ export default function ResearchIntakeWizard({
 
             <div className="space-y-1.5">
               <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
-                Detailed Method Description *
+                Detailed Method Description {formatConfig.fields.methodology === "required" ? "*" : ""}
               </label>
               <textarea
                 rows={2}
-                required
+                required={formatConfig.fields.methodology === "required"}
                 disabled={blueprintLoading}
                 className={`w-full p-3 text-xs bg-white border border-[#E5E7EB] rounded-lg focus:outline-none text-[#1A365D] ${blueprintLoading ? "animate-pulse text-gray-400" : ""}`}
                 placeholder={blueprintLoading ? "⚡ AI is formulating methodology..." : "Specify study framework, comparative tests, hermeneutical limits..."}
@@ -864,12 +917,14 @@ export default function ResearchIntakeWizard({
 
           {/* Section: Secondary details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#E5E7EB]/70">
+            {formatConfig.fields.researchGap !== "hidden" && (
             <div className="space-y-2">
               <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
-                Research Gap
+                Research Gap {formatConfig.fields.researchGap === "required" ? "*" : ""}
               </label>
               <textarea
                 rows={2}
+                required={formatConfig.fields.researchGap === "required"}
                 disabled={blueprintLoading}
                 className={`w-full p-3 text-xs bg-white border border-[#E5E7EB] rounded-lg focus:outline-none text-[#1A365D] ${blueprintLoading ? "animate-pulse text-gray-400" : ""}`}
                 placeholder={blueprintLoading ? "⚡ AI is identifying research gap..." : "Describe what core theoretical discrepancy or literature missing this study reconciles..."}
@@ -877,7 +932,8 @@ export default function ResearchIntakeWizard({
                 onChange={(e) => updateProject({ researchGap: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
+            )}
+            <div className={formatConfig.fields.researchGap === "hidden" ? "space-y-2 md:col-span-2" : "space-y-2"}>
               <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
                 Study Keywords (Commas)
               </label>
@@ -891,7 +947,28 @@ export default function ResearchIntakeWizard({
               />
             </div>
           </div>
- 
+
+          {/* Target minimum reference count (soft target, target-workflow.md Stage 5) */}
+          <div className="space-y-2">
+            <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+              Target Minimum Reference Count (Optional)
+            </label>
+            <input
+              type="number"
+              min={0}
+              className="w-full md:w-56 p-2.5 text-xs bg-white border border-[#E5E7EB] rounded-lg focus:outline-none text-[#1A365D]"
+              placeholder="e.g. 30"
+              value={project.targetReferenceCount ?? ""}
+              onChange={(e) =>
+                updateProject({ targetReferenceCount: e.target.value ? Number(e.target.value) : undefined })
+              }
+            />
+            <p className="text-[10px] text-[#8C887F] font-sans">
+              {formatConfig.referenceCountHint} A soft target only — it can warn at draft time but will never block
+              drafting or export.
+            </p>
+          </div>
+
           {/* Card Block: Author & Submission Metadata */}
           <div className="p-5 bg-[#FAF8F5] border border-[#E5E7EB] rounded-2xl space-y-4">
             <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#1A365D] flex items-center gap-1.5">
