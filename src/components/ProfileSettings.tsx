@@ -334,8 +334,8 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
       };
       
       localStorage.setItem(key, JSON.stringify(approvedProfile));
-      setSuccess(`Successfully approved changes for scholar ${targetUser}.`);
       loadProfileData(); // Reload admin grid
+      setSuccess(`Successfully approved changes for scholar ${targetUser}.`);
     } catch (err) {
       console.error("Failed to approve update as admin:", err);
       setError("Approval operation failed.");
@@ -366,8 +366,8 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
       };
 
       localStorage.setItem(key, JSON.stringify(rejectedProfile));
-      setSuccess(`Rejected update request for scholar ${targetUser}.`);
       loadProfileData();
+      setSuccess(`Rejected update request for scholar ${targetUser}.`);
     } catch (err) {
       console.error("Failed to reject update as admin:", err);
       setError("Rejection operation failed.");

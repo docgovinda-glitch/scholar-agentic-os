@@ -210,13 +210,10 @@ describe("ProfileSettings — characterization", () => {
       expect(screen.getByText("Requested University")).toBeInTheDocument();
     });
 
-    it("approves a scholar's pending update directly (pure localStorage, no network)", async () => {
-      // Real, pre-existing quirk: handleAdminApprove calls setSuccess(msg) then
-      // immediately loadProfileData(), which itself calls setSuccess(null) —
-      // within the same event handler, so the success message is set and
-      // instantly cleared and never actually becomes visible. The underlying
-      // effect (localStorage update) does happen; only the message is silently
-      // swallowed. Locking in the real behavior, not the intended one.
+    it("approves a scholar's pending update directly and shows the success message (pure localStorage, no network)", async () => {
+      // Fixed: handleAdminApprove now calls loadProfileData() (which itself
+      // calls setSuccess(null)) BEFORE setSuccess(msg), so the success
+      // message set last is the one that sticks and is actually shown.
       render(<ProfileSettings currentUser="admin" />);
       fireEvent.click(screen.getByText("Approve"));
 
@@ -224,12 +221,12 @@ describe("ProfileSettings — characterization", () => {
         const stored = JSON.parse(localStorage.getItem(`${PROFILE_STATE_PREFIX}scholar1`)!);
         expect(stored.affiliation).toBe("Requested University");
       });
-      expect(screen.queryByText(/Successfully approved changes/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Successfully approved changes for scholar scholar1/)).toBeInTheDocument();
       expect(requestProfileUpdateMock).not.toHaveBeenCalled();
     });
 
-    it("rejects a scholar's pending update directly (pure localStorage, no network)", async () => {
-      // Same setSuccess-then-loadProfileData quirk as the approve case above.
+    it("rejects a scholar's pending update directly and shows the success message (pure localStorage, no network)", async () => {
+      // Fixed: same setSuccess/loadProfileData order swap as the approve case above.
       render(<ProfileSettings currentUser="admin" />);
       fireEvent.click(screen.getByText("Reject"));
 
@@ -237,7 +234,7 @@ describe("ProfileSettings — characterization", () => {
         const stored = JSON.parse(localStorage.getItem(`${PROFILE_STATE_PREFIX}scholar1`)!);
         expect(stored.pendingAffiliation).toBeUndefined();
       });
-      expect(screen.queryByText(/Rejected update request/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Rejected update request for scholar scholar1/)).toBeInTheDocument();
 
       const stored = JSON.parse(localStorage.getItem(`${PROFILE_STATE_PREFIX}scholar1`)!);
       expect(stored.pendingAffiliation).toBeUndefined();
