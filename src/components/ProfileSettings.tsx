@@ -178,7 +178,11 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
     const authenticIdVal = newAuthenticId.trim();
 
     const cleanPhoneNum = phoneNum.trim().replace(/[+\s()-]/g, "");
-    const phoneVal = countryCode ? `${countryCode}${cleanPhoneNum}` : cleanPhoneNum;
+    const countryCodeDigits = countryCode.replace(/[+\s()-]/g, "");
+    const dedupedPhoneNum = countryCodeDigits && cleanPhoneNum.startsWith(countryCodeDigits)
+      ? cleanPhoneNum.slice(countryCodeDigits.length)
+      : cleanPhoneNum;
+    const phoneVal = countryCode ? `${countryCode}${dedupedPhoneNum}` : dedupedPhoneNum;
 
     // Check if there are changes
     const emailChanged = emailVal !== profile.email;

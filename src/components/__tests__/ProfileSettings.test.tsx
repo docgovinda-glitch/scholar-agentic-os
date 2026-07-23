@@ -124,6 +124,33 @@ describe("ProfileSettings — characterization", () => {
     });
   });
 
+  it("does not double the country code when the user types it into the phone-number field themselves", async () => {
+    // Real bug: countryCode ("+977") is prepended to whatever's in the
+    // phone-number field, symbols-only-stripped, with no check for the user
+    // having already typed the same country code's digits at the start of
+    // the number itself (e.g. entering "9779800000001" for a Nepali number
+    // while +977 is also selected) — producing "+9779779800000001" instead
+    // of the correct "+9779800000001".
+    requestProfileUpdateMock.mockResolvedValue({
+      success: true,
+      emailSent: true,
+      verificationKey: "UP-444444",
+      keyHash: "ghi789hash",
+    });
+    seedProfile("jdoe");
+    render(<ProfileSettings currentUser="jdoe" />);
+
+    fireEvent.change(screen.getByPlaceholderText("e.g. 9851102891"), { target: { value: "9779800000001" } });
+    fireEvent.click(screen.getByText("Submit Update Request"));
+
+    await waitFor(() => {
+      expect(requestProfileUpdateMock).toHaveBeenCalled();
+    });
+    expect(requestProfileUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ pendingPhone: "+9779800000001" })
+    );
+  });
+
   it("rejects submission with no detected changes, without calling requestProfileUpdate", async () => {
     seedProfile("jdoe");
     render(<ProfileSettings currentUser="jdoe" />);
