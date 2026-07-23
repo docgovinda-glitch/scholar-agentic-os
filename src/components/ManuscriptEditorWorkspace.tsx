@@ -24,6 +24,7 @@ import {
   Award
 } from "lucide-react";
 import { draftSection as aiDraftSection } from "../services/aiService";
+import { downloadDocx, downloadPdf } from "../services/documentExportService";
 import { APA7Formatter } from "../citation_compliance/formatters/apa7";
 import type { CanonicalReference, ReferenceAuthor } from "../citation_compliance/model/reference";
 
@@ -370,171 +371,34 @@ export default function ManuscriptEditorWorkspace({
     }
   };
 
-  // Download as DOCX (HTML-based approach matching journal guidelines)
-  const downloadAsDocx = () => {
+  // Download as a real .docx (Stage 12 \u2014 src/services/documentExportService.ts).
+  // Was previously an HTML file with a `.doc` extension renamed to look like a
+  // Word document; now a real OOXML file via the `docx` package.
+  const downloadAsDocx = async () => {
     setDownloadingDocx(true);
-    setTimeout(() => {
-      const citationStyle = project.complianceRules?.citationStyle || "APA 7th";
-      let fontFamily = "'Times New Roman', serif";
-      let fontSize = "12pt";
-      let lineHeight = "2.0"; // Double-spaced for APA/MLA by default
-      let margin = "1.0in";
-      let textAlign = "left";
-      let textIndent = "0.5in";
-      let extraStyles = "";
-
-      if (citationStyle.includes("IEEE")) {
-        fontFamily = "Arial, sans-serif";
-        fontSize = "10pt";
-        lineHeight = "1.15";
-        textAlign = "justify";
-        textIndent = "0in";
-        extraStyles = `
-          h1 { font-size: 24pt; font-weight: normal; margin-bottom: 12pt; text-align: center; }
-          h2 { font-size: 12pt; font-weight: bold; font-variant: small-caps; text-align: center; margin-top: 18pt; margin-bottom: 6pt; border-bottom: 1px solid #ddd; padding-bottom: 3pt; }
-          h3 { font-size: 10pt; font-style: italic; margin-top: 12pt; margin-bottom: 4pt; }
-          p { margin-bottom: 6pt; text-indent: 0.25in; }
-          .reference-list p { text-indent: -0.25in; margin-left: 0.25in; line-height: 1.15; font-family: monospace; }
-        `;
-      } else if (citationStyle.includes("Chicago")) {
-        fontFamily = "'Times New Roman', serif";
-        fontSize = "12pt";
-        lineHeight = "2.0";
-        textAlign = "left";
-        textIndent = "0.5in";
-        extraStyles = `
-          h1 { font-size: 16pt; font-weight: bold; text-align: center; margin-bottom: 12pt; }
-          h2 { font-size: 12pt; font-weight: bold; margin-top: 18pt; margin-bottom: 6pt; text-align: left; }
-          .reference-list p { text-indent: -0.5in; margin-left: 0.5in; line-height: 2.0; }
-        `;
-      } else if (citationStyle.includes("MLA")) {
-        fontFamily = "'Times New Roman', serif";
-        fontSize = "12pt";
-        lineHeight = "2.0";
-        textAlign = "left";
-        textIndent = "0.5in";
-        extraStyles = `
-          h1 { font-size: 12pt; font-weight: bold; text-align: center; margin-bottom: 12pt; }
-          h2 { font-size: 12pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; text-align: left; }
-          .reference-list p { text-indent: -0.5in; margin-left: 0.5in; line-height: 2.0; }
-        `;
-      } else { // Default to APA 7th style
-        fontFamily = "'Times New Roman', serif";
-        fontSize = "12pt";
-        lineHeight = "2.0";
-        textAlign = "left";
-        textIndent = "0.5in";
-        extraStyles = `
-          h1 { font-size: 12pt; font-weight: bold; text-align: center; margin-bottom: 18pt; }
-          h2 { font-size: 12pt; font-weight: bold; margin-top: 18pt; margin-bottom: 6pt; text-align: left; }
-          h3 { font-size: 12pt; font-weight: bold; font-style: italic; margin-top: 12pt; margin-bottom: 4pt; text-align: left; }
-          .reference-list p { text-indent: -0.5in; margin-left: 0.5in; line-height: 2.0; }
-        `;
-      }
-
-      let htmlContent = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-        <head><meta charset="utf-8"><title>${project.title || "Manuscript"}</title>
-        <style>
-          @page { size: 8.5in 11in; margin: ${margin}; }
-          body { font-family: ${fontFamily}; font-size: ${fontSize}; line-height: ${lineHeight}; text-align: ${textAlign}; }
-          p { margin-bottom: 0pt; text-indent: ${textIndent}; margin-top: 0pt; }
-          .title-page { text-align: center; page-break-after: always; padding-top: 2in; }
-          .author { text-align: center; font-size: 11pt; color: #111; margin-top: 6pt; text-indent: 0in; }
-          .author-affiliation { text-align: center; font-size: 10pt; font-style: italic; color: #444; text-indent: 0in; }
-          .reference-list { page-break-before: always; }
-          .reference-list h2 { text-align: center; margin-bottom: 12pt; }
-          ${extraStyles}
-        </style>
-        </head><body>
-        
-        <div class="title-page">
-          <h1>${project.title || "Untitled Manuscript"}</h1>
-          <p class="author">${project.authorName || project.authorDetails || "Author"}</p>
-          ${project.orcidId ? `<p class="author-affiliation">ORCID: ${project.orcidId}</p>` : ""}
-          ${project.authorAffiliation ? `<p class="author-affiliation">${project.authorAffiliation}</p>` : ""}
-          ${project.coAuthorName ? `<p class="author">Co-Author: ${project.coAuthorName}</p>${project.coAuthorAffiliation ? `<p class="author-affiliation">${project.coAuthorAffiliation}</p>` : ""}` : ""}
-        </div>
-      `;
-
-      sectionsList.forEach(sec => {
-        const content = project.sections[sec];
-        if (content?.trim()) {
-          const isReferences = sec.toLowerCase().includes("reference") || sec.toLowerCase().includes("bibliography");
-          
-          if (isReferences) {
-            htmlContent += `<div class="reference-list"><h2>${sec}</h2>`;
-          } else {
-            htmlContent += `<h2>${sec}</h2>`;
-          }
-
-          content.split("\n").forEach(para => {
-            if (para.trim()) {
-              htmlContent += `<p>${para}</p>`;
-            }
-          });
-
-          if (isReferences) {
-            htmlContent += `</div>`;
-          }
-        }
-      });
-
-      htmlContent += `</body></html>`;
-
-      const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${(project.title || "manuscript").toLowerCase().replace(/[^a-z0-9]+/g, "_")}.doc`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+    try {
+      await downloadDocx(project);
+    } catch (err) {
+      console.error("Failed to export .docx:", err);
+      window.alert(`Failed to export .docx: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
       setDownloadingDocx(false);
-    }, 800);
+    }
   };
 
-  // Download as PDF (print-based approach)
-  const downloadAsPdf = () => {
+  // Download as a real PDF with selectable text (Stage 12 \u2014
+  // src/services/documentExportService.ts, pdfmake's declarative layout).
+  // Was previously a window.print() dialog trigger, not a real export.
+  const downloadAsPdf = async () => {
     setDownloadingPdf(true);
-    setTimeout(() => {
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        let htmlContent = `
-          <!DOCTYPE html><html><head><meta charset="utf-8">
-          <title>${project.title || "Manuscript"}</title>
-          <style>
-            @media print { @page { margin: 1in; size: A4; } }
-            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.8; color: #1a1a1a; max-width: 700px; margin: 0 auto; padding: 40px; }
-            h1 { font-size: 18pt; text-align: center; margin-bottom: 8pt; font-weight: bold; }
-            h2 { font-size: 14pt; margin-top: 24pt; margin-bottom: 8pt; border-bottom: 1px solid #ddd; padding-bottom: 4pt; }
-            p { margin-bottom: 8pt; text-align: justify; }
-            .author { text-align: center; font-size: 11pt; color: #444; margin-bottom: 2pt; }
-          </style>
-          </head><body>
-          <h1>${project.title || "Untitled Manuscript"}</h1>
-          <p class="author">${project.authorName || project.authorDetails || "Author"}</p>
-          ${project.orcidId ? `<p class="author">ORCID: ${project.orcidId}</p>` : ""}
-          ${project.authorAffiliation ? `<p class="author">${project.authorAffiliation}</p>` : ""}
-          ${project.coAuthorName ? `<p class="author">Co-Author: ${project.coAuthorName}${project.coAuthorAffiliation ? `, ${project.coAuthorAffiliation}` : ""}</p>` : ""}
-          <hr/>
-        `;
-        sectionsList.forEach(sec => {
-          const content = project.sections[sec];
-          if (content?.trim()) {
-            htmlContent += `<h2>${sec}</h2>`;
-            content.split("\n").forEach(para => {
-              if (para.trim()) htmlContent += `<p>${para}</p>`;
-            });
-          }
-        });
-        htmlContent += `<script>window.onload = function() { window.print(); window.close(); }</script></body></html>`;
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-      }
+    try {
+      await downloadPdf(project);
+    } catch (err) {
+      console.error("Failed to export PDF:", err);
+      window.alert(`Failed to export PDF: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
       setDownloadingPdf(false);
-    }, 800);
+    }
   };
 
   const isApproved = project.manuscriptApproved === true;
