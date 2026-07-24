@@ -1,6 +1,16 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-23, Stage 6/10 completion + IntegrityReviewer fix session — supersedes the Stage 9 session below)
+## RESUME HERE TOMORROW (as of 2026-07-23, Stage 7/8 + fabrication-audit-closure session — supersedes the section below)
+
+**Today so far**: Committed the pending Stage 7 (per-format document templates) + Stage 8 (non-journal requirements capture) work as one logical unit (`4f69b3e`) — 639/641 passing, live-verified. Flagged, not fixed: `useProjectPersistence.ts`'s `updateProject()` closes over the current render's `project` value, so two calls in the same tick silently drop the first call's fields — confirmed live (a save-then-navigate flow lost `complianceRules` until worked around locally in `NonJournalRequirementsPanel.tsx` by folding both changes into one `updateProject` call). **This is a real, app-wide bug, only patched in one place — needs its own dedicated fix**, since any other component calling `updateProject` twice in a row (save-then-navigate, or similar) can hit the same silent data loss.
+
+Then fixed `extractRequirements` (`aiService.ts`) — one of the 2 remaining open fabrication-audit instances. See `target-workflow.md` §10 "Audit closed" for full detail: new `src/services/journalGuidelinesService.ts` discovers a journal's real instructions-for-authors page (OpenAlex homepage lookup + the existing Tavily search-proxy, scoped to that domain) instead of asking the model to invent guidelines from memory. Live-verified against a real journal (PLOS ONE) — real domain resolved, real (if short) content found, model honestly reported it as insufficient rather than fabricating plausible rules.
+
+**Fabrication audit status: 7 found, 6 fixed, 1 open** (`recommendedDatasets` — needs a real dataset-discovery retrieval service, no existing path to reuse yet).
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-23, Stage 6/10 completion + IntegrityReviewer fix session)
 
 **Today in one paragraph**: Stage 6 retrieval is now fully complete — `arxiv-proxy`, `who-proxy`, and `imf-proxy` Edge Functions (same stateless-exception pattern as `search-proxy`) all deployed and wired into `discoverDataSources`, closing the three sources deferred from the earlier Stage 6 pass. Also this session: removed the detection-evasion language flagged last session from `draftSectionBasedOnQCStream`'s system prompt (commit `3558a26`); connected `IntegrityReviewerAgent` to `QualityControlSuite.tsx`'s live UI via a new, honest `PaperProject` → agent-input adapter (commit `9faaa51`) — additive to, not replacing, the existing `runQualityControl` flow; and, having surfaced a real fabrication the moment that wiring went live, fixed it the same day (commit `64da658`): `integrityReviewerSkill.ts`'s `evaluateReportingCompliance()` now runs a real 9-item heading/keyword scan against `manuscriptText` instead of returning a hardcoded constant, plus 5 new pattern checks (placeholder text, missing ethics/data-availability/COI disclosures, absent citations) — all deterministic, no LLM call. `publicationReadiness: boolean` (always `true`) replaced with `structuralCompleteness: number`, and `executiveSummary` now explicitly discloses this is a structural scan, not semantic peer-review judgment. Full commit sequence: `3558a26` (detection-evasion fix) → `b44805a` (arXiv proxy) → `5cb1f10` (WHO/IMF proxies) → `9faaa51` (IntegrityReviewerAgent wiring) → `64da658` (IntegrityReviewer fabrication fix) → docs.
 

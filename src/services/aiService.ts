@@ -8,6 +8,7 @@ import { arxivProxy } from "./arxivProxyService";
 import { whoProxy } from "./whoProxyService";
 import { imfProxy } from "./imfProxyService";
 import { discoverJournalCandidates } from "./journalRetrievalService";
+import { discoverAuthorGuidelines } from "./journalGuidelinesService";
 import { lookupCitation, type CitationLookupResult } from "./citationEnrichmentService";
 import { APA7Formatter } from "../citation_compliance/formatters/apa7";
 import { IEEEFormatter } from "../citation_compliance/formatters/ieee";
@@ -790,16 +791,40 @@ export async function discoverJournals(project: PaperProject): Promise<{ journal
 }
 
 // Phase E: Journal Requirements Compliance Setup
+//
+// Fabrication-audit fix (target-workflow.md §10): when guidelinesText isn't
+// supplied, this used to ask the model to "generate standard guidelines for
+// a premier peer-reviewed journal in this field" — inventing a specific
+// named journal's actual submission rules from memory. No per-journal
+// guidelines API exists, so instead this now tries to discover the
+// journal's REAL "instructions for authors" page (via OpenAlex's homepage
+// field + the existing Tavily search-proxy — journalGuidelinesService.ts)
+// and feeds that real text into the same AI-synthesis prompt below. If
+// nothing real is found, this throws an honest error instead of
+// fabricating — the caller (ComplianceChecklistPanel.tsx) already has a
+// "Load Standard Journal Template" fallback UI for exactly this case.
 export async function extractRequirements(
   journalName: string,
   guidelinesText: string,
   aiSettings: AISettings
 ): Promise<ComplianceRules> {
+  let effectiveGuidelinesText = guidelinesText;
+
+  if (!effectiveGuidelinesText?.trim()) {
+    const discovered = await discoverAuthorGuidelines(journalName);
+    if (!discovered.text) {
+      throw new Error(
+        `No real author guidelines could be found for "${journalName}" via automated search. Paste the guidelines manually, or use the standard journal template instead.`
+      );
+    }
+    effectiveGuidelinesText = discovered.text;
+  }
+
   const systemInstruction = `You are a meticulous Journal Compliance Auditor. Your job is to convert raw author guidelines, or standard requirements of highly recognized publishers, into a structured, executable formatting & style checklist. Ensure exact, clear compliance criteria are outlined.`;
 
   const prompt = `Synthesize formatting and workflow rules for:
 Journal Name: ${journalName}
-Raw Instructions excerpt provided: ${guidelinesText || "None - generate standard guidelines for a premier peer-reviewed journal in this field (Elsevier/Springer format)"}
+Raw Instructions excerpt provided: ${effectiveGuidelinesText}
 
 Produce a high-fidelity checklists and internal compliance guidelines in JSON format. Return strictly valid JSON containing:
 {
