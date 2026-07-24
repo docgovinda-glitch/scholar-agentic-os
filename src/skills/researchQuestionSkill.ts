@@ -6,10 +6,15 @@
  * ResearchQuestionAgent. Registered under id "research-question-generation"
  * and invoked by ResearchQuestionAgent via AgentContext.runSkill.
  *
- * Note: recommendedDatasets' hardcoded ["dataset-1"] stub is moved here
- * unchanged, not fixed — this pass is a pure refactor (same values in/out),
- * not a fabrication-audit pass. Flagged for a future task, same category of
- * issue as the journal-recommendation fabrications fixed elsewhere today.
+ * Fixed 2026-07-23 (target-workflow.md §10, 7th and final fabrication-audit
+ * instance): recommendedDatasets was a hardcoded ["dataset-1"] stub
+ * regardless of input. Now queries DataCite's real, directly browser-
+ * callable dataset-registry API (datasetRetrievalService.ts) using the
+ * primary generated question's text — the most relevant real data already
+ * computed at this point — and returns an honest empty array (never a
+ * fabricated placeholder) when no query can be built or nothing real is
+ * found. offlineCapable is now false for the same reason
+ * literatureReviewSkill.ts's is: this makes a real network call.
  */
 
 import type { Skill, SkillContext, SkillMetadata, SkillResult } from "./types";
@@ -21,6 +26,7 @@ import type {
   ResearchObjective,
 } from "../agents/researchQuestion";
 import type { KnowledgeGap } from "../agents/knowledgeGap";
+import { discoverDatasets } from "../services/datasetRetrievalService";
 
 export class ResearchQuestionSkill implements Skill<ResearchQuestionInput, ResearchQuestionReport> {
   readonly metadata: SkillMetadata = {
@@ -30,7 +36,7 @@ export class ResearchQuestionSkill implements Skill<ResearchQuestionInput, Resea
     version: "1.0.0",
     category: "Research",
     author: "System",
-    offlineCapable: true,
+    offlineCapable: false,
     aiEnhanced: false,
   };
 
@@ -41,6 +47,7 @@ export class ResearchQuestionSkill implements Skill<ResearchQuestionInput, Resea
     const questions = this.generateQuestions(gaps, input.maxQuestions ?? 5);
     const hypotheses = this.generateHypotheses(questions);
     const objectives = this.generateObjectives(questions);
+    const recommendedDatasets = await this.recommendDatasets(questions);
 
     const report: ResearchQuestionReport = {
       executiveSummary: this.generateExecutiveSummary(questions, hypotheses),
@@ -49,7 +56,7 @@ export class ResearchQuestionSkill implements Skill<ResearchQuestionInput, Resea
       objectives,
       variables: this.extractVariables(hypotheses),
       recommendedMethodology: this.recommendMethodology(questions),
-      recommendedDatasets: ["dataset-1"],
+      recommendedDatasets,
       confidence: 0.9,
       diagnostics: {
         questionsGenerated: questions.length,
@@ -60,6 +67,15 @@ export class ResearchQuestionSkill implements Skill<ResearchQuestionInput, Resea
     };
 
     return { ok: true, data: report };
+  }
+
+  /** Real dataset-registry query built from the primary generated question — honest empty array if there's no question to query from or nothing real is found. */
+  private async recommendDatasets(questions: ResearchQuestion[]): Promise<string[]> {
+    const primary = questions.find((q) => q.primary) ?? questions[0];
+    if (!primary) return [];
+
+    const { results } = await discoverDatasets(primary.text);
+    return results.map((r) => `${r.name} — ${r.url}`);
   }
 
   private generateQuestions(gaps: KnowledgeGap[], maxQuestions: number): ResearchQuestion[] {

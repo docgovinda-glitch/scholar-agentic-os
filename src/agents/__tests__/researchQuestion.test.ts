@@ -1,10 +1,20 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi, beforeEach } from "vitest";
 import { ResearchQuestionAgent } from "../researchQuestion";
 import type { AgentContext } from "../types";
 import type { KnowledgeGapReport, KnowledgeGap } from "../knowledgeGap";
 import { SkillRegistry } from "../../skills/registry";
 import { runSkill } from "../../skills/executor";
 import { ResearchQuestionSkill } from "../../skills/researchQuestionSkill";
+
+const { mockDiscoverDatasets } = vi.hoisted(() => ({ mockDiscoverDatasets: vi.fn() }));
+vi.mock("../../services/datasetRetrievalService", () => ({
+  discoverDatasets: mockDiscoverDatasets,
+}));
+
+beforeEach(() => {
+  mockDiscoverDatasets.mockReset();
+  mockDiscoverDatasets.mockResolvedValue({ results: [], sourceErrors: [] });
+});
 
 // Exercises the real production wiring: the same SkillRegistry singleton and
 // runSkill helper that agentService.ts's createAgentContext() uses, not a mock.
@@ -103,7 +113,24 @@ describe("ResearchQuestionAgent -> ResearchQuestionSkill (native skill round tri
     expect(result.data.variables).toEqual(["variable-0", "variable-1"]);
   });
 
-  it("[flagged, not fixed in this pass] recommendedDatasets is a hardcoded single-item stub regardless of input — same category as the journal-recommendation fabrications fixed elsewhere today", async () => {
+  it("[fixed] recommendedDatasets queries real dataset registries (DataCite) using the primary generated question, instead of a hardcoded stub", async () => {
+    mockDiscoverDatasets.mockResolvedValue({
+      results: [{ name: "A Real Registered Dataset", url: "https://doi.org/10.1234/real-dataset", description: "A real dataset description.", doi: "10.1234/real-dataset", source: "DataCite" }],
+      sourceErrors: [],
+    });
+    const agent = new ResearchQuestionAgent();
+    const report = gapReport([gap({ type: "unanswered-question" })]);
+
+    const result = await agent.execute({ knowledgeGapReport: report }, createContext());
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(mockDiscoverDatasets).toHaveBeenCalledWith("What factors influence the unresolved questions in this domain?");
+    expect(result.data.recommendedDatasets).toEqual(["A Real Registered Dataset — https://doi.org/10.1234/real-dataset"]);
+  });
+
+  it("returns an honest empty array, not a fabricated placeholder, when no real datasets are found", async () => {
+    mockDiscoverDatasets.mockResolvedValue({ results: [], sourceErrors: [] });
     const agent = new ResearchQuestionAgent();
     const report = gapReport([gap()]);
 
@@ -111,7 +138,18 @@ describe("ResearchQuestionAgent -> ResearchQuestionSkill (native skill round tri
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.recommendedDatasets).toEqual(["dataset-1"]);
+    expect(result.data.recommendedDatasets).toEqual([]);
+  });
+
+  it("does not call discoverDatasets at all when there are no generated questions to build a query from", async () => {
+    const agent = new ResearchQuestionAgent();
+
+    const result = await agent.execute({}, createContext());
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(mockDiscoverDatasets).not.toHaveBeenCalled();
+    expect(result.data.recommendedDatasets).toEqual([]);
   });
 
   it("computes diagnostics and executive summary from the actual generated questions", async () => {

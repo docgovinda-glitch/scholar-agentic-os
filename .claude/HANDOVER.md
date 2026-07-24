@@ -4,9 +4,15 @@
 
 **Today so far**: Committed the pending Stage 7 (per-format document templates) + Stage 8 (non-journal requirements capture) work as one logical unit (`4f69b3e`) — 639/641 passing, live-verified. Flagged, not fixed: `useProjectPersistence.ts`'s `updateProject()` closes over the current render's `project` value, so two calls in the same tick silently drop the first call's fields — confirmed live (a save-then-navigate flow lost `complianceRules` until worked around locally in `NonJournalRequirementsPanel.tsx` by folding both changes into one `updateProject` call). **This is a real, app-wide bug, only patched in one place — needs its own dedicated fix**, since any other component calling `updateProject` twice in a row (save-then-navigate, or similar) can hit the same silent data loss.
 
-Then fixed `extractRequirements` (`aiService.ts`) — one of the 2 remaining open fabrication-audit instances. See `target-workflow.md` §10 "Audit closed" for full detail: new `src/services/journalGuidelinesService.ts` discovers a journal's real instructions-for-authors page (OpenAlex homepage lookup + the existing Tavily search-proxy, scoped to that domain) instead of asking the model to invent guidelines from memory. Live-verified against a real journal (PLOS ONE) — real domain resolved, real (if short) content found, model honestly reported it as insufficient rather than fabricating plausible rules.
+Then fixed both remaining open fabrication-audit instances, closing the audit entirely:
+- `extractRequirements` (`aiService.ts`, commit `9fc3b50`) — new `src/services/journalGuidelinesService.ts` discovers a journal's real instructions-for-authors page (OpenAlex homepage lookup + the existing Tavily search-proxy, scoped to that domain) instead of asking the model to invent guidelines from memory. Live-verified against a real journal (PLOS ONE) — real domain resolved, real (if short) content found, model honestly reported it as insufficient rather than fabricating plausible rules.
+- `recommendedDatasets` (`researchQuestionSkill.ts`) — new `src/services/datasetRetrievalService.ts` queries DataCite's real, directly browser-callable dataset-registry API using the primary generated research question's text; honest `[]` when nothing real is found. `offlineCapable: false` now (real network call). Live-verified: a real query returned 5 real, DOI-verifiable datasets; a full agent round-trip also returned genuine (if topically noisy, for a vague synthetic test question) DOI-backed results.
 
-**Fabrication audit status: 7 found, 6 fixed, 1 open** (`recommendedDatasets` — needs a real dataset-discovery retrieval service, no existing path to reuse yet).
+**Fabrication audit status: 7 found, 7 fixed, 0 open.** See `target-workflow.md` §10 "Audit closed" for the full, final tally — no LLM-invented real-world entities remain anywhere in the 8 agents/skills or `aiService.ts`.
+
+**Unrelated, still-open item carried over from earlier today**: `useProjectPersistence.ts`'s `updateProject()` closure-over-stale-`project` bug (see below) is real and app-wide — still only patched locally in `NonJournalRequirementsPanel.tsx`, not fixed.
+
+**Environment note, not a bug**: mid-session, `/Users/pobpkf/Documents` was renamed to `/Users/pobpkf/Documents/Documents - PO's iMac` (an apparent macOS/iCloud Drive sync-conflict rename) — not caused by any command run this session. The repo and all commits were confirmed intact at the new path; nothing was lost, but the absolute path to this project has changed. Update any saved paths/scripts accordingly.
 
 ---
 
