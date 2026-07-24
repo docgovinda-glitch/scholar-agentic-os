@@ -5,6 +5,7 @@ import { runQualityControl } from "../services/aiService";
 import { executeAgent } from "../services/agentService";
 import { buildIntegrityReviewerInput } from "../services/integrityReviewAdapter";
 import type { IntegrityReviewReport } from "../agents/integrityReviewer";
+import { runResearchPipeline, type PipelineStageError } from "../agents/pipeline";
 
 interface QualityControlSuiteProps {
   project: PaperProject;
@@ -46,6 +47,39 @@ export default function QualityControlSuite({
       setIntegrityError(err.message || "An error occurred while running the integrity review.");
     } finally {
       setIntegrityLoading(false);
+    }
+  };
+
+  // Agent-UI adapter Step 2c (docs/planning/agent-ui-adapter-scoping.md) — additive
+  // to runIntegrityReview above, not a replacement. That call only ever populates
+  // IntegrityReviewerInput.manuscriptText (integrityReviewAdapter.ts deliberately
+  // leaves researchPlan/literatureReview/knowledgeGapReport/researchQuestionReport/
+  // methodologyReport/statisticalAnalysisReport undefined, since PaperProject alone
+  // has no honest source for them). runResearchPipeline (src/agents/pipeline.ts,
+  // built this session) actually runs the upstream agents for real, so this button
+  // feeds the SAME integrity reviewer a real upstream chain instead of leaving
+  // those fields blank — still never fabricated, just genuinely populated now that
+  // there's a real pipeline to populate them from.
+  const [pipelineLoading, setPipelineLoading] = useState(false);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+  const [pipelineStageErrors, setPipelineStageErrors] = useState<PipelineStageError[]>([]);
+
+  const runFullPipelineReview = async () => {
+    setPipelineLoading(true);
+    setPipelineError(null);
+    setPipelineStageErrors([]);
+    try {
+      const result = await runResearchPipeline(project);
+      setPipelineStageErrors(result.errors);
+      if (result.integrityReviewReport) {
+        setIntegrityReport(result.integrityReviewReport);
+      } else {
+        setPipelineError("The pipeline ran, but the terminal integrity-review stage did not complete — see stage errors below.");
+      }
+    } catch (err: any) {
+      setPipelineError(err.message || "An error occurred while running the full research pipeline.");
+    } finally {
+      setPipelineLoading(false);
     }
   };
 
@@ -168,17 +202,42 @@ export default function QualityControlSuite({
               Runs the Research Integrity & Ethics Reviewer agent directly against your compiled manuscript text.
             </p>
           </div>
-          <button
-            onClick={runIntegrityReview}
-            disabled={integrityLoading}
-            className="px-4 py-2 bg-[#1A365D] hover:bg-[#122847] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all cursor-pointer disabled:opacity-50 shrink-0"
-          >
-            {integrityLoading ? "Running…" : "Run Integrity & Ethics Review"}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+            <button
+              onClick={runIntegrityReview}
+              disabled={integrityLoading || pipelineLoading}
+              className="px-4 py-2 bg-[#1A365D] hover:bg-[#122847] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all cursor-pointer disabled:opacity-50"
+            >
+              {integrityLoading ? "Running…" : "Run Integrity & Ethics Review"}
+            </button>
+            <button
+              onClick={runFullPipelineReview}
+              disabled={integrityLoading || pipelineLoading}
+              title="Runs the full research agent chain (literature review, research questions, methodology, statistics) for real upstream context, then the integrity review"
+              className="px-4 py-2 bg-white hover:bg-[#FAF8F5] border border-[#1A365D] text-[#1A365D] text-xs font-mono font-bold uppercase rounded-lg transition-all cursor-pointer disabled:opacity-50"
+            >
+              {pipelineLoading ? "Running Full Pipeline…" : "Run Full Pipeline (Deep Review)"}
+            </button>
+          </div>
         </div>
 
         {integrityError && (
           <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">{integrityError}</p>
+        )}
+
+        {pipelineError && (
+          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">{pipelineError}</p>
+        )}
+
+        {pipelineStageErrors.length > 0 && (
+          <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+            <p className="font-semibold">Some pipeline stages did not complete (the rest still ran):</p>
+            <ul className="list-disc list-inside">
+              {pipelineStageErrors.map((e, i) => (
+                <li key={i}>{e.agentId}: {e.message}</li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {integrityReport && (
