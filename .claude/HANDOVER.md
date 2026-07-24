@@ -1,6 +1,20 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-24, four-task session: race fix + Stage 2 + Stage 5 + agent-adapter scoping — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-24, agent-UI adapter build session — supersedes the section below)
+
+**Four tasks this session, all landed**: Stage 8 formattingRules gap fix, the full 3-step agent-UI adapter build (2a/2b/2c), and the `draftSectionStream` dead-code decision.
+
+1. **Stage 8 formattingRules gap — 🟢 fixed** (`8744650`). `documentExportService.ts` never read `complianceRules.formattingRules` (deliberately, to avoid parsing free text). Added a separate, structured `complianceRules.layoutOverrides` field (marginInches/fontSizePt/lineSpacing/fontFamily), populated from the same known-good constants already backing each journal preset's formatting prose (`ComplianceChecklistPanel.tsx`) or direct user input (`NonJournalRequirementsPanel.tsx`'s new Page Layout section). `documentExportService.resolveLayout()` now actually applies it.
+2. **Agent-UI adapter, Step 2a — 🟢 fixed** (`0291a86`). `LiteratureReviewAgent.fetchWebStudies()` was a stub returning `[]`; now calls the real `literatureRetrievalService.discoverLiterature()`. Live-verified against real Crossref/OpenAlex/PubMed/Semantic Scholar APIs (10 real results, real DOIs).
+3. **Agent-UI adapter, Step 2b — 🟢 built** (`508644c`). New `src/agents/pipeline.ts` (`runResearchPipeline`) — UI-agnostic orchestrator chaining all 7 research agents in their verified dependency order, degrading gracefully on any stage failure. Deliberately not built on the unused `src/orchestrator/*` framework; deliberately bypasses `AgentExecutor.execute()` (flagged bug there: silently reports `ok:true` even when the wrapped agent resolved `ok:false` without throwing — not fixed, out of scope). Also fixed a real crash this pipeline's first live run surfaced: `integrityReviewerSkill.ts`'s `reviewLiteratureReview` assumed `ResearchGap.evidenceSupport` was always an array (it's optional and the real `literatureReviewSkill.ts` never sets it). Live-verified end-to-end with zero errors across all 7 stages, real network calls throughout.
+4. **Agent-UI adapter, Step 2c — 🟢 built** (`ac5394b`). `QualityControlSuite.tsx` gained a "Run Full Pipeline (Deep Review)" button, additive to the existing single-agent "Run Integrity & Ethics Review" — calls `runResearchPipeline()` so the same integrity reviewer now runs against a real upstream chain (literature/gap/questions/methodology/statistics) instead of leaving those `IntegrityReviewerInput` fields undefined. Live-verified in a real browser with real API calls.
+5. **`draftSectionStream` — deleted, not wired in.** Confirmed zero live call sites (only its own now-removed test). The new agent pipeline does research planning/review, not manuscript drafting — no conceptual overlap. The correct future target for streaming drafting, if ever built, is `ManuscriptWriterAgent` (`src/agents/manuscriptWriter/`, already registered in `agentService.ts` but not wired to any panel or to `runResearchPipeline`) — not this orphaned, pre-agent-era function, to avoid two parallel drafting stacks. `ManuscriptDraftingWorkspace.tsx` still uses the non-streaming `draftSection()` only, unchanged.
+
+**Updated gap map**: Stage 8's formatting-layout gap is closed. The agent pipeline (literatureReview → researchPlanner → knowledgeGap → researchQuestion → methodologyAdvisor → statisticalAnalysis → integrityReviewer) is now for the first time reachable from a real panel (`QualityControlSuite.tsx`'s deep-review button), not just library code — `src/agents/*` is no longer purely "standalone, not wired in" (CLAUDE.md §3's caveat should be read as partially superseded: the 7 research agents ARE now reachable via `runResearchPipeline`, though `ManuscriptWriterAgent` specifically remains unwired). `src/orchestrator/*` remains entirely unused, untouched, and not recommended as a base for future agent-chaining work (see Step 2b's rationale above).
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-24, four-task session: race fix + Stage 2 + Stage 5 + agent-adapter scoping)
 
 **All four assigned tasks completed this session, three shipped as code, one scoped as a plan.**
 

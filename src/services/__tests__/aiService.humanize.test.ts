@@ -6,7 +6,7 @@ vi.mock("../aiGateway", () => ({
   default: { generate: mockGenerate, generateStream: mockGenerateStream },
 }));
 
-import { draftSection, draftSectionStream } from "../aiService";
+import { draftSection } from "../aiService";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -110,42 +110,6 @@ describe("draftSection — humanize post-processing pass (Stage 9)", () => {
   });
 });
 
-describe("draftSectionStream — characterization + humanize post-processing pass", () => {
-  it("returns the streamed response's raw text unmodified when humanize is omitted (existing default behavior)", async () => {
-    mockGenerateStream.mockResolvedValue({ text: "Streamed prose.", provider: "gemini", model: "gemini-pro", inputWords: 5, outputWords: 5, latencyMs: 10, fromFallback: false });
-    const project = { ...DEFAULT_STATE("tester"), title: "T" };
-
-    const result = await draftSectionStream({
-      projectState: project,
-      sectionName: "Introduction",
-      sectionOutline: "",
-      userStyleSample: "",
-      includeScriptures: false,
-      draftInstruction: "",
-      onToken: () => {},
-    });
-
-    expect(result.text).toBe("Streamed prose.");
-    expect(mockGenerate).not.toHaveBeenCalled();
-  });
-
-  it("applies humanize to the final streamed text when humanize is true", async () => {
-    mockGenerateStream.mockResolvedValue({ text: "Streamed prose.", provider: "gemini", model: "gemini-pro", inputWords: 5, outputWords: 5, latencyMs: 10, fromFallback: false });
-    mockGenerate.mockResolvedValue({ text: "Humanized streamed prose.", provider: "gemini", model: "gemini-pro", inputWords: 5, outputWords: 5 });
-    const project = { ...DEFAULT_STATE("tester"), title: "T" };
-
-    const result = await draftSectionStream({
-      projectState: project,
-      sectionName: "Introduction",
-      sectionOutline: "",
-      userStyleSample: "",
-      includeScriptures: false,
-      draftInstruction: "",
-      onToken: () => {},
-      humanize: true,
-    });
-
-    expect(result.text).toBe("Humanized streamed prose.");
-    expect(mockGenerate).toHaveBeenCalledTimes(1);
-  });
-});
+// draftSectionStream was removed (Task 3, agent-UI adapter session,
+// 2026-07-24) — confirmed zero live call sites anywhere in the app; see
+// HANDOVER.md for why. Its characterization tests are removed with it.
