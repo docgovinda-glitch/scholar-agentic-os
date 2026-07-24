@@ -59,6 +59,10 @@ export class AgentExecutor {
 
     let attempt = 0;
     let lastError: Error | undefined;
+    // Set when the agent's own execute() resolves { ok: false, error } without
+    // throwing, so the final failure return can propagate the agent's real
+    // error instead of a generic "Unknown error" derived only from lastError.
+    let lastAgentError: AgentResult<TOutput>["error"] | undefined;
 
     while (attempt < (mergedConfig.maxRetries ?? 3)) {
       attempt++;
@@ -90,17 +94,34 @@ export class AgentExecutor {
           await agent.cleanup();
         }
 
-        return {
-          ok: true,
-          data: result.data,
-          diagnostics: {
-            ...result.diagnostics,
-            modeUsed: result.diagnostics?.modeUsed ?? "deterministic",
-            executionTimeMs: Date.now() - startTime,
-          },
-        };
+        // Bug fixed here: this used to return { ok: true, data: result.data }
+        // unconditionally, even when the agent itself resolved { ok: false,
+        // error } without throwing — silently reporting success with
+        // data: undefined and discarding the real error. Now propagates the
+        // agent's own ok:false the same way a thrown exception is handled
+        // below: retry if attempts remain, otherwise return the real failure.
+        if (result.ok) {
+          return {
+            ok: true,
+            data: result.data,
+            diagnostics: {
+              ...result.diagnostics,
+              modeUsed: result.diagnostics?.modeUsed ?? "deterministic",
+              executionTimeMs: Date.now() - startTime,
+            },
+          };
+        }
+
+        lastAgentError = result.error;
+        lastError = new Error(result.error?.message ?? "Agent reported failure");
+        context.log?.("warn", `Agent execution attempt ${attempt} reported failure:`, result.error);
+
+        if (attempt < (mergedConfig.maxRetries ?? 3)) {
+          await this.sleep(mergedConfig.retryDelayMs ?? 1000);
+        }
       } catch (error) {
         lastError = error as Error;
+        lastAgentError = undefined;
         context.log?.("warn", `Agent execution attempt ${attempt} failed:`, error);
 
         // Wait before retry
@@ -113,7 +134,7 @@ export class AgentExecutor {
     // All retries failed
     return {
       ok: false,
-      error: {
+      error: lastAgentError ?? {
         type: "EXECUTION_ERROR",
         message: lastError?.message ?? "Unknown error",
         cause: lastError,
@@ -130,12 +151,12 @@ export class AgentExecutor {
    * Execute with timeout support.
    */
   private async withTimeout<T>(
-    promise: Promise<{ ok: boolean; data?: T; error?: unknown; diagnostics?: AgentDiagnostics }>,
+    promise: Promise<AgentResult<T>>,
     timeoutMs: number
-  ): Promise<{ ok: boolean; data?: T; error?: unknown; diagnostics?: AgentDiagnostics }> {
+  ): Promise<AgentResult<T>> {
     return Promise.race([
       promise,
-      new Promise<{ ok: false; error: { type: string; message: string } }>(
+      new Promise<AgentResult<T>>(
         (_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), timeoutMs)
       ),
     ]);

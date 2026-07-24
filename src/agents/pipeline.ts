@@ -29,13 +29,21 @@
  * "run these 7 specific agents in this specific order." Using it here would
  * mean modeling this concrete chain as a registered WorkflowDefinition against
  * machinery with no evidence of ever having been run end-to-end, for no
- * benefit over a small, direct, fully-tested function. This module also does
- * NOT go through AgentExecutor.execute() — that method's `try` branch returns
+ * benefit over a small, direct, fully-tested function.
+ *
+ * Runs each stage through AgentExecutor.execute() (timeout/retry wrapper).
+ * This used to bypass AgentExecutor and call each agent's own execute()
+ * directly, because AgentExecutor's try branch used to return
  * `{ ok: true, data: result.data }` unconditionally, even when the wrapped
- * agent itself resolved `{ ok: false, error }` without throwing (a real,
- * pre-existing bug, flagged in HANDOVER.md, not fixed here as it's out of
- * this task's scope) — so this calls each agent's own `execute()` directly
- * and checks `result.ok` itself.
+ * agent resolved `{ ok: false, error }` without throwing — silently
+ * discarding real failures. That bug is now fixed (src/agents/executor.ts),
+ * so this pipeline goes through the shared executor like any other agent
+ * caller, gaining its timeout protection for free. maxRetries is pinned to 1
+ * for every stage here, deliberately: this pipeline's own graceful-degradation
+ * design (a failed stage just passes undefined downstream, see above) already
+ * covers the retry-vs-move-on tradeoff at the chain level; adopting
+ * AgentExecutor's default retry-with-delay behavior per stage would be a
+ * separate, larger latency/behavior decision this task doesn't make.
  *
  * UI-agnostic by design: takes a PaperProject-shaped input, returns plain
  * data. No React/panel code — src/components/* wires this up (Step 2c).
@@ -44,6 +52,7 @@
 import type { PaperProject } from "../types";
 import type { AgentContext } from "./types";
 import { createAgentContext } from "../services/agentService";
+import { AgentExecutor } from "./executor";
 import { ResearchPlannerAgent, type ResearchPlan } from "./researchPlanner";
 import { LiteratureReviewAgent, type LiteratureReview } from "./literatureReview";
 import { KnowledgeGapAgent, type KnowledgeGapReport } from "./knowledgeGap";
@@ -89,10 +98,12 @@ export async function runResearchPipeline(
 ): Promise<ResearchPipelineResult> {
   const errors: PipelineStageError[] = [];
   const researchQuestions = deriveResearchQuestions(project);
+  const executor = AgentExecutor.getInstance();
 
   // Roots: no upstream dependency between these two, run in parallel.
   const [plannerResult, literatureResult] = await Promise.all([
-    new ResearchPlannerAgent().execute(
+    executor.execute(
+      new ResearchPlannerAgent(),
       {
         topic: project.title || "Untitled research project",
         objectives: splitLines(project.objectives),
@@ -100,11 +111,14 @@ export async function runResearchPipeline(
         discipline: project.field || undefined,
         targetJournal: project.targetJournal?.name,
       },
-      context
+      context,
+      { maxRetries: 1 }
     ),
-    new LiteratureReviewAgent().execute(
+    executor.execute(
+      new LiteratureReviewAgent(),
       { researchQuestions, discipline: project.field || undefined },
-      context
+      context,
+      { maxRetries: 1 }
     ),
   ]);
 
@@ -114,44 +128,53 @@ export async function runResearchPipeline(
   const researchPlan = plannerResult.ok ? plannerResult.data : null;
   const literatureReview = literatureResult.ok ? literatureResult.data : null;
 
-  const knowledgeGapResult = await new KnowledgeGapAgent().execute(
+  const knowledgeGapResult = await executor.execute(
+    new KnowledgeGapAgent(),
     { literatureReview: literatureReview ?? undefined, researchPlan: researchPlan ?? undefined },
-    context
+    context,
+    { maxRetries: 1 }
   );
   if (!knowledgeGapResult.ok) errors.push({ agentId: "knowledge-gap", message: knowledgeGapResult.error?.message ?? "Unknown error" });
   const knowledgeGapReport = knowledgeGapResult.ok ? knowledgeGapResult.data : null;
 
-  const researchQuestionResult = await new ResearchQuestionAgent().execute(
+  const researchQuestionResult = await executor.execute(
+    new ResearchQuestionAgent(),
     { researchPlan: researchPlan ?? undefined, knowledgeGapReport: knowledgeGapReport ?? undefined },
-    context
+    context,
+    { maxRetries: 1 }
   );
   if (!researchQuestionResult.ok) errors.push({ agentId: "research-question", message: researchQuestionResult.error?.message ?? "Unknown error" });
   const researchQuestionReport = researchQuestionResult.ok ? researchQuestionResult.data : null;
 
-  const methodologyResult = await new MethodologyAdvisorAgent().execute(
+  const methodologyResult = await executor.execute(
+    new MethodologyAdvisorAgent(),
     {
       researchPlan: researchPlan ?? undefined,
       researchQuestionReport: researchQuestionReport ?? undefined,
       targetJournal: project.targetJournal?.name,
     },
-    context
+    context,
+    { maxRetries: 1 }
   );
   if (!methodologyResult.ok) errors.push({ agentId: "methodology-advisor", message: methodologyResult.error?.message ?? "Unknown error" });
   const methodologyReport = methodologyResult.ok ? methodologyResult.data : null;
 
-  const statisticalResult = await new StatisticalAnalysisAdvisor().execute(
+  const statisticalResult = await executor.execute(
+    new StatisticalAnalysisAdvisor(),
     {
       researchQuestionReport: researchQuestionReport ?? undefined,
       methodologyReport: methodologyReport ?? undefined,
     },
-    context
+    context,
+    { maxRetries: 1 }
   );
   if (!statisticalResult.ok) errors.push({ agentId: "statistical-analysis-advisor", message: statisticalResult.error?.message ?? "Unknown error" });
   const statisticalAnalysisReport = statisticalResult.ok ? statisticalResult.data : null;
 
   const manuscriptText = Object.values(project.sections || {}).filter(Boolean).join("\n\n") || undefined;
 
-  const integrityResult = await new IntegrityReviewerAgent().execute(
+  const integrityResult = await executor.execute(
+    new IntegrityReviewerAgent(),
     {
       researchPlan: researchPlan ?? undefined,
       literatureReview: literatureReview ?? undefined,
@@ -161,7 +184,8 @@ export async function runResearchPipeline(
       statisticalAnalysisReport: statisticalAnalysisReport ?? undefined,
       manuscriptText,
     },
-    context
+    context,
+    { maxRetries: 1 }
   );
   if (!integrityResult.ok) errors.push({ agentId: "integrity-reviewer", message: integrityResult.error?.message ?? "Unknown error" });
   const integrityReviewReport = integrityResult.ok ? integrityResult.data : null;
