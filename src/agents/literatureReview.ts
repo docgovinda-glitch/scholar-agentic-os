@@ -7,6 +7,7 @@
 import type { Agent, AgentContext, AgentResult, ExecutionMode, AgentMetadata } from "../agents/types";
 import type { SkillResult } from "../skills/types";
 import type { LiteratureReviewSkillInput } from "../skills/literatureReviewSkill";
+import { discoverLiterature, type LiteratureResult } from "../services/literatureRetrievalService";
 
 // ============================================================================
 // Literature Review Types
@@ -182,11 +183,40 @@ export class LiteratureReviewAgent implements Agent<LiteratureReviewInput, Liter
   // Private Methods
   // ============================================================================
 
+  // Agent-UI adapter, Step 2a (docs/planning/agent-ui-adapter-scoping.md): this
+  // was a stub returning []. Now calls the same real, fabrication-audit-verified
+  // retrieval path panels already use (literatureRetrievalService.discoverLiterature
+  // — Crossref/OpenAlex/PubMed/Semantic Scholar) rather than reimplementing
+  // retrieval or inventing agent-local fetch logic. Mapped into the same
+  // doi/url/title/publicationDate/kind shape mergeAndDeduplicate/classifyStudies
+  // (literatureReviewSkill.ts) already expect from localStudies (CanonicalReference),
+  // so dedup-by-doi works across local + web studies uniformly. Honest empty
+  // array on failure or no results — never fabricated.
   private async fetchWebStudies(
     input: LiteratureReviewInput,
     context: AgentContext
   ): Promise<unknown[]> {
-    // Would call web search providers through abstraction
-    return [];
+    const query = input.researchQuestions.filter(Boolean).join(" ");
+    if (!query.trim()) return [];
+
+    try {
+      const { results } = await discoverLiterature(query);
+      return results.map((r: LiteratureResult) => {
+        const doiMatch = r.url.match(/^https?:\/\/(dx\.)?doi\.org\/(.+)$/i);
+        return {
+          kind: "journal-article",
+          title: r.title,
+          authors: r.authors,
+          source: r.venue,
+          journal: r.venue,
+          url: r.url,
+          doi: doiMatch ? doiMatch[2] : undefined,
+          publicationDate: r.year || undefined,
+          canonicalKey: doiMatch ? doiMatch[2] : r.url,
+        };
+      });
+    } catch (err) {
+      return [];
+    }
   }
 }

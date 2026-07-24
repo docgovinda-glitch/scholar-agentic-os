@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { LiteratureReviewAgent } from "../literatureReview";
 import type { AgentContext } from "../types";
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
@@ -9,6 +9,11 @@ import { LiteratureReviewSkill } from "../../skills/literatureReviewSkill";
 const { mockDiscoverJournalCandidates } = vi.hoisted(() => ({ mockDiscoverJournalCandidates: vi.fn() }));
 vi.mock("../../services/journalRetrievalService", () => ({
   discoverJournalCandidates: mockDiscoverJournalCandidates,
+}));
+
+const { mockDiscoverLiterature } = vi.hoisted(() => ({ mockDiscoverLiterature: vi.fn() }));
+vi.mock("../../services/literatureRetrievalService", () => ({
+  discoverLiterature: mockDiscoverLiterature,
 }));
 
 function ref(overrides: Partial<CanonicalReference> = {}): CanonicalReference {
@@ -36,6 +41,13 @@ function createTestAgentContext(localStudies: CanonicalReference[] = []): AgentC
 describe("LiteratureReviewAgent -> LiteratureReviewSkill (native skill round trip)", () => {
   beforeAll(() => {
     SkillRegistry.getInstance().register(new LiteratureReviewSkill());
+  });
+
+  beforeEach(() => {
+    mockDiscoverLiterature.mockReset();
+    // Default: no web studies found, same as the old stub's always-[] behavior,
+    // unless a specific test below overrides this to assert real data flows through.
+    mockDiscoverLiterature.mockResolvedValue({ results: [], sourceErrors: [] });
   });
 
   it("delegates to the registered literature-review skill and returns a full, unchanged-shape review", async () => {
@@ -122,5 +134,95 @@ describe("LiteratureReviewAgent -> LiteratureReviewSkill (native skill round tri
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.diagnostics.localStudies).toBe(0);
+  });
+
+  // Agent-UI adapter Step 2a (docs/planning/agent-ui-adapter-scoping.md):
+  // fetchWebStudies() was a stub always returning []. These fail against that
+  // stub (diagnostics.webStudies stayed 0 and no query reached the real
+  // service) and pass once it calls literatureRetrievalService.discoverLiterature
+  // for real.
+  describe("fetchWebStudies (Step 2a fix — real retrieval, not a stub)", () => {
+    beforeEach(() => {
+      mockDiscoverJournalCandidates.mockResolvedValue({ results: [], sourceErrors: [] });
+    });
+
+    it("calls discoverLiterature with the joined research questions and feeds real results into the review", async () => {
+      mockDiscoverLiterature.mockResolvedValue({
+        results: [
+          {
+            title: "A Real Retrieved Paper",
+            url: "https://doi.org/10.1/real",
+            authors: "J. Doe",
+            year: "2024",
+            venue: "Journal of Real Retrieval",
+            abstract: "",
+            citationCount: 5,
+            source: "Crossref",
+          },
+        ],
+        sourceErrors: [],
+      });
+
+      const agent = new LiteratureReviewAgent();
+      const result = await agent.execute({ researchQuestions: ["What is X?", "How does Y work?"] }, createTestAgentContext());
+
+      expect(mockDiscoverLiterature).toHaveBeenCalledWith("What is X? How does Y work?");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.diagnostics.webStudies).toBe(1);
+    });
+
+    it("does not call discoverLiterature in deterministic mode (offline path unaffected)", async () => {
+      mockDiscoverJournalCandidates.mockResolvedValue({ results: [], sourceErrors: [] });
+      const agent = new LiteratureReviewAgent();
+      const result = await agent.execute(
+        { researchQuestions: ["What is X?"], executionMode: "deterministic" },
+        createTestAgentContext()
+      );
+
+      expect(mockDiscoverLiterature).not.toHaveBeenCalled();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.diagnostics.webStudies).toBe(0);
+    });
+
+    it("returns an honest empty list (not a fabricated one) when web literature retrieval fails entirely", async () => {
+      mockDiscoverLiterature.mockRejectedValue(new Error("All literature sources failed: Crossref: network error"));
+
+      const agent = new LiteratureReviewAgent();
+      const result = await agent.execute({ researchQuestions: ["Something"] }, createTestAgentContext());
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.diagnostics.webStudies).toBe(0);
+    });
+
+    it("deduplicates a web study against a local study sharing the same DOI", async () => {
+      mockDiscoverLiterature.mockResolvedValue({
+        results: [
+          {
+            title: "Duplicate Paper",
+            url: "https://doi.org/10.1/dup",
+            authors: "A. Author",
+            year: "2023",
+            venue: "Some Journal",
+            abstract: "",
+            citationCount: null,
+            source: "OpenAlex",
+          },
+        ],
+        sourceErrors: [],
+      });
+
+      const agent = new LiteratureReviewAgent();
+      const context = createTestAgentContext([ref({ doi: "10.1/dup" } as Partial<CanonicalReference>)]);
+      const result = await agent.execute({ researchQuestions: ["Something"] }, context);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.diagnostics.localStudies).toBe(1);
+      expect(result.data.diagnostics.webStudies).toBe(1);
+      expect(result.data.diagnostics.duplicatesRemoved).toBe(1);
+    });
   });
 });
