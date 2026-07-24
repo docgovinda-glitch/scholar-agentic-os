@@ -1,6 +1,19 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-24, updateProject race-condition fix session — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-24, four-task session: race fix + Stage 2 + Stage 5 + agent-adapter scoping — supersedes the section below)
+
+**All four assigned tasks completed this session, three shipped as code, one scoped as a plan.**
+
+1. **`updateProject` race, fixed app-wide** (commit in the section directly below this one, same day). See that section for detail — bigger than expected: the hook was dead code, `App.tsx` had its own unfixed duplicate.
+2. **Stage 2 — AI configuration UI (5-tier BYOK gateway) — 🟢 built** (commit `80bc177`). `AISetupWizard.tsx` now gates provider selection behind a tier-selection screen (Local Router / Free-Tier BYOK / Heavy BYOK, plus an inert "Affiliate — Coming Soon" card for the non-technical Tier 4) per `docs/planning/ai-gateway.md`'s tier model, filtering `AI_PROVIDERS` by existing `type`/`pricingTier` fields. Vault-passphrase encryption deliberately out of scope, per task instruction — existing `encryptData()` key storage untouched. Live-verified in a real browser: all 3 tiers filter correctly, back-navigation works, Affiliate card is inert.
+3. **Stage 5 — title-only intake path — 🟢 built** (commit `63f061f`). `ResearchIntakeWizard.tsx` gained a "Start With Title Only" button bypassing the guided path's per-format `isFormValid()` gate, requiring only a title. Downstream (Stage 6+) fields were already read defensively (`|| ""` fallbacks) — confirmed via grep, no changes needed there. Live-verified: a project with only a title set navigated past Stage 5 into the main workspace with all other fields still empty (no fabricated content).
+4. **Agent-UI adapter — scoped, not built**, per explicit task instruction (scoping only). Full plan: `docs/planning/agent-ui-adapter-scoping.md`. Key finding: `LiteratureReviewAgent.fetchWebStudies()` (`src/agents/literatureReview.ts:185-191`) is still a stub returning `[]` — wiring the agent pipeline into the UI today would regress the real retrieval paths from the fabrication-audit fixes. No runtime orchestrator exists today that chains agent outputs (`knowledgeGap → researchQuestion → methodologyAdvisor → statisticalAnalysis → integrityReviewer`) — only optional input-field types declare the dependency, nothing populates them. Recommended sequencing for a future session: (1) fix the `fetchWebStudies` stub first, in isolation; (2) build the missing orchestrator; (3) only then build the panel-facing adapter, one panel at a time with regression tests against the direct-service behavior it would replace.
+
+**Updated 12-stage gap map** (target-workflow.md numbering, as of this session): Stage 2 moves 🔴 → 🟢 (tier-selection UI built); Stage 5 moves 🟡 → 🟢 for its title-only alternative path specifically (the format-based conditional-field gating was already 🟢 from a prior session — both halves of Stage 5 are now done). Agent-pipeline wiring remains 🔴 (scoped only, not built, deliberately).
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-24, updateProject race-condition fix session)
 
 **Today's finding, bigger than expected**: fixing `useProjectPersistence.ts`'s flagged `updateProject()` closure-over-stale-`project` race turned up something more significant than a one-file bug — **the hook was never actually wired into the app at all.** `App.tsx` had its own ~250-line byte-for-byte duplicate of the entire hook (`updateProject`, `createNewProject`, `switchToProject`, `deleteProject`, `loadAllProjects`, the migration effect, the `scholar_project_updated` listener) inlined directly, with the exact same unfixed race. A prior session's fix to `useProjectPersistence.ts` alone was therefore fixing dead code — confirmed by live-testing against the real running app: the fix showed no effect, and adding debug logging inside the hook never fired at all when clicking through the real UI.
 
