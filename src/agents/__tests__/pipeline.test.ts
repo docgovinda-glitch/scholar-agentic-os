@@ -105,6 +105,19 @@ describe("runResearchPipeline — chain wiring", () => {
     expect(irInput.manuscriptText).toBe("Real drafted text.");
   });
 
+  // Semantic peer review (docs/planning/semantic-peer-review-scoping.md, 2026-07-24)
+  it("feeds real title/keywords/aiSettings into the terminal integrityReviewer stage", async () => {
+    await runResearchPipeline(
+      project({ title: "A Real Title", keywords: "ethics, dharma", aiSettings: { provider: "gemini" } }),
+      FAKE_CONTEXT as any
+    );
+
+    const irInput = mockIntegrity.mock.calls[0][0];
+    expect(irInput.title).toBe("A Real Title");
+    expect(irInput.keywords).toEqual(["ethics", "dharma"]);
+    expect(irInput.aiSettings).toEqual({ provider: "gemini" });
+  });
+
   it("returns every stage's report in the final result", async () => {
     const result = await runResearchPipeline(project({ title: "A Title" }), FAKE_CONTEXT as any);
 

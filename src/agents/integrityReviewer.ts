@@ -13,6 +13,8 @@ import type { KnowledgeGapReport } from "./knowledgeGap";
 import type { ResearchQuestionReport } from "./researchQuestion";
 import type { MethodologyReport } from "./methodologyAdvisor";
 import type { StatisticalAnalysisReport } from "./statisticalAnalysis";
+import type { LiteratureResult } from "../services/literatureRetrievalService";
+import type { AISettings } from "../types";
 
 // ============================================================================
 // Integrity Review Types
@@ -38,6 +40,30 @@ export interface ReportingCompliance {
   completionPercentage: number;
 }
 
+// Semantic peer review (docs/planning/semantic-peer-review-scoping.md,
+// 2026-07-24 build session). Deliberately NOT a rigor/novelty/publishability
+// verdict — see that doc's "do not attempt" list. Every finding is anchored
+// to one specific, really-retrieved paper: citedPaper is never model-echoed
+// free text, it's looked up by the skill from the real papers it retrieved
+// (see integrityReviewerSkill.ts), so a finding can never cite a paper that
+// wasn't actually found by literatureRetrievalService.discoverLiterature().
+export interface ComparableSourceFinding {
+  /** A single, comparative, citation-anchored sentence — never a quality/rigor/publishability judgment. */
+  finding: string;
+  /** The real, retrieved paper this finding is about — looked up by the skill, never taken from model output. */
+  citedPaper: { title: string; url: string };
+}
+
+export interface ComparableSourceAnalysis {
+  /** Every real paper retrieved for comparison, regardless of whether the AI comparison pass produced a finding about it. */
+  retrievedPapers: LiteratureResult[];
+  findings: ComparableSourceFinding[];
+  /** Real, computed — reflects whether retrieval AND the AI comparison pass both actually succeeded, never a fabricated constant. */
+  confidence: number;
+  /** Set when there's nothing to compare (no query derivable, retrieval found nothing, or no manuscript text) — honest gap, not a fabricated result. */
+  note?: string;
+}
+
 export interface IntegrityReviewReport {
   executiveSummary: string;
   integrityScore: number;
@@ -60,6 +86,15 @@ export interface IntegrityReviewReport {
    * which discloses this explicitly.
    */
   structuralCompleteness: number;
+  /**
+   * Additive, separate from structuralCompleteness above — a literature-
+   * grounded comparison, not a heading-presence scan. null when nothing was
+   * available to compare against (no title/keywords to search with, no
+   * manuscript text, or retrieval found nothing) — never a fabricated
+   * result. See ComparableSourceAnalysis's comment and
+   * docs/planning/semantic-peer-review-scoping.md for the full design.
+   */
+  comparableSourceAnalysis: ComparableSourceAnalysis | null;
   confidence: number;
 }
 
@@ -75,6 +110,11 @@ export interface IntegrityReviewerInput {
   methodologyReport?: MethodologyReport;
   statisticalAnalysisReport?: StatisticalAnalysisReport;
   manuscriptText?: string;
+  /** Real manuscript title/keywords — used only to derive a real search query
+   *  for comparable-literature retrieval, never invented. */
+  title?: string;
+  keywords?: string[];
+  aiSettings?: AISettings;
   executionMode?: ExecutionMode;
 }
 

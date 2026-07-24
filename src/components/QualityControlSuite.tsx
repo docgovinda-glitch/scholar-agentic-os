@@ -249,6 +249,36 @@ export default function QualityControlSuite({
                 {integrityReport.structuralCompleteness}%
               </span>
             </p>
+
+            {/* Semantic peer review (docs/planning/semantic-peer-review-scoping.md,
+                2026-07-24) — a separate, literature-grounded comparison layer,
+                deliberately kept legible as distinct from the structural scan
+                above (never a rigor/publishability verdict). */}
+            {integrityReport.comparableSourceAnalysis && (
+              <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB] rounded-lg space-y-2">
+                <p className="font-semibold text-[#1A365D]">Comparable Literature (real, retrieved sources)</p>
+                {integrityReport.comparableSourceAnalysis.note ? (
+                  <p className="text-gray-500 italic">{integrityReport.comparableSourceAnalysis.note}</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {integrityReport.comparableSourceAnalysis.findings.map((f, i) => (
+                      <li key={i} className="border-l-2 border-[#C08A3E]/40 pl-2">
+                        <span>{f.finding}</span>{" "}
+                        <a href={f.citedPaper.url} target="_blank" rel="noreferrer" className="text-[#1A365D] underline">
+                          [{f.citedPaper.title}]
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {integrityReport.comparableSourceAnalysis.retrievedPapers.length > 0 && (
+                  <p className="text-[10px] text-gray-500">
+                    {integrityReport.comparableSourceAnalysis.retrievedPapers.length} real paper(s) retrieved for comparison — not a plagiarism, rigor, or publishability check.
+                  </p>
+                )}
+              </div>
+            )}
+
             {integrityReport.recommendations.length > 0 && (
               <ul className="list-disc list-inside space-y-1">
                 {integrityReport.recommendations.map((rec, i) => (

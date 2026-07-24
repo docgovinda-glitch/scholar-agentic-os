@@ -114,4 +114,60 @@ describe("QualityControlSuite — Step 2c full-pipeline path (new, additive)", (
     await waitFor(() => expect(mockExecuteAgent).toHaveBeenCalledWith("integrity-reviewer", expect.anything()));
     expect(mockRunResearchPipeline).not.toHaveBeenCalled();
   });
+
+  // Semantic peer review (docs/planning/semantic-peer-review-scoping.md, 2026-07-24)
+  describe("comparableSourceAnalysis display (additive, separate from structuralCompleteness)", () => {
+    it("renders each finding with a link to its real cited paper", async () => {
+      renderSuite();
+      mockRunResearchPipeline.mockResolvedValue({
+        researchPlan: null, literatureReview: null, knowledgeGapReport: null,
+        researchQuestionReport: null, methodologyReport: null, statisticalAnalysisReport: null,
+        integrityReviewReport: integrityReport({
+          comparableSourceAnalysis: {
+            retrievedPapers: [{ title: "A Real Paper", url: "https://doi.org/real", authors: "", year: "2023", venue: "", abstract: "", citationCount: null, source: "Crossref" }],
+            findings: [{ finding: "The manuscript does not engage with this paper's framework.", citedPaper: { title: "A Real Paper", url: "https://doi.org/real" } }],
+            confidence: 0.7,
+          },
+        }),
+        errors: [],
+      });
+
+      fireEvent.click(screen.getByText("Run Full Pipeline (Deep Review)"));
+
+      expect(await screen.findByText(/does not engage with this paper's framework/)).toBeInTheDocument();
+      const link = await screen.findByText("[A Real Paper]");
+      expect(link.closest("a")).toHaveAttribute("href", "https://doi.org/real");
+    });
+
+    it("shows the honest note instead of findings when nothing was available to compare", async () => {
+      renderSuite();
+      mockRunResearchPipeline.mockResolvedValue({
+        researchPlan: null, literatureReview: null, knowledgeGapReport: null,
+        researchQuestionReport: null, methodologyReport: null, statisticalAnalysisReport: null,
+        integrityReviewReport: integrityReport({
+          comparableSourceAnalysis: { retrievedPapers: [], findings: [], confidence: 0, note: "No comparable literature retrieved for this manuscript's topic." },
+        }),
+        errors: [],
+      });
+
+      fireEvent.click(screen.getByText("Run Full Pipeline (Deep Review)"));
+
+      expect(await screen.findByText("No comparable literature retrieved for this manuscript's topic.")).toBeInTheDocument();
+    });
+
+    it("does not render the comparable-literature section at all when comparableSourceAnalysis is null", async () => {
+      renderSuite();
+      mockRunResearchPipeline.mockResolvedValue({
+        researchPlan: null, literatureReview: null, knowledgeGapReport: null,
+        researchQuestionReport: null, methodologyReport: null, statisticalAnalysisReport: null,
+        integrityReviewReport: integrityReport({ comparableSourceAnalysis: null }),
+        errors: [],
+      });
+
+      fireEvent.click(screen.getByText("Run Full Pipeline (Deep Review)"));
+
+      await screen.findByText(/Integrity review complete/);
+      expect(screen.queryByText(/Comparable Literature/)).not.toBeInTheDocument();
+    });
+  });
 });

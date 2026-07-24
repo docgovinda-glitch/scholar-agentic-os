@@ -183,6 +183,12 @@ export async function runResearchPipeline(
       methodologyReport: methodologyReport ?? undefined,
       statisticalAnalysisReport: statisticalAnalysisReport ?? undefined,
       manuscriptText,
+      // Semantic peer review (docs/planning/semantic-peer-review-scoping.md,
+      // 2026-07-24) — real title/keywords, used only to derive a real
+      // literatureRetrievalService query, never invented.
+      title: project.title || undefined,
+      keywords: project.keywords ? project.keywords.split(",").map((k) => k.trim()).filter(Boolean) : undefined,
+      aiSettings: project.aiSettings,
     },
     context,
     { maxRetries: 1 }

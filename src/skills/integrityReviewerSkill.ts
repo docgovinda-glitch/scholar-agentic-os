@@ -42,8 +42,22 @@
  * "randomization was adequately described" isn't honestly derivable from
  * string matching and would just be a different flavor of fabrication.
  *
- * Stays deterministic (aiEnhanced: false, offlineCapable: true) — no LLM
- * call added.
+ * Semantic peer review, built 2026-07-24 per
+ * docs/planning/semantic-peer-review-scoping.md — additive, alongside the
+ * structural scan above, never replacing it. buildComparableSourceAnalysis()
+ * is retrieval-first: it derives a real search query from input.title/
+ * keywords, calls literatureRetrievalService.discoverLiterature() (the same
+ * real Crossref/OpenAlex/PubMed/Semantic Scholar retrieval discoverDataSources
+ * uses), and ONLY once real comparable papers are in hand does it call the AI
+ * — restricted to comparative, citation-engagement questions against those
+ * specific real papers (never "is this good science", per the scoping doc's
+ * "do not attempt" list: no plagiarism detection, no accept/reject or
+ * publishability verdicts, no data-authenticity claims). Every finding's
+ * citedPaper is looked up by this skill from the real retrieved list by
+ * index — never taken from model-echoed text — so a finding can never cite a
+ * paper that wasn't actually retrieved. aiEnhanced is now true and
+ * offlineCapable false to reflect this addition honestly (the structural
+ * scan above remains fully deterministic on its own).
  */
 
 import type { Skill, SkillContext, SkillMetadata, SkillResult } from "./types";
@@ -53,11 +67,16 @@ import type {
   IntegrityIssue,
   ReportingCompliance,
   ReportingGuideline,
+  ComparableSourceAnalysis,
+  ComparableSourceFinding,
 } from "../agents/integrityReviewer";
 import type { ResearchPlan } from "../agents/researchPlanner";
 import type { LiteratureReview } from "../agents/literatureReview";
 import type { MethodologyReport } from "../agents/methodologyAdvisor";
 import type { StatisticalAnalysisReport } from "../agents/statisticalAnalysis";
+import type { AISettings } from "../types";
+import { discoverLiterature, type LiteratureResult } from "../services/literatureRetrievalService";
+import AIGateway from "../services/aiGateway";
 
 export class IntegrityReviewerSkill implements Skill<IntegrityReviewerInput, IntegrityReviewReport> {
   readonly metadata: SkillMetadata = {
@@ -67,8 +86,8 @@ export class IntegrityReviewerSkill implements Skill<IntegrityReviewerInput, Int
     version: "1.0.0",
     category: "Validation",
     author: "System",
-    offlineCapable: true,
-    aiEnhanced: false,
+    offlineCapable: false,
+    aiEnhanced: true,
   };
 
   async execute(input: IntegrityReviewerInput, context: SkillContext): Promise<SkillResult<IntegrityReviewReport>> {
@@ -99,6 +118,7 @@ export class IntegrityReviewerSkill implements Skill<IntegrityReviewerInput, Int
 
     const reportingCompliance = this.evaluateReportingCompliance(input);
     const structuralCompleteness = reportingCompliance[0]?.completionPercentage ?? 0;
+    const comparableSourceAnalysis = await this.buildComparableSourceAnalysis(input);
 
     const blocking = issues.filter((i) => i.severity === "critical" || i.severity === "high");
     const warnings = issues.filter((i) => i.severity === "medium" || i.severity === "low");
@@ -106,7 +126,7 @@ export class IntegrityReviewerSkill implements Skill<IntegrityReviewerInput, Int
     const scores = this.calculateScores(issues);
 
     const report: IntegrityReviewReport = {
-      executiveSummary: this.generateExecutiveSummary(issues, scores, structuralCompleteness),
+      executiveSummary: this.generateExecutiveSummary(issues, scores, structuralCompleteness, comparableSourceAnalysis),
       integrityScore: scores.integrity,
       ethicsScore: scores.ethics,
       reproducibilityScore: scores.reproducibility,
@@ -117,6 +137,7 @@ export class IntegrityReviewerSkill implements Skill<IntegrityReviewerInput, Int
       warnings,
       recommendations: this.generateRecommendations(issues),
       structuralCompleteness,
+      comparableSourceAnalysis,
       confidence: 0.95,
     };
 
@@ -350,13 +371,24 @@ export class IntegrityReviewerSkill implements Skill<IntegrityReviewerInput, Int
   private generateExecutiveSummary(
     issues: IntegrityIssue[],
     scores: { integrity: number; ethics: number; reproducibility: number; transparency: number },
-    structuralCompleteness: number
+    structuralCompleteness: number,
+    comparableSourceAnalysis: ComparableSourceAnalysis | null
   ): string {
     const avgScore = (scores.integrity + scores.ethics + scores.reproducibility + scores.transparency) / 4;
+    // Step 6 (semantic-peer-review-scoping.md): keep the structural scan and
+    // the literature-grounded comparison legible as two distinct layers —
+    // never let a caller conflate a heading-presence check with a real
+    // semantic finding.
+    const comparableSourceSummary = comparableSourceAnalysis
+      ? comparableSourceAnalysis.note
+        ? ` Comparable-literature comparison: ${comparableSourceAnalysis.note}`
+        : ` Comparable-literature comparison: ${comparableSourceAnalysis.findings.length} finding(s) against ${comparableSourceAnalysis.retrievedPapers.length} real retrieved paper(s) — a citation-engagement comparison, not a rigor or publishability judgment.`
+      : "";
     return "Integrity review complete. Average score: " + Math.round(avgScore * 100) + "%. " +
       issues.length + " issues detected, " + issues.filter((i) => i.severity === "critical" || i.severity === "high").length + " blocking. " +
       "Structural completeness: " + structuralCompleteness + "%. " +
-      "This is an automated structural/completeness scan (heading and keyword presence) — it does not perform semantic peer-review judgment of the manuscript's scientific content.";
+      "This is an automated structural/completeness scan (heading and keyword presence) — it does not perform semantic peer-review judgment of the manuscript's scientific content." +
+      comparableSourceSummary;
   }
 
   private generateRecommendations(issues: IntegrityIssue[]): string[] {
@@ -366,5 +398,155 @@ export class IntegrityReviewerSkill implements Skill<IntegrityReviewerInput, Int
       "Obtain ethics approval documentation",
       "Document data availability statement",
     ];
+  }
+
+  // ==========================================================================
+  // Semantic peer review (docs/planning/semantic-peer-review-scoping.md)
+  // ==========================================================================
+
+  /**
+   * Step 2 (scoping doc) — retrieval-first. Derives a real query from
+   * input.title/keywords (falling back to literatureReview's own real
+   * recommendedSearchTerms if present), then calls the same real retrieval
+   * service discoverDataSources() uses. Returns null only when there is
+   * nothing at all to search with — an honest no-op, not a fabricated
+   * empty result standing in for "not attempted".
+   */
+  private async buildComparableSourceAnalysis(input: IntegrityReviewerInput): Promise<ComparableSourceAnalysis | null> {
+    const query = [input.title, ...(input.keywords || [])].filter(Boolean).join(" ").trim()
+      || (input.literatureReview?.recommendedSearchTerms || []).join(" ").trim();
+
+    if (!query) return null;
+
+    let papers: LiteratureResult[];
+    try {
+      const discovery = await discoverLiterature(query);
+      papers = discovery.results;
+    } catch {
+      return {
+        retrievedPapers: [],
+        findings: [],
+        confidence: 0,
+        note: "No comparable literature retrieved — retrieval failed or found nothing for this manuscript's topic.",
+      };
+    }
+
+    if (papers.length === 0) {
+      return {
+        retrievedPapers: [],
+        findings: [],
+        confidence: 0,
+        note: "No comparable literature retrieved for this manuscript's topic.",
+      };
+    }
+
+    if (!input.manuscriptText) {
+      return {
+        retrievedPapers: papers,
+        findings: [],
+        confidence: 0,
+        note: "Comparable literature was retrieved, but no manuscript text was provided to compare it against.",
+      };
+    }
+
+    const findings = await this.compareManuscriptAgainstPapers(input.manuscriptText, papers, input.aiSettings);
+    return {
+      retrievedPapers: papers,
+      findings,
+      // Real, computed: reflects whether the AI comparison pass actually
+      // produced grounded findings, not an arbitrary constant.
+      confidence: findings.length > 0 ? 0.7 : 0.3,
+    };
+  }
+
+  /**
+   * Steps 3-4 (scoping doc) — the model is given ONLY the manuscript excerpt
+   * and the real retrieved papers (numbered), and is restricted to
+   * comparative, citation-engagement questions. citedPaper is always looked
+   * up here from the real `papers` array by index — the model's own output
+   * only ever supplies an index, never a title/url we'd otherwise have to
+   * trust, so a finding can never reference a paper that wasn't actually
+   * retrieved. Any AI or parsing failure returns an honest empty findings
+   * list — never fabricated content.
+   */
+  private async compareManuscriptAgainstPapers(
+    manuscriptText: string,
+    papers: LiteratureResult[],
+    aiSettings?: AISettings
+  ): Promise<ComparableSourceFinding[]> {
+    const paperList = papers
+      .map((p, i) => {
+        const byline = [p.authors, p.year, p.venue].filter(Boolean).join(", ");
+        const abstractSnippet = p.abstract ? p.abstract.slice(0, 300) : "No abstract available.";
+        return `${i + 1}. "${p.title}"${byline ? ` (${byline})` : ""} — ${abstractSnippet}`;
+      })
+      .join("\n\n");
+
+    const systemInstruction =
+      "You compare an academic manuscript against a fixed numbered list of REAL, already-retrieved comparable papers. " +
+      "For each numbered paper, state ONLY whether the manuscript appears to cite, discuss, or engage with that specific paper's topic or findings — and if not, what specifically seems to be omitted. " +
+      "Do NOT comment on the manuscript's scientific quality, rigor, novelty, methodology soundness, or publishability. " +
+      "Do NOT claim to detect plagiarism or fabricated/inauthentic data. " +
+      "Do NOT invent or reference any paper not in the numbered list below. " +
+      'Return ONLY a JSON array, one object per paper number, each with exactly two fields: "paperIndex" (integer, the paper\'s number from the list) and "finding" (one comparative, citation-anchored sentence).';
+
+    const prompt = `Retrieved comparable papers:\n${paperList}\n\n--- Manuscript excerpt ---\n${manuscriptText.slice(0, 6000)}`;
+
+    try {
+      const response = await AIGateway.generate(
+        { systemInstruction, prompt, temperature: 0.2, responseMimeType: "application/json", taskType: "qc" },
+        aiSettings || ({ provider: "auto" } as AISettings)
+      );
+      const parsed = extractJsonArray<{ paperIndex: number; finding: string }>(response.text);
+      return parsed
+        .filter((f) => Number.isInteger(f?.paperIndex) && f.paperIndex >= 1 && f.paperIndex <= papers.length && typeof f?.finding === "string" && f.finding.trim())
+        .map((f) => ({
+          finding: f.finding.trim(),
+          citedPaper: { title: papers[f.paperIndex - 1].title, url: papers[f.paperIndex - 1].url },
+        }));
+    } catch {
+      return [];
+    }
+  }
+}
+
+/**
+ * Minimal brace/bracket-extracting JSON-array parser (CLAUDE.md convention —
+ * parse LLM responses via brace-extracting helper logic), scoped to just what
+ * compareManuscriptAgainstPapers needs. Not reused from aiService.ts's
+ * safeParseJSON since that function isn't exported and skills don't import
+ * from aiService.ts (see this file's header comment on layering).
+ */
+function extractJsonArray<T>(rawText: string): T[] {
+  const text = rawText.trim();
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const candidate = fenceMatch ? fenceMatch[1].trim() : text;
+
+  const start = candidate.indexOf("[");
+  if (start === -1) return [];
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let end = -1;
+  for (let i = start; i < candidate.length; i++) {
+    const ch = candidate[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\" && inString) { escape = true; continue; }
+    if (ch === '"' && !escape) { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "[") depth++;
+    if (ch === "]") {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  if (end === -1) return [];
+
+  try {
+    const parsed = JSON.parse(candidate.slice(start, end + 1));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
   }
 }
