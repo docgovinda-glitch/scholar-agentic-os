@@ -1,6 +1,18 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-23, Stage 7/8 + fabrication-audit-closure session — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-24, updateProject race-condition fix session — supersedes the section below)
+
+**Today's finding, bigger than expected**: fixing `useProjectPersistence.ts`'s flagged `updateProject()` closure-over-stale-`project` race turned up something more significant than a one-file bug — **the hook was never actually wired into the app at all.** `App.tsx` had its own ~250-line byte-for-byte duplicate of the entire hook (`updateProject`, `createNewProject`, `switchToProject`, `deleteProject`, `loadAllProjects`, the migration effect, the `scholar_project_updated` listener) inlined directly, with the exact same unfixed race. A prior session's fix to `useProjectPersistence.ts` alone was therefore fixing dead code — confirmed by live-testing against the real running app: the fix showed no effect, and adding debug logging inside the hook never fired at all when clicking through the real UI.
+
+**Real fix**: added a `projectRef` (synchronously updated, both by an effect for external `project` changes and directly inside `updateProject` for same-tick calls) so a second `updateProject` call in the same tick sees the first call's result immediately, without waiting for a React re-render. Then — the actual fix that matters — **deleted App.tsx's entire duplicate implementation and wired up the real hook** (`useProjectPersistence(user, project, setProject, setAllProjects, allProjects, setViewMode, setActiveTab)`), eliminating the duplication (per CLAUDE.md's no-duplication rule) and making the fix real instead of applied to unused code.
+
+**Live-verified against the exact real vulnerable path**: `ManuscriptDraftingWorkspace.tsx`'s `loadStandardDraftSegment()` calls `saveVersion("...")` (→ `updateProject({ versions })`) immediately followed by `updateProject({ sections })` — a genuine, currently-occurring instance, not hypothetical: every real "pre-compiled draft loaded" / AI-drafted section action in this app was silently losing its own version-history checkpoint. After the fix: clicking "Skip & Pre-Compile Offline" now correctly persists both `versions: [{ description: "[Title Page] Pre-compiled standard draft loaded" }]` and the new `sections` content in the same save — previously `versions` came back empty.
+
+tsc clean, 648/650 passing (2 pre-existing unrelated `supabaseClient` failures). Characterization test (`src/hooks/__tests__/useProjectPersistence.test.ts`) reproduces the original two-calls-in-one-tick race directly against the hook, confirmed failing before the fix and passing after.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-23, Stage 7/8 + fabrication-audit-closure session)
 
 **Today so far**: Committed the pending Stage 7 (per-format document templates) + Stage 8 (non-journal requirements capture) work as one logical unit (`4f69b3e`) — 639/641 passing, live-verified. Flagged, not fixed: `useProjectPersistence.ts`'s `updateProject()` closes over the current render's `project` value, so two calls in the same tick silently drop the first call's fields — confirmed live (a save-then-navigate flow lost `complianceRules` until worked around locally in `NonJournalRequirementsPanel.tsx` by folding both changes into one `updateProject` call). **This is a real, app-wide bug, only patched in one place — needs its own dedicated fix**, since any other component calling `updateProject` twice in a row (save-then-navigate, or similar) can hit the same silent data loss.
 
@@ -10,9 +22,9 @@ Then fixed both remaining open fabrication-audit instances, closing the audit en
 
 **Fabrication audit status: 7 found, 7 fixed, 0 open.** See `target-workflow.md` §10 "Audit closed" for the full, final tally — no LLM-invented real-world entities remain anywhere in the 8 agents/skills or `aiService.ts`.
 
-**Unrelated, still-open item carried over from earlier today**: `useProjectPersistence.ts`'s `updateProject()` closure-over-stale-`project` bug (see below) is real and app-wide — still only patched locally in `NonJournalRequirementsPanel.tsx`, not fixed.
+~~**Unrelated, still-open item carried over from earlier today**: `useProjectPersistence.ts`'s `updateProject()` closure-over-stale-`project` bug (see below) is real and app-wide — still only patched locally in `NonJournalRequirementsPanel.tsx`, not fixed.~~ **Fixed 2026-07-24** — see the section above. Turned out to be bigger than a one-file bug: the hook was never wired into the app at all (App.tsx had its own unfixed duplicate). Now consolidated onto one real, tested implementation.
 
-**Environment note, not a bug**: mid-session, `/Users/pobpkf/Documents` was renamed to `/Users/pobpkf/Documents/Documents - PO's iMac` (an apparent macOS/iCloud Drive sync-conflict rename) — not caused by any command run this session. The repo and all commits were confirmed intact at the new path; nothing was lost, but the absolute path to this project has changed. Update any saved paths/scripts accordingly.
+**Environment note, not a bug, now resolved**: mid-session, `/Users/pobpkf/Documents` was briefly renamed to `/Users/pobpkf/Documents/Documents - PO's iMac` (an apparent macOS/iCloud Drive sync-conflict rename) — not caused by any command run this session. The repo and all commits stayed intact throughout; nothing was lost. The path has since reverted back to the original `/Users/pobpkf/Documents/scholar-agentic-os` — confirmed working tree clean and full commit history present there as of this note.
 
 ---
 

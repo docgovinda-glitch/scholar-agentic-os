@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { PaperProject, WORKFLOW_PHASES, PROFILE_STATE_PREFIX, DEFAULT_STATE, UserProfile } from "./types";
+import React, { useState, useEffect } from "react";
+import { PaperProject, WORKFLOW_PHASES } from "./types";
 import ResearchIntakeWizard from "./components/ResearchIntakeWizard";
 import OutputFormatSelector from "./components/OutputFormatSelector";
 import GroundingMapDisplay from "./components/GroundingMapDisplay";
@@ -13,6 +13,7 @@ import QCBasedRedraftingSuite from "./components/QCBasedRedraftingSuite";
 import SubmissionPackagingSuite from "./components/SubmissionPackagingSuite";
 import ManuscriptPDFViewer from "./components/ManuscriptPDFViewer";
 import { AuthProvider, useAuth } from "./auth/authContext";
+import { useProjectPersistence } from "./hooks/useProjectPersistence";
 import OnboardingWizard from "./components/OnboardingWizard";
 import ResearchIntelligenceDashboard from "./components/ResearchIntelligenceDashboard";
 import ManuscriptEditorWorkspace from "./components/ManuscriptEditorWorkspace";
@@ -71,6 +72,24 @@ function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
 
+  // Single source of truth for project persistence (localStorage load/save,
+  // updateProject, createNewProject, switchToProject, deleteProject,
+  // client-side v2 migration, scholar_project_updated event handling).
+  // Previously App.tsx had its own ~250-line duplicate of this exact hook
+  // inlined instead of using it, which is why a real closure-over-stale-
+  // project bug in updateProject (two calls in the same tick silently
+  // dropping the first call's fields) went unfixed even after this hook
+  // itself was fixed and tested — the hook was never actually wired in.
+  const { loadAllProjects, updateProject, createNewProject, switchToProject, deleteProject } = useProjectPersistence(
+    user,
+    project,
+    setProject,
+    setAllProjects,
+    allProjects,
+    setViewMode,
+    setActiveTab
+  );
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -125,43 +144,6 @@ function App() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
-
-  // Listen for background project state updates from AI service calls
-  useEffect(() => {
-    const handleProjectUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail) {
-        setProject(customEvent.detail);
-      }
-    };
-    window.addEventListener("scholar_project_updated", handleProjectUpdated);
-    return () => {
-      window.removeEventListener("scholar_project_updated", handleProjectUpdated);
-    };
-  }, [setProject]);
-
-  // Load ALL projects belonging to this user from localStorage
-  const loadAllProjects = useCallback(() => {
-    if (!user) return;
-    const stateStr = localStorage.getItem(`${PROFILE_STATE_PREFIX}${user}`);
-    if (!stateStr) return;
-    try {
-      const profile = JSON.parse(stateStr) as UserProfile;
-      // Multi-project support: collect from projects[] array or create from projectState
-      let projects: PaperProject[] = profile.projects || [];
-      // Always ensure the current active project is included
-      if (profile.projectState && !projects.find(p => p.id === profile.projectState?.id)) {
-        projects = [profile.projectState, ...projects];
-      }
-      setAllProjects(projects.filter(Boolean));
-    } catch (e) {
-      console.error("Failed to load projects list:", e);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadAllProjects();
-  }, [loadAllProjects, project]);
 
   // Two-way URL Hash <-> React State synchronization for history navigation
   useEffect(() => {
@@ -218,166 +200,6 @@ function App() {
       window.location.hash = targetHash;
     }
   }, [user, onboardingStep, viewMode, activeTab]);
-
-  // Client-side migration runner to support cost metrics, model preferences and usage logs
-  useEffect(() => {
-    if (user && project) {
-      const needsMigration = 
-        !project.usageLogs || 
-        !project.costMetrics || 
-        !project.modelPreferences ||
-        !project.aiSettings;
-        
-      if (needsMigration) {
-        console.log("[Migration Runner] Migrating schema to v2 for user:", user);
-        
-        const migratedProject = {
-          ...project,
-          aiSettings: project.aiSettings || { provider: "gemini" },
-          usageLogs: project.usageLogs || [],
-          costMetrics: project.costMetrics || { totalCost: 0, totalCalls: 0 },
-          modelPreferences: project.modelPreferences || {
-            grounding: "deepseek",
-            dataDiscovery: "gemini",
-            journalDiscovery: "gemini",
-            requirements: "gemini",
-            drafting: "qwen",
-            qc: "deepseek",
-            submissionPack: "gemini"
-          }
-        };
-        
-        updateProject(migratedProject);
-      }
-    }
-  }, [user, project]);
-
-  const updateProject = (newFields: Partial<PaperProject>) => {
-    if (!user || !project) return;
-    const updated = { ...project, ...newFields, lastActivity: new Date().toISOString() };
-    setProject(updated);
-    
-    const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-    let existingProfile: any = {};
-    if (savedStateStr) {
-      try {
-        existingProfile = JSON.parse(savedStateStr);
-      } catch (e) {
-        console.error("Failed to parse existing profile for update:", e);
-      }
-    }
-    
-    // Update in projects array too
-    const currentProjects: PaperProject[] = existingProfile.projects || [];
-    const idx = currentProjects.findIndex((p: PaperProject) => p.id === updated.id);
-    if (idx >= 0) {
-      currentProjects[idx] = updated;
-    } else {
-      currentProjects.unshift(updated);
-    }
-
-    const profileData = {
-      ...existingProfile,
-      username: user,
-      projectState: updated,
-      projects: currentProjects
-    };
-    localStorage.setItem(`phd_profile_state_${user}`, JSON.stringify(profileData));
-    
-    // Dispatch event to notify other components of project state update
-    window.dispatchEvent(new CustomEvent("scholar_project_updated", { detail: updated }));
-  };
-
-  // Create a fresh new research project
-  const createNewProject = () => {
-    if (!user) return;
-    const newProject = {
-      ...DEFAULT_STATE(user),
-      id: `${user}-${Date.now()}`,
-      lastActivity: new Date().toISOString()
-    };
-
-    const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-    let existingProfile: any = {};
-    if (savedStateStr) {
-      try { existingProfile = JSON.parse(savedStateStr); } catch (_) {}
-    }
-    const currentProjects: PaperProject[] = existingProfile.projects || [];
-    // Ensure old active is persisted
-    if (project && !currentProjects.find(p => p.id === project.id)) {
-      currentProjects.unshift(project);
-    }
-    currentProjects.unshift(newProject);
-
-    const profileData = {
-      ...existingProfile,
-      username: user,
-      projectState: newProject,
-      projects: currentProjects,
-      activeProjectId: newProject.id
-    };
-    localStorage.setItem(`phd_profile_state_${user}`, JSON.stringify(profileData));
-    setProject(newProject);
-    setAllProjects(currentProjects);
-    setViewMode("workspace");
-    setActiveTab("workspace");
-  };
-
-  // Switch to a different project from the dashboard
-  const switchToProject = (projectId: string) => {
-    const found = allProjects.find(p => p.id === projectId);
-    if (!found) return;
-
-    const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-    let existingProfile: any = {};
-    if (savedStateStr) {
-      try { existingProfile = JSON.parse(savedStateStr); } catch (_) {}
-    }
-    const profileData = {
-      ...existingProfile,
-      projectState: found,
-      activeProjectId: projectId
-    };
-    localStorage.setItem(`phd_profile_state_${user}`, JSON.stringify(profileData));
-    setProject(found);
-    setViewMode("workspace");
-    setActiveTab("workspace");
-  };
-
-  // Delete a project from the dashboard
-  const deleteProject = (projectId: string) => {
-    if (!user) return;
-    if (!window.confirm("Are you sure you want to permanently delete this workspace? This action cannot be undone.")) return;
-
-    const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-    let existingProfile: any = {};
-    if (savedStateStr) {
-      try { existingProfile = JSON.parse(savedStateStr); } catch (_) {}
-    }
-    let currentProjects: PaperProject[] = existingProfile.projects || [];
-    currentProjects = currentProjects.filter((p: PaperProject) => p.id !== projectId);
-
-    // If we deleted the active project, switch to another or create a fresh one
-    const wasActive = project?.id === projectId;
-    let newActive = wasActive ? (currentProjects[0] || null) : project;
-    if (wasActive && !newActive) {
-      newActive = { ...DEFAULT_STATE(user), id: `${user}-${Date.now()}`, lastActivity: new Date().toISOString() };
-      currentProjects.unshift(newActive);
-    }
-
-    const profileData = {
-      ...existingProfile,
-      username: user,
-      projectState: newActive,
-      projects: currentProjects,
-      activeProjectId: newActive?.id
-    };
-    localStorage.setItem(`phd_profile_state_${user}`, JSON.stringify(profileData));
-    setAllProjects(currentProjects);
-    if (wasActive && newActive) {
-      setProject(newActive);
-    }
-  };
 
   const handlePhaseChange = (phase: typeof WORKFLOW_PHASES[number]["id"]) => {
     updateProject({ currentPhase: phase });

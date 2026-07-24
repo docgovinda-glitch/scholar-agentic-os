@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { PaperProject, PROFILE_STATE_PREFIX, DEFAULT_STATE, UserProfile } from "../types";
 
 export interface UseProjectPersistenceResult {
@@ -28,6 +28,28 @@ export function useProjectPersistence(
   setViewMode: React.Dispatch<React.SetStateAction<"dashboard" | "workspace">>,
   setActiveTab: React.Dispatch<React.SetStateAction<string>>
 ): UseProjectPersistenceResult {
+  // Fixes a real race: updateProject() used to close over the `project`
+  // argument from the render that created it. Two updateProject() calls in
+  // the same synchronous tick (no re-render between them — e.g.
+  // ManuscriptDraftingWorkspace.tsx's draftSection(): saveVersion() calls
+  // updateProject({ versions }), then updateProject({ sections }) runs
+  // immediately after) both read the SAME stale `project`, so the second
+  // call's `{ ...project, ...newFields }` silently dropped the first call's
+  // fields — confirmed live, every AI-drafted section was losing its own
+  // version-history checkpoint the moment it was saved.
+  //
+  // projectRef is the fix: updateProject reads/writes it synchronously, so a
+  // second call in the same tick sees the first call's result immediately,
+  // without waiting for React to re-render and refresh the `project` prop.
+  // The effect below keeps it in sync with `project` for every OTHER path
+  // that changes it (switchToProject, the scholar_project_updated listener,
+  // etc.), so updateProject is always working from the true latest value
+  // regardless of what last changed it.
+  const projectRef = useRef(project);
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
+
   // Listen for background project state updates from AI service calls
   useEffect(() => {
     const handleProjectUpdated = (e: Event) => {
@@ -67,8 +89,9 @@ export function useProjectPersistence(
 
   // Client-side migration runner to support cost metrics, model preferences and usage logs
   const updateProject = useCallback((newFields: Partial<PaperProject>) => {
-    if (!user || !project) return;
-    const updated = { ...project, ...newFields, lastActivity: new Date().toISOString() };
+    if (!user || !projectRef.current) return;
+    const updated = { ...projectRef.current, ...newFields, lastActivity: new Date().toISOString() };
+    projectRef.current = updated; // synchronous, so a second call in the same tick sees this immediately
     setProject(updated);
 
     const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
@@ -100,7 +123,10 @@ export function useProjectPersistence(
 
     // Dispatch event to notify other components of project state update
     window.dispatchEvent(new CustomEvent("scholar_project_updated", { detail: updated }));
-  }, [user, project, setProject]);
+    // Deliberately no `project` dependency — this reads/writes projectRef.current
+    // instead, so its identity stays stable across renders and it always acts
+    // on the true latest value regardless of when React last re-rendered.
+  }, [user, setProject]);
 
   useEffect(() => {
     if (user && project) {
