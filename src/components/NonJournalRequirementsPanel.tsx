@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { PaperProject, ComplianceRules, WORKFLOW_PHASES } from "../types";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Upload } from "lucide-react";
 import { getDocumentTemplate } from "../config/documentTemplates";
+import { learnStructureFromSampleDocument } from "../services/sampleDocLearningService";
 
 /**
  * Stage 8 (target-workflow.md) — structured requirements capture for
@@ -44,6 +45,31 @@ export default function NonJournalRequirementsPanel({
     (existing?.sectionStructure?.length ? existing.sectionStructure : template.sectionStructure).join("\n")
   );
   const [customNotes, setCustomNotes] = useState(existing?.customNotes || "");
+
+  // Stage 7 (target-workflow.md) sample-document structure learning —
+  // "independent alternative" to the template default, "sample wins" per
+  // the spec. Purely local UI state: sectionStructureText (above) is the
+  // single field either path writes to; this only tracks provenance for the
+  // badge and in-progress/error UI.
+  const [sampleSourceFileName, setSampleSourceFileName] = useState<string | null>(null);
+  const [sampleLoading, setSampleLoading] = useState(false);
+  const [sampleError, setSampleError] = useState<string | null>(null);
+  const sampleFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSampleDocUpload = async (file: File) => {
+    setSampleLoading(true);
+    setSampleError(null);
+    try {
+      const result = await learnStructureFromSampleDocument(file);
+      setSectionStructureText(result.sectionStructure.join("\n"));
+      setSampleSourceFileName(result.sourceFileName);
+    } catch (err: any) {
+      setSampleError(err.message || "Failed to learn structure from the uploaded document.");
+    } finally {
+      setSampleLoading(false);
+    }
+  };
+
   const [marginInches, setMarginInches] = useState((existing?.layoutOverrides?.marginInches ?? template.layout.marginInches).toString());
   const [fontSizePt, setFontSizePt] = useState((existing?.layoutOverrides?.fontSizePt ?? template.layout.fontSizePt).toString());
   const [lineSpacing, setLineSpacing] = useState<"single" | "double">(existing?.layoutOverrides?.lineSpacing ?? template.layout.lineSpacing);
@@ -231,16 +257,45 @@ export default function NonJournalRequirementsPanel({
                 Section Structure
               </h3>
               <span className="text-[10px] font-mono px-2 py-0.5 bg-[#C08A3E]/10 text-[#C08A3E] border border-[#C08A3E]/30 rounded font-bold uppercase">
-                Default from {project.outputFormat || "format"} template
+                {sampleSourceFileName ? `Learned from: ${sampleSourceFileName}` : `Default from ${project.outputFormat || "format"} template`}
               </span>
             </div>
             <p className="text-xs text-gray-500 leading-relaxed">
-              One section per line, in order. Pre-populated from the standard structure for this format — edit freely.
+              One section per line, in order. Pre-populated from the standard structure for this format — edit freely,
+              or upload a sample document from your target journal to replace this with its real detected structure.
             </p>
+            <div className="flex items-center gap-3">
+              <input
+                ref={sampleFileInputRef}
+                type="file"
+                accept=".pdf,.docx,.txt,.md"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleSampleDocUpload(file);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => sampleFileInputRef.current?.click()}
+                disabled={sampleLoading}
+                className="px-3 py-1.5 bg-white hover:bg-[#FAF9F6] border border-dashed border-[#8C887F] disabled:opacity-50 text-[#5c564e] text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {sampleLoading ? "Learning Structure..." : "Learn From Sample Document"}
+              </button>
+            </div>
+            {sampleError && (
+              <p className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">{sampleError}</p>
+            )}
             <textarea
               rows={10}
               value={sectionStructureText}
-              onChange={(e) => setSectionStructureText(e.target.value)}
+              onChange={(e) => {
+                setSectionStructureText(e.target.value);
+                setSampleSourceFileName(null);
+              }}
               className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D] font-mono"
             />
           </div>

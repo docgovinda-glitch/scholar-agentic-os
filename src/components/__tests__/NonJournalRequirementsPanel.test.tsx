@@ -5,13 +5,19 @@
 // to characterize).
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import NonJournalRequirementsPanel from "../NonJournalRequirementsPanel";
 import { DEFAULT_STATE, PaperProject } from "../../types";
 
+const { mockLearnStructure } = vi.hoisted(() => ({ mockLearnStructure: vi.fn() }));
+vi.mock("../../services/sampleDocLearningService", () => ({
+  learnStructureFromSampleDocument: mockLearnStructure,
+}));
+
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
 });
 
 function renderPanel(overrides: Partial<PaperProject> = {}, updateProject = vi.fn(), onNext = vi.fn()) {
@@ -77,5 +83,55 @@ describe("NonJournalRequirementsPanel — save behavior", () => {
 
     const savedRules = updateProject.mock.calls[0][0].complianceRules;
     expect(savedRules.sectionStructure).toEqual(["Custom Intro", "Custom Body", "Custom Conclusion"]);
+  });
+});
+
+// Stage 7 (target-workflow.md) sample-document structure learning —
+// "independent alternative" to the template, "sample wins" if both present.
+describe("NonJournalRequirementsPanel — Stage 7 sample-document structure learning", () => {
+  function uploadFile(file: File) {
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+  }
+
+  it("replaces the section-structure textarea with the real detected structure from an uploaded sample, and updates the provenance badge", async () => {
+    mockLearnStructure.mockResolvedValue({
+      sectionStructure: ["Abstract", "Introduction", "Methodology", "Conclusion"],
+      sourceFileName: "target-journal-sample.pdf",
+    });
+    const { updateProject } = renderPanel();
+
+    uploadFile(new File(["fake bytes"], "target-journal-sample.pdf", { type: "application/pdf" }));
+
+    await waitFor(() => expect(screen.getByText(/Learned from: target-journal-sample.pdf/i)).toBeInTheDocument());
+    const textarea = screen.getAllByRole("textbox").find((el) => (el as HTMLTextAreaElement).value.includes("Abstract")) as HTMLTextAreaElement;
+    expect(textarea.value).toBe("Abstract\nIntroduction\nMethodology\nConclusion");
+
+    fireEvent.click(screen.getByText("Save & Proceed to Drafting →"));
+    const savedRules = updateProject.mock.calls[0][0].complianceRules;
+    expect(savedRules.sectionStructure).toEqual(["Abstract", "Introduction", "Methodology", "Conclusion"]);
+  });
+
+  it("shows an honest error message (not a fabricated fallback structure) when structure learning fails", async () => {
+    mockLearnStructure.mockRejectedValue(new Error("Could not detect any section structure in this document."));
+    renderPanel();
+
+    uploadFile(new File(["fake bytes"], "scanned.pdf", { type: "application/pdf" }));
+
+    expect(await screen.findByText(/Could not detect any section structure/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Learned from:/i)).not.toBeInTheDocument();
+  });
+
+  it("clears the 'Learned from' badge (reverting to the template default label) when the user manually edits the textarea after a successful upload", async () => {
+    mockLearnStructure.mockResolvedValue({ sectionStructure: ["Abstract", "Introduction"], sourceFileName: "sample.docx" });
+    renderPanel();
+    uploadFile(new File(["fake bytes"], "sample.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+    await waitFor(() => expect(screen.getByText(/Learned from: sample.docx/i)).toBeInTheDocument());
+
+    const textarea = screen.getAllByRole("textbox").find((el) => (el as HTMLTextAreaElement).value.includes("Abstract")) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "Abstract\nIntroduction\nManually Added Section" } });
+
+    expect(screen.queryByText(/Learned from:/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Default from term-paper template/i)).toBeInTheDocument();
   });
 });

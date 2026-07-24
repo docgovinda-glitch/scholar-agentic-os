@@ -12,6 +12,7 @@ import { PDFParser } from "./src/document_intelligence/parser/parsers/pdfParser.
 import { DOCXParser } from "./src/document_intelligence/parser/parsers/docxParser.ts";
 import { TXTParser } from "./src/document_intelligence/parser/parsers/txtParser.ts";
 import { MarkdownParser } from "./src/document_intelligence/parser/parsers/markdownParser.ts";
+import { detectHeadings } from "./src/document_intelligence/parser/headingDetection.ts";
 import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "./src/citation_compliance/model/reference.ts";
 import { CitationStyleRegistry, CitationFormatterFactory } from "./src/citation_compliance/formattingEngine.ts";
 import { APA7Formatter } from "./src/citation_compliance/formatters/apa7.ts";
@@ -702,8 +703,17 @@ app.post("/api/parse-file", parseFileLimit, async (req, res) => {
       text = extractPrintableStrings(buffer);
     }
 
+    // Stage 7 (target-workflow.md) sample-document structure learning: a
+    // real, deterministic heading-detection pass over the already-extracted
+    // text — never AI-inferred, never a fabricated structure. Only applied
+    // to real prose formats (txt/md/pdf/docx); citation-import formats
+    // (.bib/.ris) and tabular/data formats have no "section structure" to
+    // detect.
+    const headings = [".txt", ".md", ".markdown", ".pdf", ".docx"].includes(ext) ? detectHeadings(text) : [];
+
     return res.json({
       text: text.slice(0, 80000), // Protect local storage by truncating to 80k characters
+      headings,
       metadata: {
         fileName,
         fileSize: buffer.length,
