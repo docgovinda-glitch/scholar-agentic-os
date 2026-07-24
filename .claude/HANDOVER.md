@@ -1,6 +1,17 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-24, executor-fix + BYOK-vault + semantic-review-scoping session — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-24, ManuscriptWriter-real + AES-GCM session — supersedes the section below)
+
+**Two substantial tasks landed this session; stopped before Task 3 (semantic peer review build) to avoid rushing it — see docs/planning/semantic-peer-review-scoping.md for that plan, still fully open.**
+
+1. **ManuscriptWriterSkill made real — 🟢 done** (`6f68a9b`). Was `aiEnhanced: false` with every section a static template and `qualityScore`/`confidence` hardcoded to 0.85/0.9 regardless of input. Now each section (`src/agents/manuscriptWriter/sections/index.ts`) is AI-generated via the real AI Gateway only when real grounding text exists in the new `ManuscriptResearchContext`; otherwise it falls back to the exact same honest placeholder as before. Results/Discussion are a firm exception — never AI-generated from scratch, only from real already-drafted text. `qualityScore`/`confidence` are now a real, computed `sectionsGrounded/sections.length` ratio. New `src/services/manuscriptWriterAdapter.ts` (honest-mapping precedent from `integrityReviewAdapter.ts`) maps `PaperProject`'s real fields onto this shape — `CanonicalResearchProject.artifacts`' `*Id` references have no resolvable content anywhere in this codebase, so `artifacts` stays empty rather than fabricating unresolvable references. Wired into `ManuscriptDraftingWorkspace.tsx` as a new "Generate Full Draft (Agent)" button, additive alongside the untouched live `draftSection()` path — fills only currently-empty sections, never overwrites drafted/edited content. Live-verified with real API calls: real, topic-specific Introduction/Methodology text, Literature Review/Results correctly stayed the honest placeholder (4/8 sections grounded).
+2. **AES-GCM upgrade for the key vault — 🟢 done** (`0b7f189`). `getApiKey` is now async across all 8 provider adapters in `aiGateway.ts` — `decryptDataAsync` (Web Crypto AES-GCM, `"v2:"`-prefixed ciphertext) replaces the legacy synchronous XOR cipher. Confirmed the entire call-site list is self-contained to `aiGateway.ts` (no external callers anywhere). Each `getApiKey` wraps its decrypt in try/catch — a decrypt failure (wrong passphrase, or old pre-AES-GCM ciphertext) is treated as "no key configured," not a crash. `AISetupWizard.tsx`/`AIControlCenter.tsx` migrated their own key storage to the async ciphers. Breaking ciphertext-format change (same accepted tradeoff as the vault-passphrase migration two sessions ago) — keys saved under the old cipher must be re-entered once. Live-verified: real key's persisted ciphertext carries the `v2:` prefix, decrypts to the exact key with the correct vault passphrase, and **throws** (not silently garbles) with the wrong one — a stronger guarantee than the cipher it replaced.
+
+**Updated gap map**: `ManuscriptWriterAgent` is no longer "correctly not wired because it fabricates" — it's real and additively wired. The BYOK key vault now has both correct secret custody (prior session) AND a modern cipher (this session). Semantic peer review (Stage 10) remains scoped but entirely unbuilt — the next concrete piece of work, per `docs/planning/semantic-peer-review-scoping.md`'s step sequence (retrieval-first via `literatureRetrievalService`, additive fields on `IntegrityReviewReport`, mandatory per-finding citation, respecting the "do not attempt" list).
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-24, executor-fix + BYOK-vault + semantic-review-scoping session)
 
 **All four tasks landed this session** (three shipped as code/decisions, one scoped as a plan):
 
