@@ -59,6 +59,40 @@ describe("IntegrityReviewerSkill — manuscriptText pattern checks (real behavio
     expect(result.data.detectedIssues.find((i) => i.id === "ip-placeholder-1")).toBeUndefined();
   });
 
+  // Agent-UI adapter Step 2b live verification surfaced this: LiteratureReviewSkill's
+  // real identifyGaps() (literatureReviewSkill.ts) never sets ResearchGap.evidenceSupport
+  // (it's optional, per literatureReview.ts's type) — reviewLiteratureReview here
+  // assumed it was always an array and crashed with "Cannot read properties of
+  // undefined (reading 'length')" the first time a real end-to-end pipeline run
+  // reached this skill with real literatureReview data, not a hand-built test fixture.
+  it("does not crash when a researchGap's evidenceSupport is undefined (real literatureReviewSkill shape)", async () => {
+    const skill = new IntegrityReviewerSkill();
+
+    const result = await skill.execute(
+      {
+        literatureReview: {
+          executiveSummary: "",
+          keyFindings: [],
+          themes: [],
+          evidenceMap: { methodologyDistribution: {} as any, yearDistribution: {}, journalDistribution: {} },
+          researchGaps: [{ id: "gap-1", description: "A gap", relatedThemes: [], suggestedSearchTerms: [] }],
+          conflictingFindings: [],
+          recommendedPapers: [],
+          recommendedJournals: [],
+          recommendedSearchTerms: [],
+          confidence: 0.5,
+          assumptions: [],
+          diagnostics: { localStudies: 0, webStudies: 0, duplicatesRemoved: 0, avgEvidenceQuality: "medium" },
+        },
+      },
+      context()
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.detectedIssues.find((i) => i.id === "ip-lit-gap-0")).toMatchObject({ severity: "medium" });
+  });
+
   it("flags a missing ethics/IRB/informed-consent disclosure as an informational issue", async () => {
     const skill = new IntegrityReviewerSkill();
     const text = "=== SECTION: Methods ===\nWe surveyed participants about their experiences.";

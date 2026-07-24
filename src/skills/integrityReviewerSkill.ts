@@ -153,7 +153,7 @@ export class IntegrityReviewerSkill implements Skill<IntegrityReviewerInput, Int
     const issues: IntegrityIssue[] = [];
 
     review.researchGaps.forEach((gap, i) => {
-      if (gap.evidenceSupport.length < 3) {
+      if ((gap.evidenceSupport ?? []).length < 3) {
         issues.push({
           id: "ip-lit-gap-" + i,
           severity: "medium",

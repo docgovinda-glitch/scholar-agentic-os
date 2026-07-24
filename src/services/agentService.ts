@@ -61,7 +61,10 @@ skillRegistry.register(new IntegrityReviewerSkill());
 skillRegistry.register(new ManuscriptWriterSkill());
 skillRegistry.register(new HumanizeSkill());
 
-function createAgentContext(): AgentContext {
+/** The one real AgentContext builder — real runSkill wired to the same SkillRegistry
+ *  every agent uses. Exported so src/agents/pipeline.ts (the multi-agent orchestrator)
+ *  can reuse this exact context instead of standing up a second one. */
+export function createAgentContext(): AgentContext {
   return {
     log: (level, ...args) => console[level === "debug" ? "log" : level](`[Agent]`, ...args),
     config: {},
