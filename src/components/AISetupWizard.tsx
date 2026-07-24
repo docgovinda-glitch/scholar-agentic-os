@@ -12,8 +12,28 @@ interface AISetupWizardProps {
   passcodeHash: string;
 }
 
+// Stage 2 (target-workflow.md) — 5-tier BYOK model (docs/planning/ai-gateway.md).
+// Concretely, per that doc: tiers differ in *where compute runs and who pays*,
+// not in model class. Only 3 are a real selectable technical flow here:
+// - Tier 1 (+5a, mechanically identical): local router (Ollama/custom), no key, free.
+// - Tier 2: free-tier BYOK — cloud providers with pricingTier "freemium" (Gemini today).
+// - Tier 3: heavy BYOK — cloud providers with pricingTier "paid" (OpenAI, Claude, etc.).
+// Tier 4 (affiliate-linked subscription) is explicitly NOT a technical AI-calling
+// tier per the doc — it's a sponsored-placement signup flow (sponsored-placements.md),
+// shown here only as an informational, non-selectable "coming soon" card.
+// Tier 5b (in-browser WebGPU/WASM inference) is explicitly experimental/lower-priority
+// per the doc and is not built here.
+type AiTier = "local" | "free-byok" | "heavy-byok";
+
+function providerMatchesTier(provider: AIProviderInfo, tier: AiTier): boolean {
+  if (tier === "local") return provider.type === "local";
+  if (tier === "free-byok") return provider.type === "cloud" && provider.pricingTier === "freemium";
+  return provider.type === "cloud" && provider.pricingTier === "paid";
+}
+
 export default function AISetupWizard({ project, updateProject, onComplete, onBack, passcodeHash }: AISetupWizardProps) {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
+  const [selectedTier, setSelectedTier] = useState<AiTier | null>(null);
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
   const [settings, setSettings] = useState<AISettings>(project.aiSettings || { provider: 'auto', fallbackOrder: [] });
   const [isDetecting, setIsDetecting] = useState(true);
@@ -138,24 +158,95 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     }
   };
 
+  const TIER_CARDS: { id: AiTier; label: string; description: string; icon: React.ReactNode }[] = [
+    {
+      id: "local",
+      label: "Local Router",
+      description: "Free, no sign-up, no API key. Run models on your own machine (Ollama, LM Studio, or a custom local server) — completely private, zero cost.",
+      icon: <Server className="w-6 h-6" />,
+    },
+    {
+      id: "free-byok",
+      label: "Free-Tier BYOK",
+      description: "Free signup required. Bring your own API key from a provider with a usable free tier (currently Google Gemini).",
+      icon: <Key className="w-6 h-6" />,
+    },
+    {
+      id: "heavy-byok",
+      label: "Heavy BYOK",
+      description: "You pay your provider directly. Bring your own paid-tier API key (OpenAI, Anthropic, DeepSeek, Qwen, Cohere) for full-capability access.",
+      icon: <Cloud className="w-6 h-6" />,
+    },
+  ];
+
+  const renderStep0 = () => (
+    <div className="space-y-6 animate-fade-in">
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold font-serif text-[#1A365D] mb-3">Choose Your AI Access Tier</h2>
+        <p className="text-[#6B665E] max-w-2xl mx-auto text-sm">
+          You bring your own AI access — pick how you want to connect. You can change this later in AI Settings.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {TIER_CARDS.map((tier) => (
+          <div
+            key={tier.id}
+            onClick={() => {
+              setSelectedTier(tier.id);
+              setStep(1);
+            }}
+            className="p-5 rounded-xl border cursor-pointer transition-all duration-300 bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/50 hover:bg-white"
+          >
+            <div className="text-[#C08A3E] mb-3">{tier.icon}</div>
+            <h4 className="font-bold text-[#1A365D] text-sm mb-2">{tier.label}</h4>
+            <p className="text-xs text-gray-500 leading-relaxed">{tier.description}</p>
+          </div>
+        ))}
+
+        {/* Tier 4 (affiliate-linked subscription) is a sponsored-placement signup
+            flow, not a technical AI-calling mechanism (see ai-gateway.md §4) —
+            shown here as an informational, non-selectable card only. */}
+        <div className="p-5 rounded-xl border border-dashed border-gray-250 bg-gray-50 opacity-70 cursor-not-allowed">
+          <div className="text-gray-400 mb-3">
+            <Zap className="w-6 h-6" />
+          </div>
+          <h4 className="font-bold text-gray-500 text-sm mb-2">Affiliate Subscription <span className="text-[10px] font-mono uppercase">(Coming Soon)</span></h4>
+          <p className="text-xs text-gray-400 leading-relaxed">
+            Get AI access without configuring your own key, via a partnered subscription offer.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderStep1 = () => (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold font-serif text-[#1A365D] mb-3">Initialize AI Intelligence</h2>
         <p className="text-[#6B665E] max-w-2xl mx-auto text-sm">
-          The Doctoral Assistant requires an AI engine to analyze your dissertation and draft the journal article. 
+          The Doctoral Assistant requires an AI engine to analyze your dissertation and draft the journal article.
           Select one or more providers below. We will automatically route requests to the best available model.
         </p>
+        {selectedTier && (
+          <button
+            onClick={() => setStep(0)}
+            className="mt-3 text-xs text-[#C08A3E] hover:text-[#A87630] font-mono underline cursor-pointer"
+          >
+            ← Change Tier
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Cloud Providers */}
+        {/* Cloud Providers — hidden entirely when the "local" tier is selected */}
+        {selectedTier !== "local" && (
         <div className="space-y-4">
           <h3 className="text-lg font-serif font-bold text-[#1A365D] flex items-center gap-2">
             <Cloud className="text-[#C08A3E]" /> Cloud AI Providers
           </h3>
           <div className="grid gap-3">
-            {AI_PROVIDERS.filter(p => p.type === 'cloud').map(provider => (
+            {AI_PROVIDERS.filter(p => p.type === 'cloud').filter(p => !selectedTier || providerMatchesTier(p, selectedTier)).map(provider => (
               <div 
                 key={provider.id}
                 onClick={() => handleProviderToggle(provider.id)}
@@ -191,8 +282,10 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             ))}
           </div>
         </div>
+        )}
 
-        {/* Local Servers */}
+        {/* Local Servers — hidden entirely when a BYOK (cloud) tier is selected */}
+        {(!selectedTier || selectedTier === "local") && (
         <div className="space-y-4">
           <h3 className="text-lg font-serif font-bold text-[#1A365D] flex items-center gap-2">
             <Server className="text-[#C08A3E]" /> Local AI Servers
@@ -242,6 +335,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             })}
           </div>
         </div>
+        )}
       </div>
 
       <div className="flex justify-between items-center pt-8 border-t border-gray-150">
@@ -493,7 +587,8 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   return (
     <div className="w-full text-[#1A365D] font-sans selection:bg-[#1A365D] selection:text-white">
       <div className="w-full max-w-4xl mx-auto space-y-6">
-        {/* Progress Tracker (Sub-steps for Step 2) */}
+        {/* Progress Tracker — only shown once a tier is picked (step > 0); the tier-selection screen itself isn't part of this 3-step tracker. */}
+        {step > 0 && (
         <div className="flex items-center justify-center">
           <div className="flex items-center gap-3">
             {[1, 2, 3].map(num => (
@@ -514,9 +609,11 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             ))}
           </div>
         </div>
+        )}
 
         {/* Wizard Content Card */}
         <div className="bg-white/95 border border-[#E2E8F0] rounded-3xl shadow-xl p-8 md:p-10 space-y-6">
+          {step === 0 && renderStep0()}
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
