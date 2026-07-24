@@ -1,8 +1,15 @@
 /**
  * Manuscript Writer Agent
  *
- * Generates complete academic manuscripts from CRPM.
- * CRPM is the ONLY source of truth.
+ * Generates complete academic manuscripts from CRPM (identity, keywords,
+ * reference IDs). Task 1 (2026-07-24 follow-up session): CRPM's `artifacts`
+ * only ever carried opaque *Id string references (see AgentOutputs in
+ * core/project/projectTypes.ts) with no ID -> content store anywhere in this
+ * codebase to resolve them — so real section drafting also needs
+ * ManuscriptWriterInput.researchContext, real resolved text the
+ * PaperProject -> CanonicalResearchProject adapter
+ * (src/services/manuscriptWriterAdapter.ts) supplies alongside the CRPM
+ * object. See ManuscriptResearchContext's comment in interfaces.ts.
  */
 
 import type { Agent, AgentContext, AgentResult, ExecutionMode, AgentMetadata } from "../types";

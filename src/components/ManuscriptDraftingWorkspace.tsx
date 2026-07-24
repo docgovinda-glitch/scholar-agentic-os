@@ -27,6 +27,9 @@ import {
   Edit3
 } from "lucide-react";
 import { draftSection as aiDraftSection, buildBibliography } from "../services/aiService";
+import { executeAgent } from "../services/agentService";
+import { buildManuscriptWriterInput } from "../services/manuscriptWriterAdapter";
+import type { ManuscriptDraft } from "../agents/manuscriptWriter/interfaces";
 import ManuscriptPDFViewer from "./ManuscriptPDFViewer";
 
 interface ManuscriptDraftingWorkspaceProps {
@@ -77,6 +80,9 @@ export default function ManuscriptDraftingWorkspace({
   const [showHistory, setShowHistory] = useState(false);
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [autoAdvanceBanner, setAutoAdvanceBanner] = useState<string | null>(null);
+  const [agentDraftLoading, setAgentDraftLoading] = useState(false);
+  const [agentDraftError, setAgentDraftError] = useState<string | null>(null);
+  const [agentDraftSummary, setAgentDraftSummary] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<"edit" | "preview" | "chat">("edit");
   const [chatMessages, setChatMessages] = useState<Array<{ id: string; role: "user" | "assistant"; content: string; timestamp: string }>>([]);
   const [chatInput, setChatInput] = useState("");
@@ -318,6 +324,75 @@ export default function ManuscriptDraftingWorkspace({
       setError(err.message || "An error occurred during section co-drafting. Check your API settings.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Task 1 (2026-07-24 follow-up session) — additive alternate path alongside
+  // draftSection() above, not a replacement. draftSection() drafts one
+  // section at a time with rich grounding (Knowledge Vault, verified
+  // bibliography, locked-section continuity, style/scripture options).
+  // ManuscriptWriterAgent instead generates ALL sections in one pass, each
+  // AI-grounded only where real research context exists (see
+  // src/agents/manuscriptWriter/sections/index.ts) — useful as a fast first
+  // pass, not a replacement for draftSection()'s richer per-section control.
+  // Only ever fills currently-EMPTY sections whose name matches one of the
+  // agent's fixed section ids — never overwrites anything already drafted or
+  // user-edited, and never touches sections it can't confidently match by name.
+  const SECTION_NAME_KEYWORDS: Record<string, string[]> = {
+    abstract: ["abstract"],
+    introduction: ["introduction"],
+    "literature-review": ["literature", "related work"],
+    methodology: ["methodology", "methods", "conceptual", "ethical framework"],
+    results: ["results", "analysis"],
+    discussion: ["discussion"],
+    conclusion: ["conclusion"],
+  };
+
+  const generateFullDraftWithAgent = async () => {
+    setAgentDraftLoading(true);
+    setAgentDraftError(null);
+    setAgentDraftSummary(null);
+    try {
+      const input = buildManuscriptWriterInput(project);
+      const result = await executeAgent("manuscript-writer", input);
+      if (!result.ok) {
+        setAgentDraftError(result.error?.message || "Full-draft generation failed.");
+        return;
+      }
+      const draft = result.data as ManuscriptDraft;
+      const updatedSections = { ...project.sections };
+      const filled: string[] = [];
+
+      for (const sectionName of sectionsList) {
+        if (updatedSections[sectionName]?.trim()) continue;
+        const lower = sectionName.toLowerCase();
+        const matchedId = Object.entries(SECTION_NAME_KEYWORDS).find(([, keywords]) =>
+          keywords.some((k) => lower.includes(k))
+        )?.[0];
+        if (!matchedId) continue;
+        const section = draft.sections.find((s) => s.id === matchedId);
+        if (section?.content) {
+          updatedSections[sectionName] = section.content;
+          filled.push(sectionName);
+        }
+      }
+
+      if (filled.length === 0) {
+        setAgentDraftSummary("No empty sections matched the agent's output — nothing was changed.");
+        return;
+      }
+
+      saveVersion("Full draft generated via Manuscript Writer Agent");
+      updateProject({ sections: updatedSections });
+      setAgentDraftSummary(
+        `Filled ${filled.length} empty section(s): ${filled.join(", ")}. ` +
+        `Grounded ${draft.diagnostics.sectionsGrounded}/${draft.diagnostics.sectionsGenerated} sections in real research context (${Math.round(draft.qualityScore * 100)}%).`
+      );
+    } catch (err: any) {
+      console.error(err);
+      setAgentDraftError(err.message || "An error occurred running the Manuscript Writer Agent.");
+    } finally {
+      setAgentDraftLoading(false);
     }
   };
 
@@ -949,6 +1024,24 @@ export default function ManuscriptDraftingWorkspace({
                   <Sparkles className="w-3.5 h-3.5 text-[#C08A3E]" />
                   Skip & Pre-Compile Offline
                 </button>
+                <button
+                  onClick={generateFullDraftWithAgent}
+                  disabled={agentDraftLoading}
+                  title="Generates all sections at once via the Manuscript Writer Agent, filling only sections that are currently empty — never overwrites anything already drafted."
+                  className="w-full py-2.5 bg-white hover:bg-[#FAF9F6] border border-dashed border-[#8C887F] disabled:opacity-50 text-[#5c564e] text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer font-mono uppercase tracking-wider"
+                >
+                  {agentDraftLoading ? (
+                    <><RefreshCcw className="w-3.5 h-3.5 animate-spin" />Generating Full Draft...</>
+                  ) : (
+                    <><Layers className="w-3.5 h-3.5 text-[#C08A3E]" />Generate Full Draft (Agent)</>
+                  )}
+                </button>
+                {agentDraftError && (
+                  <p className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">{agentDraftError}</p>
+                )}
+                {agentDraftSummary && (
+                  <p className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2">{agentDraftSummary}</p>
+                )}
               </div>
             </div>
 

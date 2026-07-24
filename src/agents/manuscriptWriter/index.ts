@@ -5,7 +5,7 @@
  */
 
 // Interfaces
-export type { ManuscriptDraft, ManuscriptSection, ManuscriptTemplate, ManuscriptWriterInput } from "./interfaces";
+export type { ManuscriptDraft, ManuscriptSection, ManuscriptTemplate, ManuscriptWriterInput, ManuscriptResearchContext } from "./interfaces";
 
 // Agent
 export { ManuscriptWriterAgent } from "./writer";
