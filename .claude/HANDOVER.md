@@ -1,6 +1,23 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-24, ManuscriptWriter-real + AES-GCM session — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-24, semantic peer review build session — supersedes the section below)
+
+**Task 1 (the only task, per instruction — substantial enough to be the whole session): semantic peer review built — 🟢 done** (`1b5a319`), following `docs/planning/semantic-peer-review-scoping.md`'s step sequence exactly.
+
+- New, additive `comparableSourceAnalysis: ComparableSourceAnalysis | null` on `IntegrityReviewReport` (`src/agents/integrityReviewer.ts`) — `structuralCompleteness` and everything else on the existing report is untouched.
+- Retrieval-first (`integrityReviewerSkill.ts`'s new `buildComparableSourceAnalysis`): derives a real query from real `title`/`keywords` (new, honest fields on `IntegrityReviewerInput`), falling back to `literatureReview.recommendedSearchTerms` if present; calls the same real `literatureRetrievalService.discoverLiterature()` `discoverDataSources()` already uses — no new retrieval logic invented.
+- AI layer only runs once real comparable papers are in hand, restricted to comparative citation-engagement questions ("does the manuscript engage with paper N") — the system instruction explicitly forbids commenting on scientific quality/rigor/novelty/publishability or claiming to detect plagiarism/data fabrication, per the scoping doc's "do not attempt" list.
+- Every finding's `citedPaper` is looked up by the skill from the real retrieved-papers array by index — the model only ever supplies an integer index in its JSON output, never a title/url we'd have to trust — so a finding can never cite a paper that wasn't actually retrieved.
+- Honest fallbacks throughout: `null` when there's nothing to search with; a disclosed `note` when retrieval fails or finds nothing; empty `findings` (never fabricated) when the AI call or JSON parsing fails.
+- `integrityReviewerSkill.ts` is now `aiEnhanced: true` / `offlineCapable: false` (accurately — this addition makes real network+AI calls); the structural scan remains fully deterministic on its own, and `executiveSummary` keeps both layers legible as separate, per the scoping doc's step 6.
+- `integrityReviewAdapter.ts` and `pipeline.ts`'s integrity call site both now supply real `title`/`keywords`/`aiSettings` — meaning the existing "Run Integrity & Ethics Review" button in `QualityControlSuite.tsx` now also runs this comparison whenever a project has a real title set, additive to its prior structural-scan-only behavior. `QualityControlSuite.tsx` renders findings with links to their real cited papers, or the honest note when nothing was available to compare.
+- Live-verified with real API calls: real Crossref/PubMed papers retrieved for a real project (some topically noisy — e.g. "Otosclerosis," "Acute Tonsillitis" — an honest reflection of real-world keyword-based retrieval limits, not a bug), correct citation-engagement findings for both an irrelevant real paper (no engagement) and a genuinely relevant real paper (real engagement correctly identified — "Ancient Wisdom for Modern Finance: Integrating Indian Knowledge Systems..."), every finding linked to a real, resolvable DOI URL (confirmed by following the link).
+
+**Updated gap map**: Stage 10 (Publication Preparation / integrity review) now has both halves live — the deterministic structural/completeness scan (prior sessions) AND a genuinely literature-grounded semantic comparison layer (this session), the last item on the fabrication-audit-adjacent side of this project. Nothing scoped in `docs/planning/semantic-peer-review-scoping.md` remains unbuilt from its recommended step sequence. Remaining known gaps going forward: `ManuscriptWriterAgent`'s AES-GCM-equivalent cipher work is done; the "do not attempt" list (plagiarism detection, accept/reject verdicts, data-authenticity claims) remains intentionally, permanently out of scope — not a future task, a hard boundary.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-24, ManuscriptWriter-real + AES-GCM session)
 
 **Two substantial tasks landed this session; stopped before Task 3 (semantic peer review build) to avoid rushing it — see docs/planning/semantic-peer-review-scoping.md for that plan, still fully open.**
 
