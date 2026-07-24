@@ -1,6 +1,24 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-24, agent-UI adapter build session — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-24, executor-fix + follow-up session — in progress, supersedes the section below)
+
+**Task 1 done**: `AgentExecutor.execute()`'s silent `ok:true`-on-failure bug fixed (`0b1dffd`) — see commit and characterization test (`src/agents/__tests__/executor.test.ts`) for detail. `src/agents/pipeline.ts`'s workaround (bypassing `AgentExecutor` entirely) removed now that it's unnecessary; every pipeline stage routes through the real, fixed executor with `maxRetries: 1` pinned per stage (deliberate — see commit message for why the default retry behavior wasn't adopted wholesale).
+
+**Task 2 decision: `ManuscriptWriterAgent` NOT wired in, after investigation — this is a considered "don't," not an oversight.**
+
+Scoped before writing any code (per this session's own instruction to check what the agent actually does differently from `draftSection` first). Findings:
+- `ManuscriptWriterAgent` (`src/agents/manuscriptWriter/writer.ts`) is a thin dispatcher to `context.runSkill("manuscript-writing", ...)` — real wiring, but only as capable as the skill underneath.
+- `ManuscriptWriterSkill` (`src/skills/manuscriptWriterSkill.ts:40`) is explicitly `aiEnhanced: false` — it makes no AI call at all. Its section builders (`src/skills/manuscriptWriter/sections/index.ts`) return static template strings ("This study addresses the research questions outlined in the project," "Results will be presented here after data collection...", etc.), and `qualityScore: 0.85` / `confidence: 0.9` are hardcoded constants, not computed from anything.
+- `draftSection` (`aiService.ts:854-983`), the real live path `ManuscriptDraftingWorkspace.tsx` uses today, is a genuine AI-drafting pipeline: grounding-map context, Knowledge Vault integration, verified-bibliography reuse, locked-section continuity, an actual AI Gateway call, optional humanize pass.
+- `ManuscriptWriterInput.project` also requires a `CanonicalResearchProject` (`src/core/project/projectModel.ts`) — a different domain model from `PaperProject` — with no existing adapter between them.
+
+Wiring this into the live UI as-is, even as an additive button (the pattern used for `QualityControlSuite.tsx`'s "Run Full Pipeline" last session), would present static placeholder prose and fabricated confidence numbers as if they were a real AI-generated draft — directly against this project's own anti-fabrication principle, the same class of problem the fabrication audit spent multiple sessions fixing elsewhere. Unlike the QC suite precedent (where the additive path added genuinely working logic), this would be a regression dressed up as a feature.
+
+**Not done, deliberately, and flagged for whoever picks this up next**: no code touched in `ManuscriptDraftingWorkspace.tsx` (zero blast radius) or `manuscriptWriterSkill.ts`. Before any future wiring attempt: (1) `ManuscriptWriterSkill` needs real AI-backed section generation (`aiEnhanced: true`, an actual `AIGateway` call per section, mirroring `draftSection`'s grounding assembly) instead of static templates, or at minimum the agent needs to be honestly relabeled as a skeleton/outline generator with `qualityScore`/`confidence` removed rather than fabricated; and (2) a real `PaperProject → CanonicalResearchProject` adapter needs to be built and tested, the same honest-mapping discipline used for `integrityReviewAdapter.ts`.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-24, agent-UI adapter build session)
 
 **Four tasks this session, all landed**: Stage 8 formattingRules gap fix, the full 3-step agent-UI adapter build (2a/2b/2c), and the `draftSectionStream` dead-code decision.
 
