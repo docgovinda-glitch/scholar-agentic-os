@@ -75,6 +75,15 @@ export interface ComplianceRules {
   referencesRequirement: string;
   ethicalDisclosure: string;
   coverLetterNecessity: string;
+  // Stage 8 (target-workflow.md) structured requirements for non-journal
+  // formats — optional because the journal path (ComplianceChecklistPanel)
+  // doesn't set these, only the free-text wordCountGoal above. When set,
+  // these are the real numeric target; wordCountGoal is kept in sync as a
+  // display string for anything already reading the free-text field.
+  wordCountMin?: number;
+  wordCountMax?: number;
+  /** Free-text institution/instructor-specific rules not covered by the structured fields above. */
+  customNotes?: string;
 }
 
 // Stage 9 (target-workflow.md) — AI-use disclosure, distinct from

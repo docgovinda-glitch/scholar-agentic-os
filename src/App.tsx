@@ -6,6 +6,7 @@ import GroundingMapDisplay from "./components/GroundingMapDisplay";
 import DataDiscoveryPanel from "./components/DataDiscoveryPanel";
 import JournalDiscoveryPanel from "./components/JournalDiscoveryPanel";
 import ComplianceChecklistPanel from "./components/ComplianceChecklistPanel";
+import NonJournalRequirementsPanel from "./components/NonJournalRequirementsPanel";
 import ManuscriptDraftingWorkspace from "./components/ManuscriptDraftingWorkspace";
 import QualityControlSuite from "./components/QualityControlSuite";
 import QCBasedRedraftingSuite from "./components/QCBasedRedraftingSuite";
@@ -767,12 +768,21 @@ function App() {
                   />
                 )}
                 {project.currentPhase === "E" && (
-                  <ComplianceChecklistPanel
-                    project={project}
-                    updateProject={updateProject}
-                    onNext={navigateNext}
-                    onBack={navigateBack}
-                  />
+                  project.outputFormat === "journal-article" || !project.outputFormat ? (
+                    <ComplianceChecklistPanel
+                      project={project}
+                      updateProject={updateProject}
+                      onNext={navigateNext}
+                      onBack={navigateBack}
+                    />
+                  ) : (
+                    <NonJournalRequirementsPanel
+                      project={project}
+                      updateProject={updateProject}
+                      onNext={navigateNext}
+                      onBack={navigateBack}
+                    />
+                  )
                 )}
                 {project.currentPhase === "F" && (
                   <ManuscriptDraftingWorkspace

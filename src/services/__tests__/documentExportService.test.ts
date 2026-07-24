@@ -28,6 +28,7 @@ vi.mock("pdfmake/build/pdfmake", () => ({
   default: { createPdf: mockCreatePdf, addFontContainer: mockAddFontContainer, fonts: {} },
 }));
 vi.mock("pdfmake/build/standard-fonts/Times.js", () => ({ default: { vfs: {}, fonts: {} } }));
+vi.mock("pdfmake/build/standard-fonts/Helvetica.js", () => ({ default: { vfs: {}, fonts: {} } }));
 
 import { buildExportDocumentModel, exportToDocx, exportToPdf } from "../documentExportService";
 
@@ -141,6 +142,72 @@ describe("buildExportDocumentModel", () => {
   it("Stage 9: disclosureText is null when no aiUseDisclosure exists at all", () => {
     const project: PaperProject = { ...DEFAULT_STATE("tester") };
     expect(buildExportDocumentModel(project).disclosureText).toBeNull();
+  });
+
+  it("Stage 7: uses the term-paper template's section structure (no abstract) when outputFormat is 'term-paper' and complianceRules isn't set", () => {
+    const project: PaperProject = {
+      ...DEFAULT_STATE("tester"),
+      outputFormat: "term-paper",
+      sections: { Introduction: "Intro.", "Body / Discussion": "Body.", Conclusion: "Conclusion." },
+    };
+
+    const model = buildExportDocumentModel(project);
+    expect(model.bodySections.map((s) => s.heading)).toEqual(["Introduction", "Body / Discussion", "Conclusion"]);
+    expect(model.layout.lineSpacing).toBe("double");
+    expect(model.layout.docxFontFamily).toBe("Times New Roman");
+    expect(model.hasReferences).toBe(true);
+  });
+
+  it("Stage 7: uses the report template's section structure and single-spaced sans-serif layout", () => {
+    const project: PaperProject = {
+      ...DEFAULT_STATE("tester"),
+      outputFormat: "report",
+      sections: { "Executive Summary": "Summary.", "Body / Findings": "Findings." },
+    };
+
+    const model = buildExportDocumentModel(project);
+    expect(model.bodySections.map((s) => s.heading)).toEqual(["Executive Summary", "Body / Findings"]);
+    expect(model.layout.lineSpacing).toBe("single");
+    expect(model.layout.docxFontFamily).toBe("Arial");
+    expect(model.layout.pdfFontFamily).toBe("Helvetica");
+  });
+
+  it("Stage 7: newspaper-article template has hasReferences: false", () => {
+    const project: PaperProject = { ...DEFAULT_STATE("tester"), outputFormat: "newspaper-article" };
+    const model = buildExportDocumentModel(project);
+    expect(model.hasReferences).toBe(false);
+  });
+
+  it("Stage 7: complianceRules.sectionStructure (real Stage 8 data) overrides the format template's default when both are present", () => {
+    const project: PaperProject = {
+      ...DEFAULT_STATE("tester"),
+      outputFormat: "term-paper",
+      complianceRules: { wordCountGoal: "", citationStyle: "", formattingRules: [], sectionStructure: ["Custom Section"], abstractRequirements: "", referencesRequirement: "", ethicalDisclosure: "", coverLetterNecessity: "" },
+      sections: { "Custom Section": "Real content." },
+    };
+
+    const model = buildExportDocumentModel(project);
+    expect(model.bodySections.map((s) => s.heading)).toEqual(["Custom Section"]);
+  });
+
+  it("Stage 8: referencesHeading is 'Works Cited' for MLA, 'Bibliography' for Chicago, and 'References' otherwise", () => {
+    const mla: PaperProject = { ...DEFAULT_STATE("tester"), complianceRules: { wordCountGoal: "", citationStyle: "MLA 9th", formattingRules: [], sectionStructure: [], abstractRequirements: "", referencesRequirement: "", ethicalDisclosure: "", coverLetterNecessity: "" } };
+    const chicago: PaperProject = { ...DEFAULT_STATE("tester"), complianceRules: { wordCountGoal: "", citationStyle: "Chicago", formattingRules: [], sectionStructure: [], abstractRequirements: "", referencesRequirement: "", ethicalDisclosure: "", coverLetterNecessity: "" } };
+    const apa: PaperProject = { ...DEFAULT_STATE("tester"), complianceRules: { wordCountGoal: "", citationStyle: "APA 7th", formattingRules: [], sectionStructure: [], abstractRequirements: "", referencesRequirement: "", ethicalDisclosure: "", coverLetterNecessity: "" } };
+    const noStyle: PaperProject = { ...DEFAULT_STATE("tester") };
+
+    expect(buildExportDocumentModel(mla).referencesHeading).toBe("Works Cited");
+    expect(buildExportDocumentModel(chicago).referencesHeading).toBe("Bibliography");
+    expect(buildExportDocumentModel(apa).referencesHeading).toBe("References");
+    expect(buildExportDocumentModel(noStyle).referencesHeading).toBe("References");
+  });
+
+  it("Stage 8: exposes a real wordCountTarget from complianceRules.wordCountMin/Max, or null when unset", () => {
+    const withTarget: PaperProject = { ...DEFAULT_STATE("tester"), complianceRules: { wordCountGoal: "3000 words", citationStyle: "APA 7th", formattingRules: [], sectionStructure: [], abstractRequirements: "", referencesRequirement: "", ethicalDisclosure: "", coverLetterNecessity: "", wordCountMin: 2500, wordCountMax: 3000 } };
+    const withoutTarget: PaperProject = { ...DEFAULT_STATE("tester") };
+
+    expect(buildExportDocumentModel(withTarget).wordCountTarget).toEqual({ min: 2500, max: 3000 });
+    expect(buildExportDocumentModel(withoutTarget).wordCountTarget).toBeNull();
   });
 
   it("falls back to the default academic section structure when complianceRules isn't set", () => {

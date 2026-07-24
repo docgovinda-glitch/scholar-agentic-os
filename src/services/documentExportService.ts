@@ -28,28 +28,14 @@ import { PaperProject } from "../types";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import pdfMake from "pdfmake/build/pdfmake";
 // pdfmake's browser build doesn't bundle standard-14 AFM metrics by default
-// (only Roboto, in build/fonts) — this separate module supplies the actual
-// vfs entries + font-family mapping pdfmake needs to lay out "Times" text.
-// Without registering it, createPdf() throws "File 'data/Times-Bold.afm' not
-// found in virtual file system" the first time a Times run is measured.
+// (only Roboto, in build/fonts) — these separate modules supply the actual
+// vfs entries + font-family mapping pdfmake needs to lay out Times/Helvetica
+// text. Without registering the right one, createPdf() throws "File
+// 'data/Times-Bold.afm' not found in virtual file system" (or the Helvetica
+// equivalent) the first time a run in that font is measured.
 import timesFontContainer from "pdfmake/build/standard-fonts/Times.js";
-
-// ─── Shared document model ───────────────────────────────────────────────
-
-const DEFAULT_SECTION_STRUCTURE = [
-  "Title Page",
-  "Abstract & Keywords",
-  "Introduction",
-  "Literature Review / Related Work",
-  "Conceptual / Ethical Framework",
-  "Methodology / Methods",
-  "Results / Analysis",
-  "Discussion (including ethical implications and limitations)",
-  "Conclusion",
-  "Declarations (Funding, Conflicts of Interest, Ethical Approval, Consent, Data Availability)",
-  "References",
-  "Appendices (if applicable)",
-];
+import helveticaFontContainer from "pdfmake/build/standard-fonts/Helvetica.js";
+import { getDocumentTemplate, DocumentLayout } from "../config/documentTemplates";
 
 export interface ExportBodySection {
   heading: string;
@@ -72,6 +58,31 @@ export interface ExportDocumentModel {
   references: ExportReference[];
   /** Stage 9 confirmed AI-use disclosure text, or null if not yet confirmed — never included unconfirmed. */
   disclosureText: string | null;
+  /** Stage 7 per-format page layout (margins/font/spacing) — see src/config/documentTemplates.ts. */
+  layout: DocumentLayout;
+  /** Stage 7 — whether this format conventionally includes a References section (false for newspaper-article). */
+  hasReferences: boolean;
+  /** Stage 8 — citation-style-appropriate heading ("Works Cited" for MLA, "Bibliography" for Chicago, "References" otherwise). */
+  referencesHeading: string;
+  /** Stage 8 — real word-count target from complianceRules.wordCountMin/Max, or null when not set. Display-only — never enforced at export time. */
+  wordCountTarget: { min?: number; max?: number } | null;
+}
+
+/**
+ * Citation-style-appropriate heading for the reference list. This is the
+ * honest limit of what "citation style affects formatting" can mean here:
+ * DiscoveredDataSource carries no structured author/year metadata (just
+ * name/url/type/relevance/reliability/limitations), so per-entry citation
+ * formatting (e.g. real APA author-date format) isn't derivable without
+ * fabricating structure that doesn't exist — only the section's own heading
+ * name genuinely differs by convention (MLA's "Works Cited" vs. Chicago's
+ * "Bibliography" vs. everything else's "References").
+ */
+function referencesHeadingFor(citationStyle: string | undefined): string {
+  const s = (citationStyle || "").toLowerCase();
+  if (s.includes("mla")) return "Works Cited";
+  if (s.includes("chicago")) return "Bibliography";
+  return "References";
 }
 
 function isTitlePageKey(key: string): boolean {
@@ -94,9 +105,10 @@ function buildAuthorsLine(project: PaperProject): string {
 }
 
 export function buildExportDocumentModel(project: PaperProject): ExportDocumentModel {
+  const template = getDocumentTemplate(project.outputFormat);
   const sectionStructure = project.complianceRules?.sectionStructure?.length
     ? project.complianceRules.sectionStructure
-    : DEFAULT_SECTION_STRUCTURE;
+    : template.sectionStructure;
 
   const sections = project.sections || {};
   const sectionKeys = Object.keys(sections);
@@ -135,6 +147,13 @@ export function buildExportDocumentModel(project: PaperProject): ExportDocumentM
     bodySections,
     references,
     disclosureText: project.aiUseDisclosure?.confirmedAt ? project.aiUseDisclosure.disclosureText : null,
+    layout: template.layout,
+    hasReferences: template.hasReferences,
+    referencesHeading: referencesHeadingFor(project.complianceRules?.citationStyle),
+    wordCountTarget:
+      project.complianceRules?.wordCountMin != null || project.complianceRules?.wordCountMax != null
+        ? { min: project.complianceRules?.wordCountMin, max: project.complianceRules?.wordCountMax }
+        : null,
   };
 }
 
@@ -154,29 +173,30 @@ function filenameFor(title: string, extension: string): string {
 }
 
 // ─── .docx export ─────────────────────────────────────────────────────────
-
-const ACADEMIC_MARGIN_TWIPS = 1440; // 1 inch
-const ACADEMIC_FONT = "Times New Roman";
-const ACADEMIC_FONT_HALF_POINTS = 24; // 12pt, docx `size` is in half-points
-const DOUBLE_SPACING = { line: 480, lineRule: "auto" as const }; // 2x single-spacing baseline
+// Margins/font/spacing now come from model.layout (Stage 7 per-format
+// template) rather than a single hardcoded academic default.
 
 export async function exportToDocx(project: PaperProject): Promise<Blob> {
   const model = buildExportDocumentModel(project);
+  const { layout } = model;
+  const marginTwips = layout.marginInches * 1440; // twips = 1/1440 inch
+  const fontHalfPoints = layout.fontSizePt * 2; // docx `size` is in half-points
+  const spacing = layout.lineSpacing === "double" ? { line: 480, lineRule: "auto" as const } : { line: 240, lineRule: "auto" as const };
 
-  const bodyRun = (text: string) => new TextRun({ text, font: ACADEMIC_FONT, size: ACADEMIC_FONT_HALF_POINTS });
+  const bodyRun = (text: string) => new TextRun({ text, font: layout.docxFontFamily, size: fontHalfPoints });
 
   const paragraphsFor = (text: string): Paragraph[] =>
     text
       .split("\n")
       .filter((line) => line.trim())
-      .map((line) => new Paragraph({ children: [bodyRun(line)], spacing: DOUBLE_SPACING }));
+      .map((line) => new Paragraph({ children: [bodyRun(line)], spacing }));
 
   const heading = (text: string, pageBreakBefore = true) =>
     new Paragraph({
-      children: [new TextRun({ text, font: ACADEMIC_FONT, bold: true, size: ACADEMIC_FONT_HALF_POINTS })],
+      children: [new TextRun({ text, font: layout.docxFontFamily, bold: true, size: fontHalfPoints })],
       heading: HeadingLevel.HEADING_1,
       pageBreakBefore,
-      spacing: DOUBLE_SPACING,
+      spacing,
     });
 
   const children: InstanceType<typeof Paragraph>[] = [];
@@ -184,20 +204,20 @@ export async function exportToDocx(project: PaperProject): Promise<Blob> {
   // Title page
   children.push(
     new Paragraph({
-      children: [new TextRun({ text: model.title, font: ACADEMIC_FONT, bold: true, size: ACADEMIC_FONT_HALF_POINTS + 8 })],
+      children: [new TextRun({ text: model.title, font: layout.docxFontFamily, bold: true, size: fontHalfPoints + 8 })],
       alignment: AlignmentType.CENTER,
-      spacing: DOUBLE_SPACING,
+      spacing,
     })
   );
   if (model.authorsLine) {
-    children.push(new Paragraph({ children: [bodyRun(model.authorsLine)], alignment: AlignmentType.CENTER, spacing: DOUBLE_SPACING }));
+    children.push(new Paragraph({ children: [bodyRun(model.authorsLine)], alignment: AlignmentType.CENTER, spacing }));
   }
   if (model.field) {
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: model.field, italics: true, font: ACADEMIC_FONT, size: ACADEMIC_FONT_HALF_POINTS })],
+        children: [new TextRun({ text: model.field, italics: true, font: layout.docxFontFamily, size: fontHalfPoints })],
         alignment: AlignmentType.CENTER,
-        spacing: DOUBLE_SPACING,
+        spacing,
       })
     );
   }
@@ -206,11 +226,11 @@ export async function exportToDocx(project: PaperProject): Promise<Blob> {
   // fully drafted "Methodology" section that may also appear in bodySections)
   children.push(heading("Research Overview"));
   if (model.researchQuestions) {
-    children.push(new Paragraph({ children: [new TextRun({ text: "Research Questions", bold: true, font: ACADEMIC_FONT, size: ACADEMIC_FONT_HALF_POINTS })], spacing: DOUBLE_SPACING }));
+    children.push(new Paragraph({ children: [new TextRun({ text: "Research Questions", bold: true, font: layout.docxFontFamily, size: fontHalfPoints })], spacing }));
     children.push(...paragraphsFor(model.researchQuestions));
   }
   if (model.methodology) {
-    children.push(new Paragraph({ children: [new TextRun({ text: "Methodology", bold: true, font: ACADEMIC_FONT, size: ACADEMIC_FONT_HALF_POINTS })], spacing: DOUBLE_SPACING }));
+    children.push(new Paragraph({ children: [new TextRun({ text: "Methodology", bold: true, font: layout.docxFontFamily, size: fontHalfPoints })], spacing }));
     children.push(...paragraphsFor(model.methodology));
   }
 
@@ -233,14 +253,17 @@ export async function exportToDocx(project: PaperProject): Promise<Blob> {
     children.push(...paragraphsFor(model.disclosureText));
   }
 
-  // References
-  children.push(heading("References"));
-  if (model.references.length > 0) {
-    for (const ref of model.references) {
-      children.push(new Paragraph({ children: [bodyRun(`${ref.name} — ${ref.url}`)], spacing: DOUBLE_SPACING }));
+  // References — omitted entirely for formats that don't conventionally
+  // include one (e.g. newspaper-article), per the format's own template.
+  if (model.hasReferences) {
+    children.push(heading(model.referencesHeading));
+    if (model.references.length > 0) {
+      for (const ref of model.references) {
+        children.push(new Paragraph({ children: [bodyRun(`${ref.name} — ${ref.url}`)], spacing }));
+      }
+    } else {
+      children.push(new Paragraph({ children: [bodyRun("No approved sources yet.")], spacing }));
     }
-  } else {
-    children.push(new Paragraph({ children: [bodyRun("No approved sources yet.")], spacing: DOUBLE_SPACING }));
   }
 
   const doc = new Document({
@@ -248,7 +271,7 @@ export async function exportToDocx(project: PaperProject): Promise<Blob> {
       {
         properties: {
           page: {
-            margin: { top: ACADEMIC_MARGIN_TWIPS, right: ACADEMIC_MARGIN_TWIPS, bottom: ACADEMIC_MARGIN_TWIPS, left: ACADEMIC_MARGIN_TWIPS },
+            margin: { top: marginTwips, right: marginTwips, bottom: marginTwips, left: marginTwips },
           },
         },
         children,
@@ -265,18 +288,30 @@ export async function downloadDocx(project: PaperProject): Promise<void> {
 }
 
 // ─── PDF export ────────────────────────────────────────────────────────────
-
-const PDF_MARGIN_POINTS: [number, number, number, number] = [72, 72, 72, 72]; // 1 inch = 72pt
+// Margins/font/spacing now come from model.layout (Stage 7 per-format
+// template) rather than a single hardcoded academic default.
 
 export async function exportToPdf(project: PaperProject): Promise<Blob> {
-  // Standard-14 PDF fonts (built into every PDF reader, no embedding needed) —
-  // "Times-Roman" is the base-14 equivalent of Times New Roman, chosen over
-  // pdfmake's bundled default (Roboto) to match the requested academic font
-  // without shipping a Microsoft-licensed font file. addFontContainer merges
-  // in both the AFM-metrics vfs entries and the "Times" family mapping.
-  (pdfMake as any).addFontContainer(timesFontContainer);
-
   const model = buildExportDocumentModel(project);
+  const { layout } = model;
+
+  // Standard-14 PDF fonts (built into every PDF reader, no embedding needed) —
+  // chosen over pdfmake's bundled default (Roboto) to match the format's
+  // real font without shipping a Microsoft-licensed font file.
+  // addFontContainer merges in both the AFM-metrics vfs entries and the
+  // font-family mapping for whichever standard font this format's template
+  // specifies (Times for academic formats, Helvetica for reports/newspaper).
+  const fontContainer = layout.pdfFontFamily === "Helvetica" ? helveticaFontContainer : timesFontContainer;
+  (pdfMake as any).addFontContainer(fontContainer);
+
+  const marginPoints: [number, number, number, number] = [
+    layout.marginInches * 72,
+    layout.marginInches * 72,
+    layout.marginInches * 72,
+    layout.marginInches * 72,
+  ];
+  const lineHeight = layout.lineSpacing === "double" ? 2 : 1;
+
   const content: Record<string, unknown>[] = [];
 
   content.push({ text: model.title, style: "title", alignment: "center" });
@@ -308,17 +343,19 @@ export async function exportToPdf(project: PaperProject): Promise<Blob> {
     content.push({ text: model.disclosureText });
   }
 
-  content.push({ text: "References", style: "heading1", pageBreak: "before" });
-  if (model.references.length > 0) {
-    content.push({ ul: model.references.map((r) => `${r.name} — ${r.url}`) });
-  } else {
-    content.push({ text: "No approved sources yet." });
+  if (model.hasReferences) {
+    content.push({ text: model.referencesHeading, style: "heading1", pageBreak: "before" });
+    if (model.references.length > 0) {
+      content.push({ ul: model.references.map((r) => `${r.name} — ${r.url}`) });
+    } else {
+      content.push({ text: "No approved sources yet." });
+    }
   }
 
   const docDefinition = {
     content,
-    pageMargins: PDF_MARGIN_POINTS,
-    defaultStyle: { font: "Times", fontSize: 12, lineHeight: 2 },
+    pageMargins: marginPoints,
+    defaultStyle: { font: layout.pdfFontFamily, fontSize: layout.fontSizePt, lineHeight },
     styles: {
       title: { fontSize: 18, bold: true, margin: [0, 0, 0, 8] },
       heading1: { fontSize: 14, bold: true, margin: [0, 0, 0, 8] },
