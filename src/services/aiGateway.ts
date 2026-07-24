@@ -7,7 +7,7 @@
  */
 
 import { AISettings, AIProviderInfo, AIRequest, AIResponse, HealthStatus } from "../types";
-import { decryptData, decryptDataSync } from "../utils/crypto";
+import { decryptDataAsync } from "../utils/crypto";
 import { getEncryptionSecret } from "./vaultPassphrase";
 
 // ─────────────────────────────────────────────────────────
@@ -21,8 +21,17 @@ import { getEncryptionSecret } from "./vaultPassphrase";
 // not a real hash. That meant the decryption secret sat right next to the
 // ciphertext. Now sources from vaultPassphrase.ts's in-memory-only vault
 // passphrase instead (imported above) — "" (locked/no session) behaves the
-// same as before (decryptData throws / getApiKey callers already handle an
-// empty key).
+// same as before (decryptDataAsync throws / getApiKey callers already handle
+// an empty key).
+//
+// Task 2 (AES-GCM upgrade, 2026-07-24 follow-up session): getApiKey is now
+// async across all 8 provider adapters — decryptDataAsync (AES-GCM via Web
+// Crypto, src/utils/crypto.ts) replaces the legacy synchronous XOR cipher
+// (decryptData) used here previously. This is a breaking ciphertext-format
+// change: keys saved under the old cipher will no longer decrypt (silently
+// return "" — decryptDataAsync requires its own "v2:" prefix and rejects
+// anything else) and must be re-entered once. Same accepted tradeoff as the
+// vault-passphrase migration in the same session before this one.
 
 function cleanJsonString(text: string): string {
   let cleaned = text.trim();
@@ -51,7 +60,7 @@ export interface AIProviderAdapter {
 
   generate(request: AIRequest, settings: AISettings): Promise<string>;
   healthCheck(settings: AISettings): Promise<HealthStatus>;
-  getApiKey(settings: AISettings): string;
+  getApiKey(settings: AISettings): Promise<string>;
   getEndpoint(settings: AISettings): string;
 }
 
@@ -171,8 +180,15 @@ const GeminiAdapter: AIProviderAdapter = {
   availableModels: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
   requiresApiKey: true,
 
-  getApiKey(settings: AISettings): string {
-    return decryptData(settings.geminiApiKey || "", getEncryptionSecret());
+  async getApiKey(settings: AISettings): Promise<string> {
+    try {
+      return await decryptDataAsync(settings.geminiApiKey || "", getEncryptionSecret());
+    } catch {
+      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
+      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
+      // treated the same as "no key configured" rather than a crash.
+      return "";
+    }
   },
 
   getEndpoint(): string {
@@ -180,7 +196,7 @@ const GeminiAdapter: AIProviderAdapter = {
   },
 
   async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    const apiKey = this.getApiKey(settings);
+    const apiKey = await this.getApiKey(settings);
     if (apiKey) {
       // Direct REST call
       const model = request.model || this.defaultModel;
@@ -210,7 +226,7 @@ const GeminiAdapter: AIProviderAdapter = {
 
   async healthCheck(settings: AISettings): Promise<HealthStatus> {
     const start = Date.now();
-    const apiKey = this.getApiKey(settings);
+    const apiKey = await this.getApiKey(settings);
     try {
       if (apiKey) {
         const resp = await fetch(`${this.getEndpoint(settings)}/models/gemini-2.5-flash?key=${apiKey}`, {
@@ -246,8 +262,15 @@ const OpenAIAdapter: AIProviderAdapter = {
   availableModels: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "o4-mini"],
   requiresApiKey: true,
 
-  getApiKey(settings: AISettings): string {
-    return decryptData(settings.openaiApiKey || "", getEncryptionSecret());
+  async getApiKey(settings: AISettings): Promise<string> {
+    try {
+      return await decryptDataAsync(settings.openaiApiKey || "", getEncryptionSecret());
+    } catch {
+      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
+      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
+      // treated the same as "no key configured" rather than a crash.
+      return "";
+    }
   },
 
   getEndpoint(): string {
@@ -255,12 +278,12 @@ const OpenAIAdapter: AIProviderAdapter = {
   },
 
   async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "openai", this.getApiKey(settings), settings);
+    return callServerProxy(request, "openai", await this.getApiKey(settings), settings);
   },
 
   async healthCheck(settings: AISettings): Promise<HealthStatus> {
     const start = Date.now();
-    const apiKey = this.getApiKey(settings);
+    const apiKey = await this.getApiKey(settings);
     if (!apiKey) return { provider: "openai", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
     try {
       const resp = await fetch("/api/generate", {
@@ -289,8 +312,15 @@ const ClaudeAdapter: AIProviderAdapter = {
   availableModels: ["claude-sonnet-4-20250514", "claude-3-5-haiku-20241022", "claude-opus-4-20250514"],
   requiresApiKey: true,
 
-  getApiKey(settings: AISettings): string {
-    return decryptData(settings.claudeApiKey || "", getEncryptionSecret());
+  async getApiKey(settings: AISettings): Promise<string> {
+    try {
+      return await decryptDataAsync(settings.claudeApiKey || "", getEncryptionSecret());
+    } catch {
+      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
+      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
+      // treated the same as "no key configured" rather than a crash.
+      return "";
+    }
   },
 
   getEndpoint(): string {
@@ -298,12 +328,12 @@ const ClaudeAdapter: AIProviderAdapter = {
   },
 
   async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "claude", this.getApiKey(settings), settings);
+    return callServerProxy(request, "claude", await this.getApiKey(settings), settings);
   },
 
   async healthCheck(settings: AISettings): Promise<HealthStatus> {
     const start = Date.now();
-    const apiKey = this.getApiKey(settings);
+    const apiKey = await this.getApiKey(settings);
     if (!apiKey) return { provider: "claude", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
     try {
       const resp = await fetch("/api/generate", {
@@ -332,8 +362,15 @@ const DeepSeekAdapter: AIProviderAdapter = {
   availableModels: ["deepseek-chat", "deepseek-coder", "deepseek-reasoner"],
   requiresApiKey: true,
 
-  getApiKey(settings: AISettings): string {
-    return decryptData(settings.deepseekApiKey || "", getEncryptionSecret());
+  async getApiKey(settings: AISettings): Promise<string> {
+    try {
+      return await decryptDataAsync(settings.deepseekApiKey || "", getEncryptionSecret());
+    } catch {
+      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
+      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
+      // treated the same as "no key configured" rather than a crash.
+      return "";
+    }
   },
 
   getEndpoint(): string {
@@ -341,12 +378,12 @@ const DeepSeekAdapter: AIProviderAdapter = {
   },
 
   async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "deepseek", this.getApiKey(settings), settings);
+    return callServerProxy(request, "deepseek", await this.getApiKey(settings), settings);
   },
 
   async healthCheck(settings: AISettings): Promise<HealthStatus> {
     const start = Date.now();
-    const apiKey = this.getApiKey(settings);
+    const apiKey = await this.getApiKey(settings);
     if (!apiKey) return { provider: "deepseek", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
     try {
       const resp = await fetch("/api/generate", {
@@ -375,8 +412,15 @@ const QwenAdapter: AIProviderAdapter = {
   availableModels: ["qwen-plus", "qwen-turbo", "qwen-max"],
   requiresApiKey: true,
 
-  getApiKey(settings: AISettings): string {
-    return decryptData(settings.qwenApiKey || "", getEncryptionSecret());
+  async getApiKey(settings: AISettings): Promise<string> {
+    try {
+      return await decryptDataAsync(settings.qwenApiKey || "", getEncryptionSecret());
+    } catch {
+      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
+      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
+      // treated the same as "no key configured" rather than a crash.
+      return "";
+    }
   },
 
   getEndpoint(): string {
@@ -384,12 +428,12 @@ const QwenAdapter: AIProviderAdapter = {
   },
 
   async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "qwen", this.getApiKey(settings), settings);
+    return callServerProxy(request, "qwen", await this.getApiKey(settings), settings);
   },
 
   async healthCheck(settings: AISettings): Promise<HealthStatus> {
     const start = Date.now();
-    const apiKey = this.getApiKey(settings);
+    const apiKey = await this.getApiKey(settings);
     if (!apiKey) return { provider: "qwen", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
     try {
       const resp = await fetch("/api/generate", {
@@ -418,8 +462,15 @@ const CohereAdapter: AIProviderAdapter = {
   availableModels: ["command-r-plus", "command-r", "command-a-03-2025"],
   requiresApiKey: true,
 
-  getApiKey(settings: AISettings): string {
-    return decryptData(settings.cohereApiKey || "", getEncryptionSecret());
+  async getApiKey(settings: AISettings): Promise<string> {
+    try {
+      return await decryptDataAsync(settings.cohereApiKey || "", getEncryptionSecret());
+    } catch {
+      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
+      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
+      // treated the same as "no key configured" rather than a crash.
+      return "";
+    }
   },
 
   getEndpoint(): string {
@@ -427,12 +478,12 @@ const CohereAdapter: AIProviderAdapter = {
   },
 
   async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "cohere", this.getApiKey(settings), settings);
+    return callServerProxy(request, "cohere", await this.getApiKey(settings), settings);
   },
 
   async healthCheck(settings: AISettings): Promise<HealthStatus> {
     const start = Date.now();
-    const apiKey = this.getApiKey(settings);
+    const apiKey = await this.getApiKey(settings);
     if (!apiKey) return { provider: "cohere", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
     try {
       const resp = await fetch("/api/generate", {
@@ -461,7 +512,7 @@ const OllamaAdapter: AIProviderAdapter = {
   availableModels: ["llama3.1:8b", "mistral:7b", "qwen2:7b", "deepseek-coder:6.7b", "gemma2:9b"],
   requiresApiKey: false,
 
-  getApiKey(): string {
+  async getApiKey(): Promise<string> {
     return "";
   },
 
@@ -537,7 +588,7 @@ const CustomAdapter: AIProviderAdapter = {
   availableModels: [],
   requiresApiKey: false,
 
-  getApiKey(): string {
+  async getApiKey(): Promise<string> {
     return "";
   },
 
@@ -832,14 +883,13 @@ const ADAPTERS: Record<string, AIProviderAdapter> = {
 // AUTO-MODE TASK ROUTING
 // ─────────────────────────────────────────────────────────
 
-function resolveProvider(taskType: string, settings: AISettings): { provider: string; model?: string; apiKey?: string } {
-  const secret = getEncryptionSecret();
+async function resolveProvider(taskType: string, settings: AISettings): Promise<{ provider: string; model?: string; apiKey?: string }> {
   const provider = settings.provider || "gemini";
 
   if (provider !== "auto") {
     const adapter = ADAPTERS[provider];
     if (adapter) {
-      const apiKey = adapter.requiresApiKey ? adapter.getApiKey(settings) : "";
+      const apiKey = adapter.requiresApiKey ? await adapter.getApiKey(settings) : "";
       let model = "";
       if (provider === "openai") model = settings.openaiModel || "gpt-4o-mini";
       else if (provider === "claude") model = settings.claudeModel || "claude-sonnet-4-20250514";
@@ -867,15 +917,17 @@ function resolveProvider(taskType: string, settings: AISettings): { provider: st
     targetProvider = "qwen";
   }
 
-  // 3. Key availability fallback
+  // 3. Key availability fallback — reuses each adapter's own getApiKey
+  // (already safely try/catch-wrapped) instead of duplicating decrypt-error
+  // handling here.
   if (targetProvider === "deepseek") {
-    const key = decryptData(settings.deepseekApiKey || "", secret);
+    const key = await ADAPTERS.deepseek.getApiKey(settings);
     if (key) return { provider: "deepseek", model: settings.deepseekModel || "deepseek-chat", apiKey: key };
   } else if (targetProvider === "qwen") {
-    const key = decryptData(settings.qwenApiKey || "", secret);
+    const key = await ADAPTERS.qwen.getApiKey(settings);
     if (key) return { provider: "qwen", model: settings.qwenModel || "qwen-plus", apiKey: key };
   } else if (targetProvider === "gemini") {
-    const key = decryptData(settings.geminiApiKey || "", secret);
+    const key = await ADAPTERS.gemini.getApiKey(settings);
     if (key) return { provider: "gemini", model: "gemini-2.5-flash", apiKey: key };
   }
 
@@ -901,7 +953,7 @@ export const AIGateway = {
    */
   async generate(request: AIRequest, settings: AISettings): Promise<AIResponse> {
     const startTime = Date.now();
-    const { provider, model, apiKey } = resolveProvider(request.taskType, settings);
+    const { provider, model, apiKey } = await resolveProvider(request.taskType, settings);
     const inputWords = (request.systemInstruction + "\n" + request.prompt).split(/\s+/).length;
 
     let text = "";
@@ -958,7 +1010,7 @@ export const AIGateway = {
     onToken: (token: string) => void
   ): Promise<AIResponse> {
     const startTime = Date.now();
-    const { provider, model, apiKey } = resolveProvider(request.taskType, settings);
+    const { provider, model, apiKey } = await resolveProvider(request.taskType, settings);
     const inputWords = (request.systemInstruction + "\n" + request.prompt).split(/\s+/).length;
 
     let text = "";
@@ -1006,7 +1058,7 @@ export const AIGateway = {
       if (!adapter) continue;
       
       // Check if this provider is configured
-      if (adapter.requiresApiKey && !adapter.getApiKey(settings)) continue;
+      if (adapter.requiresApiKey && !(await adapter.getApiKey(settings))) continue;
       
       try {
         console.log(`[AIGateway] Trying fallback provider: ${fb}`);
@@ -1071,15 +1123,20 @@ export const AIGateway = {
   /**
    * Get list of currently available (online/configured) providers.
    */
-  getAvailableProviders(settings: AISettings): AIProviderInfo[] {
-    return AI_PROVIDERS.filter(p => {
-      const health = settings.providerHealth?.[p.id];
-      if (health?.status === "online") return true;
-      if (!p.requiresApiKey) return true; // Local providers are always shown
-      // Check if API key is configured
-      const adapter = ADAPTERS[p.id];
-      return adapter ? !!adapter.getApiKey(settings) : false;
-    });
+  // Unused anywhere else in this codebase today (confirmed by grep) — async
+  // because getApiKey now decrypts via encryptDataAsync's AES-GCM (Web Crypto),
+  // which has no synchronous form.
+  async getAvailableProviders(settings: AISettings): Promise<AIProviderInfo[]> {
+    const checks = await Promise.all(
+      AI_PROVIDERS.map(async (p) => {
+        const health = settings.providerHealth?.[p.id];
+        if (health?.status === "online") return true;
+        if (!p.requiresApiKey) return true; // Local providers are always shown
+        const adapter = ADAPTERS[p.id];
+        return adapter ? !!(await adapter.getApiKey(settings)) : false;
+      })
+    );
+    return AI_PROVIDERS.filter((_, i) => checks[i]);
   },
 
   /**
@@ -1136,7 +1193,7 @@ export const AIGateway = {
    * Resolve which provider would be used for a given task type.
    */
   resolveProvider(taskType: string, settings: AISettings) {
-    return resolveProvider(taskType, settings);
+    return resolveProvider(taskType, settings); // async now — callers must await
   }
 };
 

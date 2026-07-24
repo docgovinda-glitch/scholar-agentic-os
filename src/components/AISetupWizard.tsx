@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Cloud, Server, ChevronRight, ChevronLeft, CheckCircle2, AlertTriangle, Key, Cpu, Zap, Search, Loader2, BookOpen } from 'lucide-react';
 import { PaperProject, AISettings, HealthStatus, AIProviderInfo } from '../types';
 import AIGateway, { AI_PROVIDERS } from '../services/aiGateway';
-import { encryptData, decryptData } from '../utils/crypto';
+import { encryptDataAsync, decryptDataAsync } from '../utils/crypto';
 import { setVaultPassphrase, getVaultPassphrase, isVaultUnlocked } from '../services/vaultPassphrase';
 
 interface AISetupWizardProps {
@@ -70,7 +70,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             setSelectedProviders(prev => Array.from(new Set([...prev, "gemini"])));
             
             // Pre-fill geminiApiKey with "defined_on_server" dummy key
-            const encryptedDummy = encryptData("defined_on_server", vaultSecret);
+            const encryptedDummy = await encryptDataAsync("defined_on_server", vaultSecret);
             setSettings(prev => ({
               ...prev,
               geminiApiKey: encryptedDummy
@@ -112,16 +112,47 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     );
   };
 
-  const handleSettingChange = (provider: string, field: string, value: string) => {
-    // We update local state, and encrypt keys before saving
-    let finalValue = value;
+  // Task 2 (AES-GCM upgrade, 2026-07-24 follow-up session): decryption is now
+  // async (encryptDataAsync/decryptDataAsync, Web Crypto AES-GCM) — can no
+  // longer be called inline inside JSX's `value={...}`. decryptedKeys mirrors
+  // the plaintext for display, kept in sync by the effect below; typing
+  // updates it optimistically here so the input feels instant, without
+  // waiting on the encrypt round-trip before echoing what was typed.
+  const [decryptedKeys, setDecryptedKeys] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        AI_PROVIDERS.filter(p => p.requiresApiKey).map(async (p) => {
+          const cipher = (settings as any)[`${p.id}ApiKey`];
+          if (!cipher) return [p.id, ""] as const;
+          try {
+            const plain = await decryptDataAsync(cipher, vaultSecret);
+            return [p.id, plain === "defined_on_server" ? "Defined on Server (.env)" : plain] as const;
+          } catch {
+            // Wrong/missing vault passphrase, or old pre-AES-GCM ciphertext —
+            // same "treat as unset" handling as aiGateway.ts's getApiKey.
+            return [p.id, ""] as const;
+          }
+        })
+      );
+      if (!cancelled) setDecryptedKeys(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [settings, vaultSecret]);
+
+  const handleSettingChange = async (provider: string, field: string, value: string) => {
     if (field.toLowerCase().includes('apikey')) {
-      finalValue = encryptData(value, vaultSecret);
+      setDecryptedKeys(prev => ({ ...prev, [provider]: value }));
+      const finalValue = value ? await encryptDataAsync(value, vaultSecret) : "";
+      setSettings(prev => ({ ...prev, [`${provider}${field}`]: finalValue }));
+      return;
     }
-    
+
     setSettings(prev => ({
       ...prev,
-      [`${provider}${field}`]: finalValue
+      [`${provider}${field}`]: value
     }));
   };
 
@@ -455,13 +486,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                         <input
                           type={showKeys[provider.id] ? "text" : "password"}
                           placeholder={`Enter ${provider.name} API Key`}
-                          value={
-                            (settings as any)[`${provider.id}ApiKey`] 
-                              ? decryptData((settings as any)[`${provider.id}ApiKey`], vaultSecret) === "defined_on_server"
-                                ? "Defined on Server (.env)"
-                                : decryptData((settings as any)[`${provider.id}ApiKey`], vaultSecret)
-                              : ""
-                          }
+                          value={decryptedKeys[provider.id] ?? ""}
                           className="w-full bg-white border border-[#D1CEC7] rounded-xl py-2.5 px-4 text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/10 focus:border-[#1A365D] transition-all font-mono text-sm placeholder:text-gray-400"
                           onChange={(e) => handleSettingChange(provider.id, 'ApiKey', e.target.value)}
                         />

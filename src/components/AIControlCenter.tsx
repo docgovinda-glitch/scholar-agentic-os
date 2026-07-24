@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { PaperProject, AISettings } from "../types";
-import { encryptData, decryptData } from "../utils/crypto";
+import { encryptDataAsync, decryptDataAsync } from "../utils/crypto";
 import { setVaultPassphrase, getVaultPassphrase, isVaultUnlocked } from "../services/vaultPassphrase";
 import {
   Key, 
@@ -68,20 +68,41 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
   };
 
   // Decrypt existing keys once the vault is unlocked (or whenever settings change while unlocked).
+  // Task 2 (AES-GCM upgrade, 2026-07-24 follow-up session): decryptDataAsync
+  // (Web Crypto AES-GCM) has no synchronous form, unlike the legacy XOR
+  // cipher this replaced — each key is decrypted independently so one bad/
+  // old-format ciphertext doesn't block the others from loading.
   useEffect(() => {
     if (!vaultUnlocked) return;
-    const secret = getVaultPassphrase() || "";
-    try {
+    let cancelled = false;
+    (async () => {
+      const secret = getVaultPassphrase() || "";
       const settings = (project.aiSettings || {}) as import("../types").AISettings;
-      if (settings.geminiApiKey) setGeminiKey(decryptData(settings.geminiApiKey, secret));
-      if (settings.openaiApiKey) setOpenaiKey(decryptData(settings.openaiApiKey, secret));
-      if (settings.claudeApiKey) setClaudeKey(decryptData(settings.claudeApiKey, secret));
-      if (settings.deepseekApiKey) setDeepseekKey(decryptData(settings.deepseekApiKey, secret));
-      if (settings.qwenApiKey) setQwenKey(decryptData(settings.qwenApiKey, secret));
-      if (settings.cohereApiKey) setCohereKey(decryptData(settings.cohereApiKey, secret));
-    } catch (e) {
-      console.error("Failed to decrypt stored API keys with the current vault passphrase:", e);
-    }
+      const decryptOrEmpty = async (cipher?: string) => {
+        if (!cipher) return "";
+        try {
+          return await decryptDataAsync(cipher, secret);
+        } catch {
+          return "";
+        }
+      };
+      const [gemini, openai, claude, deepseek, qwen, cohere] = await Promise.all([
+        decryptOrEmpty(settings.geminiApiKey),
+        decryptOrEmpty(settings.openaiApiKey),
+        decryptOrEmpty(settings.claudeApiKey),
+        decryptOrEmpty(settings.deepseekApiKey),
+        decryptOrEmpty(settings.qwenApiKey),
+        decryptOrEmpty(settings.cohereApiKey),
+      ]);
+      if (cancelled) return;
+      if (gemini) setGeminiKey(gemini);
+      if (openai) setOpenaiKey(openai);
+      if (claude) setClaudeKey(claude);
+      if (deepseek) setDeepseekKey(deepseek);
+      if (qwen) setQwenKey(qwen);
+      if (cohere) setCohereKey(cohere);
+    })();
+    return () => { cancelled = true; };
   }, [vaultUnlocked, project.aiSettings]);
 
   // Automatically check Ollama status when scanning or mounting
@@ -116,18 +137,24 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
     setTestResult({ status: null, message: "" });
 
     try {
-      // Build temp aiSettings configuration for validation test
+      // Build temp aiSettings configuration for validation test — only the
+      // provider actually being tested needs a freshly-encrypted key; every
+      // other provider's key passes through already-encrypted, untouched.
       const secret = getVaultPassphrase() || "";
+      const keyByProvider: Record<string, string> = {
+        gemini: geminiKey, openai: openaiKey, claude: claudeKey,
+        deepseek: deepseekKey, qwen: qwenKey, cohere: cohereKey,
+      };
+      const encryptedTestKey = keyByProvider[targetProvider] ? await encryptDataAsync(keyByProvider[targetProvider], secret) : undefined;
       const settingsCopy: AISettings = {
         ...project.aiSettings,
         provider: targetProvider as any,
-        // Include latest keys in testing context
-        geminiApiKey: targetProvider === "gemini" ? encryptData(geminiKey, secret) : project.aiSettings?.geminiApiKey,
-        openaiApiKey: targetProvider === "openai" ? encryptData(openaiKey, secret) : project.aiSettings?.openaiApiKey,
-        claudeApiKey: targetProvider === "claude" ? encryptData(claudeKey, secret) : project.aiSettings?.claudeApiKey,
-        deepseekApiKey: targetProvider === "deepseek" ? encryptData(deepseekKey, secret) : project.aiSettings?.deepseekApiKey,
-        qwenApiKey: targetProvider === "qwen" ? encryptData(qwenKey, secret) : project.aiSettings?.qwenApiKey,
-        cohereApiKey: targetProvider === "cohere" ? encryptData(cohereKey, secret) : project.aiSettings?.cohereApiKey,
+        geminiApiKey: targetProvider === "gemini" ? encryptedTestKey : project.aiSettings?.geminiApiKey,
+        openaiApiKey: targetProvider === "openai" ? encryptedTestKey : project.aiSettings?.openaiApiKey,
+        claudeApiKey: targetProvider === "claude" ? encryptedTestKey : project.aiSettings?.claudeApiKey,
+        deepseekApiKey: targetProvider === "deepseek" ? encryptedTestKey : project.aiSettings?.deepseekApiKey,
+        qwenApiKey: targetProvider === "qwen" ? encryptedTestKey : project.aiSettings?.qwenApiKey,
+        cohereApiKey: targetProvider === "cohere" ? encryptedTestKey : project.aiSettings?.cohereApiKey,
       } as AISettings;
 
       const result = await AIGateway.healthCheckProvider(targetProvider, settingsCopy);
@@ -148,14 +175,22 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
   // Save credentials encrypted
   const handleSaveCredentials = async () => {
     const secret = getVaultPassphrase() || "";
+    const [gemini, openai, claude, deepseek, qwen, cohere] = await Promise.all([
+      encryptDataAsync(geminiKey, secret),
+      encryptDataAsync(openaiKey, secret),
+      encryptDataAsync(claudeKey, secret),
+      encryptDataAsync(deepseekKey, secret),
+      encryptDataAsync(qwenKey, secret),
+      encryptDataAsync(cohereKey, secret),
+    ]);
     const updatedSettings: AISettings = {
       ...project.aiSettings,
-      geminiApiKey: encryptData(geminiKey, secret),
-      openaiApiKey: encryptData(openaiKey, secret),
-      claudeApiKey: encryptData(claudeKey, secret),
-      deepseekApiKey: encryptData(deepseekKey, secret),
-      qwenApiKey: encryptData(qwenKey, secret),
-      cohereApiKey: encryptData(cohereKey, secret)
+      geminiApiKey: gemini,
+      openaiApiKey: openai,
+      claudeApiKey: claude,
+      deepseekApiKey: deepseek,
+      qwenApiKey: qwen,
+      cohereApiKey: cohere,
     };
 
     updateProject({ aiSettings: updatedSettings });
