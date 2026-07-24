@@ -210,4 +210,53 @@ describe("ResearchIntakeWizard — Stage 4/5 field gating", () => {
       expect(onNext).toHaveBeenCalled();
     });
   });
+
+  describe("title-only alternative path (target-workflow.md Stage 5)", () => {
+    it("'Continue Setup' still blocks onNext when only a title is set (baseline unchanged)", () => {
+      const { onNext } = renderWizard(
+        buildProject("journal-article", {
+          title: "A Title",
+          field: "",
+          objectives: "",
+          researchQuestions: "",
+          researchGap: "",
+          methodology: "",
+        })
+      );
+
+      fireEvent.click(screen.getByText("Continue Setup"));
+      expect(onNext).not.toHaveBeenCalled();
+    });
+
+    it("'Start With Title Only' blocks onNext and shows an error when the title is empty", () => {
+      const { onNext } = renderWizard(buildProject("journal-article", { title: "" }));
+
+      fireEvent.click(screen.getByText(/Start With Title Only/i));
+      expect(onNext).not.toHaveBeenCalled();
+      expect(screen.getByText(/Please specify a research title/i)).toBeInTheDocument();
+    });
+
+    it("'Start With Title Only' calls onNext with just a title, bypassing all other required-field gating", () => {
+      const { onNext } = renderWizard(
+        buildProject("journal-article", {
+          title: "A Title",
+          field: "",
+          objectives: "",
+          researchQuestions: "",
+          researchGap: "",
+          methodology: "",
+        })
+      );
+
+      fireEvent.click(screen.getByText(/Start With Title Only/i));
+      expect(onNext).toHaveBeenCalled();
+    });
+
+    it("'Start With Title Only' works even for formats whose guided path would normally require everything (research-proposal)", () => {
+      const { onNext } = renderWizard(buildProject("research-proposal", { title: "A Title" }));
+
+      fireEvent.click(screen.getByText(/Start With Title Only/i));
+      expect(onNext).toHaveBeenCalled();
+    });
+  });
 });

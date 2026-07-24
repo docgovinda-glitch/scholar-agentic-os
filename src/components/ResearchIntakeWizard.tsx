@@ -288,6 +288,22 @@ export default function ResearchIntakeWizard({
     onNext();
   };
 
+  // Title-only alternative path (target-workflow.md Stage 5, previously 🔴 not built):
+  // bypasses the guided path's per-format required-field gate above, requiring only
+  // a title. Downstream stages already read the gated fields defensively (|| ""
+  // fallbacks in aiService.ts, documentExportService.ts, etc.), so this reuses the
+  // same onNext() the guided path uses rather than a separate flow.
+  const isTitleOnlyValid = () => project.title.trim() !== "";
+
+  const handleTitleOnlyClick = () => {
+    if (!isTitleOnlyValid()) {
+      setError("Please specify a research title to proceed with a title-only start.");
+      return;
+    }
+    setError(null);
+    onNext();
+  };
+
   // AI Co-agent Trigger Actions
   const handleSuggestTopic = async () => {
     setTopicLoading(true);
@@ -542,6 +558,12 @@ export default function ResearchIntakeWizard({
               Continue Setup
             </button>
           </div>
+          <button
+            onClick={handleTitleOnlyClick}
+            className="w-full py-2 border border-dashed border-[#8C887F] hover:bg-[#FAF8F5] text-[#5c564e] font-mono text-[10px] uppercase font-bold rounded-lg cursor-pointer transition-all"
+          >
+            Start With Title Only — Fill In The Rest Later
+          </button>
         </div>
 
         {/* Right Card: Research Readiness */}
