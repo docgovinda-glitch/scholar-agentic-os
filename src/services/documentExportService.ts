@@ -8,13 +8,17 @@
  * (buildExportDocumentModel), so the two renderers never duplicate the
  * "which fields come from where" logic.
  *
- * Margins/font/line-spacing default to sensible academic values (1" margins,
- * 12pt Times New Roman-equivalent, double-spaced) because project.complianceRules
- * has no structured numeric field for any of these today — only a free-text
+ * Margins/font/line-spacing default to the per-format template's sensible
+ * academic values (1" margins, 12pt Times New Roman-equivalent,
+ * double-spaced), overridden by complianceRules.layoutOverrides when set
+ * (see resolveLayout() below and that field's comment in types.ts).
+ * layoutOverrides is intentionally separate from the free-text
  * formattingRules string array (e.g. "Double spaced, 12pt Times New Roman,
- * margins") that isn't safe to parse for an exact value without risking the
- * same invented-from-unstructured-text pattern this project has fixed
- * elsewhere. complianceRules.sectionStructure IS structured (a real ordered
+ * margins") — formattingRules still isn't parsed, since doing so would risk
+ * the same invented-from-unstructured-text pattern this project has fixed
+ * elsewhere; layoutOverrides is only ever set from a known-good source (a
+ * hardcoded journal template value or direct user input), never derived from
+ * it. complianceRules.sectionStructure IS structured (a real ordered
  * array), so it genuinely does drive section order/naming below.
  *
  * References are built from project.dataSources with status === "approved"
@@ -104,6 +108,22 @@ function buildAuthorsLine(project: PaperProject): string {
   return [primary, co].filter(Boolean).join("; ") || project.authorDetails || "";
 }
 
+// Stage 8/12 — applies complianceRules.layoutOverrides (structured, never
+// parsed from free text — see that field's comment in types.ts) on top of
+// the per-format template default. Any override left unset falls through
+// to the template's value, same as before this field existed.
+function resolveLayout(project: PaperProject, template: DocumentLayout): DocumentLayout {
+  const overrides = project.complianceRules?.layoutOverrides;
+  if (!overrides) return template;
+  return {
+    marginInches: overrides.marginInches ?? template.marginInches,
+    fontSizePt: overrides.fontSizePt ?? template.fontSizePt,
+    lineSpacing: overrides.lineSpacing ?? template.lineSpacing,
+    docxFontFamily: overrides.fontFamily ?? template.docxFontFamily,
+    pdfFontFamily: overrides.fontFamily ? (overrides.fontFamily === "Arial" ? "Helvetica" : "Times") : template.pdfFontFamily,
+  };
+}
+
 export function buildExportDocumentModel(project: PaperProject): ExportDocumentModel {
   const template = getDocumentTemplate(project.outputFormat);
   const sectionStructure = project.complianceRules?.sectionStructure?.length
@@ -147,7 +167,7 @@ export function buildExportDocumentModel(project: PaperProject): ExportDocumentM
     bodySections,
     references,
     disclosureText: project.aiUseDisclosure?.confirmedAt ? project.aiUseDisclosure.disclosureText : null,
-    layout: template.layout,
+    layout: resolveLayout(project, template.layout),
     hasReferences: template.hasReferences,
     referencesHeading: referencesHeadingFor(project.complianceRules?.citationStyle),
     wordCountTarget:

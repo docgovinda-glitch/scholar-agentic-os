@@ -84,6 +84,19 @@ export interface ComplianceRules {
   wordCountMax?: number;
   /** Free-text institution/instructor-specific rules not covered by the structured fields above. */
   customNotes?: string;
+  // Stage 8/12 structured layout overrides — deliberately separate from the
+  // free-text formattingRules[] above, which documentExportService.ts still
+  // never parses (see that file's header comment for why). These are only
+  // ever set from a known-good source: a hardcoded journal template value
+  // (ComplianceChecklistPanel) or direct user input (NonJournalRequirementsPanel) —
+  // never derived from formattingRules or any other free text. When present,
+  // documentExportService.ts prefers these over the per-format template default.
+  layoutOverrides?: {
+    marginInches?: number;
+    fontSizePt?: number;
+    lineSpacing?: "single" | "double";
+    fontFamily?: "Times New Roman" | "Arial";
+  };
 }
 
 // Stage 9 (target-workflow.md) — AI-use disclosure, distinct from

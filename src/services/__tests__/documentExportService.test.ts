@@ -172,6 +172,64 @@ describe("buildExportDocumentModel", () => {
     expect(model.layout.pdfFontFamily).toBe("Helvetica");
   });
 
+  describe("Stage 8/12: complianceRules.layoutOverrides drives actual export layout", () => {
+    it("applies marginInches/fontSizePt/lineSpacing/fontFamily overrides on top of the report template's single-spaced Arial default", () => {
+      const project: PaperProject = {
+        ...DEFAULT_STATE("tester"),
+        outputFormat: "report",
+        complianceRules: {
+          wordCountGoal: "",
+          citationStyle: "APA 7th",
+          formattingRules: [],
+          sectionStructure: [],
+          abstractRequirements: "",
+          referencesRequirement: "",
+          ethicalDisclosure: "",
+          coverLetterNecessity: "",
+          layoutOverrides: { marginInches: 1.5, fontSizePt: 11, lineSpacing: "double", fontFamily: "Times New Roman" },
+        },
+      };
+
+      const model = buildExportDocumentModel(project);
+      expect(model.layout.marginInches).toBe(1.5);
+      expect(model.layout.fontSizePt).toBe(11);
+      expect(model.layout.lineSpacing).toBe("double");
+      expect(model.layout.docxFontFamily).toBe("Times New Roman");
+      expect(model.layout.pdfFontFamily).toBe("Times");
+    });
+
+    it("falls back to the template default for any override field left unset", () => {
+      const project: PaperProject = {
+        ...DEFAULT_STATE("tester"),
+        outputFormat: "journal-article",
+        complianceRules: {
+          wordCountGoal: "",
+          citationStyle: "APA 7th",
+          formattingRules: [],
+          sectionStructure: [],
+          abstractRequirements: "",
+          referencesRequirement: "",
+          ethicalDisclosure: "",
+          coverLetterNecessity: "",
+          layoutOverrides: { fontSizePt: 14 },
+        },
+      };
+
+      const model = buildExportDocumentModel(project);
+      expect(model.layout.fontSizePt).toBe(14);
+      expect(model.layout.marginInches).toBe(1);
+      expect(model.layout.lineSpacing).toBe("double");
+      expect(model.layout.docxFontFamily).toBe("Times New Roman");
+    });
+
+    it("uses the template default entirely when layoutOverrides isn't set at all (no regression)", () => {
+      const project: PaperProject = { ...DEFAULT_STATE("tester"), outputFormat: "report" };
+      const model = buildExportDocumentModel(project);
+      expect(model.layout.lineSpacing).toBe("single");
+      expect(model.layout.docxFontFamily).toBe("Arial");
+    });
+  });
+
   it("Stage 7: newspaper-article template has hasReferences: false", () => {
     const project: PaperProject = { ...DEFAULT_STATE("tester"), outputFormat: "newspaper-article" };
     const model = buildExportDocumentModel(project);

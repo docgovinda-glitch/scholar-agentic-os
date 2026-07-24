@@ -44,6 +44,10 @@ export default function NonJournalRequirementsPanel({
     (existing?.sectionStructure?.length ? existing.sectionStructure : template.sectionStructure).join("\n")
   );
   const [customNotes, setCustomNotes] = useState(existing?.customNotes || "");
+  const [marginInches, setMarginInches] = useState((existing?.layoutOverrides?.marginInches ?? template.layout.marginInches).toString());
+  const [fontSizePt, setFontSizePt] = useState((existing?.layoutOverrides?.fontSizePt ?? template.layout.fontSizePt).toString());
+  const [lineSpacing, setLineSpacing] = useState<"single" | "double">(existing?.layoutOverrides?.lineSpacing ?? template.layout.lineSpacing);
+  const [fontFamily, setFontFamily] = useState<"Times New Roman" | "Arial">(existing?.layoutOverrides?.fontFamily ?? template.layout.docxFontFamily);
 
   // Re-initialize local fields if the user switches format before saving (rare, but avoids stale state).
   useEffect(() => {
@@ -73,6 +77,12 @@ export default function NonJournalRequirementsPanel({
       wordCountMin: min,
       wordCountMax: max,
       customNotes,
+      layoutOverrides: {
+        marginInches: parseFloat(marginInches) || template.layout.marginInches,
+        fontSizePt: parseInt(fontSizePt, 10) || template.layout.fontSizePt,
+        lineSpacing,
+        fontFamily,
+      },
     };
 
     // updateProject (useProjectPersistence.ts) closes over the project value
@@ -145,6 +155,58 @@ export default function NonJournalRequirementsPanel({
                   {" — shown for reference only, not enforced."}
                 </p>
               )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-3">
+            <h3 className="text-sm font-bold text-[#1A365D] font-serif uppercase tracking-wider border-b border-gray-150 pb-2">
+              Page Layout
+            </h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Drives the actual exported document's margins/font/spacing at Stage 12 — pre-filled from this format's default.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Margins (in)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={marginInches}
+                  onChange={(e) => setMarginInches(e.target.value)}
+                  className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Font Size (pt)</label>
+                <input
+                  type="number"
+                  value={fontSizePt}
+                  onChange={(e) => setFontSizePt(e.target.value)}
+                  className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Font Family</label>
+                <select
+                  value={fontFamily}
+                  onChange={(e) => setFontFamily(e.target.value as "Times New Roman" | "Arial")}
+                  className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
+                >
+                  <option value="Times New Roman">Times New Roman</option>
+                  <option value="Arial">Arial</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Line Spacing</label>
+                <select
+                  value={lineSpacing}
+                  onChange={(e) => setLineSpacing(e.target.value as "single" | "double")}
+                  className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
+                >
+                  <option value="single">Single</option>
+                  <option value="double">Double</option>
+                </select>
+              </div>
             </div>
           </div>
 

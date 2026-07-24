@@ -68,7 +68,10 @@ export default function ComplianceChecklistPanel({
         abstractRequirements: "Strict limit of 150 words, non-structured single paragraph. Underneath specify 4 to 6 keywords.",
         referencesRequirement: "Ensure Chicago (Author-Date) format. Include complete DOIs.",
         ethicalDisclosure: "State funding declarations and any institutional review board (IRB) ethical clearances if applicable.",
-        coverLetterNecessity: "Mandatory. Must address the Editor and justify why the paper fits ISQ aims."
+        coverLetterNecessity: "Mandatory. Must address the Editor and justify why the paper fits ISQ aims.",
+        // Stage 8/12 — same known values as the formattingRules prose above,
+        // structured for documentExportService.ts to actually apply.
+        layoutOverrides: { marginInches: 1, fontSizePt: 12, lineSpacing: "double", fontFamily: "Times New Roman" }
       };
     } else if (journalName === "European Journal of International Relations") {
       standardRules = {
@@ -92,7 +95,8 @@ export default function ComplianceChecklistPanel({
         abstractRequirements: "Strict limit of 200 words, reflecting the key argument and theoretical context.",
         referencesRequirement: "Harvard style. Include DOIs.",
         ethicalDisclosure: "Declarations of funding and potential conflicts of interest must be provided at submission.",
-        coverLetterNecessity: "Required. Must state originality and fit for EJIR."
+        coverLetterNecessity: "Required. Must state originality and fit for EJIR.",
+        layoutOverrides: { marginInches: 1, fontSizePt: 12, lineSpacing: "double", fontFamily: "Times New Roman" }
       };
     } else {
       standardRules = {
@@ -121,7 +125,8 @@ export default function ComplianceChecklistPanel({
         abstractRequirements: "Strict limit of 250 words, non-structured single paragraph format. Underneath specify 4 to 6 indexing keywords.",
         referencesRequirement: "Ensure APA 2020 format. Complete DOI pointers or portal URLs for every reference listed.",
         ethicalDisclosure: "Mandatory Declarations Section detailing Conflicts of Interest, Funding sources, and Ethical Approval status.",
-        coverLetterNecessity: "Highly recommended or mandatory. Must state that the submission is original and has not been submitted elsewhere."
+        coverLetterNecessity: "Highly recommended or mandatory. Must state that the submission is original and has not been submitted elsewhere.",
+        layoutOverrides: { marginInches: 1, fontSizePt: 12, lineSpacing: "double", fontFamily: "Times New Roman" }
       };
     }
     updateProject({ complianceRules: standardRules });
