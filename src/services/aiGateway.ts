@@ -8,28 +8,21 @@
 
 import { AISettings, AIProviderInfo, AIRequest, AIResponse, HealthStatus } from "../types";
 import { decryptData, decryptDataSync } from "../utils/crypto";
+import { getEncryptionSecret } from "./vaultPassphrase";
 
 // ─────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────
 
-function getActivePasscodeHash(): string {
-  // SECURITY: No hardcoded fallback keys allowed
-  // Must authenticate user before decryption is available
-  if (typeof localStorage === "undefined") return "";
-  const user = localStorage.getItem("phd_active_session_username");
-  if (!user) return "";
-  const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-  if (savedStateStr) {
-    try {
-      const parsed = JSON.parse(savedStateStr);
-      return parsed.passcodeHash || "";
-    } catch (e) {
-      console.error("Error reading passcode hash for decryption:", e);
-    }
-  }
-  return "";
-}
+// Task 3 (BYOK vault passphrase, 2026-07-24): every getEncryptionSecret() call
+// below used to read `phd_profile_state_<user>`'s `passcodeHash` field from
+// localStorage — the same blob the encrypted provider keys are stored in,
+// and (per UserProfileGate.tsx) actually just the user's raw login password,
+// not a real hash. That meant the decryption secret sat right next to the
+// ciphertext. Now sources from vaultPassphrase.ts's in-memory-only vault
+// passphrase instead (imported above) — "" (locked/no session) behaves the
+// same as before (decryptData throws / getApiKey callers already handle an
+// empty key).
 
 function cleanJsonString(text: string): string {
   let cleaned = text.trim();
@@ -179,7 +172,7 @@ const GeminiAdapter: AIProviderAdapter = {
   requiresApiKey: true,
 
   getApiKey(settings: AISettings): string {
-    return decryptData(settings.geminiApiKey || "", getActivePasscodeHash());
+    return decryptData(settings.geminiApiKey || "", getEncryptionSecret());
   },
 
   getEndpoint(): string {
@@ -254,7 +247,7 @@ const OpenAIAdapter: AIProviderAdapter = {
   requiresApiKey: true,
 
   getApiKey(settings: AISettings): string {
-    return decryptData(settings.openaiApiKey || "", getActivePasscodeHash());
+    return decryptData(settings.openaiApiKey || "", getEncryptionSecret());
   },
 
   getEndpoint(): string {
@@ -297,7 +290,7 @@ const ClaudeAdapter: AIProviderAdapter = {
   requiresApiKey: true,
 
   getApiKey(settings: AISettings): string {
-    return decryptData(settings.claudeApiKey || "", getActivePasscodeHash());
+    return decryptData(settings.claudeApiKey || "", getEncryptionSecret());
   },
 
   getEndpoint(): string {
@@ -340,7 +333,7 @@ const DeepSeekAdapter: AIProviderAdapter = {
   requiresApiKey: true,
 
   getApiKey(settings: AISettings): string {
-    return decryptData(settings.deepseekApiKey || "", getActivePasscodeHash());
+    return decryptData(settings.deepseekApiKey || "", getEncryptionSecret());
   },
 
   getEndpoint(): string {
@@ -383,7 +376,7 @@ const QwenAdapter: AIProviderAdapter = {
   requiresApiKey: true,
 
   getApiKey(settings: AISettings): string {
-    return decryptData(settings.qwenApiKey || "", getActivePasscodeHash());
+    return decryptData(settings.qwenApiKey || "", getEncryptionSecret());
   },
 
   getEndpoint(): string {
@@ -426,7 +419,7 @@ const CohereAdapter: AIProviderAdapter = {
   requiresApiKey: true,
 
   getApiKey(settings: AISettings): string {
-    return decryptData(settings.cohereApiKey || "", getActivePasscodeHash());
+    return decryptData(settings.cohereApiKey || "", getEncryptionSecret());
   },
 
   getEndpoint(): string {
@@ -840,7 +833,7 @@ const ADAPTERS: Record<string, AIProviderAdapter> = {
 // ─────────────────────────────────────────────────────────
 
 function resolveProvider(taskType: string, settings: AISettings): { provider: string; model?: string; apiKey?: string } {
-  const secret = getActivePasscodeHash();
+  const secret = getEncryptionSecret();
   const provider = settings.provider || "gemini";
 
   if (provider !== "auto") {

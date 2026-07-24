@@ -3,13 +3,13 @@ import { Shield, Cloud, Server, ChevronRight, ChevronLeft, CheckCircle2, AlertTr
 import { PaperProject, AISettings, HealthStatus, AIProviderInfo } from '../types';
 import AIGateway, { AI_PROVIDERS } from '../services/aiGateway';
 import { encryptData, decryptData } from '../utils/crypto';
+import { setVaultPassphrase, getVaultPassphrase, isVaultUnlocked } from '../services/vaultPassphrase';
 
 interface AISetupWizardProps {
   project: PaperProject;
   updateProject: (fields: Partial<PaperProject>) => void;
   onComplete: (readiness: 'validated' | 'simulated', nextChoice: 'vault' | 'skip') => void;
   onBack?: () => void;
-  passcodeHash: string;
 }
 
 // Stage 2 (target-workflow.md) — 5-tier BYOK model (docs/planning/ai-gateway.md).
@@ -31,7 +31,7 @@ function providerMatchesTier(provider: AIProviderInfo, tier: AiTier): boolean {
   return provider.type === "cloud" && provider.pricingTier === "paid";
 }
 
-export default function AISetupWizard({ project, updateProject, onComplete, onBack, passcodeHash }: AISetupWizardProps) {
+export default function AISetupWizard({ project, updateProject, onComplete, onBack }: AISetupWizardProps) {
   const [step, setStep] = useState(0);
   const [selectedTier, setSelectedTier] = useState<AiTier | null>(null);
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
@@ -40,6 +40,23 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   const [isTesting, setIsTesting] = useState(false);
   const [healthResults, setHealthResults] = useState<Record<string, HealthStatus>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+
+  // Task 3 (BYOK vault passphrase) — a separate, in-memory-only secret used to
+  // encrypt provider API keys, distinct from the login passcode. See
+  // src/services/vaultPassphrase.ts for why: the login passcodeHash used to be
+  // reused as the encryption secret, but it's stored in the same localStorage
+  // blob as the encrypted keys (and isn't even really hashed), which defeated
+  // the point of encrypting at all.
+  const [vaultUnlocked, setVaultUnlocked] = useState(isVaultUnlocked());
+  const [vaultInput, setVaultInput] = useState("");
+  const vaultSecret = getVaultPassphrase() || "";
+
+  const handleUnlockVault = () => {
+    if (!vaultInput.trim()) return;
+    setVaultPassphrase(vaultInput);
+    setVaultUnlocked(true);
+    setVaultInput("");
+  };
 
   // Check if Gemini key is set on the server via .env on mount
   useEffect(() => {
@@ -53,7 +70,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             setSelectedProviders(prev => Array.from(new Set([...prev, "gemini"])));
             
             // Pre-fill geminiApiKey with "defined_on_server" dummy key
-            const encryptedDummy = encryptData("defined_on_server", passcodeHash);
+            const encryptedDummy = encryptData("defined_on_server", vaultSecret);
             setSettings(prev => ({
               ...prev,
               geminiApiKey: encryptedDummy
@@ -65,7 +82,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
       }
     };
     checkServerKey();
-  }, [passcodeHash]);
+  }, [vaultSecret]);
 
   // Step 1: Detect local servers on mount
   useEffect(() => {
@@ -99,7 +116,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     // We update local state, and encrypt keys before saving
     let finalValue = value;
     if (field.toLowerCase().includes('apikey')) {
-      finalValue = encryptData(value, passcodeHash);
+      finalValue = encryptData(value, vaultSecret);
     }
     
     setSettings(prev => ({
@@ -355,13 +372,50 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
 
   const renderStep2 = () => {
     const selected = AI_PROVIDERS.filter(p => selectedProviders.includes(p.id));
-    
+    const needsVault = selected.some(p => p.requiresApiKey);
+
+    if (needsVault && !vaultUnlocked) {
+      return (
+        <div className="space-y-6 animate-fade-in max-w-xl mx-auto text-center">
+          <div className="w-14 h-14 bg-[#1A365D]/5 border border-gray-200 rounded-full flex items-center justify-center mx-auto">
+            <Shield className="w-7 h-7 text-[#C08A3E]" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold font-serif text-[#1A365D] mb-3">Unlock Your Key Vault</h2>
+            <p className="text-[#6B665E] text-sm">
+              Choose a vault passphrase. It encrypts your provider API keys and is held only in this
+              browser tab's memory — never written to disk or synced anywhere. Closing or reloading
+              the tab locks the vault again; you'll enter this passphrase each session before your
+              keys can be used. There is no recovery if you forget it — you'd re-enter your API keys.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <input
+              type="password"
+              value={vaultInput}
+              onChange={(e) => setVaultInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleUnlockVault()}
+              placeholder="Vault passphrase"
+              className="w-full bg-white border border-[#D1CEC7] rounded-xl py-2.5 px-4 text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/10 focus:border-[#1A365D] transition-all font-mono text-sm"
+            />
+            <button
+              onClick={handleUnlockVault}
+              disabled={!vaultInput.trim()}
+              className="px-5 py-2.5 bg-[#1A365D] hover:bg-[#122847] font-bold text-white text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 uppercase tracking-wider font-mono"
+            >
+              Unlock Vault
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6 animate-fade-in">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold font-serif text-[#1A365D] mb-3">Configure Connections</h2>
           <p className="text-[#6B665E] max-w-2xl mx-auto text-sm">
-            Provide the necessary API keys or endpoint URLs for your selected AI engines. 
+            Provide the necessary API keys or endpoint URLs for your selected AI engines.
             Keys are XOR-encrypted locally and never stored in plain text.
           </p>
         </div>
@@ -403,9 +457,9 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                           placeholder={`Enter ${provider.name} API Key`}
                           value={
                             (settings as any)[`${provider.id}ApiKey`] 
-                              ? decryptData((settings as any)[`${provider.id}ApiKey`], passcodeHash) === "defined_on_server"
+                              ? decryptData((settings as any)[`${provider.id}ApiKey`], vaultSecret) === "defined_on_server"
                                 ? "Defined on Server (.env)"
-                                : decryptData((settings as any)[`${provider.id}ApiKey`], passcodeHash)
+                                : decryptData((settings as any)[`${provider.id}ApiKey`], vaultSecret)
                               : ""
                           }
                           className="w-full bg-white border border-[#D1CEC7] rounded-xl py-2.5 px-4 text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/10 focus:border-[#1A365D] transition-all font-mono text-sm placeholder:text-gray-400"

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { PaperProject, AISettings } from "../types";
 import { encryptData, decryptData } from "../utils/crypto";
-import { 
+import { setVaultPassphrase, getVaultPassphrase, isVaultUnlocked } from "../services/vaultPassphrase";
+import {
   Key, 
   Cpu, 
   TrendingUp, 
@@ -31,8 +32,16 @@ interface AIControlCenterProps {
 
 export default function AIControlCenter({ project, updateProject, onRequireVault }: AIControlCenterProps) {
   const [activeSubTab, setActiveSubTab] = useState<"credentials" | "ollama" | "usage" | "comparison">("credentials");
-  const [passcodeHash, setPasscodeHash] = useState("");
-  
+
+  // Task 3 (BYOK vault passphrase, 2026-07-24) — this used to decrypt/encrypt
+  // provider keys with the user's login passcodeHash, falling back to a
+  // HARDCODED literal ("scholar_agentic_fallback_secret_salt_123") whenever
+  // passcodeHash wasn't loaded yet. That fallback defeated the encryption
+  // entirely — anyone could decrypt stored keys offline with a known constant.
+  // Now uses vaultPassphrase.ts's in-memory-only passphrase; no fallback.
+  const [vaultUnlocked, setVaultUnlockedState] = useState(isVaultUnlocked());
+  const [vaultInput, setVaultInput] = useState("");
+
   // Decrypted keys state
   const [geminiKey, setGeminiKey] = useState("");
   const [openaiKey, setOpenaiKey] = useState("");
@@ -51,31 +60,29 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
   const [ollamaLatency, setOllamaLatency] = useState<number | null>(null);
   const [scanningOllama, setScanningOllama] = useState(false);
 
-  // Initialize passcode secret and decrypt existing keys on mount
-  useEffect(() => {
-    const user = localStorage.getItem("phd_active_session_username");
-    if (user) {
-      const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-      if (savedStateStr) {
-        try {
-          const parsed = JSON.parse(savedStateStr);
-          const secret = parsed.passcodeHash || "scholar_agentic_fallback_secret_salt_123";
-          setPasscodeHash(secret);
+  const handleUnlockVault = () => {
+    if (!vaultInput.trim()) return;
+    setVaultPassphrase(vaultInput);
+    setVaultUnlockedState(true);
+    setVaultInput("");
+  };
 
-          // Decrypt settings keys
-          const settings = (project.aiSettings || {}) as import("../types").AISettings;
-          if (settings.geminiApiKey) setGeminiKey(decryptData(settings.geminiApiKey, secret));
-          if (settings.openaiApiKey) setOpenaiKey(decryptData(settings.openaiApiKey, secret));
-          if (settings.claudeApiKey) setClaudeKey(decryptData(settings.claudeApiKey, secret));
-          if (settings.deepseekApiKey) setDeepseekKey(decryptData(settings.deepseekApiKey, secret));
-          if (settings.qwenApiKey) setQwenKey(decryptData(settings.qwenApiKey, secret));
-          if (settings.cohereApiKey) setCohereKey(decryptData(settings.cohereApiKey, secret));
-        } catch (e) {
-          console.error("Failed to parse user passcode hash for AI decryption:", e);
-        }
-      }
+  // Decrypt existing keys once the vault is unlocked (or whenever settings change while unlocked).
+  useEffect(() => {
+    if (!vaultUnlocked) return;
+    const secret = getVaultPassphrase() || "";
+    try {
+      const settings = (project.aiSettings || {}) as import("../types").AISettings;
+      if (settings.geminiApiKey) setGeminiKey(decryptData(settings.geminiApiKey, secret));
+      if (settings.openaiApiKey) setOpenaiKey(decryptData(settings.openaiApiKey, secret));
+      if (settings.claudeApiKey) setClaudeKey(decryptData(settings.claudeApiKey, secret));
+      if (settings.deepseekApiKey) setDeepseekKey(decryptData(settings.deepseekApiKey, secret));
+      if (settings.qwenApiKey) setQwenKey(decryptData(settings.qwenApiKey, secret));
+      if (settings.cohereApiKey) setCohereKey(decryptData(settings.cohereApiKey, secret));
+    } catch (e) {
+      console.error("Failed to decrypt stored API keys with the current vault passphrase:", e);
     }
-  }, [project.aiSettings]);
+  }, [vaultUnlocked, project.aiSettings]);
 
   // Automatically check Ollama status when scanning or mounting
   useEffect(() => {
@@ -110,7 +117,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
     try {
       // Build temp aiSettings configuration for validation test
-      const secret = passcodeHash || "scholar_agentic_fallback_secret_salt_123";
+      const secret = getVaultPassphrase() || "";
       const settingsCopy: AISettings = {
         ...project.aiSettings,
         provider: targetProvider as any,
@@ -140,7 +147,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
   // Save credentials encrypted
   const handleSaveCredentials = async () => {
-    const secret = passcodeHash || "scholar_agentic_fallback_secret_salt_123";
+    const secret = getVaultPassphrase() || "";
     const updatedSettings: AISettings = {
       ...project.aiSettings,
       geminiApiKey: encryptData(geminiKey, secret),
@@ -238,7 +245,39 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
       </div>
 
       {/* SUB TAB 1: API CREDENTIALS MANAGER */}
-      {activeSubTab === "credentials" && (
+      {activeSubTab === "credentials" && !vaultUnlocked && (
+        <div className="space-y-6 animate-fade-in max-w-xl mx-auto text-center py-8">
+          <div className="w-14 h-14 bg-[#1A365D]/5 border border-gray-200 rounded-full flex items-center justify-center mx-auto">
+            <Key className="w-7 h-7 text-[#C08A3E]" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold font-serif text-[#1A365D] mb-3">Unlock Your Key Vault</h3>
+            <p className="text-[#6B665E] text-sm">
+              Enter your vault passphrase to view or edit your encrypted provider API keys. It's held
+              only in this browser tab's memory for this session — never written to disk or synced.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <input
+              type="password"
+              value={vaultInput}
+              onChange={(e) => setVaultInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleUnlockVault()}
+              placeholder="Vault passphrase"
+              className="w-full bg-white border border-[#D1CEC7] rounded-xl py-2.5 px-4 text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/10 focus:border-[#1A365D] transition-all font-mono text-sm"
+            />
+            <button
+              onClick={handleUnlockVault}
+              disabled={!vaultInput.trim()}
+              className="px-5 py-2.5 bg-[#1A365D] hover:bg-[#122847] font-bold text-white text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 uppercase tracking-wider font-mono"
+            >
+              Unlock Vault
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === "credentials" && vaultUnlocked && (
         <div className="space-y-6 animate-fade-in">
           {/* Info Alert Box */}
           <div className="p-4 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl flex gap-3 items-start">
@@ -246,7 +285,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
             <div className="space-y-1">
               <span className="text-xs font-bold text-[#1A365D] uppercase tracking-wider font-mono block">Synchronous XOR Cipher Encryption</span>
               <p className="text-[11px] text-gray-600 leading-normal font-sans">
-                To prevent accidental key exposure in local storage exports or browser caches, all API credentials entered below are encrypted in memory using a symmetric XOR cipher keyed to your secure profile passcode. They are decrypted on the fly only at the moment of request dispatch.
+                To prevent accidental key exposure in local storage exports or browser caches, all API credentials entered below are encrypted using a symmetric XOR cipher keyed to your vault passphrase — a separate secret from your login, held only in this browser tab's memory for this session. They are decrypted on the fly only at the moment of request dispatch.
               </p>
             </div>
           </div>

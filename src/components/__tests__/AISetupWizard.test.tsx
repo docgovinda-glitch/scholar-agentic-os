@@ -54,7 +54,6 @@ function renderWizard(overrides: Partial<PaperProject> = {}) {
       project={project}
       updateProject={vi.fn()}
       onComplete={vi.fn()}
-      passcodeHash="test-hash"
     />
   );
 }

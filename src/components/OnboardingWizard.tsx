@@ -62,8 +62,6 @@ export default function OnboardingWizard() {
   if (onboardingStep === "login" || !user) {
     activeContent = <UserProfileGate onProfileActive={handleLoginSuccess} />;
   } else if (onboardingStep === "ai-setup") {
-    const parsedState = JSON.parse(localStorage.getItem(`phd_profile_state_${user}`) || '{}');
-    const passcodeHash = parsedState.passcodeHash || '';
     activeContent = (
       <AISetupWizard
         project={project!}
@@ -78,7 +76,6 @@ export default function OnboardingWizard() {
         onBack={() => {
           logout();
         }}
-        passcodeHash={passcodeHash}
       />
     );
   } else if (onboardingStep === "knowledge-vault") {
