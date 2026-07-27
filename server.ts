@@ -59,13 +59,27 @@ interface UserRecord {
   };
 }
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "scholar-agentic-secure-vault-32ch";
+// Production-readiness pass (2026-07-24): this used to fall back to a
+// hardcoded literal ("scholar-agentic-secure-vault-32ch") whenever
+// ENCRYPTION_KEY wasn't set — the exact same class of vulnerability fixed
+// for the BYOK vault passphrase in an earlier session (a known constant
+// standing in for a real secret defeats the point of encrypting at all).
+// No fallback now: if unset, decryptServerKey refuses to decrypt (returns
+// "" — resolveApiKey's caller already treats that as "no server-stored key
+// available", not a crash) instead of silently using a guessable key.
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+if (!ENCRYPTION_KEY) {
+  console.warn(
+    "[Security] ENCRYPTION_KEY is not set — server-stored provider API keys (resolveApiKey's users.json fallback) cannot be decrypted until it's configured."
+  );
+}
 
 function decryptServerKey(text: string): string {
+  if (!ENCRYPTION_KEY) return "";
   try {
     let cipherKey = Buffer.alloc(32);
     cipherKey.write(ENCRYPTION_KEY, 'utf-8');
-    
+
     const parts = text.split(':');
     const iv = Buffer.from(parts.shift() || '', 'hex');
     const encryptedText = Buffer.from(parts.join(':'), 'hex');

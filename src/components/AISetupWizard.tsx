@@ -240,9 +240,18 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
         {TIER_CARDS.map((tier) => (
           <div
             key={tier.id}
+            role="button"
+            tabIndex={0}
             onClick={() => {
               setSelectedTier(tier.id);
               setStep(1);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setSelectedTier(tier.id);
+                setStep(1);
+              }
             }}
             className="p-5 rounded-xl border cursor-pointer transition-all duration-300 bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/50 hover:bg-white"
           >
@@ -295,12 +304,20 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
           </h3>
           <div className="grid gap-3">
             {AI_PROVIDERS.filter(p => p.type === 'cloud').filter(p => !selectedTier || providerMatchesTier(p, selectedTier)).map(provider => (
-              <div 
+              <div
                 key={provider.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => handleProviderToggle(provider.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleProviderToggle(provider.id);
+                  }
+                }}
                 className={`relative p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
-                  selectedProviders.includes(provider.id) 
-                    ? 'bg-[#1A365D]/5 border-[#1A365D] shadow-sm' 
+                  selectedProviders.includes(provider.id)
+                    ? 'bg-[#1A365D]/5 border-[#1A365D] shadow-sm'
                     : 'bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/30 hover:bg-[#FAF8F5]/50'
                 }`}
               >
@@ -342,9 +359,17 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             {AI_PROVIDERS.filter(p => p.type === 'local').map(provider => {
               const isDetected = healthResults[provider.id]?.status === 'online';
               return (
-                <div 
+                <div
                   key={provider.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleProviderToggle(provider.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleProviderToggle(provider.id);
+                    }
+                  }}
                   className={`relative p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
                     selectedProviders.includes(provider.id) 
                       ? 'bg-[#1A365D]/5 border-[#1A365D] shadow-sm' 

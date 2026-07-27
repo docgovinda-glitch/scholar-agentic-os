@@ -123,6 +123,35 @@ describe("AISetupWizard — Stage 2 tier-selection gate", () => {
 
     expect(await screen.findByText(/choose your ai access tier/i)).toBeInTheDocument();
   });
+
+  // Production-readiness pass (2026-07-24) — these tier cards are clickable
+  // <div>s, not real <button>s; without role="button"/tabIndex/onKeyDown they
+  // were unreachable and unusable via keyboard alone.
+  it("is keyboard-operable: pressing Enter on the Local Router tier card advances to the provider step", async () => {
+    renderWizard();
+    await screen.findByText(/choose your ai access tier/i);
+
+    const card = screen.getByText(/local router/i).closest('[role="button"]')!;
+    expect(card).toHaveAttribute("tabIndex", "0");
+    fireEvent.keyDown(card, { key: "Enter" });
+
+    expect(await screen.findByText("Local AI Servers")).toBeInTheDocument();
+  });
+
+  it("is keyboard-operable: pressing Space on a provider card toggles its selection", async () => {
+    renderWizard();
+    await screen.findByText(/choose your ai access tier/i);
+    fireEvent.click(screen.getByText(/heavy byok/i));
+    await screen.findByText("Cloud AI Providers");
+
+    const providerCard = screen.getByText("OpenAI GPT").closest('[role="button"]')!;
+    const configureButton = screen.getByText(/configure providers/i).closest("button")!;
+    expect(configureButton).toBeDisabled();
+
+    fireEvent.keyDown(providerCard, { key: " " });
+
+    expect(configureButton).not.toBeDisabled();
+  });
 });
 
 describe("AISetupWizard — provider-selection step (characterization, unchanged once a tier is picked)", () => {
