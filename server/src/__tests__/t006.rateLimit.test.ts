@@ -50,6 +50,15 @@ function getRetryAfterNumber(body: any): number | null {
   return null;
 }
 
+// Retiring the old server.ts auth/user/admin routes (2026-07-24 — real auth
+// now lives in supabaseAuthService.ts + Supabase Edge Functions, confirmed
+// via grep that nothing in src/ still calls the old routes) removed
+// /api/verify-and-sync-profile, /api/request-password-reset, and their
+// dedicated loginBruteForceLimit/authModerateLimit/authModeratePerUserLimit/
+// authQueryPerUserLimit rate limiters. The two tests that characterized
+// those limiters on those routes are removed with them — the remaining
+// tests below cover rate limiters that are still live (aiAbuseLimit,
+// parseExternalLinkLimit, lookupDoiLimit).
 describe("T006 — Rate limiting & brute-force protection", () => {
   beforeEach(() => {
     // Ensure NODE_ENV behavior doesn't start real server; server.ts gates on NODE_ENV.
@@ -57,30 +66,6 @@ describe("T006 — Rate limiting & brute-force protection", () => {
     // Isolate in-memory rate limiter store between tests.
     __resetRateLimitStore();
     mockFetch.mockClear();
-  });
-
-  it("throttles auth brute-force endpoint by (ip + username)", async () => {
-    const username = "rl_user_1";
-    const password = "wrong_password";
-
-    // loginBruteForceLimit: window 15m, max 5
-    for (let i = 0; i < 5; i++) {
-      const res = await request(app)
-        .post("/api/verify-and-sync-profile")
-        .send({ username, password });
-      expect(res.status).not.toBe(429);
-    }
-
-    const res429 = await request(app)
-      .post("/api/verify-and-sync-profile")
-      .send({ username, password });
-
-    expect(res429.status).toBe(429);
-    expect(res429.headers["content-type"]).toContain("application/json");
-    expect(res429.body?.code).toBe("RATE_LIMIT_EXCEEDED");
-    const retryAfter = getRetryAfterNumber(res429.body);
-    expect(retryAfter).not.toBeNull();
-    expect((retryAfter as number) >= 0).toBe(true);
   });
 
   it("throttles AI generation endpoints", async () => {
@@ -118,31 +103,6 @@ describe("T006 — Rate limiting & brute-force protection", () => {
     }
 
     const res429 = await request(app).post("/api/parse-external-link").send(payload);
-    expect(res429.status).toBe(429);
-    expect(res429.body?.code).toBe("RATE_LIMIT_EXCEEDED");
-    expect(getRetryAfterNumber(res429.body)).not.toBeNull();
-  });
-
-  it("throttles auth endpoints by IP (register + password reset)", async () => {
-    // authModerateLimit: window 15m, max 20 (IP only)
-    // /api/request-password-reset uses authModerateLimit
-    const resetPayload = {
-      username: "rl_reset_user_1",
-      email: "rl_reset_user_1@example.com",
-      newPasswordHash: "hash",
-    };
-
-    for (let i = 0; i < 20; i++) {
-      const res = await request(app)
-        .post("/api/request-password-reset")
-        .send(resetPayload);
-      expect(res.status).not.toBe(429);
-    }
-
-    const res429 = await request(app)
-      .post("/api/request-password-reset")
-      .send(resetPayload);
-
     expect(res429.status).toBe(429);
     expect(res429.body?.code).toBe("RATE_LIMIT_EXCEEDED");
     expect(getRetryAfterNumber(res429.body)).not.toBeNull();
