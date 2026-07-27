@@ -485,7 +485,7 @@ export default function ManuscriptEditorWorkspace({
 
       {/* Download Bar */}
       <div className="flex flex-wrap items-center gap-3 bg-[#FAF8F5] border border-[#E2E8F0] rounded-xl p-3">
-        <span className="text-[10px] font-mono font-bold text-[#8C887F] uppercase tracking-wider">Download:</span>
+        <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase tracking-wider">Download:</span>
         <button
           onClick={() => requestDownload("docx")}
           disabled={downloadingDocx}
@@ -565,7 +565,7 @@ export default function ManuscriptEditorWorkspace({
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   {/* Word Count Progress */}
                   <div className="flex items-center gap-2 grow max-w-xs">
-                    <span className="text-[#8C887F] font-bold uppercase shrink-0">
+                    <span className="text-[#76726A] font-bold uppercase shrink-0">
                       Length: {editingSection ? (project.sections[editingSection] || "").trim().split(/\s+/).filter(Boolean).length : 0} / {editingSection ? getLengthConstraint(editingSection).max : 1000}w
                     </span>
                     <div className="grow h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
@@ -599,7 +599,7 @@ export default function ManuscriptEditorWorkspace({
 
                   {/* Originality Index */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[#8C887F] font-bold uppercase">Originality:</span>
+                    <span className="text-[#76726A] font-bold uppercase">Originality:</span>
                     <span className={`px-1.5 py-0.5 rounded font-bold ${
                       calculateOriginalityIndex(editingSection ? (project.sections[editingSection] || "") : "") >= 90 
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
@@ -611,7 +611,7 @@ export default function ManuscriptEditorWorkspace({
 
                   {/* Style warnings */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[#8C887F] font-bold uppercase">Style Errors:</span>
+                    <span className="text-[#76726A] font-bold uppercase">Style Errors:</span>
                     <span className={`px-1.5 py-0.5 rounded font-bold ${
                       checkAcademicTone(editingSection ? (project.sections[editingSection] || "") : "").length === 0 
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
@@ -625,7 +625,7 @@ export default function ManuscriptEditorWorkspace({
                 {/* Tone warnings suggestion list */}
                 {checkAcademicTone(editingSection ? (project.sections[editingSection] || "") : "").length > 0 && (
                   <div className="mt-1 pt-1.5 border-t border-slate-200/50 max-h-[50px] overflow-y-auto flex flex-wrap gap-1.5 text-[9px] text-[#A87630]">
-                    <span className="font-bold text-[#8C887F] mr-1">Suggestions:</span>
+                    <span className="font-bold text-[#76726A] mr-1">Suggestions:</span>
                     {checkAcademicTone(editingSection ? (project.sections[editingSection] || "") : "").slice(0, 4).map((warn, i) => (
                       <span key={i} className="bg-amber-50 border border-amber-100 rounded px-1">
                         "{warn.word}" → <span className="font-bold text-slate-700">{warn.replacement}</span>
@@ -683,7 +683,7 @@ export default function ManuscriptEditorWorkspace({
                               <div key={file.id} className="p-2 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors text-[10px] bg-white">
                                 <div className="flex items-center justify-between font-mono font-bold text-[#1A365D]">
                                   <span className="line-clamp-1 grow mr-2">{file.fileName}</span>
-                                  <span className="text-[#C08A3E] shrink-0 font-normal">[{tag}]</span>
+                                  <span className="text-[#946A30] shrink-0 font-normal">[{tag}]</span>
                                 </div>
                                 <div className="mt-2 flex gap-1.5">
                                   <button
@@ -729,7 +729,7 @@ export default function ManuscriptEditorWorkspace({
                           <span className="text-xl font-mono font-bold text-[#1A365D]">
                             {checkThematicAlignment(editingSection ? (project.sections[editingSection] || "") : "").score}%
                           </span>
-                          <span className="text-[8px] uppercase tracking-wider font-bold text-[#C08A3E]">Ṛta Match</span>
+                          <span className="text-[8px] uppercase tracking-wider font-bold text-[#946A30]">Ṛta Match</span>
                         </div>
                       </div>
                       

@@ -128,10 +128,10 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
       {/* Simulation Controls Menu bar */}
       <div className="bg-[#F2EFE9] border-b border-[#D1CEC7] px-5 py-3.5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-1 px-2.5 bg-[#FAF9F6] border border-[#D1CEC7] rounded text-[10px] font-mono uppercase font-bold text-[#8C887F]">
+          <div className="p-1 px-2.5 bg-[#FAF9F6] border border-[#D1CEC7] rounded text-[10px] font-mono uppercase font-bold text-[#76726A]">
             PDF PRE-PRINT LAYOUT
           </div>
-          <span className="text-xs text-[#8C887F]">
+          <span className="text-xs text-[#76726A]">
             Word Count: <strong className="text-[#1A1A1A]">{totalWords} words</strong>
           </span>
         </div>
@@ -229,7 +229,7 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
           <div className="w-full max-w-2xl bg-white border border-[#D1CEC7] rounded-xl p-10 text-center space-y-4 shadow">
             <AlertCircle className="w-8 h-8 text-[#8C887F] mx-auto" />
             <h4 className="font-serif italic text-lg text-[#1A1A1A]">Manuscript Not Drafted Yet</h4>
-            <p className="text-xs text-[#8C887F] max-w-sm mx-auto">
+            <p className="text-xs text-[#76726A] max-w-sm mx-auto">
               Please advance to <strong className="text-[#1A1A1A]">Phase F: Interactive Manuscript Drafting</strong> and trigger the drafting co-agent. 
               Once you co-write or draft sections, the compiled publication paper will automatically render below.
             </p>
@@ -255,7 +255,7 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
             )}
 
             {/* Academic Running Header */}
-            <div className="border-b border-[#EAE7DF] pb-2 mb-8 flex items-center justify-between text-[10px] font-mono text-[#8C887F] uppercase tracking-wider">
+            <div className="border-b border-[#EAE7DF] pb-2 mb-8 flex items-center justify-between text-[10px] font-mono text-[#76726A] uppercase tracking-wider">
               <span>{project.targetJournal?.name || "Scopus Indexed Scholarly Manuscript"}</span>
               <span>Pre-Print Document Tracker</span>
             </div>
@@ -282,13 +282,13 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
                     </p>
                   )}
                   {project.authorEmail || project.orcidId ? (
-                    <p className="text-[10px] text-[#8C887F] font-mono uppercase tracking-widest mt-1">
+                    <p className="text-[10px] text-[#76726A] font-mono uppercase tracking-widest mt-1">
                       {project.authorEmail && `Email: ${project.authorEmail}`}
                       {project.authorEmail && project.orcidId && " • "}
                       {project.orcidId && `ORCID: ${project.orcidId}`}
                     </p>
                   ) : (
-                    <p className="text-[10px] text-[#8C887F] font-mono uppercase tracking-widest mt-1">
+                    <p className="text-[10px] text-[#76726A] font-mono uppercase tracking-widest mt-1">
                       Nepal • Independent Scholar Status
                     </p>
                   )}
@@ -306,7 +306,7 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
                       </p>
                     )}
                     {(project.coAuthorEmail || project.coAuthorOrcidId) && (
-                      <p className="text-[9px] text-[#8C887F] font-mono uppercase tracking-widest mt-0.5">
+                      <p className="text-[9px] text-[#76726A] font-mono uppercase tracking-widest mt-0.5">
                         {project.coAuthorEmail && `Email: ${project.coAuthorEmail}`}
                         {project.coAuthorEmail && project.coAuthorOrcidId && " • "}
                         {project.coAuthorOrcidId && `ORCID: ${project.coAuthorOrcidId}`}
@@ -336,7 +336,7 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
               {/* Opt-in custom Title Page content if drafted */}
               {project.sections["Title Page"] && (
                 <div className="bg-[#FAF9F6] border border-[#D1CEC7] p-5 rounded-lg mb-6 text-xs text-justify space-y-1 font-sans">
-                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#8C887F]">Title Page Metadata & Affiliation Addendum</h3>
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#76726A]">Title Page Metadata & Affiliation Addendum</h3>
                   <div className="whitespace-pre-line leading-relaxed italic">{project.sections["Title Page"]}</div>
                 </div>
               )}
@@ -379,7 +379,7 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
             </div>
 
             {/* Simulated Manuscript Page Numbers */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-mono text-[#8C887F] tracking-widest uppercase">
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-mono text-[#76726A] tracking-widest uppercase">
               Page 1 of 1 // Simulated Manuscript Track
             </div>
 

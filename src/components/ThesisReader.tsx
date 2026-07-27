@@ -286,7 +286,7 @@ export default function KnowledgeVaultManager({ project, updateProject }: Knowle
             <Database className="w-5 h-5 text-amber-800" />
             Knowledge Vault
           </h2>
-          <p className="text-xs text-[#8C887F] font-mono uppercase tracking-wider mt-1">
+          <p className="text-xs text-[#76726A] font-mono uppercase tracking-wider mt-1">
             Upload research documents to ground AI-generated content with citations
           </p>
         </div>
@@ -353,7 +353,7 @@ export default function KnowledgeVaultManager({ project, updateProject }: Knowle
                 </div>
                 <div className="max-w-xs space-y-2">
                   <h3 className="text-base font-bold text-[#1A1A1A] font-serif">Knowledge Vault v2.0 Empty</h3>
-                  <p className="text-xs text-[#8C887F] leading-relaxed">
+                  <p className="text-xs text-[#76726A] leading-relaxed">
                     Click anywhere here to launch the Multi-Source Import Wizard. Ingest via PDF, URL, DOI, ISBN, PMID, arXiv, YouTube, Audio, or OCR.
                   </p>
                 </div>
@@ -381,7 +381,7 @@ export default function KnowledgeVaultManager({ project, updateProject }: Knowle
                           {file.status === "ready" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
                           {file.status === "error" && <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                         </div>
-                        <p className="text-[10px] text-[#8C887F] font-mono mt-0.5">
+                        <p className="text-[10px] text-[#76726A] font-mono mt-0.5">
                           {formatSize(file.fileSize)} · {file.chunks.length} chunks · {new Date(file.uploadedAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -426,7 +426,7 @@ export default function KnowledgeVaultManager({ project, updateProject }: Knowle
               {selectedFile ? "Document Overview" : "Source Details"}
             </span>
             {selectedFile?.parsedOverview?.citationTag && (
-              <span className="text-[10px] text-[#8C887F] font-mono">{selectedFile.parsedOverview.citationTag}</span>
+              <span className="text-[10px] text-[#76726A] font-mono">{selectedFile.parsedOverview.citationTag}</span>
             )}
           </div>
 
@@ -439,7 +439,7 @@ export default function KnowledgeVaultManager({ project, updateProject }: Knowle
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-sm font-bold font-serif">Processing Document...</h3>
-                    <p className="text-xs text-[#8C887F]">Parsing text, chunking for retrieval, and extracting overview via AI.</p>
+                    <p className="text-xs text-[#76726A]">Parsing text, chunking for retrieval, and extracting overview via AI.</p>
                   </div>
                 </div>
               ) : selectedFile.status === "error" ? (
@@ -459,7 +459,7 @@ export default function KnowledgeVaultManager({ project, updateProject }: Knowle
                       <span className={`text-[9px] font-bold font-mono px-2.5 py-0.5 rounded-md border ${selectedFile.isActive ? "bg-emerald-500/10 text-emerald-800 border-emerald-500/20" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
                         {selectedFile.isActive ? "Active Source" : "Inactive Source"}
                       </span>
-                      <span className="text-[9px] font-mono text-[#8C887F]">
+                      <span className="text-[9px] font-mono text-[#76726A]">
                         {selectedFile.chunks.length} chunks · {selectedFile.charCount.toLocaleString()} chars
                       </span>
                     </div>
@@ -655,23 +655,23 @@ export default function KnowledgeVaultManager({ project, updateProject }: Knowle
                       <>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5 text-[11px] font-sans">
                           <div>
-                            <span className="text-[#8C887F] block text-[9px] uppercase font-mono tracking-wider">Primary Author(s)</span>
+                            <span className="text-[#76726A] block text-[9px] uppercase font-mono tracking-wider">Primary Author(s)</span>
                             <span className="font-semibold text-[#1A1A1A]">{selectedFile.parsedOverview?.author || "Academic Researcher"}</span>
                           </div>
                           <div>
-                            <span className="text-[#8C887F] block text-[9px] uppercase font-mono tracking-wider">Publication Year</span>
+                            <span className="text-[#76726A] block text-[9px] uppercase font-mono tracking-wider">Publication Year</span>
                             <span className="font-semibold text-[#1A1A1A]">{selectedFile.parsedOverview?.year || new Date().getFullYear()}</span>
                           </div>
                           <div>
-                            <span className="text-[#8C887F] block text-[9px] uppercase font-mono tracking-wider">Institution / Journal</span>
+                            <span className="text-[#76726A] block text-[9px] uppercase font-mono tracking-wider">Institution / Journal</span>
                             <span className="font-semibold text-[#1A1A1A]">{selectedFile.parsedOverview?.institutionOrJournal || "Research Institution"}</span>
                           </div>
                           <div>
-                            <span className="text-[#8C887F] block text-[9px] uppercase font-mono tracking-wider">Volume / Issue</span>
+                            <span className="text-[#76726A] block text-[9px] uppercase font-mono tracking-wider">Volume / Issue</span>
                             <span className="font-semibold text-[#1A1A1A]">{selectedFile.parsedOverview?.volumeIssue || "Doctoral Dissertation"}</span>
                           </div>
                           <div className="sm:col-span-2">
-                            <span className="text-[#8C887F] block text-[9px] uppercase font-mono tracking-wider">In-Text Citation Tag (APA/MLA)</span>
+                            <span className="text-[#76726A] block text-[9px] uppercase font-mono tracking-wider">In-Text Citation Tag (APA/MLA)</span>
                             <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded inline-block mt-0.5 border border-emerald-200 text-xs">
                               {selectedFile.parsedOverview?.citationTag || selectedFile.fileName}
                             </span>
@@ -737,7 +737,7 @@ export default function KnowledgeVaultManager({ project, updateProject }: Knowle
                 </div>
                 <div className="max-w-sm space-y-2">
                   <h3 className="text-sm font-bold text-[#1A1A1A] font-serif">Select a Source</h3>
-                  <p className="text-xs text-[#8C887F] leading-relaxed">
+                  <p className="text-xs text-[#76726A] leading-relaxed">
                     {vault.files.length > 0
                       ? "Click on a file in the registry to view its extracted overview, chapters, and citation details."
                       : "Upload your doctoral thesis or research documents to get started. The AI will automatically extract an overview and chunk the content for citation-backed drafting."}

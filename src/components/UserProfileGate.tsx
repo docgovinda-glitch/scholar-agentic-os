@@ -675,7 +675,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
             <h1 className="text-3xl font-serif font-bold tracking-tight text-gradient">
               🎓 Scholar Agentic OS
             </h1>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#C08A3E] font-sans">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#946A30] font-sans">
               AI Research Operating System
             </p>
             <p className="text-[11px] text-[#6B665E] max-w-xs mx-auto leading-relaxed font-sans">
@@ -1027,7 +1027,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-[#D1CEC7]/35"></div>
                 </div>
-                <span className="relative px-3.5 bg-white text-[9px] font-mono font-bold text-[#8C887F] uppercase tracking-wider">
+                <span className="relative px-3.5 bg-white text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider">
                   Or continue with
                 </span>
               </div>
@@ -1055,7 +1055,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               
               {/* Credentials Section */}
               <div className="space-y-4 border-b border-[#D1CEC7]/30 pb-4">
-                <span className="text-[9px] font-mono uppercase font-bold text-[#C08A3E] tracking-wider block">1. Security Credentials</span>
+                <span className="text-[9px] font-mono uppercase font-bold text-[#946A30] tracking-wider block">1. Security Credentials</span>
                 
                 {/* Signup Username */}
                 <div className="space-y-1.5">
@@ -1173,7 +1173,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
               {/* Scholar Information Section */}
               <div className="space-y-4">
-                <span className="text-[9px] font-mono uppercase font-bold text-[#C08A3E] tracking-wider block">2. Personal & Academic Details</span>
+                <span className="text-[9px] font-mono uppercase font-bold text-[#946A30] tracking-wider block">2. Personal & Academic Details</span>
                 
                 {/* Full name & Email */}
                 <div className="grid grid-cols-2 gap-3">
@@ -1297,7 +1297,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-[#D1CEC7]/35"></div>
                 </div>
-                <span className="relative px-3.5 bg-white text-[9px] font-mono font-bold text-[#8C887F] uppercase tracking-wider">
+                <span className="relative px-3.5 bg-white text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider">
                   Or sign up with
                 </span>
               </div>
@@ -1411,7 +1411,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
       </div>
 
       {/* Subtly presented Trust Signals Footer */}
-      <div className="mt-8 text-center font-mono text-[10px] text-[#8C887F] tracking-widest uppercase">
+      <div className="mt-8 text-center font-mono text-[10px] text-[#76726A] tracking-widest uppercase">
         Secure • Encrypted • Private
       </div>
 

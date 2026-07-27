@@ -117,7 +117,7 @@ function OnboardingProgressBar({ currentIndex }: { currentIndex: number }) {
             <GraduationCap className="w-5 h-5 text-[#1A365D]" />
             <span className="text-sm font-serif font-bold text-[#1A365D]">Scholar Agentic OS — Setup Wizard</span>
           </div>
-          <span className="text-[10px] font-mono text-[#C08A3E] font-bold uppercase tracking-wider">
+          <span className="text-[10px] font-mono text-[#946A30] font-bold uppercase tracking-wider">
             Step {currentIndex + 1} of {STEPS.length}
           </span>
         </div>

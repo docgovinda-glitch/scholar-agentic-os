@@ -285,7 +285,7 @@ function App() {
               <h1 className="text-xl font-serif font-bold text-[#1A365D] tracking-tight leading-tight">
                 🎓 Scholar Agentic OS
               </h1>
-              <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-[#C08A3E] font-sans">
+              <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-[#946A30] font-sans">
                 AI Research Operating System
               </p>
             </div>
@@ -436,7 +436,7 @@ function App() {
 
         {/* Status bar — only in workspace view */}
         {viewMode === "workspace" && (
-        <div className="px-6 py-2 bg-[#FFFFFF] flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono text-[#8C887F] gap-2">
+        <div className="px-6 py-2 bg-[#FFFFFF] flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono text-[#76726A] gap-2">
           <div className="flex items-center gap-4 flex-wrap">
             <span className="flex items-center gap-1 text-[#1A365D]">
               Active Model:
@@ -740,7 +740,7 @@ function App() {
         )}
       </main>
 
-      <footer className="border-t border-[#E5E7EB] bg-[#FFFFFF] px-6 py-4 flex flex-col md:flex-row items-center justify-between text-xs text-[#8C887F] gap-2 font-mono shrink-0">
+      <footer className="border-t border-[#E5E7EB] bg-[#FFFFFF] px-6 py-4 flex flex-col md:flex-row items-center justify-between text-xs text-[#76726A] gap-2 font-mono shrink-0">
         <span className="text-[10px] uppercase tracking-wider">
           System Core: <span className="text-[#1A365D] font-bold">Scholar Agentic OS v1.0</span> | State: <span className="text-emerald-600 font-bold">Active</span>
         </span>
@@ -838,7 +838,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+        <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
           Select AI Provider
         </label>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -895,7 +895,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
           </div>
           <div className="space-y-3">
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 Anthropic API Key
               </label>
               <input
@@ -910,7 +910,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 Select Model
               </label>
               <select
@@ -940,7 +940,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
           </div>
           <div className="space-y-3">
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 DeepSeek API Key
               </label>
               <input
@@ -955,7 +955,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 Select Model
               </label>
               <select
@@ -984,7 +984,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
           </div>
           <div className="space-y-3">
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 Cohere API Key
               </label>
               <input
@@ -999,7 +999,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 Select Model
               </label>
               <select
@@ -1027,7 +1027,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
             </p>
           </div>
           <div>
-            <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+            <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
               Google Gemini API Key
             </label>
             <input
@@ -1040,31 +1040,31 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
               }}
               placeholder="AIzaSy..."
             />
-            <span className="text-[9px] text-[#8C887F] mt-1 block leading-normal font-sans">
-              Get a free key from <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-[#C08A3E] underline font-semibold">Google AI Studio</a>.
+            <span className="text-[9px] text-[#76726A] mt-1 block leading-normal font-sans">
+              Get a free key from <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-[#946A30] underline font-semibold">Google AI Studio</a>.
             </span>
           </div>
 
           {/* Illustrated 3-step setup guide */}
           <div className="p-4 bg-[#FAF8F5] border border-[#E5E7EB] rounded-xl space-y-2.5">
-            <span className="text-[10px] font-mono uppercase font-bold text-[#8C887F] block">
+            <span className="text-[10px] font-mono uppercase font-bold text-[#76726A] block">
               💡 How to get a free API Key in 20 seconds:
             </span>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[10px] font-sans leading-normal">
               <div className="p-2.5 bg-white border border-[#E5E7EB] rounded-lg space-y-1">
-                <span className="font-mono text-[#C08A3E] font-bold uppercase block text-[9px]">Step 1</span>
+                <span className="font-mono text-[#946A30] font-bold uppercase block text-[9px]">Step 1</span>
                 <p className="text-[#6B665E]">
-                  Go to <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-[#C08A3E] underline font-semibold font-sans">Google AI Studio</a> and sign in with Gmail.
+                  Go to <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-[#946A30] underline font-semibold font-sans">Google AI Studio</a> and sign in with Gmail.
                 </p>
               </div>
               <div className="p-2.5 bg-white border border-[#E5E7EB] rounded-lg space-y-1">
-                <span className="font-mono text-[#C08A3E] font-bold uppercase block text-[9px]">Step 2</span>
+                <span className="font-mono text-[#946A30] font-bold uppercase block text-[9px]">Step 2</span>
                 <p className="text-[#6B665E]">
                   Click the blue <strong>"Get API Key"</strong> button at the top left of the dashboard.
                 </p>
               </div>
               <div className="p-2.5 bg-white border border-[#E5E7EB] rounded-lg space-y-1">
-                <span className="font-mono text-[#C08A3E] font-bold uppercase block text-[9px]">Step 3</span>
+                <span className="font-mono text-[#946A30] font-bold uppercase block text-[9px]">Step 3</span>
                 <p className="text-[#6B665E]">
                   Copy the key (starts with <code>AIzaSy...</code>) and paste it in the box above!
                 </p>
@@ -1084,7 +1084,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
           </div>
           <div className="space-y-3">
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 OpenAI API Key
               </label>
               <input
@@ -1099,7 +1099,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 Select Model
               </label>
               <select
@@ -1131,7 +1131,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
           
           <div className="space-y-3">
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 Ollama Endpoint URL
               </label>
               <input
@@ -1146,7 +1146,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 Local Model Name
               </label>
               <input
@@ -1159,7 +1159,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
                 }}
                 placeholder="llama3"
               />
-              <span className="text-[9px] text-[#8C887F] mt-1 block leading-normal font-sans">
+              <span className="text-[9px] text-[#76726A] mt-1 block leading-normal font-sans">
                 e.g. `llama3`, `mistral`, `gemma2`, `phi3`, etc. Must match the model name listed in `ollama list`.
               </span>
             </div>
@@ -1178,7 +1178,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
           
           <div className="space-y-3">
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 API Endpoint Base URL
               </label>
               <input
@@ -1191,12 +1191,12 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
                 }}
                 placeholder="http://localhost:1234/v1"
               />
-              <span className="text-[9px] text-[#8C887F] mt-1 block leading-normal font-sans">
+              <span className="text-[9px] text-[#76726A] mt-1 block leading-normal font-sans">
                 Must include `/v1` or equivalent base path (e.g. `http://localhost:1234/v1`).
               </span>
             </div>
             <div>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                 Model Identifier
               </label>
               <input
@@ -1227,7 +1227,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Google Client ID */}
             <div className="space-y-1">
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                 Google Client ID
               </label>
               <input
@@ -1263,7 +1263,7 @@ function SettingsTabContent({ project, updateProject, hideIdentitySection = fals
                 Settings saved & API configuration locked!
               </div>
             ) : (
-              <p className="text-[11px] text-[#8C887F] font-sans">
+              <p className="text-[11px] text-[#76726A] font-sans">
                 All settings are temporarily cached; click Lock & Save to persist permanently.
               </p>
             )}
@@ -1416,7 +1416,7 @@ function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
           {response ? (
             <div className="bg-[#FAF8F5] border border-[#E5E7EB] rounded-xl p-4 text-xs text-[#1A365D] leading-relaxed max-h-[300px] overflow-y-auto whitespace-pre-wrap font-sans relative animate-fade-in shadow-inner">
               <div className="flex justify-between items-center mb-2 border-b border-[#E5E7EB] pb-1.5">
-                <span className="font-bold text-[10px] font-mono text-[#C08A3E] uppercase tracking-wider">
+                <span className="font-bold text-[10px] font-mono text-[#946A30] uppercase tracking-wider">
                   Agent Feedback:
                 </span>
                 <button
@@ -1440,7 +1440,7 @@ function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
         <form onSubmit={handleConsult} className="space-y-4">
           {/* Suggestions List */}
           <div className="space-y-1.5 pt-1">
-            <span className="block text-[9px] font-mono text-[#8C887F] uppercase tracking-wider font-bold">Suggested Prompts:</span>
+            <span className="block text-[9px] font-mono text-[#76726A] uppercase tracking-wider font-bold">Suggested Prompts:</span>
             <div className="flex flex-col gap-1.5">
               {(suggestedQueries[selectedAgent] || []).map((suggestion, idx) => (
                 <button

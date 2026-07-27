@@ -358,7 +358,7 @@ export default function DataDiscoveryPanel({
           />
           <Upload className="w-7 h-7 text-gray-300 group-hover:text-[#C08A3E] mx-auto mb-2 transition-all" />
           <p className="text-xs text-gray-500 font-sans">
-            Drag & drop or <span className="text-[#C08A3E] font-semibold">click to browse</span> your research documents
+            Drag & drop or <span className="text-[#946A30] font-semibold">click to browse</span> your research documents
           </p>
           <p className="text-[10px] text-gray-400 mt-1">
             Uploaded content will be parsed and used by the AI to discover more relevant sources
@@ -520,7 +520,7 @@ export default function DataDiscoveryPanel({
                           href={source.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[10px] font-mono text-[#C08A3E] hover:underline mt-0.5 block break-all"
+                          className="text-[10px] font-mono text-[#946A30] hover:underline mt-0.5 block break-all"
                         >
                           {source.url}
                         </a>
@@ -540,11 +540,11 @@ export default function DataDiscoveryPanel({
 
                     <div className="space-y-2 pt-3 border-t border-[#E2E8F0]">
                       <div>
-                        <span className="text-[10px] font-bold font-mono text-[#C08A3E] uppercase block">Relevance to Study:</span>
+                        <span className="text-[10px] font-bold font-mono text-[#946A30] uppercase block">Relevance to Study:</span>
                         <p className="text-xs text-gray-700 mt-1 leading-relaxed font-sans">{source.relevance}</p>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold font-mono text-[#C08A3E] uppercase block">Reliability Details:</span>
+                        <span className="text-[10px] font-bold font-mono text-[#946A30] uppercase block">Reliability Details:</span>
                         <p className="text-xs text-gray-700 mt-1 leading-relaxed font-sans">{source.reliability}</p>
                       </div>
                       <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex gap-2 items-start">

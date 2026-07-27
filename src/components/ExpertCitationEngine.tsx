@@ -228,7 +228,7 @@ export default function ExpertCitationEngine({ project, updateProject }: ExpertC
             {/* Bibliographic Reference */}
             <div className="md:col-span-2 p-4 bg-[#FAF8F5] border border-[#D1CEC7] rounded-xl space-y-2 relative group">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase font-bold text-[#8C887F]">
+                <span className="text-[10px] font-mono uppercase font-bold text-[#76726A]">
                   Full Bibliographic Entry ({result.style})
                 </span>
                 <button
@@ -247,7 +247,7 @@ export default function ExpertCitationEngine({ project, updateProject }: ExpertC
             {/* Parenthetical Citation */}
             <div className="p-4 bg-[#FAF8F5] border border-[#D1CEC7] rounded-xl space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase font-bold text-[#8C887F]">
+                <span className="text-[10px] font-mono uppercase font-bold text-[#76726A]">
                   In-Text Parenthetical
                 </span>
                 <button
@@ -266,7 +266,7 @@ export default function ExpertCitationEngine({ project, updateProject }: ExpertC
             {/* Narrative Citation */}
             <div className="p-4 bg-[#FAF8F5] border border-[#D1CEC7] rounded-xl space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase font-bold text-[#8C887F]">
+                <span className="text-[10px] font-mono uppercase font-bold text-[#76726A]">
                   In-Text Narrative
                 </span>
                 <button

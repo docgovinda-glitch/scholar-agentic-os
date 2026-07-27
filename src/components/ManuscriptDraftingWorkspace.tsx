@@ -577,7 +577,7 @@ export default function ManuscriptDraftingWorkspace({
       {showDiff && diffPrev !== null && (
         <div className="bg-[#FFFBF5] border border-[#C08A3E]/30 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-mono font-bold text-[#C08A3E] uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className="text-xs font-mono font-bold text-[#946A30] uppercase tracking-wider flex items-center gap-1.5">
               <GitCompare className="w-3.5 h-3.5" />
               Revision Comparison — {activeSec}
             </h3>
@@ -646,7 +646,7 @@ export default function ManuscriptDraftingWorkspace({
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   {/* Word Count Progress */}
                   <div className="flex items-center gap-2 grow max-w-xs">
-                    <span className="text-[#8C887F] font-bold uppercase shrink-0 text-[9px]">
+                    <span className="text-[#76726A] font-bold uppercase shrink-0 text-[9px]">
                       Length: {wordCount} / {getLengthConstraint(activeSec).max}w
                     </span>
                     <div className="grow h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
@@ -676,7 +676,7 @@ export default function ManuscriptDraftingWorkspace({
 
                   {/* Originality Index */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[#8C887F] font-bold uppercase text-[9px]">Originality:</span>
+                    <span className="text-[#76726A] font-bold uppercase text-[9px]">Originality:</span>
                     <span className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${
                       calculateOriginalityIndex(currentText) >= 90 
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
@@ -688,7 +688,7 @@ export default function ManuscriptDraftingWorkspace({
 
                   {/* Style warnings */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[#8C887F] font-bold uppercase text-[9px]">Style Errors:</span>
+                    <span className="text-[#76726A] font-bold uppercase text-[9px]">Style Errors:</span>
                     <span className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${
                       checkAcademicTone(currentText).length === 0 
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
@@ -702,7 +702,7 @@ export default function ManuscriptDraftingWorkspace({
                 {/* Tone warnings suggestion list */}
                 {checkAcademicTone(currentText).length > 0 && (
                   <div className="mt-1 pt-1.5 border-t border-slate-200/50 max-h-[50px] overflow-y-auto flex flex-wrap gap-1.5 text-[9px] text-[#A87630]">
-                    <span className="font-bold text-[#8C887F] mr-1">Suggestions:</span>
+                    <span className="font-bold text-[#76726A] mr-1">Suggestions:</span>
                     {checkAcademicTone(currentText).slice(0, 4).map((warn, i) => (
                       <span key={i} className="bg-amber-50 border border-amber-100 rounded px-1">
                         "{warn.word}" → <span className="font-bold text-slate-700">{warn.replacement}</span>
@@ -762,7 +762,7 @@ export default function ManuscriptDraftingWorkspace({
                               <div key={file.id} className="p-2 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors text-[10px] bg-white">
                                 <div className="flex items-center justify-between font-mono font-bold text-[#1A365D]">
                                   <span className="line-clamp-1 grow mr-2">{file.fileName}</span>
-                                  <span className="text-[#C08A3E] shrink-0 font-normal">[{tag}]</span>
+                                  <span className="text-[#946A30] shrink-0 font-normal">[{tag}]</span>
                                 </div>
                                 <div className="mt-2 flex gap-1.5">
                                   <button
@@ -806,7 +806,7 @@ export default function ManuscriptDraftingWorkspace({
                         />
                         <div className="flex flex-col items-center">
                           <span className="text-xl font-mono font-bold text-[#1A365D]">{checkThematicAlignment(currentText).score}%</span>
-                          <span className="text-[8px] uppercase tracking-wider font-bold text-[#C08A3E]">Ṛta Match</span>
+                          <span className="text-[8px] uppercase tracking-wider font-bold text-[#946A30]">Ṛta Match</span>
                         </div>
                       </div>
                       
@@ -877,7 +877,7 @@ export default function ManuscriptDraftingWorkspace({
             <div className="lg:col-span-4 space-y-4">
               {/* Section picker */}
               <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 space-y-2">
-                <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+                <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                   1. Select Manuscript Section
                 </label>
                 <div className="flex flex-col gap-1.5 max-h-[220px] overflow-y-auto pr-1">
@@ -919,7 +919,7 @@ export default function ManuscriptDraftingWorkspace({
               {/* Style & Writing Controls */}
               <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 space-y-3">
                 <div>
-                  <label htmlFor="writing-style-sample" className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+                  <label htmlFor="writing-style-sample" className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                     2. Writing Style Sample
                   </label>
                   <textarea
@@ -965,7 +965,7 @@ export default function ManuscriptDraftingWorkspace({
                 </div>
 
                 <div>
-                  <label htmlFor="section-outline" className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+                  <label htmlFor="section-outline" className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                     3. Section Outline (Optional)
                   </label>
                   <textarea
@@ -979,7 +979,7 @@ export default function ManuscriptDraftingWorkspace({
                 </div>
 
                 <div>
-                  <label htmlFor="custom-writing-directives" className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+                  <label htmlFor="custom-writing-directives" className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                     4. Custom Writing Directives
                   </label>
                   <input
@@ -1154,7 +1154,7 @@ export default function ManuscriptDraftingWorkspace({
               {showHistory && (
                 <div className="border-b border-[#E2E8F0] bg-[#FAFAF9] px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-[#8C887F] uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase tracking-wider flex items-center gap-1.5">
                       <Clock className="w-3 h-3" />
                       Revision History — {activeSec}
                     </span>
@@ -1301,7 +1301,7 @@ export default function ManuscriptDraftingWorkspace({
                       <Lock className="w-3 h-3" />LOCKED
                     </span>
                   )}
-                  <span className="text-[#C08A3E] font-bold">DISSERTATION FIRST</span>
+                  <span className="text-[#946A30] font-bold">DISSERTATION FIRST</span>
                 </div>
               </div>
             </div>

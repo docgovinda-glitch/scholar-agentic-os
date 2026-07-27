@@ -124,7 +124,7 @@ export default function VedicDatabase() {
             <BookOpen className="w-5 h-5 text-amber-700" />
             Scriptural & Ethical Database (Vedic & Kautilyan Library)
           </h2>
-          <p className="text-xs text-[#8C887F] font-mono uppercase tracking-wider mt-1">
+          <p className="text-xs text-[#76726A] font-mono uppercase tracking-wider mt-1">
             Reference directory of authentic, annotated philosophical support verses for your manuscript
           </p>
         </div>
@@ -149,7 +149,7 @@ export default function VedicDatabase() {
         </div>
         
         <div className="md:col-span-8 flex flex-wrap gap-1.5 items-center justify-end">
-          <span className="text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mr-2 flex items-center gap-1">
+          <span className="text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mr-2 flex items-center gap-1">
             <Filter className="w-3 h-3" /> Filter:
           </span>
           {["All", "Vedas", "Upanishads", "Bhagavad Gita", "Arthashastra"].map((cat) => (
@@ -187,7 +187,7 @@ export default function VedicDatabase() {
                       {item.source} ({item.verseNum})
                     </h3>
                   </div>
-                  <span className="text-[10px] text-[#8C887F] font-mono">ID: {item.id}</span>
+                  <span className="text-[10px] text-[#76726A] font-mono">ID: {item.id}</span>
                 </div>
 
                 {/* Sanskrit Box */}
@@ -197,7 +197,7 @@ export default function VedicDatabase() {
 
                 {/* Transliteration */}
                 <div>
-                  <span className="text-[9px] font-bold font-mono text-[#8C887F] uppercase tracking-wider block">Transliteration:</span>
+                  <span className="text-[9px] font-bold font-mono text-[#76726A] uppercase tracking-wider block">Transliteration:</span>
                   <p className="text-[11px] text-[#6B665E] font-sans mt-0.5 italic leading-relaxed">
                     {item.transliteration}
                   </p>
@@ -213,7 +213,7 @@ export default function VedicDatabase() {
 
                 {/* Academic Context */}
                 <div className="p-3 bg-white/60 border border-[#D1CEC7] rounded-lg">
-                  <span className="text-[9px] font-bold font-mono text-[#8C887F] uppercase tracking-wider block">Academic Context & CSR Adaptation:</span>
+                  <span className="text-[9px] font-bold font-mono text-[#76726A] uppercase tracking-wider block">Academic Context & CSR Adaptation:</span>
                   <p className="text-xs text-[#6B665E] leading-relaxed mt-1">
                     {item.context}
                   </p>
@@ -222,7 +222,7 @@ export default function VedicDatabase() {
 
               {/* Card Footer actions */}
               <div className="flex justify-between items-center pt-4 mt-4 border-t border-[#D1CEC7] text-xs">
-                <span className="text-[10px] font-mono text-[#8C887F] italic truncate max-w-[200px]" title={item.citation}>
+                <span className="text-[10px] font-mono text-[#76726A] italic truncate max-w-[200px]" title={item.citation}>
                   Cite: {item.verseNum}
                 </span>
 
@@ -275,7 +275,7 @@ export default function VedicDatabase() {
           <div className="col-span-2 text-center p-12 bg-[#FAF9F6] border border-[#D1CEC7] rounded-2xl">
             <BookOpen className="w-10 h-10 text-[#8C887F] mx-auto opacity-40 mb-3" />
             <p className="text-sm font-serif italic text-[#6B665E]">No matching scriptures found</p>
-            <p className="text-xs text-[#8C887F] mt-1">Try expanding your filter or search keywords</p>
+            <p className="text-xs text-[#76726A] mt-1">Try expanding your filter or search keywords</p>
           </div>
         )}
       </div>

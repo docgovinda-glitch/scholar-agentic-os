@@ -134,7 +134,7 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
           {response ? (
             <div className="bg-[#FAF8F5] border border-[#E5E7EB] rounded-xl p-4 text-xs text-[#1A365D] leading-relaxed max-h-[300px] overflow-y-auto whitespace-pre-wrap font-sans relative animate-fade-in shadow-inner">
               <div className="flex justify-between items-center mb-2 border-b border-[#E5E7EB] pb-1.5">
-                <span className="font-bold text-[10px] font-mono text-[#C08A3E] uppercase tracking-wider">Agent Feedback:</span>
+                <span className="font-bold text-[10px] font-mono text-[#946A30] uppercase tracking-wider">Agent Feedback:</span>
                 <button
                   type="button"
                   onClick={handleCopy}
@@ -156,7 +156,7 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
         <form onSubmit={handleConsult} className="space-y-4">
           {/* Suggestions List */}
           <div className="space-y-1.5 pt-1">
-            <span className="block text-[9px] font-mono text-[#8C887F] uppercase tracking-wider font-bold">Suggested Prompts:</span>
+            <span className="block text-[9px] font-mono text-[#76726A] uppercase tracking-wider font-bold">Suggested Prompts:</span>
             <div className="flex flex-col gap-1.5">
               {(suggestedQueries[selectedAgent] || []).map((suggestion, idx) => (
                 <button

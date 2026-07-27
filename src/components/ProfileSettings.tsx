@@ -469,25 +469,25 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
             {/* Read-Only Identity Fields */}
             <div className="grid grid-cols-2 gap-4 text-xs font-mono">
               <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB]/70 rounded-xl">
-                <span className="text-[#8C887F] block text-[9px] uppercase">Scholar Username</span>
+                <span className="text-[#76726A] block text-[9px] uppercase">Scholar Username</span>
                 <span className="font-bold text-[#1A365D] break-all">{profile.username}</span>
               </div>
               <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB]/70 rounded-xl">
-                <span className="text-[#8C887F] block text-[9px] uppercase">Affiliation / Inst.</span>
+                <span className="text-[#76726A] block text-[9px] uppercase">Affiliation / Inst.</span>
                 <span className="font-bold text-[#1A365D] truncate block" title={profile.affiliation}>{profile.affiliation || "Not Set"}</span>
               </div>
               <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB]/70 rounded-xl col-span-2">
-                <span className="text-[#8C887F] block text-[9px] uppercase">Official Scholar Full Name</span>
+                <span className="text-[#76726A] block text-[9px] uppercase">Official Scholar Full Name</span>
                 <span className="font-bold text-[#1A365D] block truncate">{profile.fullName || profile.username}</span>
               </div>
               <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB]/70 rounded-xl col-span-2">
-                <span className="text-[#8C887F] block text-[9px] uppercase">Authentic ID (Passport / Student ID Number)</span>
+                <span className="text-[#76726A] block text-[9px] uppercase">Authentic ID (Passport / Student ID Number)</span>
                 <span className="font-bold text-[#1A365D] block truncate">{profile.authenticId || "Not Set"}</span>
               </div>
               {profile.idDocument && (
                 <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB]/70 rounded-xl col-span-2 flex items-center justify-between">
                   <div>
-                    <span className="text-[#8C887F] block text-[9px] uppercase">Identity Verification Proof</span>
+                    <span className="text-[#76726A] block text-[9px] uppercase">Identity Verification Proof</span>
                     <span className="font-bold text-[#1A365D] flex items-center gap-1.5 mt-0.5">
                       <FileText className="w-3.5 h-3.5 text-emerald-600" />
                       {profile.idDocumentName || "identity_document.pdf"}
@@ -510,7 +510,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
               
               {/* Full Name input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#8C887F] flex items-center gap-1">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
                   <User className="w-3.5 h-3.5" />
                   Official Full Name
                 </label>
@@ -526,7 +526,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
 
               {/* Email Input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#8C887F] flex items-center gap-1">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
                   <Mail className="w-3.5 h-3.5" />
                   Email Address
                 </label>
@@ -542,7 +542,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
 
               {/* Phone split inputs */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#8C887F] flex items-center gap-1">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
                   <Phone className="w-3.5 h-3.5" />
                   Contact Phone Number
                 </label>
@@ -579,7 +579,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
 
               {/* Affiliation input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#8C887F] flex items-center gap-1">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
                   <Building className="w-3.5 h-3.5" />
                   Affiliation / University
                 </label>
@@ -596,7 +596,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
 
               {/* Authentic ID Number Input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#8C887F] flex items-center gap-1">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
                   <FileText className="w-3.5 h-3.5" />
                   Authentic Identification (Passport / Student ID / citizenship)
                 </label>
@@ -613,7 +613,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
 
               {/* Document upload field */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#8C887F] flex items-center gap-1">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
                   <Upload className="w-3.5 h-3.5" />
                   Upload ID Proof Document (Passport / ID Scan, Max 4MB)
                 </label>
@@ -649,7 +649,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                     <span className="text-[11px] font-mono text-gray-500 font-semibold text-center">
                       Click to choose file or drag & drop here
                     </span>
-                    <span className="text-[9px] text-[#8C887F] text-center mt-0.5">
+                    <span className="text-[9px] text-[#76726A] text-center mt-0.5">
                       Accepted file formats: PDF, PNG, JPG, JPEG (Max 4MB)
                     </span>
                   </div>
@@ -698,41 +698,41 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
 
                 {/* Proposed Changes list */}
                 <div className="p-4 bg-[#FAF8F5] border border-[#E5E7EB] rounded-xl space-y-3">
-                  <span className="text-[9px] font-mono text-[#8C887F] uppercase font-bold tracking-wider block border-b border-[#E5E7EB] pb-1">Proposed Profile Updates</span>
+                  <span className="text-[9px] font-mono text-[#76726A] uppercase font-bold tracking-wider block border-b border-[#E5E7EB] pb-1">Proposed Profile Updates</span>
                   <div className="space-y-2 text-xs font-mono leading-relaxed">
                     {profile.pendingFullName && (
                       <div>
-                        <span className="text-[#8C887F] block text-[9px] uppercase">New Full Name</span>
+                        <span className="text-[#76726A] block text-[9px] uppercase">New Full Name</span>
                         <span className="font-bold text-[#1A365D]">{profile.pendingFullName}</span>
                       </div>
                     )}
                     {profile.pendingEmail && (
                       <div>
-                        <span className="text-[#8C887F] block text-[9px] uppercase">New Email Address</span>
+                        <span className="text-[#76726A] block text-[9px] uppercase">New Email Address</span>
                         <span className="font-bold text-[#1A365D] break-all">{profile.pendingEmail}</span>
                       </div>
                     )}
                     {profile.pendingPhone && (
                       <div>
-                        <span className="text-[#8C887F] block text-[9px] uppercase">New Phone Number</span>
+                        <span className="text-[#76726A] block text-[9px] uppercase">New Phone Number</span>
                         <span className="font-bold text-[#1A365D]">{profile.pendingPhone}</span>
                       </div>
                     )}
                     {profile.pendingAffiliation && (
                       <div>
-                        <span className="text-[#8C887F] block text-[9px] uppercase">New Affiliation</span>
+                        <span className="text-[#76726A] block text-[9px] uppercase">New Affiliation</span>
                         <span className="font-bold text-[#1A365D]">{profile.pendingAffiliation}</span>
                       </div>
                     )}
                     {profile.pendingAuthenticId && (
                       <div>
-                        <span className="text-[#8C887F] block text-[9px] uppercase">New Authentic ID</span>
+                        <span className="text-[#76726A] block text-[9px] uppercase">New Authentic ID</span>
                         <span className="font-bold text-[#1A365D]">{profile.pendingAuthenticId}</span>
                       </div>
                     )}
                     {profile.pendingIdDocument && (
                       <div>
-                        <span className="text-[#8C887F] block text-[9px] uppercase">Uploaded ID Proof Doc</span>
+                        <span className="text-[#76726A] block text-[9px] uppercase">Uploaded ID Proof Doc</span>
                         <div className="flex items-center justify-between mt-1 p-2 bg-white rounded border border-[#E5E7EB]">
                           <span className="font-semibold text-emerald-800 truncate flex items-center gap-1 max-w-[70%]">
                             <FileText className="w-3.5 h-3.5" />
@@ -748,7 +748,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                         </div>
                         {profile.pendingIdDocument.startsWith("data:image/") && (
                           <div className="mt-2 text-center bg-white p-2 rounded border border-[#E5E7EB]">
-                            <span className="text-[8px] text-[#8C887F] uppercase tracking-wider block mb-1">Image Preview</span>
+                            <span className="text-[8px] text-[#76726A] uppercase tracking-wider block mb-1">Image Preview</span>
                             <img 
                               src={profile.pendingIdDocument} 
                               alt="ID Proof Preview" 
@@ -764,7 +764,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                 {/* Key Entry Form */}
                 <form onSubmit={handleVerifyUpdateKey} className="space-y-3">
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-mono font-bold uppercase text-[#8C887F] tracking-widest block">
+                    <label className="text-[9px] font-mono font-bold uppercase text-[#76726A] tracking-widest block">
                       Admin Update Key
                     </label>
                     <input
@@ -806,7 +806,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
               <div className="h-48 flex flex-col items-center justify-center text-center p-6 space-y-2">
                 <ShieldCheck className="w-10 h-10 text-emerald-600/80" />
                 <span className="font-mono text-xs font-bold text-[#1A365D]">Identity Verified</span>
-                <p className="text-[11px] text-[#8C887F] max-w-[240px] font-sans">
+                <p className="text-[11px] text-[#76726A] max-w-[240px] font-sans">
                   No pending profile changes. Your email, phone, and official identification records are fully approved and synchronized.
                 </p>
               </div>
@@ -831,7 +831,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
             <div className="overflow-x-auto">
               <table className="w-full text-xs font-mono text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[#E5E7EB] text-[#8C887F]">
+                  <tr className="border-b border-[#E5E7EB] text-[#76726A]">
                     <th className="pb-3 pr-4 font-bold uppercase">Scholar</th>
                     <th className="pb-3 pr-4 font-bold uppercase">Current Details</th>
                     <th className="pb-3 pr-4 font-bold uppercase">Requested Updates</th>
@@ -843,32 +843,32 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                     <tr key={u.username} className="hover:bg-neutral-50/55 transition-colors">
                       <td className="py-4 pr-4 align-top font-bold text-[#1A365D]">
                         {u.username}
-                        <span className="block font-normal text-[10px] text-[#8C887F]">{u.fullName || "No Name"}</span>
+                        <span className="block font-normal text-[10px] text-[#76726A]">{u.fullName || "No Name"}</span>
                       </td>
                       <td className="py-4 pr-4 align-top text-gray-500 space-y-1.5 max-w-[250px]">
                         <div>
-                          <span className="text-[9px] uppercase tracking-wider text-[#8C887F] block">Name</span>
+                          <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Name</span>
                           <span className="font-semibold text-gray-700">{u.fullName || u.username}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] uppercase tracking-wider text-[#8C887F] block">Email</span>
+                          <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Email</span>
                           <span className="font-semibold text-gray-700 break-all">{u.email}</span>
                         </div>
                         <div>
-                           <span className="text-[9px] uppercase tracking-wider text-[#8C887F] block">Phone</span>
+                           <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Phone</span>
                            <span className="font-semibold text-gray-700">{u.phone || "Not Set"}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] uppercase tracking-wider text-[#8C887F] block">Affiliation</span>
+                          <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Affiliation</span>
                           <span className="font-semibold text-gray-700 truncate block" title={u.affiliation}>{u.affiliation || "Not Set"}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] uppercase tracking-wider text-[#8C887F] block">Authentic ID</span>
+                          <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Authentic ID</span>
                           <span className="font-semibold text-gray-700 block truncate" title={u.authenticId}>{u.authenticId || "Not Set"}</span>
                         </div>
                         {u.idDocument && (
                           <div>
-                            <span className="text-[9px] uppercase tracking-wider text-[#8C887F] block">Active Document</span>
+                            <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Active Document</span>
                             <a href={u.idDocument} download={u.idDocumentName || "active_proof"} className="text-emerald-700 font-semibold flex items-center gap-1 text-[10px] hover:underline">
                               <FileText className="w-3 h-3" />
                               {u.idDocumentName || "download_document"}
@@ -956,8 +956,8 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
           ) : (
             <div className="flex flex-col items-center justify-center p-8 text-center space-y-2 border border-dashed border-[#D1CEC7] rounded-xl bg-[#FAF8F5]/50">
               <ShieldCheck className="w-8 h-8 text-neutral-400" />
-              <span className="text-[11px] font-bold text-[#8C887F]">No Pending Updates Found</span>
-              <p className="text-[10px] text-[#8C887F] max-w-xs font-sans">
+              <span className="text-[11px] font-bold text-[#76726A]">No Pending Updates Found</span>
+              <p className="text-[10px] text-[#76726A] max-w-xs font-sans">
                 All scholar profiles across the workspace databases are synchronized and approved.
               </p>
             </div>

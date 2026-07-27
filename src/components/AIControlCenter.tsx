@@ -329,7 +329,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
             {/* Left side: Provider Selector & Custom overrides */}
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1.5">
+                <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1.5">
                   AI Model Gateway Mode
                 </label>
                 <select
@@ -351,7 +351,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
                   <option value="ollama">Ollama Local LLM</option>
                   <option value="custom">Custom Local API Proxy</option>
                 </select>
-                <span className="text-[9px] text-[#8C887F] mt-1.5 block leading-normal">
+                <span className="text-[9px] text-[#76726A] mt-1.5 block leading-normal">
                   In **Auto Mode**, requests automatically route to DeepSeek for grounding/reasoning, Qwen for section drafting, and Gemini for data discovery and citation lookups.
                 </span>
               </div>
@@ -359,7 +359,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
               {/* Conditional Model Selectors */}
               {project.aiSettings?.provider === "openai" && (
                 <div className="space-y-2 border-t border-gray-100 pt-3 animate-fade-in">
-                  <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                     OpenAI Chat Model
                   </label>
                   <select
@@ -378,7 +378,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
               {project.aiSettings?.provider === "claude" && (
                 <div className="space-y-2 border-t border-gray-100 pt-3 animate-fade-in">
-                  <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                     Anthropic Claude Model
                   </label>
                   <select
@@ -397,7 +397,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
               {project.aiSettings?.provider === "deepseek" && (
                 <div className="space-y-2 border-t border-gray-100 pt-3 animate-fade-in">
-                  <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                     DeepSeek Model
                   </label>
                   <select
@@ -415,7 +415,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
               {project.aiSettings?.provider === "qwen" && (
                 <div className="space-y-2 border-t border-gray-100 pt-3 animate-fade-in">
-                  <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                     Qwen Model
                   </label>
                   <select
@@ -434,7 +434,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
               {project.aiSettings?.provider === "cohere" && (
                 <div className="space-y-2 border-t border-gray-100 pt-3 animate-fade-in">
-                  <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                     Cohere Model
                   </label>
                   <select
@@ -453,7 +453,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
               {project.aiSettings?.provider === "custom" && (
                 <div className="space-y-3 border-t border-gray-100 pt-3 animate-fade-in text-xs font-mono">
                   <div>
-                    <label className="block text-[10px] font-bold text-[#8C887F] uppercase mb-1">
+                    <label className="block text-[10px] font-bold text-[#76726A] uppercase mb-1">
                       Local Proxy Endpoint
                     </label>
                     <input
@@ -467,7 +467,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-[#8C887F] uppercase mb-1">
+                    <label className="block text-[10px] font-bold text-[#76726A] uppercase mb-1">
                       Custom Model Name
                     </label>
                     <input
@@ -486,9 +486,9 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
             {/* Right side: API Keys Inputs */}
             <div className="space-y-4 border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-5">
-              <h3 className="text-xs font-bold font-mono text-[#8C887F] uppercase tracking-wider border-b border-gray-50 pb-1 flex items-center justify-between">
+              <h3 className="text-xs font-bold font-mono text-[#76726A] uppercase tracking-wider border-b border-gray-50 pb-1 flex items-center justify-between">
                 <span>API Keys Configuration</span>
-                <span className="text-[9px] text-[#C08A3E] lowercase normal-case italic font-sans font-normal">XOR encrypted</span>
+                <span className="text-[9px] text-[#946A30] lowercase normal-case italic font-sans font-normal">XOR encrypted</span>
               </h3>
 
               {/* Gemini key input */}
@@ -669,7 +669,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                   Ollama Service URL
                 </label>
                 <div className="flex gap-2">
@@ -693,7 +693,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
                   Selected Local model tag
                 </label>
                 <div className="flex gap-2">
@@ -727,7 +727,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
             {/* Health monitor status dashboard */}
             <div className="bg-[#FAF9F6] border border-gray-200 p-5 rounded-2xl flex flex-col justify-between space-y-4">
               <div className="space-y-3">
-                <h3 className="text-xs font-bold font-mono text-[#8C887F] uppercase tracking-wider border-b border-gray-200/50 pb-1">
+                <h3 className="text-xs font-bold font-mono text-[#76726A] uppercase tracking-wider border-b border-gray-200/50 pb-1">
                   Ollama Status Dashboard
                 </h3>
                 
@@ -788,18 +788,18 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
                 <Clock className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider block">Total AI Calls</span>
+                <span className="text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider block">Total AI Calls</span>
                 <span className="text-xl font-bold text-[#1A365D] font-mono">{totalCalls}</span>
               </div>
             </div>
 
             {/* Metric 2 */}
             <div className="bg-[#FAF9F6] border border-gray-200 p-4 rounded-xl flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-[#C08A3E]/10 text-[#C08A3E] flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-full bg-[#C08A3E]/10 text-[#946A30] flex items-center justify-center shrink-0">
                 <DollarSign className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider block">Estimated API Expenses</span>
+                <span className="text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider block">Estimated API Expenses</span>
                 <span className="text-xl font-bold text-[#1A365D] font-mono">${totalCost.toFixed(5)}</span>
               </div>
             </div>
@@ -810,7 +810,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider block">Active Session Provider</span>
+                <span className="text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider block">Active Session Provider</span>
                 <span className="text-sm font-bold text-emerald-800 font-mono uppercase">{project.aiSettings?.provider || "gemini"}</span>
               </div>
             </div>
@@ -818,7 +818,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
           {/* Usage Chart (Styled markup bar) */}
           <div className="border border-gray-200 rounded-2xl p-5 space-y-4">
-            <h3 className="text-xs font-bold font-mono text-[#8C887F] uppercase tracking-wider border-b border-gray-100 pb-2">
+            <h3 className="text-xs font-bold font-mono text-[#76726A] uppercase tracking-wider border-b border-gray-100 pb-2">
               Expense Distribution by Task Type
             </h3>
             
@@ -862,14 +862,14 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
           {/* Detailed usage logs table */}
           <div className="border border-gray-200 rounded-2xl overflow-hidden">
-            <h3 className="text-xs font-bold font-mono text-[#8C887F] uppercase tracking-wider p-4 bg-[#FAF9F6] border-b border-gray-200">
+            <h3 className="text-xs font-bold font-mono text-[#76726A] uppercase tracking-wider p-4 bg-[#FAF9F6] border-b border-gray-200">
               API Generation Audit Log
             </h3>
             
             <div className="overflow-x-auto max-h-[300px]">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-[#FAF9F6] border-b border-gray-200 text-[#8C887F] font-mono text-[10px] uppercase font-bold">
+                  <tr className="bg-[#FAF9F6] border-b border-gray-200 text-[#76726A] font-mono text-[10px] uppercase font-bold">
                     <th className="p-3">Timestamp</th>
                     <th className="p-3">Provider</th>
                     <th className="p-3">Model</th>
@@ -894,7 +894,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
                       <td className="p-3 text-right font-mono text-gray-500">
                         {log.inputWords + log.outputWords} words
                       </td>
-                      <td className="p-3 text-right font-mono font-bold text-[#C08A3E]">
+                      <td className="p-3 text-right font-mono font-bold text-[#946A30]">
                         ${log.estimatedCost.toFixed(5)}
                       </td>
                     </tr>
@@ -929,7 +929,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
           <div className="border border-gray-200 rounded-2xl overflow-hidden">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-[#FAF9F6] border-b border-gray-200 text-[#8C887F] font-mono text-[10px] uppercase font-bold">
+                <tr className="bg-[#FAF9F6] border-b border-gray-200 text-[#76726A] font-mono text-[10px] uppercase font-bold">
                   <th className="p-4">Provider / Model</th>
                   <th className="p-4">Specialized Task Category</th>
                   <th className="p-4">Strengths</th>

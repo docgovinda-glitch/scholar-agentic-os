@@ -255,7 +255,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             }}
             className="p-5 rounded-xl border cursor-pointer transition-all duration-300 bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/50 hover:bg-white"
           >
-            <div className="text-[#C08A3E] mb-3">{tier.icon}</div>
+            <div className="text-[#946A30] mb-3">{tier.icon}</div>
             <h4 className="font-bold text-[#1A365D] text-sm mb-2">{tier.label}</h4>
             <p className="text-xs text-gray-500 leading-relaxed">{tier.description}</p>
           </div>

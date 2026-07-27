@@ -159,27 +159,27 @@ export default function ResearchIntelligenceDashboard({
           {/* Grid of Key Analytical Metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#8C887F] uppercase block">Total Papers</span>
+          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Total Papers</span>
           <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1">{totalProjects}</span>
         </div>
         <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#8C887F] uppercase block">Active Projects</span>
+          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Active Projects</span>
           <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-emerald-600">{activeProjects}</span>
         </div>
         <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#8C887F] uppercase block">Completed</span>
+          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Completed</span>
           <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-blue-600">{completedProjects}</span>
         </div>
         <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#8C887F] uppercase block">Draft / In Review</span>
+          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Draft / In Review</span>
           <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-yellow-600">{draftArticles}</span>
         </div>
         <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#8C887F] uppercase block">Submitted</span>
-          <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-[#C08A3E]">{submittedArticles}</span>
+          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Submitted</span>
+          <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-[#946A30]">{submittedArticles}</span>
         </div>
         <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#8C887F] uppercase block">Accepted (Q1/Q2)</span>
+          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Accepted (Q1/Q2)</span>
           <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-indigo-600">{acceptedArticles}</span>
         </div>
       </div>
@@ -262,7 +262,7 @@ export default function ResearchIntelligenceDashboard({
                           />
                         </div>
                         <div className="flex items-center justify-between text-[9px] text-gray-400 font-mono pt-1">
-                          <span>AI: <span className="text-[#C08A3E] font-bold">{p.aiSettings?.provider?.toUpperCase() || "AUTO"}</span></span>
+                          <span>AI: <span className="text-[#946A30] font-bold">{p.aiSettings?.provider?.toUpperCase() || "AUTO"}</span></span>
                           <span className="uppercase font-semibold text-emerald-600">{p.status || "Draft"}</span>
                         </div>
                       </div>
@@ -428,7 +428,7 @@ export default function ResearchIntelligenceDashboard({
                     </div>
                     <div className="space-y-0.5">
                       <span className="text-[10px] font-bold text-[#1D4ED8] block font-mono">{act.title}</span>
-                      <span className="text-[9px] text-[#C08A3E] font-medium block uppercase tracking-wider">{act.projectTitle}</span>
+                      <span className="text-[9px] text-[#946A30] font-medium block uppercase tracking-wider">{act.projectTitle}</span>
                       <p className="text-[11px] text-gray-600 leading-normal">{act.desc}</p>
                       <span className="text-[9px] text-gray-400 font-mono block pt-0.5">{act.time}</span>
                     </div>
@@ -495,7 +495,7 @@ export default function ResearchIntelligenceDashboard({
               .map((item) => (
                 <div key={item.id} className="bg-white p-3.5 rounded-xl border border-[#E2E8F0] shadow-2xs space-y-2 hover:border-[#C08A3E]/40 transition-all group">
                   <div className="flex justify-between items-start">
-                    <span className="text-[10px] font-mono font-bold text-[#C08A3E] bg-[#C08A3E]/10 px-2 py-0.5 rounded">
+                    <span className="text-[10px] font-mono font-bold text-[#946A30] bg-[#C08A3E]/10 px-2 py-0.5 rounded">
                       {item.type}
                     </span>
                     <button 

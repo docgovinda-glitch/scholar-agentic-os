@@ -264,7 +264,7 @@ export default function NonJournalRequirementsPanel({
               <h3 className="text-sm font-bold text-[#1A365D] font-serif uppercase tracking-wider">
                 Section Structure
               </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 bg-[#C08A3E]/10 text-[#C08A3E] border border-[#C08A3E]/30 rounded font-bold uppercase">
+              <span className="text-[10px] font-mono px-2 py-0.5 bg-[#C08A3E]/10 text-[#946A30] border border-[#C08A3E]/30 rounded font-bold uppercase">
                 {sampleSourceFileName ? `Learned from: ${sampleSourceFileName}` : `Default from ${project.outputFormat || "format"} template`}
               </span>
             </div>

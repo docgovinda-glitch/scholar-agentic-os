@@ -742,7 +742,7 @@ Return strictly valid JSON:
               <Loader2 className="w-8 h-8 text-amber-800 animate-spin" />
               <div className="space-y-1">
                 <span className="text-xs font-serif font-bold text-[#1A1A1A]">Processing Resource...</span>
-                <p className="text-[10px] text-[#8C887F] max-w-[200px]">Extracting data streams, structure, and referencing metadata.</p>
+                <p className="text-[10px] text-[#76726A] max-w-[200px]">Extracting data streams, structure, and referencing metadata.</p>
               </div>
             </div>
           ) : (
@@ -774,7 +774,7 @@ Return strictly valid JSON:
                   </div>
                   <div className="space-y-0.5">
                     <span className="text-[11px] font-mono font-bold text-[#1A1A1A] block">Drag & Drop Document</span>
-                    <span className="text-[8px] text-[#8C887F] block">PDF, DOCX, CSV, TXT, PNG/JPG, MP3/WAV</span>
+                    <span className="text-[8px] text-[#76726A] block">PDF, DOCX, CSV, TXT, PNG/JPG, MP3/WAV</span>
                   </div>
                   <div className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded-lg text-[9px] font-mono uppercase tracking-wider font-bold">
                     Choose File
@@ -864,7 +864,7 @@ Return strictly valid JSON:
 
           {/* Uploaded Documents List */}
           <div className="space-y-2.5 pt-2 border-t border-[#E5E7EB]">
-            <span className="text-[9px] font-mono font-bold text-[#8C887F] uppercase tracking-wider block">Indexed Library ({files.length})</span>
+            <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Indexed Library ({files.length})</span>
             {files.length === 0 ? (
               <div className="p-8 text-center bg-[#FAF8F5]/50 border border-[#E5E7EB] rounded-xl">
                 <span className="text-[10px] font-mono text-gray-400">No sources indexed yet.</span>
@@ -933,8 +933,8 @@ Return strictly valid JSON:
           {!selectedFile ? (
             <div className="flex flex-col items-center justify-center p-8 bg-[#FAF8F5]/30 border border-dashed border-[#E5E7EB] rounded-xl grow text-center min-h-[300px]">
               <Sparkles className="w-8 h-8 text-neutral-300 mb-2" />
-              <span className="text-[11px] font-mono text-[#8C887F] font-bold">No Source Selected</span>
-              <p className="text-[10px] text-[#8C887F] max-w-[200px] mt-1 font-sans">Upload or select an indexed document from Column 1 to synthesize findings.</p>
+              <span className="text-[11px] font-mono text-[#76726A] font-bold">No Source Selected</span>
+              <p className="text-[10px] text-[#76726A] max-w-[200px] mt-1 font-sans">Upload or select an indexed document from Column 1 to synthesize findings.</p>
             </div>
           ) : selectedFile.status === "processing" ? (
             <div className="flex flex-col items-center justify-center p-8 bg-[#FAF8F5]/30 border border-dashed border-[#E5E7EB] rounded-xl grow text-center min-h-[300px] space-y-2">
@@ -957,7 +957,7 @@ Return strictly valid JSON:
 
                 {/* Abstract Text */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#8C887F] uppercase tracking-wider block">Document Abstract</span>
+                  <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Document Abstract</span>
                   <div className="p-3.5 bg-white border border-[#E5E7EB] rounded-xl text-[11px] text-gray-600 leading-relaxed font-sans max-h-[140px] overflow-y-auto">
                     {selectedFile.parsedOverview?.abstract || "No abstract or summary was generated."}
                   </div>
@@ -965,7 +965,7 @@ Return strictly valid JSON:
 
                 {/* Chapters / Sections */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#8C887F] uppercase tracking-wider block">Extracted Chapters & Sections</span>
+                  <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Extracted Chapters & Sections</span>
                   <div className="border border-[#E5E7EB] rounded-xl divide-y divide-[#E5E7EB] max-h-[150px] overflow-y-auto bg-white">
                     {selectedFile.parsedOverview?.chapters && selectedFile.parsedOverview.chapters.length > 0 ? (
                       selectedFile.parsedOverview.chapters.map((ch, idx) => (
@@ -997,8 +997,8 @@ Return strictly valid JSON:
           {!selectedFile ? (
             <div className="flex flex-col items-center justify-center p-8 bg-[#FAF8F5]/30 border border-dashed border-[#E5E7EB] rounded-xl grow text-center min-h-[300px]">
               <ShieldCheck className="w-8 h-8 text-neutral-300 mb-2" />
-              <span className="text-[11px] font-mono text-[#8C887F] font-bold">Extraction Idle</span>
-              <p className="text-[10px] text-[#8C887F] max-w-[200px] mt-1 font-sans">Select a document to extract data variables and research findings.</p>
+              <span className="text-[11px] font-mono text-[#76726A] font-bold">Extraction Idle</span>
+              <p className="text-[10px] text-[#76726A] max-w-[200px] mt-1 font-sans">Select a document to extract data variables and research findings.</p>
             </div>
           ) : selectedFile.status === "processing" ? (
             <div className="flex flex-col items-center justify-center p-8 bg-[#FAF8F5]/30 border border-dashed border-[#E5E7EB] rounded-xl grow text-center min-h-[300px] space-y-2">
@@ -1011,7 +1011,7 @@ Return strictly valid JSON:
               <div className="space-y-3.5">
                 {/* Key Findings Card */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#8C887F] uppercase tracking-wider block">Key Research Findings</span>
+                  <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Key Research Findings</span>
                   <div className="p-3 bg-amber-50/30 border border-amber-200/80 rounded-xl space-y-1.5 max-h-[140px] overflow-y-auto">
                     {selectedFile.parsedOverview?.keyFindings && selectedFile.parsedOverview.keyFindings.length > 0 ? (
                       selectedFile.parsedOverview.keyFindings.map((finding, idx) => (
@@ -1028,7 +1028,7 @@ Return strictly valid JSON:
 
                 {/* Key Data Points Card */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#8C887F] uppercase tracking-wider block">Key Statistical / Experimental Data</span>
+                  <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Key Statistical / Experimental Data</span>
                   <div className="p-3 bg-emerald-50/20 border border-emerald-200/80 rounded-xl space-y-1.5 max-h-[140px] overflow-y-auto">
                     {selectedFile.parsedOverview?.keyDataPoints && selectedFile.parsedOverview.keyDataPoints.length > 0 ? (
                       selectedFile.parsedOverview.keyDataPoints.map((dataPt, idx) => (
@@ -1045,7 +1045,7 @@ Return strictly valid JSON:
 
                 {/* Key Terms Badges */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#8C887F] uppercase tracking-wider block">Extracted Key Terms</span>
+                  <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Extracted Key Terms</span>
                   <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto">
                     {selectedFile.parsedOverview?.keyTerms && selectedFile.parsedOverview.keyTerms.length > 0 ? (
                       selectedFile.parsedOverview.keyTerms.map((term, idx) => (

@@ -343,7 +343,7 @@ export default function QualityControlSuite({
 
               <div className="glass-effect rounded-xl p-5 border border-gray-200 flex flex-col items-center text-center justify-between shadow-xs">
                 <span className="text-[10px] font-bold font-mono text-gray-500 block uppercase">Journal Compliance Match</span>
-                <div className="text-4xl font-extrabold font-serif text-[#C08A3E] my-4">
+                <div className="text-4xl font-extrabold font-serif text-[#946A30] my-4">
                   {report.complianceScore}%
                 </div>
                 <p className="text-xs text-gray-500 leading-relaxed">

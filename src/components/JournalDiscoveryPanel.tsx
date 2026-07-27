@@ -227,7 +227,7 @@ export default function JournalDiscoveryPanel({
                           <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-[#1A365D]/10 text-[#1A365D] rounded border border-[#1A365D]/15">
                             {journal.publisher}
                           </span>
-                          <h3 className="text-base font-bold text-[#1A365D] font-serif mt-2 group-hover:text-[#C08A3E] transition-colors">
+                          <h3 className="text-base font-bold text-[#1A365D] font-serif mt-2 group-hover:text-[#946A30] transition-colors">
                             {journal.name}
                           </h3>
                         </div>
@@ -255,15 +255,15 @@ export default function JournalDiscoveryPanel({
 
                       <div className="space-y-2.5 text-xs">
                         <div>
-                          <span className="font-bold font-mono text-[#C08A3E] uppercase block">Aim & Scope Alignment:</span>
+                          <span className="font-bold font-mono text-[#946A30] uppercase block">Aim & Scope Alignment:</span>
                           <p className="text-gray-700 mt-0.5 leading-relaxed font-sans">{journal.scopeFit}</p>
                         </div>
                         <div>
-                          <span className="font-bold font-mono text-[#C08A3E] uppercase block">Why this is an ideal strategic fit:</span>
+                          <span className="font-bold font-mono text-[#946A30] uppercase block">Why this is an ideal strategic fit:</span>
                           <p className="text-gray-700 mt-0.5 leading-relaxed font-sans">{journal.whyFit}</p>
                         </div>
                         <div>
-                          <span className="font-bold font-mono text-[#C08A3E] uppercase block">Reviewing Style:</span>
+                          <span className="font-bold font-mono text-[#946A30] uppercase block">Reviewing Style:</span>
                           <p className="text-gray-500 mt-0.5 leading-relaxed italic font-sans">{journal.reviewContext}</p>
                         </div>
                       </div>
@@ -271,7 +271,7 @@ export default function JournalDiscoveryPanel({
 
                     <div className="flex justify-end pt-4 mt-4 border-t border-[#F1F5F9]">
                       <span className={`text-[11px] font-mono flex items-center gap-1 ${
-                        isSelected ? "text-[#C08A3E] font-bold" : "text-gray-400 group-hover:text-gray-600"
+                        isSelected ? "text-[#946A30] font-bold" : "text-gray-400 group-hover:text-gray-600"
                       }`}>
                         {isSelected ? "Selected Target Venue" : "Click to select journal"}
                         <ChevronRight className="w-3 h-3" />

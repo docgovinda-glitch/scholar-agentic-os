@@ -506,7 +506,7 @@ export default function ResearchIntakeWizard({
               <BookOpen className="w-4.5 h-4.5 text-[#C08A3E]" />
               Research Blueprint
             </h3>
-            <span className="text-xs font-mono font-bold text-[#C08A3E]">
+            <span className="text-xs font-mono font-bold text-[#946A30]">
               Progress: {intakeProgress}%
             </span>
           </div>
@@ -547,7 +547,7 @@ export default function ResearchIntakeWizard({
           <div className="pt-2 flex gap-3">
             <button
               onClick={loadPreset}
-              className="flex-1 py-2 border border-[#C08A3E] hover:bg-amber-50/50 text-[#C08A3E] font-mono text-[10px] uppercase font-bold rounded-lg cursor-pointer transition-all"
+              className="flex-1 py-2 border border-[#C08A3E] hover:bg-amber-50/50 text-[#946A30] font-mono text-[10px] uppercase font-bold rounded-lg cursor-pointer transition-all"
             >
               Load 'Dharmic Ethics' Preset
             </button>
@@ -576,7 +576,7 @@ export default function ResearchIntakeWizard({
           
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <span className="block text-[10px] font-mono font-bold text-[#8C887F] uppercase tracking-wider">
+              <span className="block text-[10px] font-mono font-bold text-[#76726A] uppercase tracking-wider">
                 Overall Completion Metrics:
               </span>
               <div className="font-mono text-sm font-bold text-amber-700 bg-[#FAF8F5] p-3 rounded-lg border border-[#E5E7EB]">
@@ -640,7 +640,7 @@ export default function ResearchIntakeWizard({
           {/* Card Block 1: Research Topic */}
           {/* Card Block 1: Research Topic */}
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+            <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
               Proposed Research Title / Topic *
             </label>
             <textarea
@@ -723,7 +723,7 @@ export default function ResearchIntakeWizard({
             )}
             {topicSuggestions.length > 0 && !topicLoading && (
               <div className="mt-2 p-3 bg-white border border-[#E5E7EB] rounded-lg space-y-1.5 shadow-sm">
-                <span className="block text-[10px] font-mono text-[#8C887F] uppercase font-bold">Apply Suggested Title:</span>
+                <span className="block text-[10px] font-mono text-[#76726A] uppercase font-bold">Apply Suggested Title:</span>
                 <div className="flex flex-col gap-1">
                   {topicSuggestions.map((titleSuggestion, idx) => (
                     <button
@@ -747,7 +747,7 @@ export default function ResearchIntakeWizard({
           {/* Card Block 2: Objectives */}
           {formatConfig.fields.objectives !== "hidden" && (
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+            <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
               Research Objectives {formatConfig.fields.objectives === "required" ? "*" : ""}
             </label>
             <textarea
@@ -771,7 +771,7 @@ export default function ResearchIntakeWizard({
 
             {objectivesAdvice.length > 0 && !objectivesLoading && (
               <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                <span className="block text-[10px] font-mono font-bold text-[#C08A3E] uppercase tracking-wider">
+                <span className="block text-[10px] font-mono font-bold text-[#946A30] uppercase tracking-wider">
                   Suggested Objectives:
                 </span>
                 <ul className="list-disc pl-4 space-y-1 text-xs text-slate-700 font-sans leading-relaxed">
@@ -798,7 +798,7 @@ export default function ResearchIntakeWizard({
           {/* Card Block 3: Research Questions */}
           {formatConfig.fields.researchQuestions !== "hidden" && (
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+            <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
               Research Questions {formatConfig.fields.researchQuestions === "required" ? "*" : ""}
             </label>
             <textarea
@@ -822,7 +822,7 @@ export default function ResearchIntakeWizard({
 
             {rqQuality && !rqLoading && (
               <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 font-mono text-[10px] uppercase font-semibold text-[#1A365D] animate-fade-in shadow-sm">
-                <span className="block text-[10px] font-mono font-bold text-[#C08A3E] uppercase tracking-wider">
+                <span className="block text-[10px] font-mono font-bold text-[#946A30] uppercase tracking-wider">
                   AI Quality Score:
                 </span>
                 <div className="grid grid-cols-3 gap-4 border-b border-[#E5E7EB] pb-2">
@@ -851,7 +851,7 @@ export default function ResearchIntakeWizard({
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+                <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                   Methodology Category *
                 </label>
                 <select
@@ -867,7 +867,7 @@ export default function ResearchIntakeWizard({
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+                <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                   Target Academic Field *
                 </label>
                 <input
@@ -883,7 +883,7 @@ export default function ResearchIntakeWizard({
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                 Detailed Method Description {formatConfig.fields.methodology === "required" ? "*" : ""}
               </label>
               <textarea
@@ -909,7 +909,7 @@ export default function ResearchIntakeWizard({
 
             {methodologyAdvice && !methodologyLoading && (
               <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs text-slate-700 font-sans animate-fade-in shadow-sm">
-                <span className="block text-[10px] font-mono font-bold text-[#C08A3E] uppercase tracking-wider">
+                <span className="block text-[10px] font-mono font-bold text-[#946A30] uppercase tracking-wider">
                   AI Methodology Advisor:
                 </span>
                 <div className="space-y-1">
@@ -941,7 +941,7 @@ export default function ResearchIntakeWizard({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#E5E7EB]/70">
             {formatConfig.fields.researchGap !== "hidden" && (
             <div className="space-y-2">
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                 Research Gap {formatConfig.fields.researchGap === "required" ? "*" : ""}
               </label>
               <textarea
@@ -956,7 +956,7 @@ export default function ResearchIntakeWizard({
             </div>
             )}
             <div className={formatConfig.fields.researchGap === "hidden" ? "space-y-2 md:col-span-2" : "space-y-2"}>
-              <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+              <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
                 Study Keywords (Commas)
               </label>
               <input
@@ -972,7 +972,7 @@ export default function ResearchIntakeWizard({
 
           {/* Target minimum reference count (soft target, target-workflow.md Stage 5) */}
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider">
+            <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
               Target Minimum Reference Count (Optional)
             </label>
             <input
@@ -985,7 +985,7 @@ export default function ResearchIntakeWizard({
                 updateProject({ targetReferenceCount: e.target.value ? Number(e.target.value) : undefined })
               }
             />
-            <p className="text-[10px] text-[#8C887F] font-sans">
+            <p className="text-[10px] text-[#76726A] font-sans">
               {formatConfig.referenceCountHint} A soft target only — it can warn at draft time but will never block
               drafting or export.
             </p>
@@ -1000,7 +1000,7 @@ export default function ResearchIntakeWizard({
             
             {/* Primary Author Metadata */}
             <div className="space-y-3">
-              <span className="block text-[10px] font-mono text-[#8C887F] uppercase font-bold">Primary Author Details</span>
+              <span className="block text-[10px] font-mono text-[#76726A] uppercase font-bold">Primary Author Details</span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="block text-[9px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
@@ -1060,7 +1060,7 @@ export default function ResearchIntakeWizard({
 
             {/* Co-Author Metadata (Optional) */}
             <div className="space-y-3">
-              <span className="block text-[10px] font-mono text-[#8C887F] uppercase font-bold">Co-Author Details (Optional)</span>
+              <span className="block text-[10px] font-mono text-[#76726A] uppercase font-bold">Co-Author Details (Optional)</span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="block text-[9px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">

@@ -192,7 +192,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
       {/* Top Header */}
       <div className="bg-[#1A365D] text-white p-5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-[#C08A3E]/20 rounded-xl border border-[#C08A3E]/30 text-[#C08A3E]">
+          <div className="p-2.5 bg-[#C08A3E]/20 rounded-xl border border-[#C08A3E]/30 text-[#946A30]">
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
@@ -314,7 +314,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
               <div className="p-5 border-b border-[#E2E8F0] bg-[#FAF9F6] flex items-center justify-between shrink-0">
                 <div className="space-y-1 flex-1 mr-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-[#C08A3E] uppercase tracking-wider">
+                    <span className="text-xs font-mono font-bold text-[#946A30] uppercase tracking-wider">
                       Source Type:
                     </span>
                     <select
@@ -802,7 +802,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                       </div>
 
                       {aiActionLoading && (
-                        <div className="p-6 text-center text-xs font-mono text-[#C08A3E] flex items-center justify-center gap-2 animate-pulse">
+                        <div className="p-6 text-center text-xs font-mono text-[#946A30] flex items-center justify-center gap-2 animate-pulse">
                           <RefreshCw className="w-4 h-4 animate-spin" /> Synthesizing doctoral literature with Gemini AI...
                         </div>
                       )}
@@ -810,7 +810,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                       {aiActionResult && (
                         <div className="bg-white border border-[#C08A3E]/40 rounded-xl p-4 font-sans text-xs leading-relaxed text-[#1A365D] whitespace-pre-wrap shadow-sm">
                           <div className="flex items-center justify-between border-b border-[#F1F5F9] pb-2 mb-2">
-                            <span className="font-mono font-bold text-[#C08A3E] uppercase text-[10px]">AI Synthesis Output</span>
+                            <span className="font-mono font-bold text-[#946A30] uppercase text-[10px]">AI Synthesis Output</span>
                             <button
                               onClick={() => navigator.clipboard.writeText(aiActionResult)}
                               className="text-[10px] font-mono text-gray-400 hover:text-[#1A365D] flex items-center gap-1 cursor-pointer"

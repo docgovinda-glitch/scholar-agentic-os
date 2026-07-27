@@ -55,7 +55,7 @@ export default function AppHeader({
             <h1 className="text-xl font-serif font-bold text-[#1A365D] tracking-tight leading-tight">
               🎓 Scholar Agentic OS
             </h1>
-            <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-[#C08A3E] font-sans">
+            <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-[#946A30] font-sans">
               AI Research Operating System
             </p>
           </div>
@@ -206,7 +206,7 @@ export default function AppHeader({
 
       {/* Status bar — only in workspace view */}
       {viewMode === "workspace" && (
-      <div className="px-6 py-2 bg-[#FFFFFF] flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono text-[#8C887F] gap-2">
+      <div className="px-6 py-2 bg-[#FFFFFF] flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono text-[#76726A] gap-2">
         <div className="flex items-center gap-4 flex-wrap">
           <span className="flex items-center gap-1 text-[#1A365D]">
             Active Model:

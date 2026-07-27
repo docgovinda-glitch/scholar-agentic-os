@@ -60,7 +60,7 @@ export default function AIDisclosureReviewModal({
           </div>
 
           <div>
-            <label className="block text-xs font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+            <label className="block text-xs font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
               Disclosure Statement (editable)
             </label>
             <textarea
