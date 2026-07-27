@@ -1,6 +1,14 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-24 [latest], bundle code-splitting — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-24 [latest+1], #8C887F/#C08A3E contrast fix — supersedes the section below)
+
+**Contrast fix — 🟢 done** (`8ac63e9`), following `docs/planning/color-contrast-scoping.md`'s step sequence exactly rather than a global find/replace. Classified every occurrence mechanically (lowercase HTML tag = real text, needs fixing; PascalCase component = lucide-react icon coloring an SVG stroke, not text — left alone; `border-[#...]`/`bg-[#...]` also left alone). Computed real replacement shades preserving hue/saturation, reducing lightness until 4.5:1 clears against every background actually used in the app (not just white): `#8C887F` → `#76726A`, `#C08A3E` → `#946A30`. Applied to 207 real text occurrences across 25 files; left ~100 icon/border/background occurrences on the original brand hex untouched. `ComplianceChecklistPanel.tsx`'s dark-theme surface (flagged as needing separate checking) confirmed to never use either hex at all — nothing there needed touching. tsc clean, full suite 770/772 unchanged (same 2 pre-existing unrelated failures). Live-verified with real `getComputedStyle` checks against the actual rendered page background (not a static code check): both fixed colors render correctly and clear 4.5:1 against the real page background (4.58:1 and 4.60:1 respectively).
+
+**Updated gap map**: production-readiness is now **fully closed** — every item from the original audit is either done or was never actually in scope. The sci-fi UI redesign is the only work remaining on this project, and it hasn't been scoped yet.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-24 [latest], bundle code-splitting)
 
 **Bundle code-splitting — 🟢 done** (`d05eca9`). The one item scoped-not-fixed in the prior session (`docs/planning/color-contrast-scoping.md`'s companion note on bundle size, referenced from item 3 below). Converted `docx`/`pdfmake`/its standard-font containers in `documentExportService.ts` from static top-level imports to dynamic `import()` inside `exportToDocx`/`exportToPdf` only (`buildExportDocumentModel`, the pure model builder, needs neither library). Confirmed `xlsx` — also flagged — is a dependency but never actually imported anywhere; nothing to fix there. Real, measured result: main bundle **3,255.65 kB (915.69 kB gzip) → 1,346.98 kB (350.18 kB gzip)** — pdfmake (1,010.76 kB) and the two font containers (540 kB combined) now load as separate on-demand chunks. All 20 existing `documentExportService.test.ts` tests pass unchanged (`vi.mock()` intercepts dynamic imports the same as static ones). Live-verified against the actual production build (`vite preview` serving `dist/`, not the dev server) — a real project's Download .DOCX and Download .PDF both completed with no error, confirming the lazily-loaded chunks genuinely work.
 
