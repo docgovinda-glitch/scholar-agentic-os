@@ -29,17 +29,38 @@
  */
 
 import { PaperProject } from "../types";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
-import pdfMake from "pdfmake/build/pdfmake";
-// pdfmake's browser build doesn't bundle standard-14 AFM metrics by default
-// (only Roboto, in build/fonts) — these separate modules supply the actual
-// vfs entries + font-family mapping pdfmake needs to lay out Times/Helvetica
-// text. Without registering the right one, createPdf() throws "File
-// 'data/Times-Bold.afm' not found in virtual file system" (or the Helvetica
-// equivalent) the first time a run in that font is measured.
-import timesFontContainer from "pdfmake/build/standard-fonts/Times.js";
-import helveticaFontContainer from "pdfmake/build/standard-fonts/Helvetica.js";
+import type { Paragraph as ParagraphT } from "docx";
 import { getDocumentTemplate, DocumentLayout } from "../config/documentTemplates";
+
+// Bundle code-splitting (production-readiness pass, 2026-07-24): docx and
+// pdfmake (plus its standard-font containers) were static top-level imports,
+// pulling both libraries into the main bundle even for users who never
+// export a document — a real, measured contributor to the 3.25MB unsplit
+// bundle flagged in HANDOVER.md. buildExportDocumentModel (below) needs
+// neither library — only exportToDocx/exportToPdf actually do — so each
+// loads its own dependency lazily, on first real use, instead of at app
+// startup. vi.mock() in documentExportService.test.ts intercepts these the
+// same way regardless of static vs. dynamic import syntax, so this doesn't
+// change how the existing tests mock docx/pdfmake.
+async function loadDocx() {
+  return import("docx");
+}
+
+async function loadPdfMake() {
+  const [{ default: pdfMake }, { default: timesFontContainer }, { default: helveticaFontContainer }] = await Promise.all([
+    import("pdfmake/build/pdfmake"),
+    // pdfmake's browser build doesn't bundle standard-14 AFM metrics by
+    // default (only Roboto, in build/fonts) — these separate modules supply
+    // the actual vfs entries + font-family mapping pdfmake needs to lay out
+    // Times/Helvetica text. Without registering the right one, createPdf()
+    // throws "File 'data/Times-Bold.afm' not found in virtual file system"
+    // (or the Helvetica equivalent) the first time a run in that font is
+    // measured.
+    import("pdfmake/build/standard-fonts/Times.js"),
+    import("pdfmake/build/standard-fonts/Helvetica.js"),
+  ]);
+  return { pdfMake, timesFontContainer, helveticaFontContainer };
+}
 
 export interface ExportBodySection {
   heading: string;
@@ -197,6 +218,8 @@ function filenameFor(title: string, extension: string): string {
 // template) rather than a single hardcoded academic default.
 
 export async function exportToDocx(project: PaperProject): Promise<Blob> {
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = await loadDocx();
+
   const model = buildExportDocumentModel(project);
   const { layout } = model;
   const marginTwips = layout.marginInches * 1440; // twips = 1/1440 inch
@@ -205,7 +228,7 @@ export async function exportToDocx(project: PaperProject): Promise<Blob> {
 
   const bodyRun = (text: string) => new TextRun({ text, font: layout.docxFontFamily, size: fontHalfPoints });
 
-  const paragraphsFor = (text: string): Paragraph[] =>
+  const paragraphsFor = (text: string): ParagraphT[] =>
     text
       .split("\n")
       .filter((line) => line.trim())
@@ -219,7 +242,7 @@ export async function exportToDocx(project: PaperProject): Promise<Blob> {
       spacing,
     });
 
-  const children: InstanceType<typeof Paragraph>[] = [];
+  const children: ParagraphT[] = [];
 
   // Title page
   children.push(
@@ -312,6 +335,8 @@ export async function downloadDocx(project: PaperProject): Promise<void> {
 // template) rather than a single hardcoded academic default.
 
 export async function exportToPdf(project: PaperProject): Promise<Blob> {
+  const { pdfMake, timesFontContainer, helveticaFontContainer } = await loadPdfMake();
+
   const model = buildExportDocumentModel(project);
   const { layout } = model;
 
