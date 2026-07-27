@@ -1,6 +1,20 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-24 [latest+1], #8C887F/#C08A3E contrast fix — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-27, sci-fi redesign scoped — supersedes the section below)
+
+**Scoped, not started** — `docs/planning/sci-fi-redesign-scoping.md`. Re-verified (not just trusted) the existing 2026-07-20 design proposal (`docs/planning/2026-07-20-session-notes.md` §1) against current code, since a lot changed in between:
+
+- Direction still sound ("Ancient Knowledge, Future Interface" — dark-first palette, new phosphor-cyan accent for system/AI state kept distinct from the existing gold accent reserved for scholarship/citations, serif for manuscript content vs. mono for chrome, state-driven motion only). Theme tokens for the serif/mono fonts and a brand-900/950 dark scale already exist in `src/index.css` — unused as a real surface color today, just present inside `.glass-effect` dark selectors.
+- **Corrected one stale claim**: the original proposal said `font-mono` was "unused for chrome" — it's actually used 861 times across current `.tsx` files, just not with a deliberate content-vs-chrome distinction yet.
+- **Quantified the real scale before estimating anything**: this session's `#8C887F`/`#C08A3E` contrast fix (25 files, 207 occurrences) was the *easy* end of a palette change. The other brand color, `#1A365D` navy, alone is 632 occurrences across 29 files — 2.5–3x that. Several other hardcoded neutrals/borders (`#E5E7EB`, `#E2E8F0`, `#D1CEC7`, etc., 50-200 occurrences each) aren't yet classified text-vs-decorative the way this session did for gold/neutral.
+- A11y debt is real but improved: real `aria-*`/`role`/`tabIndex` usage is now 6 of 34 non-test components (up from the original proposal's near-zero), still under 20% coverage. **No `:focus-visible` style and no `prefers-reduced-motion` handling exist anywhere** — both must be built into this redesign from day one, not retrofitted, since glow/pulse effects make both gaps worse by default.
+- Reproduced the original proposal's ordered, impact-to-risk-ranked component list (re-verified current line counts): `index.css`+`AppHeader`/`AppFooter` → `CommandPalette.tsx` → `ActiveAgentsPanel.tsx` → `AIControlCenter.tsx`/`AISetupWizard.tsx` → `ResearchIntelligenceDashboard.tsx`, everything else adopted incrementally as touched rather than as a batch migration.
+
+**Updated gap map**: this is now the one item left on the project, and it's scoped (not just flagged) for the first time. No color values are finalized and no component has been touched — that's deliberate, per this project's own standing discipline of scoping before touching a systemic change.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-24 [latest+1], #8C887F/#C08A3E contrast fix)
 
 **Contrast fix — 🟢 done** (`8ac63e9`), following `docs/planning/color-contrast-scoping.md`'s step sequence exactly rather than a global find/replace. Classified every occurrence mechanically (lowercase HTML tag = real text, needs fixing; PascalCase component = lucide-react icon coloring an SVG stroke, not text — left alone; `border-[#...]`/`bg-[#...]` also left alone). Computed real replacement shades preserving hue/saturation, reducing lightness until 4.5:1 clears against every background actually used in the app (not just white): `#8C887F` → `#76726A`, `#C08A3E` → `#946A30`. Applied to 207 real text occurrences across 25 files; left ~100 icon/border/background occurrences on the original brand hex untouched. `ComplianceChecklistPanel.tsx`'s dark-theme surface (flagged as needing separate checking) confirmed to never use either hex at all — nothing there needed touching. tsc clean, full suite 770/772 unchanged (same 2 pre-existing unrelated failures). Live-verified with real `getComputedStyle` checks against the actual rendered page background (not a static code check): both fixed colors render correctly and clear 4.5:1 against the real page background (4.58:1 and 4.60:1 respectively).
 
