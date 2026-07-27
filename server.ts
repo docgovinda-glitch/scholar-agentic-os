@@ -27,12 +27,32 @@ dotenv.config();
 
 const PORT = 3000;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Production-readiness pass (2026-07-24): this used to be
+// `const __filename = fileURLToPath(import.meta.url); const __dirname =
+// path.dirname(__filename);` unconditionally — which crashes on startup
+// under the CJS build `npm start` actually runs (`dist/server.cjs`,
+// produced by esbuild --format=cjs): `import.meta.url` is empty in CJS, so
+// `fileURLToPath(undefined)` threw ERR_INVALID_ARG_TYPE immediately
+// (confirmed by actually running `node dist/server.cjs`, not just reading
+// the build warning). Node/esbuild's CJS output already provides a real,
+// working `__dirname` binding for free — this only needs to compute one
+// from `import.meta.url` in the ESM path (`tsx server.ts`, used by `npm run
+// dev`), and defer to the ambient one otherwise. Resolved once, at module
+// load, not per-request.
+function resolveServerDirname(): string {
+  if (typeof import.meta !== "undefined" && import.meta.url) {
+    return path.dirname(fileURLToPath(import.meta.url));
+  }
+  // @ts-ignore — __dirname is a real binding injected by Node's CJS module
+  // wrapper at runtime in the esbuild-bundled dist/server.cjs; it isn't a
+  // declared identifier in this ESM-authored source file.
+  return __dirname;
+}
+const serverDirname = resolveServerDirname();
 
 const app = express();
 
-const USERS_DB_PATH = path.join(__dirname, "users.json");
+const USERS_DB_PATH = path.join(serverDirname, "users.json");
 
 interface UserRecord {
   username: string;

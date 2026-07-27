@@ -9,6 +9,17 @@
 
 import type { Skill, SkillContext, SkillResult, SkillErrorType, SkillValidationResult } from "./types";
 import { createLogger } from "../core/logger";
+// Production-readiness pass (2026-07-24): this used to be a dynamic
+// import("./registry") below, on the theory it would let bundlers split
+// registry.ts into its own chunk. In practice, src/services/agentService.ts
+// (the module that actually wires every agent/skill together for the live
+// app) already imports SkillRegistry statically — so registry.ts was always
+// pulled into the main bundle regardless, and Vite's build correctly warned
+// that the dynamic import here achieved nothing (mixed static/dynamic import
+// of the same module prevents any chunk-splitting benefit). Importing it
+// statically here too removes the pointless async indirection and the
+// build warning, with no behavior change.
+import { SkillRegistry } from "./registry";
 
 const logger = createLogger("SkillExecutor");
 
@@ -308,7 +319,7 @@ export async function runSkill<TInput, TOutput>(
   input: TInput,
   options: ExecuteOptions = {}
 ): Promise<SkillResult<TOutput>> {
-  const registry = (await import("./registry")).SkillRegistry.getInstance();
+  const registry = SkillRegistry.getInstance();
   const skill = registry.get(skillId);
   if (!skill) {
     return {
