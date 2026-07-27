@@ -1,6 +1,14 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-24 [even later], production-readiness pass finished — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-24 [latest], bundle code-splitting — supersedes the section below)
+
+**Bundle code-splitting — 🟢 done** (`d05eca9`). The one item scoped-not-fixed in the prior session (`docs/planning/color-contrast-scoping.md`'s companion note on bundle size, referenced from item 3 below). Converted `docx`/`pdfmake`/its standard-font containers in `documentExportService.ts` from static top-level imports to dynamic `import()` inside `exportToDocx`/`exportToPdf` only (`buildExportDocumentModel`, the pure model builder, needs neither library). Confirmed `xlsx` — also flagged — is a dependency but never actually imported anywhere; nothing to fix there. Real, measured result: main bundle **3,255.65 kB (915.69 kB gzip) → 1,346.98 kB (350.18 kB gzip)** — pdfmake (1,010.76 kB) and the two font containers (540 kB combined) now load as separate on-demand chunks. All 20 existing `documentExportService.test.ts` tests pass unchanged (`vi.mock()` intercepts dynamic imports the same as static ones). Live-verified against the actual production build (`vite preview` serving `dist/`, not the dev server) — a real project's Download .DOCX and Download .PDF both completed with no error, confirming the lazily-loaded chunks genuinely work.
+
+**Updated gap map**: production-readiness now has exactly one deliberately-deferred item left — `#8C887F`/`#C08A3E` contrast (`docs/planning/color-contrast-scoping.md`, systemic, needs a palette decision) — plus the sci-fi UI redesign, which was never started and isn't even scoped yet. Everything else in the production-readiness space is closed.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-24 [even later], production-readiness pass finished)
 
 **Worked through every item the prior session logged as open, in order. Production-readiness is now closed except for two explicitly-scoped, deliberately-deferred items (bundle splitting, sci-fi redesign) — no more small isolated fixes remain in this space.**
 
