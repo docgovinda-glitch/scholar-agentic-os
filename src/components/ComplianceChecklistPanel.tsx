@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { PaperProject, ComplianceRules } from "../types";
-import { FileSearch, Sparkles, ClipboardCheck, Edit3, CheckSquare, ListPlus } from "lucide-react";
+import { FileSearch, Sparkles, ClipboardCheck, Edit3, CheckSquare, ListPlus, Upload } from "lucide-react";
 import { extractRequirements } from "../services/aiService";
+import { learnStructureFromSampleDocument } from "../services/sampleDocLearningService";
 
 interface ComplianceChecklistPanelProps {
   project: PaperProject;
@@ -24,6 +25,43 @@ export default function ComplianceChecklistPanel({
   // Editable fields local state initialized when rules change
   const [lclWordGoal, setLclWordGoal] = useState("");
   const [lclCitations, setLclCitations] = useState("");
+
+  // Stage 7 (target-workflow.md) sample-document structure learning — was
+  // read-only here (chip list only), unlike NonJournalRequirementsPanel.tsx's
+  // editable textarea. Restructured to be editable first, then wired to the
+  // same real upload/parse service, following the exact "sample wins" rule
+  // and provenance-badge pattern already built there.
+  const [isEditingSections, setIsEditingSections] = useState(false);
+  const [sectionStructureText, setSectionStructureText] = useState("");
+  const [sampleSourceFileName, setSampleSourceFileName] = useState<string | null>(null);
+  const [sampleLoading, setSampleLoading] = useState(false);
+  const [sampleError, setSampleError] = useState<string | null>(null);
+  const sampleFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSampleDocUpload = async (file: File) => {
+    setSampleLoading(true);
+    setSampleError(null);
+    try {
+      const result = await learnStructureFromSampleDocument(file);
+      setSectionStructureText(result.sectionStructure.join("\n"));
+      setSampleSourceFileName(result.sourceFileName);
+      setIsEditingSections(true);
+    } catch (err: any) {
+      setSampleError(err.message || "Failed to learn structure from the uploaded document.");
+    } finally {
+      setSampleLoading(false);
+    }
+  };
+
+  const saveSectionStructure = () => {
+    if (!project.complianceRules) return;
+    const sectionStructure = sectionStructureText
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    updateProject({ complianceRules: { ...project.complianceRules, sectionStructure } });
+    setIsEditingSections(false);
+  };
 
   const loadStandardGuidelines = () => {
     setError(null);
@@ -164,6 +202,15 @@ export default function ComplianceChecklistPanel({
       setLclCitations(project.complianceRules.citationStyle);
     }
   }, [project.targetJournal]);
+
+  // Keep the section-structure textarea in sync with real rules whenever
+  // they change (extraction/template load) — but never while the user has
+  // the editor open with unsaved changes.
+  useEffect(() => {
+    if (project.complianceRules && !isEditingSections) {
+      setSectionStructureText(project.complianceRules.sectionStructure.join("\n"));
+    }
+  }, [project.complianceRules?.sectionStructure]);
 
   const saveLocalEdits = () => {
     if (!project.complianceRules) return;
@@ -347,25 +394,80 @@ export default function ComplianceChecklistPanel({
                   <div className="flex items-center justify-between border-b border-[#A3E635]/15 pb-2 flex-wrap gap-2">
                     <h3 className="text-sm font-semibold text-[#A3E635] font-mono uppercase tracking-wider flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4" />
-                      Target Section Structure (Successfully Learned Journal Format)
+                      Target Section Structure
                     </h3>
                     <span className="text-[10px] font-mono px-2 py-0.5 bg-brand-500/20 text-[#A3E635] border border-[#A3E635]/40 rounded font-bold uppercase">
-                      Journal Template Aligned
+                      {sampleSourceFileName ? `Learned from: ${sampleSourceFileName}` : "Journal Template Aligned"}
                     </span>
                   </div>
-                  
+
                   <p className="text-xs text-gray-300 leading-relaxed">
-                    The entire system has absorbed this target workflow structure. The <strong>Manuscript Drafting Workbench (Phase F)</strong> and the <strong>PDF Pre-Print Compiler</strong> are currently locked-in to this precise structure:
+                    The entire system has absorbed this target workflow structure. The <strong>Manuscript Drafting Workbench (Phase F)</strong> and the <strong>PDF Pre-Print Compiler</strong> are currently locked-in to this precise structure — edit it directly, or upload a sample document from your target journal to replace it with its real detected structure.
                   </p>
 
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {rules.sectionStructure.map((sec, i) => (
-                      <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-950/60 border border-brand-500/20 rounded-lg text-xs font-mono text-brand-200">
-                        <span className="font-bold text-brand-400">{i + 1}.</span>
-                        {sec}
-                      </div>
-                    ))}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <input
+                      ref={sampleFileInputRef}
+                      type="file"
+                      accept=".pdf,.docx,.txt,.md"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleSampleDocUpload(file);
+                        e.target.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => sampleFileInputRef.current?.click()}
+                      disabled={sampleLoading}
+                      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-dashed border-white/20 disabled:opacity-50 text-gray-200 text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      {sampleLoading ? "Learning Structure..." : "Learn From Sample Document"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingSections(!isEditingSections)}
+                      className="text-xs text-brand-400 hover:text-brand-300 font-semibold cursor-pointer"
+                    >
+                      {isEditingSections ? "Cancel" : "Edit Structure"}
+                    </button>
                   </div>
+
+                  {sampleError && (
+                    <p className="text-[10px] text-red-300 bg-red-950/40 border border-red-500/30 rounded-lg p-2">{sampleError}</p>
+                  )}
+
+                  {isEditingSections ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-400">One section per line, in order.</p>
+                      <textarea
+                        rows={10}
+                        value={sectionStructureText}
+                        onChange={(e) => {
+                          setSectionStructureText(e.target.value);
+                          setSampleSourceFileName(null);
+                        }}
+                        className="w-full bg-brand-950/60 border border-white/15 rounded-lg px-2.5 py-2 text-xs text-white font-mono"
+                      />
+                      <button
+                        onClick={saveSectionStructure}
+                        className="w-full py-1.5 bg-brand-500 hover:bg-brand-650 text-white rounded text-xs font-mono font-medium cursor-pointer"
+                      >
+                        Save Section Structure
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {rules.sectionStructure.map((sec, i) => (
+                        <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-950/60 border border-brand-500/20 rounded-lg text-xs font-mono text-brand-200">
+                          <span className="font-bold text-brand-400">{i + 1}.</span>
+                          {sec}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="glass-effect rounded-xl p-5 border-white/5 space-y-3">
