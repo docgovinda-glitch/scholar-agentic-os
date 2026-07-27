@@ -145,8 +145,9 @@ export default function NonJournalRequirementsPanel({
               Core Requirements
             </h3>
             <div>
-              <label className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Citation Style</label>
+              <label htmlFor="citation-style" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Citation Style</label>
               <select
+                id="citation-style"
                 value={citationStyle}
                 onChange={(e) => setCitationStyle(e.target.value)}
                 className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
@@ -157,11 +158,12 @@ export default function NonJournalRequirementsPanel({
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Word Count Target</label>
+              <label id="word-count-target-label" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Word Count Target</label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   placeholder="Min"
+                  aria-label="Minimum word count target"
                   value={wordCountMin}
                   onChange={(e) => setWordCountMin(e.target.value)}
                   className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
@@ -170,6 +172,7 @@ export default function NonJournalRequirementsPanel({
                 <input
                   type="number"
                   placeholder="Max"
+                  aria-label="Maximum word count target"
                   value={wordCountMax}
                   onChange={(e) => setWordCountMax(e.target.value)}
                   className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
@@ -193,8 +196,9 @@ export default function NonJournalRequirementsPanel({
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Margins (in)</label>
+                <label htmlFor="page-margins" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Margins (in)</label>
                 <input
+                  id="page-margins"
                   type="number"
                   step="0.1"
                   value={marginInches}
@@ -203,8 +207,9 @@ export default function NonJournalRequirementsPanel({
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Font Size (pt)</label>
+                <label htmlFor="font-size" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Font Size (pt)</label>
                 <input
+                  id="font-size"
                   type="number"
                   value={fontSizePt}
                   onChange={(e) => setFontSizePt(e.target.value)}
@@ -212,8 +217,9 @@ export default function NonJournalRequirementsPanel({
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Font Family</label>
+                <label htmlFor="font-family" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Font Family</label>
                 <select
+                  id="font-family"
                   value={fontFamily}
                   onChange={(e) => setFontFamily(e.target.value as "Times New Roman" | "Arial")}
                   className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
@@ -223,8 +229,9 @@ export default function NonJournalRequirementsPanel({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Line Spacing</label>
+                <label htmlFor="line-spacing" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Line Spacing</label>
                 <select
+                  id="line-spacing"
                   value={lineSpacing}
                   onChange={(e) => setLineSpacing(e.target.value as "single" | "double")}
                   className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
@@ -237,11 +244,12 @@ export default function NonJournalRequirementsPanel({
           </div>
 
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-3">
-            <h3 className="text-sm font-bold text-[#1A365D] font-serif uppercase tracking-wider border-b border-gray-150 pb-2">
+            <h3 id="institution-notes-label" className="text-sm font-bold text-[#1A365D] font-serif uppercase tracking-wider border-b border-gray-150 pb-2">
               Institution / Instructor Notes
             </h3>
             <textarea
               rows={5}
+              aria-labelledby="institution-notes-label"
               placeholder="Any custom rules from your institution, instructor, or rubric (optional)..."
               value={customNotes}
               onChange={(e) => setCustomNotes(e.target.value)}
@@ -269,6 +277,7 @@ export default function NonJournalRequirementsPanel({
                 ref={sampleFileInputRef}
                 type="file"
                 accept=".pdf,.docx,.txt,.md"
+                aria-label="Upload sample document to detect section structure"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -291,6 +300,7 @@ export default function NonJournalRequirementsPanel({
             )}
             <textarea
               rows={10}
+              aria-label="Manuscript section structure, one section per line"
               value={sectionStructureText}
               onChange={(e) => {
                 setSectionStructureText(e.target.value);

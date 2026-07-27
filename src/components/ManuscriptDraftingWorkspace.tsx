@@ -615,6 +615,7 @@ export default function ManuscriptDraftingWorkspace({
                   <span className="text-xs font-mono font-bold text-[#1A365D] uppercase tracking-wider">Canvas: {activeSec}</span>
                 </div>
                 <select
+                  aria-label="Select manuscript section to edit"
                   value={activeSec}
                   onChange={(e) => {
                     setActiveSec(e.target.value);
@@ -631,6 +632,7 @@ export default function ManuscriptDraftingWorkspace({
 
               <div className="grow p-5 overflow-y-auto">
                 <textarea
+                  aria-label="Manuscript section draft editor"
                   className="w-full h-full bg-white border-0 focus:ring-0 focus:outline-none text-sm text-[#1A365D] leading-relaxed font-sans resize-none min-h-[350px]"
                   placeholder="Start writing or editing your research draft here... Use the global command palette (Cmd+K) to navigate."
                   value={currentText}
@@ -917,10 +919,11 @@ export default function ManuscriptDraftingWorkspace({
               {/* Style & Writing Controls */}
               <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 space-y-3">
                 <div>
-                  <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+                  <label htmlFor="writing-style-sample" className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
                     2. Writing Style Sample
                   </label>
                   <textarea
+                    id="writing-style-sample"
                     rows={2}
                     className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D] focus:outline-none focus:border-[#C08A3E] font-sans"
                     placeholder="Paste a sample of your academic writing for style mimicry..."
@@ -930,12 +933,12 @@ export default function ManuscriptDraftingWorkspace({
                 </div>
 
                 <div className="flex items-center justify-between p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-                  <div>
+                  <label htmlFor="scripture-toggle" className="cursor-pointer">
                     <span className="text-xs font-bold font-mono text-amber-800 uppercase block">Scriptural & Ethical Support</span>
                     <p className="text-[10px] text-amber-700 leading-normal mt-0.5">
                       Integrate Vedic/classical references when relevant
                     </p>
-                  </div>
+                  </label>
                   <input
                     type="checkbox"
                     id="scripture-toggle"
@@ -946,12 +949,12 @@ export default function ManuscriptDraftingWorkspace({
                 </div>
 
                 <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div>
+                  <label htmlFor="humanize-toggle" className="cursor-pointer">
                     <span className="text-xs font-bold font-mono text-blue-800 uppercase block">Humanize Prose</span>
                     <p className="text-[10px] text-blue-700 leading-normal mt-0.5">
                       Post-process the draft to reduce formulaic AI-writing patterns (stock transitions, hollow topic sentences, passive voice, uniform sentence length, hedging)
                     </p>
-                  </div>
+                  </label>
                   <input
                     type="checkbox"
                     id="humanize-toggle"
@@ -962,10 +965,11 @@ export default function ManuscriptDraftingWorkspace({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+                  <label htmlFor="section-outline" className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
                     3. Section Outline (Optional)
                   </label>
                   <textarea
+                    id="section-outline"
                     rows={2}
                     className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D] focus:outline-none focus:border-[#C08A3E] placeholder:text-gray-400 font-sans"
                     placeholder="e.g.:&#10;- Definition of trusteeship&#10;- Critique of Milton Friedman..."
@@ -975,10 +979,11 @@ export default function ManuscriptDraftingWorkspace({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
+                  <label htmlFor="custom-writing-directives" className="block text-[10px] font-bold font-mono text-[#8C887F] uppercase tracking-wider mb-1">
                     4. Custom Writing Directives
                   </label>
                   <input
+                    id="custom-writing-directives"
                     type="text"
                     className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D] focus:outline-none focus:border-[#C08A3E] font-sans"
                     placeholder="e.g. 'Synthesize with World Bank data findings...'"
@@ -1240,6 +1245,7 @@ export default function ManuscriptDraftingWorkspace({
                     <div className="p-3 bg-white border-t border-gray-200 flex gap-2 items-center shrink-0">
                       <input
                         type="text"
+                        aria-label="Instruct AI to edit the current section"
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleSendChat(); }}
@@ -1250,6 +1256,7 @@ export default function ManuscriptDraftingWorkspace({
                       <button
                         onClick={handleSendChat}
                         disabled={chatLoading || !chatInput.trim()}
+                        aria-label="Send instruction to AI"
                         className="p-2 bg-[#1A365D] hover:bg-[#122847] text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                       >
                         <Send className="w-4 h-4" />
@@ -1269,6 +1276,7 @@ export default function ManuscriptDraftingWorkspace({
                 ) : (
                   <textarea
                     ref={textareaRef}
+                    aria-label="Manuscript section draft editor"
                     className={`grow w-full bg-transparent border-0 text-[#1A365D] text-sm leading-relaxed p-0 focus:ring-0 focus:outline-none font-sans whitespace-pre-line resize-none min-h-[420px] ${
                       isCurrentLocked ? "cursor-not-allowed opacity-60" : ""
                     }`}
