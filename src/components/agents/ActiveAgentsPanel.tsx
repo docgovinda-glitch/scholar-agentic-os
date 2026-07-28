@@ -101,7 +101,7 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
                 }}
                 className={`w-full text-left p-3 border rounded-xl transition-all duration-200 cursor-pointer flex flex-col gap-1 ${
                   isSelected
-                    ? "bg-[#1A365D] text-white border-[#1A365D] shadow-sm"
+                    ? "bg-[color:var(--color-cyan-accent)]/10 text-[#1A365D] border-[color:var(--color-cyan-accent)] shadow-sm"
                     : "bg-[#FAF8F5] text-[#1A365D] border-[#E5E7EB] hover:bg-neutral-50 hover:border-[#C08A3E]/20"
                 }`}
               >
@@ -109,14 +109,14 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
                   <span className="text-xs font-bold font-sans">{agent.name}</span>
                   <span
                     className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 ${
-                      isSelected ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
+                      isSelected ? "bg-[color:var(--color-cyan-accent)]/20 text-[#0E7490]" : "bg-slate-100 text-slate-500"
                     }`}
                   >
-                    <span className={`w-1 h-1 rounded-full ${isSelected ? "bg-white" : "bg-emerald-500"} animate-pulse`}></span>
+                    <span className={`w-1 h-1 rounded-full ${isSelected ? "bg-[color:var(--color-cyan-accent)] animate-pulse" : "bg-slate-400"}`}></span>
                     {agent.status}
                   </span>
                 </div>
-                <span className={`text-[10px] ${isSelected ? "text-white/80" : "text-[#6B665E]"} leading-normal font-sans`}>{agent.role}</span>
+                <span className={`text-[10px] ${isSelected ? "text-[#1A365D]/80" : "text-[#6B665E]"} leading-normal font-sans`}>{agent.role}</span>
               </button>
             );
           })}
@@ -183,7 +183,7 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-[#1A365D] hover:bg-[#1A365D]/90 disabled:bg-gray-300 text-white text-xs font-mono font-bold uppercase tracking-widest rounded-lg cursor-pointer transition-all flex items-center gap-1.5 shadow-sm"
+              className="px-5 py-2 bg-[color:var(--color-cyan-accent-dim)] hover:bg-[#0891B2] disabled:bg-gray-300 text-white text-xs font-mono font-bold uppercase tracking-widest rounded-lg cursor-pointer transition-all flex items-center gap-1.5 shadow-sm"
             >
               {loading ? (
                 <>
