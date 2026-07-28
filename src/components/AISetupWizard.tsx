@@ -317,7 +317,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                 }}
                 className={`relative p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
                   selectedProviders.includes(provider.id)
-                    ? 'bg-[#1A365D]/5 border-[#1A365D] shadow-sm'
+                    ? 'bg-[color:var(--color-cyan-accent)]/5 border-[color:var(--color-cyan-accent)] shadow-sm'
                     : 'bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/30 hover:bg-[#FAF8F5]/50'
                 }`}
               >
@@ -327,7 +327,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-[#1A365D] text-sm">{provider.name}</h4>
                       {selectedProviders.includes(provider.id) && (
-                        <CheckCircle2 className="text-[#1A365D] w-5 h-5 animate-scale-in" />
+                        <CheckCircle2 className="text-[color:var(--color-cyan-accent-dim)] w-5 h-5 animate-scale-in" />
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">{provider.description}</p>
@@ -371,8 +371,8 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                     }
                   }}
                   className={`relative p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
-                    selectedProviders.includes(provider.id) 
-                      ? 'bg-[#1A365D]/5 border-[#1A365D] shadow-sm' 
+                    selectedProviders.includes(provider.id)
+                      ? 'bg-[color:var(--color-cyan-accent)]/5 border-[color:var(--color-cyan-accent)] shadow-sm'
                       : 'bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/30 hover:bg-[#FAF8F5]/50'
                   }`}
                 >
@@ -382,7 +382,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                       <div className="flex items-center justify-between">
                         <h4 className="font-bold text-[#1A365D] text-sm">{provider.name}</h4>
                         {selectedProviders.includes(provider.id) && (
-                          <CheckCircle2 className="text-[#1A365D] w-5 h-5 animate-scale-in" />
+                          <CheckCircle2 className="text-[color:var(--color-cyan-accent-dim)] w-5 h-5 animate-scale-in" />
                         )}
                       </div>
                       <p className="text-xs text-gray-500 mt-1">{provider.description}</p>
@@ -395,8 +395,8 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                             <Loader2 className="w-3 h-3 animate-spin" /> Detecting...
                           </span>
                         ) : isDetected ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 font-bold">
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[color:var(--color-cyan-accent)]/10 text-[#0E7490] border border-[color:var(--color-cyan-accent)]/30 flex items-center gap-1 font-bold">
+                            <span className="w-1.5 h-1.5 bg-[color:var(--color-cyan-accent)] rounded-full animate-pulse"></span>
                             Detected
                           </span>
                         ) : null}
@@ -489,7 +489,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                   </div>
                   {health && (
                     <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                      health.status === 'online' ? 'bg-emerald-50 text-emerald-700 border border-emerald-250' :
+                      health.status === 'online' ? 'bg-[color:var(--color-cyan-accent)]/10 text-[#0E7490] border border-[color:var(--color-cyan-accent)]/30' :
                       health.status === 'offline' ? 'bg-red-50 text-red-700 border border-red-200' :
                       'bg-amber-50 text-amber-700 border border-amber-200'
                     }`}>
@@ -698,15 +698,15 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             {[1, 2, 3].map(num => (
               <React.Fragment key={num}>
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full border text-xs font-mono font-bold transition-all duration-350 ${
-                  step >= num 
-                    ? 'border-[#1A365D] bg-[#1A365D] text-white shadow-sm' 
+                  step >= num
+                    ? 'border-[color:var(--color-cyan-accent-dim)] bg-[color:var(--color-cyan-accent-dim)] text-white shadow-sm'
                     : 'border-gray-300 text-gray-400 bg-white'
                 }`}>
                   {num}
                 </div>
                 {num < 3 && (
                   <div className={`w-12 h-[1px] transition-all duration-350 ${
-                    step > num ? 'bg-[#1A365D]' : 'bg-gray-200'
+                    step > num ? 'bg-[color:var(--color-cyan-accent-dim)]' : 'bg-gray-200'
                   }`} />
                 )}
               </React.Fragment>

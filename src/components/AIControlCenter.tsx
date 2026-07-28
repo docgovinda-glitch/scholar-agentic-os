@@ -243,14 +243,14 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-100 pb-4 gap-4">
         <div>
           <h2 className="text-xl font-semibold text-[#1A365D] font-display flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-[#C08A3E]" />
+            <Cpu className="w-5 h-5 text-[color:var(--color-cyan-accent-dim)]" />
             AI Control Center & Gateway
           </h2>
           <p className="text-xs text-gray-500">
             Configure encrypted credentials, specialized routing, local engines, and track estimated API costs.
           </p>
         </div>
-        
+
         {/* Sub Navigation Tabs */}
         <div className="flex gap-1.5 bg-[#FAF9F6] border border-gray-200/60 p-1 rounded-xl shrink-0 overflow-x-auto">
           {[
@@ -267,7 +267,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
                 onClick={() => setActiveSubTab(tab.id as any)}
                 className={`px-3 py-1.5 text-xs font-mono font-semibold uppercase tracking-wider rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   active
-                    ? "bg-[#1A365D] text-white shadow-sm"
+                    ? "bg-[color:var(--color-cyan-accent-dim)] text-white shadow-sm"
                     : "text-[#6B665E] hover:text-[#1A365D] hover:bg-neutral-100"
                 }`}
               >
@@ -282,8 +282,8 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
       {/* SUB TAB 1: API CREDENTIALS MANAGER */}
       {activeSubTab === "credentials" && !vaultUnlocked && (
         <div className="space-y-6 animate-fade-in max-w-xl mx-auto text-center py-8">
-          <div className="w-14 h-14 bg-[#1A365D]/5 border border-gray-200 rounded-full flex items-center justify-center mx-auto">
-            <Key className="w-7 h-7 text-[#C08A3E]" />
+          <div className="w-14 h-14 bg-[color:var(--color-cyan-accent)]/10 border border-gray-200 rounded-full flex items-center justify-center mx-auto">
+            <Key className="w-7 h-7 text-[color:var(--color-cyan-accent-dim)]" />
           </div>
           <div>
             <h3 className="text-xl font-bold font-serif text-[#1A365D] mb-3">Unlock Your Key Vault</h3>
@@ -734,7 +734,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
                 <div className="flex items-center justify-between py-1 border-b border-gray-100">
                   <span className="text-xs text-gray-500 font-sans">Service Connection:</span>
                   {ollamaStatus === "online" ? (
-                    <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold uppercase rounded-md flex items-center gap-1">
+                    <span className="px-2.5 py-0.5 bg-[color:var(--color-cyan-accent)]/15 text-[#0E7490] text-[10px] font-mono font-bold uppercase rounded-md flex items-center gap-1">
                       <Wifi className="w-3 h-3" />
                       ONLINE
                     </span>
@@ -806,12 +806,12 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
             {/* Metric 3 */}
             <div className="bg-[#FAF9F6] border border-gray-200 p-4 rounded-xl flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-full bg-[color:var(--color-cyan-accent)]/15 text-[#0E7490] flex items-center justify-center shrink-0">
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
                 <span className="text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider block">Active Session Provider</span>
-                <span className="text-sm font-bold text-emerald-800 font-mono uppercase">{project.aiSettings?.provider || "gemini"}</span>
+                <span className="text-sm font-bold text-[#0E7490] font-mono uppercase">{project.aiSettings?.provider || "gemini"}</span>
               </div>
             </div>
           </div>
