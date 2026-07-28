@@ -1,6 +1,20 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-28, AI modes IA/UX redesign complete — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-28, Option 1 corrected: Pollinations → OmniRoute — supersedes the section below)
+
+**Follow-up correction — 🟢 done, Tasks 1-5 all complete.** Full record in `docs/planning/ai-modes-reconciliation.md`'s new "Follow-up correction" section. The AI modes redesign below (Steps 0-8) shipped Option 1 ("Smart AI") backed by Pollinations, which turned out to only simulate success in some paths rather than reliably deliver — it was removed, not patched. Option 1 is now **OmniRoute ("Smart Gateway")**: a self-hosted local router (`npm install -g omniroute`) that itself proxies to real cloud providers with automatic fallback. Important distinction from the old copy: this is explicitly **not** zero-install — it needs `~5 min setup, one-time`, and its `howItWorks` copy states plainly that inference happens in the cloud (only the routing step is local). Any future reference to "Smart AI" or "Pollinations" in this codebase is stale.
+
+- **`AIModeId`** is now `"omniroute" | "cloud" | "local" | "byok" | "partner"` (was `"smart" | ...`) — check this before assuming old code samples/tests referencing `"smart"` still apply.
+- **Recommendation banner re-resolved**: no longer points at Option 1 (that only made sense when it was zero-setup). Now recommends **Cloud AI Providers** as the default starting point, with **Bring Your Own AI** as the alternative for users who already pay for a provider — the "RECOMMENDED FOR REGULAR USE" badge moved to the Cloud AI Providers card.
+- **Jargon-banned-word list** (`aiModes.test.ts`) had `inference` deliberately removed — banning it would recreate the vagueness this correction exists to fix, since OmniRoute's copy must honestly say inference happens in the cloud. `router` stayed banned (OmniRoute copy says "gateway" instead).
+- **Live-verified in a real browser**: OmniRoute was deliberately not installed in this shared sandbox (739MB unpacked, same judgment call as Step 0 below) — instead verified the full UI flow against a genuinely absent local instance (real `OFFLINE` results with different latencies each check, a direct in-browser `fetch` independently corroborating connection failure) and confirmed Options 2-5 (Cloud AI Providers, Local AI, Bring Your Own AI, Partner Subscription) still render/select/gate correctly, including a true-positive "Detected running" badge against this sandbox's own real, pre-existing Ollama instance.
+- `tsc --noEmit` clean, full suite 869/871 (same 2 pre-existing unrelated `supabaseClient.test.ts` failures as every session before this one — zero new regressions).
+
+**Updated gap map**: this correction is closed out as complete. Nothing from Tasks 1-5 is left open.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-28, AI modes IA/UX redesign complete — superseded by the section above; "Smart AI"/Pollinations references below are historical, since replaced by OmniRoute above)
 
 **AI Setup/Settings redesign around 5 user-facing AI Modes — 🟢 done, Steps 0-8 all complete.** Full step-by-step record in `docs/planning/ai-modes-reconciliation.md`. This was an information-architecture redesign of `AISetupWizard.tsx` (onboarding) and `AIControlCenter.tsx` (settings), not a visual refresh — users are now asked "How would you like your AI assistant to work?" and choose among 5 plain-language modes (Smart AI, Cloud AI Providers, Local AI, Bring Your Own AI, Partner Subscription), never an implementation detail. Every step: real live verification (not code-read-only), `tsc --noEmit` + full suite clean throughout (baseline: 864/866, same 2 pre-existing unrelated `supabaseClient.test.ts` failures — zero new regressions across 9 commits), one commit per step.
 

@@ -332,3 +332,48 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 | 6 | Smart AI status & diagnostics | 🟢 done (folded into Step 5's Diagnostics tab — see note) |
 | 7 | Accessibility, responsive, motion | 🟢 done |
 | 8 | Final verification | 🟢 done |
+
+---
+
+## Follow-up correction (2026-07-28) — Option 1 replaced: Pollinations ("Smart AI") → OmniRoute ("Smart Gateway")
+
+**Trigger**: Option 1 as shipped in Steps 0-8 above only simulated success in some paths rather than reliably delivering, and was ordered removed rather than patched.
+
+### Task 1 — removal
+
+Deleted the Pollinations-backed adapter, mode config entry, and its "continue → done" onboarding shortcut (`handleSelectSmartAI` in `AISetupWizard.tsx`). Grepped the full codebase afterward for `pollinations`/`Pollinations`/`"smart"` — confirmed no dead references remain outside of historical explanatory comments (including this document, which is a record, not live copy). Tests either converted to characterize the new path or removed outright (never silently dropped): `aiGateway.newProviders.test.ts`, `aiModes.test.ts`, `AIModeCard.test.tsx`, `AISetupWizard.test.tsx`, `AISetupWizard.vaultGate.test.tsx`, `AIControlCenter.aiModeTab.test.tsx`, `AIControlCenter.step5Tabs.test.tsx`.
+
+### Task 2 — OmniRoute added as the new Option 1
+
+Copy was deliberately written to avoid repeating the old option's fabrication in a new shape:
+- Badge changed from "Instant" to **"~5 min setup, one-time"** — it requires installing a real local package (`npm install -g omniroute`), so "instant"/"no install" language was banned by a new assertion in `aiModes.test.ts` specifically for this mode.
+- `howItWorks` copy states plainly that **inference happens in the cloud**, on whichever provider OmniRoute selects — only the routing step is local. This required removing `inference` from the existing jargon-banned-word list (it had been banned as internal-engineering jargon in Step 1, but banning it here would have recreated the same vagueness this correction exists to fix — using the accurate word is the honest choice). `router` stayed banned; two occurrences in the draft mode/provider `description` copy were reworded to `gateway`.
+- Requirements/limitations spell out that a real install-and-launch step is needed before anything works, and that underlying provider accounts/keys may still be needed via OmniRoute's own dashboard, not this app.
+
+### Task 3 — real setup flow
+
+Extended the existing local-server auto-detection pattern (previously only Ollama/Custom in `detectLocalServers()`) to also probe OmniRoute's default local endpoint (`http://localhost:20128/v1`). `AISetupWizard.tsx` introduces a `usesAutoDetection` flag (`isLocalMode || selectedMode === "omniroute"`) so OmniRoute gets the same "Detecting.../Detected running" badge and install-guidance UI as Local AI's backends — while `isLocalMode` alone (unchanged) continues to gate the "nothing leaves your computer" privacy banner, which must NOT show for OmniRoute since inference is cloud-side. "Test Connection" and the Configure Connections status badge call OmniRoute's real `/v1/models` endpoint and report genuine online/offline/latency — never optimistic.
+
+### Task 4 — recommendation banner re-resolved
+
+The old banner recommended Option 1 specifically because it needed zero setup — no longer true. Replaced with a banner recommending **Cloud AI Providers** as the default starting point (free account with Gemini/OpenRouter/etc., no local install) and **Bring Your Own AI** as the alternative for users who already pay for a provider. The "RECOMMENDED FOR REGULAR USE" badge was moved from the old Option 1 card to the Cloud AI Providers card. Live-verified in-browser (see below) — the banner and badge both render the new copy, and Smart Gateway carries no recommendation badge.
+
+### Task 5 — regression check on Options 2-5
+
+Full automated suite: 869/871 passing (same 2 pre-existing, unrelated `supabaseClient.test.ts` failures present since Step 0). The vault-gate regression suite's `NO_KEY_OPTIONS` special-case exclusion for `"smart"` mode was removed — every mode, including the new OmniRoute, now goes through the identical parametrized standard-flow assertion, with no shortcut left to carve out.
+
+**Live-browser walkthrough** (real running dev server, not simulated), from a freshly seeded onboarding session:
+- **Mode grid**: all 5 cards render — Smart Gateway, Cloud AI Providers (now carrying "RECOMMENDED FOR REGULAR USE"), Local AI, Bring Your Own AI, Partner Subscription ("COMING SOON", non-selectable) — with the corrected recommendation banner text visible above the grid.
+- **Smart Gateway → OmniRoute**: provider step shows real install guidance (`npm install -g omniroute`) and a working download link, no fabricated "Detected running" badge (nothing listens on port 20128 in this sandbox — confirmed by direct `curl` returning exit 7 / connection refused). Configure Connections showed a real `OFFLINE (90ms)` then, on a second "Test Connection" click, an independently recomputed `OFFLINE (23ms)` — different latency each time, proving the check is live, not cached or fabricated. A direct in-browser `fetch('http://localhost:20128/v1/models')` independently corroborated `{"error": "Failed to fetch"}`.
+- **Cloud AI Providers**: renders Google Gemini, Groq, DeepSeek, Together AI; Continue correctly disabled at 0 selected, enabled with a genuine checkmark after selecting Gemini ("Selected: 1 providers"). No OmniRoute/local leakage onto this screen.
+- **Local AI**: renders exactly 3 backends — Ollama, LM Studio, Custom server — confirming OmniRoute no longer appears here (it's its own top-level mode, since it doesn't do local/private inference). Ollama showed a genuine **"Detected running"** badge; cross-checked with a direct `curl http://localhost:11434/api/tags` from the host, which returned `HTTP 200` — this sandbox happens to have a real Ollama instance running, so the badge is a true positive, not a fabrication.
+- **Bring Your Own AI**: renders OpenAI, Anthropic Claude, Cohere, Qwen (Alibaba) — unchanged.
+- **Partner Subscription**: still shows "COMING SOON" and remains non-selectable.
+
+**What was and wasn't installed in this sandbox**: OmniRoute itself (the real npm package, ~739MB unpacked per Step 0's prior download-only check) was deliberately NOT installed here — judged disproportionate for a shared dev sandbox, consistent with the same judgment made in Step 0. What was verified instead: the full UI flow end-to-end against a genuinely absent local instance (real connection failures, not stubbed), and, separately, that this sandbox's real (pre-existing, unrelated) Ollama instance is correctly detected — demonstrating the shared detection code path does report true positives when something real is actually listening, not just true negatives when nothing is.
+
+### Commit structure
+
+Committed as 2 logical layers rather than 5 literal one-per-task commits: Tasks 1+2 (config/adapter layer — `aiGateway.ts`, `aiModes.ts`, `types.ts`, and their tests) had to land together because removing the old adapter/type without its replacement present would leave `tsc --noEmit` broken mid-commit; Tasks 3+4 (UI layer — `AISetupWizard.tsx`, `AIModeCard.tsx`, `AIControlCenter.tsx`, and their tests) likewise share files that only make sense once the new config exists. This mirrors the precedent set for "Steps 5+6" in the original redesign (this document, above) — consolidation was explicit and recorded, not a silent scope deviation.
+
+`tsc --noEmit` clean; full suite 869/871 (same 2 pre-existing unrelated failures throughout this entire project).
