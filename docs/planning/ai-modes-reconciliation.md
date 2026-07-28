@@ -304,6 +304,14 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 - **Diagnostics tab folds in Step 6 directly** (deliberate consolidation, not skipped): current provider, current model, fallback availability, connection status, and last successful request are all read from data this app already tracks for real (`aiSettings`, `fallbackOrder`, `usageLogs`) — live-verified showing the honest "None configured" / "No requests recorded yet" states rather than a plausible-looking placeholder, exactly the failure mode this task's instructions warn against. Consolidating Steps 5 and 6 into one pass was a deliberate scoping call given how tightly the Diagnostics tab's existence (Step 5's nav) and its content (Step 6's ask) are coupled — recorded here explicitly rather than silently combined.
 - 16 new tests across the new/restructured tabs, `tsc --noEmit` clean, full suite 848/850 (same 2 pre-existing unrelated failures).
 
+## Step 7 notes
+
+- **AIModeCard's outer `role="button"` was a real ARIA violation, caught by an actual accessibility-tree snapshot, not assumed**: the card wraps genuinely interactive descendants (the CTA button, two expand/collapse toggles) — nesting interactive elements inside another interactive role is invalid and produced a giant, redundant accessible name (the whole card's text read as one "button"). Fixed: the outer element is now a plain `<div aria-labelledby="...">` (no role/tabIndex), the CTA button is the real keyboard-operable control (native `<button>` — Enter/Space work for free, no synthetic keyboard handling needed), `aria-pressed` moved to that button. Mouse click-anywhere-on-card behavior is unchanged. Re-verified live: Tab reaches each button individually with a visible cyan focus ring; the accessibility tree now shows a clean `generic → heading + 3 distinct buttons` structure instead of one wall-of-text button.
+- **Animation durations audited and tightened to the ≤250ms budget**: `AISetupWizard.tsx` had several `duration-300`/`duration-350` transitions and a 0.4s/0.3s fade/scale keyframe pair exceeding it — all reduced to ≤200ms. `AIModeCard.tsx` was already compliant. Confirmed live that `prefers-reduced-motion` collapses these to ~0 (already covered by the global CSS rule from the sci-fi redesign — no new wiring needed since neither component uses JS-driven animation).
+- **Responsive breakpoints verified live at exactly the three specified widths** (1440px desktop, 834px tablet, 390px mobile): desktop renders 3-per-row (3+2), tablet 2-per-row, mobile single-column — no horizontal scroll in either component's own content area.
+- **Found and correctly scoped out a real but pre-existing, out-of-scope issue**: at the 390px mobile width, `document.documentElement` does overflow horizontally by ~20px — traced to `AppHeader.tsx`'s nav-history/dashboard/hash-select button cluster (`.flex.items-center.gap-2.5`), not to anything in `AISetupWizard.tsx`/`AIControlCenter.tsx` (confirmed by measuring the wizard's own content container separately: exactly 390px, no overflow). `AppHeader.tsx` wasn't touched by this task and predates it — recorded here rather than silently expanding scope to fix unrelated global chrome, or silently ignoring a real finding.
+- 3 tests updated in `AIModeCard.test.tsx` and 1 in `AISetupWizard.test.tsx` to match the corrected a11y structure (real behavior change, not a regression). `tsc --noEmit` clean, full suite 850/852 (same 2 pre-existing unrelated failures).
+
 ## Progress log
 
 | Step | Description | Status |
@@ -315,5 +323,5 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 | 4 | Settings mirroring onboarding | 🟢 done |
 | 5 | Settings sub-navigation & management surfaces | 🟢 done |
 | 6 | Smart AI status & diagnostics | 🟢 done (folded into Step 5's Diagnostics tab — see note) |
-| 7 | Accessibility, responsive, motion | 🔲 not started |
+| 7 | Accessibility, responsive, motion | 🟢 done |
 | 8 | Final verification | 🔲 not started |

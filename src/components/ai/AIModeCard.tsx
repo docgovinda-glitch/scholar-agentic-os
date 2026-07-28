@@ -49,20 +49,23 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
     onSelect(mode.id);
   };
 
+  const titleId = `ai-mode-title-${mode.id}`;
+
   return (
+    // Deliberately NOT role="button": this card contains several genuinely
+    // interactive descendants (the CTA button, two expand/collapse
+    // toggles) — nesting them inside an outer button-role element is an
+    // ARIA/screen-reader anti-pattern (confirmed live via a real
+    // accessibility-tree snapshot during Step 7's a11y pass: the whole
+    // card's text was read as one giant redundant accessible name). The
+    // div's onClick below is a mouse-only convenience "click anywhere on
+    // the card" affordance; keyboard users get the identical action via
+    // the real, individually-focusable CTA button below, so 2.1.1
+    // (Keyboard) is satisfied without a redundant/duplicate focus stop.
     <div
-      role="button"
-      tabIndex={isComingSoon ? -1 : 0}
-      aria-pressed={isSelected}
-      aria-disabled={isComingSoon}
+      aria-labelledby={titleId}
       data-testid={`ai-mode-card-${mode.id}`}
       onClick={handleActivate}
-      onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && !isComingSoon) {
-          e.preventDefault();
-          handleActivate();
-        }
-      }}
       className={`relative rounded-2xl border p-5 flex flex-col gap-3 transition-all duration-200 ${
         isComingSoon
           ? "border-[#E2E8F0] bg-gray-50 opacity-70 cursor-not-allowed"
@@ -72,7 +75,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
       }`}
     >
       {isSelected && !isComingSoon && (
-        <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-[color:var(--color-cyan-accent)] flex items-center justify-center shadow-sm">
+        <div aria-hidden="true" className="absolute top-4 right-4 w-6 h-6 rounded-full bg-[color:var(--color-cyan-accent)] flex items-center justify-center shadow-sm">
           <Check className="w-4 h-4 text-white" />
         </div>
       )}
@@ -91,7 +94,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
       {/* Title + badge */}
       <div>
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-base font-bold font-serif text-[#1A365D]">{mode.title}</h3>
+          <h3 id={titleId} className="text-base font-bold font-serif text-[#1A365D]">{mode.title}</h3>
           <span
             className={`text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
               isComingSoon
@@ -137,10 +140,11 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
         </div>
       </div>
 
-      {/* Primary CTA */}
+      {/* Primary CTA — the real keyboard-operable control for selecting this mode */}
       <button
         type="button"
         disabled={isComingSoon}
+        aria-pressed={isSelected}
         onClick={(e) => {
           e.stopPropagation();
           handleActivate();

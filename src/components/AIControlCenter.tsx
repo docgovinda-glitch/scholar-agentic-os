@@ -1207,7 +1207,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
                         </div>
                         <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
                           <div 
-                            className="bg-[#C08A3E] h-full rounded-full transition-all duration-300"
+                            className="bg-[#C08A3E] h-full rounded-full transition-all duration-200"
                             style={{ width: `${percent}%` }}
                           ></div>
                         </div>

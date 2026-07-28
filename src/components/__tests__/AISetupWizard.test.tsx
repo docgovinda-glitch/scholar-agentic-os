@@ -126,13 +126,15 @@ describe("AISetupWizard — AI Mode selection screen", () => {
     expect(screen.getByText(/how would you like your ai assistant to work/i)).toBeInTheDocument();
   });
 
-  it("is keyboard-operable: pressing Enter on the Local AI card advances to the provider step", async () => {
+  it("is keyboard-operable: the Local AI card's CTA is a real, focusable <button> (native Enter/Space activation, no synthetic keyDown needed) that advances to the provider step", async () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
     const card = screen.getByTestId("ai-mode-card-local");
-    expect(card).toHaveAttribute("tabIndex", "0");
-    fireEvent.keyDown(card, { key: "Enter" });
+    const cta = card.querySelector("button")!;
+    cta.focus();
+    expect(document.activeElement).toBe(cta);
+    fireEvent.click(cta);
 
     expect(await screen.findByText("Ollama")).toBeInTheDocument();
   });

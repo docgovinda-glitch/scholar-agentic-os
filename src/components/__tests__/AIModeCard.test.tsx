@@ -2,6 +2,15 @@
 //
 // AI modes redesign, Step 1 — tests for the shared AIModeCard component,
 // written before wiring it into AISetupWizard.tsx/AIControlCenter.tsx.
+//
+// Updated in Step 7 (accessibility pass) — a real accessibility-tree
+// snapshot during live verification showed the card's outer role="button"
+// produced a giant, redundant accessible name (it contained several real
+// nested interactive elements: the CTA button, two expand toggles — an
+// ARIA anti-pattern). The outer div is no longer role="button"/tabbable;
+// the CTA button is now the real, individually-focusable keyboard control
+// (same handleActivate action), aria-labelledby wires the card to its
+// heading instead. Mouse click-anywhere-on-card behavior is unchanged.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
@@ -38,19 +47,35 @@ describe("AIModeCard — available mode", () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
-  it("is keyboard-activatable via Enter and Space", () => {
+  it("the CTA button is a real, independently keyboard-focusable control (not nested inside another interactive role)", () => {
     const onSelect = vi.fn();
     render(<AIModeCard mode={smart} isSelected={false} onSelect={onSelect} />);
-    const card = screen.getByTestId("ai-mode-card-smart");
-    fireEvent.keyDown(card, { key: "Enter" });
-    fireEvent.keyDown(card, { key: " " });
-    expect(onSelect).toHaveBeenCalledTimes(2);
+    const cta = screen.getByText(smart.ctaLabel).closest("button")!;
+    cta.focus();
+    expect(document.activeElement).toBe(cta);
+    fireEvent.click(cta);
+    expect(onSelect).toHaveBeenCalledWith("smart");
   });
 
-  it("shows a checkmark and aria-pressed=true when selected", () => {
-    render(<AIModeCard mode={smart} isSelected={true} onSelect={vi.fn()} />);
+  it("the card is not itself a redundant focus stop (no role=button/tabIndex on the outer element)", () => {
+    render(<AIModeCard mode={smart} isSelected={false} onSelect={vi.fn()} />);
     const card = screen.getByTestId("ai-mode-card-smart");
-    expect(card).toHaveAttribute("aria-pressed", "true");
+    expect(card).not.toHaveAttribute("role", "button");
+    expect(card).not.toHaveAttribute("tabindex");
+  });
+
+  it("the card is labelled by its own heading (aria-labelledby), for the group AT context", () => {
+    render(<AIModeCard mode={smart} isSelected={false} onSelect={vi.fn()} />);
+    const card = screen.getByTestId("ai-mode-card-smart");
+    const labelId = card.getAttribute("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    expect(document.getElementById(labelId!)).toHaveTextContent("Smart AI");
+  });
+
+  it("shows a checkmark and aria-pressed=true on the CTA button when selected", () => {
+    render(<AIModeCard mode={smart} isSelected={true} onSelect={vi.fn()} />);
+    const cta = screen.getByText(smart.ctaLabel).closest("button")!;
+    expect(cta).toHaveAttribute("aria-pressed", "true");
   });
 
   it("How it works and Requirements start collapsed and expand on click", () => {
@@ -86,11 +111,10 @@ describe("AIModeCard — coming-soon mode", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("is not keyboard-focusable (tabIndex -1) and marked aria-disabled", () => {
+  it("the CTA button itself carries the disabled state for AT users (real disabled attribute, not just visual dimming)", () => {
     render(<AIModeCard mode={partner} isSelected={false} onSelect={vi.fn()} />);
-    const card = screen.getByTestId("ai-mode-card-partner");
-    expect(card).toHaveAttribute("tabindex", "-1");
-    expect(card).toHaveAttribute("aria-disabled", "true");
+    const cta = screen.getByText(partner.ctaLabel).closest("button")!;
+    expect(cta).toBeDisabled();
   });
 });
 

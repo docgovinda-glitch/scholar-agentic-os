@@ -344,7 +344,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                   isLocalMode ? handleLocalOptionToggle(option) : handleProviderToggle(option.id);
                 }
               }}
-              className={`relative p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
+              className={`relative p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
                 isSelected
                   ? 'bg-[color:var(--color-cyan-accent)]/5 border-[color:var(--color-cyan-accent)] shadow-sm'
                   : 'bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/30 hover:bg-[#FAF8F5]/50'
@@ -698,7 +698,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
           <div className="flex items-center gap-3">
             {[1, 2, 3].map(num => (
               <React.Fragment key={num}>
-                <div className={`flex items-center justify-center w-8 h-8 rounded-full border text-xs font-mono font-bold transition-all duration-350 ${
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full border text-xs font-mono font-bold transition-all duration-200 ${
                   step >= num
                     ? 'border-[color:var(--color-cyan-accent-dim)] bg-[color:var(--color-cyan-accent-dim)] text-white shadow-sm'
                     : 'border-gray-300 text-gray-400 bg-white'
@@ -706,7 +706,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                   {num}
                 </div>
                 {num < 3 && (
-                  <div className={`w-12 h-[1px] transition-all duration-350 ${
+                  <div className={`w-12 h-[1px] transition-all duration-200 ${
                     step > num ? 'bg-[color:var(--color-cyan-accent-dim)]' : 'bg-gray-200'
                   }`} />
                 )}
@@ -728,8 +728,8 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes scaleIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
-        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        .animate-scale-in { animation: scaleIn 0.3s ease-out forwards; }
+        .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        .animate-scale-in { animation: scaleIn 0.2s ease-out forwards; }
       `}} />
     </div>
   );
