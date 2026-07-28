@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  Sparkles,
+  Route,
   Cloud,
   Server,
   KeyRound,
@@ -25,7 +25,7 @@ import { AIMode, AIModeId } from "../../config/aiModes";
 // separate useReducedMotion wiring is needed here).
 
 const MODE_ICONS: Record<AIModeId, React.ComponentType<{ className?: string }>> = {
-  smart: Sparkles,
+  omniroute: Route,
   cloud: Cloud,
   local: Server,
   byok: KeyRound,

@@ -53,21 +53,20 @@ describe("AIControlCenter — Current Status tab", () => {
 });
 
 describe("AIControlCenter — Local Models tab", () => {
-  it("detects all 4 backends (Ollama, LM Studio, OmniRoute, Custom server) with real per-backend state", async () => {
-    healthCheckProviderMock.mockImplementation((providerId: string, settings: any) => {
+  it("detects all 3 Local AI backends (Ollama, LM Studio, Custom server) with real per-backend state — OmniRoute is no longer here, it's its own top-level mode now", async () => {
+    healthCheckProviderMock.mockImplementation((providerId: string) => {
       if (providerId === "ollama") return Promise.resolve({ provider: "ollama", status: "online" });
-      if (settings?.customEndpoint === "http://localhost:20128/v1") return Promise.resolve({ provider: "custom", status: "online" });
       return Promise.resolve({ provider: "custom", status: "offline" });
     });
     renderAndGoTo("Local Models");
 
     expect(await screen.findByText("Ollama")).toBeInTheDocument();
     expect(screen.getByText("LM Studio")).toBeInTheDocument();
-    expect(screen.getByText("OmniRoute")).toBeInTheDocument();
     expect(screen.getByText("Custom server")).toBeInTheDocument();
+    expect(screen.queryByText("OmniRoute")).not.toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getAllByText("Running").length).toBeGreaterThanOrEqual(2); // Ollama + OmniRoute
+      expect(screen.getAllByText("Running").length).toBeGreaterThanOrEqual(1); // Ollama
     });
     expect(screen.getAllByText("Stopped").length).toBeGreaterThanOrEqual(1); // LM Studio
   });

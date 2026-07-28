@@ -34,6 +34,7 @@ vi.mock("../../services/aiGateway", async () => {
       detectLocalServers: vi.fn().mockResolvedValue({
         ollama: { provider: "ollama", status: "offline" },
         custom: { provider: "custom", status: "offline" },
+        omniroute: { provider: "omniroute", status: "offline" },
       }),
       healthCheckProvider: vi.fn(),
       healthCheckAll: vi.fn().mockResolvedValue({}),
@@ -88,21 +89,23 @@ describe("AISetupWizard — vault-passphrase gate before key entry", () => {
     expect(await screen.findByText("Configure Connections")).toBeInTheDocument();
   });
 
-  it("Smart AI never shows the vault gate at all — it has no key to protect", async () => {
-    const AIGatewayModule = await import("../../services/aiGateway");
-    (AIGatewayModule.default.healthCheckAll as any).mockResolvedValue({
-      pollinations: { provider: "pollinations", status: "online" }
-    });
-    const onComplete = vi.fn();
-    const project: PaperProject = { ...DEFAULT_STATE("jdoe") };
-    render(<AISetupWizard project={project} updateProject={vi.fn()} onComplete={onComplete} />);
+  it("OmniRoute (the new Option 1) never shows the vault gate — it has no key to protect — but DOES go through the standard select-mode → detect → configure → test flow, not a shortcut (the old Smart AI's removed 'continue → done' shortcut is exactly what this replacement corrects)", async () => {
+    renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
-    fireEvent.click(screen.getByTestId("ai-mode-card-smart"));
+    fireEvent.click(screen.getByTestId("ai-mode-card-omniroute"));
 
-    // Smart AI's "continue → done" flow never renders a vault-unlock prompt
-    // and never asks the user to touch the vault at all.
+    // Standard flow: provider-selection step renders (not skipped), showing
+    // the real OmniRoute option with its detection state.
+    expect(await screen.findByText("OmniRoute")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("OmniRoute"));
+    fireEvent.click(screen.getByText(/^continue$/i));
+
+    // No key required, so no vault gate — but it still lands on the real
+    // Configure Connections screen (endpoint + Test Connection), not an
+    // immediate "done".
     expect(screen.queryByText(/unlock your key vault/i)).not.toBeInTheDocument();
+    expect(await screen.findByText("Configure Connections")).toBeInTheDocument();
     expect(isVaultUnlocked()).toBe(false);
   });
 
@@ -161,12 +164,11 @@ const REQUIRES_KEY_OPTIONS = AI_MODES.flatMap((mode) =>
     .map((option) => ({ modeTestId: `ai-mode-card-${mode.id}`, label: option.label }))
 );
 
-// Smart AI is deliberately excluded here: it has its own "continue → done"
-// shortcut (no provider-selection screen at all — see the dedicated test
-// above), not the standard select-provider-then-Continue flow every other
-// mode follows, so it can't be parametrized through goToKeyEntryStep's
-// generic flow.
-const NO_KEY_OPTIONS = AI_MODES.filter((mode) => mode.id !== "smart").flatMap((mode) =>
+// Every mode (including OmniRoute, the new Option 1) now follows the same
+// standard select-provider-then-Continue flow — the old Smart AI's
+// "continue → done" shortcut that skipped this screen entirely is exactly
+// what got it removed, so no mode needs excluding here anymore.
+const NO_KEY_OPTIONS = AI_MODES.flatMap((mode) =>
   mode.providers
     .filter((option) => AI_PROVIDERS.find((p) => p.id === option.id)?.requiresApiKey === false)
     .map((option) => ({ modeTestId: `ai-mode-card-${mode.id}`, label: option.label }))

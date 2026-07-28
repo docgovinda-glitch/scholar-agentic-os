@@ -23,75 +23,75 @@ afterEach(() => {
 });
 
 describe("AIModeCard — available mode", () => {
-  const smart = getAIMode("smart")!;
+  const omniroute = getAIMode("omniroute")!;
 
   it("renders title, badge, description, and CTA", () => {
-    render(<AIModeCard mode={smart} isSelected={false} onSelect={vi.fn()} />);
-    expect(screen.getByText("Smart AI")).toBeInTheDocument();
-    expect(screen.getByText("Fastest to start")).toBeInTheDocument();
-    expect(screen.getByText(smart.description)).toBeInTheDocument();
-    expect(screen.getByText(smart.ctaLabel)).toBeInTheDocument();
+    render(<AIModeCard mode={omniroute} isSelected={false} onSelect={vi.fn()} />);
+    expect(screen.getByText(omniroute.title)).toBeInTheDocument();
+    expect(screen.getByText(omniroute.badge)).toBeInTheDocument();
+    expect(screen.getByText(omniroute.description)).toBeInTheDocument();
+    expect(screen.getByText(omniroute.ctaLabel)).toBeInTheDocument();
   });
 
   it("clicking the card calls onSelect with the mode id", () => {
     const onSelect = vi.fn();
-    render(<AIModeCard mode={smart} isSelected={false} onSelect={onSelect} />);
-    fireEvent.click(screen.getByTestId("ai-mode-card-smart"));
-    expect(onSelect).toHaveBeenCalledWith("smart");
+    render(<AIModeCard mode={omniroute} isSelected={false} onSelect={onSelect} />);
+    fireEvent.click(screen.getByTestId("ai-mode-card-omniroute"));
+    expect(onSelect).toHaveBeenCalledWith("omniroute");
   });
 
   it("clicking the CTA button also calls onSelect (without double-navigating past the card)", () => {
     const onSelect = vi.fn();
-    render(<AIModeCard mode={smart} isSelected={false} onSelect={onSelect} />);
-    fireEvent.click(screen.getByText(smart.ctaLabel));
+    render(<AIModeCard mode={omniroute} isSelected={false} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText(omniroute.ctaLabel));
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
   it("the CTA button is a real, independently keyboard-focusable control (not nested inside another interactive role)", () => {
     const onSelect = vi.fn();
-    render(<AIModeCard mode={smart} isSelected={false} onSelect={onSelect} />);
-    const cta = screen.getByText(smart.ctaLabel).closest("button")!;
+    render(<AIModeCard mode={omniroute} isSelected={false} onSelect={onSelect} />);
+    const cta = screen.getByText(omniroute.ctaLabel).closest("button")!;
     cta.focus();
     expect(document.activeElement).toBe(cta);
     fireEvent.click(cta);
-    expect(onSelect).toHaveBeenCalledWith("smart");
+    expect(onSelect).toHaveBeenCalledWith("omniroute");
   });
 
   it("the card is not itself a redundant focus stop (no role=button/tabIndex on the outer element)", () => {
-    render(<AIModeCard mode={smart} isSelected={false} onSelect={vi.fn()} />);
-    const card = screen.getByTestId("ai-mode-card-smart");
+    render(<AIModeCard mode={omniroute} isSelected={false} onSelect={vi.fn()} />);
+    const card = screen.getByTestId("ai-mode-card-omniroute");
     expect(card).not.toHaveAttribute("role", "button");
     expect(card).not.toHaveAttribute("tabindex");
   });
 
   it("the card is labelled by its own heading (aria-labelledby), for the group AT context", () => {
-    render(<AIModeCard mode={smart} isSelected={false} onSelect={vi.fn()} />);
-    const card = screen.getByTestId("ai-mode-card-smart");
+    render(<AIModeCard mode={omniroute} isSelected={false} onSelect={vi.fn()} />);
+    const card = screen.getByTestId("ai-mode-card-omniroute");
     const labelId = card.getAttribute("aria-labelledby");
     expect(labelId).toBeTruthy();
-    expect(document.getElementById(labelId!)).toHaveTextContent("Smart AI");
+    expect(document.getElementById(labelId!)).toHaveTextContent(omniroute.title);
   });
 
   it("shows a checkmark and aria-pressed=true on the CTA button when selected", () => {
-    render(<AIModeCard mode={smart} isSelected={true} onSelect={vi.fn()} />);
-    const cta = screen.getByText(smart.ctaLabel).closest("button")!;
+    render(<AIModeCard mode={omniroute} isSelected={true} onSelect={vi.fn()} />);
+    const cta = screen.getByText(omniroute.ctaLabel).closest("button")!;
     expect(cta).toHaveAttribute("aria-pressed", "true");
   });
 
   it("How it works and Requirements start collapsed and expand on click", () => {
-    const { container } = render(<AIModeCard mode={smart} isSelected={false} onSelect={vi.fn()} />);
-    expect(screen.queryByText(smart.howItWorks[0])).not.toBeInTheDocument();
+    const { container } = render(<AIModeCard mode={omniroute} isSelected={false} onSelect={vi.fn()} />);
+    expect(screen.queryByText(omniroute.howItWorks[0])).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("How it works"));
-    expect(screen.getByText(smart.howItWorks[0])).toBeInTheDocument();
+    expect(screen.getByText(omniroute.howItWorks[0])).toBeInTheDocument();
 
-    expect(container.textContent).not.toContain(smart.requirements[0]);
+    expect(container.textContent).not.toContain(omniroute.requirements[0]);
     fireEvent.click(screen.getByText("Requirements"));
-    expect(container.textContent).toContain(smart.requirements[0]);
+    expect(container.textContent).toContain(omniroute.requirements[0]);
   });
 
   it("expanding How it works does not also trigger onSelect", () => {
     const onSelect = vi.fn();
-    render(<AIModeCard mode={smart} isSelected={false} onSelect={onSelect} />);
+    render(<AIModeCard mode={omniroute} isSelected={false} onSelect={onSelect} />);
     fireEvent.click(screen.getByText("How it works"));
     expect(onSelect).not.toHaveBeenCalled();
   });

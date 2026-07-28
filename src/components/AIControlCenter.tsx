@@ -171,15 +171,22 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
   };
 
   // Local Models tab — real detection across every Local AI backend the
-  // onboarding flow offers (Ollama, LM Studio, OmniRoute, generic custom),
-  // per docs/planning/ai-modes-reconciliation.md's Local AI mode. LM
-  // Studio/OmniRoute/custom all resolve to the "custom" adapter at
-  // different default ports, so each is checked with that specific default
-  // endpoint rather than whatever's currently saved in settings.
+  // onboarding flow offers (Ollama, LM Studio, generic custom), per
+  // docs/planning/ai-modes-reconciliation.md's Local AI mode. LM Studio/
+  // custom both resolve to the "custom" adapter at different default
+  // ports, so each is checked with that specific default endpoint rather
+  // than whatever's currently saved in settings.
+  //
+  // Follow-up correction (2026-07-28): OmniRoute is deliberately NOT listed
+  // here — it moved out of "Local AI" into its own top-level mode ("Smart
+  // Gateway"), since it doesn't do local/private inference the way this
+  // tab's other entries do (only its routing is local; inference happens
+  // in the cloud via whichever provider it selects). Its own connection
+  // status is visible via the AI Mode/Current Status/Diagnostics tabs like
+  // any other mode, through the same getModeForProvider resolution.
   const LOCAL_BACKENDS = [
     { key: "ollama", label: "Ollama", providerId: "ollama", endpoint: project.aiSettings?.ollamaEndpoint || "http://localhost:11434" },
     { key: "lmstudio", label: "LM Studio", providerId: "custom", endpoint: "http://localhost:1234/v1" },
-    { key: "omniroute", label: "OmniRoute", providerId: "custom", endpoint: "http://localhost:20128/v1" },
     { key: "custom", label: "Custom server", providerId: "custom", endpoint: project.aiSettings?.customEndpoint || "" }
   ];
 
@@ -1097,7 +1104,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
 
       {/* SUB TAB 3: COST & USAGE DASHBOARD */}
       {activeSubTab === "diagnostics" && (() => {
-        // Step 6 — Smart AI / gateway diagnostics from REAL tracked data only:
+        // Step 6 — AI Mode / gateway diagnostics from REAL tracked data only:
         // fallbackOrder and usageLogs already exist and are populated by
         // real requests (aiGateway.ts / draftSection) — nothing here is a
         // plausible-looking placeholder. lastSuccessfulRequest is simply the
@@ -1299,7 +1306,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
               <option value="groq">Groq</option>
               <option value="together">Together AI</option>
               <option value="openrouter">OpenRouter</option>
-              <option value="pollinations">Pollinations (Smart AI)</option>
+              <option value="omniroute">OmniRoute (Smart Gateway)</option>
               <option value="ollama">Ollama Local LLM</option>
               <option value="custom">Custom Local API Proxy</option>
             </select>

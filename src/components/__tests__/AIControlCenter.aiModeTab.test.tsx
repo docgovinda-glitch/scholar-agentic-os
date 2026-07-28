@@ -44,7 +44,7 @@ describe("AIControlCenter — AI Mode tab is the default view", () => {
 
     expect(screen.getByText("Current AI Mode")).toBeInTheDocument();
     expect(screen.getAllByText("Cloud AI Providers").length).toBeGreaterThan(0);
-    expect(screen.getByRole("heading", { name: "Smart AI" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Smart Gateway" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Local AI" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Bring Your Own AI" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Partner Subscription" })).toBeInTheDocument();

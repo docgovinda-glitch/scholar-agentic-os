@@ -2,12 +2,19 @@
 //
 // AI modes redesign (2026-07-28) — rewritten from the old 3-tier
 // ("Local Router" / "Free-Tier BYOK" / "Heavy BYOK") screen to the new
-// 5-mode screen (Smart AI / Cloud AI Providers / Local AI / Bring Your Own
-// AI / Partner Subscription) from src/config/aiModes.ts. Every underlying
-// behavior these tests locked in before (provider-selection gating,
-// keyboard operability, local-server detection, the non-selectable
+// 5-mode screen (Smart Gateway / Cloud AI Providers / Local AI / Bring Your
+// Own AI / Partner Subscription) from src/config/aiModes.ts. Every
+// underlying behavior these tests locked in before (provider-selection
+// gating, keyboard operability, local-server detection, the non-selectable
 // coming-soon card) is preserved — only the labels/navigation path changed
 // to match the new IA.
+//
+// Follow-up correction (2026-07-28): "Smart AI" (Pollinations-backed) was
+// removed for only simulating success in some paths rather than reliably
+// delivering. "Smart Gateway" (OmniRoute) replaces it and goes through the
+// SAME standard flow as every other mode — see AISetupWizard.vaultGate.test.tsx
+// for the dedicated test confirming it's no longer a "continue → done"
+// shortcut.
 //
 // jsdom's window.localStorage isn't aliased onto globalThis by default in
 // this jsdom/vitest combination — same quirk worked around in
@@ -32,6 +39,7 @@ vi.mock("../../services/aiGateway", async () => {
       detectLocalServers: vi.fn().mockResolvedValue({
         ollama: { provider: "ollama", status: "offline" },
         custom: { provider: "custom", status: "offline" },
+        omniroute: { provider: "omniroute", status: "offline" },
       }),
       healthCheckProvider: vi.fn(),
       healthCheckAll: vi.fn().mockResolvedValue({}),
@@ -66,7 +74,7 @@ describe("AISetupWizard — AI Mode selection screen", () => {
     renderWizard();
 
     expect(await screen.findByText(/how would you like your ai assistant to work/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Smart AI" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Smart Gateway" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Cloud AI Providers" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Local AI" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Bring Your Own AI" })).toBeInTheDocument();
@@ -81,7 +89,7 @@ describe("AISetupWizard — AI Mode selection screen", () => {
     expect(screen.getByText(/not sure which option to choose/i)).toBeInTheDocument();
   });
 
-  it("selecting Local AI advances to a provider step showing only local backend choices", async () => {
+  it("selecting Local AI advances to a provider step showing only local backend choices (OmniRoute is its own mode now, not listed here — it doesn't do local/private inference)", async () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
@@ -89,8 +97,19 @@ describe("AISetupWizard — AI Mode selection screen", () => {
 
     expect(await screen.findByText("Ollama")).toBeInTheDocument();
     expect(screen.getByText("LM Studio")).toBeInTheDocument();
-    expect(screen.getByText("OmniRoute")).toBeInTheDocument();
+    expect(screen.getByText("Custom server")).toBeInTheDocument();
+    expect(screen.queryByText("OmniRoute")).not.toBeInTheDocument();
     expect(screen.queryByText("Google Gemini")).not.toBeInTheDocument();
+  });
+
+  it("selecting Smart Gateway (OmniRoute) advances to a provider step showing OmniRoute with real install guidance, not a shortcut", async () => {
+    renderWizard();
+    await screen.findByText(/how would you like your ai assistant to work/i);
+
+    fireEvent.click(screen.getByTestId("ai-mode-card-omniroute"));
+
+    expect(await screen.findByText("OmniRoute")).toBeInTheDocument();
+    expect(screen.getByText(/npm install -g omniroute/i)).toBeInTheDocument();
   });
 
   it("selecting Cloud AI Providers shows only that mode's free-tier-friendly providers", async () => {

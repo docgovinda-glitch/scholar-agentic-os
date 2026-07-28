@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Shield, Cloud, Server, ChevronRight, ChevronLeft, CheckCircle2, AlertTriangle, Key, Cpu, Zap, Search, Loader2, BookOpen, Sparkles } from 'lucide-react';
+import { Shield, Cloud, Server, ChevronRight, ChevronLeft, CheckCircle2, AlertTriangle, Key, Cpu, Zap, Search, Loader2, BookOpen } from 'lucide-react';
 import { PaperProject, AISettings, HealthStatus, AIProviderInfo } from '../types';
 import AIGateway, { AI_PROVIDERS } from '../services/aiGateway';
 import { encryptDataAsync, decryptDataAsync } from '../utils/crypto';
@@ -20,9 +20,16 @@ interface AISetupWizardProps {
 // docs/planning/ai-modes-reconciliation.md for how these map onto
 // ai-gateway.md's tier model — this component only ever deals in AIModeId
 // and the config's own provider option lists now, never a raw pricingTier
-// filter. Smart AI is the one mode with a genuinely different flow (no
-// provider selection, no key entry, no vault interaction at all) — see
-// handleSelectMode below.
+// filter.
+//
+// Follow-up correction (2026-07-28): the old "Smart AI" mode (Pollinations-
+// backed) was confirmed to only simulate success in some paths rather than
+// reliably deliver, and has been removed — along with its special-cased
+// "continue → done" shortcut that skipped provider selection/connection
+// testing entirely. OmniRoute replaces it as Option 1 and goes through the
+// SAME standard select-mode → detect/configure → test → continue flow as
+// every other mode (it is not zero-install, so a shortcut would misrepresent
+// it exactly the way the old Smart AI shortcut did).
 
 export default function AISetupWizard({ project, updateProject, onComplete, onBack }: AISetupWizardProps) {
   const [step, setStep] = useState(0);
@@ -85,7 +92,8 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
         const autoSelected = [];
         if (results.ollama.status === 'online') autoSelected.push('ollama');
         if (results.custom.status === 'online') autoSelected.push('custom');
-        
+        if (results.omniroute.status === 'online') autoSelected.push('omniroute');
+
         if (autoSelected.length > 0) {
           setSelectedProviders(prev => Array.from(new Set([...prev, ...autoSelected])));
         }
@@ -199,43 +207,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     }
   };
 
-  // Smart AI's whole premise is "continue → done": no provider list, no key
-  // entry, no vault interaction (docs/planning/ai-modes-reconciliation.md
-  // §4 — Smart AI never touches the vault, there's no key to protect).
-  // Still runs one REAL health check before marking readiness — never an
-  // optimistic "Connected" — self-contained rather than reusing
-  // runFinalValidation() because that function reads `selectedProviders`
-  // from closure state, which setSelectedProviders() wouldn't update
-  // synchronously in the same click handler.
-  const handleSelectSmartAI = async () => {
-    setSelectedMode("smart");
-    setSelectedProviders(["pollinations"]);
-    setIsTesting(true);
-    try {
-      const testSettings: AISettings = { ...settings, provider: "pollinations", fallbackOrder: ["pollinations"] };
-      const results = await AIGateway.healthCheckAll(testSettings);
-      setHealthResults(prev => ({ ...prev, ...results }));
-      const newSettings: AISettings = {
-        ...testSettings,
-        providerHealth: results,
-        aiReadiness: results.pollinations?.status === "online" ? "validated" : "simulated"
-      };
-      updateProject({ aiSettings: newSettings });
-      setSettings(newSettings);
-      setStep(3);
-    } catch (e) {
-      console.error("Smart AI validation failed", e);
-      setStep(3);
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
   const handleSelectMode = (id: AIModeId) => {
-    if (id === "smart") {
-      handleSelectSmartAI();
-      return;
-    }
     setSelectedMode(id);
     setSelectedProviders([]);
     setStep(1);
@@ -250,18 +222,22 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
         </p>
       </div>
 
-      {/* Recommendation banner — per docs/planning/ai-modes-reconciliation.md
-          §1, Smart AI is genuinely working but rate-limited to ~1 req/15s and
-          not meant for heavy use, so it's framed as "fastest to try", not "the"
-          universal recommendation. Cloud AI Providers (a real, dedicated free
-          tier) is the recommended path for regular drafting work. */}
+      {/* Recommendation banner — re-resolved after removing the old Smart AI
+          mode (docs/planning/ai-modes-reconciliation.md, follow-up
+          correction). The old banner recommended Smart AI specifically
+          because it needed zero setup; that's no longer true of Option 1
+          (OmniRoute needs a real, ~5-minute local install). Cloud AI
+          Providers is the new default recommendation — genuinely
+          lower-friction than OmniRoute (a free account, no local install)
+          and proven reliable this session, per the task's own guidance. */}
       <div className="max-w-2xl mx-auto p-4 bg-[color:var(--color-cyan-accent)]/5 border border-[color:var(--color-cyan-accent)]/30 rounded-xl flex items-start gap-3">
-        <Sparkles className="w-5 h-5 text-[color:var(--color-cyan-accent-dim)] shrink-0 mt-0.5" />
+        <Cloud className="w-5 h-5 text-[color:var(--color-cyan-accent-dim)] shrink-0 mt-0.5" />
         <div>
           <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-[#1A365D] mb-1">Not sure which option to choose?</h4>
           <p className="text-xs text-[#475569] leading-relaxed">
-            Try <strong>Smart AI</strong> right now — no setup at all — to see the assistant in action. For regular drafting work,
-            <strong> Cloud AI Providers</strong> gives you a free, dedicated connection that won't run into Smart AI's shared rate limit.
+            <strong>Cloud AI Providers</strong> is the best starting point for most people — a free account with a provider
+            like Google Gemini or OpenRouter, no local install required. Already pay for OpenAI, Anthropic, or another
+            provider? <strong>Bring Your Own AI</strong> connects it directly.
           </p>
         </div>
       </div>
@@ -282,6 +258,13 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   const renderStep1 = () => {
     const modeConfig = selectedMode ? getAIMode(selectedMode) : undefined;
     const isLocalMode = selectedMode === "local";
+    // OmniRoute is auto-detected the same way Ollama/LM Studio are (a real
+    // running-process check, docs/planning/ai-modes-reconciliation.md's
+    // follow-up correction) even though it isn't grouped under the "Local
+    // AI" mode — it's a local *router*, not local *inference*, so it must
+    // NOT show Local AI's "nothing leaves your computer" privacy banner
+    // (that claim is false for OmniRoute — only the routing is local).
+    const usesAutoDetection = isLocalMode || selectedMode === "omniroute";
 
     // Local AI's provider list has duplicate provider ids by design (LM
     // Studio / OmniRoute / Custom server all resolve to the "custom"
@@ -363,7 +346,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                         <Shield className="w-3 h-3" /> No account needed
                       </span>
                     )}
-                    {isLocalMode && (isDetecting ? (
+                    {usesAutoDetection && (isDetecting ? (
                       <span className="text-[10px] flex items-center gap-1 text-gray-400">
                         <Loader2 className="w-3 h-3 animate-spin" /> Detecting...
                       </span>
@@ -373,7 +356,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                         Detected running
                       </span>
                     ) : null)}
-                    {!isLocalMode && option.getKeyUrl && (
+                    {!usesAutoDetection && option.getKeyUrl && (
                       <a
                         href={option.getKeyUrl}
                         target="_blank"
@@ -385,7 +368,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                       </a>
                     )}
                   </div>
-                  {isLocalMode && option.installGuidance && (
+                  {usesAutoDetection && option.installGuidance && (
                     <p className="text-[10px] text-gray-500 mt-2 leading-relaxed border-t border-[#E2E8F0] pt-2">
                       {option.installGuidance}
                       {option.installUrl && (
@@ -534,8 +517,16 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                       </label>
                       <input
                         type="text"
-                        placeholder={provider.id === 'ollama' ? 'http://localhost:11434' : 'http://localhost:1234/v1'}
-                        value={(settings as any)[provider.id + 'Endpoint'] || (provider.id === 'ollama' ? 'http://localhost:11434' : 'http://localhost:1234/v1')}
+                        placeholder={
+                          provider.id === 'ollama' ? 'http://localhost:11434' :
+                          provider.id === 'omniroute' ? 'http://localhost:20128/v1' :
+                          'http://localhost:1234/v1'
+                        }
+                        value={(settings as any)[provider.id + 'Endpoint'] || (
+                          provider.id === 'ollama' ? 'http://localhost:11434' :
+                          provider.id === 'omniroute' ? 'http://localhost:20128/v1' :
+                          'http://localhost:1234/v1'
+                        )}
                         onChange={(e) => handleSettingChange(provider.id, 'Endpoint', e.target.value)}
                         className="w-full bg-white border border-[#D1CEC7] rounded-xl py-2.5 px-4 text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/10 focus:border-[#1A365D] transition-all font-mono text-sm placeholder:text-gray-400"
                       />
