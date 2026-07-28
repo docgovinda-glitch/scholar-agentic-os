@@ -22,6 +22,8 @@ import "@testing-library/jest-dom/vitest";
 import AISetupWizard from "../AISetupWizard";
 import { DEFAULT_STATE, PaperProject } from "../../types";
 import { clearVaultPassphrase, isVaultUnlocked, getVaultPassphrase } from "../../services/vaultPassphrase";
+import { AI_MODES } from "../../config/aiModes";
+import { AI_PROVIDERS } from "../../services/aiGateway";
 
 vi.mock("../../services/aiGateway", async () => {
   const actual = await vi.importActual<typeof import("../../services/aiGateway")>("../../services/aiGateway");
@@ -144,4 +146,60 @@ describe("AISetupWizard — vault-passphrase gate before key entry", () => {
     expect(await screen.findByText("Configure Connections")).toBeInTheDocument();
     expect(screen.queryByText(/unlock your key vault/i)).not.toBeInTheDocument();
   });
+});
+
+// Step 0/8 regression requirement (docs/planning/ai-modes-reconciliation.md
+// §4): "a test asserting that for every mode/provider combination where
+// requiresApiKey === true, the rendered component shows the vault-unlock
+// prompt (not a key <input>) when isVaultUnlocked() is false — parametrized
+// over the config from Step 1, so a future provider added to config
+// automatically gets covered without a new test being hand-written per
+// provider." This is that test.
+const REQUIRES_KEY_OPTIONS = AI_MODES.flatMap((mode) =>
+  mode.providers
+    .filter((option) => AI_PROVIDERS.find((p) => p.id === option.id)?.requiresApiKey)
+    .map((option) => ({ modeTestId: `ai-mode-card-${mode.id}`, label: option.label }))
+);
+
+// Smart AI is deliberately excluded here: it has its own "continue → done"
+// shortcut (no provider-selection screen at all — see the dedicated test
+// above), not the standard select-provider-then-Continue flow every other
+// mode follows, so it can't be parametrized through goToKeyEntryStep's
+// generic flow.
+const NO_KEY_OPTIONS = AI_MODES.filter((mode) => mode.id !== "smart").flatMap((mode) =>
+  mode.providers
+    .filter((option) => AI_PROVIDERS.find((p) => p.id === option.id)?.requiresApiKey === false)
+    .map((option) => ({ modeTestId: `ai-mode-card-${mode.id}`, label: option.label }))
+);
+
+describe("AISetupWizard — vault-gate regression, parametrized over the real config (never hand-written per provider)", () => {
+  it(`found at least one requires-key option and one no-key option to parametrize over (sanity check the parametrization itself isn't vacuous)`, () => {
+    expect(REQUIRES_KEY_OPTIONS.length).toBeGreaterThan(0);
+    expect(NO_KEY_OPTIONS.length).toBeGreaterThan(0);
+  });
+
+  it.each(REQUIRES_KEY_OPTIONS)(
+    "$label (in $modeTestId) shows the vault-unlock prompt, never a raw key input, while locked",
+    async ({ modeTestId, label }) => {
+      renderWizard();
+      await goToKeyEntryStep(modeTestId, label);
+
+      expect(await screen.findByText(/unlock your key vault/i)).toBeInTheDocument();
+      expect(document.querySelector('input[type="password"][placeholder^="Enter"]')).not.toBeInTheDocument();
+    }
+  );
+
+  it.each(NO_KEY_OPTIONS)(
+    "$label (in $modeTestId) never gates on the vault at all — it has no key to protect",
+    async ({ modeTestId, label }) => {
+      renderWizard();
+      await screen.findByText(/how would you like your ai assistant to work/i);
+      fireEvent.click(screen.getByTestId(modeTestId));
+      await screen.findByText(label);
+      fireEvent.click(screen.getByText(label));
+      fireEvent.click(screen.getByText(/^continue$/i));
+
+      expect(screen.queryByText(/unlock your key vault/i)).not.toBeInTheDocument();
+    }
+  );
 });

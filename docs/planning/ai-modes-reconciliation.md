@@ -312,6 +312,13 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 - **Found and correctly scoped out a real but pre-existing, out-of-scope issue**: at the 390px mobile width, `document.documentElement` does overflow horizontally by ~20px — traced to `AppHeader.tsx`'s nav-history/dashboard/hash-select button cluster (`.flex.items-center.gap-2.5`), not to anything in `AISetupWizard.tsx`/`AIControlCenter.tsx` (confirmed by measuring the wizard's own content container separately: exactly 390px, no overflow). `AppHeader.tsx` wasn't touched by this task and predates it — recorded here rather than silently expanding scope to fix unrelated global chrome, or silently ignoring a real finding.
 - 3 tests updated in `AIModeCard.test.tsx` and 1 in `AISetupWizard.test.tsx` to match the corrected a11y structure (real behavior change, not a regression). `tsc --noEmit` clean, full suite 850/852 (same 2 pre-existing unrelated failures).
 
+## Step 8 notes — final verification
+
+- **Vault-gate regression test now fully parametrized over the real config**, per Step 0's own requirement: `it.each` over every `(mode, provider)` pair in `src/config/aiModes.ts` where `AI_PROVIDERS` marks `requiresApiKey: true` asserts the vault-unlock prompt shows, never a raw key input; every `requiresApiKey: false` pair (Smart AI excluded — its own dedicated test covers its distinct "continue → done" flow, which has no provider-selection screen to parametrize through) asserts no gate at all. 20 cases generated automatically — a future provider added to config is covered with zero new test code.
+- **Full screenshot pass** across onboarding (3 breakpoints, Step 7) and every one of AIControlCenter's 7 settings tabs (desktop fully, tablet spot-checked on Diagnostics) — all render correctly, no fabricated data anywhere (every "No requests recorded yet"/"None configured"/"Not configured" state reflects genuine absence of data, not a placeholder).
+- `tsc --noEmit` clean, full suite 864/866 (same 2 pre-existing unrelated `supabaseClient.test.ts` failures throughout every step of this entire session — never a new regression).
+- **No hard-stop was hit at any step.** All 8 steps plus Step 0 are complete.
+
 ## Progress log
 
 | Step | Description | Status |
@@ -324,4 +331,4 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 | 5 | Settings sub-navigation & management surfaces | 🟢 done |
 | 6 | Smart AI status & diagnostics | 🟢 done (folded into Step 5's Diagnostics tab — see note) |
 | 7 | Accessibility, responsive, motion | 🟢 done |
-| 8 | Final verification | 🔲 not started |
+| 8 | Final verification | 🟢 done |
