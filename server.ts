@@ -932,7 +932,7 @@ app.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
       return res.end();
     }
 
-    if (["openai", "deepseek", "qwen"].includes(aiProvider)) {
+    if (["openai", "deepseek", "qwen", "groq", "together"].includes(aiProvider)) {
       if (!activeApiKey) {
         res.write(`data: ${JSON.stringify({ error: `${aiProvider.toUpperCase()} API Key is required.` })}\n\n`);
         return res.end();
@@ -947,6 +947,12 @@ app.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
       } else if (aiProvider === "qwen") {
         url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
         targetModel = model || "qwen-plus";
+      } else if (aiProvider === "groq") {
+        url = "https://api.groq.com/openai/v1/chat/completions";
+        targetModel = model || "llama-3.3-70b-versatile";
+      } else if (aiProvider === "together") {
+        url = "https://api.together.xyz/v1/chat/completions";
+        targetModel = model || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
       }
 
       const response = await fetch(url, {
@@ -1275,6 +1281,68 @@ app.post("/api/generate", aiAbuseLimit, async (req, res) => {
 
       const data: any = await response.json();
       return sendCachedJson(res, cacheKey, { text: data.text?.trim() || "" });
+    }
+
+    // 6. Groq — OpenAI-compatible chat completions
+    if (aiProvider === "groq") {
+      if (!activeApiKey) {
+        return res.status(400).json({ error: "Groq API Key is required." });
+      }
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${activeApiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: model || "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: systemInstruction || "You are a helpful assistant." },
+            { role: "user", content: prompt }
+          ],
+          temperature: temperature ?? 0.5
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: `Groq API failed: ${errText}` });
+      }
+
+      const data: any = await response.json();
+      return sendCachedJson(res, cacheKey, { text: data.choices?.[0]?.message?.content?.trim() || "" });
+    }
+
+    // 7. Together AI — OpenAI-compatible chat completions
+    if (aiProvider === "together") {
+      if (!activeApiKey) {
+        return res.status(400).json({ error: "Together AI API Key is required." });
+      }
+
+      const response = await fetch("https://api.together.xyz/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${activeApiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: model || "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+          messages: [
+            { role: "system", content: systemInstruction || "You are a helpful assistant." },
+            { role: "user", content: prompt }
+          ],
+          temperature: temperature ?? 0.5
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: `Together AI API failed: ${errText}` });
+      }
+
+      const data: any = await response.json();
+      return sendCachedJson(res, cacheKey, { text: data.choices?.[0]?.message?.content?.trim() || "" });
     }
 
     return res.status(400).json({ error: `Unsupported provider: ${aiProvider}` });

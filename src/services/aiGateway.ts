@@ -155,15 +155,51 @@ export const AI_PROVIDERS: AIProviderInfo[] = [
   },
   {
     id: "custom",
-    name: "Custom Server (vLLM/LM Studio)",
+    name: "Custom Server (LM Studio/OmniRoute/vLLM)",
     type: "local",
     icon: "⚙",
-    description: "Connect any OpenAI-compatible local server (vLLM, LM Studio, etc.)",
+    description: "Connect any OpenAI-compatible local server (LM Studio, OmniRoute, vLLM, etc.)",
     defaultModel: "default",
     availableModels: [],
     requiresApiKey: false,
     pricingTier: "free",
     color: "#8B5CF6"
+  },
+  {
+    id: "pollinations",
+    name: "Pollinations (Smart AI)",
+    type: "cloud",
+    icon: "✺",
+    description: "Free, keyless hosted AI — no signup, no setup. Rate-limited (~1 request/15s); best for trying the assistant, not heavy drafting sessions.",
+    defaultModel: "openai",
+    availableModels: ["openai"],
+    requiresApiKey: false,
+    pricingTier: "free",
+    color: "#22D3EE"
+  },
+  {
+    id: "groq",
+    name: "Groq",
+    type: "cloud",
+    icon: "▲",
+    description: "Ultra-fast inference with a usable free tier",
+    defaultModel: "llama-3.3-70b-versatile",
+    availableModels: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+    requiresApiKey: true,
+    pricingTier: "freemium",
+    color: "#F55036"
+  },
+  {
+    id: "together",
+    name: "Together AI",
+    type: "cloud",
+    icon: "◐",
+    description: "Broad open-model catalog with competitive pricing",
+    defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    availableModels: ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-7B-Instruct-Turbo"],
+    requiresApiKey: true,
+    pricingTier: "paid",
+    color: "#0F6FFF"
   }
 ];
 
@@ -658,6 +694,181 @@ const CustomAdapter: AIProviderAdapter = {
   }
 };
 
+// --- Pollinations Adapter ("Smart AI") ---
+// Verified live (docs/planning/ai-modes-reconciliation.md §1, 2026-07-28):
+// text.pollinations.ai/openai is genuinely keyless (no Authorization header
+// sent — confirmed by real completion returned with none) and CORS-open
+// (access-control-allow-origin: * on both the OPTIONS preflight and the
+// actual response) — called directly from the browser, no server proxy,
+// no vault interaction, matching the "Smart AI" mode's whole premise.
+// Anonymous rate limit is real (~1 request/15s per Pollinations' own
+// public issue tracker) — surfaced to the user via healthCheck's status
+// text, not hidden.
+const PollinationsAdapter: AIProviderAdapter = {
+  id: "pollinations",
+  name: "Pollinations (Smart AI)",
+  type: "cloud",
+  defaultModel: "openai",
+  availableModels: ["openai"],
+  requiresApiKey: false,
+
+  async getApiKey(): Promise<string> {
+    return "";
+  },
+
+  getEndpoint(): string {
+    return "https://text.pollinations.ai";
+  },
+
+  async generate(request: AIRequest): Promise<string> {
+    const response = await fetch(`${this.getEndpoint()}/openai`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: this.defaultModel,
+        messages: [
+          { role: "system", content: request.systemInstruction },
+          { role: "user", content: request.prompt }
+        ]
+      })
+    });
+    if (!response.ok) {
+      if (response.status === 429) {
+        throw new Error("Smart AI is rate-limited right now (anonymous access allows about 1 request per 15 seconds). Wait a moment and try again, or switch to a Cloud AI Provider / Local AI for heavier use.");
+      }
+      const errText = await response.text().catch(() => "Unknown error");
+      throw new Error(`Smart AI request failed (status ${response.status}): ${errText}`);
+    }
+    const data = await response.json();
+    return (data.choices?.[0]?.message?.content || "").trim();
+  },
+
+  async healthCheck(): Promise<HealthStatus> {
+    const start = Date.now();
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const resp = await fetch(`${this.getEndpoint()}/openai`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "openai", messages: [{ role: "user", content: "Respond with exactly the word: OK" }] }),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (resp.status === 429) {
+        return { provider: "pollinations", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Rate-limited (anonymous access: ~1 request/15s)" };
+      }
+      if (!resp.ok) throw new Error(`Status ${resp.status}`);
+      const data = await resp.json();
+      const text = data.choices?.[0]?.message?.content || "";
+      if (text.includes("OK")) {
+        return { provider: "pollinations", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
+      }
+      return { provider: "pollinations", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
+    } catch (e: any) {
+      return { provider: "pollinations", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
+    }
+  }
+};
+
+// --- Groq Adapter ("Cloud AI Providers") ---
+// OpenAI-compatible REST API, routed through the existing /api/generate
+// server proxy (same pattern as OpenAI/Claude/DeepSeek above) rather than
+// direct-from-browser — consistent with this app's established proxy
+// architecture for BYOK cloud providers, not a new pattern.
+const GroqAdapter: AIProviderAdapter = {
+  id: "groq",
+  name: "Groq",
+  type: "cloud",
+  defaultModel: "llama-3.3-70b-versatile",
+  availableModels: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+  requiresApiKey: true,
+
+  async getApiKey(settings: AISettings): Promise<string> {
+    try {
+      return await decryptDataAsync(settings.groqApiKey || "", getEncryptionSecret());
+    } catch {
+      return "";
+    }
+  },
+
+  getEndpoint(): string {
+    return "https://api.groq.com/openai/v1";
+  },
+
+  async generate(request: AIRequest, settings: AISettings): Promise<string> {
+    return callServerProxy(request, "groq", await this.getApiKey(settings), settings);
+  },
+
+  async healthCheck(settings: AISettings): Promise<HealthStatus> {
+    const start = Date.now();
+    const apiKey = await this.getApiKey(settings);
+    if (!apiKey) return { provider: "groq", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
+    try {
+      const resp = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "groq", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
+        signal: AbortSignal.timeout(10000)
+      });
+      const data = await resp.json();
+      if (data.text?.includes("OK")) {
+        return { provider: "groq", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
+      }
+      return { provider: "groq", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
+    } catch (e: any) {
+      return { provider: "groq", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
+    }
+  }
+};
+
+// --- Together AI Adapter ("Cloud AI Providers") ---
+const TogetherAdapter: AIProviderAdapter = {
+  id: "together",
+  name: "Together AI",
+  type: "cloud",
+  defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+  availableModels: ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-7B-Instruct-Turbo"],
+  requiresApiKey: true,
+
+  async getApiKey(settings: AISettings): Promise<string> {
+    try {
+      return await decryptDataAsync(settings.togetherApiKey || "", getEncryptionSecret());
+    } catch {
+      return "";
+    }
+  },
+
+  getEndpoint(): string {
+    return "https://api.together.xyz/v1";
+  },
+
+  async generate(request: AIRequest, settings: AISettings): Promise<string> {
+    return callServerProxy(request, "together", await this.getApiKey(settings), settings);
+  },
+
+  async healthCheck(settings: AISettings): Promise<HealthStatus> {
+    const start = Date.now();
+    const apiKey = await this.getApiKey(settings);
+    if (!apiKey) return { provider: "together", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
+    try {
+      const resp = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "together", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
+        signal: AbortSignal.timeout(10000)
+      });
+      const data = await resp.json();
+      if (data.text?.includes("OK")) {
+        return { provider: "together", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
+      }
+      return { provider: "together", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
+    } catch (e: any) {
+      return { provider: "together", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
+    }
+  }
+};
+
 // ─────────────────────────────────────────────────────────
 // SERVER PROXY HELPER
 // ─────────────────────────────────────────────────────────
@@ -877,6 +1088,9 @@ const ADAPTERS: Record<string, AIProviderAdapter> = {
   cohere: CohereAdapter,
   ollama: OllamaAdapter,
   custom: CustomAdapter,
+  pollinations: PollinationsAdapter,
+  groq: GroqAdapter,
+  together: TogetherAdapter,
 };
 
 // ─────────────────────────────────────────────────────────
@@ -898,6 +1112,9 @@ async function resolveProvider(taskType: string, settings: AISettings): Promise<
       else if (provider === "qwen") model = settings.qwenModel || "qwen-plus";
       else if (provider === "ollama") model = settings.ollamaModel || "llama3.1:8b";
       else if (provider === "custom") model = settings.customModel || "default";
+      else if (provider === "groq") model = settings.groqModel || "llama-3.3-70b-versatile";
+      else if (provider === "together") model = settings.togetherModel || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
+      else if (provider === "pollinations") model = "openai";
       return { provider, model, apiKey };
     }
     return { provider, apiKey: "" };

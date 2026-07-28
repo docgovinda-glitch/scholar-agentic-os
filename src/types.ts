@@ -183,7 +183,7 @@ export interface AIResponse {
 }
 
 export interface AISettings {
-  provider: "auto" | "server" | "gemini" | "openai" | "ollama" | "custom" | "claude" | "deepseek" | "cohere" | "qwen";
+  provider: "auto" | "server" | "gemini" | "openai" | "ollama" | "custom" | "claude" | "deepseek" | "cohere" | "qwen" | "pollinations" | "groq" | "together";
   ollamaModel?: string;
   ollamaEndpoint?: string;
   customModel?: string;
@@ -199,7 +199,11 @@ export interface AISettings {
   cohereModel?: string;
   qwenApiKey?: string;
   qwenModel?: string;
-  
+  groqApiKey?: string;
+  groqModel?: string;
+  togetherApiKey?: string;
+  togetherModel?: string;
+
   // Gateway extensions
   providerHealth?: Record<string, HealthStatus>;
   fallbackOrder?: string[];

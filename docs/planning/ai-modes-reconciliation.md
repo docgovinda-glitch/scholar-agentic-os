@@ -235,12 +235,19 @@ originally planned:
 
 No hard-stop condition was triggered. Proceeding to Step 1.
 
+## Step 1 notes
+
+- `src/config/aiModes.ts`: the 5-mode config, `AIMode`/`AIModeProviderOption` types, `getAIMode()`. Copy follows the honest-limitations rule throughout (Smart AI states its real 15s rate limit; Partner Subscription's `comingSoonNote` explicitly says no partner is confirmed). A jargon test (`aiModes.test.ts`) fails the build if "Tier N", "backend", "endpoint", "router", or "inference" ever leaks into user-facing fields — "free tier"/"paid tier" are allowed since that's the providers' own honest terminology, not our internal framing.
+- Three new adapters added to `src/services/aiGateway.ts` (Pollinations, Groq, Together AI) plus matching `server.ts` `/api/generate` (and its streaming counterpart) blocks for Groq/Together — same pattern as every existing BYOK cloud provider. Pollinations calls `text.pollinations.ai` directly from the browser (no server proxy, no key), per its Step 0-verified keyless/CORS-open status. `AISettings.provider` union and 4 new key fields (`groqApiKey`/`groqModel`/`togetherApiKey`/`togetherModel`) added to `src/types.ts`.
+- `src/components/ai/AIModeCard.tsx`: the one shared card, consumed by nothing yet — **no live-browser verification was possible for this step alone**, since it has no page to render on in the running app. This is deferred to Step 2, where the card gets wired into the real onboarding screen and live-verified there. Recorded here explicitly rather than silently skipped, per the standing live-verify rule.
+- 27 new tests total (7 config, 14 card, 6 adapter), all passing; `tsc --noEmit` clean; full suite 824/826 (same 2 pre-existing unrelated failures).
+
 ## Progress log
 
 | Step | Description | Status |
 |---|---|---|
 | 0 | Pre-flight verification (this document) | 🟢 done |
-| 1 | Central config + shared `AIModeCard` | 🔲 not started |
+| 1 | Central config + shared `AIModeCard` | 🟢 done (foundation only — no live consumer yet, see note) |
 | 2 | Onboarding screen | 🔲 not started |
 | 3 | Per-mode setup flows | 🔲 not started |
 | 4 | Settings mirroring onboarding | 🔲 not started |
