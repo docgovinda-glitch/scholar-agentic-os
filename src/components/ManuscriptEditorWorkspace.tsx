@@ -651,7 +651,7 @@ export default function ManuscriptEditorWorkspace({
                       key={tab.id}
                       onClick={() => setDrawerTab(tab.id as any)}
                       className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
-                        isActive ? "bg-[#1A365D] text-white" : "text-gray-500 hover:bg-slate-100"
+                        isActive ? "bg-[color:var(--color-cyan-accent-dim)] text-white" : "text-gray-500 hover:bg-slate-100"
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
