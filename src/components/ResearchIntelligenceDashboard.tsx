@@ -262,7 +262,7 @@ export default function ResearchIntelligenceDashboard({
                           />
                         </div>
                         <div className="flex items-center justify-between text-[9px] text-gray-400 font-mono pt-1">
-                          <span>AI: <span className="text-[#946A30] font-bold">{p.aiSettings?.provider?.toUpperCase() || "AUTO"}</span></span>
+                          <span>AI: <span className="text-[#0E7490] font-bold">{p.aiSettings?.provider?.toUpperCase() || "AUTO"}</span></span>
                           <span className="uppercase font-semibold text-emerald-600">{p.status || "Draft"}</span>
                         </div>
                       </div>
@@ -297,7 +297,7 @@ export default function ResearchIntelligenceDashboard({
               {/* Metric 2 */}
               <div className="space-y-1">
                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase flex items-center gap-1">
-                  <Cpu className="w-3.5 h-3.5 text-[#1A365D]" />
+                  <Cpu className="w-3.5 h-3.5 text-[color:var(--color-cyan-accent-dim)]" />
                   AI Call Counts
                 </span>
                 <span className="text-2xl font-bold font-serif text-[#1A365D] block">{totalCalls}</span>
@@ -329,8 +329,8 @@ export default function ResearchIntelligenceDashboard({
                           <span className="text-gray-400">{cnt} calls ({pct}%)</span>
                         </div>
                         <div className="w-full bg-[#F1F5F9] h-1.5 rounded-full overflow-hidden">
-                          <div 
-                            className="bg-[#1A365D] h-full rounded-full"
+                          <div
+                            className="bg-[color:var(--color-cyan-accent-dim)] h-full rounded-full"
                             style={{ width: `${pct}%` }}
                           />
                         </div>

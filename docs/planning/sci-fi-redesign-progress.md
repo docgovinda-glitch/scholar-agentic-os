@@ -11,7 +11,7 @@ re-scope here — this is a status log, not a design doc.
 | 3 | `src/components/agents/ActiveAgentsPanel.tsx` | 🟢 done | (pending) |
 | 4 | `#1A365D` navy replacement (632 occurrences, 29 files) | 🔲 not started | — |
 | 5 | `src/components/AIControlCenter.tsx` / `AISetupWizard.tsx` | 🟢 done | (pending) |
-| 6 | `src/components/ResearchIntelligenceDashboard.tsx` | 🔲 not started | — |
+| 6 | `src/components/ResearchIntelligenceDashboard.tsx` | 🟢 done | (pending) |
 | 7 | Remaining components, incrementally | 🔲 not started | — |
 
 Legend: 🔲 not started · 🟡 in progress · 🟢 done · 🔴 blocked (see note)
