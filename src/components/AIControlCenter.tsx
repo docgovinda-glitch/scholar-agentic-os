@@ -23,6 +23,9 @@ import {
 } from "lucide-react";
 import AIGateway from "../services/aiGateway";
 import { saveModelPreferences, saveApiKeys } from "../services/supabaseAuthService";
+import { AI_MODES, getModeForProvider, AIModeId } from "../config/aiModes";
+import AIModeCard from "./ai/AIModeCard";
+import type { HealthStatus } from "../types";
 
 interface AIControlCenterProps {
   project: PaperProject;
@@ -31,7 +34,30 @@ interface AIControlCenterProps {
 }
 
 export default function AIControlCenter({ project, updateProject, onRequireVault }: AIControlCenterProps) {
-  const [activeSubTab, setActiveSubTab] = useState<"credentials" | "ollama" | "usage" | "comparison">("credentials");
+  const [activeSubTab, setActiveSubTab] = useState<"mode" | "credentials" | "ollama" | "usage" | "comparison">("mode");
+
+  // AI modes redesign (2026-07-28), Step 4 — real connection status for the
+  // "Current AI Mode" card, fetched fresh whenever this tab is viewed. Never
+  // an optimistic guess: unchecked until the real request resolves.
+  const [currentModeStatus, setCurrentModeStatus] = useState<HealthStatus | null>(null);
+  const [checkingCurrentMode, setCheckingCurrentMode] = useState(false);
+
+  useEffect(() => {
+    if (activeSubTab !== "mode") return;
+    let cancelled = false;
+    (async () => {
+      setCheckingCurrentMode(true);
+      try {
+        const result = await AIGateway.healthCheckProvider(project.aiSettings?.provider || "gemini", project.aiSettings || { provider: "gemini" });
+        if (!cancelled) setCurrentModeStatus(result);
+      } catch {
+        if (!cancelled) setCurrentModeStatus({ provider: project.aiSettings?.provider || "gemini", status: "offline", error: "Check failed" });
+      } finally {
+        if (!cancelled) setCheckingCurrentMode(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSubTab, project.aiSettings?.provider]);
 
   // Task 3 (BYOK vault passphrase, 2026-07-24) — this used to decrypt/encrypt
   // provider keys with the user's login passcodeHash, falling back to a
@@ -254,6 +280,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
         {/* Sub Navigation Tabs */}
         <div className="flex gap-1.5 bg-[#FAF9F6] border border-gray-200/60 p-1 rounded-xl shrink-0 overflow-x-auto">
           {[
+            { id: "mode", name: "AI Mode", icon: Sparkles },
             { id: "credentials", name: "Credentials", icon: Key },
             { id: "ollama", name: "Ollama Local", icon: Database },
             { id: "usage", name: "Analytics & Costs", icon: TrendingUp },
@@ -278,6 +305,68 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
           })}
         </div>
       </div>
+
+      {/* SUB TAB 0: AI MODE (mirrors onboarding — docs/planning/ai-modes-reconciliation.md Step 4) */}
+      {activeSubTab === "mode" && (() => {
+        const currentProvider = project.aiSettings?.provider || "gemini";
+        const currentModeId = getModeForProvider(currentProvider);
+        const currentMode = currentModeId ? AI_MODES.find(m => m.id === currentModeId) : undefined;
+        const statusLabel = checkingCurrentMode ? "Checking..." : (currentModeStatus?.status || "unchecked");
+        const statusIsOnline = statusLabel === "online";
+        const statusIsOffline = statusLabel === "offline" || statusLabel === "degraded";
+
+        return (
+          <div className="space-y-6 animate-fade-in">
+            {/* Current AI Mode status card */}
+            <div className="bg-[#FAF9F6] border border-gray-200 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[color:var(--color-cyan-accent)]/15 text-[color:var(--color-cyan-accent-dim)] flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider block">Current AI Mode</span>
+                  <h3 className="text-lg font-bold font-serif text-[#1A365D]">
+                    {currentMode ? currentMode.title : "Not configured yet"}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1 max-w-md">
+                    {currentMode
+                      ? currentMode.description
+                      : "Choose an AI mode below to get started."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
+                  statusIsOnline ? "bg-[color:var(--color-cyan-accent)]/10 text-[#0E7490] border border-[color:var(--color-cyan-accent)]/30" :
+                  statusIsOffline ? "bg-red-50 text-red-700 border border-red-200" :
+                  "bg-gray-100 text-gray-500 border border-gray-200"
+                }`}>
+                  {checkingCurrentMode ? <Loader2 className="w-3 h-3 animate-spin" /> : (statusIsOnline ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />)}
+                  {statusLabel}
+                </span>
+                <button
+                  onClick={() => setActiveSubTab("credentials")}
+                  className="px-3 py-1.5 border border-gray-200 hover:bg-white text-[#1A365D] text-xs font-mono font-semibold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap"
+                >
+                  Change Mode
+                </button>
+              </div>
+            </div>
+
+            {/* Same 5 mode cards as onboarding — identical terminology and hierarchy */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {AI_MODES.map((mode) => (
+                <AIModeCard
+                  key={mode.id}
+                  mode={mode}
+                  isSelected={currentModeId === mode.id}
+                  onSelect={() => setActiveSubTab("credentials")}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* SUB TAB 1: API CREDENTIALS MANAGER */}
       {activeSubTab === "credentials" && !vaultUnlocked && (

@@ -288,6 +288,14 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 - Smart AI's "continue → done" and BYOK/Cloud's "select → sign in → API key → done" flows were already functionally correct from Step 2; this step's work was making the "sign in" and "install" steps real and specific rather than assumed present.
 - 4 new tests (Cloud AI Providers exact provider list, every getKeyUrl is a real https link, OmniRoute's specific guidance, no duplicate install guidance across backends) plus 1 new OpenRouter adapter test. `tsc --noEmit` clean, full suite 831/833 (same 2 pre-existing unrelated failures).
 
+## Step 4 notes
+
+- New `getModeForProvider()` reverse lookup (`src/config/aiModes.ts`) resolves a real `AISettings.provider` id back to its user-facing mode — "gemini" → "Cloud AI Providers", never the raw provider id. Returns `undefined` for internal routing providers (`auto`/`server`) or anything unrecognized, rather than fabricating a mode — surfaced in the UI as "Not configured yet".
+- `AIControlCenter.tsx` gets a new default "AI Mode" tab (`activeSubTab` default changed from `"credentials"` to `"mode"` — an intentional behavior change per this step's own spec, not a regression; the 9 existing Credentials-tab characterization tests were updated to navigate there first, same as the AISetupWizard rewrite in Step 2): a "Current AI Mode" status card (mode name, a **real** connection check — fetched fresh via `AIGateway.healthCheckProvider` whenever the tab is viewed, never an optimistic default — plain-language description, "Change Mode" button) followed by the identical 5 `AIModeCard` grid used in onboarding.
+- Selecting any card in the settings grid, or the "Change Mode" button, switches to the Credentials tab — full setup-flow duplication into settings (Providers/Local Models/API Keys management surfaces) is Step 5's explicit job, not this one.
+- Live-verified: real "Checking..." → "ONLINE" transition against the actual configured Gemini key, correct tab-active-state on both the status card and the nav (a screenshot mid-transition looked ambiguous; confirmed via direct DOM class inspection that the state was correct throughout).
+- 7 new tests for the AI Mode tab, `tsc --noEmit` clean, full suite 840/842 (same 2 pre-existing unrelated failures).
+
 ## Progress log
 
 | Step | Description | Status |
@@ -296,7 +304,7 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 | 1 | Central config + shared `AIModeCard` | 🟢 done (foundation only — no live consumer yet, see note) |
 | 2 | Onboarding screen | 🟢 done |
 | 3 | Per-mode setup flows | 🟢 done |
-| 4 | Settings mirroring onboarding | 🔲 not started |
+| 4 | Settings mirroring onboarding | 🟢 done |
 | 5 | Settings sub-navigation & management surfaces | 🔲 not started |
 | 6 | Smart AI status & diagnostics | 🔲 not started |
 | 7 | Accessibility, responsive, motion | 🔲 not started |

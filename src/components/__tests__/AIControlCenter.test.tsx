@@ -77,6 +77,10 @@ describe("AIControlCenter — characterization", () => {
       aiSettings: { provider: "gemini", ...aiSettingsOverrides } as PaperProject["aiSettings"],
     };
     render(<AIControlCenter project={project} updateProject={updateProject} />);
+    // AI modes redesign (2026-07-28), Step 4 — "AI Mode" is now the default
+    // tab (mirrors onboarding); these tests are about the Credentials tab's
+    // save/sync behavior specifically, so navigate there first.
+    fireEvent.click(screen.getByText("Credentials"));
     return project;
   }
 
@@ -177,6 +181,7 @@ describe("AIControlCenter — vault-passphrase gate (Task 3, 2026-07-24)", () =>
   function renderControlCenter() {
     const project: PaperProject = { ...DEFAULT_STATE("jdoe"), aiSettings: { provider: "gemini" } as PaperProject["aiSettings"] };
     render(<AIControlCenter project={project} updateProject={updateProject} />);
+    fireEvent.click(screen.getByText("Credentials"));
   }
 
   it("shows the vault-unlock prompt instead of API key inputs when the vault is locked", () => {

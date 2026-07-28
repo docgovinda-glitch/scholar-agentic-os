@@ -250,3 +250,21 @@ export const AI_MODES: AIMode[] = [
 export function getAIMode(id: AIModeId): AIMode | undefined {
   return AI_MODES.find((m) => m.id === id);
 }
+
+/**
+ * Reverse lookup: given a real AISettings.provider id (e.g. "gemini",
+ * "ollama", "pollinations"), find which of the 5 user-facing AI Modes it
+ * belongs to — used by AIControlCenter.tsx's "Current AI Mode" status card
+ * (Step 4) to show the user-facing mode name for whatever provider is
+ * actually configured, never the raw provider id or internal tier name.
+ * "auto"/"server" (internal routing providers, not a real user-facing
+ * mode) and unrecognized providers resolve to undefined — callers should
+ * handle that as "no mode selected yet", not fabricate one.
+ */
+export function getModeForProvider(providerId: string | undefined): AIModeId | undefined {
+  if (!providerId) return undefined;
+  for (const mode of AI_MODES) {
+    if (mode.providers.some((p) => p.id === providerId)) return mode.id;
+  }
+  return undefined;
+}

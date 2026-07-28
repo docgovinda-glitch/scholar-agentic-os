@@ -2,7 +2,7 @@
 // truth both AISetupWizard.tsx and AIControlCenter.tsx will consume.
 
 import { describe, it, expect } from "vitest";
-import { AI_MODES, getAIMode, AIModeId } from "../aiModes";
+import { AI_MODES, getAIMode, getModeForProvider, AIModeId } from "../aiModes";
 import { AI_PROVIDERS } from "../../services/aiGateway";
 
 const EXPECTED_IDS: AIModeId[] = ["smart", "cloud", "local", "byok", "partner"];
@@ -107,5 +107,29 @@ describe("AI_MODES config", () => {
     const guidances = local.providers.map((p) => p.installGuidance);
     expect(new Set(guidances).size).toBe(guidances.length);
     for (const g of guidances) expect(g).toBeTruthy();
+  });
+});
+
+describe("getModeForProvider — reverse lookup for the settings 'Current AI Mode' card (Step 4)", () => {
+  it("resolves each real provider id to its correct user-facing mode", () => {
+    expect(getModeForProvider("pollinations")).toBe("smart");
+    expect(getModeForProvider("gemini")).toBe("cloud");
+    expect(getModeForProvider("openrouter")).toBe("cloud");
+    expect(getModeForProvider("groq")).toBe("cloud");
+    expect(getModeForProvider("deepseek")).toBe("cloud");
+    expect(getModeForProvider("together")).toBe("cloud");
+    expect(getModeForProvider("ollama")).toBe("local");
+    expect(getModeForProvider("custom")).toBe("local");
+    expect(getModeForProvider("openai")).toBe("byok");
+    expect(getModeForProvider("claude")).toBe("byok");
+    expect(getModeForProvider("cohere")).toBe("byok");
+    expect(getModeForProvider("qwen")).toBe("byok");
+  });
+
+  it("returns undefined for internal routing providers and unknown ids, rather than fabricating a mode", () => {
+    expect(getModeForProvider("auto")).toBeUndefined();
+    expect(getModeForProvider("server")).toBeUndefined();
+    expect(getModeForProvider(undefined)).toBeUndefined();
+    expect(getModeForProvider("not-a-real-provider")).toBeUndefined();
   });
 });
