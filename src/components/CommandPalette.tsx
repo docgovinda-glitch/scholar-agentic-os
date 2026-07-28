@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import {
   Search,
   BookOpen,
@@ -62,6 +62,7 @@ export default function CommandPalette({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   // Define commands
   const commands: CommandItem[] = [
@@ -349,21 +350,22 @@ export default function CommandPalette({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={prefersReducedMotion ? { duration: 0 } : undefined}
             onClick={onClose}
-            className="absolute inset-0 bg-[#0F172A]/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-[#030810]/60 backdrop-blur-sm"
           />
 
           {/* Modal box */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: -8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -8 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className="relative w-full max-w-2xl bg-white border border-[#E2E8F0] shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[500px]"
+            initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: -8 }}
+            animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: -8 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.15, ease: "easeOut" }}
+            className="chrome-dark relative w-full max-w-2xl border shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[500px]"
           >
             {/* Input Bar */}
-            <div className="flex items-center px-4 py-3.5 border-b border-[#E2E8F0] shrink-0">
-              <Search className="w-4 h-4 text-gray-400 mr-2.5 shrink-0" />
+            <div className="flex items-center px-4 py-3.5 border-b border-white/10 shrink-0">
+              <Search className="w-4 h-4 text-[#64748B] mr-2.5 shrink-0" />
               <input
                 ref={inputRef}
                 type="text"
@@ -373,15 +375,15 @@ export default function CommandPalette({
                   setSearch(e.target.value);
                   setSelectedIndex(0);
                 }}
-                className="w-full bg-transparent border-0 outline-none text-xs text-[#1A365D] placeholder:text-gray-400 font-sans"
+                className="w-full bg-transparent border-0 outline-none text-xs text-[#E2E8F0] placeholder:text-[#64748B] font-sans"
               />
-              <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 text-gray-400 rounded text-[9px] font-mono shrink-0 select-none">ESC</kbd>
+              <kbd className="px-1.5 py-0.5 chrome-dark-subtle border border-white/10 text-[#94A3B8] rounded text-[9px] font-mono shrink-0 select-none">ESC</kbd>
             </div>
 
             {/* List */}
             {filteredCommands.length === 0 ? (
-              <div className="p-12 text-center text-gray-400 shrink-0">
-                <Compass className="w-8 h-8 mx-auto mb-2 text-gray-300 animate-spin" />
+              <div className="p-12 text-center text-[#64748B] shrink-0">
+                <Compass className={`w-8 h-8 mx-auto mb-2 text-[#475569] ${prefersReducedMotion ? "" : "animate-spin"}`} />
                 <p className="text-xs font-mono">No matching commands found.</p>
               </div>
             ) : (
@@ -393,7 +395,7 @@ export default function CommandPalette({
                   const catCommands = filteredCommands.filter((c) => c.category === cat);
                   return (
                     <div key={cat} className="space-y-1">
-                      <span className="px-3.5 text-[9px] font-mono font-bold uppercase tracking-wider text-gray-400 select-none block mb-1">
+                      <span className="px-3.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[#64748B] select-none block mb-1">
                         {cat}
                       </span>
                       {catCommands.map((cmd) => {
@@ -413,31 +415,31 @@ export default function CommandPalette({
                             onMouseEnter={() => setSelectedIndex(currentOverallIdx)}
                             className={`w-full text-left px-3.5 py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between group ${
                               isSelected
-                                ? "bg-[#1A365D] text-white shadow-md shadow-[#1A365D]/10"
-                                : "hover:bg-slate-50 text-slate-700"
+                                ? "bg-[color:var(--color-cyan-accent)]/15 text-[#E2E8F0] shadow-md shadow-[color:var(--color-cyan-accent)]/10 border border-[color:var(--color-cyan-accent)]/30"
+                                : "hover:bg-white/5 text-[#CBD5E1] border border-transparent"
                             }`}
                           >
                             <div className="flex items-center gap-3">
                               <div className={`p-1.5 rounded-lg shrink-0 ${
-                                isSelected ? "bg-white/10 text-white" : "bg-slate-100 text-slate-500"
+                                isSelected ? "bg-[color:var(--color-cyan-accent)]/20 text-[color:var(--color-cyan-accent)]" : "bg-white/5 text-[#64748B]"
                               }`}>
                                 <Icon className="w-4 h-4" />
                               </div>
                               <div className="flex flex-col">
                                 <span className={`text-xs font-mono font-bold ${
-                                  isSelected ? "text-white" : "text-[#1A365D]"
+                                  isSelected ? "text-[color:var(--color-cyan-accent)]" : "text-[#E2E8F0]"
                                 }`}>
                                   {cmd.title}
                                 </span>
                                 <span className={`text-[10px] line-clamp-1 ${
-                                  isSelected ? "text-white/70" : "text-gray-400"
+                                  isSelected ? "text-[#E2E8F0]/70" : "text-[#64748B]"
                                 }`}>
                                   {cmd.subtitle}
                                 </span>
                               </div>
                             </div>
                             <ArrowRight className={`w-3.5 h-3.5 transition-all ${
-                              isSelected ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"
+                              isSelected ? "opacity-100 translate-x-0 text-[color:var(--color-cyan-accent)]" : "opacity-0 -translate-x-2"
                             }`} />
                           </button>
                         );
@@ -449,14 +451,14 @@ export default function CommandPalette({
             )}
 
             {/* Footer */}
-            <div className="border-t border-[#E2E8F0] px-4 py-2.5 bg-slate-50 flex items-center justify-between text-[9px] font-mono text-gray-400 shrink-0">
+            <div className="chrome-dark-subtle border-t border-white/10 px-4 py-2.5 flex items-center justify-between text-[9px] font-mono text-[#64748B] shrink-0">
               <div className="flex items-center gap-2">
-                <span>Use <kbd className="px-1 py-0.5 bg-white border rounded">↑</kbd> <kbd className="px-1 py-0.5 bg-white border rounded">↓</kbd> to navigate</span>
-                <span className="text-slate-300">|</span>
-                <span>Press <kbd className="px-1 py-0.5 bg-white border rounded">Enter</kbd> to select</span>
+                <span>Use <kbd className="px-1 py-0.5 bg-white/5 border border-white/10 rounded">↑</kbd> <kbd className="px-1 py-0.5 bg-white/5 border border-white/10 rounded">↓</kbd> to navigate</span>
+                <span className="text-white/10">|</span>
+                <span>Press <kbd className="px-1 py-0.5 bg-white/5 border border-white/10 rounded">Enter</kbd> to select</span>
               </div>
               <div>
-                <span>Press <kbd className="px-1 py-0.5 bg-white border rounded">⌘</kbd> + <kbd className="px-1 py-0.5 bg-white border rounded">K</kbd> to toggle</span>
+                <span>Press <kbd className="px-1 py-0.5 bg-white/5 border border-white/10 rounded">⌘</kbd> + <kbd className="px-1 py-0.5 bg-white/5 border border-white/10 rounded">K</kbd> to toggle</span>
               </div>
             </div>
           </motion.div>
