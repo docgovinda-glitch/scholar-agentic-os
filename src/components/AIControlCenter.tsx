@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import AIGateway from "../services/aiGateway";
 import { saveModelPreferences, saveApiKeys } from "../services/supabaseAuthService";
-import { AI_MODES, getModeForProvider, AIModeId } from "../config/aiModes";
+import { AI_MODES, getAIMode, getModeForProvider, AIModeId } from "../config/aiModes";
 import AIModeCard from "./ai/AIModeCard";
 import type { HealthStatus } from "../types";
 
@@ -34,7 +34,20 @@ interface AIControlCenterProps {
 }
 
 export default function AIControlCenter({ project, updateProject, onRequireVault }: AIControlCenterProps) {
-  const [activeSubTab, setActiveSubTab] = useState<"mode" | "credentials" | "ollama" | "usage" | "comparison">("mode");
+  // AI modes redesign (2026-07-28), Step 5 — settings sub-navigation matches
+  // the task's own exact 7-tab spec: AI Mode / Current Status / Providers /
+  // Local Models / API Keys / Advanced / Diagnostics. "credentials" kept as
+  // the internal id for the Providers tab (least-churn rename, its
+  // connect/configure/test logic is unchanged) — the OLD "usage" (Analytics
+  // & Costs) and "comparison" (Provider Matrix) tabs' real content moved
+  // into "diagnostics" and "advanced" respectively rather than deleted, per
+  // this project's standing rule against removing working functionality.
+  const [activeSubTab, setActiveSubTab] = useState<"mode" | "status" | "credentials" | "local" | "keys" | "advanced" | "diagnostics">("mode");
+
+  // Local Models tab — real detection state for every Local AI backend
+  // (Ollama, LM Studio, OmniRoute, generic custom), not just Ollama.
+  const [localBackendStatus, setLocalBackendStatus] = useState<Record<string, HealthStatus>>({});
+  const [scanningLocalBackends, setScanningLocalBackends] = useState(false);
 
   // AI modes redesign (2026-07-28), Step 4 — real connection status for the
   // "Current AI Mode" card, fetched fresh whenever this tab is viewed. Never
@@ -43,7 +56,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
   const [checkingCurrentMode, setCheckingCurrentMode] = useState(false);
 
   useEffect(() => {
-    if (activeSubTab !== "mode") return;
+    if (activeSubTab !== "mode" && activeSubTab !== "status") return;
     let cancelled = false;
     (async () => {
       setCheckingCurrentMode(true);
@@ -157,6 +170,44 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
     }
   };
 
+  // Local Models tab — real detection across every Local AI backend the
+  // onboarding flow offers (Ollama, LM Studio, OmniRoute, generic custom),
+  // per docs/planning/ai-modes-reconciliation.md's Local AI mode. LM
+  // Studio/OmniRoute/custom all resolve to the "custom" adapter at
+  // different default ports, so each is checked with that specific default
+  // endpoint rather than whatever's currently saved in settings.
+  const LOCAL_BACKENDS = [
+    { key: "ollama", label: "Ollama", providerId: "ollama", endpoint: project.aiSettings?.ollamaEndpoint || "http://localhost:11434" },
+    { key: "lmstudio", label: "LM Studio", providerId: "custom", endpoint: "http://localhost:1234/v1" },
+    { key: "omniroute", label: "OmniRoute", providerId: "custom", endpoint: "http://localhost:20128/v1" },
+    { key: "custom", label: "Custom server", providerId: "custom", endpoint: project.aiSettings?.customEndpoint || "" }
+  ];
+
+  const checkAllLocalBackends = async () => {
+    setScanningLocalBackends(true);
+    try {
+      const results = await Promise.all(
+        LOCAL_BACKENDS.map(async (backend) => {
+          if (backend.key === "custom" && !backend.endpoint) {
+            return [backend.key, { provider: "custom", status: "unchecked" as const, error: "No custom endpoint configured" }] as const;
+          }
+          const settingsForCheck = backend.providerId === "ollama"
+            ? { ...project.aiSettings, ollamaEndpoint: backend.endpoint }
+            : { ...project.aiSettings, customEndpoint: backend.endpoint };
+          const health = await AIGateway.healthCheckProvider(backend.providerId, settingsForCheck as AISettings);
+          return [backend.key, health] as const;
+        })
+      );
+      setLocalBackendStatus(Object.fromEntries(results));
+    } finally {
+      setScanningLocalBackends(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === "local") checkAllLocalBackends();
+  }, [activeSubTab]);
+
   // Test provider connection
   const handleTestConnection = async (targetProvider: string) => {
     setTestingProvider(targetProvider);
@@ -258,6 +309,25 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
     }
   };
 
+  // API Keys tab (Step 5) — mask + per-key test/remove, real state.
+  const KEY_FIELDS: { id: string; label: string; value: string; setValue: (v: string) => void }[] = [
+    { id: "gemini", label: "Google Gemini", value: geminiKey, setValue: setGeminiKey },
+    { id: "openai", label: "OpenAI ChatGPT", value: openaiKey, setValue: setOpenaiKey },
+    { id: "claude", label: "Anthropic Claude", value: claudeKey, setValue: setClaudeKey },
+    { id: "deepseek", label: "DeepSeek API", value: deepseekKey, setValue: setDeepseekKey },
+    { id: "qwen", label: "Qwen API (Alibaba)", value: qwenKey, setValue: setQwenKey },
+    { id: "cohere", label: "Cohere AI", value: cohereKey, setValue: setCohereKey },
+  ];
+
+  const maskKey = (key: string) => (key.length <= 6 ? "••••••" : `${key.slice(0, 3)}${"•".repeat(Math.min(key.length - 6, 12))}${key.slice(-3)}`);
+
+  const handleRemoveKey = async (field: typeof KEY_FIELDS[number]) => {
+    field.setValue("");
+    const secret = getVaultPassphrase() || "";
+    const emptyCipher = await encryptDataAsync("", secret);
+    updateProject({ aiSettings: { ...project.aiSettings, [`${field.id}ApiKey`]: emptyCipher } as AISettings });
+  };
+
   // Calculate cost summary metrics
   const totalCalls = project.costMetrics?.totalCalls || 0;
   const totalCost = project.costMetrics?.totalCost || 0;
@@ -281,10 +351,12 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
         <div className="flex gap-1.5 bg-[#FAF9F6] border border-gray-200/60 p-1 rounded-xl shrink-0 overflow-x-auto">
           {[
             { id: "mode", name: "AI Mode", icon: Sparkles },
-            { id: "credentials", name: "Credentials", icon: Key },
-            { id: "ollama", name: "Ollama Local", icon: Database },
-            { id: "usage", name: "Analytics & Costs", icon: TrendingUp },
-            { id: "comparison", name: "Provider Matrix", icon: Table }
+            { id: "status", name: "Current Status", icon: Activity },
+            { id: "credentials", name: "Providers", icon: Key },
+            { id: "local", name: "Local Models", icon: Database },
+            { id: "keys", name: "API Keys", icon: Key },
+            { id: "advanced", name: "Advanced", icon: Table },
+            { id: "diagnostics", name: "Diagnostics", icon: HelpCircle }
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeSubTab === tab.id;
@@ -363,6 +435,43 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
                   onSelect={() => setActiveSubTab("credentials")}
                 />
               ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* SUB TAB: CURRENT STATUS (Step 5 — lean real-time readout; deeper history lives in Diagnostics) */}
+      {activeSubTab === "status" && (() => {
+        const currentProvider = project.aiSettings?.provider || "gemini";
+        const currentModeId = getModeForProvider(currentProvider);
+        const currentMode = currentModeId ? AI_MODES.find(m => m.id === currentModeId) : undefined;
+        const statusLabel = checkingCurrentMode ? "Checking..." : (currentModeStatus?.status || "unchecked");
+        const statusIsOnline = statusLabel === "online";
+
+        return (
+          <div className="space-y-4 animate-fade-in font-sans max-w-2xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-[#FAF9F6] border border-gray-200 rounded-xl p-4">
+                <span className="text-[10px] font-bold font-mono text-gray-400 uppercase tracking-wider block mb-1">Active AI Mode</span>
+                <span className="text-sm font-bold text-[#1A365D]">{currentMode ? currentMode.title : "Not configured"}</span>
+              </div>
+              <div className="bg-[#FAF9F6] border border-gray-200 rounded-xl p-4">
+                <span className="text-[10px] font-bold font-mono text-gray-400 uppercase tracking-wider block mb-1">Active Provider</span>
+                <span className="text-sm font-bold text-[#1A365D] uppercase font-mono">{currentProvider}</span>
+              </div>
+              <div className="bg-[#FAF9F6] border border-gray-200 rounded-xl p-4">
+                <span className="text-[10px] font-bold font-mono text-gray-400 uppercase tracking-wider block mb-1">Connection State</span>
+                <span className={`text-sm font-bold font-mono uppercase flex items-center gap-1.5 ${statusIsOnline ? "text-[#0E7490]" : "text-gray-500"}`}>
+                  {checkingCurrentMode ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (statusIsOnline ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />)}
+                  {statusLabel}
+                </span>
+              </div>
+              <div className="bg-[#FAF9F6] border border-gray-200 rounded-xl p-4">
+                <span className="text-[10px] font-bold font-mono text-gray-400 uppercase tracking-wider block mb-1">Latency</span>
+                <span className="text-sm font-bold text-[#1A365D] font-mono">
+                  {currentModeStatus?.latencyMs ? `${currentModeStatus.latencyMs}ms` : "—"}
+                </span>
+              </div>
             </div>
           </div>
         );
@@ -742,16 +851,135 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
         </div>
       )}
 
-      {/* SUB TAB 2: OLLAMA LOCAL MANAGER */}
-      {activeSubTab === "ollama" && (
+      {/* SUB TAB: API KEYS (Step 5 — grouped, always masked, behind the same vault gate as Providers) */}
+      {activeSubTab === "keys" && !vaultUnlocked && (
+        <div className="space-y-6 animate-fade-in max-w-xl mx-auto text-center py-8">
+          <div className="w-14 h-14 bg-[color:var(--color-cyan-accent)]/10 border border-gray-200 rounded-full flex items-center justify-center mx-auto">
+            <Key className="w-7 h-7 text-[color:var(--color-cyan-accent-dim)]" />
+          </div>
+          <h3 className="text-xl font-bold font-serif text-[#1A365D] mb-1">Unlock Your Key Vault</h3>
+          <p className="text-[#6B665E] text-sm">Enter your vault passphrase to view your configured API keys (masked).</p>
+          <div className="flex flex-col gap-3">
+            <input
+              type="password"
+              value={vaultInput}
+              onChange={(e) => setVaultInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleUnlockVault()}
+              placeholder="Vault passphrase"
+              className="w-full bg-white border border-[#D1CEC7] rounded-xl py-2.5 px-4 text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/10 focus:border-[#1A365D] transition-all font-mono text-sm"
+            />
+            <button
+              onClick={handleUnlockVault}
+              disabled={!vaultInput.trim()}
+              className="px-5 py-2.5 bg-[#1A365D] hover:bg-[#122847] font-bold text-white text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 uppercase tracking-wider font-mono"
+            >
+              Unlock Vault
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === "keys" && vaultUnlocked && (
+        <div className="space-y-4 animate-fade-in max-w-2xl">
+          <div className="p-3 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl text-[11px] text-gray-600">
+            Keys are grouped by provider and always shown masked. Test verifies the key still works; Remove clears it (encrypted empty value saved, same as clearing the field in Providers).
+          </div>
+          <div className="border border-gray-200 rounded-2xl divide-y divide-gray-100 overflow-hidden">
+            {KEY_FIELDS.map((field) => {
+              const configured = !!field.value;
+              return (
+                <div key={field.id} className="p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-sm font-bold text-[#1A365D] block">{field.label}</span>
+                    <span className="text-[11px] font-mono text-gray-400">
+                      {configured ? maskKey(field.value) : "Not configured"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleTestConnection(field.id)}
+                      disabled={!configured || testingProvider !== null}
+                      className="px-2.5 py-1 border border-gray-200 hover:bg-gray-50 text-[10px] font-mono font-semibold uppercase text-gray-600 rounded-lg cursor-pointer disabled:opacity-40"
+                    >
+                      {testingProvider === field.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Test"}
+                    </button>
+                    <button
+                      onClick={() => handleRemoveKey(field)}
+                      disabled={!configured}
+                      className="px-2.5 py-1 border border-red-200 hover:bg-red-50 text-[10px] font-mono font-semibold uppercase text-red-600 rounded-lg cursor-pointer disabled:opacity-40"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {testResult.status && (
+            <div className={`p-3 rounded-lg border text-xs font-sans flex items-center gap-2 animate-fade-in ${
+              testResult.status === "success" ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-800"
+            }`}>
+              {testResult.status === "success" ? <CheckCircle className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
+              <span>{testResult.message}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUB TAB: LOCAL MODELS (Step 5 — real detection across every Local AI backend) */}
+      {activeSubTab === "local" && (
         <div className="space-y-6 animate-fade-in font-sans">
           <div className="p-4 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl flex gap-3 items-start">
             <Database className="w-4 h-4 text-[#C08A3E] shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <span className="text-xs font-bold text-[#1A365D] uppercase tracking-wider font-mono block">Local Offline Generation Engine</span>
+              <span className="text-xs font-bold text-[#1A365D] uppercase tracking-wider font-mono block">Local Offline Generation Engines</span>
               <p className="text-[11px] text-gray-600 leading-normal font-sans">
-                Connect your workspace directly to local LLMs running on your own hardware via Ollama. Ideal for completely offline, cost-free generation with absolute data privacy. Local routing bypasses Vercel proxy.
+                Connect your workspace directly to local LLMs running on your own hardware. Ideal for completely offline, cost-free generation with absolute data privacy.
               </p>
+            </div>
+          </div>
+
+          <div className="border border-gray-200 rounded-2xl overflow-hidden">
+            <div className="p-4 bg-[#FAF9F6] border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-xs font-bold font-mono text-[#76726A] uppercase tracking-wider">Detected Backends</h3>
+              <button
+                onClick={checkAllLocalBackends}
+                disabled={scanningLocalBackends}
+                className="px-3 py-1.5 bg-[color:var(--color-cyan-accent-dim)] hover:bg-[#0891B2] text-white text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {scanningLocalBackends ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
+                Refresh
+              </button>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {LOCAL_BACKENDS.map((backend) => {
+                const health = localBackendStatus[backend.key];
+                const modeConfig = getAIMode("local");
+                const optionGuidance = modeConfig?.providers.find(p => p.label === backend.label);
+                const status = scanningLocalBackends ? "checking" : (health?.status || "unchecked");
+                return (
+                  <div key={backend.key} className="p-4 flex items-center justify-between gap-4">
+                    <div>
+                      <span className="text-sm font-bold text-[#1A365D] block">{backend.label}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">{backend.endpoint || "No endpoint configured"}</span>
+                      {optionGuidance?.installUrl && status !== "online" && (
+                        <a href={optionGuidance.installUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#C08A3E] hover:underline block mt-0.5">
+                          Launch guide →
+                        </a>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5 shrink-0 ${
+                      status === "online" ? "bg-[color:var(--color-cyan-accent)]/10 text-[#0E7490] border border-[color:var(--color-cyan-accent)]/30" :
+                      status === "checking" ? "bg-gray-100 text-gray-500 border border-gray-200" :
+                      status === "unchecked" ? "bg-gray-100 text-gray-500 border border-gray-200" :
+                      "bg-red-50 text-red-700 border border-red-200"
+                    }`}>
+                      {status === "checking" ? <Loader2 className="w-3 h-3 animate-spin" /> : status === "online" ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                      {status === "online" ? "Running" : status === "checking" ? "Checking" : status === "unchecked" ? "Not configured" : "Stopped"}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -868,8 +1096,50 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
       )}
 
       {/* SUB TAB 3: COST & USAGE DASHBOARD */}
-      {activeSubTab === "usage" && (
+      {activeSubTab === "diagnostics" && (() => {
+        // Step 6 — Smart AI / gateway diagnostics from REAL tracked data only:
+        // fallbackOrder and usageLogs already exist and are populated by
+        // real requests (aiGateway.ts / draftSection) — nothing here is a
+        // plausible-looking placeholder. lastSuccessfulRequest is simply the
+        // most recent real usageLogs entry, or omitted (not fabricated) if
+        // none exist yet.
+        const fallbackOrder = project.aiSettings?.fallbackOrder || [];
+        const lastRequest = logs.length > 0 ? logs[logs.length - 1] : null;
+
+        return (
         <div className="space-y-6 animate-fade-in font-sans">
+          <div className="border border-gray-200 rounded-2xl p-5 space-y-3">
+            <h3 className="text-xs font-bold font-mono text-[#76726A] uppercase tracking-wider border-b border-gray-100 pb-2">Gateway Diagnostics</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="flex justify-between border-b border-gray-50 py-1.5">
+                <span className="text-gray-500">Current provider</span>
+                <span className="font-mono font-bold text-[#1A365D] uppercase">{project.aiSettings?.provider || "gemini"}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-50 py-1.5">
+                <span className="text-gray-500">Current model</span>
+                <span className="font-mono font-bold text-[#1A365D]">
+                  {(project.aiSettings as any)?.[`${project.aiSettings?.provider}Model`] || "default"}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-gray-50 py-1.5">
+                <span className="text-gray-500">Fallback availability</span>
+                <span className="font-mono font-bold text-[#1A365D]">
+                  {fallbackOrder.length > 0 ? `${fallbackOrder.length} configured` : "None configured"}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-gray-50 py-1.5">
+                <span className="text-gray-500">Connection status</span>
+                <span className="font-mono font-bold text-[#1A365D] uppercase">{checkingCurrentMode ? "checking" : (currentModeStatus?.status || "unchecked")}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-50 py-1.5 sm:col-span-2">
+                <span className="text-gray-500">Last successful request</span>
+                <span className="font-mono font-bold text-[#1A365D]">
+                  {lastRequest ? `${lastRequest.provider} · ${new Date(lastRequest.timestamp).toLocaleString()}` : "No requests recorded yet"}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Metric 1 */}
             <div className="bg-[#FAF9F6] border border-gray-200 p-4 rounded-xl flex items-center gap-4">
@@ -1000,11 +1270,44 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
-      {/* SUB TAB 4: MODEL COMPARISON MATRIX */}
-      {activeSubTab === "comparison" && (
+      {/* SUB TAB: ADVANCED (Step 5 — gateway routing mode + the former Provider Matrix, moved here rather than deleted) */}
+      {activeSubTab === "advanced" && (
         <div className="space-y-6 animate-fade-in font-sans">
+          <div className="border border-gray-200 rounded-2xl p-5 space-y-2 max-w-xl">
+            <label className="block text-[10px] font-bold font-mono text-[#76726A] uppercase tracking-wider">
+              AI Model Gateway Mode
+            </label>
+            <select
+              className="w-full bg-white border border-[#CBD5E1] rounded-lg px-3 py-2 text-xs text-[#1A365D] focus:outline-none focus:border-[#C08A3E] font-mono"
+              value={project.aiSettings?.provider || "gemini"}
+              onChange={(e) => {
+                const val = e.target.value as any;
+                updateProject({ aiSettings: { ...project.aiSettings, provider: val } });
+              }}
+            >
+              <option value="auto">Auto Mode (Task-Based Specialized Routing)</option>
+              <option value="server">Server Proxy (Zero-Config Default)</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI ChatGPT</option>
+              <option value="claude">Anthropic Claude</option>
+              <option value="deepseek">DeepSeek API</option>
+              <option value="qwen">Qwen API (DashScope)</option>
+              <option value="cohere">Cohere Command</option>
+              <option value="groq">Groq</option>
+              <option value="together">Together AI</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="pollinations">Pollinations (Smart AI)</option>
+              <option value="ollama">Ollama Local LLM</option>
+              <option value="custom">Custom Local API Proxy</option>
+            </select>
+            <span className="text-[9px] text-[#76726A] mt-1.5 block leading-normal">
+              In Auto Mode, requests automatically route to DeepSeek for grounding/reasoning, Qwen for section drafting, and Gemini for data discovery and citation lookups.
+            </span>
+          </div>
+
           <div className="p-4 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl flex gap-3 items-start">
             <HelpCircle className="w-4 h-4 text-[#C08A3E] shrink-0 mt-0.5" />
             <div className="space-y-1">

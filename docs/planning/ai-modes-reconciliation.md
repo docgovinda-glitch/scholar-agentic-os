@@ -296,6 +296,14 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 - Live-verified: real "Checking..." → "ONLINE" transition against the actual configured Gemini key, correct tab-active-state on both the status card and the nav (a screenshot mid-transition looked ambiguous; confirmed via direct DOM class inspection that the state was correct throughout).
 - 7 new tests for the AI Mode tab, `tsc --noEmit` clean, full suite 840/842 (same 2 pre-existing unrelated failures).
 
+## Step 5 & 6 notes (built together — see rationale below)
+
+- **AIControlCenter.tsx's sub-nav restructured to the task's exact 7 names**: AI Mode / Current Status / Providers / Local Models / API Keys / Advanced / Diagnostics. No working functionality was deleted to get there — the old "Analytics & Costs" tab's real cost/usage-log content moved into Diagnostics, and the old "Provider Matrix" table moved into Advanced alongside the AI Model Gateway Mode selector, per this project's standing rule against removing functionality users depend on.
+- **Local Models tab is genuinely new**: detects all 4 Local AI backends (Ollama, LM Studio, OmniRoute, generic custom) independently via real `healthCheckProvider` calls against each one's actual default endpoint (not just Ollama, which is all the old tab covered) — live-verified: Ollama showed real `ONLINE`/latency/model-count, "Custom server" honestly showed "Not configured" rather than a fabricated state, per the real absence of a configured endpoint.
+- **API Keys tab is genuinely new**: masked values only (`maskKey()`, never plaintext), grouped by provider, Test + Remove per key, behind the same vault gate as Providers — live-verified the vault-unlock prompt blocks it exactly like Providers does.
+- **Diagnostics tab folds in Step 6 directly** (deliberate consolidation, not skipped): current provider, current model, fallback availability, connection status, and last successful request are all read from data this app already tracks for real (`aiSettings`, `fallbackOrder`, `usageLogs`) — live-verified showing the honest "None configured" / "No requests recorded yet" states rather than a plausible-looking placeholder, exactly the failure mode this task's instructions warn against. Consolidating Steps 5 and 6 into one pass was a deliberate scoping call given how tightly the Diagnostics tab's existence (Step 5's nav) and its content (Step 6's ask) are coupled — recorded here explicitly rather than silently combined.
+- 16 new tests across the new/restructured tabs, `tsc --noEmit` clean, full suite 848/850 (same 2 pre-existing unrelated failures).
+
 ## Progress log
 
 | Step | Description | Status |
@@ -305,7 +313,7 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 | 2 | Onboarding screen | 🟢 done |
 | 3 | Per-mode setup flows | 🟢 done |
 | 4 | Settings mirroring onboarding | 🟢 done |
-| 5 | Settings sub-navigation & management surfaces | 🔲 not started |
-| 6 | Smart AI status & diagnostics | 🔲 not started |
+| 5 | Settings sub-navigation & management surfaces | 🟢 done |
+| 6 | Smart AI status & diagnostics | 🟢 done (folded into Step 5's Diagnostics tab — see note) |
 | 7 | Accessibility, responsive, motion | 🔲 not started |
 | 8 | Final verification | 🔲 not started |
