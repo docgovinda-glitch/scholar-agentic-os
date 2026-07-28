@@ -16,14 +16,32 @@ import { setVaultPassphrase, clearVaultPassphrase } from "../vaultPassphrase";
 import type { AISettings } from "../../types";
 
 describe("AI_PROVIDERS registry — new entries", () => {
-  it("includes pollinations, groq, and together with correct metadata", () => {
+  it("includes pollinations, groq, together, and openrouter with correct metadata", () => {
     const pollinations = AI_PROVIDERS.find((p) => p.id === "pollinations");
     const groq = AI_PROVIDERS.find((p) => p.id === "groq");
     const together = AI_PROVIDERS.find((p) => p.id === "together");
+    const openrouter = AI_PROVIDERS.find((p) => p.id === "openrouter");
 
     expect(pollinations).toMatchObject({ requiresApiKey: false, pricingTier: "free", type: "cloud" });
     expect(groq).toMatchObject({ requiresApiKey: true, type: "cloud" });
     expect(together).toMatchObject({ requiresApiKey: true, type: "cloud" });
+    expect(openrouter).toMatchObject({ requiresApiKey: true, type: "cloud" });
+  });
+});
+
+describe("OpenRouter adapter — BYOK, vault-gated, proxy-routed (Step 3)", () => {
+  beforeEach(() => {
+    clearVaultPassphrase();
+  });
+
+  it("is unavailable until a real key is decryptable (vault unlocked, correct passphrase)", async () => {
+    const cipher = await encryptDataAsync("sk-or-real-key", "correct-pass");
+    const locked: AISettings = { provider: "openrouter", openrouterApiKey: cipher };
+    expect((await AIGateway.getAvailableProviders(locked)).some((p) => p.id === "openrouter")).toBe(false);
+
+    setVaultPassphrase("correct-pass");
+    const unlocked: AISettings = { provider: "openrouter", openrouterApiKey: cipher };
+    expect((await AIGateway.getAvailableProviders(unlocked)).some((p) => p.id === "openrouter")).toBe(true);
   });
 });
 

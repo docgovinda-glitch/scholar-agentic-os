@@ -77,4 +77,35 @@ describe("AI_MODES config", () => {
     expect(getAIMode("local")?.title).toBe("Local AI");
     expect(getAIMode("nonexistent" as AIModeId)).toBeUndefined();
   });
+
+  it("every Cloud AI Providers / Bring Your Own AI provider has a real https getKeyUrl", () => {
+    for (const modeId of ["cloud", "byok"] as const) {
+      const mode = getAIMode(modeId)!;
+      for (const provider of mode.providers) {
+        expect(provider.getKeyUrl, `${modeId}/${provider.id} missing getKeyUrl`).toMatch(/^https:\/\//);
+      }
+    }
+  });
+
+  it("Cloud AI Providers lists exactly OpenRouter, Google Gemini, Groq, DeepSeek, Together AI (Step 3 spec)", () => {
+    const cloud = getAIMode("cloud")!;
+    expect(cloud.providers.map((p) => p.label)).toEqual([
+      "OpenRouter", "Google Gemini", "Groq", "DeepSeek", "Together AI"
+    ]);
+  });
+
+  it("OmniRoute has real, specific install guidance (not a generic placeholder) and a working install link", () => {
+    const local = getAIMode("local")!;
+    const omniroute = local.providers.find((p) => p.label === "OmniRoute")!;
+    expect(omniroute.installGuidance).toMatch(/npm install -g omniroute/);
+    expect(omniroute.installUrl).toMatch(/^https:\/\//);
+    expect(omniroute.defaultEndpoint).toBe("http://localhost:20128/v1");
+  });
+
+  it("every Local AI backend has non-generic install guidance distinct from the others", () => {
+    const local = getAIMode("local")!;
+    const guidances = local.providers.map((p) => p.installGuidance);
+    expect(new Set(guidances).size).toBe(guidances.length);
+    for (const g of guidances) expect(g).toBeTruthy();
+  });
 });

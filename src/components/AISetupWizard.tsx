@@ -373,7 +373,37 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                         Detected running
                       </span>
                     ) : null)}
+                    {!isLocalMode && option.getKeyUrl && (
+                      <a
+                        href={option.getKeyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[10px] text-[#C08A3E] hover:text-[#A87630] underline font-mono"
+                      >
+                        Get your API key →
+                      </a>
+                    )}
                   </div>
+                  {isLocalMode && option.installGuidance && (
+                    <p className="text-[10px] text-gray-500 mt-2 leading-relaxed border-t border-[#E2E8F0] pt-2">
+                      {option.installGuidance}
+                      {option.installUrl && (
+                        <>
+                          {" "}
+                          <a
+                            href={option.installUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[#C08A3E] hover:text-[#A87630] underline font-mono"
+                          >
+                            Download →
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

@@ -932,7 +932,7 @@ app.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
       return res.end();
     }
 
-    if (["openai", "deepseek", "qwen", "groq", "together"].includes(aiProvider)) {
+    if (["openai", "deepseek", "qwen", "groq", "together", "openrouter"].includes(aiProvider)) {
       if (!activeApiKey) {
         res.write(`data: ${JSON.stringify({ error: `${aiProvider.toUpperCase()} API Key is required.` })}\n\n`);
         return res.end();
@@ -953,6 +953,9 @@ app.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
       } else if (aiProvider === "together") {
         url = "https://api.together.xyz/v1/chat/completions";
         targetModel = model || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
+      } else if (aiProvider === "openrouter") {
+        url = "https://openrouter.ai/api/v1/chat/completions";
+        targetModel = model || "openai/gpt-4o-mini";
       }
 
       const response = await fetch(url, {
@@ -1339,6 +1342,37 @@ app.post("/api/generate", aiAbuseLimit, async (req, res) => {
       if (!response.ok) {
         const errText = await response.text();
         return res.status(response.status).json({ error: `Together AI API failed: ${errText}` });
+      }
+
+      const data: any = await response.json();
+      return sendCachedJson(res, cacheKey, { text: data.choices?.[0]?.message?.content?.trim() || "" });
+    }
+
+    // 8. OpenRouter — OpenAI-compatible chat completions
+    if (aiProvider === "openrouter") {
+      if (!activeApiKey) {
+        return res.status(400).json({ error: "OpenRouter API Key is required." });
+      }
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${activeApiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: model || "openai/gpt-4o-mini",
+          messages: [
+            { role: "system", content: systemInstruction || "You are a helpful assistant." },
+            { role: "user", content: prompt }
+          ],
+          temperature: temperature ?? 0.5
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: `OpenRouter API failed: ${errText}` });
       }
 
       const data: any = await response.json();

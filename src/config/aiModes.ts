@@ -28,6 +28,13 @@ export interface AIModeProviderOption {
   /** True only for options that genuinely require zero account/signup */
   noAccountRequired?: boolean;
   /**
+   * Cloud AI Providers / BYOK only: a real, verified link to that
+   * provider's own API-key dashboard page (spot-checked via web search
+   * against each provider's current docs, 2026-07-28 — not guessed) —
+   * the "sign in" step of "select provider → sign in → API key → done".
+   */
+  getKeyUrl?: string;
+  /**
    * Local AI only: several backend choices (LM Studio, OmniRoute, a plain
    * custom server) all resolve to the same "custom" adapter/id but differ
    * in which local port they listen on by default — this is the UI-level
@@ -35,6 +42,14 @@ export interface AIModeProviderOption {
    * adapter per backend.
    */
   defaultEndpoint?: string;
+  /**
+   * Local AI only: real, specific install/launch instructions for this
+   * backend — never a generic placeholder (OmniRoute's real npm package
+   * name and default port were verified live, docs/planning/
+   * ai-modes-reconciliation.md §2, not assumed).
+   */
+  installGuidance?: string;
+  installUrl?: string;
 }
 
 export interface AIMode {
@@ -116,10 +131,11 @@ export const AI_MODES: AIMode[] = [
     ],
     requirements: ["A free account with your chosen provider", "An API key from that provider's dashboard"],
     providers: [
-      { id: "gemini", label: "Google Gemini", description: "Fast, generous free tier" },
-      { id: "groq", label: "Groq", description: "Extremely fast responses, usable free tier" },
-      { id: "deepseek", label: "DeepSeek", description: "Strong reasoning, low-cost free tier" },
-      { id: "qwen", label: "Qwen (Alibaba)", description: "Multilingual, competitive free tier" }
+      { id: "openrouter", label: "OpenRouter", description: "One key, hundreds of models across many providers", getKeyUrl: "https://openrouter.ai/keys" },
+      { id: "gemini", label: "Google Gemini", description: "Fast, generous free tier", getKeyUrl: "https://aistudio.google.com/app/apikey" },
+      { id: "groq", label: "Groq", description: "Extremely fast responses, usable free tier", getKeyUrl: "https://console.groq.com/keys" },
+      { id: "deepseek", label: "DeepSeek", description: "Strong reasoning, low-cost free tier", getKeyUrl: "https://platform.deepseek.com/api_keys" },
+      { id: "together", label: "Together AI", description: "Broad open-model catalog, usable free credits", getKeyUrl: "https://api.together.xyz/settings/api-keys" }
     ],
     availability: "available"
   },
@@ -150,10 +166,29 @@ export const AI_MODES: AIMode[] = [
     ],
     requirements: ["A desktop or laptop computer (not recommended on mobile)", "One local AI program installed and running"],
     providers: [
-      { id: "ollama", label: "Ollama", description: "The most popular option — simplest to install and use", noAccountRequired: true, defaultEndpoint: "http://localhost:11434" },
-      { id: "custom", label: "LM Studio", description: "Friendly desktop app with a built-in model browser", noAccountRequired: true, defaultEndpoint: "http://localhost:1234/v1" },
-      { id: "custom", label: "OmniRoute", description: "Local AI gateway that connects many providers through one program on your computer", noAccountRequired: true, defaultEndpoint: "http://localhost:20128/v1" },
-      { id: "custom", label: "Custom server", description: "Any other OpenAI-compatible local server you already run", noAccountRequired: true }
+      {
+        id: "ollama", label: "Ollama", description: "The most popular option — simplest to install and use",
+        noAccountRequired: true, defaultEndpoint: "http://localhost:11434",
+        installUrl: "https://ollama.com/download",
+        installGuidance: "Download and install Ollama, then run `ollama pull llama3.1` in a terminal to download a model. Ollama starts a local server automatically at localhost:11434."
+      },
+      {
+        id: "custom", label: "LM Studio", description: "Friendly desktop app with a built-in model browser",
+        noAccountRequired: true, defaultEndpoint: "http://localhost:1234/v1",
+        installUrl: "https://lmstudio.ai/download",
+        installGuidance: "Download and install the LM Studio desktop app, download a model from its built-in browser, then start its local server (it defaults to localhost:1234)."
+      },
+      {
+        id: "custom", label: "OmniRoute", description: "Local AI gateway that connects many providers through one program on your computer",
+        noAccountRequired: true, defaultEndpoint: "http://localhost:20128/v1",
+        installUrl: "https://www.npmjs.com/package/omniroute",
+        installGuidance: "Requires Node.js. Run `npm install -g omniroute` in a terminal, then run `omniroute` to start it — its dashboard and local API both come up at localhost:20128 automatically."
+      },
+      {
+        id: "custom", label: "Custom server", description: "Any other OpenAI-compatible local server you already run",
+        noAccountRequired: true,
+        installGuidance: "Enter the address your server listens on below (for example, http://localhost:8000/v1)."
+      }
     ],
     availability: "available"
   },
@@ -182,10 +217,10 @@ export const AI_MODES: AIMode[] = [
     ],
     requirements: ["An existing paid account with your chosen provider", "An API key from that provider's dashboard"],
     providers: [
-      { id: "openai", label: "OpenAI", description: "GPT models" },
-      { id: "claude", label: "Anthropic Claude", description: "Claude models" },
-      { id: "together", label: "Together AI", description: "Broad open-model catalog" },
-      { id: "cohere", label: "Cohere", description: "Enterprise-grade models" }
+      { id: "openai", label: "OpenAI", description: "GPT models", getKeyUrl: "https://platform.openai.com/api-keys" },
+      { id: "claude", label: "Anthropic Claude", description: "Claude models", getKeyUrl: "https://console.anthropic.com/settings/keys" },
+      { id: "cohere", label: "Cohere", description: "Enterprise-grade models", getKeyUrl: "https://dashboard.cohere.com/api-keys" },
+      { id: "qwen", label: "Qwen (Alibaba)", description: "Multilingual, competitive pricing", getKeyUrl: "https://dashscope.console.aliyun.com/" }
     ],
     availability: "available"
   },

@@ -200,6 +200,18 @@ export const AI_PROVIDERS: AIProviderInfo[] = [
     requiresApiKey: true,
     pricingTier: "paid",
     color: "#0F6FFF"
+  },
+  {
+    id: "openrouter",
+    name: "OpenRouter",
+    type: "cloud",
+    icon: "◇",
+    description: "One API key, hundreds of models across many providers",
+    defaultModel: "openai/gpt-4o-mini",
+    availableModels: ["openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.0-flash-001"],
+    requiresApiKey: true,
+    pricingTier: "freemium",
+    color: "#6467F2"
   }
 ];
 
@@ -869,6 +881,58 @@ const TogetherAdapter: AIProviderAdapter = {
   }
 };
 
+// --- OpenRouter Adapter ("Cloud AI Providers") ---
+// Aggregates many providers/models behind one OpenAI-compatible API and
+// explicitly supports direct client-side/browser usage as an intended use
+// case (ai-gateway.md Tier 2's original candidate) — routed through the
+// existing /api/generate server proxy here for consistency with every
+// other BYOK cloud provider in this app, same as Groq/Together above.
+const OpenRouterAdapter: AIProviderAdapter = {
+  id: "openrouter",
+  name: "OpenRouter",
+  type: "cloud",
+  defaultModel: "openai/gpt-4o-mini",
+  availableModels: ["openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.0-flash-001"],
+  requiresApiKey: true,
+
+  async getApiKey(settings: AISettings): Promise<string> {
+    try {
+      return await decryptDataAsync(settings.openrouterApiKey || "", getEncryptionSecret());
+    } catch {
+      return "";
+    }
+  },
+
+  getEndpoint(): string {
+    return "https://openrouter.ai/api/v1";
+  },
+
+  async generate(request: AIRequest, settings: AISettings): Promise<string> {
+    return callServerProxy(request, "openrouter", await this.getApiKey(settings), settings);
+  },
+
+  async healthCheck(settings: AISettings): Promise<HealthStatus> {
+    const start = Date.now();
+    const apiKey = await this.getApiKey(settings);
+    if (!apiKey) return { provider: "openrouter", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
+    try {
+      const resp = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "openrouter", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
+        signal: AbortSignal.timeout(10000)
+      });
+      const data = await resp.json();
+      if (data.text?.includes("OK")) {
+        return { provider: "openrouter", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
+      }
+      return { provider: "openrouter", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
+    } catch (e: any) {
+      return { provider: "openrouter", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
+    }
+  }
+};
+
 // ─────────────────────────────────────────────────────────
 // SERVER PROXY HELPER
 // ─────────────────────────────────────────────────────────
@@ -1091,6 +1155,7 @@ const ADAPTERS: Record<string, AIProviderAdapter> = {
   pollinations: PollinationsAdapter,
   groq: GroqAdapter,
   together: TogetherAdapter,
+  openrouter: OpenRouterAdapter,
 };
 
 // ─────────────────────────────────────────────────────────
@@ -1114,6 +1179,7 @@ async function resolveProvider(taskType: string, settings: AISettings): Promise<
       else if (provider === "custom") model = settings.customModel || "default";
       else if (provider === "groq") model = settings.groqModel || "llama-3.3-70b-versatile";
       else if (provider === "together") model = settings.togetherModel || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
+      else if (provider === "openrouter") model = settings.openrouterModel || "openai/gpt-4o-mini";
       else if (provider === "pollinations") model = "openai";
       return { provider, model, apiKey };
     }

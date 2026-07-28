@@ -280,6 +280,14 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 - Live-verified: Ollama genuinely detected running in this dev environment ("Detected running" badge, real health check), Local AI's Configure Connections screen showed a real `ONLINE (134ms)` status, the Partner Subscription card correctly refuses to navigate on click, and `:focus-visible` still resolves via real Tab-key focus on the new cards.
 - `tsc --noEmit` clean, full suite 826/828 (same 2 pre-existing unrelated failures).
 
+## Step 3 notes
+
+- **Added a 4th new adapter, OpenRouter** (`src/services/aiGateway.ts` + matching `server.ts` routes) — the task's own Step 3 spec lists Cloud AI Providers as "OpenRouter, Google Gemini, Groq, DeepSeek, Together AI", which differs from Step 0/1's initial tier-based split (Together AI had been placed under BYOK). Reconciled: `aiModes.ts`'s `cloud` mode now lists exactly those 5 in that order (verified by test), `byok` now lists OpenAI/Anthropic Claude/Cohere/Qwen.
+- **Every Cloud AI Providers / BYOK provider now has a real `getKeyUrl`** to that provider's actual API-key dashboard page — each URL spot-checked via web search against current provider docs (not guessed): two of my initial guesses were wrong and corrected (Google's is `aistudio.google.com/app/apikey` not `/apikey`; Qwen's is `dashscope.console.aliyun.com`, not the `bailian` subdomain I first assumed). Rendered as a real "Get your API key →" link on each provider card, live-verified.
+- **OmniRoute (and every Local AI backend) now has real, specific install guidance**, not a generic placeholder: the actual verified npm command (`npm install -g omniroute`) and real default port (`localhost:20128`) from Step 0's package-source inspection, plus a working download link. Ollama/LM Studio get their own real guidance (actual pull command, actual default port) rather than sharing generic text. Enforced by a test asserting no two backends share identical guidance text.
+- Smart AI's "continue → done" and BYOK/Cloud's "select → sign in → API key → done" flows were already functionally correct from Step 2; this step's work was making the "sign in" and "install" steps real and specific rather than assumed present.
+- 4 new tests (Cloud AI Providers exact provider list, every getKeyUrl is a real https link, OmniRoute's specific guidance, no duplicate install guidance across backends) plus 1 new OpenRouter adapter test. `tsc --noEmit` clean, full suite 831/833 (same 2 pre-existing unrelated failures).
+
 ## Progress log
 
 | Step | Description | Status |
@@ -287,7 +295,7 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 | 0 | Pre-flight verification (this document) | 🟢 done |
 | 1 | Central config + shared `AIModeCard` | 🟢 done (foundation only — no live consumer yet, see note) |
 | 2 | Onboarding screen | 🟢 done |
-| 3 | Per-mode setup flows | 🔲 not started |
+| 3 | Per-mode setup flows | 🟢 done |
 | 4 | Settings mirroring onboarding | 🔲 not started |
 | 5 | Settings sub-navigation & management surfaces | 🔲 not started |
 | 6 | Smart AI status & diagnostics | 🔲 not started |

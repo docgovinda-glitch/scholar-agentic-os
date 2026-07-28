@@ -183,7 +183,7 @@ export interface AIResponse {
 }
 
 export interface AISettings {
-  provider: "auto" | "server" | "gemini" | "openai" | "ollama" | "custom" | "claude" | "deepseek" | "cohere" | "qwen" | "pollinations" | "groq" | "together";
+  provider: "auto" | "server" | "gemini" | "openai" | "ollama" | "custom" | "claude" | "deepseek" | "cohere" | "qwen" | "pollinations" | "groq" | "together" | "openrouter";
   ollamaModel?: string;
   ollamaEndpoint?: string;
   customModel?: string;
@@ -203,6 +203,8 @@ export interface AISettings {
   groqModel?: string;
   togetherApiKey?: string;
   togetherModel?: string;
+  openrouterApiKey?: string;
+  openrouterModel?: string;
 
   // Gateway extensions
   providerHealth?: Record<string, HealthStatus>;
