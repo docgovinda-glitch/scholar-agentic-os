@@ -1,6 +1,23 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-27, sci-fi redesign scoped — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi redesign implemented — supersedes the section below)
+
+**Redesign executed, `docs/planning/sci-fi-redesign-scoping.md`'s full step sequence — 🟢 done.** Full step-by-step record in `docs/planning/sci-fi-redesign-progress.md`. Every step: characterization tests before the change, `tsc --noEmit` clean, full suite clean (baseline throughout: 797/799, same 2 pre-existing unrelated `supabaseClient.test.ts` failures — no regressions introduced by any step), live-verified in a real browser via `agent-browser` (screenshots, real Tab-key `:focus-visible` checks, emulated `prefers-reduced-motion` checks), one commit per step.
+
+- **New token**: `--color-cyan-accent` (`#22D3EE`, verified 10.55:1 contrast on `--color-brand-900`) for system/AI/machine state, kept distinct from the existing gold accent (citations/scholarship). `--color-cyan-accent-dim` (`#0E7490`) added for text/icon use against light backgrounds.
+- **Global chrome** (`src/index.css` + `AppHeader.tsx`/`AppFooter.tsx`): header/footer moved to the dark `brand-900` surface via a new `.chrome-dark` utility, scoped to global chrome only — the rest of the app intentionally stays on its existing light surface (see below). Built this codebase's first-ever `:focus-visible` rule and `prefers-reduced-motion` handling (neither existed anywhere before this).
+- **CommandPalette.tsx**: dark surface, cyan selected-command state, `useReducedMotion` wired (CSS media queries don't reach `motion`'s WAAPI-driven transforms — this needed the JS hook).
+- **ActiveAgentsPanel.tsx**: cyan pulse for agent "Online"/selected status. **Also fixed a real pre-existing bug this step's live-verification caught**: `App.tsx` had a byte-identical inline duplicate of this component (the one actually rendered, via `App.tsx:665`), while the extracted file this doc names was dead code only reachable through `TabContentView.tsx` — itself never imported anywhere. Deleted the duplicate, wired `App.tsx` to import the extracted (now-redesigned) component. **Worth a broader dead-code sweep** before assuming any other `TabContentView.tsx`-adjacent file is live.
+- **AIControlCenter.tsx / AISetupWizard.tsx**: cyan for AI/system connectivity signals (Ollama online/offline, active provider badge, selected-provider highlighting, connection health badges, internal step tracker). An early attempt at converting the whole container to the dark surface was reverted after realizing it would leave ~900 lines of light-theme-assuming inner text illegible — kept the incremental-adoption pattern instead (cyan accents on a still-light surface), consistent with the other four components.
+- **ResearchIntelligenceDashboard.tsx**: cyan for the per-project "AI: PROVIDER" label, AI Call Counts icon, and Engine Dispatch Frequency bar chart — verified live against a real usage log, not a mock.
+- **`#1A365D` navy replacement — deliberately NOT a mechanical 632-occurrence pass.** Sampled usage across all 25 remaining files: the overwhelming majority is either the app's standard heading/body text color on light backgrounds or generic primary-CTA button styling — neither is a "system/AI state" signal, and recoloring either would break contrast or misapply the accent's meaning. Classified and changed only the two genuine matches (the `isActive` drawer-tab nav in `ManuscriptDraftingWorkspace.tsx`/`ManuscriptEditorWorkspace.tsx`'s Focus Mode). Two other candidates were considered and deliberately left alone (`ThesisReader.tsx`'s citation-format toggle — gold's domain; `UserProfileGate.tsx`'s login/signup switch — not an AI/system signal). **The remaining ~630 navy occurrences are correctly navy** and out of scope for this redesign — this was a real, load-bearing scoping decision, not deferred work.
+- **Everything else** (29 non-test components not named above): intentionally untouched. Per the scoping doc's own closing guidance, these adopt the new system incrementally as touched by other work, not as a batch migration — this is the doc's Step 7 by definition, not a task that gets "finished."
+
+**Updated gap map**: the sci-fi redesign is closed out as complete against its own scoping doc. Nothing about the redesign is left as an open task — the incremental adoption of untouched components is ongoing practice, not a tracked TODO.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-27, sci-fi redesign scoped — superseded by the section above)
 
 **Scoped, not started** — `docs/planning/sci-fi-redesign-scoping.md`. Re-verified (not just trusted) the existing 2026-07-20 design proposal (`docs/planning/2026-07-20-session-notes.md` §1) against current code, since a lot changed in between:
 
