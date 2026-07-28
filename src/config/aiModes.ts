@@ -5,14 +5,25 @@
 // for how these 5 modes map onto the internal 5-tier BYOK model in
 // docs/planning/ai-gateway.md (same concept, user-facing vs. engineering
 // framing — not two competing taxonomies) and for why each mode's copy says
-// exactly what it says (Pollinations' rate limit, OmniRoute's CORS story,
-// etc. are all from real, live-verified findings, not assumptions).
+// exactly what it says (OmniRoute's real npm package/default port, its own
+// CORS story, etc. are all from real, live-verified findings, not
+// assumptions — see the reconciliation doc's follow-up correction section).
 //
-// User-facing language rule (do not violate): never say tier, inference,
-// backend, endpoint, router to the user. Say AI Mode, Connection Method,
-// Provider, "Runs on your computer", Cloud AI, Automatic AI.
+// Follow-up correction (2026-07-28): Option 1 used to be Pollinations-
+// backed "Smart AI", confirmed to only simulate success in some paths
+// rather than reliably deliver, and was removed entirely. OmniRoute (a
+// self-hosted router to real cloud providers, NOT a zero-install/no-account
+// experience) replaces it — see the "omniroute" mode below.
+//
+// User-facing language rule (do not violate): never say tier, backend,
+// endpoint, bare "router" to the user. Say AI Mode, Connection Method,
+// Provider, "Runs on your computer", Cloud AI, Automatic AI. Exception:
+// "inference" IS used deliberately in the omniroute mode's copy, to state
+// plainly that AI processing happens in the cloud, not locally — omitting
+// the accurate word here would recreate the same honesty gap that got the
+// old Smart AI removed.
 
-export type AIModeId = "smart" | "cloud" | "local" | "byok" | "partner";
+export type AIModeId = "omniroute" | "cloud" | "local" | "byok" | "partner";
 
 export type AIModeDifficulty = "Easiest" | "Easy" | "Moderate" | "Advanced";
 
@@ -76,32 +87,38 @@ export interface AIMode {
 
 export const AI_MODES: AIMode[] = [
   {
-    id: "smart",
-    title: "Smart AI",
-    internalTierMapping: "New concept, not in ai-gateway.md's original 5 tiers — a genuinely keyless hosted option",
-    badge: "Fastest to start",
-    description: "Start writing immediately with a free, shared AI connection. No account, no setup — just go.",
-    difficulty: "Easiest",
-    setupTime: "0 minutes",
-    bestFor: "Trying the assistant right now, light or occasional use",
+    id: "omniroute",
+    title: "Smart Gateway",
+    internalTierMapping: "New concept, not in ai-gateway.md's original 5 tiers — a self-hosted router reaching cloud providers with automatic fallback",
+    badge: "~5 min setup, one-time",
+    description: "Install a small self-hosted gateway that automatically switches across free and paid cloud providers, so you don't manage keys for each one individually.",
+    difficulty: "Moderate",
+    setupTime: "About 5 minutes, once",
+    bestFor: "Automatic fallback across providers without configuring each cloud account individually",
     features: [
-      "No account or sign-in required",
-      "No API key to create or paste",
-      "Works the moment you open the app"
+      "Automatic fallback if one provider is down or rate-limited",
+      "One local install covers many cloud providers at once",
+      "No juggling separate API keys per provider in this app"
     ],
     limitations: [
-      "Rate-limited to about 1 request every 15 seconds",
-      "Not intended for heavy, back-to-back drafting sessions",
-      "Model quality and availability can vary — it's a shared free service, not a dedicated one"
+      "Requires installing and running OmniRoute on your computer first — not a zero-setup option",
+      "Inference still happens in the cloud, via whichever provider OmniRoute selects — this is not private or offline",
+      "You may still need accounts/keys with the underlying providers, managed through OmniRoute's own dashboard, not this app"
     ],
-    ctaLabel: "Continue with Smart AI",
+    ctaLabel: "Set Up Smart Gateway",
     howItWorks: [
-      "Your requests go directly from your browser to a free public AI service — nothing is stored or proxied by us.",
-      "There is no per-user key: everyone using Smart AI shares the same free access, which is why it's rate-limited."
+      "Install OmniRoute on your computer (npm, Docker, Electron, and other options are available) and start it.",
+      "This app connects to the OmniRoute program running on your machine — but OmniRoute itself forwards each request to a real cloud AI provider and automatically falls back to another if one fails.",
+      "The actual AI processing (inference) always happens in the cloud, on whichever provider OmniRoute picks — only the routing step is local."
     ],
-    requirements: ["An internet connection. Nothing else."],
+    requirements: ["A desktop or laptop computer to run OmniRoute on", "OmniRoute installed and running (npm, Docker, or another supported method)"],
     providers: [
-      { id: "pollinations", label: "Smart AI (shared, free)", description: "Free hosted AI, no account needed", noAccountRequired: true }
+      {
+        id: "omniroute", label: "OmniRoute", description: "Self-hosted gateway to cloud AI providers, with automatic fallback",
+        defaultEndpoint: "http://localhost:20128/v1",
+        installUrl: "https://www.npmjs.com/package/omniroute",
+        installGuidance: "Requires Node.js. Run `npm install -g omniroute` in a terminal, then run `omniroute` to start it — its dashboard and local API both come up at localhost:20128 automatically."
+      }
     ],
     availability: "available"
   },
@@ -179,12 +196,6 @@ export const AI_MODES: AIMode[] = [
         installGuidance: "Download and install the LM Studio desktop app, download a model from its built-in browser, then start its local server (it defaults to localhost:1234)."
       },
       {
-        id: "custom", label: "OmniRoute", description: "Local AI gateway that connects many providers through one program on your computer",
-        noAccountRequired: true, defaultEndpoint: "http://localhost:20128/v1",
-        installUrl: "https://www.npmjs.com/package/omniroute",
-        installGuidance: "Requires Node.js. Run `npm install -g omniroute` in a terminal, then run `omniroute` to start it — its dashboard and local API both come up at localhost:20128 automatically."
-      },
-      {
         id: "custom", label: "Custom server", description: "Any other OpenAI-compatible local server you already run",
         noAccountRequired: true,
         installGuidance: "Enter the address your server listens on below (for example, http://localhost:8000/v1)."
@@ -253,7 +264,7 @@ export function getAIMode(id: AIModeId): AIMode | undefined {
 
 /**
  * Reverse lookup: given a real AISettings.provider id (e.g. "gemini",
- * "ollama", "pollinations"), find which of the 5 user-facing AI Modes it
+ * "ollama", "omniroute"), find which of the 5 user-facing AI Modes it
  * belongs to — used by AIControlCenter.tsx's "Current AI Mode" status card
  * (Step 4) to show the user-facing mode name for whatever provider is
  * actually configured, never the raw provider id or internal tier name.

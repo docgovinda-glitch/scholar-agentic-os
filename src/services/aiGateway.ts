@@ -158,7 +158,7 @@ export const AI_PROVIDERS: AIProviderInfo[] = [
     name: "Custom Server (LM Studio/OmniRoute/vLLM)",
     type: "local",
     icon: "⚙",
-    description: "Connect any OpenAI-compatible local server (LM Studio, OmniRoute, vLLM, etc.)",
+    description: "Connect any OpenAI-compatible local server (LM Studio, vLLM, etc.)",
     defaultModel: "default",
     availableModels: [],
     requiresApiKey: false,
@@ -166,13 +166,13 @@ export const AI_PROVIDERS: AIProviderInfo[] = [
     color: "#8B5CF6"
   },
   {
-    id: "pollinations",
-    name: "Pollinations (Smart AI)",
-    type: "cloud",
-    icon: "✺",
-    description: "Free, keyless hosted AI — no signup, no setup. Rate-limited (~1 request/15s); best for trying the assistant, not heavy drafting sessions.",
-    defaultModel: "openai",
-    availableModels: ["openai"],
+    id: "omniroute",
+    name: "OmniRoute",
+    type: "local",
+    icon: "⇄",
+    description: "Self-hosted router that automatically switches across free and paid cloud providers — install once, then no per-provider key juggling.",
+    defaultModel: "auto",
+    availableModels: ["auto"],
     requiresApiKey: false,
     pricingTier: "free",
     color: "#22D3EE"
@@ -706,79 +706,92 @@ const CustomAdapter: AIProviderAdapter = {
   }
 };
 
-// --- Pollinations Adapter ("Smart AI") ---
-// Verified live (docs/planning/ai-modes-reconciliation.md §1, 2026-07-28):
-// text.pollinations.ai/openai is genuinely keyless (no Authorization header
-// sent — confirmed by real completion returned with none) and CORS-open
-// (access-control-allow-origin: * on both the OPTIONS preflight and the
-// actual response) — called directly from the browser, no server proxy,
-// no vault interaction, matching the "Smart AI" mode's whole premise.
-// Anonymous rate limit is real (~1 request/15s per Pollinations' own
-// public issue tracker) — surfaced to the user via healthCheck's status
-// text, not hidden.
-const PollinationsAdapter: AIProviderAdapter = {
-  id: "pollinations",
-  name: "Pollinations (Smart AI)",
-  type: "cloud",
-  defaultModel: "openai",
-  availableModels: ["openai"],
+// --- OmniRoute Adapter ("Smart Gateway", replaces the old "Smart AI") ---
+// Follow-up correction (2026-07-28): the old Pollinations-backed "Smart AI"
+// was confirmed to only simulate success in some paths rather than reliably
+// deliver, and has been removed. OmniRoute replaces it as Option 1 — a
+// self-hosted router (npm/Docker/Electron/Termux/PWA, verified real package
+// in docs/planning/ai-modes-reconciliation.md §2) that the user runs
+// locally and which then reaches real cloud providers with automatic
+// fallback across their free tiers. This is NOT a zero-install/no-account
+// experience like the old Option 1 claimed — it needs a real install step,
+// and inference itself happens in the cloud via whichever provider
+// OmniRoute selects, not locally. Mechanically the same shape as
+// CustomAdapter (generic OpenAI-compatible local endpoint) but kept as its
+// own adapter/id rather than folded into "custom" so status/diagnostics
+// surfaces can honestly label it "OmniRoute", not "Custom".
+const OmniRouteAdapter: AIProviderAdapter = {
+  id: "omniroute",
+  name: "OmniRoute",
+  type: "local",
+  defaultModel: "auto",
+  availableModels: ["auto"],
   requiresApiKey: false,
 
   async getApiKey(): Promise<string> {
     return "";
   },
 
-  getEndpoint(): string {
-    return "https://text.pollinations.ai";
+  getEndpoint(settings: AISettings): string {
+    return settings.omnirouteEndpoint || "http://localhost:20128/v1";
   },
 
-  async generate(request: AIRequest): Promise<string> {
-    const response = await fetch(`${this.getEndpoint()}/openai`, {
+  async generate(request: AIRequest, settings: AISettings): Promise<string> {
+    const endpoint = this.getEndpoint(settings);
+    const model = request.model || settings.omnirouteModel || this.defaultModel;
+    let fullPrompt = request.prompt;
+    if (request.responseMimeType === "application/json") {
+      fullPrompt += "\n\nIMPORTANT: Return strictly valid JSON only. Do not wrap it in markdown code blocks like ```json or anything else. Just the raw JSON string.";
+    }
+
+    const cleanEndpoint = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
+    const response = await fetch(`${cleanEndpoint}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: this.defaultModel,
+        model,
         messages: [
           { role: "system", content: request.systemInstruction },
-          { role: "user", content: request.prompt }
-        ]
+          { role: "user", content: fullPrompt }
+        ],
+        temperature: request.temperature
       })
     });
+
     if (!response.ok) {
-      if (response.status === 429) {
-        throw new Error("Smart AI is rate-limited right now (anonymous access allows about 1 request per 15 seconds). Wait a moment and try again, or switch to a Cloud AI Provider / Local AI for heavier use.");
-      }
       const errText = await response.text().catch(() => "Unknown error");
-      throw new Error(`Smart AI request failed (status ${response.status}): ${errText}`);
+      throw new Error(`OmniRoute connection failed (status ${response.status}): ${errText}`);
     }
+
     const data = await response.json();
-    return (data.choices?.[0]?.message?.content || "").trim();
+    let text = data.choices?.[0]?.message?.content || "";
+    if (request.responseMimeType === "application/json") {
+      text = cleanJsonString(text);
+    }
+    return text.trim();
   },
 
-  async healthCheck(): Promise<HealthStatus> {
+  async healthCheck(settings: AISettings): Promise<HealthStatus> {
     const start = Date.now();
+    const endpoint = this.getEndpoint(settings);
     try {
+      const cleanEndpoint = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const resp = await fetch(`${this.getEndpoint()}/openai`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "openai", messages: [{ role: "user", content: "Respond with exactly the word: OK" }] }),
-        signal: controller.signal
-      });
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      const resp = await fetch(`${cleanEndpoint}/models`, { signal: controller.signal });
       clearTimeout(timeout);
-      if (resp.status === 429) {
-        return { provider: "pollinations", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Rate-limited (anonymous access: ~1 request/15s)" };
-      }
       if (!resp.ok) throw new Error(`Status ${resp.status}`);
       const data = await resp.json();
-      const text = data.choices?.[0]?.message?.content || "";
-      if (text.includes("OK")) {
-        return { provider: "pollinations", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      return { provider: "pollinations", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
+      const models = (data.data || []).map((m: any) => m.id);
+      return {
+        provider: "omniroute",
+        status: "online",
+        latencyMs: Date.now() - start,
+        lastChecked: new Date().toISOString(),
+        availableModels: models
+      };
     } catch (e: any) {
-      return { provider: "pollinations", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
+      return { provider: "omniroute", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
     }
   }
 };
@@ -1152,7 +1165,7 @@ const ADAPTERS: Record<string, AIProviderAdapter> = {
   cohere: CohereAdapter,
   ollama: OllamaAdapter,
   custom: CustomAdapter,
-  pollinations: PollinationsAdapter,
+  omniroute: OmniRouteAdapter,
   groq: GroqAdapter,
   together: TogetherAdapter,
   openrouter: OpenRouterAdapter,
@@ -1180,7 +1193,7 @@ async function resolveProvider(taskType: string, settings: AISettings): Promise<
       else if (provider === "groq") model = settings.groqModel || "llama-3.3-70b-versatile";
       else if (provider === "together") model = settings.togetherModel || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
       else if (provider === "openrouter") model = settings.openrouterModel || "openai/gpt-4o-mini";
-      else if (provider === "pollinations") model = "openai";
+      else if (provider === "omniroute") model = settings.omnirouteModel || "auto";
       return { provider, model, apiKey };
     }
     return { provider, apiKey: "" };
@@ -1425,18 +1438,21 @@ export const AIGateway = {
   /**
    * Auto-detect local AI servers running on standard ports.
    */
-  async detectLocalServers(): Promise<{ ollama: HealthStatus; custom: HealthStatus }> {
+  async detectLocalServers(): Promise<{ ollama: HealthStatus; custom: HealthStatus; omniroute: HealthStatus }> {
     const defaultOllamaSettings: AISettings = { provider: "ollama", ollamaEndpoint: "http://localhost:11434" };
     const defaultCustomSettings: AISettings = { provider: "custom", customEndpoint: "http://localhost:1234/v1" };
+    const defaultOmniRouteSettings: AISettings = { provider: "omniroute", omnirouteEndpoint: "http://localhost:20128/v1" };
 
-    const [ollama, custom] = await Promise.allSettled([
+    const [ollama, custom, omniroute] = await Promise.allSettled([
       OllamaAdapter.healthCheck(defaultOllamaSettings),
-      CustomAdapter.healthCheck(defaultCustomSettings)
+      CustomAdapter.healthCheck(defaultCustomSettings),
+      OmniRouteAdapter.healthCheck(defaultOmniRouteSettings)
     ]);
 
     return {
       ollama: ollama.status === "fulfilled" ? ollama.value : { provider: "ollama", status: "offline", lastChecked: new Date().toISOString() },
-      custom: custom.status === "fulfilled" ? custom.value : { provider: "custom", status: "offline", lastChecked: new Date().toISOString() }
+      custom: custom.status === "fulfilled" ? custom.value : { provider: "custom", status: "offline", lastChecked: new Date().toISOString() },
+      omniroute: omniroute.status === "fulfilled" ? omniroute.value : { provider: "omniroute", status: "offline", lastChecked: new Date().toISOString() }
     };
   },
 

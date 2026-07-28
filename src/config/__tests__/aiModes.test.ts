@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 import { AI_MODES, getAIMode, getModeForProvider, AIModeId } from "../aiModes";
 import { AI_PROVIDERS } from "../../services/aiGateway";
 
-const EXPECTED_IDS: AIModeId[] = ["smart", "cloud", "local", "byok", "partner"];
+const EXPECTED_IDS: AIModeId[] = ["omniroute", "cloud", "local", "byok", "partner"];
 
 describe("AI_MODES config", () => {
   it("has exactly the 5 expected modes, in order", () => {
@@ -44,18 +44,33 @@ describe("AI_MODES config", () => {
     expect(partner.providers).toHaveLength(0);
   });
 
-  it("Smart AI states its real rate limit in its limitations, not hidden", () => {
-    const smart = getAIMode("smart")!;
-    expect(smart.limitations.some((l) => /15 second/i.test(l))).toBe(true);
+  it("Smart Gateway (OmniRoute) states plainly that it needs a real install and that processing happens in the cloud, not locally — the exact honesty gap that got the old Smart AI removed", () => {
+    const omniroute = getAIMode("omniroute")!;
+    expect(omniroute.limitations.some((l) => /requires installing/i.test(l))).toBe(true);
+    const allText = [omniroute.description, omniroute.badge, ...omniroute.howItWorks, ...omniroute.limitations].join(" ");
+    expect(allText).toMatch(/cloud/i);
+    // Must not carry over the old Option 1's "zero setup" framing — that's
+    // exactly the fabrication this mode was introduced to correct.
+    expect(allText).not.toMatch(/\binstant\b/i);
+    expect(allText).not.toMatch(/no install/i);
+    expect(allText).not.toMatch(/no setup/i);
   });
 
-  it("every available mode's user-facing copy avoids internal jargon (numbered Tier references, backend, endpoint, router, inference)", () => {
+  it("every available mode's user-facing copy avoids internal jargon (numbered Tier references, backend, endpoint, bare 'router')", () => {
     // "free tier" / "paid tier" are legitimate, honest, industry-standard
     // terms providers themselves use for their own pricing plans — not
     // banned. What's actually banned is OUR internal tiering language
     // ("Tier 1", "Tier 2", ai-gateway.md's engineering framing leaking into
-    // user-facing copy) plus backend/endpoint/router/inference jargon.
-    const bannedWords = /\btier\s*\d\b|\bbackend\b|\bendpoint\b|\brouter\b|\binference\b/i;
+    // user-facing copy) plus backend/endpoint/router jargon.
+    //
+    // Follow-up correction (2026-07-28): "inference" is no longer banned.
+    // The old Smart AI mode was removed specifically for implying private/
+    // local processing that wasn't true; OmniRoute (its replacement) is
+    // REQUIRED to state plainly that "inference happens in the cloud" — an
+    // honest disclosure needs the accurate word, not a euphemism. Banning
+    // it here would have re-introduced the exact vagueness this correction
+    // exists to fix.
+    const bannedWords = /\btier\s*\d\b|\bbackend\b|\bendpoint\b|\brouter\b/i;
     for (const mode of AI_MODES) {
       const userFacingText = [
         mode.title,
@@ -94,12 +109,17 @@ describe("AI_MODES config", () => {
     ]);
   });
 
-  it("OmniRoute has real, specific install guidance (not a generic placeholder) and a working install link", () => {
-    const local = getAIMode("local")!;
-    const omniroute = local.providers.find((p) => p.label === "OmniRoute")!;
+  it("OmniRoute (now its own top-level mode, not a Local AI backend) has real, specific install guidance and a working install link", () => {
+    const omnirouteMode = getAIMode("omniroute")!;
+    const omniroute = omnirouteMode.providers.find((p) => p.label === "OmniRoute")!;
     expect(omniroute.installGuidance).toMatch(/npm install -g omniroute/);
     expect(omniroute.installUrl).toMatch(/^https:\/\//);
     expect(omniroute.defaultEndpoint).toBe("http://localhost:20128/v1");
+  });
+
+  it("OmniRoute is no longer listed under Local AI (it doesn't do local/private inference, only local routing)", () => {
+    const local = getAIMode("local")!;
+    expect(local.providers.some((p) => p.label === "OmniRoute")).toBe(false);
   });
 
   it("every Local AI backend has non-generic install guidance distinct from the others", () => {
@@ -112,7 +132,7 @@ describe("AI_MODES config", () => {
 
 describe("getModeForProvider — reverse lookup for the settings 'Current AI Mode' card (Step 4)", () => {
   it("resolves each real provider id to its correct user-facing mode", () => {
-    expect(getModeForProvider("pollinations")).toBe("smart");
+    expect(getModeForProvider("omniroute")).toBe("omniroute");
     expect(getModeForProvider("gemini")).toBe("cloud");
     expect(getModeForProvider("openrouter")).toBe("cloud");
     expect(getModeForProvider("groq")).toBe("cloud");

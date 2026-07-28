@@ -183,11 +183,13 @@ export interface AIResponse {
 }
 
 export interface AISettings {
-  provider: "auto" | "server" | "gemini" | "openai" | "ollama" | "custom" | "claude" | "deepseek" | "cohere" | "qwen" | "pollinations" | "groq" | "together" | "openrouter";
+  provider: "auto" | "server" | "gemini" | "openai" | "ollama" | "custom" | "claude" | "deepseek" | "cohere" | "qwen" | "omniroute" | "groq" | "together" | "openrouter";
   ollamaModel?: string;
   ollamaEndpoint?: string;
   customModel?: string;
   customEndpoint?: string;
+  omnirouteModel?: string;
+  omnirouteEndpoint?: string;
   geminiApiKey?: string;
   openaiApiKey?: string;
   openaiModel?: string;
