@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Shield, Cloud, Server, ChevronRight, ChevronLeft, CheckCircle2, AlertTriangle, Key, Cpu, Zap, Search, Loader2, BookOpen } from 'lucide-react';
+import { Shield, Cloud, Server, ChevronRight, ChevronLeft, CheckCircle2, AlertTriangle, Key, Cpu, Zap, Search, Loader2, BookOpen, Sparkles } from 'lucide-react';
 import { PaperProject, AISettings, HealthStatus, AIProviderInfo } from '../types';
 import AIGateway, { AI_PROVIDERS } from '../services/aiGateway';
 import { encryptDataAsync, decryptDataAsync } from '../utils/crypto';
 import { setVaultPassphrase, getVaultPassphrase, isVaultUnlocked } from '../services/vaultPassphrase';
+import { AI_MODES, getAIMode, AIModeId } from '../config/aiModes';
+import AIModeCard from './ai/AIModeCard';
 
 interface AISetupWizardProps {
   project: PaperProject;
@@ -12,28 +14,19 @@ interface AISetupWizardProps {
   onBack?: () => void;
 }
 
-// Stage 2 (target-workflow.md) — 5-tier BYOK model (docs/planning/ai-gateway.md).
-// Concretely, per that doc: tiers differ in *where compute runs and who pays*,
-// not in model class. Only 3 are a real selectable technical flow here:
-// - Tier 1 (+5a, mechanically identical): local router (Ollama/custom), no key, free.
-// - Tier 2: free-tier BYOK — cloud providers with pricingTier "freemium" (Gemini today).
-// - Tier 3: heavy BYOK — cloud providers with pricingTier "paid" (OpenAI, Claude, etc.).
-// Tier 4 (affiliate-linked subscription) is explicitly NOT a technical AI-calling
-// tier per the doc — it's a sponsored-placement signup flow (sponsored-placements.md),
-// shown here only as an informational, non-selectable "coming soon" card.
-// Tier 5b (in-browser WebGPU/WASM inference) is explicitly experimental/lower-priority
-// per the doc and is not built here.
-type AiTier = "local" | "free-byok" | "heavy-byok";
-
-function providerMatchesTier(provider: AIProviderInfo, tier: AiTier): boolean {
-  if (tier === "local") return provider.type === "local";
-  if (tier === "free-byok") return provider.type === "cloud" && provider.pricingTier === "freemium";
-  return provider.type === "cloud" && provider.pricingTier === "paid";
-}
+// AI modes redesign (2026-07-28) — replaces the old internal 3-tier
+// selection screen ("Local Router" / "Free-Tier BYOK" / "Heavy BYOK") with
+// the 5 user-facing AI Mode cards from src/config/aiModes.ts. See
+// docs/planning/ai-modes-reconciliation.md for how these map onto
+// ai-gateway.md's tier model — this component only ever deals in AIModeId
+// and the config's own provider option lists now, never a raw pricingTier
+// filter. Smart AI is the one mode with a genuinely different flow (no
+// provider selection, no key entry, no vault interaction at all) — see
+// handleSelectMode below.
 
 export default function AISetupWizard({ project, updateProject, onComplete, onBack }: AISetupWizardProps) {
   const [step, setStep] = useState(0);
-  const [selectedTier, setSelectedTier] = useState<AiTier | null>(null);
+  const [selectedMode, setSelectedMode] = useState<AIModeId | null>(null);
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
   const [settings, setSettings] = useState<AISettings>(project.aiSettings || { provider: 'auto', fallbackOrder: [] });
   const [isDetecting, setIsDetecting] = useState(true);
@@ -186,16 +179,16 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
       const testSettings = { ...settings, fallbackOrder: selectedProviders };
       const results = await AIGateway.healthCheckAll(testSettings);
       setHealthResults(prev => ({ ...prev, ...results }));
-      
+
       // Determine overall readiness
       const onlineCount = selectedProviders.filter(p => results[p]?.status === 'online').length;
-      
+
       const newSettings: AISettings = {
         ...testSettings,
         providerHealth: results,
         aiReadiness: onlineCount > 0 ? 'validated' : 'simulated'
       };
-      
+
       updateProject({ aiSettings: newSettings });
       setSettings(newSettings);
       setStep(3);
@@ -206,212 +199,189 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     }
   };
 
-  const TIER_CARDS: { id: AiTier; label: string; description: string; icon: React.ReactNode }[] = [
-    {
-      id: "local",
-      label: "Local Router",
-      description: "Free, no sign-up, no API key. Run models on your own machine (Ollama, LM Studio, or a custom local server) — completely private, zero cost.",
-      icon: <Server className="w-6 h-6" />,
-    },
-    {
-      id: "free-byok",
-      label: "Free-Tier BYOK",
-      description: "Free signup required. Bring your own API key from a provider with a usable free tier (currently Google Gemini).",
-      icon: <Key className="w-6 h-6" />,
-    },
-    {
-      id: "heavy-byok",
-      label: "Heavy BYOK",
-      description: "You pay your provider directly. Bring your own paid-tier API key (OpenAI, Anthropic, DeepSeek, Qwen, Cohere) for full-capability access.",
-      icon: <Cloud className="w-6 h-6" />,
-    },
-  ];
+  // Smart AI's whole premise is "continue → done": no provider list, no key
+  // entry, no vault interaction (docs/planning/ai-modes-reconciliation.md
+  // §4 — Smart AI never touches the vault, there's no key to protect).
+  // Still runs one REAL health check before marking readiness — never an
+  // optimistic "Connected" — self-contained rather than reusing
+  // runFinalValidation() because that function reads `selectedProviders`
+  // from closure state, which setSelectedProviders() wouldn't update
+  // synchronously in the same click handler.
+  const handleSelectSmartAI = async () => {
+    setSelectedMode("smart");
+    setSelectedProviders(["pollinations"]);
+    setIsTesting(true);
+    try {
+      const testSettings: AISettings = { ...settings, provider: "pollinations", fallbackOrder: ["pollinations"] };
+      const results = await AIGateway.healthCheckAll(testSettings);
+      setHealthResults(prev => ({ ...prev, ...results }));
+      const newSettings: AISettings = {
+        ...testSettings,
+        providerHealth: results,
+        aiReadiness: results.pollinations?.status === "online" ? "validated" : "simulated"
+      };
+      updateProject({ aiSettings: newSettings });
+      setSettings(newSettings);
+      setStep(3);
+    } catch (e) {
+      console.error("Smart AI validation failed", e);
+      setStep(3);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleSelectMode = (id: AIModeId) => {
+    if (id === "smart") {
+      handleSelectSmartAI();
+      return;
+    }
+    setSelectedMode(id);
+    setSelectedProviders([]);
+    setStep(1);
+  };
 
   const renderStep0 = () => (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold font-serif text-[#1A365D] mb-3">Choose Your AI Access Tier</h2>
+        <h2 className="text-3xl font-bold font-serif text-[#1A365D] mb-3">How would you like your AI assistant to work?</h2>
         <p className="text-[#6B665E] max-w-2xl mx-auto text-sm">
-          You bring your own AI access — pick how you want to connect. You can change this later in AI Settings.
+          Pick a connection method below. You can change this later in AI Settings.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {TIER_CARDS.map((tier) => (
-          <div
-            key={tier.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              setSelectedTier(tier.id);
-              setStep(1);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setSelectedTier(tier.id);
-                setStep(1);
-              }
-            }}
-            className="p-5 rounded-xl border cursor-pointer transition-all duration-300 bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/50 hover:bg-white"
-          >
-            <div className="text-[#946A30] mb-3">{tier.icon}</div>
-            <h4 className="font-bold text-[#1A365D] text-sm mb-2">{tier.label}</h4>
-            <p className="text-xs text-gray-500 leading-relaxed">{tier.description}</p>
-          </div>
-        ))}
-
-        {/* Tier 4 (affiliate-linked subscription) is a sponsored-placement signup
-            flow, not a technical AI-calling mechanism (see ai-gateway.md §4) —
-            shown here as an informational, non-selectable card only. */}
-        <div className="p-5 rounded-xl border border-dashed border-gray-250 bg-gray-50 opacity-70 cursor-not-allowed">
-          <div className="text-gray-400 mb-3">
-            <Zap className="w-6 h-6" />
-          </div>
-          <h4 className="font-bold text-gray-500 text-sm mb-2">Affiliate Subscription <span className="text-[10px] font-mono uppercase">(Coming Soon)</span></h4>
-          <p className="text-xs text-gray-400 leading-relaxed">
-            Get AI access without configuring your own key, via a partnered subscription offer.
+      {/* Recommendation banner — per docs/planning/ai-modes-reconciliation.md
+          §1, Smart AI is genuinely working but rate-limited to ~1 req/15s and
+          not meant for heavy use, so it's framed as "fastest to try", not "the"
+          universal recommendation. Cloud AI Providers (a real, dedicated free
+          tier) is the recommended path for regular drafting work. */}
+      <div className="max-w-2xl mx-auto p-4 bg-[color:var(--color-cyan-accent)]/5 border border-[color:var(--color-cyan-accent)]/30 rounded-xl flex items-start gap-3">
+        <Sparkles className="w-5 h-5 text-[color:var(--color-cyan-accent-dim)] shrink-0 mt-0.5" />
+        <div>
+          <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-[#1A365D] mb-1">Not sure which option to choose?</h4>
+          <p className="text-xs text-[#475569] leading-relaxed">
+            Try <strong>Smart AI</strong> right now — no setup at all — to see the assistant in action. For regular drafting work,
+            <strong> Cloud AI Providers</strong> gives you a free, dedicated connection that won't run into Smart AI's shared rate limit.
           </p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {AI_MODES.map((mode) => (
+          <AIModeCard
+            key={mode.id}
+            mode={mode}
+            isSelected={selectedMode === mode.id}
+            onSelect={handleSelectMode}
+          />
+        ))}
       </div>
     </div>
   );
 
-  const renderStep1 = () => (
+  const renderStep1 = () => {
+    const modeConfig = selectedMode ? getAIMode(selectedMode) : undefined;
+    const isLocalMode = selectedMode === "local";
+
+    // Local AI's provider list has duplicate provider ids by design (LM
+    // Studio / OmniRoute / Custom server all resolve to the "custom"
+    // adapter, just with a different default local port — see
+    // src/config/aiModes.ts's AIModeProviderOption.defaultEndpoint and
+    // docs/planning/ai-modes-reconciliation.md §3). Selecting one of those
+    // presets a single settings.customEndpoint rather than adding several
+    // independent "custom" entries to selectedProviders.
+    const handleLocalOptionToggle = (option: { id: string; label: string; defaultEndpoint?: string }) => {
+      if (option.id !== "custom") {
+        handleProviderToggle(option.id);
+        return;
+      }
+      if (option.defaultEndpoint) {
+        setSettings(prev => ({ ...prev, customEndpoint: option.defaultEndpoint }));
+      }
+      setSelectedProviders(prev => (prev.includes("custom") ? prev : [...prev, "custom"]));
+    };
+
+    return (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold font-serif text-[#1A365D] mb-3">Initialize AI Intelligence</h2>
+        <h2 className="text-3xl font-bold font-serif text-[#1A365D] mb-3">
+          {modeConfig ? modeConfig.title : "Choose Your Providers"}
+        </h2>
         <p className="text-[#6B665E] max-w-2xl mx-auto text-sm">
-          The Doctoral Assistant requires an AI engine to analyze your dissertation and draft the journal article.
-          Select one or more providers below. We will automatically route requests to the best available model.
+          {modeConfig ? modeConfig.description : "Select one or more providers below. We will automatically route requests to the best available model."}
         </p>
-        {selectedTier && (
+        {selectedMode && (
           <button
             onClick={() => setStep(0)}
             className="mt-3 text-xs text-[#C08A3E] hover:text-[#A87630] font-mono underline cursor-pointer"
           >
-            ← Change Tier
+            ← Change AI Mode
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Cloud Providers — hidden entirely when the "local" tier is selected */}
-        {selectedTier !== "local" && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-serif font-bold text-[#1A365D] flex items-center gap-2">
-            <Cloud className="text-[#C08A3E]" /> Cloud AI Providers
-          </h3>
-          <div className="grid gap-3">
-            {AI_PROVIDERS.filter(p => p.type === 'cloud').filter(p => !selectedTier || providerMatchesTier(p, selectedTier)).map(provider => (
-              <div
-                key={provider.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleProviderToggle(provider.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleProviderToggle(provider.id);
-                  }
-                }}
-                className={`relative p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
-                  selectedProviders.includes(provider.id)
-                    ? 'bg-[color:var(--color-cyan-accent)]/5 border-[color:var(--color-cyan-accent)] shadow-sm'
-                    : 'bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/30 hover:bg-[#FAF8F5]/50'
-                }`}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="text-3xl bg-white border border-[#E2E8F0] p-2 rounded-lg">{provider.icon}</div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-[#1A365D] text-sm">{provider.name}</h4>
-                      {selectedProviders.includes(provider.id) && (
-                        <CheckCircle2 className="text-[color:var(--color-cyan-accent-dim)] w-5 h-5 animate-scale-in" />
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">{provider.description}</p>
-                    <div className="flex gap-2 mt-2">
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                        {provider.pricingTier === 'free' ? 'Free Tier' : provider.pricingTier === 'freemium' ? 'Freemium' : 'API Key Req'}
+      <div className="grid grid-cols-1 gap-3 max-w-2xl mx-auto">
+        {isLocalMode && !isDetecting && (
+          <div className="p-3 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl flex items-start gap-2 text-xs text-[#475569]">
+            <Shield className="w-4 h-4 text-[#C08A3E] shrink-0 mt-0.5" />
+            <span>Nothing you write or generate leaves your computer with Local AI — this app talks directly to the program you choose below, running on your own machine.</span>
+          </div>
+        )}
+        {(modeConfig?.providers || []).map((option, idx) => {
+          const isSelected = isLocalMode && option.id === "custom"
+            ? selectedProviders.includes("custom") && settings.customEndpoint === (option.defaultEndpoint || settings.customEndpoint)
+            : selectedProviders.includes(option.id);
+          const isDetected = healthResults[option.id]?.status === 'online';
+          return (
+            <div
+              key={`${option.id}-${idx}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => isLocalMode ? handleLocalOptionToggle(option) : handleProviderToggle(option.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  isLocalMode ? handleLocalOptionToggle(option) : handleProviderToggle(option.id);
+                }
+              }}
+              className={`relative p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
+                isSelected
+                  ? 'bg-[color:var(--color-cyan-accent)]/5 border-[color:var(--color-cyan-accent)] shadow-sm'
+                  : 'bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/30 hover:bg-[#FAF8F5]/50'
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-[#1A365D] text-sm">{option.label}</h4>
+                    {isSelected && <CheckCircle2 className="text-[color:var(--color-cyan-accent-dim)] w-5 h-5 animate-scale-in" />}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{option.description}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    {option.noAccountRequired && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">
+                        <Shield className="w-3 h-3" /> No account needed
                       </span>
-                      {provider.id === 'server' && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
-                          Recommended
-                        </span>
-                      )}
-                    </div>
+                    )}
+                    {isLocalMode && (isDetecting ? (
+                      <span className="text-[10px] flex items-center gap-1 text-gray-400">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Detecting...
+                      </span>
+                    ) : isDetected ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[color:var(--color-cyan-accent)]/10 text-[#0E7490] border border-[color:var(--color-cyan-accent)]/30 flex items-center gap-1 font-bold">
+                        <span className="w-1.5 h-1.5 bg-[color:var(--color-cyan-accent)] rounded-full animate-pulse"></span>
+                        Detected running
+                      </span>
+                    ) : null)}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-        )}
-
-        {/* Local Servers — hidden entirely when a BYOK (cloud) tier is selected */}
-        {(!selectedTier || selectedTier === "local") && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-serif font-bold text-[#1A365D] flex items-center gap-2">
-            <Server className="text-[#C08A3E]" /> Local AI Servers
-          </h3>
-          <div className="grid gap-3">
-            {AI_PROVIDERS.filter(p => p.type === 'local').map(provider => {
-              const isDetected = healthResults[provider.id]?.status === 'online';
-              return (
-                <div
-                  key={provider.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleProviderToggle(provider.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleProviderToggle(provider.id);
-                    }
-                  }}
-                  className={`relative p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
-                    selectedProviders.includes(provider.id)
-                      ? 'bg-[color:var(--color-cyan-accent)]/5 border-[color:var(--color-cyan-accent)] shadow-sm'
-                      : 'bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/30 hover:bg-[#FAF8F5]/50'
-                  }`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="text-3xl bg-white border border-[#E2E8F0] p-2 rounded-lg">{provider.icon}</div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-[#1A365D] text-sm">{provider.name}</h4>
-                        {selectedProviders.includes(provider.id) && (
-                          <CheckCircle2 className="text-[color:var(--color-cyan-accent-dim)] w-5 h-5 animate-scale-in" />
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">{provider.description}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">
-                          <Shield className="w-3 h-3" /> 100% Private
-                        </span>
-                        {isDetecting ? (
-                          <span className="text-[10px] flex items-center gap-1 text-gray-400">
-                            <Loader2 className="w-3 h-3 animate-spin" /> Detecting...
-                          </span>
-                        ) : isDetected ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[color:var(--color-cyan-accent)]/10 text-[#0E7490] border border-[color:var(--color-cyan-accent)]/30 flex items-center gap-1 font-bold">
-                            <span className="w-1.5 h-1.5 bg-[color:var(--color-cyan-accent)] rounded-full animate-pulse"></span>
-                            Detected
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        )}
+            </div>
+          );
+        })}
       </div>
 
-      <div className="flex justify-between items-center pt-8 border-t border-gray-150">
+      <div className="flex justify-between items-center pt-8 border-t border-gray-150 max-w-2xl mx-auto">
         <p className="text-xs text-gray-500 font-mono">
           Selected: <span className="font-bold text-[#1A365D]">{selectedProviders.length} providers</span>
         </p>
@@ -420,11 +390,12 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
           disabled={selectedProviders.length === 0}
           className="px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider font-mono text-white bg-[#1A365D] hover:bg-[#122847] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
         >
-          Configure Providers <ChevronRight className="w-4 h-4" />
+          Continue <ChevronRight className="w-4 h-4" />
         </button>
       </div>
     </div>
-  );
+    );
+  };
 
   const renderStep2 = () => {
     const selected = AI_PROVIDERS.filter(p => selectedProviders.includes(p.id));
@@ -691,7 +662,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   return (
     <div className="w-full text-[#1A365D] font-sans selection:bg-[#1A365D] selection:text-white">
       <div className="w-full max-w-4xl mx-auto space-y-6">
-        {/* Progress Tracker — only shown once a tier is picked (step > 0); the tier-selection screen itself isn't part of this 3-step tracker. */}
+        {/* Progress Tracker — only shown once an AI mode is picked (step > 0); the mode-selection screen itself isn't part of this 3-step tracker. */}
         {step > 0 && (
         <div className="flex items-center justify-center">
           <div className="flex items-center gap-3">

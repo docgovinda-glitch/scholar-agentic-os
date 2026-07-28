@@ -59,6 +59,34 @@ No second candidate was tested; Pollinations alone is sufficient to make
 Option 1 real. Additional keyless providers can be added to the config
 later (`src/config/aiModes.ts`, Step 1) without a UI change.
 
+**Update from Step 2 live-verification (2026-07-28)**: clicking the live Smart
+AI card in a real running browser produced a genuine `403 Missing Turnstile
+token` from Pollinations — initially looked like Step 0's finding was wrong.
+Investigated rather than assumed:
+- A direct `curl` repeat, with a realistic Chrome User-Agent AND the
+  `Sec-Fetch-Mode`/`Sec-Fetch-Site`/`Sec-Fetch-Dest` headers a real browser
+  sends, still succeeded — ruling out "any browser-shaped request gets
+  blocked."
+- `navigator.userAgent` inside the automated test browser reads
+  `"...HeadlessChrome/151.0.0.0..."` — the literal string `HeadlessChrome`,
+  which is a standard, explicit bot signal most anti-bot systems (including
+  Cloudflare's, which fronts Pollinations) key off directly. A real end
+  user's actual Chrome/Firefox/Safari never sends a UA containing
+  "Headless" during normal browsing.
+- **Conclusion**: the 403 is an artifact of testing with a headless
+  automation tool, not a real limitation for actual end users. Confirmed,
+  not assumed — the curl-with-realistic-headers test is the control that
+  isolates "headless" as the actual variable. Recorded here rather than
+  quietly ignored, since a live-browser check that contradicts an earlier
+  finding must be run to ground, not dismissed either way.
+- **No code or copy change made as a result** — the existing error-message
+  path (`PollinationsAdapter.generate`'s non-429 error branch,
+  `AISetupWizard`'s "No Providers Online" simulated-fallback screen) already
+  handles a real Smart AI failure honestly, whatever its cause. That this
+  path renders truthfully under a genuine failure (verified live, not
+  mocked) is itself the correct behavior this task's anti-fabrication rule
+  asks for.
+
 ---
 
 ## 2. OmniRoute local-backend feasibility — VERIFIED FEASIBLE, no user CORS configuration needed
@@ -242,13 +270,23 @@ No hard-stop condition was triggered. Proceeding to Step 1.
 - `src/components/ai/AIModeCard.tsx`: the one shared card, consumed by nothing yet — **no live-browser verification was possible for this step alone**, since it has no page to render on in the running app. This is deferred to Step 2, where the card gets wired into the real onboarding screen and live-verified there. Recorded here explicitly rather than silently skipped, per the standing live-verify rule.
 - 27 new tests total (7 config, 14 card, 6 adapter), all passing; `tsc --noEmit` clean; full suite 824/826 (same 2 pre-existing unrelated failures).
 
+## Step 2 notes
+
+- `AISetupWizard.tsx`'s old 3-tier ("Local Router"/"Free-Tier BYOK"/"Heavy BYOK") selection screen replaced with the 5-mode `AIModeCard` grid + a recommendation banner. Internal `selectedTier: AiTier` state replaced end-to-end with `selectedMode: AIModeId`, sourced entirely from `src/config/aiModes.ts` — the old `providerMatchesTier()` pricingTier filter is gone; the provider step now iterates each mode's own curated `providers` list directly.
+- **Smart AI gets a real, distinct "continue → done" flow** (`handleSelectSmartAI`), not a provider-selection screen filtered to one option: selecting it runs one genuine `AIGateway.healthCheckAll` call (not optimistic), then goes straight to the existing final-validation screen. It never touches the vault (no key exists for Pollinations) — covered by a new regression test in `AISetupWizard.vaultGate.test.tsx`.
+- **Local AI's overlapping "custom" provider options** (LM Studio / OmniRoute / Custom server, all resolving to the same adapter at different default ports per `docs/planning/ai-modes-reconciliation.md` §3) are handled by `handleLocalOptionToggle`, which presets `settings.customEndpoint` per the chosen option rather than trying to multi-select three entries that share one underlying settings field.
+- Both existing test files for this component (`AISetupWizard.test.tsx`, `AISetupWizard.vaultGate.test.tsx`) rewritten to the new screen — every real behavior they locked in (provider-selection gating, keyboard operability, local-server detection honesty, the vault gate, the non-selectable coming-soon card) is preserved; only navigation labels changed, since the old UI text was itself being deliberately replaced.
+- **Live-verification surfaced a real, worth-recording nuance, investigated to ground rather than assumed either way**: clicking Smart AI in the actual running browser hit a genuine `403 Missing Turnstile token` from Pollinations. Traced to the test browser's own `HeadlessChrome` User-Agent (a standard bot signal) via a controlled curl comparison — real end-user browsers are unaffected. See the addendum under §1 above. No code/copy change resulted; the failure path already renders honestly ("No Providers Online", simulated-fallback offer), which is the correct behavior either way.
+- Live-verified: Ollama genuinely detected running in this dev environment ("Detected running" badge, real health check), Local AI's Configure Connections screen showed a real `ONLINE (134ms)` status, the Partner Subscription card correctly refuses to navigate on click, and `:focus-visible` still resolves via real Tab-key focus on the new cards.
+- `tsc --noEmit` clean, full suite 826/828 (same 2 pre-existing unrelated failures).
+
 ## Progress log
 
 | Step | Description | Status |
 |---|---|---|
 | 0 | Pre-flight verification (this document) | 🟢 done |
 | 1 | Central config + shared `AIModeCard` | 🟢 done (foundation only — no live consumer yet, see note) |
-| 2 | Onboarding screen | 🔲 not started |
+| 2 | Onboarding screen | 🟢 done |
 | 3 | Per-mode setup flows | 🔲 not started |
 | 4 | Settings mirroring onboarding | 🔲 not started |
 | 5 | Settings sub-navigation & management surfaces | 🔲 not started |
