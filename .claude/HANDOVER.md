@@ -1,6 +1,22 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi redesign implemented — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-28, AI modes IA/UX redesign complete — supersedes the section below)
+
+**AI Setup/Settings redesign around 5 user-facing AI Modes — 🟢 done, Steps 0-8 all complete.** Full step-by-step record in `docs/planning/ai-modes-reconciliation.md`. This was an information-architecture redesign of `AISetupWizard.tsx` (onboarding) and `AIControlCenter.tsx` (settings), not a visual refresh — users are now asked "How would you like your AI assistant to work?" and choose among 5 plain-language modes (Smart AI, Cloud AI Providers, Local AI, Bring Your Own AI, Partner Subscription), never an implementation detail. Every step: real live verification (not code-read-only), `tsc --noEmit` + full suite clean throughout (baseline: 864/866, same 2 pre-existing unrelated `supabaseClient.test.ts` failures — zero new regressions across 9 commits), one commit per step.
+
+- **Step 0 (blocking pre-flight verification)** confirmed Pollinations is genuinely keyless/CORS-open (real curl + browser-preflight check) and OmniRoute needs no CORS workaround (verified from its actual shipped npm source, not docs) — both real findings that shaped the build, not assumptions. Mapped all 5 modes onto `ai-gateway.md`'s existing 5-tier model.
+- **`src/config/aiModes.ts`** is now the single source of truth for the 5 modes (title, badge, features, difficulty, real provider-dashboard links, real per-backend install guidance, coming-soon handling) — a jargon test fails the build if internal framing ("Tier N", "backend", "endpoint") ever leaks into user-facing copy.
+- **3 new provider adapters** (Pollinations, Groq, Together AI) plus a 4th (OpenRouter) added mid-sequence once Step 3's exact Cloud-AI-Providers list didn't match the initial split — `src/services/aiGateway.ts` + matching `server.ts` routes.
+- **`src/components/ai/AIModeCard.tsx`** is the one shared card both surfaces consume. Its initial `role="button"` wrapping nested interactive children was a real ARIA violation, caught by an actual accessibility-tree snapshot during the Step 7 a11y pass (not assumed) — fixed to a plain labelled container with the CTA button as the real keyboard control.
+- **`AIControlCenter.tsx`** restructured to 7 settings tabs (AI Mode / Current Status / Providers / Local Models / API Keys / Advanced / Diagnostics) — no working functionality deleted, the old Analytics/Provider-Matrix content moved into Diagnostics/Advanced. Local Models and API Keys are genuinely new (multi-backend real detection; masked, vault-gated key management). Diagnostics reads only real tracked telemetry — honest "None configured"/"No requests recorded yet" states where genuinely empty, never a fabricated placeholder.
+- **Vault-gate preservation** (the pre-existing "Unlock Your Key Vault" gate) is now regression-tested with `it.each` parametrized over every real `(mode, provider)` pair in the config — a future provider is covered automatically, no hand-written test needed per provider.
+- A real, live-verification-driven finding worth knowing: a genuine Cloudflare Turnstile 403 appeared when testing Smart AI with the automation tool — traced to the tool's own `HeadlessChrome` User-Agent (a standard bot signal) via a controlled curl comparison, not a real limitation for actual end users. Recorded rather than either ignored or over-reacted to.
+
+**Updated gap map**: the AI modes redesign is closed out as complete. Nothing from this task is left open.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi redesign implemented — superseded by the section above)
 
 **Redesign executed, `docs/planning/sci-fi-redesign-scoping.md`'s full step sequence — 🟢 done.** Full step-by-step record in `docs/planning/sci-fi-redesign-progress.md`. Every step: characterization tests before the change, `tsc --noEmit` clean, full suite clean (baseline throughout: 797/799, same 2 pre-existing unrelated `supabaseClient.test.ts` failures — no regressions introduced by any step), live-verified in a real browser via `agent-browser` (screenshots, real Tab-key `:focus-visible` checks, emulated `prefers-reduced-motion` checks), one commit per step.
 
