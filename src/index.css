@@ -27,6 +27,14 @@
   --color-brand-800: #0A172B;
   --color-brand-900: #06101F;
   --color-brand-950: #030810;
+
+  /* Sci-fi redesign (2026-07-28) — phosphor-cyan accent for system/AI/machine
+     state, kept visually distinct from --color-brand-300 (gold), which stays
+     reserved for citations/scholarship/manuscript-content framing. Verified
+     10.55:1 contrast against --color-brand-900 (#06101F) via the sRGB
+     relative-luminance formula — see docs/planning/sci-fi-redesign-progress.md. */
+  --color-cyan-accent: #22D3EE;
+  --color-cyan-accent-dim: #0E7490;
 }
 
 /* Base style resets — override Tailwind v4 preflight height:100% to allow page scrolling */
@@ -303,6 +311,57 @@ button:disabled {
   .manuscript-paper {
     padding: 1.5rem 1.5rem;
   }
+}
+
+/* ==========================================
+   SCI-FI REDESIGN — STEP 1: ACCESSIBILITY GUARDRAILS
+   Built first, non-negotiable per docs/planning/sci-fi-redesign-scoping.md:
+   every later step must respect these, never reintroduce the gap.
+   ========================================== */
+
+/* Explicit, high-contrast keyboard focus ring — nothing in this codebase
+   defined one before this step; the browser default was the only signal.
+   Applies globally so no redesigned component can silently lose it. */
+:focus-visible {
+  outline: 2px solid var(--color-cyan-accent) !important;
+  outline-offset: 2px !important;
+  border-radius: 4px;
+}
+
+/* Reduce/disable motion for users who request it — covers every animation
+   and transition this codebase defines today (fadeIn, hover-lift, pulse,
+   os-card/glass-effect transitions) plus anything the redesign adds. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================
+   SCI-FI REDESIGN — STEP 1: GLOBAL CHROME (dark surface)
+   Scoped to a `.chrome-dark` wrapper (used by AppHeader/AppFooter) rather
+   than applied to <body>, since the rest of the app is still on the light
+   surface and adopts the dark system incrementally, per the scoping doc's
+   own "everything else adopted incrementally as touched" guidance.
+   ========================================== */
+
+.chrome-dark {
+  background-color: var(--color-brand-900);
+  color: #E2E8F0; /* verified 15.48:1 against brand-900 */
+  border-color: rgba(226, 232, 240, 0.1) !important;
+}
+
+.chrome-dark .chrome-dark-subtle {
+  background-color: var(--color-brand-950);
+}
+
+.chrome-dark-accent {
+  color: var(--color-cyan-accent); /* verified 10.55:1 against brand-900 */
 }
 
 .manuscript-body {
