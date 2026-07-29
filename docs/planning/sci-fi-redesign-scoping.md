@@ -253,8 +253,24 @@ updated progress-log table below.
 | 1 | Design tokens (navy scale, luminous blue, gold, luminous border) | 🟢 done | `9e17bb2` |
 | 2 | Global chrome (`AppHeader`/`AppFooter` onto navy, wordmark gold-split) | 🟢 done | `22db8c7` |
 | 3 | Remove the 5 unbuildable panels (per `docs/planning/dashboard-mockup-honest-data-audit.md`) | 🟢 **confirmed nothing to remove** | — |
-| 4 | Rebuild the 8 buildable panels with real data | 🔲 in progress | — |
+| 4 | Rebuild the 8 buildable panels with real data | 🟡 in progress — see note below | `f853ee8` |
 | 5 | Remaining component restyling (if budget remains) | 🔲 not started | — |
+
+**Step 4 progress so far**: while reading `ResearchIntelligenceDashboard.tsx`
+(the live dashboard) to plan the rebuild, found and fixed two real,
+currently-shipping fabrications not named in the mockup audit (they
+predate the mockup) — hardcoded fake "Scholar Alerts" notifications and a
+hardcoded fake "Cached Vault Citations" list, both shown unconditionally
+regardless of actual project state. Fixed with real, test-first
+replacements (commit `f853ee8`). This is real progress toward Step 4's
+goal (honest data on this dashboard) but is not yet the mockup's own new
+panels (AI Gateway/Kernel status, Active Models, AI Agents count,
+Knowledge Vault size, storage utilization, per-scholar Journals/Citations/
+Datasets counters, journal suggestions) or the navy/luminous-blue restyle
+of this component's still-light surfaces — those remain open. Stopping
+here at a clean, fully-verified boundary rather than starting the
+remaining large scope (a full-component restyle plus ~7 new panels)
+without the same commit-by-commit rigor the rest of this session used.
 
 **Step 3 finding, not a fabricated removal**: an exhaustive grep across
 `src/components/` for every one of the five unbuildable panels (`SYSTEM
