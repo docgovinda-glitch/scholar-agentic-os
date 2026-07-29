@@ -1,15 +1,252 @@
-# Sci-Fi UI Redesign — Scoping Note v2 (2026-07-28)
+# Sci-Fi UI Redesign — Scoping Note v3 (2026-07-28, deep-navy space direction)
 
-**Status: DIRECTION REVISED, IMPLEMENTATION PARTIALLY DONE UNDER THE OLD
-DIRECTION.** This is a docs-only session — no CSS, component, or token file
-is touched here. What changed: the visual direction itself. The prior
-version of this note ("Ancient Knowledge, Future Interface" — gold for
-citations/scholarship, cyan for system/AI, serif for manuscript content) is
-**retired**. Steps 1–6 of that direction's sequence were already built
-(confirmed live in the codebase, not assumed — see "What's already shipped"
-below), so this revision's most important job isn't re-scoping greenfield
-work, it's being honest that some of what's already merged now needs
-remapping under the new direction, and saying exactly how much.
+**Status: DIRECTION REVISED AGAIN, DOCS ONLY.** A new visual reference
+(a supplied mockup, described in full in the "v3" section immediately
+below) supersedes v2's grey-HUD direction before any of v2's Step 3/4 work
+started. No CSS, component, or token file is touched in this pass — this
+is the reversal-and-reconciliation record, per this session's explicit
+instruction to stop after the docs and get sign-off before implementing.
+v2's own history (research, the two already-shipped steps, the reasoning
+that led to grey/no-gold) is kept below, unedited, for traceability — see
+the "v2 (retired)" marker before it, and the reversal rationale in the new
+section for exactly what changed and why.
+
+## v3 — Deep-navy space direction (supersedes v2, 2026-07-28)
+
+### What the mockup shows
+
+A login/onboarding screen: deep-navy background reading as a space/orbit
+scene (a photographic-feeling Earth-from-orbit image bleeding in from the
+bottom edge, a starfield/constellation dot-and-line motif spanning the
+full canvas above it). A central glass login card with a thin luminous
+blue border and soft blue glow, containing the product wordmark (a serif
+lockup — "Scholar" in white/blue, "Agentic OS" in gold), a tagline, and
+credential fields. Either side of the card, "constellation" nodes (icon +
+label + number, connected by thin lines like a node graph) presenting
+stats — papers, journals, citations, datasets, knowledge vault, literature
+reviews, research projects, collaborators. A left rail with an "AI Kernel"
+status card, an "Active Models" list, an "AI Agents" count, and a "System
+Status" hardware panel. A right rail of metric cards (today's research,
+running agents, draft papers, literature reviews, journal suggestions,
+knowledge vault utilization). A bottom global nav bar (Home/Vault/
+Research/Journal/Prompt Studio/Workflows/Publish/Marketplace) and a
+rotating quote in the corner. Blue is the dominant accent throughout;
+gold appears only on the CTA button gradient, the wordmark's second word,
+the "Create Scholar Account" link, and one icon (journal-suggestions
+target). This asymmetry — blue everywhere, gold in exactly four
+CTA/wordmark-adjacent spots — is itself the evidence for how narrowly
+gold should be scoped (see below), not a suggestion to spread it further.
+
+### Reversals, recorded so the change stays traceable
+
+**1. The `#1A365D` navy → layered-grey remap (v2 Step 3, 632 occurrences)
+is cancelled. Navy is the base again, not grey.** v2's own rationale for
+grey (Material's `#121212`-not-pure-black guidance, avoiding a "flat dark"
+look) still holds as *general* dark-UI practice — it just isn't what this
+product's identity should look like. The mockup's whole visual identity
+*is* navy-as-a-space-color, not neutral-grey-as-a-technical-color; keeping
+grey would mean shipping two different unreconciled dark-UI languages side
+by side (the grey surfaces already built in v2 Steps 1-2, and the navy the
+mockup calls for everywhere else). Rather than adjudicate between them
+component-by-component, the direction reverses: **rebuild the elevation
+scale as layered navy tints**, reusing the navy lineage that was already
+in this codebase before v2 ever touched it (`--color-brand-500` `#1A365D`,
+`--color-brand-900` `#06101F`, `--color-brand-950` `#030810` — the
+*original* brand palette, not a new invention). v2 Step 2 had already
+started migrating `.chrome-dark`/`.chrome-dark-subtle` *off* this navy
+lineage *onto* the grey `--color-surface-1/2` tokens — that migration is
+exactly what gets reversed when implementation resumes.
+
+**2. Gold is reinstated as a second accent — but scoped narrowly, not
+restored to v1's "citations/scholarship" role.** v2's Step 4 (a full gold
+removal/remapping pass) is cancelled outright, but so is v1's original
+gold job. Neither the "gold = ancient/scholarly" framing (v1, retired
+2026-07-28) nor "no gold at all" (v2) survives contact with the mockup:
+gold appears in exactly four places — the primary CTA gradient, the
+wordmark's second word, the "create account" link (itself CTA-adjacent),
+and one icon. That's a **primary-action/wordmark accent**, not a
+content-classification color, and not a general "warm emphasis" utility
+either. Scoped this narrowly, v2's original objection to gold (a second
+brand color competing with the system accent for the user's "something
+important" attention, everywhere, on every dense screen) doesn't apply —
+gold shows up in exactly one place per screen: the thing the user is
+meant to actually click. This is a genuinely different design position
+from both retired predecessors, not a partial rollback to either.
+
+**3. Serif is permitted — in the wordmark only.** Neither v1's "serif for
+manuscript/citation body content" nor v2's "serif retired outright, no
+replacement" survive: the mockup's serif usage is exactly one lockup (the
+product name), nothing else — labels, captions, stats, body copy, and UI
+chrome are all sans/mono in the reference. `--font-serif` (Playfair
+Display, already loaded in `index.html`) is kept, but its CSS scope
+narrows to the literal wordmark component only — the current
+`h1, .font-serif { font-family: var(--font-serif) }` rule is too broad
+(it fires on every `<h1>` in the app, not just the product name) and needs
+narrowing to a dedicated class/component when implementation resumes, not
+a blanket heading rule. `--font-display` (Rajdhani, from v2 Step 1) is
+**not** reversed here — nothing in the mockup's own labels/captions reads
+as needing a different display face, and the brief doesn't ask for one;
+Rajdhani stays the answer for section headings that aren't the wordmark.
+
+### Reconciling the mockup against the non-negotiables (not copied uncritically)
+
+**Contrast — measured against colors estimated from the reference image,
+not pixel-sampled.** I do not have programmatic pixel access to the
+supplied image, so the hex values below are considered visual estimates
+from inspecting it, in the same spirit as this project's real
+computed-style verification elsewhere — **these are a starting point for
+implementation to re-verify with actual `getComputedStyle` contrast
+checks once real tokens exist**, not a substitute for that verification,
+consistent with guardrail #4 below.
+
+| Pairing | Estimated hex | Computed ratio (sRGB relative-luminance formula) | Floor | Result |
+|---|---|---|---|---|
+| Luminous blue text/icons on base navy | `#3B9CFF` on `#080F1F` | 6.72:1 | 4.5:1 (text) | Passes |
+| Luminous blue text/icons on panel navy (lighter layer) | `#3B9CFF` on `#0F1B36` | 6.00:1 | 4.5:1 (text) | Passes |
+| Gold on base navy | `#E0A83D` on `#080F1F` | 8.96:1 | 4.5:1 (text) | Passes comfortably |
+| Gold on panel navy | `#E0A83D` on `#0F1B36` | 8.00:1 | 4.5:1 (text) | Passes comfortably |
+| Primary white/near-white body text on panel navy | `#F5F7FA` on `#0F1B36` | 15.90:1 | 4.5:1 (text) | Passes with large margin |
+| Muted blue uppercase labels (e.g. "PAPERS") on panel navy | `#8FA3C4` on `#0F1B36` | 6.67:1 | 4.5:1 (text) | Passes |
+| Panel-navy elevation step vs. base navy (non-text, e.g. a card border) | `#0F1B36` vs `#080F1F` | 1.12:1 | 3:1 (non-text) | **Fails** — needs a real border color/glow, not surface-luminance alone, to hit the 3:1 UI-component floor (see token values below) |
+
+The one real failure this reconciliation surfaces: two adjacent navy
+elevation steps are *too close in luminance* to satisfy the 3:1 non-text
+floor on their own — exactly why the mockup's panels lean on a visible
+luminous border rather than a luminance jump to read as "elevated." The
+token values below make that border itself the thing that clears 3:1,
+not the surface-color step. Everything else estimates comfortably above
+floor, with enough margin that small estimation error in my color-picking
+is unlikely to flip a pass to a fail — but every value here still needs
+the same live `getComputedStyle` re-verification this project has applied
+to every other token before shipping it, not a pass because it "looks
+right" in a static reference.
+
+**Glow behind text — unchanged, still wordmark-scale only.** The mockup's
+own glow usage is consistent with this: the soft blue glow sits behind
+the *login card as a whole* (chrome/border-adjacent) and around the
+wordmark icon (display-scale), never behind the small-caps labels, stat
+numbers, or body copy. No reconciliation needed — the mockup already
+follows this guardrail; implementation just needs to not "improve" on it
+by adding glow to smaller text for extra flourish.
+
+**Background imagery — needs an explicit budget, which the mockup itself
+doesn't specify.** Two real costs to control for, not just "make it look
+like the picture":
+- **Legibility**: every panel sitting on the starfield/photo background
+  needs a real scrim/overlay behind it — the mockup's own glass panels
+  already have enough opacity+blur to serve as this in practice (this is
+  the *allowed* glass use from v2's own glass rule: overlay/floating
+  chrome, not a raw content surface sitting directly on the image), but a
+  panel implemented with too little backing opacity would fail this the
+  moment the starfield behind it gets busy. Rule for implementation: any
+  panel over the backdrop must independently hit the contrast floors
+  above *against its own backing fill*, not against the photo — the photo
+  must never be the only thing behind body text.
+- **Performance/asset budget**: one background image only, loaded once
+  globally (not per-panel, not per-route) — a compressed WebP/AVIF,
+  target **≤250KB**, with a solid-navy CSS fallback background-color so
+  there's no flash-of-unstyled-background before it loads and no broken
+  experience if it fails to load. The constellation/node-graph motif
+  (dots + connecting lines) should be CSS/SVG-generated, not part of the
+  photo — cheap, themeable, and already how the mockup's own node-graph
+  reads (perfectly aligned to specific stat icons, which a static photo
+  couldn't do).
+
+**Motion — unchanged.** State-driven only, every duration under 250ms,
+`prefers-reduced-motion` respected — all already true of the token layer
+v2 Step 1 built (`--motion-duration-fast/base/slow`, `--motion-ease`, the
+existing `prefers-reduced-motion` media query) and none of it needs to
+change for the navy/gold reversal. The mockup's own subtle pulse/glow
+animations (the AI-kernel orbital rings, the online-status dots) are
+exactly the "restrained pulse on active/status states" pattern already
+called for — implementation should reuse the existing motion tokens for
+these, not invent new ones.
+
+### Revised token values (supersedes v2's grey/no-gold table)
+
+```css
+/* Layered-navy dark surface scale — REPLACES v2's --color-surface-0..3
+   grey scale. Reuses/extends the navy lineage that predates the sci-fi
+   redesign entirely (--color-brand-500/900/950), rather than inventing a
+   new hue. Values below are visual estimates from the reference mockup,
+   pending live contrast re-verification per the reconciliation above. */
+--color-navy-0:  #030810;  /* = existing --color-brand-950, deepest layer / true page background */
+--color-navy-1:  #06101F;  /* = existing --color-brand-900, base chrome surface */
+--color-navy-2:  #0A172B;  /* = existing --color-brand-800, first elevation: cards, panels */
+--color-navy-3:  #0F1B36;  /* NEW, one step lighter than brand-800: nested panels, the login-card surface */
+--color-navy-4:  #172D4D;  /* = existing --color-brand-650, modals/top-most overlays */
+--color-border-luminous: #3B9CFF33; /* ~20% alpha luminous-blue border — this is what clears the 3:1
+                                        non-text floor between adjacent navy steps, not the surface
+                                        luminance jump alone (see reconciliation above) */
+
+/* Primary accent — distinct hue from the existing --color-cyan-accent
+   (#22D3EE, more turquoise); the mockup's blue reads as a separate,
+   less-teal blue. Kept as its own token rather than overloading
+   cyan-accent's meaning — cyan-accent's existing consumers (Step 1/2
+   work) get reworked onto this during implementation, not left split
+   across two blues with no rule for which is used where. */
+--color-luminous-blue:     #3B9CFF;
+--color-luminous-blue-dim: #1E6FD9;
+
+/* Gold — reinstated, SCOPED to primary CTA + wordmark only (see reversal
+   #2 above). Reuses the existing --color-brand-300 lineage rather than a
+   new hue, adjusted slightly warmer/brighter to match the mockup's more
+   saturated gold — subject to the same live contrast re-check as
+   everything else here. */
+--color-gold-accent:     #E0A83D; /* was --color-brand-300 #C08A3E — brightened, re-verify live */
+--color-gold-accent-dim: #A87630; /* = existing --color-brand-400, unchanged */
+
+/* Typography — only the serif scope changes; font-display and font-mono
+   are NOT reversed from v2 Step 1. */
+--font-sans:    "Inter", ui-sans-serif, system-ui, sans-serif;   /* unchanged, body copy */
+--font-display: "Rajdhani", "Chakra Petch", sans-serif;          /* UNCHANGED from v2 — section headings, not the wordmark */
+--font-mono:    "JetBrains Mono", monospace;                     /* unchanged */
+--font-serif:   "Playfair Display", serif;                       /* REINSTATED, but scope narrows to
+                                                                     the wordmark component only —
+                                                                     never a general h1/heading rule */
+```
+
+`--color-warning-accent`/`--color-error-accent` (v2 Step 1) are unaffected
+by this reversal and stay as-is; they were never part of the grey-vs-navy
+or gold question.
+
+### Revised implementation sequence (supersedes v2's steps 3 and 4 outright)
+
+v2 Steps 1 and 2 (design tokens; global chrome) are **not** thrown away —
+they're reworked, not rebuilt from scratch, since most of what they built
+(the `:focus-visible`/`prefers-reduced-motion` rules, the motion tokens,
+the semantic warning/error colors, the overall "tokens-first" discipline)
+carries forward unchanged. What changes is the surface/accent values
+themselves and where `.chrome-dark`/`.chrome-dark-subtle` point.
+
+1. **Token rebuild** — add the navy scale + `--color-luminous-blue` +
+   `--color-gold-accent` values above to `src/index.css`; do NOT delete
+   `--color-surface-0..3` or `--color-cyan-accent` yet if anything still
+   consumes them (check live-import status first, per the dead-component
+   audit discipline this project now has standing practice for) — retire
+   them once every consumer is migrated, not before.
+2. **Rework the 2 already-shipped components** (`AppHeader.tsx`/
+   `AppFooter.tsx`'s `.chrome-dark`/`.chrome-dark-subtle`,
+   `ActiveAgentsPanel.tsx`) off `--color-surface-1/2` and onto the new
+   `--color-navy-*` scale; reinstate gold **only** at any genuine
+   primary-CTA/wordmark spot in these files (there may be none — that's a
+   legitimate outcome, not a sign the step is incomplete).
+3. **Wordmark component** — if one doesn't already exist as a shared,
+   reusable piece, extract one (the "Scholar Agentic OS" logo lockup
+   appears in `AppHeader.tsx` and `OnboardingWizard.tsx` at minimum,
+   per earlier sessions' findings) so the narrowed serif rule has exactly
+   one place to apply, not a `h1` rule that has to be reasoned about
+   everywhere.
+4. **Background/backdrop treatment** — the scrim/asset-budget rules
+   above, applied once at the global-chrome level, not per-screen.
+5. **Everything else** — unchanged guidance: adopt incrementally as
+   touched by other work, not a batch migration.
+
+v2's old Step 3 (navy → grey) and Step 4 (gold removal) are cancelled, not
+"done" or "skipped" — they are the wrong direction now, full stop; see the
+updated progress-log table below.
+
+## v2 (retired 2026-07-28, kept for traceability) — grey-HUD direction record
 
 ## Why the old direction is dropped
 
@@ -382,10 +619,10 @@ sequence where the two differ.
 |---|------|--------|--------|
 | 1 | Design tokens (`src/index.css` + `index.html`) | 🟢 done | `59702c8` |
 | 2 | Global chrome (header/footer/base surfaces) | 🟢 done | `cde1e06` |
-| 2.5 | Navigation (browser history, deep links, state-loss regressions, guarded transitions, focus management) | 🔲 not started — see note | — |
-| 3 | `#1A365D` navy → layered-grey remap (632 occ., 29 files) | 🔲 not started | — |
-| 4 | Gold citation/scholarship accent remap | 🔲 not started | — |
-| 5 | `CommandPalette.tsx` → `ActiveAgentsPanel.tsx` → `ResearchIntelligenceDashboard.tsx` → remaining components | 🔲 not started | — |
+| 2.5 | Navigation (browser history, deep links, state-loss regressions, guarded transitions, focus management) | 🟢 done, in a separate session — see `docs/planning/navigation-scoping.md` | `d217496`, `6d992ae` |
+| 3 | `#1A365D` navy → layered-grey remap (632 occ., 29 files) | ⛔ **CANCELLED** — v3 (above) reverses this; navy is the new base, not grey | — |
+| 4 | Gold citation/scholarship accent remap | ⛔ **CANCELLED** — v3 (above) reinstates gold, scoped to CTA/wordmark only | — |
+| 5 | `CommandPalette.tsx` → `ActiveAgentsPanel.tsx` → `ResearchIntelligenceDashboard.tsx` → remaining components | 🔲 not started — superseded by v3's own revised sequence (above) | — |
 
 ### Step 1 notes
 
