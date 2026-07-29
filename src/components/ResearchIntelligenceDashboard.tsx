@@ -119,6 +119,17 @@ export default function ResearchIntelligenceDashboard({
   // this panel.
   const registeredAgentCount = listAgents().length;
 
+  // Sci-fi v3 Step 4 — per-scholar counters (mockup: PAPERS 12,842,761;
+  // JOURNALS 34,128; CITATIONS 88,671,221; DATASETS 6,731 — platform-wide
+  // aggregates this app has no backend to support). Real equivalent: the
+  // current scholar's own counts, at real small scale, never invented.
+  const scholarDatasetCount = projects.reduce((sum, p) => sum + (p.dataSources?.length || 0), 0);
+  const scholarCitationCount = projects.reduce(
+    (sum, p) => sum + (p.knowledgeVault?.files || []).filter(f => f.citationMetadata).length,
+    0
+  );
+  const scholarJournalSelectedCount = projects.filter(p => !!p.targetJournal).length;
+
   // Honest-data fix (docs/planning/dashboard-mockup-honest-data-audit.md's
   // discipline, applied here): this panel used to be 3 hardcoded fake
   // notifications, shown unconditionally regardless of the real project's
@@ -435,6 +446,33 @@ export default function ResearchIntelligenceDashboard({
             <div>
               <span className="text-2xl font-serif font-bold text-[#1A365D] block leading-none">{registeredAgentCount}</span>
               <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase tracking-wider">Agent types available</span>
+            </div>
+          </div>
+
+          {/* Scholar Research Snapshot — real per-scholar counters, never a
+              fabricated platform-wide aggregate (see derivation above). */}
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4 text-[#C08A3E]" />
+              Research Snapshot
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{totalProjects}</span>
+                <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Research Projects</span>
+              </div>
+              <div>
+                <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{scholarDatasetCount}</span>
+                <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Datasets</span>
+              </div>
+              <div>
+                <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{scholarCitationCount}</span>
+                <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Citations cached</span>
+              </div>
+              <div>
+                <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{scholarJournalSelectedCount}</span>
+                <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Journals selected</span>
+              </div>
             </div>
           </div>
 
