@@ -253,24 +253,45 @@ updated progress-log table below.
 | 1 | Design tokens (navy scale, luminous blue, gold, luminous border) | 🟢 done | `9e17bb2` |
 | 2 | Global chrome (`AppHeader`/`AppFooter` onto navy, wordmark gold-split) | 🟢 done | `22db8c7` |
 | 3 | Remove the 5 unbuildable panels (per `docs/planning/dashboard-mockup-honest-data-audit.md`) | 🟢 **confirmed nothing to remove** | — |
-| 4 | Rebuild the 8 buildable panels with real data | 🟡 in progress — see note below | `f853ee8` |
+| 4 | Rebuild the 8 buildable panels with real data | 🟡 4/7 new panels done + 2 bonus fixes | `f853ee8`, `0799fff`, `507d47e`, `a692e7f`, `aa8e691` |
 | 5 | Remaining component restyling (if budget remains) | 🔲 not started | — |
 
-**Step 4 progress so far**: while reading `ResearchIntelligenceDashboard.tsx`
+**Step 4 progress, this session**: while reading `ResearchIntelligenceDashboard.tsx`
 (the live dashboard) to plan the rebuild, found and fixed two real,
 currently-shipping fabrications not named in the mockup audit (they
 predate the mockup) — hardcoded fake "Scholar Alerts" notifications and a
 hardcoded fake "Cached Vault Citations" list, both shown unconditionally
-regardless of actual project state. Fixed with real, test-first
-replacements (commit `f853ee8`). This is real progress toward Step 4's
-goal (honest data on this dashboard) but is not yet the mockup's own new
-panels (AI Gateway/Kernel status, Active Models, AI Agents count,
-Knowledge Vault size, storage utilization, per-scholar Journals/Citations/
-Datasets counters, journal suggestions) or the navy/luminous-blue restyle
-of this component's still-light surfaces — those remain open. Stopping
-here at a clean, fully-verified boundary rather than starting the
-remaining large scope (a full-component restyle plus ~7 new panels)
-without the same commit-by-commit rigor the rest of this session used.
+regardless of actual project state (commit `f853ee8`). Then built 4 of the
+7 remaining mockup-inspired panels, each test-first, live-verified, its
+own commit:
+
+1. **AI Agents** (`0799fff`) — real, static `listAgents().length` (8
+   registered agent types), never a fabricated "N Active"/"N Running"
+   concurrency claim (no such model exists in this app).
+2. **Research Snapshot** (`507d47e`) — real per-scholar counters
+   (Research Projects, Datasets, Citations cached, Journals selected),
+   reframed from the mockup's platform-wide millions down to the actual
+   scholar's own small-scale counts. Also folds in the "Journal
+   suggestions" requirement: the full discovered-journal shortlist isn't
+   persisted anywhere (confirmed again here), so "Journals selected"
+   (real, from the persisted `project.targetJournal`) is the honest
+   substitute rather than a fabricated "N matches found."
+3. **Knowledge Vault** (`a692e7f`) — real summed vault-file byte size
+   (B/KB/MB, never a fabricated TB figure), and utilization ONLY via the
+   real `navigator.storage.estimate()` browser API (first use of this API
+   in the codebase) — honestly "not available" when it doesn't resolve.
+4. **Today's Research** (`aa8e691`) — real count of today's timestamped
+   `usageLogs` entries, honestly 0 with no fabricated trend when there's
+   no real activity yet.
+
+**Still open**: AI Gateway/Kernel status and Active Models (both need live
+async health-check plumbing reused from `AIControlCenter.tsx`'s
+`AIGateway.healthCheckProvider`, more involved than the 4 panels above),
+and the full navy/luminous-blue restyle of this component's still-light
+surfaces. Stopped at this clean, fully-verified 4-panel boundary per this
+session's own explicit instruction to pause after 3-4 panels rather than
+rushing the remaining scope (2 more panels plus a full-component restyle)
+without the same commit-by-commit rigor used throughout.
 
 **Step 3 finding, not a fabricated removal**: an exhaustive grep across
 `src/components/` for every one of the five unbuildable panels (`SYSTEM
