@@ -2,10 +2,25 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* --font-serif intentionally NOT removed yet: 27 .tsx files still consume
+     the `font-serif` utility this token generates. Per
+     docs/planning/sci-fi-redesign-scoping.md v2, serif is retired outright
+     with no replacement — but that retirement is component-level work (each
+     call site reverts to --font-sans deliberately, not a blind sweep), done
+     in this sequence's "rework the 6 already-redesigned components" and
+     "remaining components" steps. Removing the token here, before those
+     call sites are migrated, would silently fall back to Tailwind's default
+     generic serif stack for all 27 files in one uncontrolled step — exactly
+     the kind of mechanical change this project's own discipline avoids. */
   --font-serif: "Playfair Display", serif;
-  --font-display: "Playfair Display", serif;
+  /* CHANGED (sci-fi redesign v2): display face moves from Playfair Display
+     (retired direction) to Rajdhani, a geometric/angular technical face —
+     loaded in index.html. Reserved for h2-h4 headings and .font-display
+     only, per the "exactly one display face" typography convention this
+     revision's research settled on (see scoping doc, "Typefaces" section). */
+  --font-display: "Rajdhani", "Chakra Petch", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
-  
+
   --color-primary: #1A365D;
   --color-accent: #C08A3E;
   --color-bg-base: #F8FAFC;
@@ -14,7 +29,9 @@
   --color-warning-base: #F59E0B;
   --color-border-base: #E5E7EB;
 
-  /* Brand Colors definition for light theme fallback */
+  /* Brand Colors definition for light theme fallback. NOT removed here —
+     still consumed by unmigrated components; the navy remap step replaces
+     these call sites onto --color-surface-0..3 deliberately, file by file. */
   --color-brand-50: #FAF8F5;
   --color-brand-100: #FAF6F0;
   --color-brand-200: #FAF0E6;
@@ -28,13 +45,45 @@
   --color-brand-900: #06101F;
   --color-brand-950: #030810;
 
-  /* Sci-fi redesign (2026-07-28) — phosphor-cyan accent for system/AI/machine
-     state, kept visually distinct from --color-brand-300 (gold), which stays
-     reserved for citations/scholarship/manuscript-content framing. Verified
-     10.55:1 contrast against --color-brand-900 (#06101F) via the sRGB
-     relative-luminance formula — see docs/planning/sci-fi-redesign-progress.md. */
+  /* System/brand accent — unchanged value from the prior session, already
+     contrast-verified (10.55:1 against --color-brand-900). Under sci-fi v2
+     this is now the SOLE brand accent (gold is retired, not a second hue). */
   --color-cyan-accent: #22D3EE;
   --color-cyan-accent-dim: #0E7490;
+
+  /* Sci-fi redesign v2 (2026-07-28) — layered-grey dark surface scale.
+     Each step is a ~6-8% luminance increase over the previous, per
+     Material's elevation-by-lightening method (see scoping doc Phase 1).
+     Replaces --color-brand-500..950 as the primary surface system going
+     forward; components migrate onto this scale in the navy-remap step,
+     not instantly here. */
+  --color-surface-0: #121212;   /* base page background — never pure black */
+  --color-surface-1: #1A1A1A;   /* first elevation: cards, panels */
+  --color-surface-2: #232323;   /* second elevation: nested panels, popovers */
+  --color-surface-3: #2C2C2C;   /* third elevation: modals, top-most overlays */
+  --color-border-subtle: #383838; /* dividers, resting borders — no glow */
+
+  /* Semantic state colors (sci-fi v2) — NOT a second brand accent. Agent
+     status/error states get their own conventional, non-brand tokens;
+     citation/scholarship emphasis gets no color at all (structural
+     treatment instead) per the scoping doc's Phase 2 judgment call. */
+  --color-warning-accent: #F59E0B; /* alias of --color-warning-base, reused as-is */
+  --color-error-accent: #F87171;   /* NEW — Tailwind red-400, dark-mode-safe lightness */
+}
+
+/* Motion tokens (sci-fi v2) — state-driven only, every duration below 250ms
+   per the scoping doc's non-negotiable guardrail #5. Deliberately declared
+   in a plain :root block, NOT inside @theme: Tailwind v4's @theme directive
+   only recognizes known design-token namespaces (--font-*, --color-*,
+   --spacing-*, etc.) and silently drops any custom property outside those —
+   confirmed live: --motion-duration-base resolved to an empty string via
+   getComputedStyle until moved here. --motion-* isn't a namespace Tailwind
+   understands, so it must live outside @theme to actually reach the page. */
+:root {
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 180ms;
+  --motion-duration-slow: 220ms;
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Base style resets — override Tailwind v4 preflight height:100% to allow page scrolling */
@@ -96,7 +145,12 @@ h1, .font-serif {
 }
 
 h2, h3, h4, .font-display {
-  font-family: var(--font-sans) !important;
+  /* CHANGED (sci-fi v2): was hardcoded to var(--font-sans), which meant the
+     pre-existing --font-display token had zero effect on any heading. Now
+     genuinely wired to the token so the Rajdhani swap above is visible —
+     color left as the existing navy value deliberately; that's the navy
+     remap step's job, not this token step's. */
+  font-family: var(--font-display) !important;
   font-weight: 600 !important;
   color: #1A365D !important;
 }
