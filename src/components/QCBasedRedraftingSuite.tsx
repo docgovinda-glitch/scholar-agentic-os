@@ -124,26 +124,26 @@ export default function QCBasedRedraftingSuite({
   return (
     <div id="qc-redrafting-suite" className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[color:var(--color-navy-4)] pb-4">
         <div>
-          <h2 className="text-xl font-serif font-bold text-[#1A365D] flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[#C08A3E]" />
+          <h2 className="text-xl font-bold text-[#E2E8F0] flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
             Phase G1: QC-Based Peer Review Redrafting
           </h2>
-          <p className="text-xs text-gray-500 font-medium">
+          <p className="text-xs text-[#94A3B8] font-medium">
             Address compliance gaps, stylistic vulnerabilities, and citation warnings identified during Phase G.
           </p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 gap-2">
+      <div className="flex border-b border-[color:var(--color-navy-4)] gap-2">
         <button
           onClick={() => setActiveTab("dashboard")}
           className={`px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
             activeTab === "dashboard"
-              ? "border-[#1A365D] text-[#1A365D]"
-              : "border-transparent text-gray-400 hover:text-[#1A365D]"
+              ? "border-[color:var(--color-luminous-blue)] text-[#E2E8F0]"
+              : "border-transparent text-[#94A3B8] hover:text-[#E2E8F0]"
           }`}
         >
           QC Audit Findings
@@ -152,8 +152,8 @@ export default function QCBasedRedraftingSuite({
           onClick={() => setActiveTab("workspace")}
           className={`px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
             activeTab === "workspace"
-              ? "border-[#1A365D] text-[#1A365D]"
-              : "border-transparent text-gray-400 hover:text-[#1A365D]"
+              ? "border-[color:var(--color-luminous-blue)] text-[#E2E8F0]"
+              : "border-transparent text-[#94A3B8] hover:text-[#E2E8F0]"
           }`}
         >
           Interactive Redraft Workspace
@@ -162,8 +162,8 @@ export default function QCBasedRedraftingSuite({
           onClick={() => setActiveTab("pdf")}
           className={`px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
             activeTab === "pdf"
-              ? "border-[#1A365D] text-[#1A365D]"
-              : "border-transparent text-gray-400 hover:text-[#1A365D]"
+              ? "border-[color:var(--color-luminous-blue)] text-[#E2E8F0]"
+              : "border-transparent text-[#94A3B8] hover:text-[#E2E8F0]"
           }`}
         >
           Live PDF Preview
@@ -175,43 +175,43 @@ export default function QCBasedRedraftingSuite({
         <div className="space-y-6">
           {/* Scores Bento */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="glass-effect rounded-xl p-5 border border-gray-200 flex flex-col items-center text-center justify-between shadow-xs">
-              <span className="text-[10px] font-bold font-mono text-gray-500 block uppercase">Thesis Grounding</span>
-              <div className="text-4xl font-extrabold font-serif text-emerald-600 my-3">
+            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 flex flex-col items-center text-center justify-between shadow-xs">
+              <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Thesis Grounding</span>
+              <div className="text-4xl font-extrabold text-emerald-400 my-3">
                 {report.alignmentWithDissertationScore}%
               </div>
-              <p className="text-xs text-gray-500"> Fulfills dissertation terminology. </p>
+              <p className="text-xs text-[#94A3B8]"> Fulfills dissertation terminology. </p>
             </div>
 
-            <div className="glass-effect rounded-xl p-5 border border-gray-200 flex flex-col items-center text-center justify-between shadow-xs">
-              <span className="text-[10px] font-bold font-mono text-gray-500 block uppercase">Journal Compliance</span>
-              <div className="text-4xl font-extrabold font-serif text-[#946A30] my-3">
+            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 flex flex-col items-center text-center justify-between shadow-xs">
+              <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Journal Compliance</span>
+              <div className="text-4xl font-extrabold text-[color:var(--color-luminous-blue)] my-3">
                 {report.complianceScore}%
               </div>
-              <p className="text-xs text-gray-500"> Adheres to formatting guidelines. </p>
+              <p className="text-xs text-[#94A3B8]"> Adheres to formatting guidelines. </p>
             </div>
 
-            <div className="glass-effect rounded-xl p-5 border border-gray-200 flex flex-col items-center text-center justify-between shadow-xs">
-              <span className="text-[10px] font-bold font-mono text-gray-500 block uppercase">Scholarly Rigor</span>
-              <div className="text-4xl font-extrabold font-serif text-indigo-600 my-3">
+            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 flex flex-col items-center text-center justify-between shadow-xs">
+              <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Scholarly Rigor</span>
+              <div className="text-4xl font-extrabold text-indigo-400 my-3">
                 {report.rigorScore}%
               </div>
-              <p className="text-xs text-gray-500"> Stylistic AI bypass and flow check. </p>
+              <p className="text-xs text-[#94A3B8]"> Stylistic AI bypass and flow check. </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Column: Revision Plan */}
-            <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-sm space-y-4">
-              <h3 className="text-sm font-semibold text-[#1A365D] font-mono uppercase tracking-wider border-b border-[#F1F5F9] pb-2 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-[#C08A3E]" />
+            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-4">
+              <h3 className="text-sm font-semibold text-[#E2E8F0] font-mono uppercase tracking-wider border-b border-[color:var(--color-navy-1)] pb-2 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                 Actionable Revision Items
               </h3>
               <div className="space-y-3">
                 {report.actionableEditsPlan.map((edit, i) => (
-                  <div key={i} className="p-3 bg-[#FFFBF5] border border-[#C08A3E]/30 rounded-xl flex items-start gap-3">
-                    <AlertTriangle className="w-4 h-4 text-[#C08A3E] shrink-0 mt-0.5" />
-                    <p className="text-xs font-sans leading-relaxed text-[#1A365D] font-medium">
+                  <div key={i} className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-luminous-blue)]/30 rounded-xl flex items-start gap-3">
+                    <AlertTriangle className="w-4 h-4 text-[color:var(--color-luminous-blue)] shrink-0 mt-0.5" />
+                    <p className="text-xs font-sans leading-relaxed text-[#E2E8F0] font-medium">
                       {edit}
                     </p>
                   </div>
@@ -221,39 +221,39 @@ export default function QCBasedRedraftingSuite({
 
             {/* Right Column: Vulnerabilities */}
             <div className="space-y-6">
-              <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-sm space-y-3">
-                <span className="text-[10px] font-bold font-mono text-red-700 uppercase tracking-wider block border-b border-[#F1F5F9] pb-2 flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
+                <span className="text-[10px] font-bold font-mono text-red-400 uppercase tracking-wider block border-b border-[color:var(--color-navy-1)] pb-2 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
                   Identified Vulnerabilities
                 </span>
                 <div className="space-y-2">
                   {report.weaknesses.map((w, i) => (
-                    <div key={i} className="p-2.5 bg-red-50/50 border border-red-100 rounded-lg text-xs text-red-900 font-medium flex items-start gap-2">
-                      <span className="text-red-500 font-bold">•</span>
+                    <div key={i} className="p-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-300 font-medium flex items-start gap-2">
+                      <span className="text-red-400 font-bold">•</span>
                       <span>{w}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="glass-effect rounded-xl p-5 border border-gray-200 space-y-3 shadow-xs">
-                <h3 className="text-sm font-semibold text-[#1A365D] font-serif uppercase tracking-wider border-b border-gray-150 pb-2">
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-3 shadow-xs">
+                <h3 className="text-sm font-semibold text-[#E2E8F0] uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
                   Style Authenticity Assessment
                 </h3>
-                <p className="text-xs text-gray-600 leading-relaxed font-sans font-medium">
+                <p className="text-xs text-[#94A3B8] leading-relaxed font-sans font-medium">
                   {report.plagiarismOriginalityCheck}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-gray-200">
+          <div className="flex justify-end pt-4 border-t border-[color:var(--color-navy-4)]">
             <button
               onClick={() => setActiveTab("workspace")}
-              className="px-6 py-2.5 bg-[#1A365D] hover:bg-[#122847] font-bold text-white text-xs rounded-xl font-mono uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+              className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-xl font-mono uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-sm"
             >
               Start Interactive Redrafting
-              <ArrowRight className="w-4 h-4 text-[#C08A3E]" />
+              <ArrowRight className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
             </button>
           </div>
         </div>
@@ -262,12 +262,12 @@ export default function QCBasedRedraftingSuite({
       {activeTab === "workspace" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           {/* Left Sidebar: Section Checklist (lg:4) */}
-          <div className="lg:col-span-4 flex flex-col bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
-            <div className="p-4 bg-[#F8FAFC] border-b border-[#E2E8F0]">
-              <h3 className="text-sm font-bold text-[#1A365D] font-display">Manuscript Sections</h3>
-              <p className="text-[11px] text-gray-500">Select a section to address peer review issues.</p>
+          <div className="lg:col-span-4 flex flex-col bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl overflow-hidden shadow-sm">
+            <div className="p-4 bg-[color:var(--color-navy-1)] border-b border-[color:var(--color-navy-4)]">
+              <h3 className="text-sm font-bold text-[#E2E8F0] font-display">Manuscript Sections</h3>
+              <p className="text-[11px] text-[#94A3B8]">Select a section to address peer review issues.</p>
             </div>
-            <div className="flex-1 divide-y divide-[#F1F5F9] max-h-[500px] overflow-y-auto">
+            <div className="flex-1 divide-y divide-[color:var(--color-navy-1)] max-h-[500px] overflow-y-auto">
               {sectionsList.map((sec) => {
                 const isSelected = selectedSection === sec;
                 const status = refinedSections[sec];
@@ -284,26 +284,26 @@ export default function QCBasedRedraftingSuite({
                       }
                     }}
                     disabled={isStreaming}
-                    className={`w-full p-3.5 text-left transition-all flex items-start gap-3 hover:bg-[#F8FAFC] disabled:opacity-50 ${
-                      isSelected ? "bg-brand-50/50 border-l-4 border-brand-500" : "border-l-4 border-transparent"
+                    className={`w-full p-3.5 text-left transition-all flex items-start gap-3 hover:bg-[color:var(--color-navy-1)] disabled:opacity-50 ${
+                      isSelected ? "bg-[color:var(--color-luminous-blue)]/10 border-l-4 border-[color:var(--color-luminous-blue)]" : "border-l-4 border-transparent"
                     }`}
                   >
-                    <FileText className={`w-4 h-4 shrink-0 mt-0.5 ${isSelected ? "text-brand-500" : "text-gray-400"}`} />
+                    <FileText className={`w-4 h-4 shrink-0 mt-0.5 ${isSelected ? "text-[color:var(--color-luminous-blue)]" : "text-[#94A3B8]"}`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-[#1A365D] truncate block">{sec}</span>
+                        <span className="text-xs font-semibold text-[#E2E8F0] truncate block">{sec}</span>
                         {status === "applied" && (
-                          <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
+                          <span className="text-[9px] font-bold text-emerald-400 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
                             Refined
                           </span>
                         )}
                         {status === "kept" && (
-                          <span className="text-[9px] font-bold text-gray-500 bg-gray-150 px-1.5 py-0.5 rounded shrink-0">
+                          <span className="text-[9px] font-bold text-[#94A3B8] bg-[color:var(--color-navy-3)] px-1.5 py-0.5 rounded shrink-0">
                             Kept Orig
                           </span>
                         )}
                       </div>
-                      <div className="flex justify-between items-center mt-1 text-[10px] text-gray-500">
+                      <div className="flex justify-between items-center mt-1 text-[10px] text-[#94A3B8]">
                         <span>{length > 0 ? `${(project.sections[sec] || "").split(/\s+/).filter(Boolean).length} words` : "Empty"}</span>
                       </div>
                     </div>
@@ -314,18 +314,18 @@ export default function QCBasedRedraftingSuite({
           </div>
 
           {/* Right Main panel: Side-by-side or Streaming Workspace (lg:8) */}
-          <div className="lg:col-span-8 flex flex-col bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm min-h-[500px]">
+          <div className="lg:col-span-8 flex flex-col bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl overflow-hidden shadow-sm min-h-[500px]">
             {/* Toolbar / Header */}
-            <div className="p-4 bg-[#F8FAFC] border-b border-[#E2E8F0] flex justify-between items-center flex-wrap gap-2">
+            <div className="p-4 bg-[color:var(--color-navy-1)] border-b border-[color:var(--color-navy-4)] flex justify-between items-center flex-wrap gap-2">
               <div>
-                <h4 className="text-xs font-bold font-mono text-gray-500 uppercase tracking-wider">Active Workspace</h4>
-                <h3 className="text-sm font-bold text-[#1A365D] font-display">{selectedSection}</h3>
+                <h4 className="text-xs font-bold font-mono text-[#94A3B8] uppercase tracking-wider">Active Workspace</h4>
+                <h3 className="text-sm font-bold text-[#E2E8F0] font-display">{selectedSection}</h3>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleSkipSection(selectedSection)}
                   disabled={isStreaming}
-                  className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-3 py-1.5 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[#94A3B8] text-xs font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Mark as Keep Original
                 </button>
@@ -333,28 +333,28 @@ export default function QCBasedRedraftingSuite({
             </div>
 
             {/* Split Panel */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[#E2E8F0]">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[color:var(--color-navy-4)]">
               {/* Original Text */}
               <div className="p-4 flex flex-col min-h-[200px]">
-                <span className="text-[10px] font-bold font-mono text-gray-400 uppercase tracking-wider block mb-2">
+                <span className="text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider block mb-2">
                   Original Text
                 </span>
-                <div className="flex-1 bg-[#F8FAFC] p-3 border border-[#E2E8F0] rounded-lg text-xs font-sans text-gray-700 overflow-y-auto max-h-[300px] whitespace-pre-wrap select-all">
-                  {project.sections[selectedSection] || <span className="text-gray-400 italic">No text drafted yet.</span>}
+                <div className="flex-1 bg-[color:var(--color-navy-1)] p-3 border border-[color:var(--color-navy-4)] rounded-lg text-xs font-sans text-[#94A3B8] overflow-y-auto max-h-[300px] whitespace-pre-wrap select-all">
+                  {project.sections[selectedSection] || <span className="text-[#94A3B8] italic">No text drafted yet.</span>}
                 </div>
               </div>
 
               {/* Streaming Output / Redrafted Text */}
-              <div className="p-4 flex flex-col min-h-[200px] bg-brand-50/10">
-                <span className="text-[10px] font-bold font-mono text-brand-500 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
-                  {isStreaming && <Loader2 className="w-3.5 h-3.5 text-brand-500 animate-spin" />}
+              <div className="p-4 flex flex-col min-h-[200px] bg-[color:var(--color-luminous-blue)]/5">
+                <span className="text-[10px] font-bold font-mono text-[color:var(--color-luminous-blue)] uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+                  {isStreaming && <Loader2 className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)] animate-spin" />}
                   QC-Refined Proposition
                 </span>
-                <div className="flex-1 bg-white p-3 border border-brand-200 rounded-lg text-xs font-sans text-[#1A365D] overflow-y-auto max-h-[300px] whitespace-pre-wrap">
+                <div className="flex-1 bg-[color:var(--color-navy-1)] p-3 border border-[color:var(--color-luminous-blue)]/30 rounded-lg text-xs font-sans text-[#E2E8F0] overflow-y-auto max-h-[300px] whitespace-pre-wrap">
                   {streamingText ? (
                     streamingText
                   ) : (
-                    <span className="text-gray-400 italic">
+                    <span className="text-[#94A3B8] italic">
                       QC-refined text will stream here in real-time when you trigger the redraft.
                     </span>
                   )}
@@ -363,25 +363,27 @@ export default function QCBasedRedraftingSuite({
             </div>
 
             {/* Revision Instructions & Stream trigger */}
-            <div className="p-4 bg-[#F8FAFC] border-t border-[#E2E8F0] space-y-3">
+            <div className="p-4 bg-[color:var(--color-navy-1)] border-t border-[color:var(--color-navy-4)] space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold font-mono text-gray-500 uppercase tracking-wider block">
+                <label className="text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider block">
                   Instruction Customization (Optional)
                 </label>
-                <textarea
-                  value={customInstruction}
-                  onChange={(e) => setCustomInstruction(e.target.value)}
-                  placeholder="e.g. Focus on resolving the literature citation gaps in APA 7th style..."
-                  disabled={isStreaming}
-                  className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-lg text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:focus-brand-500 min-h-[60px]"
-                />
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-lg focus-within:ring-1 focus-within:ring-[color:var(--color-luminous-blue)]">
+                  <textarea
+                    value={customInstruction}
+                    onChange={(e) => setCustomInstruction(e.target.value)}
+                    placeholder="e.g. Focus on resolving the literature citation gaps in APA 7th style..."
+                    disabled={isStreaming}
+                    className="border-0 bg-transparent w-full p-2.5 rounded-lg text-xs text-[#E2E8F0] placeholder-[#94A3B8]/60 outline-none min-h-[60px]"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-between flex-wrap gap-3 pt-2">
                 <button
                   onClick={handleStartRedraft}
                   disabled={isStreaming}
-                  className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs rounded-lg transition-all shadow-md shadow-brand-500/10 inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white font-semibold text-xs rounded-lg transition-all shadow-md shadow-[color:var(--color-luminous-blue)]/10 inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isStreaming ? (
                     <>
@@ -400,14 +402,14 @@ export default function QCBasedRedraftingSuite({
                   <div className="flex gap-2">
                     <button
                       onClick={handleDiscardRefinedText}
-                      className="px-3 py-1.5 border border-red-200 hover:bg-red-50 text-red-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
+                      className="px-3 py-1.5 border border-red-200 hover:bg-red-50 text-red-400 text-xs font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
                     >
                       <X className="w-3.5 h-3.5" />
                       Discard
                     </button>
                     <button
                       onClick={handleApplyRefinedText}
-                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 shadow-md shadow-emerald-600/10"
+                      className="px-4 py-1.5 bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 shadow-md shadow-emerald-500/20"
                     >
                       <Check className="w-3.5 h-3.5" />
                       Apply Refined Draft
@@ -421,22 +423,22 @@ export default function QCBasedRedraftingSuite({
       )}
 
       {activeTab === "pdf" && (
-        <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm p-4 min-h-[500px]">
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl overflow-hidden shadow-sm p-4 min-h-[500px]">
           <ManuscriptPDFViewer project={project} />
         </div>
       )}
 
       {/* Footer Navigation */}
-      <div className="flex justify-between items-center pt-4 border-t border-white/10">
+      <div className="flex justify-between items-center pt-4 border-t border-[color:var(--color-navy-4)]">
         <button
           onClick={onBack}
-          className="px-4 py-2 border border-white/10 hover:bg-white/5 text-gray-300 text-sm rounded-lg transition-all duration-150 cursor-pointer"
+          className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[#94A3B8] text-sm rounded-lg transition-all duration-150 cursor-pointer"
         >
           Back to Quality Control
         </button>
         <button
           onClick={onNext}
-          className="px-6 py-2 bg-brand-500 hover:bg-brand-600 font-semibold text-white text-sm rounded-lg transition-all duration-200 shadow-lg shadow-brand-500/20 cursor-pointer"
+          className="px-6 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-semibold text-white text-sm rounded-lg transition-all duration-200 shadow-lg shadow-[color:var(--color-luminous-blue)]/20 cursor-pointer"
         >
           Proceed to Manuscript Editor
         </button>
