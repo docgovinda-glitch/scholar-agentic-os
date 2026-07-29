@@ -367,6 +367,106 @@ happen to contain them:
    work, not as a batch migration, matching this project's standing
    practice for every other cross-cutting change to date.
 
+## Progress log (v2 execution, 2026-07-28 onward)
+
+Executed as an ordered loop per this session's own instruction: implement →
+`tsc --noEmit` + full suite → live-verify in a real browser → commit that
+step alone → tick off here → next step. The step order below reflects this
+session's explicit sequencing (tokens → global chrome → navigation → navy
+remap → gold remap → CommandPalette/ActiveAgentsPanel/ResearchIntelligence-
+Dashboard/remaining), which differs from this doc's own internal ordering
+above (gold before navy) — per this session's own instruction to follow its
+sequence where the two differ.
+
+| # | Step | Status | Commit |
+|---|------|--------|--------|
+| 1 | Design tokens (`src/index.css` + `index.html`) | 🟢 done | `59702c8` |
+| 2 | Global chrome (header/footer/base surfaces) | 🟢 done | `cde1e06` |
+| 2.5 | Navigation (browser history, deep links, state-loss regressions, guarded transitions, focus management) | 🔲 not started — see note | — |
+| 3 | `#1A365D` navy → layered-grey remap (632 occ., 29 files) | 🔲 not started | — |
+| 4 | Gold citation/scholarship accent remap | 🔲 not started | — |
+| 5 | `CommandPalette.tsx` → `ActiveAgentsPanel.tsx` → `ResearchIntelligenceDashboard.tsx` → remaining components | 🔲 not started | — |
+
+### Step 1 notes
+
+Added the full token layer: `--color-surface-0..3` layered-grey elevation
+scale, `--color-border-subtle`, `--color-warning-accent`/
+`--color-error-accent` semantic state colors, `--motion-duration-fast/base/
+slow` + `--motion-ease` motion tokens, and swapped `--font-display` from
+Playfair Display to Rajdhani (loaded in `index.html`). `--font-serif` and
+`--color-brand-500..950` deliberately NOT removed yet — still consumed by
+27/25+ unmigrated files respectively; removing them now would be an
+uncontrolled visual sweep, not a scoped step.
+
+**Real bug caught by live verification**: Tailwind v4's `@theme` block
+silently drops any custom property whose namespace it doesn't recognize.
+`--motion-*` isn't a namespace Tailwind understands, so the motion tokens
+resolved to an empty string via `getComputedStyle` until moved to a plain
+`:root` block outside `@theme`. Also found and fixed: the `h2, h3, h4,
+.font-display` heading rule was hardcoded to `var(--font-sans)`, meaning
+the pre-existing `--font-display` token had *never* actually affected any
+heading in the app — now genuinely wired to the token.
+
+Verified live: all new custom properties resolve correctly via
+`getComputedStyle`; `:focus-visible` ring still renders (cyan, visible on
+the settings-gear button); `prefers-reduced-motion` media query mechanism
+intact; computed WCAG contrast for new tokens against `--color-surface-0`
+(`#121212`): `--color-error-accent` 6.77:1, `--color-cyan-accent` 10.37:1
+(sRGB relative-luminance formula, both comfortably above the 4.5:1 text
+floor).
+
+### Step 2 notes
+
+**Live verification caught a second, significant real bug**, the same
+class as the already-documented `ActiveAgentsPanel` dead-code issue:
+`AppHeader.tsx`/`AppFooter.tsx` — the dark/cyan chrome built in the prior
+redesign session — had **zero live imports anywhere in the app**. `App.tsx`
+rendered its own separately-evolved inline `<header>`/`<footer>` JSX
+instead, meaning the entire "global chrome" redesign had no visible effect
+for a real user, confirmed by a live screenshot showing a plain white
+header (`rgb(255,255,255)`) even with Step 1's tokens already in place.
+Fixed by confirming full structural/behavioral parity between the inline
+JSX and `AppHeader.tsx`/`AppFooter.tsx` (same conditional buttons, same tab
+list, same Active-Model selector, same Auto-Fallback indicator — nothing
+would be lost), then replacing the inline JSX with `<AppHeader>`/
+`<AppFooter>` in `App.tsx`. Also migrated `.chrome-dark`/
+`.chrome-dark-subtle` off `--color-brand-900/950` onto the new
+`--color-surface-1`/`-2` tokens, and removed 7 now-dead icon imports left
+behind in `App.tsx`.
+
+Verified live across the real dashboard and workspace views (not the
+isolated component in isolation): dark header/tab-nav/status-bar/footer all
+render, tab-click switches views and highlights cyan correctly, keyboard
+focus lands on tab buttons, and the Research Agents tab shows the
+(also-previously-dead, now genuinely reachable) `ActiveAgentsPanel` with
+real "Online" status pills. `tsc --noEmit` clean, full suite 869/871 (same
+2 pre-existing unrelated failures).
+
+**Worth flagging for whoever picks up remaining steps**: given two
+redesigned components in a row (`ActiveAgentsPanel` previously,
+`AppHeader`/`AppFooter` now) turned out to be dead code never actually
+wired into the live render tree, it's worth a deliberate grep-for-live-
+imports check on `CommandPalette.tsx`, `AIControlCenter.tsx`,
+`AISetupWizard.tsx`, and `ResearchIntelligenceDashboard.tsx` before
+assuming Step 5's starting point is genuinely live, rather than repeating
+this discovery a third time mid-step.
+
+### Why the loop paused here, not further
+
+Steps 1–2 are complete, verified, and committed. The loop intentionally
+stops before Step 2.5 (Navigation) rather than attempting a shallow pass at
+it: the navigation requirements for this pass (real browser-history entries
+per screen, correct deep-link resolution, state-loss regression tests
+specifically targeting the `useProjectPersistence.ts` stale-closure class of
+bug under rapid back/forward navigation, honest invalid-transition guards,
+and full keyboard/focus-management verification across the phase workflow,
+AI setup wizard, and settings sub-tabs) are a substantial, standalone body
+of engineering work — not something that can be verified honestly in the
+time remaining without risking exactly the kind of unverified-success claim
+this project's standing discipline exists to prevent. This is a scope/time
+boundary, not a failed verification — nothing here is broken or left in a
+bad state; Steps 1–2 are genuinely done and committed independently.
+
 ## What this note deliberately still does not do
 
 No component is touched in this session — this is a direction rewrite, not
