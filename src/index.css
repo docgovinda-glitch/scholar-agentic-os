@@ -171,13 +171,23 @@ body {
   overflow-y: auto;
 }
 
-/* Blueprint radial grid pattern for premium desktop canvas */
+/* Blueprint radial grid pattern for premium desktop canvas.
+   Recolored for sci-fi v3 (2026-07-29) — this class only has 2 call sites
+   (App.tsx's root div, OnboardingWizard.tsx's root div), both fully navy by
+   this point, so recoloring here directly is safe (unlike .os-card/
+   .glass-effect, which several still-unconverted components still depend
+   on and must NOT be touched globally). This was the actual root cause of
+   the "white frame behind every phase view" bug found via live browser
+   verification — App.tsx's own root <div> carried this class but had never
+   been touched by any sci-fi pass, so its light #F8FAFC background sat
+   directly behind every phase component regardless of how dark the
+   component itself was. */
 .blueprint-canvas {
-  background-color: #F8FAFC;
-  background-image: 
-    radial-gradient(circle, rgba(26, 54, 93, 0.04) 1px, transparent 1px),
-    linear-gradient(to right, rgba(26, 54, 93, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(26, 54, 93, 0.02) 1px, transparent 1px);
+  background-color: var(--color-navy-0);
+  background-image:
+    radial-gradient(circle, rgba(59, 156, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to right, rgba(59, 156, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 156, 255, 0.03) 1px, transparent 1px);
   background-size: 24px 24px, 120px 120px, 120px 120px;
   background-position: center center;
 }
@@ -227,12 +237,27 @@ body {
 h2, h3, h4, .font-display {
   /* CHANGED (sci-fi v2): was hardcoded to var(--font-sans), which meant the
      pre-existing --font-display token had zero effect on any heading. Now
-     genuinely wired to the token so the Rajdhani swap above is visible —
-     color left as the existing navy value deliberately; that's the navy
-     remap step's job, not this token step's. */
+     genuinely wired to the token so the Rajdhani swap above is visible. */
   font-family: var(--font-display) !important;
   font-weight: 600 !important;
-  color: #1A365D !important;
+  /* `color: #1A365D !important` REMOVED (sci-fi v3, 2026-07-29) — this was
+     the "navy remap step's job" the comment above deferred, and it never
+     got done: this !important rule silently force-overrode EVERY h2/h3/h4
+     heading's text color across the ENTIRE app, including every component
+     already converted to navy in this redesign, no matter what explicit
+     Tailwind text-color class the heading itself carried (a class-selector
+     declaration cannot beat an element-selector declaration marked
+     !important, regardless of specificity). Measured real-world impact:
+     #1A365D against every navy-0..4 surface was 1.14-1.65:1 — nowhere near
+     the 4.5:1 text floor, meaning every converted component's own heading
+     was silently near-invisible dark-navy-on-dark-navy this whole time,
+     found only by live browser verification (`getComputedStyle` showed
+     rgb(26,54,93) on a heading whose own JSX explicitly set #E2E8F0).
+     Removing the override lets each component's own text-color class win
+     again; elements with no explicit class still inherit body's own
+     `color: #1A365D` default unchanged, so this is safe for the
+     still-unconverted components that never set an explicit heading
+     color. */
 }
 
 /* Form controls overrides */
