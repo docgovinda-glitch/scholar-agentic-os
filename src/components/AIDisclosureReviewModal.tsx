@@ -33,56 +33,58 @@ export default function AIDisclosureReviewModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto">
-        <div className="flex items-start justify-between p-5 border-b border-gray-200">
+      <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+        <div className="flex items-start justify-between p-5 border-b border-[color:var(--color-navy-4)]">
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
             <div>
-              <h2 className="text-lg font-bold text-[#1A365D]">AI-Use Disclosure — Review Before Export</h2>
-              <p className="text-sm text-gray-600 mt-1">
+              <h2 className="text-lg font-bold text-[#E2E8F0]">AI-Use Disclosure — Review Before Export</h2>
+              <p className="text-sm text-[#94A3B8] mt-1">
                 Most journals now require authors to disclose generative AI use in manuscript preparation. Review and edit the statement below — it will be included in your exported .docx and PDF.
               </p>
             </div>
           </div>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600" aria-label="Close">
+          <button onClick={onCancel} className="text-[#94A3B8] hover:text-[#E2E8F0]" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-5 space-y-4">
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-[#94A3B8]">
             <div>
-              <span className="font-bold">Sections included:</span> {sectionsIncluded.length > 0 ? sectionsIncluded.join(", ") : "none drafted yet"}
+              <span className="font-bold text-[#E2E8F0]">Sections included:</span> {sectionsIncluded.length > 0 ? sectionsIncluded.join(", ") : "none drafted yet"}
             </div>
             <div>
-              <span className="font-bold">Model(s) used:</span> {modelsUsed.length > 0 ? modelsUsed.join(", ") : "none recorded yet"}
+              <span className="font-bold text-[#E2E8F0]">Model(s) used:</span> {modelsUsed.length > 0 ? modelsUsed.join(", ") : "none recorded yet"}
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold font-mono text-[#76726A] uppercase tracking-wider mb-1">
+            <label className="block text-xs font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1">
               Disclosure Statement (editable)
             </label>
-            <textarea
-              rows={10}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-3 py-2 text-sm text-[#1A365D] focus:outline-none focus:border-[#C08A3E] font-sans"
-            />
+            <div className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] focus-within:border-[color:var(--color-luminous-blue)] rounded-lg px-3 py-2">
+              <textarea
+                rows={10}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="w-full border-0 bg-transparent text-sm text-[#E2E8F0] focus:outline-none font-sans resize-none"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-200">
+        <div className="flex items-center justify-end gap-3 p-5 border-t border-[color:var(--color-navy-4)]">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-800"
+            className="px-4 py-2 text-sm font-semibold text-[#94A3B8] hover:text-[#E2E8F0]"
           >
             Cancel
           </button>
           <button
             onClick={() => onConfirm(text)}
             disabled={!text.trim()}
-            className="px-4 py-2 text-sm font-bold text-white bg-[#1A365D] rounded-lg hover:bg-[#12253f] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-bold text-white bg-[color:var(--color-luminous-blue-dim)] rounded-lg hover:bg-[color:var(--color-luminous-blue)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Confirm & Continue to Export
           </button>
