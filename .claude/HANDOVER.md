@@ -1,6 +1,23 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi v3 direction reversal — Steps 1-3 done, Step 4 in progress — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi v3 Step 4 — 4/7 buildable panels done — supersedes the section below)
+
+**Continuing sci-fi v3 (`docs/planning/sci-fi-redesign-scoping.md`) Step 4** — the 7 remaining buildable panels from `docs/planning/dashboard-mockup-honest-data-audit.md`, plus the full dashboard navy restyle. This session built 4 of the 7 panels, each test-first, live-verified, its own commit:
+
+1. **AI Agents** (`0799fff`) — real, static `listAgents().length` (8 registered agent types, `src/services/agentService.ts`), never a fabricated "N Active" concurrency claim.
+2. **Research Snapshot** (`507d47e`) — real per-scholar counters (Research Projects, Datasets, Citations cached, Journals selected) reframed from the mockup's platform-wide millions down to real small-scale counts. Also satisfies "Journal suggestions": the full discovered-journal shortlist isn't persisted anywhere (re-confirmed), so "Journals selected" (from the real, persisted `project.targetJournal`) is the honest substitute.
+3. **Knowledge Vault** (`a692e7f`) — real summed vault-file bytes (B/KB/MB, never a fabricated TB figure), utilization ONLY via the real `navigator.storage.estimate()` browser API (first use in this codebase) — honestly "not available" when it doesn't resolve.
+4. **Today's Research** (`aa8e691`) — real count of today's timestamped `usageLogs` entries, honestly 0 with no fabricated trend when there's no real activity.
+
+**Still open**: AI Gateway/Kernel status and Active Models (both need live async health-check plumbing reused from `AIControlCenter.tsx`'s `AIGateway.healthCheckProvider` — more involved than the 4 panels above, not yet started), and the full navy/luminous-blue restyle of `ResearchIntelligenceDashboard.tsx`'s still-light surfaces (a separate, large uniform style pass, explicitly deferred until all 7 panels render correctly per the task's own sequencing). Stopped at this clean 4-panel boundary per this session's own instruction to pause after 3-4 panels rather than rush the rest.
+
+- `tsc --noEmit` clean, full suite 940/942 throughout (same 2 pre-existing unrelated `supabaseClient.test.ts` failures), every panel live-verified in a real browser (screenshots, console checked clean, `navigator.storage.estimate()` confirmed genuinely resolving live, not mocked).
+
+**Updated gap map**: sci-fi v3 Step 4 is 4/7 new panels done (plus the 2-fabrication bonus fix from the prior session). Steps 1-3 remain fully closed (unaffected). Navigation overhaul (further below) remains fully closed.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi v3 direction reversal — Steps 1-3 done, Step 4 in progress — superseded by the section above)
 
 **A new supplied mockup reversed the sci-fi redesign's direction again — see `docs/planning/sci-fi-redesign-scoping.md`'s v3 section.** Deep-navy space aesthetic, luminous blue as primary accent, gold reinstated but scoped narrowly to primary CTA + wordmark only, serif permitted in the wordmark only. v2's grey-surface scale and "no gold" rule are both cancelled — recorded as explicit reversals with rationale, not silently overwritten. `docs/planning/dashboard-mockup-honest-data-audit.md` classifies every panel in the new mockup as real/buildable/unbuildable before any of it got built.
 
