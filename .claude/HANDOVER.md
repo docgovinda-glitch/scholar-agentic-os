@@ -1,5 +1,25 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
+## RESUME HERE TOMORROW (as of 2026-07-28, dead-component audit done + navigation overhaul Phase 1 done — supersedes the sci-fi v2 section below)
+
+**Task 1 (dead-component audit) — 🟢 done.** Full findings in the "Dead-component audit" section directly below this one (kept as its own section since it's a standing reference, not a dated status update). Five confirmed-unreachable code paths deleted (`ExpertCitationEngine.tsx`, `TabContentView.tsx`, `PdfPreviewModal.tsx`, `WorkspacePhaseView.tsx`, and a ~470-line dead `SettingsTabContent` function inline in `App.tsx`) — none needed wiring in, all were genuinely superseded by App.tsx's own more-evolved live implementations. `tsc --noEmit` clean, full suite 869/871 (same 2 pre-existing unrelated failures), live-verified in a real browser.
+
+**Task 2 (navigation overhaul) — 🟡 Phase 1 of 2 done.** Full record in `docs/planning/navigation-scoping.md`. **A sixth dead-code instance was found while scoping this task**: `src/hooks/useHashNavigation.ts` had zero live imports — `App.tsx` had its own diverged inline copy of the exact same hash-sync logic. Fixed and wired in rather than left dead.
+
+- Extended the hash scheme to cover the phase workflow (`#workspace/workspace/<phaseId>`) and settings sub-tabs (`#workspace/settings/<subTab>`) — both previously invisible to the URL, meaning no deep links and no meaningful browser back/forward for either.
+- Added an honest invalid-transition guard for the phase workflow (`project.furthestPhase` + `src/utils/phaseGating.ts`'s `canEnterPhase`) — jumping ahead of what's been reached shows a real inline message naming the phase to complete first, never a silent redirect.
+- Added focus management (`useFocusOnNavigate.ts`) so focus lands on the destination heading/container on every hash-driven navigation, never lost to `<body>` — verified against the real accessibility tree.
+- Found and fixed a **second unfixed copy of the stale-closure race** the app-wide fix was supposed to have closed: `OnboardingWizard.tsx` had its own separate, inline `updateProject` that never got the `useProjectPersistence.ts` `projectRef` fix. Migrated onto the shared hook.
+- **A real infinite-render-loop bug was introduced and caught live during this session's own implementation** (inline arrow-function wrappers as unstable effect-dependency references, compounded by `handlePhaseChange` calling `updateProject` even for a same-phase no-op) — confirmed via the browser's own `Maximum update depth exceeded` console error, not inferred from code. Fixed with `useCallback` + an explicit no-op guard. Worth remembering: **always check the browser console during live verification**, not just screenshots — this bug produced a visually-normal-looking screenshot the first time.
+- **Known, recorded gap, not silently omitted**: the phase-gate message doesn't display on the deep-link-overreach path specifically (it does on the equivalent in-app click) — the fallback itself is still honest (renders the nearest valid phase, never broken), only the explanation text is missing there. `navigation-scoping.md` progress log, item 7.
+- `tsc --noEmit` clean, full suite 895/897 (same 2 pre-existing unrelated `supabaseClient.test.ts` failures — zero new regressions). Live-verified end-to-end: forward/backward through the phase workflow, browser back/forward, two deep links (settings sub-tab and an over-reaching phase), keyboard-driven sub-tab switch with focus verified via `document.activeElement`.
+
+**What's NOT done**: Phase 2 (AI setup wizard per-mode step deep-linking, `AISetupWizard.tsx`'s internal `step`/`selectedMode`/`selectedProviders`) — scoped in `navigation-scoping.md`, not started, a comparable amount of work to everything above and deliberately left for its own session. Steps 3-5 of the sci-fi v2 redesign (navy remap, gold remap, remaining components) also remain untouched — this session's instruction was explicitly to do the audit + navigation only, not resume the redesign.
+
+**Updated gap map**: dead-component audit is closed. Navigation is 1 of 2 phases done, genuinely verified, not assumed. Sci-fi v2 redesign remains at 2/6 steps (unchanged from before this session — out of this session's scope by explicit instruction).
+
+---
+
 ## Dead-component audit (2026-07-28) — read this before touching any component, so this stops recurring
 
 The "redesigned/extracted component nobody actually renders" bug has now
