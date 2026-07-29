@@ -126,13 +126,13 @@ export default function NonJournalRequirementsPanel({
 
   return (
     <div id="non-journal-requirements" className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[color:var(--color-navy-4)] pb-4">
         <div>
-          <h2 className="text-xl font-serif font-bold text-[#1A365D] flex items-center gap-2">
-            <ClipboardCheck className="w-5 h-5 text-[#C08A3E]" />
+          <h2 className="text-xl font-bold text-[#E2E8F0] flex items-center gap-2">
+            <ClipboardCheck className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
             Phase E: Manuscript Requirements
           </h2>
-          <p className="text-xs text-gray-500 font-medium">
+          <p className="text-xs text-[#94A3B8] font-medium">
             Confirm or adjust the default requirements for this format. These drive the section structure and formatting used at export.
           </p>
         </div>
@@ -140,25 +140,27 @@ export default function NonJournalRequirementsPanel({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="space-y-6 lg:col-span-1">
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-bold text-[#1A365D] font-serif uppercase tracking-wider border-b border-gray-150 pb-2">
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
+            <h3 className="text-sm font-bold text-[#E2E8F0] uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
               Core Requirements
             </h3>
             <div>
-              <label htmlFor="citation-style" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Citation Style</label>
-              <select
-                id="citation-style"
-                value={citationStyle}
-                onChange={(e) => setCitationStyle(e.target.value)}
-                className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
-              >
-                {CITATION_STYLE_OPTIONS.map((style) => (
-                  <option key={style} value={style}>{style}</option>
-                ))}
-              </select>
+              <label htmlFor="citation-style" className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase mb-1">Citation Style</label>
+              <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg focus-within:border-[color:var(--color-luminous-blue)]">
+                <select
+                  id="citation-style"
+                  value={citationStyle}
+                  onChange={(e) => setCitationStyle(e.target.value)}
+                  className="border-0 bg-transparent w-full rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0] outline-none"
+                >
+                  {CITATION_STYLE_OPTIONS.map((style) => (
+                    <option key={style} value={style}>{style}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div>
-              <label id="word-count-target-label" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Word Count Target</label>
+              <label id="word-count-target-label" className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase mb-1">Word Count Target</label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -166,20 +168,20 @@ export default function NonJournalRequirementsPanel({
                   aria-label="Minimum word count target"
                   value={wordCountMin}
                   onChange={(e) => setWordCountMin(e.target.value)}
-                  className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
+                  className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0]"
                 />
-                <span className="text-xs text-gray-400">to</span>
+                <span className="text-xs text-[#94A3B8]">to</span>
                 <input
                   type="number"
                   placeholder="Max"
                   aria-label="Maximum word count target"
                   value={wordCountMax}
                   onChange={(e) => setWordCountMax(e.target.value)}
-                  className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
+                  className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0]"
                 />
               </div>
               {(wordCountMin || wordCountMax) && (
-                <p className="text-[10px] text-gray-500 mt-1">
+                <p className="text-[10px] text-[#94A3B8] mt-1">
                   Target: {formatWordCountGoal(wordCountMin ? parseInt(wordCountMin, 10) : undefined, wordCountMax ? parseInt(wordCountMax, 10) : undefined)}
                   {" — shown for reference only, not enforced."}
                 </p>
@@ -187,88 +189,94 @@ export default function NonJournalRequirementsPanel({
             </div>
           </div>
 
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-3">
-            <h3 className="text-sm font-bold text-[#1A365D] font-serif uppercase tracking-wider border-b border-gray-150 pb-2">
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-3">
+            <h3 className="text-sm font-bold text-[#E2E8F0] uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
               Page Layout
             </h3>
-            <p className="text-xs text-gray-500 leading-relaxed">
+            <p className="text-xs text-[#94A3B8] leading-relaxed">
               Drives the actual exported document's margins/font/spacing at Stage 12 — pre-filled from this format's default.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="page-margins" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Margins (in)</label>
+                <label htmlFor="page-margins" className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase mb-1">Margins (in)</label>
                 <input
                   id="page-margins"
                   type="number"
                   step="0.1"
                   value={marginInches}
                   onChange={(e) => setMarginInches(e.target.value)}
-                  className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
+                  className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0]"
                 />
               </div>
               <div>
-                <label htmlFor="font-size" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Font Size (pt)</label>
+                <label htmlFor="font-size" className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase mb-1">Font Size (pt)</label>
                 <input
                   id="font-size"
                   type="number"
                   value={fontSizePt}
                   onChange={(e) => setFontSizePt(e.target.value)}
-                  className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
+                  className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0]"
                 />
               </div>
               <div>
-                <label htmlFor="font-family" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Font Family</label>
-                <select
-                  id="font-family"
-                  value={fontFamily}
-                  onChange={(e) => setFontFamily(e.target.value as "Times New Roman" | "Arial")}
-                  className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
-                >
-                  <option value="Times New Roman">Times New Roman</option>
-                  <option value="Arial">Arial</option>
-                </select>
+                <label htmlFor="font-family" className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase mb-1">Font Family</label>
+                <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg focus-within:border-[color:var(--color-luminous-blue)]">
+                  <select
+                    id="font-family"
+                    value={fontFamily}
+                    onChange={(e) => setFontFamily(e.target.value as "Times New Roman" | "Arial")}
+                    className="border-0 bg-transparent w-full rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0] outline-none"
+                  >
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Arial">Arial</option>
+                  </select>
+                </div>
               </div>
               <div>
-                <label htmlFor="line-spacing" className="block text-[10px] font-bold font-mono text-gray-500 uppercase mb-1">Line Spacing</label>
-                <select
-                  id="line-spacing"
-                  value={lineSpacing}
-                  onChange={(e) => setLineSpacing(e.target.value as "single" | "double")}
-                  className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
-                >
-                  <option value="single">Single</option>
-                  <option value="double">Double</option>
-                </select>
+                <label htmlFor="line-spacing" className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase mb-1">Line Spacing</label>
+                <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg focus-within:border-[color:var(--color-luminous-blue)]">
+                  <select
+                    id="line-spacing"
+                    value={lineSpacing}
+                    onChange={(e) => setLineSpacing(e.target.value as "single" | "double")}
+                    className="border-0 bg-transparent w-full rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0] outline-none"
+                  >
+                    <option value="single">Single</option>
+                    <option value="double">Double</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-3">
-            <h3 id="institution-notes-label" className="text-sm font-bold text-[#1A365D] font-serif uppercase tracking-wider border-b border-gray-150 pb-2">
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-3">
+            <h3 id="institution-notes-label" className="text-sm font-bold text-[#E2E8F0] uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
               Institution / Instructor Notes
             </h3>
-            <textarea
-              rows={5}
-              aria-labelledby="institution-notes-label"
-              placeholder="Any custom rules from your institution, instructor, or rubric (optional)..."
-              value={customNotes}
-              onChange={(e) => setCustomNotes(e.target.value)}
-              className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D]"
-            />
+            <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg focus-within:border-[color:var(--color-luminous-blue)]">
+              <textarea
+                rows={5}
+                aria-labelledby="institution-notes-label"
+                placeholder="Any custom rules from your institution, instructor, or rubric (optional)..."
+                value={customNotes}
+                onChange={(e) => setCustomNotes(e.target.value)}
+                className="border-0 bg-transparent w-full rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0] outline-none"
+              />
+            </div>
           </div>
         </div>
 
         <div className="space-y-6 lg:col-span-2">
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-3">
-            <div className="flex items-center justify-between border-b border-gray-150 pb-2 flex-wrap gap-2">
-              <h3 className="text-sm font-bold text-[#1A365D] font-serif uppercase tracking-wider">
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-3">
+            <div className="flex items-center justify-between border-b border-[color:var(--color-navy-4)] pb-2 flex-wrap gap-2">
+              <h3 className="text-sm font-bold text-[#E2E8F0] uppercase tracking-wider">
                 Section Structure
               </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 bg-[#C08A3E]/10 text-[#946A30] border border-[#C08A3E]/30 rounded font-bold uppercase">
+              <span className="text-[10px] font-mono px-2 py-0.5 bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)] border border-[color:var(--color-luminous-blue)]/30 rounded font-bold uppercase">
                 {sampleSourceFileName ? `Learned from: ${sampleSourceFileName}` : `Default from ${project.outputFormat || "format"} template`}
               </span>
             </div>
-            <p className="text-xs text-gray-500 leading-relaxed">
+            <p className="text-xs text-[#94A3B8] leading-relaxed">
               One section per line, in order. Pre-populated from the standard structure for this format — edit freely,
               or upload a sample document from your target journal to replace this with its real detected structure.
             </p>
@@ -289,39 +297,41 @@ export default function NonJournalRequirementsPanel({
                 type="button"
                 onClick={() => sampleFileInputRef.current?.click()}
                 disabled={sampleLoading}
-                className="px-3 py-1.5 bg-white hover:bg-[#FAF9F6] border border-dashed border-[#8C887F] disabled:opacity-50 text-[#5c564e] text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-dashed border-[color:var(--color-navy-4)] disabled:opacity-50 text-[#94A3B8] text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
               >
                 <Upload className="w-3.5 h-3.5" />
                 {sampleLoading ? "Learning Structure..." : "Learn From Sample Document"}
               </button>
             </div>
             {sampleError && (
-              <p className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">{sampleError}</p>
+              <p className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-2">{sampleError}</p>
             )}
-            <textarea
-              rows={10}
-              aria-label="Manuscript section structure, one section per line"
-              value={sectionStructureText}
-              onChange={(e) => {
-                setSectionStructureText(e.target.value);
-                setSampleSourceFileName(null);
-              }}
-              className="w-full bg-[#FAF9F6] border border-[#E2E8F0] rounded-lg px-2.5 py-2 text-xs text-[#1A365D] font-mono"
-            />
+            <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg focus-within:border-[color:var(--color-luminous-blue)]">
+              <textarea
+                rows={10}
+                aria-label="Manuscript section structure, one section per line"
+                value={sectionStructureText}
+                onChange={(e) => {
+                  setSectionStructureText(e.target.value);
+                  setSampleSourceFileName(null);
+                }}
+                className="border-0 bg-transparent w-full rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0] font-mono outline-none"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex justify-between items-center pt-4 border-t border-[#E2E8F0]">
+      <div className="flex justify-between items-center pt-4 border-t border-[color:var(--color-navy-4)]">
         <button
           onClick={onBack}
-          className="px-4 py-2 border border-[#E2E8F0] hover:bg-[#FAF9F6] text-[#1A365D] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
+          className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-1)] text-[#E2E8F0] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
         >
           ← Back
         </button>
         <button
           onClick={handleSaveAndContinue}
-          className="px-6 py-2.5 bg-[#1A365D] hover:bg-[#122847] font-bold text-white text-xs rounded-lg transition-all duration-200 shadow-sm cursor-pointer font-mono uppercase tracking-wider"
+          className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-lg transition-all duration-200 shadow-sm cursor-pointer font-mono uppercase tracking-wider"
         >
           Save & Proceed to Drafting →
         </button>
