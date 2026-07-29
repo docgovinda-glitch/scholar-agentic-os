@@ -228,14 +228,14 @@ export default function ComplianceChecklistPanel({
 
   return (
     <div id="compliance-checklist" className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[color:var(--color-navy-4)] pb-4">
         <div>
-          <h2 className="text-xl font-semibold text-white font-display flex items-center gap-2">
-            <ClipboardCheck className="w-5 h-5 text-brand-400" />
+          <h2 className="text-xl font-semibold text-[#E2E8F0] font-display flex items-center gap-2">
+            <ClipboardCheck className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
             Phase E: Journal Specification & Compliance Audit setup
           </h2>
-          <p className="text-sm text-gray-400">
-            Convert complex publisher guidelines for <strong className="text-brand-300">{project.targetJournal?.name || "Target Journal"}</strong> into a highly actionable pre-writing compilation checklist.
+          <p className="text-sm text-[#94A3B8]">
+            Convert complex publisher guidelines for <strong className="text-[color:var(--color-luminous-blue)]">{project.targetJournal?.name || "Target Journal"}</strong> into a highly actionable pre-writing compilation checklist.
           </p>
         </div>
       </div>
@@ -246,13 +246,13 @@ export default function ComplianceChecklistPanel({
           <div className="flex gap-3">
             <button
               onClick={extractRules}
-              className="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 border border-red-500/40 rounded text-xs text-white font-mono transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 border border-red-500/40 rounded text-xs text-[#E2E8F0] font-mono transition-colors cursor-pointer"
             >
               🔄 Retry Extraction
             </button>
             <button
               onClick={loadStandardGuidelines}
-              className="px-3 py-1.5 bg-brand-500/30 hover:bg-brand-500/40 border border-brand-400/40 rounded text-xs text-brand-200 font-mono transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-[color:var(--color-luminous-blue)]/20 hover:bg-[color:var(--color-luminous-blue)]/30 border border-[color:var(--color-luminous-blue)]/40 rounded text-xs text-[color:var(--color-luminous-blue)] font-mono transition-colors cursor-pointer"
             >
               📄 Load Standard Journal Template
             </button>
@@ -261,43 +261,45 @@ export default function ComplianceChecklistPanel({
       )}
 
       {!rules && !loading ? (
-        <div className="p-8 text-center glass-effect rounded-2xl border-white/5 space-y-4">
+        <div className="p-8 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl space-y-4">
           <div className="max-w-md mx-auto space-y-2">
-            <h3 className="text-lg font-medium text-white font-display">Author Guidelines Parser</h3>
-            <p className="text-sm text-gray-400 font-sans">
+            <h3 className="text-lg font-medium text-[#E2E8F0] font-display">Author Guidelines Parser</h3>
+            <p className="text-sm text-[#94A3B8] font-sans">
               Optional: You can paste raw HTML/text excerpts of Author Instructions/Guidelines from the journal website, or bypass the AI parser to build with standard premier compliance structures right away.
             </p>
           </div>
           <div className="max-w-xl mx-auto space-y-4">
-            <textarea
-              rows={4}
-              className="w-full bg-brand-950/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-500 placeholder:text-gray-600 mb-2"
-              placeholder="Paste submission guidelines, styling rules, word count limits, reference specs here (optional)..."
-              value={guidelineInput}
-              onChange={(e) => setGuidelineInput(e.target.value)}
-            />
+            <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg focus-within:border-[color:var(--color-luminous-blue)] mb-2">
+              <textarea
+                rows={4}
+                className="border-0 bg-transparent w-full rounded-lg px-3 py-2 text-xs text-[#E2E8F0] font-mono outline-none placeholder:text-[#94A3B8]/70"
+                placeholder="Paste submission guidelines, styling rules, word count limits, reference specs here (optional)..."
+                value={guidelineInput}
+                onChange={(e) => setGuidelineInput(e.target.value)}
+              />
+            </div>
             <div className="flex flex-wrap justify-center gap-3">
               <button
                 onClick={extractRules}
-                className="px-5 py-2 bg-brand-500 hover:bg-brand-600 font-medium text-white text-sm rounded-lg transition-all duration-200 inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-brand-500/10"
+                className="px-5 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-medium text-white text-sm rounded-lg transition-all duration-200 inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-[color:var(--color-luminous-blue)]/10"
               >
                 <Sparkles className="w-4 h-4" />
                 Compile Spec Rules Map
               </button>
               <button
                 onClick={loadStandardGuidelines}
-                className="px-5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 font-medium text-gray-200 text-sm rounded-lg transition-all duration-200 inline-flex items-center gap-2 cursor-pointer text-xs"
+                className="px-5 py-2 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] font-medium text-[#94A3B8] text-sm rounded-lg transition-all duration-200 inline-flex items-center gap-2 cursor-pointer text-xs"
               >
-                <Sparkles className="w-4 h-4 text-brand-400" />
+                <Sparkles className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                 Skip & Load Standard Guidelines
               </button>
             </div>
           </div>
         </div>
       ) : loading ? (
-        <div className="p-12 text-center glass-effect rounded-2xl border-white/5 space-y-4">
-          <div className="w-10 h-10 border-4 border-brand-500/20 border-t-brand-400 rounded-full animate-spin mx-auto"></div>
-          <p className="text-sm text-gray-300 font-mono animate-pulse">De-serialising Guidelines & establishing rule checklist...</p>
+        <div className="p-12 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl space-y-4">
+          <div className="w-10 h-10 border-4 border-[color:var(--color-luminous-blue)]/20 border-t-[color:var(--color-luminous-blue)] rounded-full animate-spin mx-auto"></div>
+          <p className="text-sm text-[#94A3B8] font-mono animate-pulse">De-serialising Guidelines & establishing rule checklist...</p>
         </div>
       ) : (
         rules && (
@@ -306,14 +308,14 @@ export default function ComplianceChecklistPanel({
               
               {/* Word count & Core details column */}
               <div className="space-y-6 lg:col-span-1">
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-4">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <h3 className="text-sm font-semibold text-brand-300 font-mono uppercase tracking-wider">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
+                  <div className="flex justify-between items-center border-b border-[color:var(--color-navy-4)] pb-2">
+                    <h3 className="text-sm font-semibold text-[color:var(--color-luminous-blue)] font-mono uppercase tracking-wider">
                       Core Metrics
                     </h3>
                     <button
                       onClick={() => setIsEditing(!isEditing)}
-                      className="text-xs text-brand-400 hover:text-brand-300 font-semibold cursor-pointer"
+                      className="text-xs text-[color:var(--color-luminous-blue)] hover:text-[color:var(--color-luminous-blue)] font-semibold cursor-pointer"
                     >
                       {isEditing ? "Cancel" : "Edit Target Values"}
                     </button>
@@ -322,26 +324,30 @@ export default function ComplianceChecklistPanel({
                   {isEditing ? (
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-[10px] font-bold font-mono text-gray-400 uppercase">Word Count limit:</label>
-                        <input
-                          type="text"
-                          className="w-full bg-brand-950/60 border border-white/15 rounded px-2.5 py-1.5 text-xs text-white"
-                          value={lclWordGoal}
-                          onChange={(e) => setLclWordGoal(e.target.value)}
-                        />
+                        <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase">Word Count limit:</label>
+                        <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded focus-within:border-[color:var(--color-luminous-blue)]">
+                          <input
+                            type="text"
+                            className="border-0 bg-transparent w-full rounded px-2.5 py-1.5 text-xs text-[#E2E8F0] outline-none"
+                            value={lclWordGoal}
+                            onChange={(e) => setLclWordGoal(e.target.value)}
+                          />
+                        </div>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold font-mono text-gray-400 uppercase">Citation Style:</label>
-                        <input
-                          type="text"
-                          className="w-full bg-brand-950/60 border border-white/15 rounded px-2.5 py-1.5 text-xs text-white"
-                          value={lclCitations}
-                          onChange={(e) => setLclCitations(e.target.value)}
-                        />
+                        <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase">Citation Style:</label>
+                        <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded focus-within:border-[color:var(--color-luminous-blue)]">
+                          <input
+                            type="text"
+                            className="border-0 bg-transparent w-full rounded px-2.5 py-1.5 text-xs text-[#E2E8F0] outline-none"
+                            value={lclCitations}
+                            onChange={(e) => setLclCitations(e.target.value)}
+                          />
+                        </div>
                       </div>
                       <button
                         onClick={saveLocalEdits}
-                        className="w-full py-1.5 bg-brand-500 hover:bg-brand-650 text-white rounded text-xs font-mono font-medium cursor-pointer"
+                        className="w-full py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-[#E2E8F0] rounded text-xs font-mono font-medium cursor-pointer"
                       >
                         Save Configuration
                       </button>
@@ -349,26 +355,26 @@ export default function ComplianceChecklistPanel({
                   ) : (
                     <div className="space-y-4">
                       <div>
-                        <span className="text-[10px] font-bold font-mono text-gray-400 block uppercase">Word Count Goal:</span>
-                        <div className="text-xl font-bold font-display text-white mt-1">{rules.wordCountGoal}</div>
+                        <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Word Count Goal:</span>
+                        <div className="text-xl font-bold font-display text-[#E2E8F0] mt-1">{rules.wordCountGoal}</div>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold font-mono text-gray-400 block uppercase">Citation Standard:</span>
-                        <div className="text-base font-semibold text-brand-200 mt-1">{rules.citationStyle}</div>
+                        <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Citation Standard:</span>
+                        <div className="text-base font-semibold text-[color:var(--color-luminous-blue)] mt-1">{rules.citationStyle}</div>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold font-mono text-gray-400 block uppercase">Cover Letter Necessity:</span>
-                        <p className="text-xs text-gray-300 mt-1 leading-relaxed">{rules.coverLetterNecessity}</p>
+                        <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Cover Letter Necessity:</span>
+                        <p className="text-xs text-[#94A3B8] mt-1 leading-relaxed">{rules.coverLetterNecessity}</p>
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-3">
-                  <h3 className="text-sm font-semibold text-brand-300 font-mono uppercase tracking-wider border-b border-white/5 pb-2">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-3">
+                  <h3 className="text-sm font-semibold text-[color:var(--color-luminous-blue)] font-mono uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
                     Abstract Mandates
                   </h3>
-                  <p className="text-xs text-gray-300 leading-relaxed italic border border-white/5 p-3 rounded-lg bg-black/10">
+                  <p className="text-xs text-[#94A3B8] leading-relaxed italic border border-[color:var(--color-navy-4)] p-3 rounded-lg bg-black/10">
                     {rules.abstractRequirements}
                   </p>
                 </div>
@@ -376,32 +382,32 @@ export default function ComplianceChecklistPanel({
 
               {/* Checklists & Formatting rules */}
               <div className="space-y-6 lg:col-span-2">
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-4">
-                  <h3 className="text-sm font-semibold text-brand-300 font-mono uppercase tracking-wider border-b border-white/5 pb-2">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
+                  <h3 className="text-sm font-semibold text-[color:var(--color-luminous-blue)] font-mono uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
                     Guideline Rules Checklist ({rules.formattingRules.length})
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-300">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-[#94A3B8]">
                     {rules.formattingRules.map((rule, i) => (
-                      <div key={i} className="flex gap-2.5 items-start p-2.5 bg-white/[0.01] border border-white/5 rounded-lg">
-                        <CheckSquare className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
+                      <div key={i} className="flex gap-2.5 items-start p-2.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg">
+                        <CheckSquare className="w-4 h-4 text-[color:var(--color-luminous-blue)] shrink-0 mt-0.5" />
                         <span className="leading-normal">{rule}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="glass-effect rounded-xl p-5 border-[#A3E635]/20 bg-[#A3E635]/5 space-y-4 border">
+                <div className="bg-[color:var(--color-navy-2)] rounded-xl p-5 border border-[#A3E635]/20">
                   <div className="flex items-center justify-between border-b border-[#A3E635]/15 pb-2 flex-wrap gap-2">
                     <h3 className="text-sm font-semibold text-[#A3E635] font-mono uppercase tracking-wider flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4" />
                       Target Section Structure
                     </h3>
-                    <span className="text-[10px] font-mono px-2 py-0.5 bg-brand-500/20 text-[#A3E635] border border-[#A3E635]/40 rounded font-bold uppercase">
+                    <span className="text-[10px] font-mono px-2 py-0.5 bg-[color:var(--color-luminous-blue)]/20 text-[#A3E635] border border-[#A3E635]/40 rounded font-bold uppercase">
                       {sampleSourceFileName ? `Learned from: ${sampleSourceFileName}` : "Journal Template Aligned"}
                     </span>
                   </div>
 
-                  <p className="text-xs text-gray-300 leading-relaxed">
+                  <p className="text-xs text-[#94A3B8] leading-relaxed">
                     The entire system has absorbed this target workflow structure. The <strong>Manuscript Drafting Workbench (Phase F)</strong> and the <strong>PDF Pre-Print Compiler</strong> are currently locked-in to this precise structure — edit it directly, or upload a sample document from your target journal to replace it with its real detected structure.
                   </p>
 
@@ -421,7 +427,7 @@ export default function ComplianceChecklistPanel({
                       type="button"
                       onClick={() => sampleFileInputRef.current?.click()}
                       disabled={sampleLoading}
-                      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-dashed border-white/20 disabled:opacity-50 text-gray-200 text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+                      className="px-3 py-1.5 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-dashed border-[color:var(--color-navy-4)] disabled:opacity-50 text-[#94A3B8] text-[10px] font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
                     >
                       <Upload className="w-3.5 h-3.5" />
                       {sampleLoading ? "Learning Structure..." : "Learn From Sample Document"}
@@ -429,7 +435,7 @@ export default function ComplianceChecklistPanel({
                     <button
                       type="button"
                       onClick={() => setIsEditingSections(!isEditingSections)}
-                      className="text-xs text-brand-400 hover:text-brand-300 font-semibold cursor-pointer"
+                      className="text-xs text-[color:var(--color-luminous-blue)] hover:text-[color:var(--color-luminous-blue)] font-semibold cursor-pointer"
                     >
                       {isEditingSections ? "Cancel" : "Edit Structure"}
                     </button>
@@ -441,19 +447,21 @@ export default function ComplianceChecklistPanel({
 
                   {isEditingSections ? (
                     <div className="space-y-2">
-                      <p className="text-xs text-gray-400">One section per line, in order.</p>
-                      <textarea
-                        rows={10}
-                        value={sectionStructureText}
-                        onChange={(e) => {
-                          setSectionStructureText(e.target.value);
-                          setSampleSourceFileName(null);
-                        }}
-                        className="w-full bg-brand-950/60 border border-white/15 rounded-lg px-2.5 py-2 text-xs text-white font-mono"
-                      />
+                      <p className="text-xs text-[#94A3B8]">One section per line, in order.</p>
+                      <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg focus-within:border-[color:var(--color-luminous-blue)]">
+                        <textarea
+                          rows={10}
+                          value={sectionStructureText}
+                          onChange={(e) => {
+                            setSectionStructureText(e.target.value);
+                            setSampleSourceFileName(null);
+                          }}
+                          className="border-0 bg-transparent w-full rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0] font-mono outline-none"
+                        />
+                      </div>
                       <button
                         onClick={saveSectionStructure}
-                        className="w-full py-1.5 bg-brand-500 hover:bg-brand-650 text-white rounded text-xs font-mono font-medium cursor-pointer"
+                        className="w-full py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-[#E2E8F0] rounded text-xs font-mono font-medium cursor-pointer"
                       >
                         Save Section Structure
                       </button>
@@ -461,8 +469,8 @@ export default function ComplianceChecklistPanel({
                   ) : (
                     <div className="flex flex-wrap gap-2 pt-1">
                       {rules.sectionStructure.map((sec, i) => (
-                        <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-950/60 border border-brand-500/20 rounded-lg text-xs font-mono text-brand-200">
-                          <span className="font-bold text-brand-400">{i + 1}.</span>
+                        <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-luminous-blue)]/20 rounded-lg text-xs font-mono text-[color:var(--color-luminous-blue)]">
+                          <span className="font-bold text-[color:var(--color-luminous-blue)]">{i + 1}.</span>
                           {sec}
                         </div>
                       ))}
@@ -470,11 +478,11 @@ export default function ComplianceChecklistPanel({
                   )}
                 </div>
 
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-3">
-                  <h3 className="text-sm font-semibold text-brand-300 font-mono uppercase tracking-wider border-b border-white/5 pb-2">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-3">
+                  <h3 className="text-sm font-semibold text-[color:var(--color-luminous-blue)] font-mono uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
                     Integrity, Conflicts & Ethical Statements
                   </h3>
-                  <p className="text-xs text-gray-300 leading-relaxed">
+                  <p className="text-xs text-[#94A3B8] leading-relaxed">
                     {rules.ethicalDisclosure}
                   </p>
                 </div>
@@ -482,16 +490,16 @@ export default function ComplianceChecklistPanel({
 
             </div>
 
-            <div className="flex justify-between items-center pt-4 border-t border-white/10">
+            <div className="flex justify-between items-center pt-4 border-t border-[color:var(--color-navy-4)]">
               <button
                 onClick={onBack}
-                className="px-4 py-2 border border-white/10 hover:bg-white/5 text-gray-300 text-sm rounded-lg transition-all duration-150 cursor-pointer"
+                className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[#94A3B8] text-sm rounded-lg transition-all duration-150 cursor-pointer"
               >
                 Back to Journals
               </button>
               <button
                 onClick={onNext}
-                className="px-6 py-2 bg-brand-500 hover:bg-brand-600 font-medium text-white text-sm rounded-lg transition-all duration-200 shadow-lg shadow-brand-500/20 cursor-pointer"
+                className="px-6 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-medium text-white text-sm rounded-lg transition-all duration-200 shadow-lg shadow-[color:var(--color-luminous-blue)]/20 cursor-pointer"
               >
                 Proceed to Drafting Workspace
               </button>
