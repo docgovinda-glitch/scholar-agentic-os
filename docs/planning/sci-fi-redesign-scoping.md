@@ -1,11 +1,14 @@
 # Sci-Fi UI Redesign — Scoping Note v3 (2026-07-28, deep-navy space direction)
 
-**Status: DIRECTION REVISED AGAIN, DOCS ONLY.** A new visual reference
-(a supplied mockup, described in full in the "v3" section immediately
-below) supersedes v2's grey-HUD direction before any of v2's Step 3/4 work
-started. No CSS, component, or token file is touched in this pass — this
-is the reversal-and-reconciliation record, per this session's explicit
-instruction to stop after the docs and get sign-off before implementing.
+**Status: STEPS 1-4 DONE.** A supplied mockup (described in full in the
+"v3" section immediately below) superseded v2's grey-HUD direction before
+v2's own Step 3/4 work started. All 4 of v3's own implementation steps are
+now complete and live-verified — tokens, global chrome, the confirmed
+non-existence of the 5 unbuildable panels, and all 7 buildable panels
+(plus the full dashboard restyle) — see the "v3 implementation progress
+log" below for the full step-by-step record. Step 5 (remaining component
+restyling beyond the dashboard) remains open, explicitly lower-priority
+per the original sequence, not started.
 v2's own history (research, the two already-shipped steps, the reasoning
 that led to grey/no-gold) is kept below, unedited, for traceability — see
 the "v2 (retired)" marker before it, and the reversal rationale in the new
@@ -253,8 +256,8 @@ updated progress-log table below.
 | 1 | Design tokens (navy scale, luminous blue, gold, luminous border) | 🟢 done | `9e17bb2` |
 | 2 | Global chrome (`AppHeader`/`AppFooter` onto navy, wordmark gold-split) | 🟢 done | `22db8c7` |
 | 3 | Remove the 5 unbuildable panels (per `docs/planning/dashboard-mockup-honest-data-audit.md`) | 🟢 **confirmed nothing to remove** | — |
-| 4 | Rebuild the 8 buildable panels with real data | 🟡 4/7 new panels done + 2 bonus fixes | `f853ee8`, `0799fff`, `507d47e`, `a692e7f`, `aa8e691` |
-| 5 | Remaining component restyling (if budget remains) | 🔲 not started | — |
+| 4 | Rebuild the 7 buildable panels with real data + full dashboard restyle | 🟢 **done** | `f853ee8`, `0799fff`, `507d47e`, `a692e7f`, `aa8e691`, `d21784e`, `7ec9a33`, `446cb11` |
+| 5 | Remaining component restyling (if budget remains) | 🔲 not started — see closing note | — |
 
 **Step 4 progress, this session**: while reading `ResearchIntelligenceDashboard.tsx`
 (the live dashboard) to plan the rebuild, found and fixed two real,
@@ -284,14 +287,50 @@ own commit:
    `usageLogs` entries, honestly 0 with no fabricated trend when there's
    no real activity yet.
 
-**Still open**: AI Gateway/Kernel status and Active Models (both need live
-async health-check plumbing reused from `AIControlCenter.tsx`'s
-`AIGateway.healthCheckProvider`, more involved than the 4 panels above),
-and the full navy/luminous-blue restyle of this component's still-light
-surfaces. Stopped at this clean, fully-verified 4-panel boundary per this
-session's own explicit instruction to pause after 3-4 panels rather than
-rushing the remaining scope (2 more panels plus a full-component restyle)
-without the same commit-by-commit rigor used throughout.
+**A follow-up session closed out the remaining 2 panels + the full restyle**:
+
+5. **AI Gateway** (`d21784e`) — real current mode/provider/fallback state,
+   reusing `AIGateway.healthCheckProvider()` (the exact same function
+   `AIControlCenter.tsx`'s own "Current AI Mode" card already calls, not
+   duplicated). Never an unconditional "ONLINE" claim — real live status,
+   "Checking..." while in flight, honest "Not configured yet" when no
+   provider is set.
+6. **Active Models** (`7ec9a33`) — lists only the genuinely configured
+   provider(s) (current + real `fallbackOrder`), never a fixed 5-provider
+   list. The active/primary provider's status *reuses* the AI Gateway
+   panel's own check (verified by a test asserting exactly one
+   `healthCheckProvider` call total across both panels — no duplicate
+   network request for the same provider). Fallback providers are
+   deliberately *not* auto-checked (avoids an unrequested live call per
+   fallback on every dashboard load) — shown honestly as "Untested," never
+   guessed "Offline." Live-verified by adding a real fallback provider to
+   a test project and confirming the dashboard updated correctly on
+   reload: "Google Gemini — ONLINE" / "Groq — UNTESTED."
+7. **Full dashboard navy restyle** (`446cb11`) — single, large commit,
+   pure styling (confirmed via the full test suite passing unchanged).
+   Systematic conversions: card surfaces onto `--color-navy-2`/`-4`,
+   primary text to `#E2E8F0`, gold demoted from general decorative icon
+   color to *only* the dashboard's one genuine primary CTA ("New
+   Project," 9.4:1 contrast verified) per the scoping doc's reversal #2.
+   **Real contrast failures caught by computing against the new navy
+   surface, not assumed**: `blue-600` (3.47:1) and `indigo-600` (2.85:1)
+   both genuinely failed the 4.5:1 text floor — fixed to `sky-400`/
+   `indigo-300`. **A real bug caught by live verification**: the "Search
+   projects"/"Filter cached bibtex" input fields stayed white after their
+   className was updated, because `index.css`'s global
+   `input[type="text"]` rule forces a white background with `!important`,
+   exempted only by `.border-0`/`.bg-transparent` — fixed by adding those
+   classes and moving the visual field appearance to each input's
+   wrapper, re-verified live (including typing into the real field to
+   confirm search filtering still works).
+
+**Step 4 is now fully done — all 7 buildable panels are real, live-verified,
+and the dashboard matches the v3 direction.** Step 5 (remaining component
+restyling — `CommandPalette.tsx`, `AIControlCenter.tsx`/`AISetupWizard.tsx`
+reworked onto navy tokens, and the ~28 components never touched by any
+sci-fi pass) remains genuinely open, not started, and is explicitly
+lower-priority/optional per the original sequence ("if budget remains") —
+left for a future session rather than rushed here.
 
 **Step 3 finding, not a fabricated removal**: an exhaustive grep across
 `src/components/` for every one of the five unbuildable panels (`SYSTEM
