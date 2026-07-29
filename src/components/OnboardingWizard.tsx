@@ -92,7 +92,7 @@ export default function OnboardingWizard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 blueprint-canvas relative">
+    <div className="min-h-screen flex flex-col bg-[color:var(--color-navy-0)] blueprint-canvas relative">
       {/* Progress bar */}
       <OnboardingProgressBar currentIndex={currentStepIndex >= 0 ? currentStepIndex : 0} />
       <div className="grow flex items-center justify-center p-6 sm:p-12 z-10">
@@ -106,14 +106,14 @@ export default function OnboardingWizard() {
 
 function OnboardingProgressBar({ currentIndex }: { currentIndex: number }) {
   return (
-    <div className="bg-white/90 backdrop-blur-md border-b border-gray-150 px-6 py-4 shrink-0 shadow-xs sticky top-0 z-50">
+    <div className="bg-[color:var(--color-navy-1)]/90 backdrop-blur-md border-b border-[color:var(--color-navy-4)] px-6 py-4 shrink-0 shadow-xs sticky top-0 z-50">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-[#1A365D]" />
-            <span className="text-sm font-serif font-bold text-[#1A365D]">Scholar Agentic OS — Setup Wizard</span>
+            <GraduationCap className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
+            <span className="text-sm font-bold text-[#E2E8F0]">Scholar Agentic OS — Setup Wizard</span>
           </div>
-          <span className="text-[10px] font-mono text-[#946A30] font-bold uppercase tracking-wider">
+          <span className="text-[10px] font-mono text-[color:var(--color-luminous-blue)] font-bold uppercase tracking-wider">
             Step {currentIndex + 1} of {STEPS.length}
           </span>
         </div>
@@ -127,21 +127,21 @@ function OnboardingProgressBar({ currentIndex }: { currentIndex: number }) {
                 <div className="flex items-center gap-1.5">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold transition-all duration-350 ${
                     isCurrent
-                      ? "bg-[#1A365D] text-white ring-4 ring-[#1A365D]/10"
+                      ? "bg-[color:var(--color-luminous-blue-dim)] text-white ring-4 ring-[color:var(--color-luminous-blue)]/10"
                       : isPast
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-gray-50 text-gray-400 border border-gray-200"
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                      : "bg-[color:var(--color-navy-3)] text-[#94A3B8] border border-[color:var(--color-navy-4)]"
                   }`}>
                     {isPast ? <CheckCircle2 className="w-3.5 h-3.5" /> : idx + 1}
                   </div>
                   <span className={`text-[10px] font-mono font-bold uppercase tracking-wider hidden sm:inline ${
-                    isCurrent ? "text-[#1A365D]" : isPast ? "text-emerald-700" : "text-gray-400"
+                    isCurrent ? "text-[color:var(--color-luminous-blue)]" : isPast ? "text-emerald-400" : "text-[#94A3B8]"
                   }`}>
                     {step.label.split(" / ")[0]}
                   </span>
                 </div>
                 {idx < STEPS.length - 1 && (
-                  <div className={`grow h-[2px] rounded transition-colors duration-350 ${isPast ? "bg-emerald-500" : "bg-gray-250/50"}`} />
+                  <div className={`grow h-[2px] rounded transition-colors duration-350 ${isPast ? "bg-emerald-500" : "bg-[color:var(--color-navy-4)]/50"}`} />
                 )}
               </React.Fragment>
             );
