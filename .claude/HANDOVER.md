@@ -1,6 +1,25 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-28, dead-component audit done + navigation overhaul Phase 1 done — supersedes the sci-fi v2 section below)
+## RESUME HERE TOMORROW (as of 2026-07-28, navigation overhaul fully done — both phases — supersedes the section below)
+
+**Navigation overhaul (`docs/planning/navigation-scoping.md`) — 🟢 both phases done.** This session closed out everything Phase 1 had left open.
+
+**Task 1 — closed the recorded deep-link gate-message gap.** Root cause found by writing a failing test first, not assumed: `user` is `null` on the very first render of every fresh page load (before `AuthProvider`'s mount effect hydrates from `localStorage`) — the old `if (!user) { wipe the hash }` guard fired on that render, destroying any deep link before authentication ever resolved. Fixed by only wiping the hash on an actual logout (tracked via a ref), never on the initial not-yet-hydrated state. Live-verified: `#workspace/workspace/D` now shows the real "Complete X first" message on page load, not just a silent fallback.
+
+**Task 2 — Navigation Phase 2 (AI setup wizard per-mode step deep-linking) — built.** New pure resolver `src/utils/aiSetupWizardRouting.ts` (14 tests) decides what a hash segment triple (mode/step/providers) honestly resolves to — unknown mode → mode-selection, providers filtered to only what's real for that specific mode, step clamped to `[0,2]` (**never** deep-links straight to the completion screen, since it has no real validation data). New hash sub-route `#onboarding/ai-setup/<mode>/<step>/<providers>`.
+
+- The concern raised when Phase 2 was scoped — that `selectedProviders` "can't be reconstructed from a URL" — turned out solvable: a comma-joined list in the hash works fine.
+- **Non-negotiable security property, regression-tested**: the vault gate (`isVaultUnlocked()`) is structurally independent of the hash-restore path. The resolver's output can never carry a vault-unlocked flag (asserted by test), and a genuine deep link straight to a key-requiring step still renders the real unlock prompt — verified by both a component test and live in a real browser.
+- **Two real bugs caught by failing tests, not assumed**: (1) `useHashNavigation.ts`'s onboarding-step parsing did an exact-string match against the whole hash tail, breaking the moment wizard sub-segments were appended — fixed to compare only the first segment. (2) The wizard's own hash parser only recognized the trailing-slash `"#onboarding/ai-setup/..."` shape; the *bare* `"#onboarding/ai-setup"` hash a real browser-back produces didn't match, silently leaving the wizard stuck — found via a failing back/forward test.
+- `tsc --noEmit` clean, full suite 925/927 (same 2 pre-existing unrelated `supabaseClient.test.ts` failures). Live-verified end-to-end across Cloud AI Providers, Local AI, OmniRoute/Smart Gateway, and BYOK: forward flow, browser back/forward, deep links (including the vault-gate one), keyboard-only activation with focus verified via `document.activeElement`, console checked at every step.
+
+**What's NOT done**: nothing from the navigation scoping doc remains open — both phases and the recorded gap are closed. Sci-fi v2 redesign steps 3-5 (navy remap, gold remap, remaining components) remain untouched — out of scope for this session by explicit instruction, still queued for a future session.
+
+**Updated gap map**: navigation overhaul is fully closed, genuinely verified. Sci-fi v2 redesign remains at 2/6 steps (unchanged, not touched this session).
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-28, dead-component audit done + navigation overhaul Phase 1 done — superseded by the section above)
 
 **Task 1 (dead-component audit) — 🟢 done.** Full findings in the "Dead-component audit" section directly below this one (kept as its own section since it's a standing reference, not a dated status update). Five confirmed-unreachable code paths deleted (`ExpertCitationEngine.tsx`, `TabContentView.tsx`, `PdfPreviewModal.tsx`, `WorkspacePhaseView.tsx`, and a ~470-line dead `SettingsTabContent` function inline in `App.tsx`) — none needed wiring in, all were genuinely superseded by App.tsx's own more-evolved live implementations. `tsc --noEmit` clean, full suite 869/871 (same 2 pre-existing unrelated failures), live-verified in a real browser.
 
