@@ -1,14 +1,18 @@
 # Sci-Fi UI Redesign — Scoping Note v3 (2026-07-28, deep-navy space direction)
 
-**Status: STEPS 1-4 DONE.** A supplied mockup (described in full in the
+**Status: STEPS 1-5 ALL DONE.** A supplied mockup (described in full in the
 "v3" section immediately below) superseded v2's grey-HUD direction before
-v2's own Step 3/4 work started. All 4 of v3's own implementation steps are
+v2's own Step 3/4 work started. All 5 of v3's own implementation steps are
 now complete and live-verified — tokens, global chrome, the confirmed
-non-existence of the 5 unbuildable panels, and all 7 buildable panels
-(plus the full dashboard restyle) — see the "v3 implementation progress
-log" below for the full step-by-step record. Step 5 (remaining component
-restyling beyond the dashboard) remains open, explicitly lower-priority
-per the original sequence, not started.
+non-existence of the 5 unbuildable panels, all 7 buildable panels (plus
+the full dashboard restyle), and the 5 named remaining components
+(`CommandPalette.tsx`, `ai/AIModeCard.tsx`, `agents/ActiveAgentsPanel.tsx`,
+`AISetupWizard.tsx`, `ManuscriptEditorWorkspace.tsx`,
+`ManuscriptDraftingWorkspace.tsx`, `AIControlCenter.tsx`) — see the "v3
+implementation progress log" below for the full step-by-step record.
+Sci-fi v3 as originally scoped is complete; the ~28 components never
+touched by any sci-fi pass remain fully light-mode and would be new,
+separately-scoped work.
 v2's own history (research, the two already-shipped steps, the reasoning
 that led to grey/no-gold) is kept below, unedited, for traceability — see
 the "v2 (retired)" marker before it, and the reversal rationale in the new
@@ -257,7 +261,7 @@ updated progress-log table below.
 | 2 | Global chrome (`AppHeader`/`AppFooter` onto navy, wordmark gold-split) | 🟢 done | `22db8c7` |
 | 3 | Remove the 5 unbuildable panels (per `docs/planning/dashboard-mockup-honest-data-audit.md`) | 🟢 **confirmed nothing to remove** | — |
 | 4 | Rebuild the 7 buildable panels with real data + full dashboard restyle | 🟢 **done** | `f853ee8`, `0799fff`, `507d47e`, `a692e7f`, `aa8e691`, `d21784e`, `7ec9a33`, `446cb11` |
-| 5 | Remaining component restyling (if budget remains) | 🔲 not started — see closing note | — |
+| 5 | Remaining component restyling (5 named components) | 🟢 **done** | `a71e326`, `23da30a`, `6d2705d`, `6835eac`, `cac54ab`, `8938558`, `8aea3f9`, `0d4d714` |
 
 **Step 4 progress, this session**: while reading `ResearchIntelligenceDashboard.tsx`
 (the live dashboard) to plan the rebuild, found and fixed two real,
@@ -325,12 +329,86 @@ own commit:
    confirm search filtering still works).
 
 **Step 4 is now fully done — all 7 buildable panels are real, live-verified,
-and the dashboard matches the v3 direction.** Step 5 (remaining component
-restyling — `CommandPalette.tsx`, `AIControlCenter.tsx`/`AISetupWizard.tsx`
-reworked onto navy tokens, and the ~28 components never touched by any
-sci-fi pass) remains genuinely open, not started, and is explicitly
-lower-priority/optional per the original sequence ("if budget remains") —
-left for a future session rather than rushed here.
+and the dashboard matches the v3 direction.**
+
+**Step 5 is now also fully done (2026-07-29 session).** A prior Cowork
+session had left three components restyled but uncommitted, without
+test-suite or browser access to verify them: `CommandPalette.tsx`
+(cyan→luminous-blue migration), `ResearchIntelligenceDashboard.tsx` (two
+contrast fixes on top of the earlier "done" restyle), and
+`ai/AIModeCard.tsx` (full light→dark conversion). This session's first
+job was closing that verification gap, not re-doing the work:
+
+- **`ResearchIntelligenceDashboard.tsx`** (`a71e326`) — confirmed 2 real
+  leftover bugs (a non-current project card still `bg-white`, and the AI
+  Gateway/Active Models status pills still light-mode) and committed the
+  fix.
+- **`CommandPalette.tsx`** (`23da30a`) — confirmed the cyan→luminous-blue
+  migration and independently re-verified the inherited selected-item
+  border opacity fix (`/30`→`/70`) via alpha-compositing math (1.65:1 →
+  3.84:1, a genuine fix, not a rubber-stamp).
+- **`ai/AIModeCard.tsx`** (`6d2705d`) — independently re-verified all 6 of
+  the component's own claimed contrast values via the Python sRGB script;
+  all matched. **This became the reference template for every remaining
+  Step 5 component** — its exact verified token combinations (card
+  surface, badge, border, icon chip, CTA) were reused rather than
+  reinvented per component.
+
+Then the 5 remaining components were restyled in order (smallest to
+largest), each live-verified in a real browser, one commit apiece:
+
+1. **`agents/ActiveAgentsPanel.tsx`** (`6835eac`) — found 2 gold-hex
+   borders a blanket string-replace missed, and proactively fixed a
+   textarea hit by `index.css`'s global white-background override before
+   it ever reached a browser.
+2. **`AISetupWizard.tsx`** (`cac54ab`) — 4 form fields (vault passphrase,
+   API-key field with its show/hide toggle, endpoint field, model select)
+   hit by the same global-override bug, fixed via the established
+   border-0/bg-transparent + styled-wrapper-div pattern (the API-key
+   field's fix reused its *existing* `relative` wrapper rather than
+   nesting a new one, to avoid disturbing the show/hide button's
+   positioning).
+3. **`ManuscriptEditorWorkspace.tsx`** (`8938558`) — the phase-gated route
+   isn't reachable without walking the full A→G1 workflow, so
+   live-verification used a UserProfile-shaped `localStorage` seed
+   instead (matching the app's real persisted-profile schema, found by
+   reading `authContext.tsx` after an initial malformed seed crashed the
+   app). Dual-pane focus mode, all 3 intelligence-drawer tabs (including
+   the circular resonance gauge), and the section-edit textarea all
+   verified on navy.
+4. **`ManuscriptDraftingWorkspace.tsx`** (`8aea3f9`) — introduced
+   "colored card" panels (error/diff/scriptural-support/humanize/locked
+   banner) the sibling file didn't have; rather than inventing a new
+   pattern, reused the dashboard's own translucent semantic-badge
+   convention (`bg-{color}-500/10 text-{color}-400 border-{color}-500/30`
+   over navy) already established for the AI Gateway/Active Models
+   status pills.
+5. **`AIControlCenter.tsx`** (`0d4d714`) — largest (1435 lines, 7
+   sub-tabs), ~20 individual white form fields fixed via the wrapper-div
+   pattern. **Found a real structural bug invisible to grep**: the
+   component's root wrapper still carried the legacy `os-card`/
+   `.glass-effect` global CSS classes (`index.css` forces
+   `background-color: #FFFFFF`/`rgba(255,255,255,0.88) !important`
+   respectively) — silently keeping the *entire* component on a white
+   card no matter how many inner Tailwind classes were converted, caught
+   only by live browser verification (a grep for Tailwind color
+   utilities can't catch a bug living in a global CSS class name). Fixed
+   by replacing those two classes with the file's own navy-2/navy-4
+   treatment; `.os-card`/`.glass-effect` themselves were deliberately
+   left untouched in `index.css`, since 6 other still-unconverted
+   components (`GroundingMapDisplay.tsx`, `ComplianceChecklistPanel.tsx`,
+   `JournalDiscoveryPanel.tsx`, `SubmissionPackagingSuite.tsx`,
+   `QCBasedRedraftingSuite.tsx`, `QualityControlSuite.tsx`) depend on the
+   current light-mode definition and are out of scope for this session.
+
+`tsc --noEmit` clean and the full suite at 949/951 (same 2 pre-existing
+unrelated `supabaseClient.test.ts` failures) throughout every one of the
+8 commits this session. **Sci-fi v3's own 5-step sequence is now fully
+complete as originally scoped.** The ~28 components never touched by any
+sci-fi pass (including the 6 named above still using
+`.os-card`/`.glass-effect`) remain fully light-mode — converting them
+would be new, separately-scoped work, not a continuation of an open
+step.
 
 **Step 3 finding, not a fabricated removal**: an exhaustive grep across
 `src/components/` for every one of the five unbuildable panels (`SYSTEM

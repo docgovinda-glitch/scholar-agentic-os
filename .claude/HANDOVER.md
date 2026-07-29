@@ -1,6 +1,30 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi v3 — Steps 1-4 ALL DONE — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-29, sci-fi v3 — Steps 1-5 ALL DONE — supersedes the section below)
+
+**Sci-fi v3 redesign (`docs/planning/sci-fi-redesign-scoping.md`) — Step 5 (final step) fully complete.** This session's first job was verifying and committing three components left uncommitted by a prior Cowork session that lacked test/browser tooling, then finishing the remaining Step 5 component restyling.
+
+**Step 0 — verified and committed the inherited work** (all confirmed genuine fixes, not rubber-stamped):
+- **`ResearchIntelligenceDashboard.tsx`** (`a71e326`) — fixed 2 real leftover light-mode bugs from the earlier "fully done" restyle claim (`446cb11`): a non-current project card still `bg-white`, and the AI Gateway/Active Models "checking"/"unchecked" status pills still light-mode.
+- **`CommandPalette.tsx`** (`23da30a`) — migrated the stale `cyan-accent`/`-dim` references to `luminous-blue`/`-dim`; independently re-verified the inherited selected-item border fix (`/30`→`/70` opacity) via alpha-compositing math against the palette's real background — confirmed a genuine, already-fixed contrast failure (1.65:1 → 3.84:1).
+- **`ai/AIModeCard.tsx`** (`6d2705d`) — full light→dark conversion, independently re-verified all 6 of the component's own claimed contrast values via the Python sRGB script (all matched exactly). **This became the reference template for every subsequent Step 5 component.**
+
+**Step 1 — finished all 5 remaining Step 5 components**, each restyled onto the v3 navy/luminous-blue tokens using AIModeCard.tsx's exact verified token combinations, live-verified in a real browser, one commit each:
+1. **`agents/ActiveAgentsPanel.tsx`** (`6835eac`) — smallest; found and fixed 2 missed gold-hex borders a blanket replace didn't catch, and proactively fixed a textarea hit by `index.css`'s global white-background override.
+2. **`AISetupWizard.tsx`** (`cac54ab`) — 4 form fields hit by the same global-override bug (vault passphrase, API-key field with its show/hide toggle, endpoint field, model select), all fixed via the established border-0/bg-transparent + styled-wrapper-div pattern.
+3. **`ManuscriptEditorWorkspace.tsx`** (`8938558`) — live-verified via a UserProfile-shaped `localStorage` seed (the phase-gated route isn't reachable without walking the full A→G1 workflow) — dual-pane focus mode, all 3 intelligence-drawer tabs, section edit textarea.
+4. **`ManuscriptDraftingWorkspace.tsx`** (`8aea3f9`) — introduced the "colored card" panels (error/diff/scriptural-support/humanize/locked-banner) not present in the sibling file; reused the dashboard's existing translucent semantic-badge convention (`bg-{color}-500/10 text-{color}-400 border-{color}-500/30`) rather than inventing a new one.
+5. **`AIControlCenter.tsx`** (`0d4d714`) — largest (1435 lines, 7 sub-tabs), ~20 individual white form fields fixed via the wrapper-div pattern. **Found a real structural bug invisible to grep**: the component's root wrapper still carried the legacy `os-card`/`.glass-effect` global CSS classes (`index.css` forces `background-color: #FFFFFF`/`rgba(255,255,255,0.88) !important` respectively), silently keeping the *entire* component on a white card regardless of how many inner Tailwind classes were converted — caught only by live browser verification. Fixed by replacing those two classes with the file's own navy-2/navy-4 treatment; `.os-card`/`.glass-effect` themselves were deliberately left untouched in `index.css` since 6 other still-unconverted components (`GroundingMapDisplay.tsx`, `ComplianceChecklistPanel.tsx`, `JournalDiscoveryPanel.tsx`, `SubmissionPackagingSuite.tsx`, `QCBasedRedraftingSuite.tsx`, `QualityControlSuite.tsx`) depend on the current light-mode definition and are out of scope.
+
+- `tsc --noEmit` clean, full suite 949/951 throughout every commit (same 2 pre-existing unrelated `supabaseClient.test.ts` failures — zero regressions from any of the 8 pure-style commits this session), every component live-verified in a real browser (screenshots, console checked clean, real contrast computed via the Python sRGB/alpha-compositing script for every new color pairing rather than eyeballed or assumed from precedent).
+
+**What's NOT done**: the ~28 components never touched by any sci-fi pass (including the 6 named above that still use `.os-card`/`.glass-effect` as-is) remain fully light-mode. Sci-fi v3's own 5-step sequence (`docs/planning/sci-fi-redesign-scoping.md`) is now complete as scoped — any further component conversions would be a new, separate piece of work, not a continuation of an open step.
+
+**Updated gap map**: sci-fi v3 is now 5/5 steps fully done. Navigation overhaul (further below) remains fully closed.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi v3 — Steps 1-4 ALL DONE — superseded by the section above)
 
 **Sci-fi v3 redesign (`docs/planning/sci-fi-redesign-scoping.md`) — Steps 1-4 fully complete.** This session finished Step 4 by closing out the last 2 buildable panels and the full dashboard restyle:
 
