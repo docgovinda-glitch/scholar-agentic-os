@@ -50,6 +50,10 @@ vi.mock("../../services/aiGateway", async () => {
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+  // Navigation overhaul Phase 2 — the wizard now reads/writes its own hash
+  // sub-route on mount; without resetting it here, a hash left over from a
+  // previous test would leak into this one's initial step/mode/providers.
+  window.location.hash = "";
 });
 
 afterEach(() => {

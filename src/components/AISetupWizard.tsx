@@ -6,6 +6,8 @@ import { encryptDataAsync, decryptDataAsync } from '../utils/crypto';
 import { setVaultPassphrase, getVaultPassphrase, isVaultUnlocked } from '../services/vaultPassphrase';
 import { AI_MODES, getAIMode, AIModeId } from '../config/aiModes';
 import AIModeCard from './ai/AIModeCard';
+import { resolveWizardRoute } from '../utils/aiSetupWizardRouting';
+import { useFocusOnNavigate } from '../hooks/useFocusOnNavigate';
 
 interface AISetupWizardProps {
   project: PaperProject;
@@ -57,6 +59,62 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     setVaultUnlocked(true);
     setVaultInput("");
   };
+
+  // Navigation overhaul Phase 2 (docs/planning/navigation-scoping.md) — hash
+  // reflection for this wizard's own step/mode/providers, previously
+  // entirely local state invisible to the URL. Deliberately does NOT touch
+  // vaultUnlocked in either direction: that's a real, stateless fact
+  // (isVaultUnlocked()) seeded once above and re-checked live by
+  // handleUnlockVault — a crafted or restored hash can never mark a vault
+  // "unlocked". See src/utils/aiSetupWizardRouting.ts for the pure resolver
+  // (unit-tested in isolation) this reads from.
+  //
+  // Hash -> state: mount + hashchange only (deps: [] — this wizard only ever
+  // exists while onboardingStep === "ai-setup", set once by the parent's own
+  // useHashNavigation; re-subscribing per-render risks the exact unstable-
+  // effect-dependency infinite loop already found and fixed once this
+  // session in App.tsx's phase-workflow wiring).
+  useEffect(() => {
+    const parseAndApply = () => {
+      const hash = window.location.hash;
+      const bareHash = "#onboarding/ai-setup";
+      const prefix = `${bareHash}/`;
+      // Real bug caught by a failing browser-back test, not assumed: the
+      // bare hash (no sub-segments — the state a real browser-back to
+      // mode-selection actually lands on) doesn't start with the trailing-
+      // slash prefix, so it was being silently ignored entirely, leaving
+      // the wizard stuck on whatever step it was on before. Both shapes
+      // must resolve, not just the sub-segmented one.
+      if (hash !== bareHash && !hash.startsWith(prefix)) return;
+      const rest = hash === bareHash ? "" : hash.slice(prefix.length);
+      const [modeSeg, stepSeg, providersSeg] = rest.split("/");
+      const resolved = resolveWizardRoute(modeSeg, stepSeg, providersSeg);
+      setSelectedMode(resolved.mode);
+      setStep(resolved.step);
+      setSelectedProviders(resolved.providers);
+    };
+    parseAndApply();
+    window.addEventListener("hashchange", parseAndApply);
+    return () => window.removeEventListener("hashchange", parseAndApply);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // State -> hash: writes back whenever the user's real position in the
+  // wizard changes. Guards every write against the hash already matching,
+  // same defense-in-depth discipline as the phase-workflow fix.
+  useEffect(() => {
+    const targetHash = selectedMode
+      ? `#onboarding/ai-setup/${selectedMode}/${step}/${selectedProviders.join(",")}`
+      : "#onboarding/ai-setup";
+    if (window.location.hash !== targetHash) {
+      window.location.hash = targetHash;
+    }
+  }, [selectedMode, step, selectedProviders.join(",")]);
+
+  // Focus management — lands on the wizard content card on every step
+  // change (including the vault-gate variant of step 2, which swaps content
+  // without changing `step` itself, hence including vaultUnlocked in the key).
+  const wizardContentRef = useFocusOnNavigate<HTMLDivElement>(`${step}:${vaultUnlocked}`);
 
   // Check if Gemini key is set on the server via .env on mount
   useEffect(() => {
@@ -708,7 +766,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
         )}
 
         {/* Wizard Content Card */}
-        <div className="bg-white/95 border border-[#E2E8F0] rounded-3xl shadow-xl p-8 md:p-10 space-y-6">
+        <div ref={wizardContentRef} tabIndex={-1} className="bg-white/95 border border-[#E2E8F0] rounded-3xl shadow-xl p-8 md:p-10 space-y-6 focus:outline-none">
           {step === 0 && renderStep0()}
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}

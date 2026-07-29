@@ -46,6 +46,10 @@ vi.mock("../../services/aiGateway", async () => {
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
   clearVaultPassphrase();
+  // Navigation overhaul Phase 2 — the wizard now reads/writes its own hash
+  // sub-route on mount; without resetting it here, a hash left over from a
+  // previous test would leak into this one's initial step/mode/providers.
+  window.location.hash = "";
 });
 
 afterEach(() => {
@@ -142,6 +146,12 @@ describe("AISetupWizard — vault-passphrase gate before key entry", () => {
     await screen.findByText("Configure Connections");
 
     cleanup();
+    // Navigation overhaul Phase 2 — the wizard now writes its own step/mode
+    // hash as the user progresses; reset it here so this second render
+    // starts fresh at mode-selection like a genuinely new session would
+    // (this test is about vault-unlock state surviving a remount, not about
+    // hash-restore, which is covered separately in AISetupWizard.hashRoute.test.tsx).
+    window.location.hash = "";
     renderWizard();
     await goToKeyEntryStep("ai-mode-card-byok", "OpenAI");
 

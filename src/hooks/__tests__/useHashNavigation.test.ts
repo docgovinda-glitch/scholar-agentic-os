@@ -162,3 +162,30 @@ describe("useHashNavigation — deep-link race: user starts null, then loads on 
     expect(window.location.hash).toBe("");
   });
 });
+
+describe("useHashNavigation — onboarding sub-segments (navigation overhaul Phase 2)", () => {
+  it("still dispatches setOnboardingStep('ai-setup') when the hash has wizard sub-segments after it", () => {
+    window.location.hash = "#onboarding/ai-setup/cloud/2/gemini";
+    const { state } = setup();
+    act(() => window.dispatchEvent(new Event("hashchange")));
+    expect(state.setOnboardingStep).toHaveBeenCalledWith("ai-setup");
+  });
+
+  it("does NOT overwrite an already-correct onboarding hash that has wizard sub-segments — the wizard component owns anything after the first segment", () => {
+    window.location.hash = "#onboarding/ai-setup/cloud/2/gemini";
+    setup({ onboardingStep: "ai-setup" });
+    expect(window.location.hash).toBe("#onboarding/ai-setup/cloud/2/gemini");
+  });
+
+  it("still writes the plain #onboarding/<step> hash when there ARE no sub-segments yet (e.g. moving from workshop into onboarding)", () => {
+    window.location.hash = "#dashboard";
+    setup({ onboardingStep: "ai-setup" });
+    expect(window.location.hash).toBe("#onboarding/ai-setup");
+  });
+
+  it("corrects the hash when the onboarding step itself actually changes, even if the old hash had sub-segments", () => {
+    window.location.hash = "#onboarding/ai-setup/cloud/2/gemini";
+    setup({ onboardingStep: "knowledge-vault" });
+    expect(window.location.hash).toBe("#onboarding/knowledge-vault");
+  });
+});

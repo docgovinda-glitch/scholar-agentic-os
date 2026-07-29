@@ -80,7 +80,11 @@ export function useHashNavigation(params: UseHashNavigationParams): void {
       const hash = window.location.hash || "#dashboard";
 
       if (hash.startsWith("#onboarding/")) {
-        const step = hash.replace("#onboarding/", "");
+        // Navigation overhaul Phase 2 — only the FIRST segment identifies the
+        // onboarding step; anything after it (e.g. AISetupWizard's own
+        // #onboarding/ai-setup/<mode>/<step>/<providers> sub-route) is owned
+        // and parsed independently by the wizard component itself.
+        const step = hash.replace("#onboarding/", "").split("/")[0];
         if (step === "login" || step === "ai-setup" || step === "knowledge-vault" || step === "workshop") {
           setOnboardingStep(step);
         }
@@ -117,10 +121,21 @@ export function useHashNavigation(params: UseHashNavigationParams): void {
   useEffect(() => {
     if (!user) return;
 
-    let targetHash = "#dashboard";
+    // Navigation overhaul Phase 2 — if we're already on the right onboarding
+    // step, don't touch the hash: AISetupWizard.tsx owns any sub-route
+    // segments after "#onboarding/ai-setup/" and writes them itself. Only
+    // step in here when the onboarding step has genuinely changed (or there
+    // are no sub-segments yet at all).
     if (onboardingStep !== "workshop") {
-      targetHash = `#onboarding/${onboardingStep}`;
-    } else if (viewMode === "dashboard") {
+      const currentFirstSegment = window.location.hash.replace(/^#onboarding\//, "").split("/")[0];
+      if (currentFirstSegment !== onboardingStep) {
+        window.location.hash = `#onboarding/${onboardingStep}`;
+      }
+      return;
+    }
+
+    let targetHash = "#dashboard";
+    if (viewMode === "dashboard") {
       targetHash = "#dashboard";
     } else if (activeTab === "workspace") {
       targetHash = `#workspace/workspace/${currentPhase}`;
