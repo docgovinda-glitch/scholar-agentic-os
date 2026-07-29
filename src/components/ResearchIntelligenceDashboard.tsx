@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { PaperProject, WORKFLOW_PHASES } from "../types";
 import { generateCitation } from "../services/citationService";
+import { listAgents } from "../services/agentService";
 import { 
   Folder, Play, Search, Bell, Activity, PlusCircle, CheckCircle, 
   Clock, TrendingUp, AlertCircle, DollarSign, Cpu, FileText, 
@@ -108,6 +109,15 @@ export default function ResearchIntelligenceDashboard({
     }
   });
   const sortedActivity = activityTimeline.sort((a, b) => b.time.localeCompare(a.time)).slice(0, 5);
+
+  // Sci-fi v3 Step 4 — "AI Agents" panel (mockup: "12 Active"). The audit
+  // classified a live concurrency count as (c) unbuildable: no background
+  // job queue/concurrent-execution model exists, agents run synchronously
+  // per user action. Real equivalent: the actual, static number of
+  // registered agent types — listAgents() is the same real registry every
+  // agent invocation in this app goes through, not a number invented for
+  // this panel.
+  const registeredAgentCount = listAgents().length;
 
   // Honest-data fix (docs/planning/dashboard-mockup-honest-data-audit.md's
   // discipline, applied here): this panel used to be 3 hardcoded fake
@@ -412,6 +422,19 @@ export default function ResearchIntelligenceDashboard({
                   </div>
                 ))
               )}
+            </div>
+          </div>
+
+          {/* AI Agents panel — real, static registered-agent-type count.
+              Never "N Active"/"N Running": no live concurrency model
+              exists (docs/planning/dashboard-mockup-honest-data-audit.md). */}
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#1A365D]/5 border border-[#1A365D]/10 flex items-center justify-center shrink-0">
+              <Cpu className="w-5 h-5 text-[#1A365D]" />
+            </div>
+            <div>
+              <span className="text-2xl font-serif font-bold text-[#1A365D] block leading-none">{registeredAgentCount}</span>
+              <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase tracking-wider">Agent types available</span>
             </div>
           </div>
 
