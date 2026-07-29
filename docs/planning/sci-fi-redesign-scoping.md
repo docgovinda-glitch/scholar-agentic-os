@@ -246,6 +246,29 @@ v2's old Step 3 (navy → grey) and Step 4 (gold removal) are cancelled, not
 "done" or "skipped" — they are the wrong direction now, full stop; see the
 updated progress-log table below.
 
+### v3 implementation progress log
+
+| # | Step | Status | Commit |
+|---|------|--------|--------|
+| 1 | Design tokens (navy scale, luminous blue, gold, luminous border) | 🟢 done | `9e17bb2` |
+| 2 | Global chrome (`AppHeader`/`AppFooter` onto navy, wordmark gold-split) | 🟢 done | `22db8c7` |
+| 3 | Remove the 5 unbuildable panels (per `docs/planning/dashboard-mockup-honest-data-audit.md`) | 🟢 **confirmed nothing to remove** | — |
+| 4 | Rebuild the 8 buildable panels with real data | 🔲 in progress | — |
+| 5 | Remaining component restyling (if budget remains) | 🔲 not started | — |
+
+**Step 3 finding, not a fabricated removal**: an exhaustive grep across
+`src/components/` for every one of the five unbuildable panels (`SYSTEM
+STATUS`/`CPU`/`GPU`, `Collaborator`, `Running Agents`, `Marketplace`,
+`Prompt Studio`) and a direct read of `App.tsx`'s dashboard-view branch
+(confirms `ResearchIntelligenceDashboard.tsx` is the one and only live
+dashboard component) found **zero matches**. These five panels exist only
+in the newly-supplied mockup — a visual reference for work not yet
+built — never as live code. There was nothing to remove; Step 3's actual
+goal (these five never ship) is already satisfied by construction, simply
+by not introducing them in Step 4's rebuild. Recorded honestly rather than
+manufacturing a deletion commit for code that was never there, per this
+project's standing discipline against claiming work that didn't happen.
+
 ## v2 (retired 2026-07-28, kept for traceability) — grey-HUD direction record
 
 ## Why the old direction is dropped
