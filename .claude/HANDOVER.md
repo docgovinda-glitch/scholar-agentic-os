@@ -1,6 +1,24 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-28, navigation overhaul fully done — both phases — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi v3 direction reversal — Steps 1-3 done, Step 4 in progress — supersedes the section below)
+
+**A new supplied mockup reversed the sci-fi redesign's direction again — see `docs/planning/sci-fi-redesign-scoping.md`'s v3 section.** Deep-navy space aesthetic, luminous blue as primary accent, gold reinstated but scoped narrowly to primary CTA + wordmark only, serif permitted in the wordmark only. v2's grey-surface scale and "no gold" rule are both cancelled — recorded as explicit reversals with rationale, not silently overwritten. `docs/planning/dashboard-mockup-honest-data-audit.md` classifies every panel in the new mockup as real/buildable/unbuildable before any of it got built.
+
+**Steps 1-3 of the v3 implementation sequence are done, Step 4 is in progress:**
+
+- **Step 1 (tokens)** — navy elevation scale (`--color-navy-0..4`, reusing the pre-sci-fi `--color-brand-500/900/950` lineage), `--color-luminous-blue`, `--color-gold-accent` (scoped to CTA/wordmark), `--color-border-luminous`. **Real bug caught by live verification, not the docs' own pre-implementation estimate**: the first version of `--color-border-luminous` reused `--color-luminous-blue-dim`, which the scoping doc's own visual estimate had called passing — but a real `getComputedStyle`-driven contrast check (run only after the tokens existed) showed it fails against `--color-navy-4` (2.85:1, below 3:1). Fixed by using the full (non-dim) blue instead (4.86:1 worst case). v2's grey/cyan tokens are NOT deleted — still consumed live by 8 other components, retired component-by-component as each is migrated, never a blind sweep.
+- **Step 2 (global chrome)** — `AppHeader.tsx`/`AppFooter.tsx` reworked onto the navy tokens, with a real luminous border between elevation layers (navy's own luminance step there is only ~1.06:1, confirmed by Step 1's own live measurement — the border is what actually communicates elevation, not the surface color). Wordmark now splits "Scholar" (white/serif) + "Agentic OS" (gold) — the narrowed `.wordmark` CSS class replaces the old blanket `h1, .font-serif` rule, confirmed safe since all 3 real `<h1>` elements already carried their own explicit `.font-serif` className.
+- **Step 3 (remove 5 unbuildable panels)** — confirmed via exhaustive grep and a direct read of `App.tsx` that none of the five (SYSTEM STATUS hardware panel, COLLABORATORS, RUNNING AGENTS, PROMPT STUDIO/MARKETPLACE nav) exist anywhere in the live app — they're mockup-only, never built. Nothing to remove; recorded honestly rather than fabricating a deletion commit.
+- **Step 4 (rebuild 8 buildable panels), in progress** — while reading `ResearchIntelligenceDashboard.tsx` to plan the rebuild, **found and fixed two real, currently-shipping fabrications not named in the mockup audit** (they predate the new mockup entirely): hardcoded fake "Scholar Alerts" notifications and a hardcoded fake "Cached Vault Citations" list, both shown unconditionally regardless of real project state. Fixed test-first with real derived data (vault-file processing errors, real recent activity, real `citationMetadata` formatted via the already-shipped `generateCitation()` service). **Still open**: the mockup's own new panels (AI Gateway/Kernel status, Active Models, AI Agents count, Knowledge Vault size, storage utilization, per-scholar Journals/Citations/Datasets counters, journal suggestions) and the navy/luminous-blue restyle of this component's still-light surfaces.
+- `tsc --noEmit` clean, full suite 929/931 throughout (same 2 pre-existing unrelated `supabaseClient.test.ts` failures), every step live-verified in a real browser (screenshots, real in-browser contrast computation via `getComputedStyle`, console checked clean).
+
+**What's NOT done**: the bulk of Step 4 (new mockup panels, dashboard restyle) and all of Step 5 (remaining component restyling). Stopped at this clean, fully-verified boundary rather than rushing the remaining large scope.
+
+**Updated gap map**: sci-fi v3 direction is 3/5 steps done, Step 4 genuinely started (not just planned) with one real bonus fix landed. Navigation overhaul (previous section, still fully closed) is unaffected by this work.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-28, navigation overhaul fully done — both phases — superseded by the section above)
 
 **Navigation overhaul (`docs/planning/navigation-scoping.md`) — 🟢 both phases done.** This session closed out everything Phase 1 had left open.
 
