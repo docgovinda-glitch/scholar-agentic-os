@@ -415,19 +415,19 @@ export default function CommandPalette({
                             onMouseEnter={() => setSelectedIndex(currentOverallIdx)}
                             className={`w-full text-left px-3.5 py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between group ${
                               isSelected
-                                ? "bg-[color:var(--color-cyan-accent)]/15 text-[#E2E8F0] shadow-md shadow-[color:var(--color-cyan-accent)]/10 border border-[color:var(--color-cyan-accent)]/30"
+                                ? "bg-[color:var(--color-luminous-blue)]/15 text-[#E2E8F0] shadow-md shadow-[color:var(--color-luminous-blue)]/10 border border-[color:var(--color-luminous-blue)]/70"
                                 : "hover:bg-white/5 text-[#CBD5E1] border border-transparent"
                             }`}
                           >
                             <div className="flex items-center gap-3">
                               <div className={`p-1.5 rounded-lg shrink-0 ${
-                                isSelected ? "bg-[color:var(--color-cyan-accent)]/20 text-[color:var(--color-cyan-accent)]" : "bg-white/5 text-[#64748B]"
+                                isSelected ? "bg-[color:var(--color-luminous-blue)]/20 text-[color:var(--color-luminous-blue)]" : "bg-white/5 text-[#64748B]"
                               }`}>
                                 <Icon className="w-4 h-4" />
                               </div>
                               <div className="flex flex-col">
                                 <span className={`text-xs font-mono font-bold ${
-                                  isSelected ? "text-[color:var(--color-cyan-accent)]" : "text-[#E2E8F0]"
+                                  isSelected ? "text-[color:var(--color-luminous-blue)]" : "text-[#E2E8F0]"
                                 }`}>
                                   {cmd.title}
                                 </span>
@@ -439,7 +439,7 @@ export default function CommandPalette({
                               </div>
                             </div>
                             <ArrowRight className={`w-3.5 h-3.5 transition-all ${
-                              isSelected ? "opacity-100 translate-x-0 text-[color:var(--color-cyan-accent)]" : "opacity-0 -translate-x-2"
+                              isSelected ? "opacity-100 translate-x-0 text-[color:var(--color-luminous-blue)]" : "opacity-0 -translate-x-2"
                             }`} />
                           </button>
                         );
