@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PaperProject, WORKFLOW_PHASES } from "../types";
 import { generateCitation } from "../services/citationService";
 import { listAgents } from "../services/agentService";
@@ -28,6 +28,46 @@ export default function ResearchIntelligenceDashboard({
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [citationSearch, setCitationSearch] = useState("");
+
+  // Sci-fi v3 Step 4 — storage utilization, real navigator.storage.estimate()
+  // only (docs/planning/dashboard-mockup-honest-data-audit.md: the mockup's
+  // "82% Storage utilized" has no real, disclosed quota behind it at all).
+  // Honestly null (not 0, not a placeholder) until/unless the real API
+  // resolves — the render below must distinguish "not checked yet" from
+  // "checked and unavailable" from "checked and here's the real number".
+  const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
+  const [storageEstimateUnavailable, setStorageEstimateUnavailable] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (typeof navigator === "undefined" || !navigator.storage || typeof navigator.storage.estimate !== "function") {
+      setStorageEstimateUnavailable(true);
+      return;
+    }
+    navigator.storage.estimate()
+      .then((est) => {
+        if (cancelled) return;
+        if (typeof est.usage === "number" && typeof est.quota === "number" && est.quota > 0) {
+          setStorageEstimate({ usage: est.usage, quota: est.quota });
+        } else {
+          setStorageEstimateUnavailable(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStorageEstimateUnavailable(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Real, human-readable byte formatting — never a fabricated TB figure for
+  // an app whose actual vault files realistically top out at KB/MB scale.
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return "0 B";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+  const vaultByteSize = (project?.knowledgeVault?.files || []).reduce((sum, f) => sum + (f.fileSize || 0), 0);
 
   // Statistics calculation
   const totalProjects = projects.length;
@@ -472,6 +512,35 @@ export default function ResearchIntelligenceDashboard({
               <div>
                 <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{scholarJournalSelectedCount}</span>
                 <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Journals selected</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Knowledge Vault panel — real summed file bytes, never a
+              fabricated TB figure; utilization only via the real
+              navigator.storage.estimate() API, honestly "not available"
+              when it doesn't resolve, never a fabricated percentage. */}
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center gap-1.5">
+              <HelpCircle className="w-4 h-4 text-[#C08A3E]" />
+              Knowledge Vault
+            </h3>
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{formatBytes(vaultByteSize)}</span>
+                <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">{(project?.knowledgeVault?.files || []).length} file(s) stored</span>
+              </div>
+              <div className="text-right">
+                {storageEstimate ? (
+                  <>
+                    <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">
+                      {Math.round((storageEstimate.usage / storageEstimate.quota) * 100)}%
+                    </span>
+                    <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Browser storage used</span>
+                  </>
+                ) : (
+                  <span className="text-[10px] text-gray-400 italic">Storage estimate not available</span>
+                )}
               </div>
             </div>
           </div>
