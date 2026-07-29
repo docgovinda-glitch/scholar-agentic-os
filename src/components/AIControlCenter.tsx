@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { PaperProject, AISettings } from "../types";
+import { useFocusOnNavigate } from "../hooks/useFocusOnNavigate";
 import { encryptDataAsync, decryptDataAsync } from "../utils/crypto";
 import { setVaultPassphrase, getVaultPassphrase, isVaultUnlocked } from "../services/vaultPassphrase";
 import {
@@ -27,13 +28,22 @@ import { AI_MODES, getAIMode, getModeForProvider, AIModeId } from "../config/aiM
 import AIModeCard from "./ai/AIModeCard";
 import type { HealthStatus } from "../types";
 
+type SettingsSubTab = "mode" | "status" | "credentials" | "local" | "keys" | "advanced" | "diagnostics";
+
 interface AIControlCenterProps {
   project: PaperProject;
   updateProject: (fields: Partial<PaperProject>) => void;
   onRequireVault?: () => void;
+  // Navigation overhaul (docs/planning/navigation-scoping.md) — optionally
+  // CONTROLLED sub-tab: App.tsx passes both to hash-sync the settings
+  // sub-tab (deep links, browser back/forward). Callers that omit them
+  // (existing tests, any future standalone usage) keep the original
+  // self-contained useState behavior unchanged.
+  activeSubTab?: SettingsSubTab;
+  onSubTabChange?: (tab: SettingsSubTab) => void;
 }
 
-export default function AIControlCenter({ project, updateProject, onRequireVault }: AIControlCenterProps) {
+export default function AIControlCenter({ project, updateProject, onRequireVault, activeSubTab: controlledSubTab, onSubTabChange }: AIControlCenterProps) {
   // AI modes redesign (2026-07-28), Step 5 — settings sub-navigation matches
   // the task's own exact 7-tab spec: AI Mode / Current Status / Providers /
   // Local Models / API Keys / Advanced / Diagnostics. "credentials" kept as
@@ -42,7 +52,16 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
   // & Costs) and "comparison" (Provider Matrix) tabs' real content moved
   // into "diagnostics" and "advanced" respectively rather than deleted, per
   // this project's standing rule against removing working functionality.
-  const [activeSubTab, setActiveSubTab] = useState<"mode" | "status" | "credentials" | "local" | "keys" | "advanced" | "diagnostics">("mode");
+  const [internalSubTab, setInternalSubTab] = useState<SettingsSubTab>("mode");
+  const activeSubTab = controlledSubTab ?? internalSubTab;
+  const subTabContentRef = useFocusOnNavigate<HTMLDivElement>(activeSubTab);
+  const setActiveSubTab = (tab: SettingsSubTab) => {
+    if (onSubTabChange) {
+      onSubTabChange(tab);
+    } else {
+      setInternalSubTab(tab);
+    }
+  };
 
   // Local Models tab — real detection state for every Local AI backend
   // (Ollama, LM Studio, OmniRoute, generic custom), not just Ollama.
@@ -385,6 +404,10 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
         </div>
       </div>
 
+      {/* Navigation overhaul (docs/planning/navigation-scoping.md) — focus lands
+          here on every sub-tab switch (deep link, back/forward, or a click),
+          so it's never silently lost to <body>. */}
+      <div ref={subTabContentRef} tabIndex={-1} className="focus:outline-none">
       {/* SUB TAB 0: AI MODE (mirrors onboarding — docs/planning/ai-modes-reconciliation.md Step 4) */}
       {activeSubTab === "mode" && (() => {
         const currentProvider = project.aiSettings?.provider || "gemini";
@@ -1406,6 +1429,7 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

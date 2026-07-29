@@ -626,6 +626,14 @@ export interface PaperProject {
   coAuthorAffiliation?: string;
   coAuthorEmail?: string;
   currentPhase: "A" | "B" | "C" | "D" | "E" | "F" | "G" | "G1" | "G2" | "H" | "I";
+  // Navigation overhaul (docs/planning/navigation-scoping.md) — the furthest
+  // phase this project has ever reached, used as the ceiling for the honest
+  // invalid-transition guard (canEnterPhase). Optional/undefined for
+  // existing projects and old test fixtures; callers treat a missing value
+  // as equal to currentPhase (see resolveFurthestPhase in phaseGating.ts) —
+  // not a stored migration, since it only needs a safe default when read,
+  // never a one-time rewrite.
+  furthestPhase?: "A" | "B" | "C" | "D" | "E" | "F" | "G" | "G1" | "G2" | "H" | "I";
   aiSettings: AISettings;
   
   // Project metadata

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { PaperProject, WORKFLOW_PHASES } from "./types";
 import ResearchIntakeWizard from "./components/ResearchIntakeWizard";
 import OutputFormatSelector from "./components/OutputFormatSelector";
@@ -14,6 +14,9 @@ import SubmissionPackagingSuite from "./components/SubmissionPackagingSuite";
 import ManuscriptPDFViewer from "./components/ManuscriptPDFViewer";
 import { AuthProvider, useAuth } from "./auth/authContext";
 import { useProjectPersistence } from "./hooks/useProjectPersistence";
+import { useHashNavigation } from "./hooks/useHashNavigation";
+import { useFocusOnNavigate } from "./hooks/useFocusOnNavigate";
+import { canEnterPhase, resolveFurthestPhase } from "./utils/phaseGating";
 import OnboardingWizard from "./components/OnboardingWizard";
 import ResearchIntelligenceDashboard from "./components/ResearchIntelligenceDashboard";
 import ManuscriptEditorWorkspace from "./components/ManuscriptEditorWorkspace";
@@ -144,65 +147,63 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Two-way URL Hash <-> React State synchronization for history navigation
-  useEffect(() => {
-    if (!user) {
-      if (window.location.hash !== "" && window.location.hash !== "#login") {
-        window.location.hash = "";
-      }
+  // Navigation overhaul (docs/planning/navigation-scoping.md) — this used to
+  // be a second, inline copy of exactly what src/hooks/useHashNavigation.ts
+  // already implemented, except that hook had zero live imports anywhere
+  // (found while scoping navigation work — a sixth dead-code instance in the
+  // same family as ActiveAgentsPanel/AppHeader/AppFooter, documented in
+  // HANDOVER.md). Fixed and wired in here instead of leaving a second stale
+  // copy sitting next to this one.
+  const [phaseGateMessage, setPhaseGateMessage] = useState<string | null>(null);
+  const [settingsSubTab, setSettingsSubTab] = useState("mode");
+  const phaseHeadingRef = useFocusOnNavigate<HTMLHeadingElement>(project?.currentPhase || "A");
+
+  // Real bug caught by live verification, not assumed: this used to pass
+  // inline arrow-function wrappers (`(step) => setOnboardingStep(...)`) as
+  // setOnboardingStep/setActiveTab straight into useHashNavigation's params
+  // object. A NEW function is a new reference every render, and the hook's
+  // hash->state effect depends on setOnboardingStep's identity — so it
+  // reran on every single render, re-parsed the hash, and (combined with
+  // handlePhaseChange previously calling updateProject even for a no-op
+  // phase-to-itself change, creating a new `project` object reference every
+  // time) fed straight into an infinite render loop, confirmed live via a
+  // real "Maximum update depth exceeded" console error. useCallback below
+  // keeps these references stable; the no-op guard in handlePhaseChange is
+  // the second, defense-in-depth half of the fix.
+  const stableSetOnboardingStep = useCallback((step: string) => setOnboardingStep(step as any), [setOnboardingStep]);
+  const stableSetActiveTab = useCallback((tab: string) => setActiveTab(tab as any), [setActiveTab]);
+
+  const handlePhaseChange = useCallback((phase: string) => {
+    if (!project) return;
+    if (phase === project.currentPhase) return;
+    if (!WORKFLOW_PHASES.some((p) => p.id === phase)) return;
+    const furthest = resolveFurthestPhase(project);
+    const gate = canEnterPhase(WORKFLOW_PHASES, project.currentPhase, furthest, phase);
+    if (!gate.allowed) {
+      setPhaseGateMessage(gate.reason || "That phase isn't reachable yet.");
       return;
     }
+    setPhaseGateMessage(null);
+    const furthestIndex = WORKFLOW_PHASES.findIndex((p) => p.id === furthest);
+    const targetIndex = WORKFLOW_PHASES.findIndex((p) => p.id === phase);
+    const nextFurthest = targetIndex > furthestIndex ? phase : furthest;
+    updateProject({ currentPhase: phase as PaperProject["currentPhase"], furthestPhase: nextFurthest as PaperProject["furthestPhase"] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, updateProject]);
 
-    const parseAndApplyHash = () => {
-      const hash = window.location.hash || "#dashboard";
-      console.log("[Hash Navigation] Applying hash:", hash);
-
-      if (hash.startsWith("#onboarding/")) {
-        const step = hash.replace("#onboarding/", "");
-        if (step === "login" || step === "ai-setup" || step === "knowledge-vault" || step === "workshop") {
-          setOnboardingStep(step as any);
-        }
-      } else if (hash === "#dashboard") {
-        setOnboardingStep("workshop");
-        setViewMode("dashboard");
-      } else if (hash.startsWith("#workspace/")) {
-        const tab = hash.replace("#workspace/", "");
-        setOnboardingStep("workshop");
-        setViewMode("workspace");
-        if (["workspace", "vault", "agents", "publishing", "citation", "settings", "profile"].includes(tab)) {
-          setActiveTab(tab as any);
-        }
-      }
-    };
-
-    parseAndApplyHash();
-
-    window.addEventListener("hashchange", parseAndApplyHash);
-    return () => {
-      window.removeEventListener("hashchange", parseAndApplyHash);
-    };
-  }, [user, setOnboardingStep]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    let targetHash = "#dashboard";
-    if (onboardingStep !== "workshop") {
-      targetHash = `#onboarding/${onboardingStep}`;
-    } else if (viewMode === "dashboard") {
-      targetHash = "#dashboard";
-    } else {
-      targetHash = `#workspace/${activeTab}`;
-    }
-
-    if (window.location.hash !== targetHash) {
-      window.location.hash = targetHash;
-    }
-  }, [user, onboardingStep, viewMode, activeTab]);
-
-  const handlePhaseChange = (phase: typeof WORKFLOW_PHASES[number]["id"]) => {
-    updateProject({ currentPhase: phase });
-  };
+  useHashNavigation({
+    user,
+    onboardingStep,
+    setOnboardingStep: stableSetOnboardingStep,
+    viewMode,
+    setViewMode,
+    activeTab,
+    setActiveTab: stableSetActiveTab,
+    currentPhase: project?.currentPhase || "A",
+    onRequestPhase: handlePhaseChange,
+    settingsSubTab,
+    setSettingsSubTab
+  });
 
   const navigateNext = () => {
     if (!project) return;
@@ -318,9 +319,18 @@ function App() {
           <div className="flex flex-col lg:flex-row gap-6 w-full items-start">
             {/* Sidebar Phase-Timeline Graph */}
             <div className="w-full lg:w-64 shrink-0 bg-white border border-[#E5E7EB] rounded-2xl p-4 shadow-sm relative overflow-hidden">
-              <h3 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#1A365D] mb-4 select-none pb-2 border-b border-[#E5E7EB]">
-                Research Phases
+              <h3
+                ref={phaseHeadingRef}
+                tabIndex={-1}
+                className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#1A365D] mb-4 select-none pb-2 border-b border-[#E5E7EB] focus:outline-none"
+              >
+                Research Phases — {WORKFLOW_PHASES.find((p) => p.id === project.currentPhase)?.name}
               </h3>
+              {phaseGateMessage && (
+                <div role="alert" className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-mono">
+                  {phaseGateMessage}
+                </div>
+              )}
               <div className="relative flex flex-col gap-5 pl-1.5">
                 {/* Connecting Track Line */}
                 <div className="absolute left-[20px] top-4 bottom-4 w-[2px] bg-slate-100" />
@@ -537,12 +547,14 @@ function App() {
         )}
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "settings" && (
-          <AIControlCenter 
-            project={project} 
-            updateProject={updateProject} 
+          <AIControlCenter
+            project={project}
+            updateProject={updateProject}
             onRequireVault={() => {
               setActiveTab("vault");
             }}
+            activeSubTab={settingsSubTab as any}
+            onSubTabChange={(tab) => setSettingsSubTab(tab)}
           />
         )}
 

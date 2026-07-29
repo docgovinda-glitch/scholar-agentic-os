@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "../auth/authContext";
 import { PaperProject, OnboardingStep } from "../types";
+import { useProjectPersistence } from "../hooks/useProjectPersistence";
 import UserProfileGate from "./UserProfileGate";
 import AISetupWizard from "./AISetupWizard";
 import KnowledgeVaultWizard from "./KnowledgeVaultWizard";
@@ -25,31 +26,26 @@ export default function OnboardingWizard() {
 
   const currentStepIndex = STEPS.findIndex(s => s.id === onboardingStep);
 
-  const updateProject = (fields: Partial<PaperProject>) => {
-    if (!user || !project) return;
-    const updated = { ...project, ...fields, lastActivity: new Date().toISOString() };
-    setProject(updated);
-
-    const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-    let existingProfile: any = {};
-    if (savedStateStr) {
-      try { existingProfile = JSON.parse(savedStateStr); } catch (_) {}
-    }
-    const currentProjects: PaperProject[] = existingProfile.projects || [];
-    const idx = currentProjects.findIndex((p: PaperProject) => p.id === updated.id);
-    if (idx >= 0) {
-      currentProjects[idx] = updated;
-    } else {
-      currentProjects.unshift(updated);
-    }
-    const profileData = {
-      ...existingProfile,
-      username: user,
-      projectState: updated,
-      projects: currentProjects
-    };
-    localStorage.setItem(`phd_profile_state_${user}`, JSON.stringify(profileData));
-  };
+  // Navigation overhaul (docs/planning/navigation-scoping.md) — this used to
+  // be its own separate, inline updateProject, entirely independent from
+  // useProjectPersistence.ts's projectRef-based fix for the same-tick
+  // stale-closure race that once silently dropped complianceRules. Two
+  // updateProject calls in the same tick during onboarding could still hit
+  // that exact bug through this parallel path even after the app-wide fix
+  // shipped. Migrated onto the shared hook instead of duplicating the fix.
+  // setViewMode/setActiveTab/allProjects/setAllProjects are no-ops/empty
+  // here — onboarding has no view/tab/multi-project concept of its own, and
+  // none of updateProject's own code path touches them.
+  const [noopAllProjects, setNoopAllProjects] = useState<PaperProject[]>([]);
+  const { updateProject } = useProjectPersistence(
+    user,
+    project,
+    setProject,
+    setNoopAllProjects,
+    noopAllProjects,
+    () => {},
+    () => {}
+  );
 
   const handleLoginSuccess = (username: string, projectState: PaperProject) => {
     loginDirectly(username, projectState);
