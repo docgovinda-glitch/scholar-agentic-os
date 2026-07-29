@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export type ViewMode = "dashboard" | "workspace";
 export type OnboardingStep = string;
@@ -49,14 +49,32 @@ export function useHashNavigation(params: UseHashNavigationParams): void {
     setSettingsSubTab
   } = params;
 
+  // Real bug found via a live-verified, recorded gap (docs/planning/navigation-scoping.md
+  // progress log item 7) and reproduced directly in useHashNavigation.test.ts:
+  // `user` starts null on the very first render of every fresh page load
+  // (AuthProvider's own mount effect hasn't hydrated from localStorage yet —
+  // this is unavoidable client-render timing, not a bug in AuthProvider), so
+  // the old `if (!user) { wipe hash }` guard destroyed EVERY deep link before
+  // authentication ever resolved, on every single page load. That's why the
+  // phase-gate message never appeared on a deep link: the "D" segment was
+  // gone before `onRequestPhase` was ever called with a real project. Fixed
+  // by only wiping the hash on an actual logout (a real previous user going
+  // to null), tracked via this ref — never on the initial not-yet-hydrated
+  // state, which looks identical (`user === null`) but must not be treated
+  // the same way.
+  const previousUserRef = useRef(user);
+
   // Hash -> State synchronization (and browser back/forward handling)
   useEffect(() => {
     if (!user) {
-      if (window.location.hash !== "" && window.location.hash !== "#login") {
+      const wasLoggedIn = !!previousUserRef.current;
+      previousUserRef.current = user;
+      if (wasLoggedIn && window.location.hash !== "" && window.location.hash !== "#login") {
         window.location.hash = "";
       }
       return;
     }
+    previousUserRef.current = user;
 
     const parseAndApplyHash = () => {
       const hash = window.location.hash || "#dashboard";

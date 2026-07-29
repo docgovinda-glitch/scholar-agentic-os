@@ -94,3 +94,71 @@ describe("useHashNavigation — settings sub-tab segment (navigation overhaul)",
     expect(window.location.hash).toBe("#workspace/settings/keys");
   });
 });
+
+describe("useHashNavigation — deep-link race: user starts null, then loads on a later render (root cause of the recorded gate-message gap)", () => {
+  it("does NOT wipe an over-reaching deep link's hash while user is still null on the first render, and correctly re-parses it once user loads", () => {
+    window.location.hash = "#workspace/workspace/D";
+    const onRequestPhase = vi.fn();
+    const { rerender } = renderHook(
+      (props: Parameters<typeof useHashNavigation>[0]) => useHashNavigation(props),
+      {
+        initialProps: {
+          user: null,
+          onboardingStep: "workshop",
+          setOnboardingStep: vi.fn(),
+          viewMode: "workspace" as const,
+          setViewMode: vi.fn(),
+          activeTab: "workspace",
+          setActiveTab: vi.fn(),
+          currentPhase: "A",
+          onRequestPhase,
+          settingsSubTab: "mode",
+          setSettingsSubTab: vi.fn()
+        }
+      }
+    );
+
+    // Real app lifecycle: user is null on the very first render (auth context
+    // hasn't hydrated from localStorage yet), then becomes available on a
+    // later render — this must not have already destroyed the deep link.
+    expect(window.location.hash).toBe("#workspace/workspace/D");
+
+    rerender({
+      user: "jdoe",
+      onboardingStep: "workshop",
+      setOnboardingStep: vi.fn(),
+      viewMode: "workspace" as const,
+      setViewMode: vi.fn(),
+      activeTab: "workspace",
+      setActiveTab: vi.fn(),
+      currentPhase: "B",
+      onRequestPhase,
+      settingsSubTab: "mode",
+      setSettingsSubTab: vi.fn()
+    });
+
+    expect(onRequestPhase).toHaveBeenCalledWith("D");
+  });
+
+  it("still wipes the hash on an ACTUAL logout (real user -> null), unlike the not-yet-hydrated initial state", () => {
+    window.location.hash = "#workspace/workspace/B";
+    const { rerender } = setup({ user: "jdoe" });
+    expect(window.location.hash).not.toBe("");
+
+    rerender({
+      user: null,
+      onboardingStep: "workshop",
+      setOnboardingStep: vi.fn(),
+      viewMode: "workspace" as const,
+      setViewMode: vi.fn(),
+      activeTab: "workspace",
+      setActiveTab: vi.fn(),
+      currentPhase: "B",
+      onRequestPhase: vi.fn(),
+      settingsSubTab: "mode",
+      setSettingsSubTab: vi.fn()
+    });
+
+    expect(window.location.hash).toBe("");
+  });
+});
