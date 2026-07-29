@@ -45,28 +45,99 @@
   --color-brand-900: #06101F;
   --color-brand-950: #030810;
 
-  /* System/brand accent — unchanged value from the prior session, already
-     contrast-verified (10.55:1 against --color-brand-900). Under sci-fi v2
-     this is now the SOLE brand accent (gold is retired, not a second hue). */
+  /* SUPERSEDED by --color-luminous-blue below (sci-fi v3). Kept declared,
+     NOT deleted — still consumed live by AIControlCenter.tsx,
+     AISetupWizard.tsx, CommandPalette.tsx, ManuscriptDraftingWorkspace.tsx,
+     ManuscriptEditorWorkspace.tsx, ResearchIntelligenceDashboard.tsx,
+     ActiveAgentsPanel.tsx, AIModeCard.tsx (confirmed via grep before this
+     edit) — retire only once every one of those is migrated onto
+     --color-luminous-blue, component by component, never as a blind sweep. */
   --color-cyan-accent: #22D3EE;
   --color-cyan-accent-dim: #0E7490;
 
-  /* Sci-fi redesign v2 (2026-07-28) — layered-grey dark surface scale.
-     Each step is a ~6-8% luminance increase over the previous, per
-     Material's elevation-by-lightening method (see scoping doc Phase 1).
-     Replaces --color-brand-500..950 as the primary surface system going
-     forward; components migrate onto this scale in the navy-remap step,
-     not instantly here. */
+  /* SUPERSEDED by --color-navy-0..4 below (sci-fi v3 reverses v2's grey
+     scale back to navy — see docs/planning/sci-fi-redesign-scoping.md's
+     v3 section for the full reversal rationale). Kept declared, NOT
+     deleted — still consumed live by the same files listed above for
+     --color-cyan-accent; retire only once every consumer is migrated. */
   --color-surface-0: #121212;   /* base page background — never pure black */
   --color-surface-1: #1A1A1A;   /* first elevation: cards, panels */
   --color-surface-2: #232323;   /* second elevation: nested panels, popovers */
   --color-surface-3: #2C2C2C;   /* third elevation: modals, top-most overlays */
   --color-border-subtle: #383838; /* dividers, resting borders — no glow */
 
-  /* Semantic state colors (sci-fi v2) — NOT a second brand accent. Agent
-     status/error states get their own conventional, non-brand tokens;
-     citation/scholarship emphasis gets no color at all (structural
-     treatment instead) per the scoping doc's Phase 2 judgment call. */
+  /* Sci-fi redesign v3 (2026-07-28) — layered NAVY surface scale, replacing
+     v2's grey one. Reuses the --color-brand-500/900/950 lineage that
+     predates the sci-fi redesign entirely (the original brand palette),
+     rather than inventing a new hue, per the scoping doc's reversal #1.
+     --color-navy-3 is the one genuinely new value (one step lighter than
+     brand-800, for the login-card/nested-panel surface the mockup shows).
+     IMPORTANT, confirmed by real contrast computation (sRGB relative-
+     luminance formula) before writing these: every adjacent pair in this
+     scale fails the 3:1 non-text floor on luminance alone (0.03-0.18
+     ratio spread apart, at most 1.18:1 between the two lightest steps) —
+     navy is simply too tonally narrow a hue for elevation-by-luminance to
+     work the way v2's grey scale did. This is expected and intentional,
+     not a defect to fix here: elevation between these surfaces must be
+     communicated with --color-border-luminous (below) or a visible
+     border/glow, never by the surface-color step alone. Do not add more
+     intermediate navy steps hoping to find one that passes — it can't,
+     confirmed by testing the entire brand-950..650 range. */
+  --color-navy-0: #030810; /* = --color-brand-950, deepest layer / true page background */
+  --color-navy-1: #06101F; /* = --color-brand-900, base chrome surface */
+  --color-navy-2: #0A172B; /* = --color-brand-800, first elevation: cards, panels */
+  --color-navy-3: #0F1B36; /* NEW — nested panels, the login-card surface */
+  --color-navy-4: #172D4D; /* = --color-brand-650, modals / top-most overlays */
+
+  /* The real fix for the 3:1 non-text floor navy's own luminance can't
+     supply (see above) — a SOLID (not alpha) border color, deliberately
+     opaque rather than translucent: an alpha-based border's real
+     contrast depends on whatever photographic/starfield background is
+     composited underneath it, which this project can't guarantee stays
+     within floor at every point behind a panel.
+     LIVE-VERIFIED CATCH, not just computed: the first version of this
+     token reused --color-luminous-blue-dim (#1E6FD9), which looked fine
+     against navy-0..navy-3 (3.52-4.14:1) in a pre-implementation estimate,
+     but a real getComputedStyle-driven contrast check in the browser
+     (after these tokens actually existed, not before) showed it fails
+     against --color-navy-4 specifically: 2.85:1, below the 3:1 floor —
+     navy-4 is light enough that the "dim" blue is too close to it. Fixed
+     by using the full (non-dim) --color-luminous-blue value instead,
+     which clears 3:1 against every navy surface including navy-4
+     (4.86:1, the worst case) — re-verified live after the fix. */
+  --color-border-luminous: #3B9CFF;
+
+  /* Primary accent — sci-fi v3's "luminous blue," a distinct hue from
+     --color-cyan-accent (#22D3EE, more turquoise/teal); the supplied
+     mockup's blue reads as a separate, less-teal blue. Verified via the
+     sRGB formula: 4.86:1 (navy-4, worst case) to 7.06:1 (navy-0) against
+     every navy surface above — clears the 4.5:1 text floor everywhere. */
+  --color-luminous-blue: #3B9CFF;
+  --color-luminous-blue-dim: #1E6FD9; /* verified 3.37-4.14:1 vs navy-4..navy-0 — fine for
+                                          borders/non-text use per --color-border-luminous
+                                          above, but NOT reliable as body text on the two
+                                          lightest surfaces (navy-3/navy-4) — use
+                                          --color-luminous-blue (not -dim) for on-navy text. */
+
+  /* Gold — sci-fi v3 reversal #2: reinstated, but SCOPED narrowly to
+     primary CTA + wordmark only (never general emphasis — see the
+     scoping doc's reversal rationale). Brightened slightly from the
+     retired --color-brand-300 (#C08A3E) to match the mockup's more
+     saturated gold — verified via the sRGB formula: 6.48:1 (navy-4,
+     worst case) to 9.40:1 (navy-0) against every navy surface, comfortably
+     above the 4.5:1 floor even in the one CTA/wordmark spot per screen
+     this is used. */
+  --color-gold-accent: #E0A83D;
+  --color-gold-accent-dim: #A87630; /* = --color-brand-400, unchanged — same "not reliable
+                                        as on-navy text on the lightest surfaces" caveat as
+                                        --color-luminous-blue-dim above; dim variants are for
+                                        light-background contexts elsewhere in the app. */
+
+  /* Semantic state colors (sci-fi v2, unaffected by the v3 navy/gold
+     reversal) — NOT a second brand accent. Agent status/error states get
+     their own conventional, non-brand tokens; citation/scholarship
+     emphasis gets no color at all (structural treatment instead) per the
+     scoping doc's Phase 2 judgment call, still true under v3. */
   --color-warning-accent: #F59E0B; /* alias of --color-warning-base, reused as-is */
   --color-error-accent: #F87171;   /* NEW — Tailwind red-400, dark-mode-safe lightness */
 }
