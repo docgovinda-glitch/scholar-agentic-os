@@ -273,7 +273,7 @@ function App() {
   const intakeProgress = getIntakeProgress();
 
   return (
-    <div className="min-h-screen blueprint-canvas text-[#1A365D] flex flex-col font-sans selection:bg-[#1A365D] selection:text-white">
+    <div className="min-h-screen blueprint-canvas text-[#E2E8F0] flex flex-col font-sans selection:bg-[color:var(--color-luminous-blue-dim)] selection:text-white">
       
       <AppHeader
         onboardingStep={onboardingStep}
@@ -318,22 +318,22 @@ function App() {
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "workspace" && (
           <div className="flex flex-col lg:flex-row gap-6 w-full items-start">
             {/* Sidebar Phase-Timeline Graph */}
-            <div className="w-full lg:w-64 shrink-0 bg-white border border-[#E5E7EB] rounded-2xl p-4 shadow-sm relative overflow-hidden">
+            <div className="w-full lg:w-64 shrink-0 bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm relative overflow-hidden">
               <h3
                 ref={phaseHeadingRef}
                 tabIndex={-1}
-                className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#1A365D] mb-4 select-none pb-2 border-b border-[#E5E7EB] focus:outline-none"
+                className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 select-none pb-2 border-b border-[color:var(--color-navy-4)] focus:outline-none"
               >
                 Research Phases — {WORKFLOW_PHASES.find((p) => p.id === project.currentPhase)?.name}
               </h3>
               {phaseGateMessage && (
-                <div role="alert" className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-mono">
+                <div role="alert" className="mb-4 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono">
                   {phaseGateMessage}
                 </div>
               )}
               <div className="relative flex flex-col gap-5 pl-1.5">
                 {/* Connecting Track Line */}
-                <div className="absolute left-[20px] top-4 bottom-4 w-[2px] bg-slate-100" />
+                <div className="absolute left-[20px] top-4 bottom-4 w-[2px] bg-[color:var(--color-navy-4)]" />
                 
                 {WORKFLOW_PHASES.map((ph, idx) => {
                   const isActive = project.currentPhase === ph.id;
@@ -348,10 +348,10 @@ function App() {
                       <div
                         className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0 transition-all duration-300 z-10 ${
                           isActive
-                            ? "bg-[#1A365D] text-white border-2 border-[#1A365D] ring-4 ring-[#1A365D]/15 shadow-[#1A365D]/30 shadow-md animate-pulse font-bold"
+                            ? "bg-[color:var(--color-luminous-blue-dim)] text-white border-2 border-[color:var(--color-luminous-blue-dim)] ring-4 ring-[color:var(--color-luminous-blue)]/20 shadow-[color:var(--color-luminous-blue)]/30 shadow-md animate-pulse font-bold"
                             : isPast
                             ? "bg-emerald-500 text-white border-2 border-emerald-500 shadow-md shadow-emerald-500/20 font-bold"
-                            : "bg-white text-gray-400 border border-[#E5E7EB] hover:bg-gray-50 font-normal"
+                            : "bg-[color:var(--color-navy-3)] text-[#94A3B8] border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-2)] font-normal"
                         }`}
                       >
                         {ph.id}
@@ -359,12 +359,12 @@ function App() {
                       <div className="flex flex-col">
                         <span
                           className={`text-[11px] font-mono leading-none tracking-wider uppercase font-semibold transition-colors duration-200 ${
-                            isActive ? "text-[#1A365D]" : isPast ? "text-emerald-700" : "text-gray-400 group-hover:text-gray-500"
+                            isActive ? "text-[#E2E8F0]" : isPast ? "text-emerald-400" : "text-[#94A3B8] group-hover:text-[#E2E8F0]"
                           }`}
                         >
                           {ph.name}
                         </span>
-                        <span className="text-[9px] text-gray-400 mt-0.5 line-clamp-1">{ph.desc}</span>
+                        <span className="text-[9px] text-[#94A3B8] mt-0.5 line-clamp-1">{ph.desc}</span>
                       </div>
                     </button>
                   );
@@ -373,7 +373,7 @@ function App() {
             </div>
 
             {/* Main Panel Content */}
-            <div className="flex-grow w-full rounded-3xl p-5 md:p-6 shadow-sm border border-[#E5E7EB] bg-[#FFFFFF] min-h-[500px]">
+            <div className="flex-grow w-full rounded-3xl p-5 md:p-6 shadow-sm border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-2)] min-h-[500px]">
               <ErrorBoundary>
                 {project.currentPhase === "A" && !project.outputFormat && (
                   <OutputFormatSelector
@@ -491,9 +491,9 @@ function App() {
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "publishing" && (
           <div className="grid grid-cols-1 gap-6">
-            <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-sm">
-              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] mb-4 border-b border-[#E5E7EB] pb-2 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-[#C08A3E]" />
+            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                 Journal Matching Agent
               </h2>
               <JournalDiscoveryPanel
@@ -503,9 +503,9 @@ function App() {
                 onBack={() => {}}
               />
             </div>
-            <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-sm">
-              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] mb-4 border-b border-[#E5E7EB] pb-2 flex items-center gap-1.5">
-                <FileSpreadsheet className="w-4 h-4 text-[#C08A3E]" />
+            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <FileSpreadsheet className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                 Submission Packaging Workbench
               </h2>
               <SubmissionPackagingSuite
@@ -519,9 +519,9 @@ function App() {
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "citation" && (
           <div className="grid grid-cols-1 gap-6">
-            <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-sm">
-              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] mb-4 border-b border-[#E5E7EB] pb-2 flex items-center gap-1.5">
-                <BookOpenCheck className="w-4 h-4 text-[#C08A3E]" />
+            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <BookOpenCheck className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                 Citation Discovery & Textual Grounding
               </h2>
               <DataDiscoveryPanel
@@ -531,9 +531,9 @@ function App() {
                 onBack={() => {}}
               />
             </div>
-            <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-sm">
-              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] mb-4 border-b border-[#E5E7EB] pb-2 flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-[#C08A3E]" />
+            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                 Author Guidelines Parsing & Auditing
               </h2>
               <ComplianceChecklistPanel
@@ -570,22 +570,22 @@ function App() {
 
       {isPdfModalOpen && (
         <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="w-full max-w-5xl bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] border border-[#E5E7EB]">
-            <div className="bg-[#FAF8F5] border-b border-[#E5E7EB] px-6 py-4 flex items-center justify-between shrink-0">
+          <div className="w-full max-w-5xl bg-[color:var(--color-navy-2)] rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] border border-[color:var(--color-navy-4)]">
+            <div className="bg-[color:var(--color-navy-3)] border-b border-[color:var(--color-navy-4)] px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[#1A365D]" />
-                <h3 className="text-xs font-semibold text-[#1A365D] font-mono uppercase tracking-widest">
+                <FileText className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
+                <h3 className="text-xs font-semibold text-[#E2E8F0] font-mono uppercase tracking-widest">
                   Live Manuscript Compilation Workbench
                 </h3>
               </div>
               <button
                 onClick={() => setIsPdfModalOpen(false)}
-                className="p-1 px-3 bg-red-100/30 border border-red-200 hover:bg-red-100 text-[#9C2E2E] rounded text-[11px] font-mono uppercase cursor-pointer transition-all font-semibold"
+                className="p-1 px-3 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 rounded text-[11px] font-mono uppercase cursor-pointer transition-all font-semibold"
               >
                 Dismiss Preview
               </button>
             </div>
-            <div className="overflow-y-auto grow bg-[#F8FAFC]">
+            <div className="overflow-y-auto grow bg-[color:var(--color-navy-1)]">
               <ManuscriptPDFViewer project={project} />
             </div>
           </div>
