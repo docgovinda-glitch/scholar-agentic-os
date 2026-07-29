@@ -157,7 +157,7 @@ export default function JournalDiscoveryPanel({
       )}
 
       {!listToRender && !loading ? (
-        <div className="p-8 text-center glass-effect rounded-2xl border-white/5 space-y-4">
+        <div className="p-8 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl shadow-sm space-y-4">
           <div className="w-12 h-12 bg-brand-900/40 border border-brand-500/30 rounded-full flex items-center justify-center mx-auto">
             <BookOpen className="w-6 h-6 text-brand-400" />
           </div>
@@ -185,7 +185,7 @@ export default function JournalDiscoveryPanel({
           </div>
         </div>
       ) : loading ? (
-        <div className="p-12 text-center glass-effect rounded-2xl border-white/5 space-y-4">
+        <div className="p-12 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl shadow-sm space-y-4">
           <div className="w-10 h-10 border-4 border-brand-500/20 border-t-brand-400 rounded-full animate-spin mx-auto"></div>
           <p className="text-sm text-gray-300 font-mono animate-pulse">Filtering Scopus Q1/Q2 registries...</p>
           <p className="text-xs text-gray-500 max-w-sm mx-auto">Auditing APC levels and checking editorial turnarounds of compliant publishers.</p>
@@ -193,16 +193,16 @@ export default function JournalDiscoveryPanel({
       ) : (
         listToRender && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#FAF9F6] border border-[#E2E8F0] rounded-xl p-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-4">
               <div>
-                <h4 className="text-sm font-bold text-[#1A365D] font-serif">Target Publication Venue</h4>
-                <p className="text-xs text-gray-500">
+                <h4 className="text-sm font-bold text-[#E2E8F0]">Target Publication Venue</h4>
+                <p className="text-xs text-[#94A3B8]">
                   Select a journal to lock-in submission constraints for Phase E compliance translation.
                 </p>
               </div>
               <button
                 onClick={findJournals}
-                className="px-3 py-1.5 bg-[#1A365D] hover:bg-[#122847] text-white rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer shadow-sm"
+                className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer shadow-sm"
               >
                 Re-scan Registries
               </button>
@@ -215,63 +215,63 @@ export default function JournalDiscoveryPanel({
                   <div
                     key={i}
                     onClick={() => selectJournal(journal)}
-                    className={`bg-white rounded-xl border p-5 transition-all duration-200 cursor-pointer flex flex-col justify-between group shadow-sm ${
+                    className={`bg-[color:var(--color-navy-2)] rounded-xl border p-5 transition-all duration-200 cursor-pointer flex flex-col justify-between group shadow-sm ${
                       isSelected
-                        ? "border-[#C08A3E] bg-[#FFFBF5]/60 ring-1 ring-[#C08A3E]"
-                        : "border-[#E2E8F0] hover:border-[#C08A3E]/50"
+                        ? "border-[color:var(--color-luminous-blue)] bg-[color:var(--color-navy-3)] ring-1 ring-[color:var(--color-luminous-blue)]"
+                        : "border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)]/50"
                     }`}
                   >
                     <div className="space-y-4">
                       <div className="flex justify-between items-start gap-4">
                         <div>
-                          <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-[#1A365D]/10 text-[#1A365D] rounded border border-[#1A365D]/15">
+                          <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)] rounded border border-[color:var(--color-luminous-blue)]/20">
                             {journal.publisher}
                           </span>
-                          <h3 className="text-base font-bold text-[#1A365D] font-serif mt-2 group-hover:text-[#946A30] transition-colors">
+                          <h3 className="text-base font-bold text-[#E2E8F0] mt-2 group-hover:text-[color:var(--color-luminous-blue)] transition-colors">
                             {journal.name}
                           </h3>
                         </div>
                         <div
                           className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
                             isSelected
-                              ? "bg-[#C08A3E] border-[#C08A3E] text-white"
-                              : "border-[#CBD5E1] text-transparent"
+                              ? "bg-[color:var(--color-luminous-blue)] border-[color:var(--color-luminous-blue)] text-white"
+                              : "border-[color:var(--color-navy-4)] text-transparent"
                           }`}
                         >
                           <Check className="w-3.5 h-3.5" />
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 bg-[#F8FAFC] p-3 rounded-lg border border-[#F1F5F9]">
+                      <div className="grid grid-cols-2 gap-3 bg-[color:var(--color-navy-3)] p-3 rounded-lg border border-[color:var(--color-navy-4)]">
                         <div>
-                          <span className="text-[10px] font-bold font-mono text-gray-500 block uppercase">Fee / APC Status:</span>
-                          <span className="text-xs text-[#1A365D] font-semibold mt-1 block font-mono">{journal.feeStatus}</span>
+                          <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Fee / APC Status:</span>
+                          <span className="text-xs text-[#E2E8F0] font-semibold mt-1 block font-mono">{journal.feeStatus}</span>
                         </div>
                         <div>
-                          <span className="text-[10px] font-bold font-mono text-gray-500 block uppercase">Indexing & Ranking:</span>
-                          <span className="text-xs text-[#1A365D] font-semibold mt-1 block font-mono">{journal.ranking}</span>
+                          <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Indexing & Ranking:</span>
+                          <span className="text-xs text-[#E2E8F0] font-semibold mt-1 block font-mono">{journal.ranking}</span>
                         </div>
                       </div>
 
                       <div className="space-y-2.5 text-xs">
                         <div>
-                          <span className="font-bold font-mono text-[#946A30] uppercase block">Aim & Scope Alignment:</span>
-                          <p className="text-gray-700 mt-0.5 leading-relaxed font-sans">{journal.scopeFit}</p>
+                          <span className="font-bold font-mono text-[color:var(--color-luminous-blue)] uppercase block">Aim & Scope Alignment:</span>
+                          <p className="text-[#94A3B8] mt-0.5 leading-relaxed font-sans">{journal.scopeFit}</p>
                         </div>
                         <div>
-                          <span className="font-bold font-mono text-[#946A30] uppercase block">Why this is an ideal strategic fit:</span>
-                          <p className="text-gray-700 mt-0.5 leading-relaxed font-sans">{journal.whyFit}</p>
+                          <span className="font-bold font-mono text-[color:var(--color-luminous-blue)] uppercase block">Why this is an ideal strategic fit:</span>
+                          <p className="text-[#94A3B8] mt-0.5 leading-relaxed font-sans">{journal.whyFit}</p>
                         </div>
                         <div>
-                          <span className="font-bold font-mono text-[#946A30] uppercase block">Reviewing Style:</span>
-                          <p className="text-gray-500 mt-0.5 leading-relaxed italic font-sans">{journal.reviewContext}</p>
+                          <span className="font-bold font-mono text-[color:var(--color-luminous-blue)] uppercase block">Reviewing Style:</span>
+                          <p className="text-[#94A3B8] mt-0.5 leading-relaxed italic font-sans">{journal.reviewContext}</p>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-end pt-4 mt-4 border-t border-[#F1F5F9]">
+                    <div className="flex justify-end pt-4 mt-4 border-t border-[color:var(--color-navy-4)]">
                       <span className={`text-[11px] font-mono flex items-center gap-1 ${
-                        isSelected ? "text-[#946A30] font-bold" : "text-gray-400 group-hover:text-gray-600"
+                        isSelected ? "text-[color:var(--color-luminous-blue)] font-bold" : "text-[#94A3B8] group-hover:text-[#E2E8F0]"
                       }`}>
                         {isSelected ? "Selected Target Venue" : "Click to select journal"}
                         <ChevronRight className="w-3 h-3" />
