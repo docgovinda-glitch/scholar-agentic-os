@@ -170,6 +170,17 @@ export default function ResearchIntelligenceDashboard({
   );
   const scholarJournalSelectedCount = projects.filter(p => !!p.targetJournal).length;
 
+  // Sci-fi v3 Step 4 — "Today's Research" (mockup: "28 New papers found" +
+  // sparkline, implying a live discovery feed). No background crawler
+  // exists in this app — real equivalent: a real count of today's
+  // timestamped usageLogs entries across all of the scholar's projects,
+  // honestly 0 with no fabricated trend when there's nothing real yet.
+  const todayKey = new Date().toDateString();
+  const todaysActionCount = projects.reduce(
+    (sum, p) => sum + (p.usageLogs || []).filter(log => new Date(log.timestamp).toDateString() === todayKey).length,
+    0
+  );
+
   // Honest-data fix (docs/planning/dashboard-mockup-honest-data-audit.md's
   // discipline, applied here): this panel used to be 3 hardcoded fake
   // notifications, shown unconditionally regardless of the real project's
@@ -542,6 +553,20 @@ export default function ResearchIntelligenceDashboard({
                   <span className="text-[10px] text-gray-400 italic">Storage estimate not available</span>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Today's Research — real, timestamped usageLogs activity only.
+              Never a fabricated discovery-feed count: no background
+              crawler exists in this app (docs/planning/
+              dashboard-mockup-honest-data-audit.md). */}
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#1A365D]/5 border border-[#1A365D]/10 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-5 h-5 text-[#1A365D]" />
+            </div>
+            <div>
+              <span className="text-2xl font-serif font-bold text-[#1A365D] block leading-none">{todaysActionCount}</span>
+              <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase tracking-wider">Today's Research — AI actions today</span>
             </div>
           </div>
 
