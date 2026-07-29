@@ -52,10 +52,14 @@ export default function AppHeader({
             <GraduationCap className="w-6 h-6 chrome-dark-accent" />
           </div>
           <div>
-            <h1 className="text-xl font-serif font-bold text-[#E2E8F0] tracking-tight leading-tight">
-              🎓 Scholar Agentic OS
+            {/* Sci-fi v3 wordmark: serif reinstated but scoped to this
+                lockup only (.wordmark, index.css), gold reserved for the
+                second word only per the scoping doc's reversal #2/#3 —
+                never general emphasis, never the whole heading. */}
+            <h1 className="wordmark text-xl font-bold text-[#E2E8F0] tracking-tight leading-tight">
+              🎓 Scholar <span style={{ color: "var(--color-gold-accent)" }}>Agentic OS</span>
             </h1>
-            <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-[#C08A3E] font-mono">
+            <p className="text-[10px] uppercase tracking-[0.15em] font-bold font-mono" style={{ color: "var(--color-luminous-blue)" }}>
               AI Research Operating System
             </p>
           </div>
@@ -84,7 +88,7 @@ export default function AppHeader({
           {/* Home Button */}
           <button
             onClick={() => { window.location.hash = "#dashboard"; }}
-            className="chrome-dark-subtle p-1.5 border border-white/10 hover:bg-white/10 rounded-lg text-[#94A3B8] hover:text-[color:var(--color-cyan-accent)] transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center"
+            className="chrome-dark-subtle p-1.5 border border-white/10 hover:bg-white/10 rounded-lg text-[#94A3B8] hover:text-[color:var(--color-luminous-blue)] transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center"
             title="Go to Dashboard Home"
           >
             <LayoutDashboard className="w-4 h-4" />
@@ -95,7 +99,7 @@ export default function AppHeader({
             <select
               value={onboardingStep !== "workshop" ? `#onboarding/${onboardingStep}` : (viewMode === "dashboard" ? "#dashboard" : `#workspace/${activeTab}`)}
               onChange={(e) => { window.location.hash = e.target.value; }}
-              className="chrome-dark-subtle px-3 py-1.5 border border-white/10 rounded-lg text-xs font-mono font-bold text-[#E2E8F0] focus:ring-1 focus:ring-[color:var(--color-cyan-accent)] focus:outline-none cursor-pointer shadow-sm"
+              className="chrome-dark-subtle px-3 py-1.5 border border-white/10 rounded-lg text-xs font-mono font-bold text-[#E2E8F0] focus:ring-1 focus:ring-[color:var(--color-luminous-blue)] focus:outline-none cursor-pointer shadow-sm"
             >
               <optgroup label="Onboarding Steps">
                 <option value="#onboarding/ai-setup">Step 2: AI Configuration</option>
@@ -124,7 +128,7 @@ export default function AppHeader({
               onClick={() => setViewMode(viewMode === "dashboard" ? "workspace" : "dashboard")}
               className={`px-3.5 py-1.5 border rounded-lg text-xs font-mono tracking-wider flex items-center gap-1.5 cursor-pointer transition-all uppercase font-semibold shadow-sm ${
                 viewMode === "dashboard"
-                  ? "bg-[color:var(--color-cyan-accent)] text-[#06101F] border-[color:var(--color-cyan-accent)]"
+                  ? "bg-[color:var(--color-luminous-blue)] text-[#06101F] border-[color:var(--color-luminous-blue)]"
                   : "chrome-dark-subtle text-[#E2E8F0] border-white/10 hover:bg-white/10"
               }`}
               title={viewMode === "dashboard" ? "Open Active Workspace" : "Back to Dashboard"}
@@ -139,7 +143,7 @@ export default function AppHeader({
           {onboardingStep === "workshop" && viewMode === "workspace" && (
             <button
               onClick={() => setIsPdfModalOpen(true)}
-              className="px-3.5 py-1.5 bg-[color:var(--color-cyan-accent)] text-[#06101F] border border-[color:var(--color-cyan-accent)] hover:bg-[#5EEAD4] rounded-lg text-xs font-mono tracking-wider flex items-center gap-1.5 cursor-pointer transition-all uppercase font-semibold shadow-sm"
+              className="px-3.5 py-1.5 bg-[color:var(--color-luminous-blue)] text-[#06101F] border border-[color:var(--color-luminous-blue)] hover:bg-[#6BB6FF] rounded-lg text-xs font-mono tracking-wider flex items-center gap-1.5 cursor-pointer transition-all uppercase font-semibold shadow-sm"
               title="View complete compiled manuscript"
             >
               <FileText className="w-3.5 h-3.5" />
@@ -189,11 +193,11 @@ export default function AppHeader({
               onClick={() => setActiveTab(tab.id as any)}
               className={`px-4 py-2 text-xs font-mono font-semibold uppercase tracking-wider rounded-xl transition-all duration-200 cursor-pointer shrink-0 flex items-center gap-2 border ${
                 isActive
-                  ? "bg-[color:var(--color-cyan-accent)]/15 text-[color:var(--color-cyan-accent)] border-[color:var(--color-cyan-accent)]/40"
+                  ? "bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)] border-[color:var(--color-luminous-blue)]/40"
                   : "text-[#94A3B8] bg-transparent border-white/10 hover:text-[#E2E8F0] hover:bg-white/5 hover:border-white/20"
               }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? "text-[color:var(--color-cyan-accent)]" : "text-[#64748B]"}`} />
+              <Icon className={`w-3.5 h-3.5 ${isActive ? "text-[color:var(--color-luminous-blue)]" : "text-[#64748B]"}`} />
               <span>{tab.name}</span>
               {tab.id === "vault" && project?.knowledgeVault?.files.some((f: any) => f.isActive && f.status === "ready") && (
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
@@ -223,7 +227,7 @@ export default function AppHeader({
                 }
                 updateProject({ aiSettings: updatedSettings });
               }}
-              className="bg-transparent border-none text-[color:var(--color-cyan-accent)] font-bold focus:outline-none cursor-pointer pl-1 font-mono text-xs select-none"
+              className="bg-transparent border-none text-[color:var(--color-luminous-blue)] font-bold focus:outline-none cursor-pointer pl-1 font-mono text-xs select-none"
             >
               <option value="gemini">Gemini 3.5</option>
               <option value="gpt-4o">GPT-4o</option>
@@ -233,8 +237,8 @@ export default function AppHeader({
           </span>
           <div className="h-3 w-[1px] bg-white/10"></div>
           <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-cyan-accent)] animate-pulse"></div>
-            <span className="text-[10px] font-bold text-[color:var(--color-cyan-accent)]">Auto-Fallback ON</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-luminous-blue)] animate-pulse"></div>
+            <span className="text-[10px] font-bold text-[color:var(--color-luminous-blue)]">Auto-Fallback ON</span>
           </div>
         </div>
         <div>

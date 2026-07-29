@@ -210,8 +210,17 @@ body {
   border-radius: 16px !important;
 }
 
-/* Heading font overrides */
-h1, .font-serif {
+/* Heading font overrides.
+   NARROWED (sci-fi v3): was `h1, .font-serif`, applying serif to EVERY
+   <h1> in the app regardless of whether it was the product wordmark or
+   just a section heading that happened to use an h1 tag — too broad per
+   the scoping doc's reversal #3 ("serif in the wordmark only"). Confirmed
+   safe to narrow: the only 3 real <h1> elements in the app
+   (AppHeader.tsx, UserProfileGate.tsx, ManuscriptPDFViewer.tsx) each
+   already carry their own explicit `.font-serif` className, so removing
+   the bare `h1` selector changes nothing for them — it only stops a
+   *future* h1 from silently inheriting serif it was never meant to have. */
+.font-serif {
   font-family: var(--font-serif) !important;
 }
 
@@ -468,31 +477,46 @@ button:disabled {
 }
 
 /* ==========================================
-   SCI-FI REDESIGN v2 — STEP 2: GLOBAL CHROME (dark surface)
+   SCI-FI REDESIGN v3 — STEP 2: GLOBAL CHROME (deep-navy surface)
    Scoped to a `.chrome-dark` wrapper (used by AppHeader/AppFooter) rather
    than applied to <body>, since the rest of the app is still on the light
    surface and adopts the dark system incrementally, per the scoping doc's
    own "everything else adopted incrementally as touched" guidance.
-   CHANGED (v2): moved off --color-brand-900/950 onto the layered-grey
-   --color-surface-1/2 scale established in Step 1 — this is the base-
-   surfaces half of "global chrome + base surfaces," ahead of the separate
-   navy-remap step, since these two classes were always cyan/dark-surface
-   chrome, never a navy-text-on-light-surface case the navy remap step
-   needs to classify. Re-verified contrast live after the swap (see commit).
-   ========================================== */
+   CHANGED (v3): moved off v2's grey --color-surface-1/2 tokens onto the
+   --color-navy-1/2 scale from Step 1 — this is the v3 reversal's own
+   "rework the 2 already-shipped components" step. Added a real, visible
+   luminous border between .chrome-dark and its nested .chrome-dark-subtle
+   layer: Step 1 confirmed live that navy's own luminance step between
+   these two tokens is only ~1.06:1, nowhere near the 3:1 non-text floor —
+   the border is what actually communicates the elevation change, not the
+   surface color alone. Re-verified contrast live after the swap (see
+   commit). ========================================== */
 
 .chrome-dark {
-  background-color: var(--color-surface-1);
+  background-color: var(--color-navy-1);
   color: #E2E8F0;
   border-color: rgba(226, 232, 240, 0.1) !important;
 }
 
 .chrome-dark .chrome-dark-subtle {
-  background-color: var(--color-surface-2);
+  background-color: var(--color-navy-2);
+  border: 1px solid var(--color-border-luminous);
 }
 
 .chrome-dark-accent {
-  color: var(--color-cyan-accent);
+  color: var(--color-luminous-blue);
+}
+
+/* Sci-fi v3 — the product wordmark, scoped narrowly (never a blanket h1
+   rule — see the note on the old `h1, .font-serif` rule below, which this
+   replaces for wordmark purposes). Serif is permitted ONLY here, per the
+   scoping doc's reversal #3; gold is reserved for the second word only,
+   applied inline by whichever component renders the wordmark, not by this
+   class (a shared value, not a shared markup structure, since the
+   wordmark still appears in more than one component pending the "extract
+   a shared component" step in the v3 sequence). */
+.wordmark {
+  font-family: var(--font-serif);
 }
 
 .manuscript-body {

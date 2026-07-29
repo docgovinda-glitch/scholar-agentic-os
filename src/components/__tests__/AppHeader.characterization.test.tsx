@@ -41,7 +41,13 @@ function renderHeader(overrides: Partial<React.ComponentProps<typeof AppHeader>>
 describe("AppHeader — behavior preserved across the redesign", () => {
   it("renders the app title and tagline", () => {
     renderHeader();
-    expect(screen.getByText(/Scholar Agentic OS/)).toBeInTheDocument();
+    // Sci-fi v3 — the wordmark now splits "Scholar" and "Agentic OS" into
+    // separate text nodes (gold reserved for the second word only), so the
+    // full title is matched via a custom text function across nodes
+    // rather than a single regex against one text node.
+    expect(
+      screen.getByText((_, element) => element?.tagName.toLowerCase() === "h1" && element.textContent!.includes("Scholar") && element.textContent!.includes("Agentic OS"))
+    ).toBeInTheDocument();
     expect(screen.getByText("AI Research Operating System")).toBeInTheDocument();
   });
 
