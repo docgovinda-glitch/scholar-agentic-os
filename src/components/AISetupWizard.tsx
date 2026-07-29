@@ -274,8 +274,8 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   const renderStep0 = () => (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold font-serif text-[#1A365D] mb-3">How would you like your AI assistant to work?</h2>
-        <p className="text-[#6B665E] max-w-2xl mx-auto text-sm">
+        <h2 className="text-3xl font-bold font-serif text-[#E2E8F0] mb-3">How would you like your AI assistant to work?</h2>
+        <p className="text-[#94A3B8] max-w-2xl mx-auto text-sm">
           Pick a connection method below. You can change this later in AI Settings.
         </p>
       </div>
@@ -288,11 +288,11 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
           Providers is the new default recommendation — genuinely
           lower-friction than OmniRoute (a free account, no local install)
           and proven reliable this session, per the task's own guidance. */}
-      <div className="max-w-2xl mx-auto p-4 bg-[color:var(--color-cyan-accent)]/5 border border-[color:var(--color-cyan-accent)]/30 rounded-xl flex items-start gap-3">
-        <Cloud className="w-5 h-5 text-[color:var(--color-cyan-accent-dim)] shrink-0 mt-0.5" />
+      <div className="max-w-2xl mx-auto p-4 bg-[color:var(--color-luminous-blue)]/5 border border-[color:var(--color-luminous-blue)]/30 rounded-xl flex items-start gap-3">
+        <Cloud className="w-5 h-5 text-[color:var(--color-luminous-blue-dim)] shrink-0 mt-0.5" />
         <div>
-          <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-[#1A365D] mb-1">Not sure which option to choose?</h4>
-          <p className="text-xs text-[#475569] leading-relaxed">
+          <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-[#E2E8F0] mb-1">Not sure which option to choose?</h4>
+          <p className="text-xs text-[#94A3B8] leading-relaxed">
             <strong>Cloud AI Providers</strong> is the best starting point for most people — a free account with a provider
             like Google Gemini or OpenRouter, no local install required. Already pay for OpenAI, Anthropic, or another
             provider? <strong>Bring Your Own AI</strong> connects it directly.
@@ -345,16 +345,16 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     return (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold font-serif text-[#1A365D] mb-3">
+        <h2 className="text-3xl font-bold font-serif text-[#E2E8F0] mb-3">
           {modeConfig ? modeConfig.title : "Choose Your Providers"}
         </h2>
-        <p className="text-[#6B665E] max-w-2xl mx-auto text-sm">
+        <p className="text-[#94A3B8] max-w-2xl mx-auto text-sm">
           {modeConfig ? modeConfig.description : "Select one or more providers below. We will automatically route requests to the best available model."}
         </p>
         {selectedMode && (
           <button
             onClick={() => setStep(0)}
-            className="mt-3 text-xs text-[#C08A3E] hover:text-[#A87630] font-mono underline cursor-pointer"
+            className="mt-3 text-xs text-[color:var(--color-luminous-blue)] hover:text-[color:var(--color-luminous-blue-dim)] font-mono underline cursor-pointer"
           >
             ← Change AI Mode
           </button>
@@ -363,8 +363,8 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
 
       <div className="grid grid-cols-1 gap-3 max-w-2xl mx-auto">
         {isLocalMode && !isDetecting && (
-          <div className="p-3 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl flex items-start gap-2 text-xs text-[#475569]">
-            <Shield className="w-4 h-4 text-[#C08A3E] shrink-0 mt-0.5" />
+          <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl flex items-start gap-2 text-xs text-[#94A3B8]">
+            <Shield className="w-4 h-4 text-[color:var(--color-luminous-blue)] shrink-0 mt-0.5" />
             <span>Nothing you write or generate leaves your computer with Local AI — this app talks directly to the program you choose below, running on your own machine.</span>
           </div>
         )}
@@ -387,20 +387,20 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
               }}
               className={`relative p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
                 isSelected
-                  ? 'bg-[color:var(--color-cyan-accent)]/5 border-[color:var(--color-cyan-accent)] shadow-sm'
-                  : 'bg-[#FAF8F5] border-[#E2E8F0] hover:border-[#C08A3E]/30 hover:bg-[#FAF8F5]/50'
+                  ? 'bg-[color:var(--color-luminous-blue)]/5 border-[color:var(--color-luminous-blue)] shadow-sm'
+                  : 'bg-[color:var(--color-navy-1)] border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)]/40 hover:bg-[color:var(--color-navy-1)]/50'
               }`}
             >
               <div className="flex items-start gap-4">
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-[#1A365D] text-sm">{option.label}</h4>
-                    {isSelected && <CheckCircle2 className="text-[color:var(--color-cyan-accent-dim)] w-5 h-5 animate-scale-in" />}
+                    <h4 className="font-bold text-[#E2E8F0] text-sm">{option.label}</h4>
+                    {isSelected && <CheckCircle2 className="text-[color:var(--color-luminous-blue-dim)] w-5 h-5 animate-scale-in" />}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{option.description}</p>
+                  <p className="text-xs text-gray-400 mt-1">{option.description}</p>
                   <div className="flex items-center gap-2 mt-2">
                     {option.noAccountRequired && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[color:var(--color-navy-3)] text-[#94A3B8] flex items-center gap-1">
                         <Shield className="w-3 h-3" /> No account needed
                       </span>
                     )}
@@ -409,8 +409,8 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                         <Loader2 className="w-3 h-3 animate-spin" /> Detecting...
                       </span>
                     ) : isDetected ? (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[color:var(--color-cyan-accent)]/10 text-[#0E7490] border border-[color:var(--color-cyan-accent)]/30 flex items-center gap-1 font-bold">
-                        <span className="w-1.5 h-1.5 bg-[color:var(--color-cyan-accent)] rounded-full animate-pulse"></span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)] border border-[color:var(--color-luminous-blue)]/30 flex items-center gap-1 font-bold">
+                        <span className="w-1.5 h-1.5 bg-[color:var(--color-luminous-blue)] rounded-full animate-pulse"></span>
                         Detected running
                       </span>
                     ) : null)}
@@ -420,14 +420,14 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="text-[10px] text-[#C08A3E] hover:text-[#A87630] underline font-mono"
+                        className="text-[10px] text-[color:var(--color-luminous-blue)] hover:text-[color:var(--color-luminous-blue-dim)] underline font-mono"
                       >
                         Get your API key →
                       </a>
                     )}
                   </div>
                   {usesAutoDetection && option.installGuidance && (
-                    <p className="text-[10px] text-gray-500 mt-2 leading-relaxed border-t border-[#E2E8F0] pt-2">
+                    <p className="text-[10px] text-gray-400 mt-2 leading-relaxed border-t border-[color:var(--color-navy-4)] pt-2">
                       {option.installGuidance}
                       {option.installUrl && (
                         <>
@@ -437,7 +437,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="text-[#C08A3E] hover:text-[#A87630] underline font-mono"
+                            className="text-[color:var(--color-luminous-blue)] hover:text-[color:var(--color-luminous-blue-dim)] underline font-mono"
                           >
                             Download →
                           </a>
@@ -452,14 +452,14 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
         })}
       </div>
 
-      <div className="flex justify-between items-center pt-8 border-t border-gray-150 max-w-2xl mx-auto">
-        <p className="text-xs text-gray-500 font-mono">
-          Selected: <span className="font-bold text-[#1A365D]">{selectedProviders.length} providers</span>
+      <div className="flex justify-between items-center pt-8 border-t border-[color:var(--color-navy-4)] max-w-2xl mx-auto">
+        <p className="text-xs text-gray-400 font-mono">
+          Selected: <span className="font-bold text-[#E2E8F0]">{selectedProviders.length} providers</span>
         </p>
         <button
           onClick={() => setStep(2)}
           disabled={selectedProviders.length === 0}
-          className="px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider font-mono text-white bg-[#1A365D] hover:bg-[#122847] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+          className="px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider font-mono text-white bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
         >
           Continue <ChevronRight className="w-4 h-4" />
         </button>
@@ -475,12 +475,12 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     if (needsVault && !vaultUnlocked) {
       return (
         <div className="space-y-6 animate-fade-in max-w-xl mx-auto text-center">
-          <div className="w-14 h-14 bg-[#1A365D]/5 border border-gray-200 rounded-full flex items-center justify-center mx-auto">
-            <Shield className="w-7 h-7 text-[#C08A3E]" />
+          <div className="w-14 h-14 bg-[color:var(--color-luminous-blue)]/10 border border-[color:var(--color-navy-4)] rounded-full flex items-center justify-center mx-auto">
+            <Shield className="w-7 h-7 text-[color:var(--color-luminous-blue)]" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold font-serif text-[#1A365D] mb-3">Unlock Your Key Vault</h2>
-            <p className="text-[#6B665E] text-sm">
+            <h2 className="text-2xl font-bold font-serif text-[#E2E8F0] mb-3">Unlock Your Key Vault</h2>
+            <p className="text-[#94A3B8] text-sm">
               Choose a vault passphrase. It encrypts your provider API keys and is held only in this
               browser tab's memory — never written to disk or synced anywhere. Closing or reloading
               the tab locks the vault again; you'll enter this passphrase each session before your
@@ -488,18 +488,26 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             </p>
           </div>
           <div className="flex flex-col gap-3">
-            <input
-              type="password"
-              value={vaultInput}
-              onChange={(e) => setVaultInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleUnlockVault()}
-              placeholder="Vault passphrase"
-              className="w-full bg-white border border-[#D1CEC7] rounded-xl py-2.5 px-4 text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/10 focus:border-[#1A365D] transition-all font-mono text-sm"
-            />
+            {/* index.css's global input[type=password] override forces a
+                white background with !important, exempted only by
+                .border-0/.bg-transparent — the same bug already found and
+                fixed on the dashboard's inputs and ActiveAgentsPanel's
+                textarea. Wrapper carries the visual field look instead of
+                combining border-0 with a conflicting border utility. */}
+            <div className="rounded-xl border border-[color:var(--color-navy-4)] focus-within:border-[color:var(--color-luminous-blue)] focus-within:ring-2 focus-within:ring-[color:var(--color-luminous-blue)]/20">
+              <input
+                type="password"
+                value={vaultInput}
+                onChange={(e) => setVaultInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleUnlockVault()}
+                placeholder="Vault passphrase"
+                className="border-0 bg-transparent w-full rounded-xl py-2.5 px-4 text-[#E2E8F0] focus:outline-none transition-all font-mono text-sm"
+              />
+            </div>
             <button
               onClick={handleUnlockVault}
               disabled={!vaultInput.trim()}
-              className="px-5 py-2.5 bg-[#1A365D] hover:bg-[#122847] font-bold text-white text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 uppercase tracking-wider font-mono"
+              className="px-5 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 uppercase tracking-wider font-mono"
             >
               Unlock Vault
             </button>
@@ -511,8 +519,8 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     return (
       <div className="space-y-6 animate-fade-in">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold font-serif text-[#1A365D] mb-3">Configure Connections</h2>
-          <p className="text-[#6B665E] max-w-2xl mx-auto text-sm">
+          <h2 className="text-3xl font-bold font-serif text-[#E2E8F0] mb-3">Configure Connections</h2>
+          <p className="text-[#94A3B8] max-w-2xl mx-auto text-sm">
             Provide the necessary API keys or endpoint URLs for your selected AI engines.
             Keys are XOR-encrypted locally and never stored in plain text.
           </p>
@@ -523,15 +531,15 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             const health = healthResults[provider.id];
             
             return (
-              <div key={provider.id} className="bg-[#FAF8F5] border border-[#E2E8F0] rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#E2E8F0]">
+              <div key={provider.id} className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4 pb-4 border-b border-[color:var(--color-navy-4)]">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{provider.icon}</span>
-                    <h3 className="text-base font-serif font-bold text-[#1A365D]">{provider.name}</h3>
+                    <h3 className="text-base font-serif font-bold text-[#E2E8F0]">{provider.name}</h3>
                   </div>
                   {health && (
                     <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                      health.status === 'online' ? 'bg-[color:var(--color-cyan-accent)]/10 text-[#0E7490] border border-[color:var(--color-cyan-accent)]/30' :
+                      health.status === 'online' ? 'bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)] border border-[color:var(--color-luminous-blue)]/30' :
                       health.status === 'offline' ? 'bg-red-50 text-red-700 border border-red-200' :
                       'bg-amber-50 text-amber-700 border border-amber-200'
                     }`}>
@@ -546,20 +554,23 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                   {/* API Key Input for Cloud */}
                   {provider.requiresApiKey && provider.id !== 'server' && (
                     <div>
-                      <label className="block text-xs font-bold font-mono text-[#6B665E] uppercase tracking-wider mb-1.5 flex items-center gap-2">
-                        <Key className="w-4 h-4 text-[#C08A3E]" /> API Key
+                      <label className="block text-xs font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1.5 flex items-center gap-2">
+                        <Key className="w-4 h-4 text-[color:var(--color-luminous-blue)]" /> API Key
                       </label>
-                      <div className="relative">
+                      {/* Same global input-override exemption as the vault
+                          passphrase field above — visual field look moves
+                          to this existing relative wrapper. */}
+                      <div className="relative rounded-xl border border-[color:var(--color-navy-4)] focus-within:border-[color:var(--color-luminous-blue)] focus-within:ring-2 focus-within:ring-[color:var(--color-luminous-blue)]/20">
                         <input
                           type={showKeys[provider.id] ? "text" : "password"}
                           placeholder={`Enter ${provider.name} API Key`}
                           value={decryptedKeys[provider.id] ?? ""}
-                          className="w-full bg-white border border-[#D1CEC7] rounded-xl py-2.5 px-4 text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/10 focus:border-[#1A365D] transition-all font-mono text-sm placeholder:text-gray-400"
+                          className="border-0 bg-transparent w-full rounded-xl py-2.5 px-4 text-[#E2E8F0] focus:outline-none transition-all font-mono text-sm placeholder:text-gray-400"
                           onChange={(e) => handleSettingChange(provider.id, 'ApiKey', e.target.value)}
                         />
-                        <button 
+                        <button
                           onClick={() => setShowKeys(prev => ({ ...prev, [provider.id]: !prev[provider.id] }))}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-gray-400 hover:text-[#1A365D] cursor-pointer"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-gray-400 hover:text-[#E2E8F0] cursor-pointer"
                         >
                           {showKeys[provider.id] ? 'HIDE' : 'SHOW'}
                         </button>
@@ -570,51 +581,55 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                   {/* Endpoint Input for Local */}
                   {provider.type === 'local' && (
                     <div>
-                      <label className="block text-xs font-bold font-mono text-[#6B665E] uppercase tracking-wider mb-1.5 flex items-center gap-2">
-                        <Server className="w-4 h-4 text-[#C08A3E]" /> Server Endpoint URL
+                      <label className="block text-xs font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1.5 flex items-center gap-2">
+                        <Server className="w-4 h-4 text-[color:var(--color-luminous-blue)]" /> Server Endpoint URL
                       </label>
-                      <input
-                        type="text"
-                        placeholder={
-                          provider.id === 'ollama' ? 'http://localhost:11434' :
-                          provider.id === 'omniroute' ? 'http://localhost:20128/v1' :
-                          'http://localhost:1234/v1'
-                        }
-                        value={(settings as any)[provider.id + 'Endpoint'] || (
-                          provider.id === 'ollama' ? 'http://localhost:11434' :
-                          provider.id === 'omniroute' ? 'http://localhost:20128/v1' :
-                          'http://localhost:1234/v1'
-                        )}
-                        onChange={(e) => handleSettingChange(provider.id, 'Endpoint', e.target.value)}
-                        className="w-full bg-white border border-[#D1CEC7] rounded-xl py-2.5 px-4 text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/10 focus:border-[#1A365D] transition-all font-mono text-sm placeholder:text-gray-400"
-                      />
+                      <div className="rounded-xl border border-[color:var(--color-navy-4)] focus-within:border-[color:var(--color-luminous-blue)] focus-within:ring-2 focus-within:ring-[color:var(--color-luminous-blue)]/20">
+                        <input
+                          type="text"
+                          placeholder={
+                            provider.id === 'ollama' ? 'http://localhost:11434' :
+                            provider.id === 'omniroute' ? 'http://localhost:20128/v1' :
+                            'http://localhost:1234/v1'
+                          }
+                          value={(settings as any)[provider.id + 'Endpoint'] || (
+                            provider.id === 'ollama' ? 'http://localhost:11434' :
+                            provider.id === 'omniroute' ? 'http://localhost:20128/v1' :
+                            'http://localhost:1234/v1'
+                          )}
+                          onChange={(e) => handleSettingChange(provider.id, 'Endpoint', e.target.value)}
+                          className="border-0 bg-transparent w-full rounded-xl py-2.5 px-4 text-[#E2E8F0] focus:outline-none transition-all font-mono text-sm placeholder:text-gray-400"
+                        />
+                      </div>
                     </div>
                   )}
 
                   {/* Model Selector */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold font-mono text-[#6B665E] uppercase tracking-wider mb-1.5 flex items-center gap-2">
-                        <Cpu className="w-4 h-4 text-[#C08A3E]" /> Default Model
+                      <label className="block text-xs font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1.5 flex items-center gap-2">
+                        <Cpu className="w-4 h-4 text-[color:var(--color-luminous-blue)]" /> Default Model
                       </label>
-                      <select
-                        value={(settings as any)[provider.id + 'Model'] || provider.defaultModel}
-                        onChange={(e) => handleSettingChange(provider.id, 'Model', e.target.value)}
-                        className="w-full bg-white border border-[#D1CEC7] rounded-xl py-2.5 px-4 text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/10 focus:border-[#1A365D] transition-all text-sm cursor-pointer"
-                      >
-                        {health?.models?.length ? (
-                          health.models.map((m: string) => <option key={m} value={m}>{m}</option>)
-                        ) : (
-                          provider.availableModels.map((m: string) => <option key={m} value={m}>{m}</option>)
-                        )}
-                      </select>
+                      <div className="rounded-xl border border-[color:var(--color-navy-4)] focus-within:border-[color:var(--color-luminous-blue)] focus-within:ring-2 focus-within:ring-[color:var(--color-luminous-blue)]/20">
+                        <select
+                          value={(settings as any)[provider.id + 'Model'] || provider.defaultModel}
+                          onChange={(e) => handleSettingChange(provider.id, 'Model', e.target.value)}
+                          className="border-0 bg-transparent w-full rounded-xl py-2.5 px-4 text-[#E2E8F0] focus:outline-none transition-all text-sm cursor-pointer"
+                        >
+                          {health?.models?.length ? (
+                            health.models.map((m: string) => <option key={m} value={m}>{m}</option>)
+                          ) : (
+                            provider.availableModels.map((m: string) => <option key={m} value={m}>{m}</option>)
+                          )}
+                        </select>
+                      </div>
                     </div>
                     
                     <div className="flex items-end">
                       <button
                         onClick={() => testConnection(provider.id)}
                         disabled={isTesting}
-                        className="w-full py-2.5 px-4 rounded-xl font-bold font-mono text-xs uppercase tracking-wider text-gray-700 bg-white border border-[#E2E8F0] hover:bg-neutral-50 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+                        className="w-full py-2.5 px-4 rounded-xl font-bold font-mono text-xs uppercase tracking-wider text-[#E2E8F0] bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-2)] transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
                       >
                         {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                         Test Connection
@@ -627,17 +642,17 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
           })}
         </div>
 
-        <div className="flex justify-between items-center pt-8 border-t border-[#E2E8F0] max-w-3xl mx-auto">
+        <div className="flex justify-between items-center pt-8 border-t border-[color:var(--color-navy-4)] max-w-3xl mx-auto">
           <button
             onClick={() => setStep(1)}
-            className="px-6 py-2.5 rounded-xl font-bold font-mono text-xs uppercase tracking-wider border border-[#E2E8F0] bg-white text-gray-600 hover:bg-neutral-50 cursor-pointer transition-all"
+            className="px-6 py-2.5 rounded-xl font-bold font-mono text-xs uppercase tracking-wider border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] text-[#94A3B8] hover:bg-[color:var(--color-navy-2)] cursor-pointer transition-all"
           >
             Back
           </button>
           <button
             onClick={runFinalValidation}
             disabled={isTesting}
-            className="px-6 py-2.5 rounded-xl font-bold font-mono text-xs uppercase tracking-wider text-white bg-[#1A365D] hover:bg-[#122847] transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="px-6 py-2.5 rounded-xl font-bold font-mono text-xs uppercase tracking-wider text-white bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
           >
             {isTesting ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Validating...</>
@@ -663,31 +678,31 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
         </div>
 
         <div>
-          <h2 className="text-2xl font-serif font-bold text-[#1A365D] mb-3">
+          <h2 className="text-2xl font-serif font-bold text-[#E2E8F0] mb-3">
             {isReady ? 'Systems Validated' : 'No Providers Online'}
           </h2>
-          <p className="text-gray-500 text-sm max-w-md mx-auto leading-relaxed">
+          <p className="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
             {isReady 
               ? "Your AI Gateway is configured and ready. The system will intelligently route requests across your selected models to optimize cost and performance."
               : "We couldn't verify a connection to any of your selected AI providers. You can proceed, but the system will use a highly limited simulated fallback mode."}
           </p>
         </div>
 
-        <div className="bg-[#FAF8F5] rounded-2xl p-6 border border-[#E2E8F0] text-left">
-          <h4 className="text-xs font-bold font-mono text-[#6B665E] uppercase tracking-wider mb-4">Gateway Diagnostics</h4>
+        <div className="bg-[color:var(--color-navy-1)] rounded-2xl p-6 border border-[color:var(--color-navy-4)] text-left">
+          <h4 className="text-xs font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-4">Gateway Diagnostics</h4>
           <div className="space-y-3">
             {selectedProviders.map(id => {
               const pInfo = AI_PROVIDERS.find(p => p.id === id);
               const status = healthResults[id]?.status || 'offline';
               return (
-                <div key={id} className="flex items-center justify-between py-2 border-b border-gray-150 last:border-0">
+                <div key={id} className="flex items-center justify-between py-2 border-b border-[color:var(--color-navy-4)] last:border-0">
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{pInfo?.icon}</span>
-                    <span className="font-bold text-[#1A365D] text-sm">{pInfo?.name}</span>
+                    <span className="font-bold text-[#E2E8F0] text-sm">{pInfo?.name}</span>
                   </div>
                   <div className="flex items-center gap-4">
                     {status === 'online' && healthResults[id]?.latencyMs && (
-                      <span className="text-xs font-mono text-gray-500">{healthResults[id].latencyMs}ms</span>
+                      <span className="text-xs font-mono text-gray-400">{healthResults[id].latencyMs}ms</span>
                     )}
                     <span className={`text-[10px] font-bold font-mono px-2.5 py-1 rounded-full ${
                       status === 'online' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
@@ -719,7 +734,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             {onBack && (
               <button
                 onClick={onBack}
-                className="text-xs font-mono font-bold text-gray-400 hover:text-[#1A365D] transition-colors flex items-center gap-1 cursor-pointer"
+                className="text-xs font-mono font-bold text-gray-400 hover:text-[#E2E8F0] transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" /> Back to Login
               </button>
@@ -727,7 +742,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             {!isReady && (
               <button
                 onClick={() => setStep(2)}
-                className="text-xs font-mono font-bold text-gray-400 hover:text-[#1A365D] transition-colors cursor-pointer ml-auto"
+                className="text-xs font-mono font-bold text-gray-400 hover:text-[#E2E8F0] transition-colors cursor-pointer ml-auto"
               >
                 Return to Configuration
               </button>
@@ -739,7 +754,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   };
 
   return (
-    <div className="w-full text-[#1A365D] font-sans selection:bg-[#1A365D] selection:text-white">
+    <div className="w-full text-[#E2E8F0] font-sans selection:bg-[color:var(--color-luminous-blue-dim)] selection:text-white">
       <div className="w-full max-w-4xl mx-auto space-y-6">
         {/* Progress Tracker — only shown once an AI mode is picked (step > 0); the mode-selection screen itself isn't part of this 3-step tracker. */}
         {step > 0 && (
@@ -749,14 +764,14 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
               <React.Fragment key={num}>
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full border text-xs font-mono font-bold transition-all duration-200 ${
                   step >= num
-                    ? 'border-[color:var(--color-cyan-accent-dim)] bg-[color:var(--color-cyan-accent-dim)] text-white shadow-sm'
-                    : 'border-gray-300 text-gray-400 bg-white'
+                    ? 'border-[color:var(--color-luminous-blue-dim)] bg-[color:var(--color-luminous-blue-dim)] text-white shadow-sm'
+                    : 'border-[color:var(--color-navy-4)] text-gray-400 bg-[color:var(--color-navy-1)]'
                 }`}>
                   {num}
                 </div>
                 {num < 3 && (
                   <div className={`w-12 h-[1px] transition-all duration-200 ${
-                    step > num ? 'bg-[color:var(--color-cyan-accent-dim)]' : 'bg-gray-200'
+                    step > num ? 'bg-[color:var(--color-luminous-blue-dim)]' : 'bg-[color:var(--color-navy-4)]'
                   }`} />
                 )}
               </React.Fragment>
@@ -766,7 +781,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
         )}
 
         {/* Wizard Content Card */}
-        <div ref={wizardContentRef} tabIndex={-1} className="bg-white/95 border border-[#E2E8F0] rounded-3xl shadow-xl p-8 md:p-10 space-y-6 focus:outline-none">
+        <div ref={wizardContentRef} tabIndex={-1} className="bg-[color:var(--color-navy-2)]/95 border border-[color:var(--color-navy-4)] rounded-3xl shadow-xl p-8 md:p-10 space-y-6 focus:outline-none">
           {step === 0 && renderStep0()}
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
