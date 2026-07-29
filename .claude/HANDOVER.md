@@ -1,5 +1,46 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
+## Dead-component audit (2026-07-28) — read this before touching any component, so this stops recurring
+
+The "redesigned/extracted component nobody actually renders" bug has now
+been found **three times** across two sessions: `ActiveAgentsPanel`
+(earlier sci-fi session), `AppHeader.tsx`/`AppFooter.tsx` (sci-fi v2 Step
+2), and a from-scratch audit this session found two more classes of it —
+five total dead code paths, all deleted, none left in limbo:
+
+- `src/components/ExpertCitationEngine.tsx` — zero references anywhere.
+  Citation Center's real, live tab renders `DataDiscoveryPanel` +
+  `ComplianceChecklistPanel` instead. **Deleted** (genuinely superseded,
+  not a withheld implementation).
+- `src/components/layout/TabContentView.tsx` — zero live imports. `App.tsx`
+  has its own, more-evolved inline tab-content JSX. **Deleted**.
+- `src/components/pdf/PdfPreviewModal.tsx` — zero live imports. `App.tsx`
+  renders `ManuscriptPDFViewer` directly via its own inline
+  `isPdfModalOpen`-gated JSX. **Deleted**.
+- `src/components/workspace/WorkspacePhaseView.tsx` — zero live imports,
+  same pattern as `TabContentView.tsx`. `App.tsx`'s own inline
+  `WORKFLOW_PHASES`-driven phase view (phases A-F) is what's live.
+  **Deleted**.
+- `SettingsTabContent` — a ~470-line function component defined **inline
+  inside `App.tsx` itself** (not a separate file), never once referenced
+  as JSX. A new finding, distinct from the other four: a dead-on-arrival
+  definition sitting right next to the Settings tab's real implementation
+  (`AIControlCenter`), not an unwired extraction attempt. **Deleted**.
+
+**The pattern to watch for going forward**: this codebase has repeatedly
+accumulated components/functions that were written, sometimes styled or
+even redesigned, and never actually wired into the render tree App.tsx
+walks. Before assuming any component is live — especially before spending
+redesign effort on one — grep for its live imports AND confirm the actual
+JSX render call, not just the import line (an import can exist in a file
+that's itself dead, as `TabContentView.tsx`'s import of `AIControlCenter`
+demonstrated). `tsc --noEmit` will NOT catch any of this — unused
+imports/functions aren't a TypeScript error in this project's config, so
+these five sat there clean through every previous `tsc` check across
+multiple sessions.
+
+---
+
 ## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi redesign v2 — Steps 1-2 of 6 done, loop paused before Navigation — supersedes the section below)
 
 **Sci-fi redesign v2 execution (`docs/planning/sci-fi-redesign-scoping.md`'s revised direction) — 🟡 in progress, Steps 1-2 done of 6, loop deliberately paused before Step 2.5 (Navigation).** Full step-by-step record in the scoping doc's own new "Progress log (v2 execution)" section. This session ran the doc's ordered sequence as a loop (implement → `tsc --noEmit` + full suite → live-verify in a real browser → commit → tick off → next step), per this session's explicit instruction, stopping cleanly after Step 2 rather than rushing the Navigation overhaul (Step 2.5) without the verification rigor it needs — not a failure, a scope/time boundary.
