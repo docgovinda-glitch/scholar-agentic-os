@@ -61,10 +61,15 @@ describe("ResearchIntelligenceDashboard — AI Gateway status panel", () => {
     const project: PaperProject = { ...DEFAULT_STATE("jdoe"), aiSettings: { provider: "gemini" } };
     renderDashboard(project);
 
-    expect(await screen.findByText(/online/i)).toBeInTheDocument();
+    // "online"/"Google Gemini" now legitimately appear twice on this
+    // dashboard — the AI Gateway panel AND the Active Models panel
+    // (Step 4's next panel, which reuses this same live check for the
+    // active provider rather than duplicating the network call) both
+    // render the real result independently. Not a bug — findAllByText.
+    expect((await screen.findAllByText(/online/i)).length).toBeGreaterThan(0);
     expect(healthCheckProviderMock).toHaveBeenCalledWith("gemini", expect.objectContaining({ provider: "gemini" }));
     expect(screen.getByText(/cloud ai providers/i)).toBeInTheDocument();
-    expect(screen.getByText(/google gemini/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/google gemini/i).length).toBeGreaterThan(0);
   });
 
   it("shows a real offline result honestly, never an optimistic default", async () => {
@@ -72,7 +77,7 @@ describe("ResearchIntelligenceDashboard — AI Gateway status panel", () => {
     const project: PaperProject = { ...DEFAULT_STATE("jdoe"), aiSettings: { provider: "gemini" } };
     renderDashboard(project);
 
-    expect(await screen.findByText(/offline/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/offline/i)).length).toBeGreaterThan(0);
   });
 
   it("shows real fallback availability from the persisted fallbackOrder, not a fabricated claim", async () => {

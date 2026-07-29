@@ -68,7 +68,27 @@ export default function ResearchIntelligenceDashboard({
   const currentModeId = currentProviderId ? getModeForProvider(currentProviderId) : undefined;
   const currentMode = currentModeId ? AI_MODES.find(m => m.id === currentModeId) : undefined;
   const currentProviderInfo = AI_PROVIDERS.find(p => p.id === currentProviderId);
-  const fallbackCount = (project?.aiSettings?.fallbackOrder || []).filter(p => p !== currentProviderId).length;
+  const configuredFallbackIds = (project?.aiSettings?.fallbackOrder || []).filter(p => p !== currentProviderId);
+  const fallbackCount = configuredFallbackIds.length;
+
+  // Sci-fi v3 Step 4 — "Active Models" panel (mockup: 5 fixed providers, all
+  // "Online" simultaneously). Real equivalent: only the genuinely configured
+  // provider(s) — current + real fallbackOrder — each with real status.
+  // The active/primary provider REUSES the AI Gateway panel's own health
+  // check above (gatewayStatus/checkingGateway) rather than firing a
+  // second, redundant live request for the same provider. Fallback
+  // providers are deliberately NOT auto-checked (avoids an unrequested
+  // live network call per fallback provider on every dashboard load) —
+  // shown honestly as "Untested" rather than guessing "Offline".
+  const activeModelsList = currentProviderInfo
+    ? [
+        { id: currentProviderInfo.id, name: currentProviderInfo.name, status: checkingGateway ? "checking" : (gatewayStatus?.status || "unchecked") },
+        ...configuredFallbackIds.map(id => {
+          const info = AI_PROVIDERS.find(p => p.id === id);
+          return { id, name: info?.name || id, status: "untested" as const };
+        })
+      ]
+    : [];
 
   useEffect(() => {
     let cancelled = false;
@@ -551,6 +571,35 @@ export default function ResearchIntelligenceDashboard({
               </>
             ) : (
               <p className="text-[11px] text-gray-400">Not configured yet.</p>
+            )}
+          </div>
+
+          {/* Active Models panel — only genuinely configured providers,
+              never a fixed list; see derivation above for why fallback
+              providers show "Untested" rather than a live-checked status. */}
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center gap-1.5">
+              <Cpu className="w-4 h-4 text-[#C08A3E]" />
+              Active Models
+            </h3>
+            {activeModelsList.length === 0 ? (
+              <p className="text-[11px] text-gray-400">No models configured.</p>
+            ) : (
+              <div className="space-y-2">
+                {activeModelsList.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between text-xs">
+                    <span className="text-[#1A365D] font-medium">{m.name}</span>
+                    <span className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full ${
+                      m.status === "online" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                      m.status === "offline" || m.status === "degraded" ? "bg-red-50 text-red-700 border border-red-200" :
+                      m.status === "checking" ? "bg-gray-100 text-gray-500 border border-gray-200" :
+                      "bg-amber-50 text-amber-700 border border-amber-200"
+                    }`}>
+                      {m.status === "checking" ? "Checking..." : m.status === "untested" ? "Untested" : m.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
