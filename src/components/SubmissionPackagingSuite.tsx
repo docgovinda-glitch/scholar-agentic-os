@@ -112,7 +112,7 @@ export default function SubmissionPackagingSuite({
       )}
 
       {!pack && !loading ? (
-        <div className="p-8 text-center glass-effect rounded-2xl border-white/5 space-y-4">
+        <div className="p-8 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl shadow-sm space-y-4">
           <div className="w-12 h-12 bg-white/[0.02] border border-white/10 rounded-full flex items-center justify-center mx-auto">
             <FileText className="w-6 h-6 text-brand-400" />
           </div>
@@ -140,7 +140,7 @@ export default function SubmissionPackagingSuite({
           </div>
         </div>
       ) : loading ? (
-        <div className="p-12 text-center glass-effect rounded-2xl border-white/5 space-y-4">
+        <div className="p-12 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl shadow-sm space-y-4">
           <div className="w-10 h-10 border-4 border-brand-500/20 border-t-brand-400 rounded-full animate-spin mx-auto"></div>
           <p className="text-sm text-gray-300 font-mono animate-pulse">Drafting cover letter and compiling structural submission indices...</p>
         </div>
@@ -181,7 +181,7 @@ export default function SubmissionPackagingSuite({
               <div className="lg:col-span-5 space-y-6 flex flex-col">
                 
                 {/* Checklist bento */}
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-4 grow">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-4 grow">
                   <h3 className="text-sm font-semibold text-brand-300 font-mono uppercase tracking-wider border-b border-white/5 pb-2">
                     Pre-Flight Submission Checklist
                   </h3>
@@ -196,7 +196,7 @@ export default function SubmissionPackagingSuite({
                 </div>
 
                 {/* Templates & letters */}
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-4">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-4">
                   <h3 className="text-sm font-semibold text-brand-300 font-mono uppercase tracking-wider border-b border-white/5 pb-2">
                     Compliance & templates
                   </h3>
@@ -230,21 +230,23 @@ export default function SubmissionPackagingSuite({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono text-gray-400">Status Register:</span>
-                  <select
-                    className="bg-brand-950 border border-brand-500/30 text-brand-200 text-xs font-mono px-2.5 py-1 rounded"
-                    value={portalStatus}
-                    onChange={(e) => {
-                      const newStatus = e.target.value as any;
-                      if (!window.confirm(`Are you sure you want to change the submission status to "${newStatus}"? This action will be logged.`)) return;
-                      setPortalStatus(newStatus);
-                    }}
-                  >
-                    <option value="Draft">Drafting complete</option>
-                    <option value="Submitted">Manuscript Submitted</option>
-                    <option value="Under Review">Under Peer Review</option>
-                    <option value="Minor Revisions">Minor Revisions Requested</option>
-                    <option value="Accepted">Accepted / In-Press</option>
-                  </select>
+                  <div className="bg-brand-950 border border-brand-500/30 rounded focus-within:border-[color:var(--color-luminous-blue)]">
+                    <select
+                      className="border-0 bg-transparent text-brand-200 text-xs font-mono px-2.5 py-1"
+                      value={portalStatus}
+                      onChange={(e) => {
+                        const newStatus = e.target.value as any;
+                        if (!window.confirm(`Are you sure you want to change the submission status to "${newStatus}"? This action will be logged.`)) return;
+                        setPortalStatus(newStatus);
+                      }}
+                    >
+                      <option value="Draft">Drafting complete</option>
+                      <option value="Submitted">Manuscript Submitted</option>
+                      <option value="Under Review">Under Peer Review</option>
+                      <option value="Minor Revisions">Minor Revisions Requested</option>
+                      <option value="Accepted">Accepted / In-Press</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -252,12 +254,14 @@ export default function SubmissionPackagingSuite({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-gray-300">
                 <div className="space-y-1.5">
                   <span className="font-bold font-mono text-brand-300 uppercase block">Submission Date:</span>
-                  <input
-                    type="date"
-                    className="bg-brand-950/70 border border-white/10 rounded px-2.5 py-1 text-xs text-white"
-                    value={submissionDate}
-                    onChange={(e) => setSubmissionDate(e.target.value)}
-                  />
+                  <div className="bg-brand-950/70 border border-white/10 rounded focus-within:border-[color:var(--color-luminous-blue)]">
+                    <input
+                      type="date"
+                      className="border-0 bg-transparent px-2.5 py-1 text-xs text-white"
+                      value={submissionDate}
+                      onChange={(e) => setSubmissionDate(e.target.value)}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <span className="font-bold font-mono text-brand-300 uppercase block">Active Portal Target:</span>
