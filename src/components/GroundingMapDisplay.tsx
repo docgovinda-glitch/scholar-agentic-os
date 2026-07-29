@@ -109,7 +109,7 @@ export default function GroundingMapDisplay({
       )}
 
       {!map && !loading ? (
-        <div className="p-8 text-center glass-effect rounded-2xl border-white/5 space-y-4">
+        <div className="p-8 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl shadow-sm space-y-4">
           <div className="w-12 h-12 bg-brand-900/40 border border-brand-500/30 rounded-full flex items-center justify-center mx-auto">
             <Anchor className="w-6 h-6 text-brand-400" />
           </div>
@@ -137,7 +137,7 @@ export default function GroundingMapDisplay({
           </div>
         </div>
       ) : loading ? (
-        <div className="p-12 text-center glass-effect rounded-2xl border-white/5 space-y-4">
+        <div className="p-12 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl shadow-sm space-y-4">
           <div className="inline-block relative">
             <div className="w-12 h-12 border-4 border-brand-500/20 border-t-brand-400 rounded-full animate-spin"></div>
             <Sparkles className="w-4 h-4 text-yellow-400 absolute top-1 right-1 animate-pulse" />
@@ -174,7 +174,7 @@ export default function GroundingMapDisplay({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Left Column */}
               <div className="space-y-6">
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-3">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
                   <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
                     Conceptual Framework Alignment
                   </h3>
@@ -183,7 +183,7 @@ export default function GroundingMapDisplay({
                   </p>
                 </div>
 
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-3">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
                   <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
                     Key Thesis Constructs
                   </h3>
@@ -199,7 +199,7 @@ export default function GroundingMapDisplay({
                   </div>
                 </div>
 
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-3">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
                   <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
                     Consistent Terminology Standard
                   </h3>
@@ -215,7 +215,7 @@ export default function GroundingMapDisplay({
 
               {/* Right Column */}
               <div className="space-y-6">
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-3">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
                   <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
                     Philosophical Anchors
                   </h3>
@@ -224,7 +224,7 @@ export default function GroundingMapDisplay({
                   </p>
                 </div>
 
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-3">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
                   <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
                     Reusable Arguments
                   </h3>
@@ -235,7 +235,7 @@ export default function GroundingMapDisplay({
                   </ul>
                 </div>
 
-                <div className="glass-effect rounded-xl p-5 border-white/5 space-y-3">
+                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
                   <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
                     Voice & Academic Register
                   </h3>
