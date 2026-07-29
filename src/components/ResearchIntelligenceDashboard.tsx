@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { PaperProject, WORKFLOW_PHASES } from "../types";
+import { PaperProject, WORKFLOW_PHASES, HealthStatus } from "../types";
 import { generateCitation } from "../services/citationService";
 import { listAgents } from "../services/agentService";
+import AIGateway, { AI_PROVIDERS } from "../services/aiGateway";
+import { AI_MODES, getModeForProvider } from "../config/aiModes";
 import { 
   Folder, Play, Search, Bell, Activity, PlusCircle, CheckCircle, 
   Clock, TrendingUp, AlertCircle, DollarSign, Cpu, FileText, 
@@ -37,6 +39,36 @@ export default function ResearchIntelligenceDashboard({
   // "checked and unavailable" from "checked and here's the real number".
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [storageEstimateUnavailable, setStorageEstimateUnavailable] = useState(false);
+
+  // Sci-fi v3 Step 4 — "AI Gateway" panel (mockup: "AI KERNEL — ONLINE",
+  // unconditionally). Real equivalent: the currently-configured provider's
+  // genuine live health check, via the SAME AIGateway.healthCheckProvider
+  // function AIControlCenter.tsx already calls — reused here, not
+  // reimplemented or duplicated. Re-runs whenever the configured provider
+  // changes (e.g. the user switches AI mode in Settings), same dependency
+  // pattern AIControlCenter's own effect already uses.
+  const currentProviderId = project?.aiSettings?.provider;
+  const [gatewayStatus, setGatewayStatus] = useState<HealthStatus | null>(null);
+  const [checkingGateway, setCheckingGateway] = useState(false);
+
+  useEffect(() => {
+    if (!currentProviderId || currentProviderId === "auto") {
+      setGatewayStatus(null);
+      return;
+    }
+    let cancelled = false;
+    setCheckingGateway(true);
+    AIGateway.healthCheckProvider(currentProviderId, project?.aiSettings || { provider: currentProviderId as any })
+      .then((result) => { if (!cancelled) setGatewayStatus(result); })
+      .catch(() => { if (!cancelled) setGatewayStatus({ provider: currentProviderId, status: "offline", error: "Check failed" }); })
+      .finally(() => { if (!cancelled) setCheckingGateway(false); });
+    return () => { cancelled = true; };
+  }, [currentProviderId, project?.aiSettings]);
+
+  const currentModeId = currentProviderId ? getModeForProvider(currentProviderId) : undefined;
+  const currentMode = currentModeId ? AI_MODES.find(m => m.id === currentModeId) : undefined;
+  const currentProviderInfo = AI_PROVIDERS.find(p => p.id === currentProviderId);
+  const fallbackCount = (project?.aiSettings?.fallbackOrder || []).filter(p => p !== currentProviderId).length;
 
   useEffect(() => {
     let cancelled = false;
@@ -485,6 +517,41 @@ export default function ResearchIntelligenceDashboard({
                 ))
               )}
             </div>
+          </div>
+
+          {/* AI Gateway panel — real current mode/provider/fallback state,
+              real live health check (reused AIGateway.healthCheckProvider,
+              same function AIControlCenter.tsx already calls). Never an
+              unconditional "ONLINE" (docs/planning/
+              dashboard-mockup-honest-data-audit.md). */}
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Cpu className="w-4 h-4 text-[#C08A3E]" />
+                AI Gateway
+              </span>
+              <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                checkingGateway ? "bg-gray-100 text-gray-500" :
+                gatewayStatus?.status === "online" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                gatewayStatus?.status === "offline" || gatewayStatus?.status === "degraded" ? "bg-red-50 text-red-700 border border-red-200" :
+                "bg-gray-100 text-gray-500 border border-gray-200"
+              }`}>
+                {checkingGateway ? "Checking..." : (gatewayStatus?.status || "unchecked")}
+              </span>
+            </h3>
+            {currentMode && currentProviderInfo ? (
+              <>
+                <div>
+                  <span className="text-sm font-bold text-[#1A365D] block">{currentMode.title}</span>
+                  <span className="text-xs text-gray-500">{currentProviderInfo.name}</span>
+                </div>
+                <div className="text-[10px] font-mono text-gray-400 uppercase">
+                  {fallbackCount > 0 ? `${fallbackCount} fallback provider(s) configured` : "No fallback configured"}
+                </div>
+              </>
+            ) : (
+              <p className="text-[11px] text-gray-400">Not configured yet.</p>
+            )}
           </div>
 
           {/* AI Agents panel — real, static registered-agent-type count.
