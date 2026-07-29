@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { PaperProject, WORKFLOW_PHASES } from "../types";
+import { generateCitation } from "../services/citationService";
 import { 
   Folder, Play, Search, Bell, Activity, PlusCircle, CheckCircle, 
   Clock, TrendingUp, AlertCircle, DollarSign, Cpu, FileText, 
@@ -26,11 +27,6 @@ export default function ResearchIntelligenceDashboard({
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [citationSearch, setCitationSearch] = useState("");
-  const [notifications, setNotifications] = useState([
-    { id: 1, text: "Vedic Database sync complete. 12 new constructs cached.", time: "10 mins ago", type: "success" },
-    { id: 2, text: "Draft check: 'Literature Review' APA citation audit completed.", time: "1 hour ago", type: "info" },
-    { id: 3, text: "Gemini 3.5 latency spike detected (4.2s). Auto-fallback active.", time: "2 hours ago", type: "warning" }
-  ]);
 
   // Statistics calculation
   const totalProjects = projects.length;
@@ -112,6 +108,50 @@ export default function ResearchIntelligenceDashboard({
     }
   });
   const sortedActivity = activityTimeline.sort((a, b) => b.time.localeCompare(a.time)).slice(0, 5);
+
+  // Honest-data fix (docs/planning/dashboard-mockup-honest-data-audit.md's
+  // discipline, applied here): this panel used to be 3 hardcoded fake
+  // notifications, shown unconditionally regardless of the real project's
+  // state. Real alerts only, derived from genuinely available signals —
+  // vault files that actually failed to process (a real, actionable
+  // problem), and the same real recent-activity data already computed
+  // above. Honestly empty when neither exists, never a fabricated filler.
+  type Alert = { id: string; text: string; time: string; type: "success" | "info" | "warning" };
+  const alerts: Alert[] = [];
+  projects.forEach(p => {
+    (p.knowledgeVault?.files || []).forEach(f => {
+      if (f.status === "error") {
+        alerts.push({
+          id: `vault-error-${f.id}`,
+          text: `"${f.fileName}" failed to process${f.errorMessage ? `: ${f.errorMessage}` : "."}`,
+          time: new Date(f.uploadedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          type: "warning"
+        });
+      }
+    });
+  });
+  sortedActivity.slice(0, 3).forEach((act, i) => {
+    alerts.push({ id: `activity-${i}`, text: `${act.title} — ${act.projectTitle}`, time: act.time, type: "info" });
+  });
+
+  // Honest-data fix — this sidebar used to show 3 entirely fabricated
+  // references unconditionally, never anything the user actually uploaded.
+  // Real vault files with real citationMetadata only, formatted via the
+  // already-shipped generateCitation() service — never invented content.
+  const cachedCitations = (project?.knowledgeVault?.files || [])
+    .filter(f => f.citationMetadata)
+    .map(f => {
+      const meta = f.citationMetadata!;
+      const lastNames = (meta.authors || []).map(a => a.lastName).filter(Boolean);
+      const year = meta.dates?.publicationDate ? meta.dates.publicationDate.substring(0, 4) : "n.d.";
+      const inText = lastNames.length > 0 ? `(${lastNames.join(" & ")}, ${year})` : `(${year})`;
+      return {
+        id: f.id,
+        type: meta.sourceType || "Source",
+        ref: generateCitation(meta, "APA"),
+        inText
+      };
+    });
 
   return (
     <div className="space-y-6">
@@ -353,21 +393,25 @@ export default function ResearchIntelligenceDashboard({
                 <Bell className="w-4 h-4 text-[#C08A3E]" />
                 Scholar Alerts
               </span>
-              <span className="w-2.5 h-2.5 bg-[#C08A3E] rounded-full animate-ping" />
+              {alerts.length > 0 && <span className="w-2.5 h-2.5 bg-[#C08A3E] rounded-full animate-ping" />}
             </h3>
             <div className="space-y-3">
-              {notifications.map((n) => (
-                <div key={n.id} className="flex gap-2.5 items-start p-2.5 rounded-xl hover:bg-[#FAF8F5] transition-all">
-                  <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                    n.type === "success" ? "bg-emerald-500" :
-                    n.type === "warning" ? "bg-amber-500" : "bg-blue-500"
-                  }`} />
-                  <div className="space-y-0.5">
-                    <p className="text-xs text-[#1E293B] leading-normal font-sans">{n.text}</p>
-                    <span className="text-[9px] text-gray-400 font-mono block">{n.time}</span>
+              {alerts.length === 0 ? (
+                <p className="text-[11px] text-gray-400 text-center py-4">No alerts yet.</p>
+              ) : (
+                alerts.map((n) => (
+                  <div key={n.id} className="flex gap-2.5 items-start p-2.5 rounded-xl hover:bg-[#FAF8F5] transition-all">
+                    <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                      n.type === "success" ? "bg-emerald-500" :
+                      n.type === "warning" ? "bg-amber-500" : "bg-blue-500"
+                    }`} />
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-[#1E293B] leading-normal font-sans">{n.text}</p>
+                      <span className="text-[9px] text-gray-400 font-mono block">{n.time}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
@@ -471,39 +515,28 @@ export default function ResearchIntelligenceDashboard({
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
-            {[
-              {
-                id: "1",
-                type: "Empirical Study",
-                ref: "Smith, J. A., & Doe, R. B. (2026). AI frameworks in doctoral research workflows: An empirical baseline. Journal of Academic Informatics, 14(2), 112-128.",
-                inText: "(Smith & Doe, 2026)"
-              },
-              {
-                id: "2",
-                type: "Methodology",
-                ref: "Vedic Construct Mapping Consortium. (2025). High-density semantic retrieval for qualitative coding protocols. Oxford University Press.",
-                inText: "(Vedic Consortium, 2025)"
-              },
-              {
-                id: "3",
-                type: "Theoretical Framework",
-                ref: "Johnson, K. L. (2024). Grounding doctoral dissertations in generative AI compliance models. Educational Review, 40(4), 401-419.",
-                inText: "(Johnson, 2024)"
+            {(() => {
+              const filtered = cachedCitations.filter(item =>
+                item.ref.toLowerCase().includes(citationSearch.toLowerCase()) || item.type.toLowerCase().includes(citationSearch.toLowerCase())
+              );
+              if (cachedCitations.length === 0) {
+                return <p className="text-[11px] text-gray-400 text-center py-6">No cached citations yet — upload a source in the Knowledge Vault to see it here.</p>;
               }
-            ]
-              .filter(item => item.ref.toLowerCase().includes(citationSearch.toLowerCase()) || item.type.toLowerCase().includes(citationSearch.toLowerCase()))
-              .map((item) => (
+              if (filtered.length === 0) {
+                return <p className="text-[11px] text-gray-400 text-center py-6">No cached citations match your search.</p>;
+              }
+              return filtered.map((item) => (
                 <div key={item.id} className="bg-white p-3.5 rounded-xl border border-[#E2E8F0] shadow-2xs space-y-2 hover:border-[#C08A3E]/40 transition-all group">
                   <div className="flex justify-between items-start">
                     <span className="text-[10px] font-mono font-bold text-[#946A30] bg-[#C08A3E]/10 px-2 py-0.5 rounded">
                       {item.type}
                     </span>
-                    <button 
+                    <button
                       onClick={() => {
                         navigator.clipboard.writeText(item.inText);
                         alert(`Copied parenthetical citation: ${item.inText}`);
                       }}
-                      title="Copy Parenthetical Citation" 
+                      title="Copy Parenthetical Citation"
                       className="text-gray-400 hover:text-[#1A365D] cursor-pointer group-hover:text-[#C08A3E] transition-colors"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -517,7 +550,8 @@ export default function ResearchIntelligenceDashboard({
                     <span className="text-[9px] text-gray-400 uppercase">APA 7th</span>
                   </div>
                 </div>
-              ))}
+              ));
+            })()}
           </div>
         </div>
       )}
