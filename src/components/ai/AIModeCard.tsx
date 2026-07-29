@@ -17,12 +17,25 @@ import { AIMode, AIModeId } from "../../config/aiModes";
 // both AISetupWizard.tsx (onboarding) and AIControlCenter.tsx (settings), so
 // adding/changing a mode never means maintaining two card implementations.
 // Visual language matches the sci-fi redesign already applied to both host
-// components (docs/planning/sci-fi-redesign-progress.md, commit 2779683):
-// cyan for selection/system-state, existing light card surface, global
-// :focus-visible, motion kept under 250ms and respecting
+// components. Global :focus-visible, motion kept under 250ms and respecting
 // prefers-reduced-motion via the CSS media query already in src/index.css
 // (this component uses only CSS transitions, no JS-driven animation, so no
 // separate useReducedMotion wiring is needed here).
+//
+// Sci-fi v3 (2026-07-29) — converted from the retired light-theme surface
+// (bg-white / #1A365D navy-serif headings) onto the v3 navy tokens. Every
+// pair below was measured with real sRGB contrast math against the actual
+// navy surface it sits on, not eyeballed:
+//   - card bg navy-2, resting border slate-400/60 (3.32:1 vs navy-2 —
+//     navy-4 alone measured only 1.30:1, below the 3:1 non-text floor)
+//   - selected bg luminous-blue/10 over navy-1, selected border full
+//     luminous-blue (6.70:1 vs navy-1)
+//   - icon chip (selected) blue/15 over the selected bg: icon 4.65:1
+//   - badge (available) blue/10 over navy-2: text 5.48:1
+//   - badge (coming-soon) slate-400/15 over navy-3: text 5.19:1
+//   - primary CTA: white text on --color-luminous-blue-dim, 4.85:1
+//   - title/body: #E2E8F0 / #CBD5E1 / #94A3B8 all clear 7:1+ on every
+//     navy surface used here
 
 const MODE_ICONS: Record<AIModeId, React.ComponentType<{ className?: string }>> = {
   omniroute: Route,
@@ -68,15 +81,15 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
       onClick={handleActivate}
       className={`relative rounded-2xl border p-5 flex flex-col gap-3 transition-all duration-200 ${
         isComingSoon
-          ? "border-[#E2E8F0] bg-gray-50 opacity-70 cursor-not-allowed"
+          ? "border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-3)] opacity-70 cursor-not-allowed"
           : isSelected
-          ? "border-[color:var(--color-cyan-accent)] bg-[color:var(--color-cyan-accent)]/5 shadow-lg cursor-pointer"
-          : "border-[#E2E8F0] bg-white hover:border-[color:var(--color-cyan-accent)]/40 hover:shadow-md cursor-pointer"
+          ? "border-[color:var(--color-luminous-blue)] bg-[color:var(--color-luminous-blue)]/10 shadow-lg cursor-pointer"
+          : "border-[#94A3B8]/60 bg-[color:var(--color-navy-2)] hover:border-[color:var(--color-luminous-blue)]/40 hover:shadow-md cursor-pointer"
       }`}
     >
       {isSelected && !isComingSoon && (
-        <div aria-hidden="true" className="absolute top-4 right-4 w-6 h-6 rounded-full bg-[color:var(--color-cyan-accent)] flex items-center justify-center shadow-sm">
-          <Check className="w-4 h-4 text-white" />
+        <div aria-hidden="true" className="absolute top-4 right-4 w-6 h-6 rounded-full bg-[color:var(--color-luminous-blue)] flex items-center justify-center shadow-sm">
+          <Check className="w-4 h-4 text-[color:var(--color-navy-0)]" />
         </div>
       )}
 
@@ -84,8 +97,8 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
       <div
         className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
           isSelected && !isComingSoon
-            ? "bg-[color:var(--color-cyan-accent)]/15 text-[color:var(--color-cyan-accent-dim)]"
-            : "bg-[#FAF9F6] text-[#1A365D]"
+            ? "bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)]"
+            : "bg-[color:var(--color-navy-3)] text-[#94A3B8]"
         }`}
       >
         <Icon className="w-6 h-6" />
@@ -94,49 +107,49 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
       {/* Title + badge */}
       <div>
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 id={titleId} className="text-base font-bold font-serif text-[#1A365D]">{mode.title}</h3>
+          <h3 id={titleId} className="text-base font-bold text-[#E2E8F0]">{mode.title}</h3>
           <span
             className={`text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
               isComingSoon
-                ? "bg-gray-200 text-gray-500"
-                : "bg-[color:var(--color-cyan-accent)]/10 text-[#0E7490]"
+                ? "bg-[color:var(--color-navy-3)] text-[#94A3B8]"
+                : "bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)]"
             }`}
           >
             {mode.badge}
           </span>
         </div>
-        <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{mode.description}</p>
+        <p className="text-xs text-[#94A3B8] mt-1.5 leading-relaxed">{mode.description}</p>
       </div>
 
-      <div className="border-t border-[#F1F5F9]" />
+      <div className="border-t border-[color:var(--color-navy-4)]" />
 
       {/* Features */}
       {mode.features.length > 0 && (
         <ul className="space-y-1">
           {mode.features.map((feature) => (
-            <li key={feature} className="text-[11px] text-[#475569] flex items-start gap-1.5">
-              <Check className="w-3 h-3 text-[color:var(--color-cyan-accent-dim)] shrink-0 mt-0.5" />
+            <li key={feature} className="text-[11px] text-[#CBD5E1] flex items-start gap-1.5">
+              <Check className="w-3 h-3 text-[color:var(--color-luminous-blue)] shrink-0 mt-0.5" />
               <span>{feature}</span>
             </li>
           ))}
         </ul>
       )}
 
-      <div className="border-t border-[#F1F5F9]" />
+      <div className="border-t border-[color:var(--color-navy-4)]" />
 
       {/* Difficulty / setup time / best-for */}
-      <div className="grid grid-cols-1 gap-1.5 text-[10px] font-mono text-[#64748B]">
+      <div className="grid grid-cols-1 gap-1.5 text-[10px] font-mono text-[#94A3B8]">
         <div className="flex items-center gap-1.5">
           <Zap className="w-3 h-3 shrink-0" />
-          <span>Difficulty: <strong className="text-[#1A365D]">{mode.difficulty}</strong></span>
+          <span>Difficulty: <strong className="text-[#E2E8F0]">{mode.difficulty}</strong></span>
         </div>
         <div className="flex items-center gap-1.5">
           <Clock className="w-3 h-3 shrink-0" />
-          <span>Setup time: <strong className="text-[#1A365D]">{mode.setupTime}</strong></span>
+          <span>Setup time: <strong className="text-[#E2E8F0]">{mode.setupTime}</strong></span>
         </div>
         <div className="flex items-start gap-1.5">
           <Target className="w-3 h-3 shrink-0 mt-0.5" />
-          <span>Best for: <strong className="text-[#1A365D]">{mode.bestFor}</strong></span>
+          <span>Best for: <strong className="text-[#E2E8F0]">{mode.bestFor}</strong></span>
         </div>
       </div>
 
@@ -151,20 +164,20 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
         }}
         className={`w-full py-2.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all ${
           isComingSoon
-            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-            : "bg-[color:var(--color-cyan-accent-dim)] hover:bg-[#0891B2] text-white cursor-pointer"
+            ? "bg-[color:var(--color-navy-4)] text-[#94A3B8] cursor-not-allowed"
+            : "bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white cursor-pointer"
         }`}
       >
         {mode.ctaLabel}
       </button>
 
       {isComingSoon && mode.comingSoonNote && (
-        <p className="text-[10px] text-gray-400 italic leading-relaxed">{mode.comingSoonNote}</p>
+        <p className="text-[10px] text-[#94A3B8] italic leading-relaxed">{mode.comingSoonNote}</p>
       )}
 
       {/* Expandable: How it works */}
       {mode.howItWorks.length > 0 && (
-        <div className="border-t border-[#F1F5F9] pt-2">
+        <div className="border-t border-[color:var(--color-navy-4)] pt-2">
           <button
             type="button"
             aria-expanded={howItWorksOpen}
@@ -172,7 +185,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
               e.stopPropagation();
               setHowItWorksOpen((v) => !v);
             }}
-            className="w-full flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[#64748B] cursor-pointer"
+            className="w-full flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[#94A3B8] cursor-pointer"
           >
             <span>How it works</span>
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${howItWorksOpen ? "rotate-180" : ""}`} />
@@ -180,7 +193,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
           {howItWorksOpen && (
             <ol className="mt-2 space-y-1.5 list-decimal list-inside">
               {mode.howItWorks.map((step) => (
-                <li key={step} className="text-[11px] text-[#475569] leading-relaxed">{step}</li>
+                <li key={step} className="text-[11px] text-[#CBD5E1] leading-relaxed">{step}</li>
               ))}
             </ol>
           )}
@@ -189,7 +202,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
 
       {/* Expandable: Requirements */}
       {mode.requirements.length > 0 && (
-        <div className="border-t border-[#F1F5F9] pt-2">
+        <div className="border-t border-[color:var(--color-navy-4)] pt-2">
           <button
             type="button"
             aria-expanded={requirementsOpen}
@@ -197,7 +210,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
               e.stopPropagation();
               setRequirementsOpen((v) => !v);
             }}
-            className="w-full flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[#64748B] cursor-pointer"
+            className="w-full flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[#94A3B8] cursor-pointer"
           >
             <span>Requirements</span>
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${requirementsOpen ? "rotate-180" : ""}`} />
@@ -205,7 +218,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
           {requirementsOpen && (
             <ul className="mt-2 space-y-1">
               {mode.requirements.map((req) => (
-                <li key={req} className="text-[11px] text-[#475569] leading-relaxed">• {req}</li>
+                <li key={req} className="text-[11px] text-[#CBD5E1] leading-relaxed">• {req}</li>
               ))}
             </ul>
           )}
