@@ -447,11 +447,11 @@ export default function ManuscriptEditorWorkspace({
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold font-serif text-[#1A365D] flex items-center gap-2">
-            <Edit3 className="w-5 h-5 text-[#C08A3E]" />
+          <h2 className="text-lg font-bold text-[#E2E8F0] flex items-center gap-2">
+            <Edit3 className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
             Manuscript Editor & Approval
           </h2>
-          <p className="text-xs text-gray-500 font-mono mt-0.5 uppercase tracking-wider">
+          <p className="text-xs text-[#94A3B8] font-mono mt-0.5 uppercase tracking-wider">
             Review, edit via AI chat, approve & download · {totalWords.toLocaleString()} words · {draftedSections.length}/{sectionsList.length} sections
           </p>
         </div>
@@ -484,12 +484,12 @@ export default function ManuscriptEditorWorkspace({
       </div>
 
       {/* Download Bar */}
-      <div className="flex flex-wrap items-center gap-3 bg-[#FAF8F5] border border-[#E2E8F0] rounded-xl p-3">
-        <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase tracking-wider">Download:</span>
+      <div className="flex flex-wrap items-center gap-3 bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-3">
+        <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">Download:</span>
         <button
           onClick={() => requestDownload("docx")}
           disabled={downloadingDocx}
-          className="px-3.5 py-1.5 bg-[#1A365D] hover:bg-[#122847] text-white rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+          className="px-3.5 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
         >
           {downloadingDocx ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
           Download .DOCX
@@ -497,7 +497,7 @@ export default function ManuscriptEditorWorkspace({
         <button
           onClick={() => requestDownload("pdf")}
           disabled={downloadingPdf}
-          className="px-3.5 py-1.5 bg-[#C08A3E] hover:bg-[#A87630] text-white rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+          className="px-3.5 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
         >
           {downloadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
           Download .PDF
@@ -505,7 +505,7 @@ export default function ManuscriptEditorWorkspace({
         <button
           onClick={onToggleFocusMode}
           className={`ml-auto px-3 py-1.5 border rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all flex items-center gap-1.5 ${
-            isFocusMode ? "bg-[#C08A3E] text-white border-[#C08A3E]" : "bg-white text-gray-500 border-[#E2E8F0] hover:bg-gray-50"
+            isFocusMode ? "bg-[color:var(--color-luminous-blue-dim)] text-white border-[color:var(--color-luminous-blue-dim)]" : "bg-[color:var(--color-navy-2)] text-[#94A3B8] border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)]"
           }`}
         >
           <Sparkles className="w-3.5 h-3.5" />
@@ -514,7 +514,7 @@ export default function ManuscriptEditorWorkspace({
         <button
           onClick={() => setShowChat(!showChat)}
           className={`ml-2 px-3 py-1.5 border rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all flex items-center gap-1.5 ${
-            showChat ? "bg-[#1A365D]/10 text-[#1A365D] border-[#1A365D]/20" : "bg-white text-gray-500 border-[#E2E8F0] hover:bg-gray-50"
+            showChat ? "bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)] border-[color:var(--color-luminous-blue)]/20" : "bg-[color:var(--color-navy-2)] text-[#94A3B8] border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)]"
           }`}
         >
           <MessageSquare className="w-3.5 h-3.5" />
@@ -528,16 +528,16 @@ export default function ManuscriptEditorWorkspace({
           /* DUAL-PANE FOCUS MODE */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             {/* Left Pane: The Canvas Editor */}
-            <div className="lg:col-span-7 flex flex-col bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm min-h-[580px] justify-between">
-              <div className="bg-[#FAF9F6] border-b border-[#E2E8F0] px-4 py-2.5 flex items-center justify-between shrink-0">
+            <div className="lg:col-span-7 flex flex-col bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl overflow-hidden shadow-sm min-h-[580px] justify-between">
+              <div className="bg-[color:var(--color-navy-3)] border-b border-[color:var(--color-navy-4)] px-4 py-2.5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
-                  <Edit3 className="w-3.5 h-3.5 text-[#C08A3E]" />
-                  <span className="text-xs font-mono font-bold text-[#1A365D] uppercase tracking-wider">Canvas: {editingSection}</span>
+                  <Edit3 className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" />
+                  <span className="text-xs font-mono font-bold text-[#E2E8F0] uppercase tracking-wider">Canvas: {editingSection}</span>
                 </div>
                 <select
                   value={editingSection || ""}
                   onChange={(e) => setEditingSection(e.target.value)}
-                  className="bg-transparent border-0 text-[#C08A3E] font-bold focus:outline-none cursor-pointer text-xs font-mono select-none"
+                  className="bg-transparent border-0 text-[color:var(--color-luminous-blue)] font-bold focus:outline-none cursor-pointer text-xs font-mono select-none"
                 >
                   {sectionsList.map(sec => (
                     <option key={sec} value={sec}>{sec}</option>
@@ -548,27 +548,27 @@ export default function ManuscriptEditorWorkspace({
               <div className="grow p-5 overflow-y-auto">
                 {editingSection ? (
                   <textarea
-                    className="w-full h-full bg-white border-0 focus:ring-0 focus:outline-none text-sm text-[#1A365D] leading-relaxed font-sans resize-none min-h-[350px]"
+                    className="w-full h-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm text-[#E2E8F0] leading-relaxed font-sans resize-none min-h-[350px]"
                     placeholder="Start writing or editing your research draft here... Use the global command palette (Cmd+K) to navigate."
                     value={editingSection ? (project.sections[editingSection] || "") : ""}
                     onChange={(e) => editingSection && handleSectionEdit(editingSection, e.target.value)}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-gray-400 text-xs font-mono">
+                  <div className="flex items-center justify-center h-full text-[#94A3B8] text-xs font-mono">
                     Select a section from the header dropdown to start writing.
                   </div>
                 )}
               </div>
 
               {/* Quality Control HUD */}
-              <div className="border-t border-[#E2E8F0] bg-slate-50 p-4 shrink-0 flex flex-col gap-2.5 font-mono text-[10px]">
+              <div className="border-t border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-3)] p-4 shrink-0 flex flex-col gap-2.5 font-mono text-[10px]">
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   {/* Word Count Progress */}
                   <div className="flex items-center gap-2 grow max-w-xs">
-                    <span className="text-[#76726A] font-bold uppercase shrink-0">
+                    <span className="text-[#94A3B8] font-bold uppercase shrink-0">
                       Length: {editingSection ? (project.sections[editingSection] || "").trim().split(/\s+/).filter(Boolean).length : 0} / {editingSection ? getLengthConstraint(editingSection).max : 1000}w
                     </span>
-                    <div className="grow h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
+                    <div className="grow h-1.5 bg-[color:var(--color-navy-4)] rounded-full overflow-hidden">
                       <div 
                         className={`h-full rounded-full transition-all ${
                           (editingSection ? (project.sections[editingSection] || "").trim().split(/\s+/).filter(Boolean).length : 0) < (editingSection ? getLengthConstraint(editingSection).min : 100) 
@@ -599,7 +599,7 @@ export default function ManuscriptEditorWorkspace({
 
                   {/* Originality Index */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[#76726A] font-bold uppercase">Originality:</span>
+                    <span className="text-[#94A3B8] font-bold uppercase">Originality:</span>
                     <span className={`px-1.5 py-0.5 rounded font-bold ${
                       calculateOriginalityIndex(editingSection ? (project.sections[editingSection] || "") : "") >= 90 
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
@@ -611,7 +611,7 @@ export default function ManuscriptEditorWorkspace({
 
                   {/* Style warnings */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[#76726A] font-bold uppercase">Style Errors:</span>
+                    <span className="text-[#94A3B8] font-bold uppercase">Style Errors:</span>
                     <span className={`px-1.5 py-0.5 rounded font-bold ${
                       checkAcademicTone(editingSection ? (project.sections[editingSection] || "") : "").length === 0 
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
@@ -624,11 +624,11 @@ export default function ManuscriptEditorWorkspace({
 
                 {/* Tone warnings suggestion list */}
                 {checkAcademicTone(editingSection ? (project.sections[editingSection] || "") : "").length > 0 && (
-                  <div className="mt-1 pt-1.5 border-t border-slate-200/50 max-h-[50px] overflow-y-auto flex flex-wrap gap-1.5 text-[9px] text-[#A87630]">
-                    <span className="font-bold text-[#76726A] mr-1">Suggestions:</span>
+                  <div className="mt-1 pt-1.5 border-t border-[color:var(--color-navy-4)]/50 max-h-[50px] overflow-y-auto flex flex-wrap gap-1.5 text-[9px] text-[color:var(--color-luminous-blue)]">
+                    <span className="font-bold text-[#94A3B8] mr-1">Suggestions:</span>
                     {checkAcademicTone(editingSection ? (project.sections[editingSection] || "") : "").slice(0, 4).map((warn, i) => (
                       <span key={i} className="bg-amber-50 border border-amber-100 rounded px-1">
-                        "{warn.word}" → <span className="font-bold text-slate-700">{warn.replacement}</span>
+                        "{warn.word}" → <span className="font-bold text-[#E2E8F0]">{warn.replacement}</span>
                       </span>
                     ))}
                   </div>
@@ -637,8 +637,8 @@ export default function ManuscriptEditorWorkspace({
             </div>
 
             {/* Right Pane: Intelligence Drawer */}
-            <div className="lg:col-span-5 flex flex-col bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm min-h-[580px] justify-between">
-              <div className="bg-[#FAF9F6] border-b border-[#E2E8F0] px-2 py-1.5 flex items-center justify-start gap-1 shrink-0">
+            <div className="lg:col-span-5 flex flex-col bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl overflow-hidden shadow-sm min-h-[580px] justify-between">
+              <div className="bg-[color:var(--color-navy-3)] border-b border-[color:var(--color-navy-4)] px-2 py-1.5 flex items-center justify-start gap-1 shrink-0">
                 {[
                   { id: "citations", name: "Citations", icon: BookOpenCheck },
                   { id: "checker", name: "Thematic Checker", icon: ShieldCheck },
@@ -651,7 +651,7 @@ export default function ManuscriptEditorWorkspace({
                       key={tab.id}
                       onClick={() => setDrawerTab(tab.id as any)}
                       className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
-                        isActive ? "bg-[color:var(--color-cyan-accent-dim)] text-white" : "text-gray-500 hover:bg-slate-100"
+                        isActive ? "bg-[color:var(--color-luminous-blue-dim)] text-white" : "text-[#94A3B8] hover:bg-[color:var(--color-navy-3)]"
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
@@ -661,15 +661,15 @@ export default function ManuscriptEditorWorkspace({
                 })}
               </div>
 
-              <div className="grow overflow-y-auto p-4 bg-[#FAF9F6]/30">
+              <div className="grow overflow-y-auto p-4 bg-[color:var(--color-navy-1)]/30">
                 {drawerTab === "citations" && (
                   <div className="space-y-4">
-                    <div className="border border-slate-200 rounded-xl bg-white p-3 space-y-2">
-                      <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#1A365D] flex items-center gap-1">
-                        <BookOpenCheck className="w-3.5 h-3.5 text-[#C08A3E]" />
+                    <div className="border border-[color:var(--color-navy-4)] rounded-xl bg-[color:var(--color-navy-2)] p-3 space-y-2">
+                      <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#E2E8F0] flex items-center gap-1">
+                        <BookOpenCheck className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" />
                         APA/IEEE Inline Preview
                       </h4>
-                      <p className="text-[10px] text-gray-400 leading-normal">
+                      <p className="text-[10px] text-[#94A3B8] leading-normal">
                         Copy inline formats compiled from your private research vault.
                       </p>
                       
@@ -680,21 +680,21 @@ export default function ManuscriptEditorWorkspace({
                             const apaInText = formatVaultFileApaInText(file);
 
                             return (
-                              <div key={file.id} className="p-2 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors text-[10px] bg-white">
-                                <div className="flex items-center justify-between font-mono font-bold text-[#1A365D]">
+                              <div key={file.id} className="p-2 border border-[color:var(--color-navy-4)] rounded-lg hover:border-[color:var(--color-luminous-blue)]/40 transition-colors text-[10px] bg-[color:var(--color-navy-1)] text-[#E2E8F0]">
+                                <div className="flex items-center justify-between font-mono font-bold text-[#E2E8F0]">
                                   <span className="line-clamp-1 grow mr-2">{file.fileName}</span>
-                                  <span className="text-[#946A30] shrink-0 font-normal">[{tag}]</span>
+                                  <span className="text-[color:var(--color-luminous-blue)] shrink-0 font-normal">[{tag}]</span>
                                 </div>
                                 <div className="mt-2 flex gap-1.5">
                                   <button
                                     onClick={() => navigator.clipboard.writeText(apaInText)}
-                                    className="bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded text-[8px] font-mono cursor-pointer transition-colors"
+                                    className="bg-[color:var(--color-navy-3)] hover:bg-[color:var(--color-navy-4)] text-[#E2E8F0] px-1.5 py-0.5 rounded text-[8px] font-mono cursor-pointer transition-colors"
                                   >
                                     APA: {apaInText}
                                   </button>
                                   <button
                                     onClick={() => navigator.clipboard.writeText(`[${idx + 1}]`)}
-                                    className="bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded text-[8px] font-mono cursor-pointer transition-colors"
+                                    className="bg-[color:var(--color-navy-3)] hover:bg-[color:var(--color-navy-4)] text-[#E2E8F0] px-1.5 py-0.5 rounded text-[8px] font-mono cursor-pointer transition-colors"
                                   >
                                     IEEE: [{idx + 1}]
                                   </button>
@@ -703,7 +703,7 @@ export default function ManuscriptEditorWorkspace({
                             );
                           })
                         ) : (
-                          <div className="p-8 text-center text-gray-400 text-[10px] font-mono">
+                          <div className="p-8 text-center text-[#94A3B8] text-[10px] font-mono">
                             No files loaded in Vault. Use the Knowledge Vault tab.
                           </div>
                         )}
@@ -714,45 +714,45 @@ export default function ManuscriptEditorWorkspace({
 
                 {drawerTab === "checker" && (
                   <div className="space-y-4">
-                    <div className="border border-slate-200 rounded-xl bg-white p-4 text-center space-y-3">
-                      <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#1A365D] text-left">
+                    <div className="border border-[color:var(--color-navy-4)] rounded-xl bg-[color:var(--color-navy-2)] p-4 text-center space-y-3">
+                      <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#E2E8F0] text-left">
                         Framework Resonance Analysis
                       </h4>
                       
                       <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
-                        <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+                        <div className="absolute inset-0 rounded-full border-4 border-[color:var(--color-navy-4)]" />
                         <div 
-                          className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#C08A3E] border-r-[#C08A3E] transition-all duration-500" 
+                          className="absolute inset-0 rounded-full border-4 border-transparent border-t-[color:var(--color-luminous-blue)] border-r-[color:var(--color-luminous-blue)] transition-all duration-500" 
                           style={{ transform: `rotate(${Math.min(360, (checkThematicAlignment(editingSection ? (project.sections[editingSection] || "") : "").score / 100) * 360 - 90)}deg)` }}
                         />
                         <div className="flex flex-col items-center">
-                          <span className="text-xl font-mono font-bold text-[#1A365D]">
+                          <span className="text-xl font-mono font-bold text-[#E2E8F0]">
                             {checkThematicAlignment(editingSection ? (project.sections[editingSection] || "") : "").score}%
                           </span>
-                          <span className="text-[8px] uppercase tracking-wider font-bold text-[#946A30]">Ṛta Match</span>
+                          <span className="text-[8px] uppercase tracking-wider font-bold text-[color:var(--color-luminous-blue)]">Ṛta Match</span>
                         </div>
                       </div>
                       
-                      <p className="text-[10px] text-slate-700 leading-relaxed font-sans px-2">
+                      <p className="text-[10px] text-[#94A3B8] leading-relaxed font-sans px-2">
                         {checkThematicAlignment(editingSection ? (project.sections[editingSection] || "") : "").feedback}
                       </p>
                     </div>
 
-                    <div className="border border-slate-200 rounded-xl bg-white p-3 space-y-2 text-[10px]">
-                      <h4 className="font-mono font-bold uppercase tracking-wider text-[#1A365D] flex items-center gap-1">
-                        <Award className="w-3.5 h-3.5 text-[#C08A3E]" />
+                    <div className="border border-[color:var(--color-navy-4)] rounded-xl bg-[color:var(--color-navy-2)] p-3 space-y-2 text-[10px]">
+                      <h4 className="font-mono font-bold uppercase tracking-wider text-[#E2E8F0] flex items-center gap-1">
+                        <Award className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" />
                         Detected Framework Anchors
                       </h4>
                       {checkThematicAlignment(editingSection ? (project.sections[editingSection] || "") : "").keywordsFound.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {checkThematicAlignment(editingSection ? (project.sections[editingSection] || "") : "").keywordsFound.map((kw, i) => (
-                            <span key={i} className="bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 text-[#1A365D] text-[9px] font-mono">
+                            <span key={i} className="bg-[color:var(--color-luminous-blue)]/10 border border-[color:var(--color-luminous-blue)]/20 rounded px-1.5 py-0.5 text-[color:var(--color-luminous-blue)] text-[9px] font-mono">
                               #{kw}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-400 italic text-[9px]">No core framework terms detected in the active segment.</p>
+                        <p className="text-[#94A3B8] italic text-[9px]">No core framework terms detected in the active segment.</p>
                       )}
                     </div>
                   </div>
@@ -760,24 +760,24 @@ export default function ManuscriptEditorWorkspace({
 
                 {drawerTab === "vault" && (
                   <div className="space-y-4">
-                    <div className="border border-slate-200 rounded-xl bg-white p-3 space-y-2 text-[10px]">
-                      <h4 className="font-mono font-bold uppercase tracking-wider text-[#1A365D] flex items-center gap-1">
-                        <Layers className="w-3.5 h-3.5 text-[#C08A3E]" />
+                    <div className="border border-[color:var(--color-navy-4)] rounded-xl bg-[color:var(--color-navy-2)] p-3 space-y-2 text-[10px]">
+                      <h4 className="font-mono font-bold uppercase tracking-wider text-[#E2E8F0] flex items-center gap-1">
+                        <Layers className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" />
                         Chapter Continuity Excerpts
                       </h4>
                       <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
                         {sectionsList
                           .filter(s => s !== editingSection && project.sections[s]?.trim())
                           .map(s => (
-                            <div key={s} className="p-2 bg-slate-50 rounded-lg border border-slate-150">
-                              <span className="font-mono font-bold text-[#1A365D] text-[9px] uppercase tracking-wider block mb-1">{s}</span>
-                              <p className="text-slate-600 text-[9px] leading-relaxed line-clamp-3">
+                            <div key={s} className="p-2 bg-[color:var(--color-navy-1)] rounded-lg border border-[color:var(--color-navy-4)]">
+                              <span className="font-mono font-bold text-[#E2E8F0] text-[9px] uppercase tracking-wider block mb-1">{s}</span>
+                              <p className="text-[#94A3B8] text-[9px] leading-relaxed line-clamp-3">
                                 {project.sections[s]}
                               </p>
                             </div>
                           ))}
                         {sectionsList.filter(s => s !== editingSection && project.sections[s]?.trim()).length === 0 && (
-                          <div className="p-4 text-center text-gray-400 italic text-[9px]">
+                          <div className="p-4 text-center text-[#94A3B8] italic text-[9px]">
                             No other sections drafted yet.
                           </div>
                         )}
@@ -787,7 +787,7 @@ export default function ManuscriptEditorWorkspace({
                 )}
               </div>
 
-              <div className="border-t border-[#E2E8F0] bg-white p-2.5 shrink-0 flex items-center justify-between text-[9px] font-mono text-gray-400">
+              <div className="border-t border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-2)] p-2.5 shrink-0 flex items-center justify-between text-[9px] font-mono text-[#94A3B8]">
                 <span>Focus intelligence Drawer</span>
                 <span>OS V1.0</span>
               </div>
@@ -797,14 +797,14 @@ export default function ManuscriptEditorWorkspace({
           /* STANDARD PREVIEW & CHAT MODE */
           <div className={`grid gap-5 items-start ${showChat ? "grid-cols-1 lg:grid-cols-12" : "grid-cols-1"}`}>
             {/* Manuscript Preview / Editor */}
-            <div className={`${showChat ? "lg:col-span-7" : ""} bg-white border border-[#E2E8F0] rounded-xl overflow-hidden`} ref={printAreaRef}>
+            <div className={`${showChat ? "lg:col-span-7" : ""} bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl overflow-hidden`} ref={printAreaRef}>
               {/* Toolbar */}
-              <div className="bg-[#FAF9F6] border-b border-[#E2E8F0] px-4 py-2.5 flex items-center justify-between">
+              <div className="bg-[color:var(--color-navy-3)] border-b border-[color:var(--color-navy-4)] px-4 py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setViewMode("preview")}
                     className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-bold uppercase cursor-pointer transition-all flex items-center gap-1 ${
-                      viewMode === "preview" ? "bg-[#1A365D] text-white" : "text-gray-500 hover:bg-gray-100"
+                      viewMode === "preview" ? "bg-[color:var(--color-luminous-blue-dim)] text-white" : "text-[#94A3B8] hover:bg-[color:var(--color-navy-3)]"
                     }`}
                   >
                     <Eye className="w-3 h-3" /> Preview
@@ -812,13 +812,13 @@ export default function ManuscriptEditorWorkspace({
                   <button
                     onClick={() => setViewMode("edit")}
                     className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-bold uppercase cursor-pointer transition-all flex items-center gap-1 ${
-                      viewMode === "edit" ? "bg-[#1A365D] text-white" : "text-gray-500 hover:bg-gray-100"
+                      viewMode === "edit" ? "bg-[color:var(--color-luminous-blue-dim)] text-white" : "text-[#94A3B8] hover:bg-[color:var(--color-navy-3)]"
                     }`}
                   >
                     <Edit3 className="w-3 h-3" /> Edit
                   </button>
                 </div>
-                <span className="text-[9px] font-mono text-gray-400">
+                <span className="text-[9px] font-mono text-[#94A3B8]">
                   {totalWords.toLocaleString()} words · {draftedSections.length} sections
                 </span>
               </div>
@@ -826,13 +826,13 @@ export default function ManuscriptEditorWorkspace({
               {/* Content */}
               <div className="max-h-[600px] overflow-y-auto">
                 {draftedSections.length === 0 ? (
-                  <div className="p-12 text-center text-gray-400">
-                    <FileText className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                  <div className="p-12 text-center text-[#94A3B8]">
+                    <FileText className="w-10 h-10 mx-auto mb-3 text-[#94A3B8]/50" />
                     <p className="text-sm font-mono">No sections drafted yet.</p>
                     <p className="text-xs mt-1">Go to Phase F to draft your manuscript sections.</p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-[#F1F5F9]">
+                  <div className="divide-y divide-[color:var(--color-navy-4)]">
                     {sectionsList.map(sec => {
                       const content = project.sections[sec];
                       if (!content?.trim()) return null;
@@ -844,18 +844,18 @@ export default function ManuscriptEditorWorkspace({
                           {/* Section Header */}
                           <button
                             onClick={() => toggleSection(sec)}
-                            className="w-full px-5 py-3 flex items-center justify-between hover:bg-[#FAF9F6] transition-all cursor-pointer"
+                            className="w-full px-5 py-3 flex items-center justify-between hover:bg-[color:var(--color-navy-3)] transition-all cursor-pointer"
                           >
                             <div className="flex items-center gap-2">
                               {isExpanded ? (
-                                <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                                <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8]" />
                               ) : (
-                                <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                                <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8]" />
                               )}
-                              <span className="text-xs font-mono font-bold text-[#1A365D] uppercase tracking-wider">{sec}</span>
+                              <span className="text-xs font-mono font-bold text-[#E2E8F0] uppercase tracking-wider">{sec}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-[9px] font-mono text-gray-400">
+                              <span className="text-[9px] font-mono text-[#94A3B8]">
                                 {content.split(/\s+/).filter(Boolean).length} words
                               </span>
                               {viewMode === "edit" && (
@@ -865,7 +865,7 @@ export default function ManuscriptEditorWorkspace({
                                     setEditingSection(isEditing ? null : sec);
                                     if (!isExpanded) toggleSection(sec);
                                   }}
-                                  className="px-2 py-0.5 bg-[#C08A3E]/10 text-[#C08A3E] rounded text-[9px] font-mono font-bold hover:bg-[#C08A3E]/20 transition-all cursor-pointer"
+                                  className="px-2 py-0.5 bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)] rounded text-[9px] font-mono font-bold hover:bg-[color:var(--color-luminous-blue)]/20 transition-all cursor-pointer"
                                 >
                                   {isEditing ? "Done" : "Edit"}
                                 </button>
@@ -878,12 +878,12 @@ export default function ManuscriptEditorWorkspace({
                             <div className="px-5 pb-4">
                               {isEditing ? (
                                 <textarea
-                                  className="w-full bg-[#FFFBF5] border border-[#C08A3E]/20 rounded-lg px-4 py-3 text-sm text-[#1A365D] leading-relaxed font-sans focus:outline-none focus:border-[#C08A3E] min-h-[200px] resize-y"
+                                  className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-luminous-blue)]/20 rounded-lg px-4 py-3 text-sm text-[#E2E8F0] leading-relaxed font-sans focus:outline-none focus:border-[color:var(--color-luminous-blue)] min-h-[200px] resize-y"
                                   value={content}
                                   onChange={(e) => handleSectionEdit(sec, e.target.value)}
                                 />
                               ) : (
-                                <div className="text-sm text-[#2D3748] leading-relaxed font-sans whitespace-pre-line pl-6 border-l-2 border-[#E2E8F0]">
+                                <div className="text-sm text-[#E2E8F0] leading-relaxed font-sans whitespace-pre-line pl-6 border-l-2 border-[color:var(--color-navy-4)]">
                                   {content}
                                 </div>
                               )}
@@ -899,11 +899,11 @@ export default function ManuscriptEditorWorkspace({
 
             {/* AI Chat Editor Panel */}
             {showChat && (
-              <div className="lg:col-span-5 bg-white border border-[#E2E8F0] rounded-xl overflow-hidden flex flex-col" style={{ minHeight: "500px", maxHeight: "660px" }}>
+              <div className="lg:col-span-5 bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl overflow-hidden flex flex-col" style={{ minHeight: "500px", maxHeight: "660px" }}>
                 {/* Chat Header */}
-                <div className="bg-[#1A365D] px-4 py-3 flex items-center justify-between shrink-0">
+                <div className="bg-[color:var(--color-navy-1)] px-4 py-3 flex items-center justify-between shrink-0 border-b border-[color:var(--color-navy-4)]">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#C08A3E]" />
+                    <Sparkles className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                     <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">AI Manuscript Editor</span>
                   </div>
                   <button
@@ -915,12 +915,12 @@ export default function ManuscriptEditorWorkspace({
                 </div>
 
                 {/* Chat Messages */}
-                <div className="grow overflow-y-auto p-4 space-y-3 bg-[#F8FAFC]">
+                <div className="grow overflow-y-auto p-4 space-y-3 bg-[color:var(--color-navy-1)]">
                   {chatMessages.length === 0 && (
                     <div className="text-center py-8 space-y-2">
-                      <MessageSquare className="w-8 h-8 mx-auto text-gray-300" />
-                      <p className="text-xs text-gray-400 font-mono">Ask the AI to edit your manuscript</p>
-                      <div className="space-y-1 text-[10px] text-gray-400 max-w-xs mx-auto">
+                      <MessageSquare className="w-8 h-8 mx-auto text-[#94A3B8]/50" />
+                      <p className="text-xs text-[#94A3B8] font-mono">Ask the AI to edit your manuscript</p>
+                      <div className="space-y-1 text-[10px] text-[#94A3B8] max-w-xs mx-auto">
                         <p>Try: "Improve the Introduction section"</p>
                         <p>Try: "Fix grammar in Literature Review"</p>
                       </div>
@@ -930,8 +930,8 @@ export default function ManuscriptEditorWorkspace({
                     <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[90%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
                         msg.role === "user"
-                          ? "bg-[#1A365D] text-white"
-                          : "bg-white border border-[#E2E8F0] text-[#2D3748]"
+                          ? "bg-[color:var(--color-luminous-blue-dim)] text-white"
+                          : "bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] text-[#E2E8F0]"
                       }`}>
                         <div className="whitespace-pre-line">{msg.content}</div>
                         {msg.appliedSection && (
@@ -944,9 +944,9 @@ export default function ManuscriptEditorWorkspace({
                   ))}
                   {chatLoading && (
                     <div className="flex justify-start">
-                      <div className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 flex items-center gap-2">
-                        <Loader2 className="w-3.5 h-3.5 text-[#C08A3E] animate-spin" />
-                        <span className="text-xs text-gray-400 font-mono animate-pulse">Editing manuscript...</span>
+                      <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl px-4 py-3 flex items-center gap-2">
+                        <Loader2 className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)] animate-spin" />
+                        <span className="text-xs text-[#94A3B8] font-mono animate-pulse">Editing manuscript...</span>
                       </div>
                     </div>
                   )}
@@ -954,11 +954,11 @@ export default function ManuscriptEditorWorkspace({
                 </div>
 
                 {/* Chat Input */}
-                <div className="border-t border-[#E2E8F0] bg-white p-3 shrink-0">
+                <div className="border-t border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-2)] p-3 shrink-0">
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      className="flex-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs text-[#1A365D] focus:outline-none focus:border-[#C08A3E] font-sans placeholder:text-gray-400"
+                      className="flex-1 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)] font-sans placeholder:text-[#94A3B8]"
                       placeholder="Ask AI to edit your manuscript..."
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
@@ -973,7 +973,7 @@ export default function ManuscriptEditorWorkspace({
                     <button
                       onClick={sendChatMessage}
                       disabled={chatLoading || !chatInput.trim()}
-                      className="px-3 py-2 bg-[#1A365D] hover:bg-[#122847] text-white rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                      className="px-3 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg transition-all cursor-pointer disabled:opacity-50"
                     >
                       <Send className="w-3.5 h-3.5" />
                     </button>
@@ -986,10 +986,10 @@ export default function ManuscriptEditorWorkspace({
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between items-center pt-4 border-t border-[#E2E8F0]">
+      <div className="flex justify-between items-center pt-4 border-t border-[color:var(--color-navy-4)]">
         <button
           onClick={onBack}
-          className="px-4 py-2 border border-[#E2E8F0] hover:bg-[#FAF9F6] text-[#1A365D] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
+          className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[#E2E8F0] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
         >
           ← Back to Quality Control
         </button>
@@ -1002,8 +1002,8 @@ export default function ManuscriptEditorWorkspace({
           }}
           className={`px-6 py-2.5 font-bold text-xs rounded-lg transition-all duration-200 shadow-sm cursor-pointer font-mono uppercase tracking-wider ${
             isApproved
-              ? "bg-[#1A365D] hover:bg-[#122847] text-white"
-              : "bg-gray-300 hover:bg-gray-400 text-gray-600"
+              ? "bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white"
+              : "bg-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-4)]/80 text-[#94A3B8]"
           }`}
         >
           Proceed to Submission Pack →
