@@ -396,7 +396,7 @@ export default function ResearchIntelligenceDashboard({
                       className={`border rounded-xl p-4 cursor-pointer hover-lift relative overflow-hidden flex flex-col justify-between min-h-[170px] ${
                         isCurrent 
                           ? "border-[color:var(--color-luminous-blue)] bg-[color:var(--color-navy-1)] shadow-md shadow-[color:var(--color-luminous-blue)]/5" 
-                          : "border-[color:var(--color-navy-4)] bg-white"
+                          : "border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-2)]"
                       }`}
                     >
                       <div className="space-y-1.5">
@@ -561,10 +561,10 @@ export default function ResearchIntelligenceDashboard({
                 AI Gateway
               </span>
               <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                checkingGateway ? "bg-gray-100 text-gray-400" :
+                checkingGateway ? "bg-[color:var(--color-navy-3)] text-[#94A3B8] border border-[#94A3B8]/60" :
                 gatewayStatus?.status === "online" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" :
                 gatewayStatus?.status === "offline" || gatewayStatus?.status === "degraded" ? "bg-red-500/10 text-red-400 border border-red-500/30" :
-                "bg-gray-100 text-gray-400 border border-[color:var(--color-navy-4)]"
+                "bg-[color:var(--color-navy-3)] text-[#94A3B8] border border-[#94A3B8]/60"
               }`}>
                 {checkingGateway ? "Checking..." : (gatewayStatus?.status || "unchecked")}
               </span>
@@ -602,7 +602,7 @@ export default function ResearchIntelligenceDashboard({
                     <span className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full ${
                       m.status === "online" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" :
                       m.status === "offline" || m.status === "degraded" ? "bg-red-500/10 text-red-400 border border-red-500/30" :
-                      m.status === "checking" ? "bg-gray-100 text-gray-400 border border-[color:var(--color-navy-4)]" :
+                      m.status === "checking" ? "bg-[color:var(--color-navy-3)] text-[#94A3B8] border border-[#94A3B8]/60" :
                       "bg-amber-500/10 text-amber-400 border border-amber-500/30"
                     }`}>
                       {m.status === "checking" ? "Checking..." : m.status === "untested" ? "Untested" : m.status}
