@@ -282,36 +282,46 @@ export default function ResearchIntelligenceDashboard({
       {/* Top Header Panel */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold font-serif text-[#1A365D]">Research Intelligence Dashboard</h2>
-          <p className="text-xs text-gray-500 font-mono uppercase tracking-wider">
+          <h2 className="text-xl font-bold font-serif text-[#E2E8F0]">Research Intelligence Dashboard</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-wider">
             Overview of your doctoral publications workspace
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative">
+          {/* The global input[type=text] CSS override (index.css) forces a
+              white background/navy text with !important, excluded only by
+              the .border-0/.bg-transparent classes — real bug caught live:
+              without these two classes this field stayed white even after
+              every other className here was updated to navy. The visual
+              "field" look (bg/border) moves to this wrapper instead. */}
+          <div className="relative bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl focus-within:border-[color:var(--color-luminous-blue)]">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-            <input 
-              type="text" 
-              placeholder="Search projects..." 
+            <input
+              type="text"
+              placeholder="Search projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-[#E2E8F0] rounded-xl text-xs w-[240px] focus:outline-none focus:border-[#C08A3E] font-sans"
+              className="border-0 bg-transparent pl-9 pr-4 py-2 rounded-xl text-xs w-[240px] text-[#E2E8F0] focus:outline-none font-sans"
             />
           </div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className={`px-3 py-2 border rounded-xl text-xs font-mono font-semibold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-all ${
-              sidebarOpen ? "bg-[#C08A3E] text-white border-[#C08A3E]" : "bg-white border-[#E2E8F0] text-[#1A365D] hover:bg-gray-50"
+              sidebarOpen ? "bg-[color:var(--color-luminous-blue)] text-white border-[color:var(--color-luminous-blue)]" : "bg-[color:var(--color-navy-1)] border-[color:var(--color-navy-4)] text-[#E2E8F0] hover:bg-[color:var(--color-navy-2)]"
             }`}
           >
             <BookOpen className="w-4 h-4" />
             {sidebarOpen ? "Close Vault" : "Citations Vault"}
           </button>
-          <button 
+          {/* The one genuine primary CTA on this dashboard — gold, per the
+              scoping doc's reversal #2 (gold scoped to primary CTA +
+              wordmark only, never general emphasis). Verified 9.4:1
+              contrast (navy-0 text on gold-accent) via the sRGB formula. */}
+          <button
             onClick={onCreateProject}
-            className="px-4 py-2 bg-[#1A365D] hover:bg-[#122847] text-white border border-[#1A365D] rounded-xl text-xs font-mono font-semibold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+            className="px-4 py-2 bg-[color:var(--color-gold-accent)] hover:bg-[#F0B855] text-[#030810] border border-[color:var(--color-gold-accent)] rounded-xl text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
           >
-            <PlusCircle className="w-4 h-4 text-[#C08A3E]" />
+            <PlusCircle className="w-4 h-4 text-[#030810]" />
             New Project
           </button>
         </div>
@@ -322,29 +332,29 @@ export default function ResearchIntelligenceDashboard({
         <div className="flex-1 space-y-6 min-w-0 transition-all duration-300">
           {/* Grid of Key Analytical Metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Total Papers</span>
-          <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1">{totalProjects}</span>
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase block">Total Papers</span>
+          <span className="text-2xl font-serif font-bold text-[#E2E8F0] block mt-1">{totalProjects}</span>
         </div>
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Active Projects</span>
-          <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-emerald-600">{activeProjects}</span>
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase block">Active Projects</span>
+          <span className="text-2xl font-serif font-bold text-[#E2E8F0] block mt-1 text-emerald-400">{activeProjects}</span>
         </div>
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Completed</span>
-          <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-blue-600">{completedProjects}</span>
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase block">Completed</span>
+          <span className="text-2xl font-serif font-bold text-[#E2E8F0] block mt-1 text-sky-400">{completedProjects}</span>
         </div>
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Draft / In Review</span>
-          <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-yellow-600">{draftArticles}</span>
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase block">Draft / In Review</span>
+          <span className="text-2xl font-serif font-bold text-[#E2E8F0] block mt-1 text-amber-400">{draftArticles}</span>
         </div>
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Submitted</span>
-          <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-[#946A30]">{submittedArticles}</span>
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase block">Submitted</span>
+          <span className="text-2xl font-serif font-bold text-[#E2E8F0] block mt-1 text-[#94A3B8]">{submittedArticles}</span>
         </div>
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm">
-          <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase block">Accepted (Q1/Q2)</span>
-          <span className="text-2xl font-serif font-bold text-[#1A365D] block mt-1 text-indigo-600">{acceptedArticles}</span>
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase block">Accepted (Q1/Q2)</span>
+          <span className="text-2xl font-serif font-bold text-[#E2E8F0] block mt-1 text-indigo-300">{acceptedArticles}</span>
         </div>
       </div>
 
@@ -353,18 +363,18 @@ export default function ResearchIntelligenceDashboard({
         
         {/* Left Column: Projects & Active Cards (Col-span 2) */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-[#F1F5F9] pb-3">
-              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] flex items-center gap-1.5">
-                <Folder className="w-4 h-4 text-[#C08A3E]" />
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-[color:var(--color-navy-4)] pb-3">
+              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] flex items-center gap-1.5">
+                <Folder className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                 Manuscript Workspaces
               </h3>
               {project && (
                 <button
                   onClick={() => onSelectProject(project.id)}
-                  className="px-2.5 py-1.5 bg-[#1A365D]/10 hover:bg-[#1A365D]/20 text-[#1A365D] rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
+                  className="px-2.5 py-1.5 bg-[color:var(--color-luminous-blue)]/10 hover:bg-[color:var(--color-luminous-blue)]/20 text-[#E2E8F0] rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
                 >
-                  <Play className="w-3 h-3 text-[#C08A3E]" />
+                  <Play className="w-3 h-3 text-[color:var(--color-luminous-blue)]" />
                   Continue Active Work
                 </button>
               )}
@@ -385,13 +395,13 @@ export default function ResearchIntelligenceDashboard({
                       onClick={() => onSelectProject(p.id)}
                       className={`border rounded-xl p-4 cursor-pointer hover-lift relative overflow-hidden flex flex-col justify-between min-h-[170px] ${
                         isCurrent 
-                          ? "border-[#C08A3E] bg-[#FAF8F5] shadow-md shadow-[#C08A3E]/5" 
-                          : "border-[#E2E8F0] bg-white"
+                          ? "border-[color:var(--color-luminous-blue)] bg-[color:var(--color-navy-1)] shadow-md shadow-[color:var(--color-luminous-blue)]/5" 
+                          : "border-[color:var(--color-navy-4)] bg-white"
                       }`}
                     >
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-mono bg-[#1A365D]/10 text-[#1A365D] px-2 py-0.5 rounded-full font-bold uppercase">
+                          <span className="text-[9px] font-mono bg-[color:var(--color-luminous-blue)]/10 text-[#E2E8F0] px-2 py-0.5 rounded-full font-bold uppercase">
                             {p.field.split(" ")[0] || "General"}
                           </span>
                         <div className="flex items-center gap-2">
@@ -400,39 +410,39 @@ export default function ResearchIntelligenceDashboard({
                           </span>
                           <button
                             onClick={(e) => { e.stopPropagation(); onDeleteProject(p.id); }}
-                            className="p-1 rounded-md hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all cursor-pointer"
+                            className="p-1 rounded-md hover:bg-red-500/10 text-gray-500 hover:text-red-400 transition-all cursor-pointer"
                             title="Delete workspace"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                         </div>
-                        <h4 className="text-xs font-bold text-[#1A365D] line-clamp-2 font-display">{p.title || "Untitled Dissertation Project"}</h4>
-                        <div className="text-[10px] text-gray-500 flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-[#E2E8F0] line-clamp-2 font-display">{p.title || "Untitled Dissertation Project"}</h4>
+                        <div className="text-[10px] text-gray-400 flex items-center gap-2">
                           <Clock className="w-3 h-3 text-gray-400" />
                           <span>Phase {p.currentPhase}: {getPhaseName(p.currentPhase)}</span>
                         </div>
                       </div>
 
-                      <div className="space-y-2 mt-4 pt-3 border-t border-[#F1F5F9]">
+                      <div className="space-y-2 mt-4 pt-3 border-t border-[color:var(--color-navy-4)]">
                         <div className="flex items-center justify-between text-[10px]">
                           <span className="font-mono text-gray-400">Completion:</span>
-                          <span className="font-bold text-[#1A365D]">{completion}%</span>
+                          <span className="font-bold text-[#E2E8F0]">{completion}%</span>
                         </div>
                         <div className="w-full bg-[#E2E8F0] h-1.5 rounded-full overflow-hidden">
                           <div 
-                            className="bg-[#C08A3E] h-full rounded-full transition-all duration-300"
+                            className="bg-[color:var(--color-luminous-blue)] h-full rounded-full transition-all duration-300"
                             style={{ width: `${completion}%` }}
                           />
                         </div>
                         <div className="flex items-center justify-between text-[9px] text-gray-400 font-mono pt-1">
                           <span>AI: <span className="text-[#0E7490] font-bold">{p.aiSettings?.provider?.toUpperCase() || "AUTO"}</span></span>
-                          <span className="uppercase font-semibold text-emerald-600">{p.status || "Draft"}</span>
+                          <span className="uppercase font-semibold text-emerald-400">{p.status || "Draft"}</span>
                         </div>
                       </div>
 
                       {isCurrent && (
-                        <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-[#C08A3E] rounded-bl-full" />
+                        <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-[color:var(--color-luminous-blue)] rounded-bl-full" />
                       )}
                     </div>
                   );
@@ -442,19 +452,19 @@ export default function ResearchIntelligenceDashboard({
           </div>
 
           {/* Productivity Analytics Panel */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-[#C08A3E]" />
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-sm space-y-4">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-3 flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Research Productivity & AI Analytics
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Metric 1 */}
               <div className="space-y-1">
                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase flex items-center gap-1">
-                  <FileText className="w-3.5 h-3.5 text-[#1A365D]" /> 
+                  <FileText className="w-3.5 h-3.5 text-[#E2E8F0]" /> 
                   Words Compiled
                 </span>
-                <span className="text-2xl font-bold font-serif text-[#1A365D] block">{totalWords.toLocaleString()}</span>
+                <span className="text-2xl font-bold font-serif text-[#E2E8F0] block">{totalWords.toLocaleString()}</span>
                 <p className="text-[9px] text-gray-400 leading-normal">Total words generated across active co-writing sections.</p>
               </div>
 
@@ -464,24 +474,24 @@ export default function ResearchIntelligenceDashboard({
                   <Cpu className="w-3.5 h-3.5 text-[color:var(--color-cyan-accent-dim)]" />
                   AI Call Counts
                 </span>
-                <span className="text-2xl font-bold font-serif text-[#1A365D] block">{totalCalls}</span>
+                <span className="text-2xl font-bold font-serif text-[#E2E8F0] block">{totalCalls}</span>
                 <p className="text-[9px] text-gray-400 leading-normal">Total agent requests dispatched to AI providers.</p>
               </div>
 
               {/* Metric 3 */}
               <div className="space-y-1">
                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase flex items-center gap-1">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
                   Estimated Expenditures
                 </span>
-                <span className="text-2xl font-bold font-serif text-emerald-600 block">${totalCost.toFixed(4)}</span>
+                <span className="text-2xl font-bold font-serif text-emerald-400 block">${totalCost.toFixed(4)}</span>
                 <p className="text-[9px] text-gray-400 leading-normal">Aggregated cloud costs based on input/output pricing tokens.</p>
               </div>
             </div>
 
             {/* Popular Providers bar chart simulation */}
             {Object.keys(providerStats).length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-[#F1F5F9]">
+              <div className="space-y-2 pt-2 border-t border-[color:var(--color-navy-4)]">
                 <span className="text-[9px] font-mono font-bold text-gray-400 uppercase block mb-2">Engine Dispatch Frequency</span>
                 <div className="space-y-2">
                   {Object.entries(providerStats).map(([prov, cnt]) => {
@@ -492,7 +502,7 @@ export default function ResearchIntelligenceDashboard({
                           <span className="uppercase text-gray-600">{prov}</span>
                           <span className="text-gray-400">{cnt} calls ({pct}%)</span>
                         </div>
-                        <div className="w-full bg-[#F1F5F9] h-1.5 rounded-full overflow-hidden">
+                        <div className="w-full bg-[color:var(--color-navy-1)] h-1.5 rounded-full overflow-hidden">
                           <div
                             className="bg-[color:var(--color-cyan-accent-dim)] h-full rounded-full"
                             style={{ width: `${pct}%` }}
@@ -511,20 +521,20 @@ export default function ResearchIntelligenceDashboard({
         <div className="space-y-6">
           
           {/* Notifications Panel */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center justify-between">
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-sm space-y-4">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-3 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Bell className="w-4 h-4 text-[#C08A3E]" />
+                <Bell className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                 Scholar Alerts
               </span>
-              {alerts.length > 0 && <span className="w-2.5 h-2.5 bg-[#C08A3E] rounded-full animate-ping" />}
+              {alerts.length > 0 && <span className="w-2.5 h-2.5 bg-[color:var(--color-luminous-blue)] rounded-full animate-ping" />}
             </h3>
             <div className="space-y-3">
               {alerts.length === 0 ? (
                 <p className="text-[11px] text-gray-400 text-center py-4">No alerts yet.</p>
               ) : (
                 alerts.map((n) => (
-                  <div key={n.id} className="flex gap-2.5 items-start p-2.5 rounded-xl hover:bg-[#FAF8F5] transition-all">
+                  <div key={n.id} className="flex gap-2.5 items-start p-2.5 rounded-xl hover:bg-[color:var(--color-navy-1)] transition-all">
                     <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
                       n.type === "success" ? "bg-emerald-500" :
                       n.type === "warning" ? "bg-amber-500" : "bg-blue-500"
@@ -544,17 +554,17 @@ export default function ResearchIntelligenceDashboard({
               same function AIControlCenter.tsx already calls). Never an
               unconditional "ONLINE" (docs/planning/
               dashboard-mockup-honest-data-audit.md). */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center justify-between">
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-3 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Cpu className="w-4 h-4 text-[#C08A3E]" />
+                <Cpu className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                 AI Gateway
               </span>
               <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                checkingGateway ? "bg-gray-100 text-gray-500" :
-                gatewayStatus?.status === "online" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
-                gatewayStatus?.status === "offline" || gatewayStatus?.status === "degraded" ? "bg-red-50 text-red-700 border border-red-200" :
-                "bg-gray-100 text-gray-500 border border-gray-200"
+                checkingGateway ? "bg-gray-100 text-gray-400" :
+                gatewayStatus?.status === "online" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" :
+                gatewayStatus?.status === "offline" || gatewayStatus?.status === "degraded" ? "bg-red-500/10 text-red-400 border border-red-500/30" :
+                "bg-gray-100 text-gray-400 border border-[color:var(--color-navy-4)]"
               }`}>
                 {checkingGateway ? "Checking..." : (gatewayStatus?.status || "unchecked")}
               </span>
@@ -562,8 +572,8 @@ export default function ResearchIntelligenceDashboard({
             {currentMode && currentProviderInfo ? (
               <>
                 <div>
-                  <span className="text-sm font-bold text-[#1A365D] block">{currentMode.title}</span>
-                  <span className="text-xs text-gray-500">{currentProviderInfo.name}</span>
+                  <span className="text-sm font-bold text-[#E2E8F0] block">{currentMode.title}</span>
+                  <span className="text-xs text-gray-400">{currentProviderInfo.name}</span>
                 </div>
                 <div className="text-[10px] font-mono text-gray-400 uppercase">
                   {fallbackCount > 0 ? `${fallbackCount} fallback provider(s) configured` : "No fallback configured"}
@@ -577,9 +587,9 @@ export default function ResearchIntelligenceDashboard({
           {/* Active Models panel — only genuinely configured providers,
               never a fixed list; see derivation above for why fallback
               providers show "Untested" rather than a live-checked status. */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center gap-1.5">
-              <Cpu className="w-4 h-4 text-[#C08A3E]" />
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-3 flex items-center gap-1.5">
+              <Cpu className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Active Models
             </h3>
             {activeModelsList.length === 0 ? (
@@ -588,12 +598,12 @@ export default function ResearchIntelligenceDashboard({
               <div className="space-y-2">
                 {activeModelsList.map((m) => (
                   <div key={m.id} className="flex items-center justify-between text-xs">
-                    <span className="text-[#1A365D] font-medium">{m.name}</span>
+                    <span className="text-[#E2E8F0] font-medium">{m.name}</span>
                     <span className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full ${
-                      m.status === "online" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
-                      m.status === "offline" || m.status === "degraded" ? "bg-red-50 text-red-700 border border-red-200" :
-                      m.status === "checking" ? "bg-gray-100 text-gray-500 border border-gray-200" :
-                      "bg-amber-50 text-amber-700 border border-amber-200"
+                      m.status === "online" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" :
+                      m.status === "offline" || m.status === "degraded" ? "bg-red-500/10 text-red-400 border border-red-500/30" :
+                      m.status === "checking" ? "bg-gray-100 text-gray-400 border border-[color:var(--color-navy-4)]" :
+                      "bg-amber-500/10 text-amber-400 border border-amber-500/30"
                     }`}>
                       {m.status === "checking" ? "Checking..." : m.status === "untested" ? "Untested" : m.status}
                     </span>
@@ -606,38 +616,38 @@ export default function ResearchIntelligenceDashboard({
           {/* AI Agents panel — real, static registered-agent-type count.
               Never "N Active"/"N Running": no live concurrency model
               exists (docs/planning/dashboard-mockup-honest-data-audit.md). */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#1A365D]/5 border border-[#1A365D]/10 flex items-center justify-center shrink-0">
-              <Cpu className="w-5 h-5 text-[#1A365D]" />
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[color:var(--color-luminous-blue)]/5 border border-[color:var(--color-luminous-blue)]/20 flex items-center justify-center shrink-0">
+              <Cpu className="w-5 h-5 text-[#E2E8F0]" />
             </div>
             <div>
-              <span className="text-2xl font-serif font-bold text-[#1A365D] block leading-none">{registeredAgentCount}</span>
-              <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase tracking-wider">Agent types available</span>
+              <span className="text-2xl font-serif font-bold text-[#E2E8F0] block leading-none">{registeredAgentCount}</span>
+              <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">Agent types available</span>
             </div>
           </div>
 
           {/* Scholar Research Snapshot — real per-scholar counters, never a
               fabricated platform-wide aggregate (see derivation above). */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4 text-[#C08A3E]" />
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-3 flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Research Snapshot
             </h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{totalProjects}</span>
+                <span className="text-lg font-serif font-bold text-[#E2E8F0] block leading-none">{totalProjects}</span>
                 <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Research Projects</span>
               </div>
               <div>
-                <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{scholarDatasetCount}</span>
+                <span className="text-lg font-serif font-bold text-[#E2E8F0] block leading-none">{scholarDatasetCount}</span>
                 <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Datasets</span>
               </div>
               <div>
-                <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{scholarCitationCount}</span>
+                <span className="text-lg font-serif font-bold text-[#E2E8F0] block leading-none">{scholarCitationCount}</span>
                 <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Citations cached</span>
               </div>
               <div>
-                <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{scholarJournalSelectedCount}</span>
+                <span className="text-lg font-serif font-bold text-[#E2E8F0] block leading-none">{scholarJournalSelectedCount}</span>
                 <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Journals selected</span>
               </div>
             </div>
@@ -647,20 +657,20 @@ export default function ResearchIntelligenceDashboard({
               fabricated TB figure; utilization only via the real
               navigator.storage.estimate() API, honestly "not available"
               when it doesn't resolve, never a fabricated percentage. */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center gap-1.5">
-              <HelpCircle className="w-4 h-4 text-[#C08A3E]" />
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-3 flex items-center gap-1.5">
+              <HelpCircle className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Knowledge Vault
             </h3>
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">{formatBytes(vaultByteSize)}</span>
+                <span className="text-lg font-serif font-bold text-[#E2E8F0] block leading-none">{formatBytes(vaultByteSize)}</span>
                 <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">{(project?.knowledgeVault?.files || []).length} file(s) stored</span>
               </div>
               <div className="text-right">
                 {storageEstimate ? (
                   <>
-                    <span className="text-lg font-serif font-bold text-[#1A365D] block leading-none">
+                    <span className="text-lg font-serif font-bold text-[#E2E8F0] block leading-none">
                       {Math.round((storageEstimate.usage / storageEstimate.quota) * 100)}%
                     </span>
                     <span className="text-[9px] font-mono font-bold text-gray-400 uppercase">Browser storage used</span>
@@ -676,49 +686,49 @@ export default function ResearchIntelligenceDashboard({
               Never a fabricated discovery-feed count: no background
               crawler exists in this app (docs/planning/
               dashboard-mockup-honest-data-audit.md). */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#1A365D]/5 border border-[#1A365D]/10 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-5 h-5 text-[#1A365D]" />
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[color:var(--color-luminous-blue)]/5 border border-[color:var(--color-luminous-blue)]/20 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-5 h-5 text-[#E2E8F0]" />
             </div>
             <div>
-              <span className="text-2xl font-serif font-bold text-[#1A365D] block leading-none">{todaysActionCount}</span>
-              <span className="text-[10px] font-mono font-bold text-[#76726A] uppercase tracking-wider">Today's Research — AI actions today</span>
+              <span className="text-2xl font-serif font-bold text-[#E2E8F0] block leading-none">{todaysActionCount}</span>
+              <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">Today's Research — AI actions today</span>
             </div>
           </div>
 
           {/* Quick Actions Panel */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-[#C08A3E]" />
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-3 flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Quick Command Panel
             </h3>
             <div className="grid grid-cols-1 gap-2">
               <button 
                 onClick={() => onNavigateToPhase("B")}
-                className="w-full text-left p-2.5 hover:bg-[#FAF8F5] border border-transparent hover:border-[#E2E8F0] rounded-xl flex items-center justify-between group cursor-pointer transition-all"
+                className="w-full text-left p-2.5 hover:bg-[color:var(--color-navy-1)] border border-transparent hover:border-[color:var(--color-navy-4)] rounded-xl flex items-center justify-between group cursor-pointer transition-all"
               >
                 <div className="flex items-center gap-2">
-                  <Star className="w-4 h-4 text-[#C08A3E]" />
+                  <Star className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   <span className="text-xs text-gray-700">Anchor to Dissertation</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:translate-x-1 transition-all" />
               </button>
               <button 
                 onClick={() => onNavigateToPhase("D")}
-                className="w-full text-left p-2.5 hover:bg-[#FAF8F5] border border-transparent hover:border-[#E2E8F0] rounded-xl flex items-center justify-between group cursor-pointer transition-all"
+                className="w-full text-left p-2.5 hover:bg-[color:var(--color-navy-1)] border border-transparent hover:border-[color:var(--color-navy-4)] rounded-xl flex items-center justify-between group cursor-pointer transition-all"
               >
                 <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#1A365D]" />
+                  <FileText className="w-4 h-4 text-[#E2E8F0]" />
                   <span className="text-xs text-gray-700">Find Target Journal</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:translate-x-1 transition-all" />
               </button>
               <button 
                 onClick={() => onNavigateToPhase("G")}
-                className="w-full text-left p-2.5 hover:bg-[#FAF8F5] border border-transparent hover:border-[#E2E8F0] rounded-xl flex items-center justify-between group cursor-pointer transition-all"
+                className="w-full text-left p-2.5 hover:bg-[color:var(--color-navy-1)] border border-transparent hover:border-[color:var(--color-navy-4)] rounded-xl flex items-center justify-between group cursor-pointer transition-all"
               >
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   <span className="text-xs text-gray-700">Run Compliance Audit</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:translate-x-1 transition-all" />
@@ -727,23 +737,23 @@ export default function ResearchIntelligenceDashboard({
           </div>
 
           {/* Activity Log Panel */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#F1F5F9] pb-3 flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-[#C08A3E]" />
+          <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-sm space-y-4">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-3 flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Recent Activity
             </h3>
             {sortedActivity.length === 0 ? (
               <p className="text-[11px] text-gray-400 text-center py-4">No recent activity logged.</p>
             ) : (
-              <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-[1px] before:bg-gray-100">
+              <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-[1px] before:bg-[color:var(--color-navy-4)]">
                 {sortedActivity.map((act, index) => (
                   <div key={index} className="flex gap-4 items-start relative pl-1">
-                    <div className="w-4 h-4 rounded-full bg-white border-2 border-[#C08A3E] flex items-center justify-center shrink-0 z-10">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#1A365D]" />
+                    <div className="w-4 h-4 rounded-full bg-[color:var(--color-navy-1)] border-2 border-[color:var(--color-luminous-blue)] flex items-center justify-center shrink-0 z-10">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-luminous-blue)]" />
                     </div>
                     <div className="space-y-0.5">
                       <span className="text-[10px] font-bold text-[#1D4ED8] block font-mono">{act.title}</span>
-                      <span className="text-[9px] text-[#946A30] font-medium block uppercase tracking-wider">{act.projectTitle}</span>
+                      <span className="text-[9px] text-[#94A3B8] font-medium block uppercase tracking-wider">{act.projectTitle}</span>
                       <p className="text-[11px] text-gray-600 leading-normal">{act.desc}</p>
                       <span className="text-[9px] text-gray-400 font-mono block pt-0.5">{act.time}</span>
                     </div>
@@ -758,29 +768,32 @@ export default function ResearchIntelligenceDashboard({
 
       {/* Right Split-Pane: Live Citation & Construct Vault */}
       {sidebarOpen && (
-        <div className="w-[360px] border border-[#E2E8F0] bg-[#FAF9F6] rounded-2xl flex flex-col shrink-0 shadow-sm overflow-hidden sticky top-6 max-h-[calc(100vh-120px)] animate-fade-in">
-          <div className="p-4 border-b border-[#E2E8F0] bg-white flex items-center justify-between">
-            <span className="text-xs font-mono font-bold uppercase text-[#1A365D] tracking-wider flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4 text-[#C08A3E]" />
+        <div className="w-[360px] border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] rounded-2xl flex flex-col shrink-0 shadow-sm overflow-hidden sticky top-6 max-h-[calc(100vh-120px)] animate-fade-in">
+          <div className="p-4 border-b border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-2)] flex items-center justify-between">
+            <span className="text-xs font-mono font-bold uppercase text-[#E2E8F0] tracking-wider flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Cached Vault Citations
             </span>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="text-gray-400 hover:text-[#1A365D] cursor-pointer p-1"
+              className="text-gray-400 hover:text-[#E2E8F0] cursor-pointer p-1"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="p-3 border-b border-[#E2E8F0] bg-white/50">
-            <div className="relative">
+          <div className="p-3 border-b border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)]/50">
+            {/* Same global-override exemption as the "Search projects" field
+                above — .border-0/.bg-transparent, visual field look on the
+                wrapper. */}
+            <div className="relative bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg focus-within:border-[color:var(--color-luminous-blue)]">
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Filter cached bibtex / authors..."
                 value={citationSearch}
                 onChange={(e) => setCitationSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-white border border-[#CBD5E1] rounded-lg text-xs focus:outline-none focus:border-[#C08A3E] font-sans"
+                className="border-0 bg-transparent w-full pl-8 pr-3 py-1.5 rounded-lg text-xs text-[#E2E8F0] focus:outline-none font-sans"
               />
             </div>
           </div>
@@ -797,9 +810,9 @@ export default function ResearchIntelligenceDashboard({
                 return <p className="text-[11px] text-gray-400 text-center py-6">No cached citations match your search.</p>;
               }
               return filtered.map((item) => (
-                <div key={item.id} className="bg-white p-3.5 rounded-xl border border-[#E2E8F0] shadow-2xs space-y-2 hover:border-[#C08A3E]/40 transition-all group">
+                <div key={item.id} className="bg-[color:var(--color-navy-2)] p-3.5 rounded-xl border border-[color:var(--color-navy-4)] shadow-2xs space-y-2 hover:border-[color:var(--color-luminous-blue)]/40 transition-all group">
                   <div className="flex justify-between items-start">
-                    <span className="text-[10px] font-mono font-bold text-[#946A30] bg-[#C08A3E]/10 px-2 py-0.5 rounded">
+                    <span className="text-[10px] font-mono font-bold text-[#94A3B8] bg-[color:var(--color-luminous-blue)]/10 px-2 py-0.5 rounded">
                       {item.type}
                     </span>
                     <button
@@ -808,15 +821,15 @@ export default function ResearchIntelligenceDashboard({
                         alert(`Copied parenthetical citation: ${item.inText}`);
                       }}
                       title="Copy Parenthetical Citation"
-                      className="text-gray-400 hover:text-[#1A365D] cursor-pointer group-hover:text-[#C08A3E] transition-colors"
+                      className="text-gray-400 hover:text-[#E2E8F0] cursor-pointer group-hover:text-[color:var(--color-luminous-blue)] transition-colors"
                     >
                       <Copy className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <p className="text-xs font-serif text-[#1A365D] leading-snug">
+                  <p className="text-xs font-serif text-[#E2E8F0] leading-snug">
                     {item.ref}
                   </p>
-                  <div className="bg-[#F8FAFC] p-2 rounded border border-[#F1F5F9] font-mono text-[10px] text-gray-600 flex justify-between items-center">
+                  <div className="bg-[color:var(--color-navy-1)] p-2 rounded border border-[color:var(--color-navy-4)] font-mono text-[10px] text-gray-600 flex justify-between items-center">
                     <span>{item.inText}</span>
                     <span className="text-[9px] text-gray-400 uppercase">APA 7th</span>
                   </div>
