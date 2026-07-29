@@ -1,6 +1,22 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi v3 Step 4 — 4/7 buildable panels done — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi v3 — Steps 1-4 ALL DONE — supersedes the section below)
+
+**Sci-fi v3 redesign (`docs/planning/sci-fi-redesign-scoping.md`) — Steps 1-4 fully complete.** This session finished Step 4 by closing out the last 2 buildable panels and the full dashboard restyle:
+
+5. **AI Gateway** (`d21784e`) — real current mode/provider/fallback state, reusing `AIGateway.healthCheckProvider()` — the exact same function `AIControlCenter.tsx`'s own status card already calls, not duplicated. Never an unconditional "ONLINE" — real live status only.
+6. **Active Models** (`7ec9a33`) — lists only genuinely configured providers (current + real `fallbackOrder`), never a fixed list. The active provider's status *reuses* the AI Gateway panel's own check (test-verified: exactly one `healthCheckProvider` call total across both panels, no duplicate network request). Fallback providers are deliberately not auto-checked — shown honestly as "Untested," never guessed "Offline." Live-verified by adding a real fallback provider and confirming the dashboard updated on reload.
+7. **Full dashboard navy restyle** (`446cb11`) — single commit, pure styling, confirmed via the full test suite passing unchanged. **Real contrast failures caught by computing against the new navy surface**: `blue-600` (3.47:1) and `indigo-600` (2.85:1) both genuinely failed 4.5:1 — fixed to `sky-400`/`indigo-300`. **A real bug caught by live verification**: the dashboard's two search/filter inputs stayed white after their className was updated, because `index.css`'s global `input[type="text"]` rule forces white with `!important`, exempted only by `.border-0`/`.bg-transparent` — fixed and re-verified live, including typing into the real field to confirm search still works. Gold demoted from general decorative icon color to *only* the dashboard's one genuine primary CTA ("New Project"), per the scoping doc's reversal #2.
+
+- `tsc --noEmit` clean, full suite 949/951 throughout (same 2 pre-existing unrelated `supabaseClient.test.ts` failures — zero regressions from the pure style pass), every panel and the restyle live-verified in a real browser (console checked clean throughout).
+
+**What's NOT done**: Step 5 (remaining component restyling — `CommandPalette.tsx`, `AIControlCenter.tsx`/`AISetupWizard.tsx` reworked onto navy tokens, and the ~28 components never touched by any sci-fi pass) remains genuinely open, explicitly lower-priority per the original sequence ("if budget remains"), not started.
+
+**Updated gap map**: sci-fi v3 is now 4/5 steps fully done (Steps 1-4 complete and live-verified); only Step 5's optional remaining-component restyling is open. Navigation overhaul (further below) remains fully closed.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-28, sci-fi v3 Step 4 — 4/7 buildable panels done — superseded by the section above)
 
 **Continuing sci-fi v3 (`docs/planning/sci-fi-redesign-scoping.md`) Step 4** — the 7 remaining buildable panels from `docs/planning/dashboard-mockup-honest-data-audit.md`, plus the full dashboard navy restyle. This session built 4 of the 7 panels, each test-first, live-verified, its own commit:
 
