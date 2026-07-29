@@ -397,25 +397,31 @@ button:disabled {
 }
 
 /* ==========================================
-   SCI-FI REDESIGN — STEP 1: GLOBAL CHROME (dark surface)
+   SCI-FI REDESIGN v2 — STEP 2: GLOBAL CHROME (dark surface)
    Scoped to a `.chrome-dark` wrapper (used by AppHeader/AppFooter) rather
    than applied to <body>, since the rest of the app is still on the light
    surface and adopts the dark system incrementally, per the scoping doc's
    own "everything else adopted incrementally as touched" guidance.
+   CHANGED (v2): moved off --color-brand-900/950 onto the layered-grey
+   --color-surface-1/2 scale established in Step 1 — this is the base-
+   surfaces half of "global chrome + base surfaces," ahead of the separate
+   navy-remap step, since these two classes were always cyan/dark-surface
+   chrome, never a navy-text-on-light-surface case the navy remap step
+   needs to classify. Re-verified contrast live after the swap (see commit).
    ========================================== */
 
 .chrome-dark {
-  background-color: var(--color-brand-900);
-  color: #E2E8F0; /* verified 15.48:1 against brand-900 */
+  background-color: var(--color-surface-1);
+  color: #E2E8F0;
   border-color: rgba(226, 232, 240, 0.1) !important;
 }
 
 .chrome-dark .chrome-dark-subtle {
-  background-color: var(--color-brand-950);
+  background-color: var(--color-surface-2);
 }
 
 .chrome-dark-accent {
-  color: var(--color-cyan-accent); /* verified 10.55:1 against brand-900 */
+  color: var(--color-cyan-accent);
 }
 
 .manuscript-body {
