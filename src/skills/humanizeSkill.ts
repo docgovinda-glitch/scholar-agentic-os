@@ -9,12 +9,11 @@
  *
  * This is explicitly NOT a detection-evasion tool. It never references
  * detectors, "sounding human," or bypassing anything in its instructions to
- * the model — only sentence-level prose-quality edits. Contrast this with
- * draftSectionBasedOnQCStream's existing system prompt in aiService.ts,
- * which does contain real detection-evasion language ("bypass common AI
- * detectors (GPTZero, Turnitin-AI)") — that prompt is untouched by this
- * skill (out of scope for this task) but this skill deliberately does not
- * reuse or extend that framing anywhere.
+ * the model — only sentence-level prose-quality edits. draftSectionBasedOnQCStream's
+ * system prompt in aiService.ts previously contained real detection-evasion
+ * language ("bypass common AI detectors (GPTZero, Turnitin-AI)") but that
+ * was fixed in a later session (see aiService.draftSectionBasedOnQCStream.test.ts's
+ * regression test) — this skill never reused or extended that framing.
  */
 
 import type { Skill, SkillContext, SkillMetadata, SkillResult, SkillValidationResult } from "./types";
