@@ -1,6 +1,20 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-30, codebase-wide fabrication audit — 6 real instances found and removed across 5 files — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-30, manuscript approval no longer a blind rubber-stamp — supersedes the section below)
+
+**Follow-up to the fabrication audit below**: checked whether the app's real QC/integrity computation actually has any teeth at the approval step, or whether it's purely decorative. Found: `ManuscriptEditorWorkspace.tsx`'s `handleApprove()` never referenced `project.qcReport` at all — one generic `confirm()` dialog regardless of whether any QC audit had ever run, or had run and surfaced real weaknesses. Commit `b36da3f`.
+
+**Deliberately not fixed by blocking approval on a bad score** — this project's own established principle (semantic-peer-review scoping's "do not attempt" list) is that the system never issues an accept/reject verdict; a human makes that call. Fixed as informed consent instead: the confirm dialog now shows the real compliance/rigor/alignment scores and specific weaknesses (or an honest "no audit run yet" warning) before the human self-attests approval. They can still approve despite a bad score — they just can't do it blind anymore.
+
+Also fixed in the same block: the "Manuscript Approved"/"Revoke" status pills still used leftover light-mode tokens (`bg-emerald-50`/`bg-amber-50`) missed during this file's earlier sci-fi conversion pass.
+
+5 new tests added. `tsc --noEmit` clean, full suite 1080/1080 (+5), `npm run build` clean. Live-verified in a real browser via `agent-browser`'s `dialog accept`/native-dialog handling: seeded a real 41%/38%/45% QC report with 2 weaknesses, confirmed the exact scores and weakness text appeared verbatim in the real native confirm dialog before accepting.
+
+**Also worth knowing for next time**: `IntegrityReviewerAgent`'s review result (`structuralCompleteness` score, computed in `QualityControlSuite.tsx` via `agentService.executeAgent`) is stored in local component `useState` only — never persisted onto `project` at all. It's invisible anywhere outside the Quality Control tab, including at the approval step this session just fixed. Not addressed this pass (would need a new `PaperProject` field + wiring); flagging as the natural next piece if continuing this exact thread.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-30, codebase-wide fabrication audit — 6 real instances found and removed across 5 files — superseded by the section above)
 
 **Follow-up to the Stage 5 fabrication fix below**: that fix (removing `handleAutoFillBlueprint`'s hardcoded fake-blueprint fallback) turned out to be one instance of a systemic pattern, not a one-off. Audited every component consuming `aiService.ts` for the same shape of bug — a "skip the real AI call" button that fabricates specific, invented content and presents it as genuinely generated or verified. Commit `c239889`.
 
