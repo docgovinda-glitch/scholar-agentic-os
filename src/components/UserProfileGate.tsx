@@ -651,16 +651,16 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
   };
 
   return (
-    <div className="text-[#1A365D] flex flex-col items-center justify-center font-sans selection:bg-[#1A365D] selection:text-white w-full max-w-lg mx-auto">
+    <div className="text-[#E2E8F0] flex flex-col items-center justify-center font-sans selection:bg-[color:var(--color-luminous-blue-dim)] selection:text-white w-full max-w-lg mx-auto">
       
       {/* Main card box container */}
-      <div className="w-full bg-white/95 border border-[#E2E8F0] rounded-3xl shadow-xl overflow-hidden flex flex-col p-8 md:p-10 space-y-6 hover-lift transition-all duration-300 relative">
+      <div className="w-full bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-3xl shadow-xl overflow-hidden flex flex-col p-8 md:p-10 space-y-6 hover-lift transition-all duration-300 relative">
         
         {/* Settings Gear Button */}
         <button
           type="button"
           onClick={openSettingsModal}
-          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-[#1A365D] hover:bg-neutral-100/80 rounded-xl transition-all duration-200 cursor-pointer z-10 animate-pulse-hover"
+          className="absolute top-4 right-4 p-2 text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[color:var(--color-navy-3)] rounded-xl transition-all duration-200 cursor-pointer z-10 animate-pulse-hover"
           title="Configure API Credentials"
         >
           <Settings className="w-4.5 h-4.5" />
@@ -668,17 +668,17 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
         {/* Brand Logo & Header */}
         <div className="text-center space-y-2.5">
-          <div className="w-14 h-14 rounded-2xl bg-[#1A365D]/5 border border-[#1A365D]/10 flex items-center justify-center mx-auto shadow-sm">
-            <GraduationCap className="w-8 h-8 text-[#1A365D]" />
+          <div className="w-14 h-14 rounded-2xl bg-[color:var(--color-luminous-blue)]/10 border border-[color:var(--color-luminous-blue)]/20 flex items-center justify-center mx-auto shadow-sm">
+            <GraduationCap className="w-8 h-8 text-[color:var(--color-luminous-blue)]" />
           </div>
           <div className="space-y-1">
             <h1 className="text-3xl font-serif font-bold tracking-tight text-gradient">
               🎓 Scholar Agentic OS
             </h1>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#946A30] font-sans">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-luminous-blue)] font-sans">
               AI Research Operating System
             </p>
-            <p className="text-[11px] text-[#6B665E] max-w-xs mx-auto leading-relaxed font-sans">
+            <p className="text-[11px] text-[#94A3B8] max-w-xs mx-auto leading-relaxed font-sans">
               for Scholars
             </p>
           </div>
@@ -686,7 +686,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
         {/* Tab Selection toggle bar */}
         {!showDualVerifyScreen && activeTab !== "activation" && profiles.length > 0 && (
-          <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#FAF8F5] border border-[#D1CEC7]/50 rounded-2xl text-xs font-mono shrink-0">
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)]/50 rounded-2xl text-xs font-mono shrink-0">
             <button
               onClick={() => {
                 setActiveTab("login");
@@ -695,8 +695,8 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               }}
               className={`py-2.5 rounded-xl transition-all cursor-pointer font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 ${
                 activeTab === "login"
-                  ? "bg-[#1A365D] text-white shadow-md shadow-[#1A365D]/10"
-                  : "text-[#6B665E] hover:text-[#1A365D] hover:bg-neutral-100"
+                  ? "bg-[color:var(--color-luminous-blue-dim)] text-white shadow-md"
+                  : "text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[color:var(--color-navy-3)]"
               }`}
             >
               <Lock className="w-3.5 h-3.5" />
@@ -710,8 +710,8 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               }}
               className={`py-2.5 rounded-xl transition-all cursor-pointer font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 ${
                 activeTab === "signup"
-                  ? "bg-[#1A365D] text-white shadow-md shadow-[#1A365D]/10"
-                  : "text-[#6B665E] hover:text-[#1A365D] hover:bg-neutral-100"
+                  ? "bg-[color:var(--color-luminous-blue-dim)] text-white shadow-md"
+                  : "text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[color:var(--color-navy-3)]"
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -722,8 +722,8 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
         {/* Error notification card */}
         {error && (
-          <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-start gap-2.5">
-            <ShieldAlert className="w-4.5 h-4.5 text-red-700 shrink-0 mt-0.5" />
+          <div className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2.5">
+            <ShieldAlert className="w-4.5 h-4.5 text-red-400 shrink-0 mt-0.5" />
             <span className="leading-relaxed font-sans font-medium">{error}</span>
           </div>
         )}
@@ -734,9 +734,9 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
         <div className="grow">
           {showDualVerifyScreen ? (
             <form onSubmit={handleVerifyDualOtp} className="space-y-5 animate-fade-in">
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-950">
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-xs text-amber-300">
                 <h4 className="font-bold uppercase font-mono tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="w-4.5 h-4.5 text-amber-700" />
+                  <ShieldCheck className="w-4.5 h-4.5 text-amber-400" />
                   Email OTP Scholar Verification
                 </h4>
                 <p className="text-xs leading-normal">
@@ -745,30 +745,30 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               </div>
 
               {dualVerifyError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-start gap-2.5">
-                  <AlertCircle className="w-4.5 h-4.5 text-red-700 shrink-0 mt-0.5" />
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2.5">
+                  <AlertCircle className="w-4.5 h-4.5 text-red-400 shrink-0 mt-0.5" />
                   <span className="leading-relaxed font-sans font-medium">{dualVerifyError}</span>
                 </div>
               )}
 
               {dualVerifyBypass && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 text-xs leading-normal font-mono select-all">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs leading-normal font-mono select-all">
                   {dualVerifyBypass}
                 </div>
               )}
 
               {/* Email OTP Input */}
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
+                <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
                   6-Digit Email Verification OTP
                 </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
+                <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                  <Mail className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5 z-10" />
                   <input
                     type="text"
                     maxLength={6}
                     placeholder="Enter email code..."
-                    className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-4 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono tracking-[0.2em] text-center"
+                    className="w-full border-0 bg-transparent pl-10 pr-4 py-3 text-xs text-[#E2E8F0] focus:outline-none font-mono tracking-[0.2em] text-center"
                     value={enteredEmailOtp}
                     onChange={(e) => {
                       setEnteredEmailOtp(e.target.value);
@@ -787,14 +787,14 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     setDualVerifyError(null);
                     setDualVerifyBypass(null);
                   }}
-                  className="w-1/3 py-3 border border-[#D1CEC7] hover:bg-neutral-50 text-[10px] font-mono uppercase text-[#6B665E] rounded-xl cursor-pointer transition-all"
+                  className="w-1/3 py-3 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[10px] font-mono uppercase text-[#94A3B8] rounded-xl cursor-pointer transition-all"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-2/3 py-3 bg-[#1A365D] hover:bg-[#1A365D]/90 disabled:bg-[#D1CEC7] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                  className="w-2/3 py-3 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--color-navy-4)] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
                 >
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -809,9 +809,9 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
             </form>
           ) : isPasswordRecoveryMode ? (
             <form onSubmit={handleUpdatePasswordRecovery} className="space-y-5 animate-fade-in">
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-950">
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-xs text-amber-300">
                 <h4 className="font-bold uppercase font-mono tracking-wider flex items-center gap-1.5">
-                  <Key className="w-4.5 h-4.5 text-amber-700" />
+                  <Key className="w-4.5 h-4.5 text-amber-400" />
                   Set New Password
                 </h4>
                 <p className="text-xs leading-normal">
@@ -820,28 +820,28 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               </div>
 
               {recoveryError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-start gap-2.5">
-                  <ShieldAlert className="w-4.5 h-4.5 text-red-700 shrink-0 mt-0.5" />
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2.5">
+                  <ShieldAlert className="w-4.5 h-4.5 text-red-400 shrink-0 mt-0.5" />
                   <span className="leading-relaxed font-sans font-medium">{recoveryError}</span>
                 </div>
               )}
 
               {recoveryDone ? (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs leading-normal font-sans font-medium">
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs leading-normal font-sans font-medium">
                   Password updated successfully. You can now log in with your new password.
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
                     New Password
                   </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
+                  <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <Lock className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5 z-10" />
                     <input
                       type="password"
                       required
                       placeholder="Enter new password..."
-                      className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-4 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono"
+                      className="w-full border-0 bg-transparent pl-10 pr-4 py-3 text-xs text-[#E2E8F0] focus:outline-none font-mono"
                       value={newPasswordForRecovery}
                       onChange={(e) => setNewPasswordForRecovery(e.target.value)}
                     />
@@ -858,7 +858,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                       setActiveTab("login");
                       setError(null);
                     }}
-                    className="w-full py-3 bg-[#1A365D] hover:bg-[#1A365D]/90 text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all"
+                    className="w-full py-3 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all"
                   >
                     Go to Login
                   </button>
@@ -866,7 +866,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 bg-[#1A365D] hover:bg-[#1A365D]/90 disabled:bg-[#D1CEC7] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                    className="w-full py-3 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--color-navy-4)] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
                   >
                     {loading ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -879,9 +879,9 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
             </form>
           ) : isForgotPasswordMode ? (
             <form onSubmit={handleForgotPasswordSubmit} className="space-y-5 animate-fade-in">
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-950">
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-xs text-amber-300">
                 <h4 className="font-bold uppercase font-mono tracking-wider flex items-center gap-1.5">
-                  <Key className="w-4.5 h-4.5 text-amber-700" />
+                  <Key className="w-4.5 h-4.5 text-amber-400" />
                   Forgot Password
                 </h4>
                 <p className="text-xs leading-normal">
@@ -890,23 +890,23 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               </div>
 
               {resetSuccessMessage && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs leading-normal font-sans font-medium">
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs leading-normal font-sans font-medium">
                   {resetSuccessMessage}
                 </div>
               )}
 
               {/* Email Input */}
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
+                <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
                   Registered Email Address
                 </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
+                <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                  <Mail className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5 z-10" />
                   <input
                     type="email"
                     required
                     placeholder="Enter registered email..."
-                    className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-4 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono"
+                    className="w-full border-0 bg-transparent pl-10 pr-4 py-3 text-xs text-[#E2E8F0] focus:outline-none font-mono"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
                   />
@@ -922,14 +922,14 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     setError(null);
                     setResetSuccessMessage(null);
                   }}
-                  className="w-1/3 py-3 border border-[#D1CEC7] hover:bg-neutral-50 text-[10px] font-mono uppercase text-[#6B665E] rounded-xl cursor-pointer transition-all"
+                  className="w-1/3 py-3 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[10px] font-mono uppercase text-[#94A3B8] rounded-xl cursor-pointer transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-2/3 py-3 bg-[#1A365D] hover:bg-[#1A365D]/90 disabled:bg-[#D1CEC7] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                  className="w-2/3 py-3 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--color-navy-4)] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
                 >
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -943,15 +943,15 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
             <form onSubmit={handleLogin} className="space-y-5">
               {/* Login Username */}
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
+                <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
                   Scholar Username
                 </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
+                <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                  <User className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5 z-10" />
                   <input
                     type="text"
                     required
-                    className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-4 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono placeholder:text-gray-400/80 transition-all"
+                    className="w-full border-0 bg-transparent pl-10 pr-4 py-3 text-xs text-[#E2E8F0] focus:outline-none font-mono placeholder:text-[#94A3B8]/80 transition-all"
                     placeholder="Enter your username..."
                     value={usernameInput}
                     onChange={(e) => {
@@ -964,15 +964,15 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
               {/* Login Password */}
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
+                <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
                   Password
                 </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
+                <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                  <Lock className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5 z-10" />
                   <input
                     type={showPassword ? "text" : "password"}
                     required
-                    className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-10 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono placeholder:text-gray-400/80 transition-all"
+                    className="w-full border-0 bg-transparent pl-10 pr-10 py-3 text-xs text-[#E2E8F0] focus:outline-none font-mono placeholder:text-[#94A3B8]/80 transition-all"
                     placeholder="Enter your password..."
                     value={passwordInput}
                     onChange={(e) => {
@@ -983,7 +983,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3.5 text-[#8C887F] hover:text-[#1A365D] cursor-pointer"
+                    className="absolute right-3 top-3.5 text-[#94A3B8] hover:text-[#E2E8F0] cursor-pointer z-10"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -1000,7 +1000,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     setResetSuccessMessage(null);
                     setDebugCodeMsg(null);
                   }}
-                  className="text-[11px] font-mono text-[#C08A3E] hover:underline cursor-pointer font-bold"
+                  className="text-[11px] font-mono text-[color:var(--color-luminous-blue)] hover:underline cursor-pointer font-bold"
                 >
                   Forgot Password?
                 </button>
@@ -1010,7 +1010,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-[#1A365D] hover:bg-[#1A365D]/90 disabled:bg-[#D1CEC7] disabled:text-neutral-500 text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-lg shadow-[#1A365D]/10 hover:shadow-xl hover:shadow-[#1A365D]/15 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--color-navy-4)] disabled:text-[#94A3B8] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -1025,9 +1025,9 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               {/* Social Login Divider */}
               <div className="relative flex items-center justify-center py-2">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[#D1CEC7]/35"></div>
+                  <div className="w-full border-t border-[color:var(--color-navy-4)]/35"></div>
                 </div>
-                <span className="relative px-3.5 bg-white text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider">
+                <span className="relative px-3.5 bg-[color:var(--color-navy-2)] text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
                   Or continue with
                 </span>
               </div>
@@ -1037,7 +1037,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 <button
                   type="button"
                   onClick={triggerGoogleSignIn}
-                  className="flex items-center justify-center gap-1.5 py-3 px-6 bg-white border border-[#E2E8F0] hover:bg-[#FAF8F5] hover:border-[#D1CEC7] text-[11px] font-bold font-sans text-gray-700 rounded-xl hover-lift cursor-pointer transition-all shadow-sm w-full"
+                  className="flex items-center justify-center gap-1.5 py-3 px-6 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] hover:border-[color:var(--color-luminous-blue)]/40 text-[11px] font-bold font-sans text-[#E2E8F0] rounded-xl hover-lift cursor-pointer transition-all shadow-sm w-full"
                   title="Sign in with Google"
                 >
                   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -1054,20 +1054,20 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
             <form onSubmit={handleCreateProfile} className="space-y-5">
               
               {/* Credentials Section */}
-              <div className="space-y-4 border-b border-[#D1CEC7]/30 pb-4">
-                <span className="text-[9px] font-mono uppercase font-bold text-[#946A30] tracking-wider block">1. Security Credentials</span>
+              <div className="space-y-4 border-b border-[color:var(--color-navy-4)]/30 pb-4">
+                <span className="text-[9px] font-mono uppercase font-bold text-[color:var(--color-luminous-blue)] tracking-wider block">1. Security Credentials</span>
                 
                 {/* Signup Username */}
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
                     Scholar Username *
                   </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
+                  <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <User className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5 z-10" />
                     <input
                       type="text"
                       required
-                      className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-4 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono placeholder:text-gray-400/80 transition-all"
+                      className="w-full border-0 bg-transparent pl-10 pr-4 py-3 text-xs text-[#E2E8F0] focus:outline-none font-mono placeholder:text-[#94A3B8]/80 transition-all"
                       placeholder="Choose a username..."
                       value={usernameInput}
                       onChange={(e) => {
@@ -1080,15 +1080,15 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
                 {/* Signup Password */}
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
                     Secure Password *
                   </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
+                  <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <Lock className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5 z-10" />
                     <input
                       type={showPassword ? "text" : "password"}
                       required
-                      className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-10 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono placeholder:text-gray-400/80 transition-all"
+                      className="w-full border-0 bg-transparent pl-10 pr-10 py-3 text-xs text-[#E2E8F0] focus:outline-none font-mono placeholder:text-[#94A3B8]/80 transition-all"
                       placeholder="Create secure password..."
                       value={passwordInput}
                       onChange={(e) => {
@@ -1099,7 +1099,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3.5 text-[#8C887F] hover:text-[#1A365D] cursor-pointer"
+                      className="absolute right-3 top-3.5 text-[#94A3B8] hover:text-[#E2E8F0] cursor-pointer z-10"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -1112,7 +1112,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     {/* Visual strength bar */}
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
-                        <span className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
+                        <span className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
                           Password Strength
                         </span>
                         <span className={`text-[10px] font-bold uppercase font-mono ${
@@ -1136,7 +1136,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                             <div 
                               key={segIndex} 
                               className={`h-full flex-1 rounded-full transition-all duration-350 ${
-                                isFilled ? fillColor : "bg-slate-100"
+                                isFilled ? fillColor : "bg-[color:var(--color-navy-4)]"
                               }`}
                             />
                           );
@@ -1145,24 +1145,24 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     </div>
 
                     {/* Requirements validation checklist */}
-                    <div className="space-y-1 font-mono text-xs pl-1 text-[#6B665E]">
+                    <div className="space-y-1 font-mono text-xs pl-1 text-[#94A3B8]">
                       <div className="flex items-center gap-1.5">
-                        <span className={checkLength ? "text-emerald-600 font-bold" : "text-gray-400"}>
+                        <span className={checkLength ? "text-emerald-400 font-bold" : "text-[#94A3B8]"}>
                           {checkLength ? "✓" : "•"} 8+ Characters
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={checkUpper ? "text-emerald-600 font-bold" : "text-gray-400"}>
+                        <span className={checkUpper ? "text-emerald-400 font-bold" : "text-[#94A3B8]"}>
                           {checkUpper ? "✓" : "•"} Uppercase Letter
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={checkNumber ? "text-emerald-600 font-bold" : "text-gray-400"}>
+                        <span className={checkNumber ? "text-emerald-400 font-bold" : "text-[#94A3B8]"}>
                           {checkNumber ? "✓" : "•"} Number
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={checkSpecial ? "text-emerald-600 font-bold" : "text-gray-400"}>
+                        <span className={checkSpecial ? "text-emerald-400 font-bold" : "text-[#94A3B8]"}>
                           {checkSpecial ? "✓" : "•"} Special Character
                         </span>
                       </div>
@@ -1173,18 +1173,18 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
               {/* Scholar Information Section */}
               <div className="space-y-4">
-                <span className="text-[9px] font-mono uppercase font-bold text-[#946A30] tracking-wider block">2. Personal & Academic Details</span>
+                <span className="text-[9px] font-mono uppercase font-bold text-[color:var(--color-luminous-blue)] tracking-wider block">2. Personal & Academic Details</span>
                 
                 {/* Full name & Email */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">Full Name *</label>
-                    <div className="relative">
-                      <User className="w-3.5 h-3.5 text-[#8C887F] absolute left-3 top-3.5" />
+                    <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">Full Name *</label>
+                    <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                      <User className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-3.5 z-10" />
                       <input
                         type="text"
                         required
-                        className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-8 pr-3 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D]"
+                        className="w-full border-0 bg-transparent pl-8 pr-3 py-3 text-xs text-[#E2E8F0] focus:outline-none"
                         placeholder="Dr. John Doe"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
@@ -1192,13 +1192,13 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">Email Address *</label>
-                    <div className="relative">
-                      <Mail className="w-3.5 h-3.5 text-[#8C887F] absolute left-3 top-3.5" />
+                    <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">Email Address *</label>
+                    <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                      <Mail className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-3.5 z-10" />
                       <input
                         type="email"
                         required
-                        className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-8 pr-3 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D]"
+                        className="w-full border-0 bg-transparent pl-8 pr-3 py-3 text-xs text-[#E2E8F0] focus:outline-none"
                         placeholder="doe@uni.edu"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -1210,12 +1210,13 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 {/* Phone & Affiliation */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">Phone Number *</label>
+                    <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">Phone Number *</label>
                     <div className="flex gap-1.5">
+                      <div className="w-24 shrink-0 rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                       <select
                         value={countryCode}
                         onChange={(e) => setCountryCode(e.target.value)}
-                        className="w-24 bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl px-2 py-3 text-[11px] text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D] font-mono cursor-pointer shrink-0"
+                        className="w-full border-0 bg-transparent px-2 py-3 text-[11px] text-[#E2E8F0] focus:outline-none font-mono cursor-pointer"
                       >
                         <option value="+977">+977 (NP)</option>
                         <option value="+1">+1 (US)</option>
@@ -1229,12 +1230,13 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                         <option value="+971">+971 (AE)</option>
                         <option value="">Other</option>
                       </select>
-                      <div className="relative flex-grow">
-                        <Phone className="w-3.5 h-3.5 text-[#8C887F] absolute left-3 top-3.5" />
+                      </div>
+                      <div className="relative flex-grow rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                        <Phone className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-3.5 z-10" />
                         <input
                           type="text"
                           required
-                          className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-8 pr-3 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D]"
+                          className="w-full border-0 bg-transparent pl-8 pr-3 py-3 text-xs text-[#E2E8F0] focus:outline-none"
                           placeholder="e.g. 9851108291"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
@@ -1243,13 +1245,13 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">Affiliation / Inst. *</label>
-                    <div className="relative">
-                      <Building className="w-3.5 h-3.5 text-[#8C887F] absolute left-3 top-3.5" />
+                    <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">Affiliation / Inst. *</label>
+                    <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                      <Building className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-3.5 z-10" />
                       <input
                         type="text"
                         required
-                        className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-8 pr-3 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D]"
+                        className="w-full border-0 bg-transparent pl-8 pr-3 py-3 text-xs text-[#E2E8F0] focus:outline-none"
                         placeholder="e.g. Oxford University"
                         value={affiliation}
                         onChange={(e) => setAffiliation(e.target.value)}
@@ -1260,14 +1262,14 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
                 {/* Authentic ID input */}
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold font-mono text-[#6B665E] uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
                     Authentic Identification (Optional - Passport / Student ID / citizenship)
                   </label>
-                  <div className="relative">
-                    <Landmark className="w-4 h-4 text-[#8C887F] absolute left-3.5 top-3.5" />
+                  <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <Landmark className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5 z-10" />
                     <input
                       type="text"
-                      className="w-full bg-[#FAF9F6] border border-[#D1CEC7] rounded-xl pl-10 pr-4 py-3 text-xs text-[#1A365D] focus:outline-none focus:ring-2 focus:ring-[#1A365D]/20 focus:border-[#1A365D]"
+                      className="w-full border-0 bg-transparent pl-10 pr-4 py-3 text-xs text-[#E2E8F0] focus:outline-none"
                       placeholder="e.g., Passport No: 2819-2018 or Student ID: 22-IR-401..."
                       value={authenticId}
                       onChange={(e) => setAuthenticId(e.target.value)}
@@ -1280,7 +1282,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               <button
                 type="submit"
                 disabled={loading || strengthScore < 4}
-                className="w-full py-3 bg-[#1A365D] hover:bg-[#1A365D]/90 disabled:bg-[#D1CEC7] disabled:text-neutral-500 text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-lg shadow-[#1A365D]/10 hover:shadow-xl hover:shadow-[#1A365D]/15 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--color-navy-4)] disabled:text-[#94A3B8] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -1295,9 +1297,9 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               {/* Social Signup Divider */}
               <div className="relative flex items-center justify-center py-2">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[#D1CEC7]/35"></div>
+                  <div className="w-full border-t border-[color:var(--color-navy-4)]/35"></div>
                 </div>
-                <span className="relative px-3.5 bg-white text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider">
+                <span className="relative px-3.5 bg-[color:var(--color-navy-2)] text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
                   Or sign up with
                 </span>
               </div>
@@ -1307,7 +1309,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                 <button
                   type="button"
                   onClick={triggerGoogleSignIn}
-                  className="flex items-center justify-center gap-1.5 py-3 px-6 bg-white border border-[#E2E8F0] hover:bg-[#FAF8F5] hover:border-[#D1CEC7] text-[11px] font-bold font-sans text-gray-700 rounded-xl hover-lift cursor-pointer transition-all shadow-sm w-full"
+                  className="flex items-center justify-center gap-1.5 py-3 px-6 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] hover:border-[color:var(--color-luminous-blue)]/40 text-[11px] font-bold font-sans text-[#E2E8F0] rounded-xl hover-lift cursor-pointer transition-all shadow-sm w-full"
                   title="Sign up with Google"
                 >
                   <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24" width="18" height="18">
@@ -1323,9 +1325,9 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
           ) : (
             // Tab: Activation Screen (Pending approval entry)
             <div className="space-y-5 animate-fade-in">
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2.5 text-xs text-amber-950">
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2.5 text-xs text-amber-300">
                 <h4 className="font-bold flex items-center gap-1.5 uppercase font-mono tracking-wider">
-                  <Clock className="w-4.5 h-4.5 text-amber-700 animate-pulse" />
+                  <Clock className="w-4.5 h-4.5 text-amber-400 animate-pulse" />
                   Request Pending Admin Verification
                 </h4>
                 <p className="leading-relaxed">
@@ -1337,7 +1339,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               </div>
 
               {debugCodeMsg && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 text-xs leading-normal font-mono select-all">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs leading-normal font-mono select-all">
                   {debugCodeMsg}
                 </div>
               )}
@@ -1350,7 +1352,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     setPendingUser(null);
                     setError(null);
                   }}
-                  className="w-1/3 py-3 border border-[#D1CEC7] hover:bg-neutral-50 text-[10px] font-mono uppercase text-[#6B665E] rounded-xl cursor-pointer transition-all"
+                  className="w-1/3 py-3 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[10px] font-mono uppercase text-[#94A3B8] rounded-xl cursor-pointer transition-all"
                 >
                   Cancel
                 </button>
@@ -1358,7 +1360,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                   type="button"
                   onClick={handleCheckApprovalAndLogin}
                   disabled={loading}
-                  className="w-2/3 py-3 bg-[#C08A3E] hover:bg-[#A3702E] disabled:bg-[#D1CEC7] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                  className="w-2/3 py-3 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--color-navy-4)] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
                 >
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -1376,9 +1378,9 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
         {/* Secondary Account Switcher Links */}
         {activeTab !== "activation" && (
-          <div className="text-center pt-2 border-t border-[#D1CEC7]/30 text-xs space-y-2">
+          <div className="text-center pt-2 border-t border-[color:var(--color-navy-4)]/30 text-xs space-y-2">
             {activeTab === "login" ? (
-              <p className="text-[#6B665E]">
+              <p className="text-[#94A3B8]">
                 Need a new workspace?{" "}
                 <button
                   onClick={() => {
@@ -1386,13 +1388,13 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     setError(null);
                     setPasswordInput("");
                   }}
-                  className="text-[#C08A3E] hover:text-amber-800 font-bold underline cursor-pointer"
+                  className="text-[color:var(--color-luminous-blue)] hover:text-white font-bold underline cursor-pointer"
                 >
                   Create Scholar Account
                 </button>
               </p>
             ) : (
-              <p className="text-[#6B665E]">
+              <p className="text-[#94A3B8]">
                 Already registered?{" "}
                 <button
                   onClick={() => {
@@ -1400,7 +1402,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     setError(null);
                     setPasswordInput("");
                   }}
-                  className="text-[#C08A3E] hover:text-amber-800 font-bold underline cursor-pointer"
+                  className="text-[color:var(--color-luminous-blue)] hover:text-white font-bold underline cursor-pointer"
                 >
                   Launch Workspace
                 </button>
@@ -1411,28 +1413,28 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
       </div>
 
       {/* Subtly presented Trust Signals Footer */}
-      <div className="mt-8 text-center font-mono text-[10px] text-[#76726A] tracking-widest uppercase">
+      <div className="mt-8 text-center font-mono text-[10px] text-[#94A3B8] tracking-widest uppercase">
         Secure • Encrypted • Private
       </div>
 
       {/* Real OAuth Key Config Prompt Modal (Google only) */}
       {promptKeyType !== null && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 backdrop-blur-sm p-4 font-sans animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col p-6 space-y-4">
-            <div className="flex items-center gap-2 text-[#1A365D]">
-              <Key className="w-5 h-5 text-[#C08A3E]" />
+          <div className="bg-[color:var(--color-navy-2)] w-full max-w-md rounded-2xl shadow-2xl border border-[color:var(--color-navy-4)] overflow-hidden flex flex-col p-6 space-y-4">
+            <div className="flex items-center gap-2 text-[#E2E8F0]">
+              <Key className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
               <h3 className="text-sm font-mono font-bold uppercase tracking-wider">
                 Configure Google Client ID
               </h3>
             </div>
 
-            <p className="text-xs text-gray-500 leading-normal">
+            <p className="text-xs text-[#94A3B8] leading-normal">
               To enable real authentication, please supply your Google OAuth Client ID. It will be saved securely in your browser's local storage.
             </p>
 
             {modalError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                 <span className="leading-relaxed font-sans font-medium">{modalError}</span>
               </div>
             )}
@@ -1456,20 +1458,22 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
               className="space-y-4"
             >
               <div className="space-y-1">
-                <label className="block text-[9px] font-bold font-mono uppercase tracking-wider text-gray-500">
+                <label className="block text-[9px] font-bold font-mono uppercase tracking-wider text-[#94A3B8]">
                   Google Client ID *
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="xxxxxxx.apps.googleusercontent.com"
-                  className="w-full border border-gray-200 rounded-lg p-2.5 text-xs text-gray-700 focus:outline-none focus:border-[#1A365D] font-mono"
-                  value={keyValueInput}
-                  onChange={(e) => {
-                    setKeyValueInput(e.target.value);
-                    setModalError(null);
-                  }}
-                />
+                <div className="rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                  <input
+                    type="text"
+                    required
+                    placeholder="xxxxxxx.apps.googleusercontent.com"
+                    className="w-full border-0 bg-transparent p-2.5 text-xs text-[#E2E8F0] focus:outline-none font-mono"
+                    value={keyValueInput}
+                    onChange={(e) => {
+                      setKeyValueInput(e.target.value);
+                      setModalError(null);
+                    }}
+                  />
+                </div>
               </div>
 
               <div className="flex gap-2">
@@ -1479,13 +1483,13 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
                     setPromptKeyType(null);
                     setModalError(null);
                   }}
-                  className="w-1/3 py-2 border border-gray-250 hover:bg-neutral-50 text-xs font-mono text-gray-500 rounded-lg cursor-pointer"
+                  className="w-1/3 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-xs font-mono text-[#94A3B8] rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="w-2/3 py-2 bg-[#1A365D] hover:bg-[#1A365D]/90 text-white text-xs font-mono font-bold rounded-lg cursor-pointer"
+                  className="w-2/3 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-mono font-bold rounded-lg cursor-pointer"
                 >
                   Save & Authenticate
                 </button>
@@ -1498,21 +1502,21 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
       {/* Unified Credentials Configuration Settings Modal */}
       {showSettingsModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 backdrop-blur-sm p-4 font-sans animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col p-6 space-y-4 max-h-[90vh]">
-            <div className="flex items-center gap-2 text-[#1A365D] border-b border-gray-100 pb-3">
-              <Settings className="w-5 h-5 text-[#C08A3E]" />
+          <div className="bg-[color:var(--color-navy-2)] w-full max-w-md rounded-2xl shadow-2xl border border-[color:var(--color-navy-4)] overflow-hidden flex flex-col p-6 space-y-4 max-h-[90vh]">
+            <div className="flex items-center gap-2 text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-3">
+              <Settings className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
               <h3 className="text-sm font-mono font-bold uppercase tracking-wider">
                 API Credentials Configuration
               </h3>
             </div>
             
-            <p className="text-xs text-[#6B665E] leading-normal font-sans">
+            <p className="text-xs text-[#94A3B8] leading-normal font-sans">
               Configure your Google OAuth Client ID directly in the browser. Credentials are saved locally in your browser's secure storage.
             </p>
 
             {modalError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                 <span className="leading-relaxed font-sans font-medium">{modalError}</span>
               </div>
             )}
@@ -1534,33 +1538,35 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
             >
               {/* Google Client ID */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold font-mono uppercase tracking-wider text-gray-500">
+                <label className="block text-[10px] font-bold font-mono uppercase tracking-wider text-[#94A3B8]">
                   Google Client ID (OAuth)
                 </label>
-                <input
-                  type="text"
-                  placeholder="xxxxxxx.apps.googleusercontent.com"
-                  className="w-full border border-gray-200 rounded-lg p-2.5 text-xs text-gray-700 focus:outline-none focus:border-[#1A365D] font-mono"
-                  value={tempGoogleId}
-                  onChange={(e) => setTempGoogleId(e.target.value)}
-                />
+                <div className="rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                  <input
+                    type="text"
+                    placeholder="xxxxxxx.apps.googleusercontent.com"
+                    className="w-full border-0 bg-transparent p-2.5 text-xs text-[#E2E8F0] focus:outline-none font-mono"
+                    value={tempGoogleId}
+                    onChange={(e) => setTempGoogleId(e.target.value)}
+                  />
+                </div>
               </div>
 
               {/* Buttons */}
-              <div className="flex gap-2 pt-2 border-t border-gray-100">
+              <div className="flex gap-2 pt-2 border-t border-[color:var(--color-navy-4)]">
                 <button
                   type="button"
                   onClick={() => {
                     setShowSettingsModal(false);
                     setModalError(null);
                   }}
-                  className="w-1/3 py-2.5 border border-gray-200 hover:bg-neutral-50 text-xs font-mono text-gray-500 rounded-lg cursor-pointer"
+                  className="w-1/3 py-2.5 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-xs font-mono text-[#94A3B8] rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="w-2/3 py-2.5 bg-[#1A365D] hover:bg-[#1A365D]/90 text-white text-xs font-mono font-bold rounded-lg cursor-pointer"
+                  className="w-2/3 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-mono font-bold rounded-lg cursor-pointer"
                 >
                   Save Settings
                 </button>
