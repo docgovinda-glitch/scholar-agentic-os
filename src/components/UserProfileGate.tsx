@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { User, Lock, Eye, EyeOff, ShieldCheck, Check, AlertCircle, Sparkles, GraduationCap, ArrowRight, ShieldAlert, Key, Phone, Mail, Building, Landmark, Clock, Settings } from "lucide-react";
+import { User, Lock, Eye, EyeOff, ShieldCheck, Check, AlertCircle, Sparkles, GraduationCap, ArrowRight, ShieldAlert, Key, Phone, Mail, Building, Landmark, Clock } from "lucide-react";
 import { UserProfile, PaperProject } from "../types";
-import { signUp, signIn, sendPasswordResetEmail, updatePassword, onPasswordRecovery } from "../services/supabaseAuthService";
+import { signUp, signIn, sendPasswordResetEmail, updatePassword, onPasswordRecovery, signInWithGoogle, onGoogleSignIn } from "../services/supabaseAuthService";
 
 interface UserProfileGateProps {
   onProfileActive: (username: string, projectState: PaperProject) => void;
@@ -62,21 +62,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Real OAuth Key Config States
-  const [promptKeyType, setPromptKeyType] = useState<"google" | null>(null);
-  const [keyValueInput, setKeyValueInput] = useState("");
-  const [modalError, setModalError] = useState<string | null>(null);
-
-  // Unified Credentials Configuration Settings Modal
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [tempGoogleId, setTempGoogleId] = useState("");
-
-  const openSettingsModal = () => {
-    setTempGoogleId(localStorage.getItem("phd_google_client_id") || import.meta.env.VITE_GOOGLE_CLIENT_ID || "");
-    setModalError(null);
-    setShowSettingsModal(true);
-  };
-
   // Registration Email-OTP & Forgot Password states
   const [showDualVerifyScreen, setShowDualVerifyScreen] = useState(false);
   const [generatedEmailOtp, setGeneratedEmailOtp] = useState("");
@@ -97,38 +82,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
   // Load profiles list and check for OAuth redirect callbacks on mount
   useEffect(() => {
-    // Listen for Google OAuth redirect callback token in URL hash. Supabase's
-    // own password-recovery redirect ALSO lands with an access_token in the
-    // hash (see onPasswordRecovery below) — it's distinguishable by
-    // type=recovery, which Google's implicit-flow hash never has. Must not
-    // strip/consume the hash for that case, or Supabase's own client-side
-    // session detection (which also needs to read it) never gets to run.
-    const hash = window.location.hash;
-    if (hash) {
-      const params = new URLSearchParams(hash.substring(1));
-      const accessToken = params.get("access_token");
-      const isSupabaseRecovery = params.get("type") === "recovery";
-      if (accessToken && !isSupabaseRecovery) {
-        // Remove hash from URL so it doesn't linger
-        window.history.replaceState(null, "", window.location.pathname);
-        
-        setLoading(true);
-        fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`)
-          .then(res => {
-            if (res.ok) return res.json();
-            throw new Error("Failed to fetch Google profile");
-          })
-          .then(data => {
-            handleSocialSignIn(data.name || data.email, data.email);
-          })
-          .catch(err => {
-            console.error("Google OAuth callback error:", err);
-            setError("Google authentication failed. Please try again.");
-            setLoading(false);
-          });
-      }
-    }
-
     const saved = localStorage.getItem(PROFILES_LIST_KEY);
     if (saved) {
       try {
@@ -148,13 +101,26 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     // Detect landing back from a password-reset email link (Supabase parses
     // the recovery session from the URL fragment automatically and fires
     // this event once).
-    const unsubscribe = onPasswordRecovery(() => {
+    const unsubscribeRecovery = onPasswordRecovery(() => {
       setIsForgotPasswordMode(false);
       setIsPasswordRecoveryMode(true);
       setRecoveryError(null);
       setRecoveryDone(false);
     });
-    return unsubscribe;
+
+    // Detect a real Supabase session established via Google OAuth — replaces
+    // the old manual access_token-in-URL-hash parsing + userinfo fetch
+    // entirely. Supabase's own client handles the whole redirect round-trip
+    // (including clearing its own hash fragment); this just reacts to the
+    // session once it exists, same as onPasswordRecovery above.
+    const unsubscribeGoogle = onGoogleSignIn((user) => {
+      handleSocialSignIn(user.fullName, user.email);
+    });
+
+    return () => {
+      unsubscribeRecovery();
+      unsubscribeGoogle();
+    };
   }, []);
 
   // Password Requirements Checker
@@ -373,68 +339,19 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     }
   };
 
-  const triggerGoogleSignIn = () => {
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem("phd_google_client_id") || "";
-    
-    if (!googleClientId) {
-      setError("Google Client ID is not configured. Please add VITE_GOOGLE_CLIENT_ID to your Vercel Environment Variables or click the settings gear icon at the top right of this card to configure it in the browser.");
-      return;
-    }
-
-    if (!googleClientId.trim().endsWith(".apps.googleusercontent.com")) {
-      setError("Invalid Google Client ID. It must end with '.apps.googleusercontent.com'. Check your environment variables or local storage.");
-      return;
-    }
-
-    try {
-      const loadGsiAndPrompt = () => {
-        const client = (window as any).google.accounts.oauth2.initTokenClient({
-          client_id: googleClientId.trim(),
-          scope: 'profile email',
-          callback: (tokenResponse: any) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              setLoading(true);
-              fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${tokenResponse.access_token}`)
-                .then(res => {
-                  if (!res.ok) throw new Error("Failed to fetch Google profile");
-                  return res.json();
-                })
-                .then(data => {
-                  handleSocialSignIn(data.name || data.email, data.email);
-                })
-                .catch(err => {
-                  console.error("Google OAuth callback error:", err);
-                  setError("Google authentication failed. Please try again.");
-                  setLoading(false);
-                });
-            } else {
-               setError("Google authentication failed or was cancelled.");
-               setLoading(false);
-            }
-          },
-          error_callback: (err: any) => {
-            console.error("GIS Error:", err);
-            setError(`Google Sign-In failed: ${err.message || err.type || "Unknown Error"}`);
-            setLoading(false);
-          }
-        });
-        client.requestAccessToken();
-      };
-
-      if ((window as any).google?.accounts?.oauth2) {
-        loadGsiAndPrompt();
-      } else {
-        const script = document.createElement('script');
-        script.src = "https://accounts.google.com/gsi/client";
-        script.async = true;
-        script.defer = true;
-        script.onload = loadGsiAndPrompt;
-        script.onerror = () => setError("Failed to load Google Identity Services.");
-        document.body.appendChild(script);
-      }
-    } catch (e: any) {
-      console.error(e);
-      setError(`Google Sign-In initialization failed: ${e.message}`);
+  // Replaces the old client-side Google Identity Services flow entirely
+  // (no VITE_GOOGLE_CLIENT_ID, no window.google.accounts.oauth2, no manual
+  // userinfo fetch) — signInWithGoogle() hands the whole thing to Supabase,
+  // which redirects to Google and back on its own. On success the browser
+  // navigates away immediately, so there's nothing further to do here; the
+  // session (and the resulting local-profile sync via handleSocialSignIn)
+  // is picked up by the onGoogleSignIn listener registered in the mount
+  // effect above once the app reloads signed in.
+  const triggerGoogleSignIn = async () => {
+    setError(null);
+    const { error: oauthError } = await signInWithGoogle();
+    if (oauthError) {
+      setError(`Google Sign-In failed: ${oauthError.message}`);
     }
   };
 
@@ -656,16 +573,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
       {/* Main card box container */}
       <div className="w-full bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-3xl shadow-xl overflow-hidden flex flex-col p-8 md:p-10 space-y-6 hover-lift transition-all duration-300 relative">
         
-        {/* Settings Gear Button */}
-        <button
-          type="button"
-          onClick={openSettingsModal}
-          className="absolute top-4 right-4 p-2 text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[color:var(--color-navy-3)] rounded-xl transition-all duration-200 cursor-pointer z-10 animate-pulse-hover"
-          title="Configure API Credentials"
-        >
-          <Settings className="w-4.5 h-4.5" />
-        </button>
-
         {/* Brand Logo & Header */}
         <div className="text-center space-y-2.5">
           <div className="w-14 h-14 rounded-2xl bg-[color:var(--color-luminous-blue)]/10 border border-[color:var(--color-luminous-blue)]/20 flex items-center justify-center mx-auto shadow-sm">
@@ -1416,165 +1323,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
       <div className="mt-8 text-center font-mono text-[10px] text-[#94A3B8] tracking-widest uppercase">
         Secure • Encrypted • Private
       </div>
-
-      {/* Real OAuth Key Config Prompt Modal (Google only) */}
-      {promptKeyType !== null && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 backdrop-blur-sm p-4 font-sans animate-fade-in">
-          <div className="bg-[color:var(--color-navy-2)] w-full max-w-md rounded-2xl shadow-2xl border border-[color:var(--color-navy-4)] overflow-hidden flex flex-col p-6 space-y-4">
-            <div className="flex items-center gap-2 text-[#E2E8F0]">
-              <Key className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
-              <h3 className="text-sm font-mono font-bold uppercase tracking-wider">
-                Configure Google Client ID
-              </h3>
-            </div>
-
-            <p className="text-xs text-[#94A3B8] leading-normal">
-              To enable real authentication, please supply your Google OAuth Client ID. It will be saved securely in your browser's local storage.
-            </p>
-
-            {modalError && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                <span className="leading-relaxed font-sans font-medium">{modalError}</span>
-              </div>
-            )}
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setModalError(null);
-                const val = keyValueInput.trim();
-                if (val) {
-                  if (!val.endsWith(".apps.googleusercontent.com")) {
-                    setModalError("Invalid Google Client ID. It must end with '.apps.googleusercontent.com' (e.g. xxxxxxx.apps.googleusercontent.com)");
-                    return;
-                  }
-
-                  localStorage.setItem("phd_google_client_id", val);
-                  setPromptKeyType(null);
-                  triggerGoogleSignIn();
-                }
-              }}
-              className="space-y-4"
-            >
-              <div className="space-y-1">
-                <label className="block text-[9px] font-bold font-mono uppercase tracking-wider text-[#94A3B8]">
-                  Google Client ID *
-                </label>
-                <div className="rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
-                  <input
-                    type="text"
-                    required
-                    placeholder="xxxxxxx.apps.googleusercontent.com"
-                    className="w-full border-0 bg-transparent p-2.5 text-xs text-[#E2E8F0] focus:outline-none font-mono"
-                    value={keyValueInput}
-                    onChange={(e) => {
-                      setKeyValueInput(e.target.value);
-                      setModalError(null);
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPromptKeyType(null);
-                    setModalError(null);
-                  }}
-                  className="w-1/3 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-xs font-mono text-[#94A3B8] rounded-lg cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="w-2/3 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-mono font-bold rounded-lg cursor-pointer"
-                >
-                  Save & Authenticate
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Unified Credentials Configuration Settings Modal */}
-      {showSettingsModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 backdrop-blur-sm p-4 font-sans animate-fade-in">
-          <div className="bg-[color:var(--color-navy-2)] w-full max-w-md rounded-2xl shadow-2xl border border-[color:var(--color-navy-4)] overflow-hidden flex flex-col p-6 space-y-4 max-h-[90vh]">
-            <div className="flex items-center gap-2 text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-3">
-              <Settings className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
-              <h3 className="text-sm font-mono font-bold uppercase tracking-wider">
-                API Credentials Configuration
-              </h3>
-            </div>
-            
-            <p className="text-xs text-[#94A3B8] leading-normal font-sans">
-              Configure your Google OAuth Client ID directly in the browser. Credentials are saved locally in your browser's secure storage.
-            </p>
-
-            {modalError && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                <span className="leading-relaxed font-sans font-medium">{modalError}</span>
-              </div>
-            )}
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setModalError(null);
-
-                const gId = tempGoogleId.trim();
-                // Save to localStorage
-                if (gId) localStorage.setItem("phd_google_client_id", gId);
-                else localStorage.removeItem("phd_google_client_id");
-
-                setShowSettingsModal(false);
-                setError("Credentials updated successfully.");
-              }}
-              className="space-y-4 overflow-y-auto pr-1"
-            >
-              {/* Google Client ID */}
-              <div className="space-y-1">
-                <label className="block text-[10px] font-bold font-mono uppercase tracking-wider text-[#94A3B8]">
-                  Google Client ID (OAuth)
-                </label>
-                <div className="rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
-                  <input
-                    type="text"
-                    placeholder="xxxxxxx.apps.googleusercontent.com"
-                    className="w-full border-0 bg-transparent p-2.5 text-xs text-[#E2E8F0] focus:outline-none font-mono"
-                    value={tempGoogleId}
-                    onChange={(e) => setTempGoogleId(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex gap-2 pt-2 border-t border-[color:var(--color-navy-4)]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSettingsModal(false);
-                    setModalError(null);
-                  }}
-                  className="w-1/3 py-2.5 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-xs font-mono text-[#94A3B8] rounded-lg cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="w-2/3 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-mono font-bold rounded-lg cursor-pointer"
-                >
-                  Save Settings
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );

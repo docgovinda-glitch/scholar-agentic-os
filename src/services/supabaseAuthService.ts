@@ -283,6 +283,60 @@ export function onPasswordRecovery(callback: () => void): () => void {
   return () => subscription.unsubscribe();
 }
 
+/**
+ * Starts Supabase's own Google OAuth redirect flow. Replaces the old
+ * client-side Google Identity Services implementation entirely — there is
+ * no VITE_GOOGLE_CLIENT_ID, no window.google.accounts.oauth2 token client,
+ * and no manual userinfo fetch anymore. Supabase (already configured with
+ * the Google provider in the dashboard) handles the full redirect
+ * round-trip and establishes the session itself; this call only kicks
+ * that off. The browser navigates away on success, so callers generally
+ * don't need to do anything with a resolved promise — only the rejection
+ * path (Supabase itself failing to even start the redirect) is
+ * meaningful here.
+ */
+export async function signInWithGoogle() {
+  const supabase = getSupabaseClient();
+  return supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.origin,
+    },
+  });
+}
+
+/**
+ * Registers a callback for the moment Supabase establishes a real session
+ * that came from Google OAuth (as opposed to this app's own
+ * signInWithPassword call in signIn() above, which also fires SIGNED_IN).
+ * Distinguished via session.user.app_metadata.provider, which Supabase
+ * sets itself based on which provider actually authenticated the user —
+ * not something this app has to track. Fires once per page load where the
+ * user just landed back from Google's redirect (or already has an active
+ * Google-authenticated session). Returns an unsubscribe function.
+ */
+export function onGoogleSignIn(
+  callback: (user: { id: string; email: string; fullName: string }) => void
+): () => void {
+  const supabase = getSupabaseClient();
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((event, session) => {
+    if (event !== "SIGNED_IN" || !session?.user) return;
+    if (session.user.app_metadata?.provider !== "google") return;
+    callback({
+      id: session.user.id,
+      email: session.user.email || "",
+      fullName:
+        session.user.user_metadata?.full_name ||
+        session.user.user_metadata?.name ||
+        session.user.email ||
+        "",
+    });
+  });
+  return () => subscription.unsubscribe();
+}
+
 export interface RequestProfileUpdateInput {
   username: string;
   pendingEmail?: string;

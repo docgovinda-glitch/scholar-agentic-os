@@ -24,18 +24,24 @@
 //     supabaseAuthService.ts, not introduced by this component's rewire;
 //     out of scope for this pass (password-reset logic is untouched).
 //
-// Also covers, as a CURRENT-behavior baseline ahead of a follow-up pass
-// (dead-code removal + two small fixes, see .claude/HANDOVER.md):
-//   - Google OAuth login (kept and untouched by that pass).
+// Also covers, as a CURRENT-behavior baseline:
 //   - The countryCode dropdown bug: its value is currently ignored when
 //     building the phone number passed to signUp() (fix pending).
 //   - handleForgotPasswordSubmit currently does NOT surface result.error
 //     when result.success is true — the same silent-email-failure gap as
 //     signUp(), but not yet fixed here (fix pending).
 //
-// Deliberately NOT covering: Facebook login (dead/unreachable code, being
-// removed in the same follow-up pass), the API-credentials settings modal,
-// password strength visuals.
+// Google OAuth login was migrated (2026-07-30) from a client-side Google
+// Identity Services implementation (VITE_GOOGLE_CLIENT_ID,
+// window.google.accounts.oauth2.initTokenClient, a manual userinfo fetch)
+// to Supabase Auth's own signInWithOAuth — see the "Google OAuth login"
+// describe block below. The old client-side Google Client ID settings
+// modal (and its dead, never-shown sibling modal) were removed entirely
+// in the same pass, along with the manual access_token-in-URL-hash
+// parsing this component used to do for the old Google callback.
+//
+// Deliberately NOT covering: Facebook login (dead/unreachable code, removed
+// separately before this pass), password strength visuals.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
@@ -50,6 +56,8 @@ vi.mock("../../services/supabaseAuthService", () => ({
   sendPasswordResetEmail: vi.fn(),
   updatePassword: vi.fn(),
   onPasswordRecovery: vi.fn(() => () => {}),
+  signInWithGoogle: vi.fn(),
+  onGoogleSignIn: vi.fn(() => () => {}),
 }));
 
 // Vitest's jsdom environment proxies window's own-enumerable properties onto
@@ -382,14 +390,17 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
       expect(screen.queryByText("Set New Password")).not.toBeInTheDocument();
     });
 
-    it("does NOT treat a Supabase recovery hash (type=recovery) as a Google OAuth callback", () => {
-      // Regression test: Supabase's password-recovery redirect also lands
-      // with access_token in the URL hash, same as Google's OAuth implicit
-      // flow. The pre-existing Google-callback handler used to grab any
-      // access_token unconditionally and strip the hash via
-      // history.replaceState before Supabase's own client library could
-      // read it — silently breaking password recovery. type=recovery is
-      // what disambiguates the two.
+    it("does not fetch anything for a Supabase recovery hash (type=recovery) landing in the URL", () => {
+      // This used to be a regression test against UserProfileGate.tsx's own
+      // manual access_token-in-hash parsing (the old Google Identity
+      // Services callback path), which grabbed any access_token
+      // unconditionally and could clobber Supabase's own recovery-session
+      // hash handling. That manual hash parsing has since been removed
+      // entirely — Google sign-in now goes through Supabase's
+      // signInWithOAuth/onGoogleSignIn instead, which never touches the URL
+      // hash from this component's side at all. Kept as a basic sanity
+      // check that a recovery-shaped hash still triggers no unexpected
+      // fetch from this component.
       window.location.hash = "#access_token=fake-supabase-token&type=recovery&expires_in=3600";
       const fetchMock = vi.fn();
       (globalThis as any).fetch = fetchMock;
@@ -437,42 +448,38 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
     });
   });
 
-  describe("Google OAuth login (kept, untouched by the follow-up dead-code-removal pass)", () => {
-    afterEach(() => {
-      delete (window as any).google;
-    });
+  describe("Google OAuth login (migrated to Supabase Auth's signInWithOAuth — no client-side Google Identity Services anymore)", () => {
+    const signInWithGoogleMock = supabaseAuthService.signInWithGoogle as ReturnType<typeof vi.fn>;
 
-    it("shows a clear error when no Google Client ID is configured", async () => {
+    it("calls Supabase's signInWithGoogle() when 'Sign in with Google' is clicked", async () => {
       seedExistingProfile("someoneelse");
+      signInWithGoogleMock.mockResolvedValue({ error: null });
+
       render(<UserProfileGate onProfileActive={onProfileActive} />);
       fireEvent.click(screen.getByTitle("Sign in with Google"));
-      expect(
-        await screen.findByText(/Google Client ID is not configured/)
-      ).toBeInTheDocument();
+
+      await waitFor(() => expect(signInWithGoogleMock).toHaveBeenCalled());
     });
 
-    it("completes a full Google sign-in and calls onProfileActive", async () => {
+    it("shows a clear error when Supabase's signInWithOAuth call itself fails", async () => {
       seedExistingProfile("someoneelse");
-      localStorage.setItem("phd_google_client_id", "test-client-id.apps.googleusercontent.com");
-      (globalThis as any).fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ name: "Jane Googler", email: "jane.g@example.com" }),
+      signInWithGoogleMock.mockResolvedValue({ error: { message: "OAuth provider not enabled." } });
+
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      fireEvent.click(screen.getByTitle("Sign in with Google"));
+
+      expect(await screen.findByText(/Google Sign-In failed: OAuth provider not enabled\./)).toBeInTheDocument();
+    });
+
+    it("calls onProfileActive once onGoogleSignIn's callback fires with a real session user (the post-redirect path)", async () => {
+      let capturedCallback: ((user: { id: string; email: string; fullName: string }) => void) | null = null;
+      (supabaseAuthService.onGoogleSignIn as ReturnType<typeof vi.fn>).mockImplementation((cb) => {
+        capturedCallback = cb;
+        return () => {};
       });
 
-      let capturedCallback: ((tokenResponse: any) => void) | null = null;
-      (window as any).google = {
-        accounts: {
-          oauth2: {
-            initTokenClient: (opts: any) => {
-              capturedCallback = opts.callback;
-              return { requestAccessToken: () => capturedCallback!({ access_token: "fake-token" }) };
-            },
-          },
-        },
-      };
-
       render(<UserProfileGate onProfileActive={onProfileActive} />);
-      fireEvent.click(screen.getByTitle("Sign in with Google"));
+      capturedCallback!({ id: "google-user-1", email: "jane.g@example.com", fullName: "Jane Googler" });
 
       await waitFor(() => expect(onProfileActive).toHaveBeenCalledWith("Jane Googler", expect.any(Object)));
     });
