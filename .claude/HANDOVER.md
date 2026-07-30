@@ -1,6 +1,23 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-30, Stage 9 + Stage 5 both closed out — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-30, codebase-wide fabrication audit — 6 real instances found and removed across 5 files — supersedes the section below)
+
+**Follow-up to the Stage 5 fabrication fix below**: that fix (removing `handleAutoFillBlueprint`'s hardcoded fake-blueprint fallback) turned out to be one instance of a systemic pattern, not a one-off. Audited every component consuming `aiService.ts` for the same shape of bug — a "skip the real AI call" button that fabricates specific, invented content and presents it as genuinely generated or verified. Commit `c239889`.
+
+**Found and removed 6 instances**, in increasing severity:
+- `ResearchIntakeWizard.tsx` — 3 more instances in the same file (`handleSuggestObjectives`, `handleCheckRQs`, `handleRecommendMethodology`), same keyword-matched fake content pattern.
+- `DataDiscoveryPanel.tsx` — fabricated fake **data sources** (invented archive names) labeled "Load Verified Offline Directories," feeding the same `status: "pending"` approval pipeline as genuinely-retrieved sources.
+- `JournalDiscoveryPanel.tsx` — invented **bibliometric facts** (fake Scopus rankings, APC status, turnaround times) about real, specifically-named journals, labeled "Load Verified Springer Index" — included a leftover hardcoded personal name ("Matches Dr. Govinda's...") confirming this was dev/demo content that leaked into production. Also silently auto-selected a fake journal as `project.targetJournal`.
+- `QualityControlSuite.tsx` — **the most severe**: `loadStandardQCReport` fabricated an always-passing peer-review report (96%/95%/98% scores, a false "zero plagiarism" claim, a false "ethics declarations exist" claim) labeled "Load Verified Editorial Audit Report." A student could trust this before submitting real work, believing a real integrity check had run.
+- `SubmissionPackagingSuite.tsx` — hardcoded fake "Peer Reviewer Feedback Logs" about an unrelated topic, shown regardless of the real project's content; a false "verified"/"aligned" claim in a cover-letter template.
+
+**Explicitly left alone** (already honest, not the same bug): `ComplianceChecklistPanel.tsx`, `GroundingMapDisplay.tsx`, `ManuscriptDraftingWorkspace.tsx` each have a similar "skip AI, load a standard template" button, but all three use openly generic placeholder text (no invented specific facts, several explicitly say "to be verified") and are honestly labeled — the differentiator from the 6 removed instances is inventing *specific, checkable false claims* vs. providing an honestly-generic starting template.
+
+- `tsc --noEmit` clean (2 now-orphaned type imports removed), full suite 1075/1075 unchanged (no test had ever asserted on the removed fabricated behavior), `npm run build` clean. Live-verified in a real browser across Phase C/D/G — each fabricated button confirmed gone, console clean.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-30, Stage 9 + Stage 5 both closed out — superseded by the section above)
 
 **Both stages closed via investigation-first, not blind rebuilding** — same discipline as the production-readiness pass below. Full detail in `docs/planning/target-workflow.md`'s Stage 5/Stage 9 sections.
 
