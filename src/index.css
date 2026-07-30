@@ -192,15 +192,6 @@ body {
   background-position: center center;
 }
 
-/* Premium OS Card Style */
-.os-card {
-  background-color: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px -2px rgba(26, 54, 93, 0.04), 0 2px 6px -1px rgba(26, 54, 93, 0.02);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
 /* Premium hover lift class */
 .hover-lift {
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
@@ -208,16 +199,12 @@ body {
 .hover-lift:hover {
   transform: translateY(-3px);
   box-shadow: 0 12px 28px -4px rgba(26, 54, 93, 0.08), 0 4px 12px -2px rgba(26, 54, 93, 0.03);
-  border-color: rgba(192, 138, 62, 0.3);
-}
-
-/* Retro-modern glassmorphic effect updated for high readability light theme */
-.glass-effect {
-  background-color: rgba(255, 255, 255, 0.88) !important;
-  backdrop-filter: blur(12px) !important;
-  border: 1px solid #E2E8F0 !important;
-  box-shadow: 0 8px 32px 0 rgba(26, 54, 93, 0.04) !important;
-  border-radius: 16px !important;
+  /* Was a gold-tinted border (rgba(192, 138, 62, 0.3)) — violated the
+     "gold is CTA + wordmark only" rule this redesign has maintained
+     throughout, applying it to any hovered card (ResearchIntelligence-
+     Dashboard.tsx, ActiveAgentsPanel.tsx, UserProfileGate.tsx all use this
+     class on plain cards, not CTAs). Swapped to luminous-blue. */
+  border-color: rgba(59, 156, 255, 0.3);
 }
 
 /* Heading font overrides.
@@ -301,118 +288,6 @@ textarea:focus:not(.border-0) {
   background: #94A3B8;
 }
 
-/* ==========================================
-   GLOBAL NESTED CLASS OVERRIDES FOR GLASS-EFFECT CARDS
-   (Fixes all white-on-white/contrast bugs across modules)
-   ========================================== */
-
-.glass-effect h2,
-.glass-effect h3,
-.glass-effect h4 {
-  color: #1A365D !important;
-}
-
-.glass-effect .text-white:not(button):not(button *):not([class*="bg-[#"]):not([class*="bg-[#"] *):not([class*="bg-brand-"]):not([class*="bg-brand-"] *),
-.glass-effect h4.text-white:not(button):not(button *):not([class*="bg-[#"]):not([class*="bg-[#"] *):not([class*="bg-brand-"]):not([class*="bg-brand-"] *),
-.glass-effect h3.text-white:not(button):not(button *):not([class*="bg-[#"]):not([class*="bg-[#"] *):not([class*="bg-brand-"]):not([class*="bg-brand-"] *),
-.glass-effect h2.text-white:not(button):not(button *):not([class*="bg-[#"]):not([class*="bg-[#"] *):not([class*="bg-brand-"]):not([class*="bg-brand-"] *) {
-  color: #1A365D !important;
-}
-
-/* Explicitly preserve white text & icons inside buttons and dark background layouts */
-.glass-effect button.text-white,
-.glass-effect button .text-white,
-.glass-effect button,
-.glass-effect button .lucide,
-.glass-effect [class*="bg-[#1A365D]"] .text-white,
-.glass-effect [class*="bg-[#1A365D]"] .lucide,
-.glass-effect [class*="bg-brand-500"] .text-white,
-.glass-effect [class*="bg-brand-500"] .lucide,
-.glass-effect [class*="bg-brand-600"] .text-white,
-.glass-effect [class*="bg-brand-600"] .lucide {
-  color: #FFFFFF !important;
-}
-.glass-effect button .lucide,
-.glass-effect [class*="bg-[#1A365D]"] .lucide,
-.glass-effect [class*="bg-brand-500"] .lucide,
-.glass-effect [class*="bg-brand-600"] .lucide {
-  stroke: #FFFFFF !important;
-}
-
-.glass-effect .text-gray-300,
-.glass-effect .text-gray-400,
-.glass-effect p.text-gray-400,
-.glass-effect span.text-gray-400 {
-  color: #475569 !important; /* Highly readable Slate text */
-}
-
-.glass-effect .text-brand-200,
-.glass-effect .text-brand-300,
-.glass-effect .text-brand-400 {
-  color: #C08A3E !important; /* Gold/Bronze accent */
-  font-weight: 600;
-}
-
-.glass-effect .text-brand-500,
-.glass-effect .text-brand-600 {
-  color: #1A365D !important; /* Oxford Blue */
-}
-
-/* Map dark backgrounds inside panels to clean, warm ivory/cream backgrounds */
-.glass-effect div[class*="bg-brand-950"],
-.glass-effect div[class*="bg-brand-900"],
-.glass-effect textarea[class*="bg-brand-950"],
-.glass-effect input[class*="bg-brand-950"] {
-  background-color: #FAF8F5 !important;
-  color: #1A365D !important;
-  border-color: #E2E8F0 !important;
-}
-
-.glass-effect div[class*="bg-brand-900/40"],
-.glass-effect div[class*="bg-brand-900/30"],
-.glass-effect div[class*="bg-brand-900/20"],
-.glass-effect div[class*="bg-brand-500/10"] {
-  background-color: #FAF6F0 !important;
-  border-color: rgba(192, 138, 62, 0.15) !important;
-}
-
-/* Intercept buttons using dark brand backgrounds and convert to premium primary buttons */
-.glass-effect button[class*="bg-brand-500"],
-.glass-effect button[class*="bg-brand-600"] {
-  background-color: #1A365D !important;
-  color: #FFFFFF !important;
-  border-color: #1A365D !important;
-  transition: all 0.2s ease !important;
-}
-.glass-effect button[class*="bg-brand-500"]:hover,
-.glass-effect button[class*="bg-brand-600"]:hover {
-  background-color: #122847 !important;
-}
-
-.glass-effect button[class*="bg-brand-500/30"],
-.glass-effect button[class*="bg-brand-500/10"] {
-  background-color: #FAF8F5 !important;
-  border-color: #E2E8F0 !important;
-  color: #C08A3E !important;
-}
-
-/* Override dark/white borders inside panels to subtle borders */
-.glass-effect div[class*="border-white"],
-.glass-effect select[class*="border-white"],
-.glass-effect textarea[class*="border-white"],
-.glass-effect input[class*="border-white"],
-.glass-effect button[class*="border-white"] {
-  border-color: #E2E8F0 !important;
-}
-
-/* Custom visual helper styling */
-.text-gradient {
-  background: linear-gradient(135deg, #1A365D 20%, #C08A3E 80%);
-  -webkit-background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
 .animate-fade-in {
   animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -428,23 +303,41 @@ textarea:focus:not(.border-0) {
   }
 }
 
-/* Intercept low-contrast 'Back' buttons and map to clean secondary buttons */
+/* Intercept low-contrast 'Back' buttons and map to clean secondary buttons.
+   RECOLORED (sci-fi v3, 2026-07-29) — same bug class as the h2/h3/h4 and
+   button:disabled !important overrides fixed earlier this session: this
+   rule force-applied a LIGHT secondary-button look (cream background, dark
+   navy text) to any button carrying a `border-white/10` class, silently
+   fighting the navy design in every file that uses that class —
+   CommandPalette.tsx, AppHeader.tsx (both pre-dating this redesign) plus
+   GroundingMapDisplay.tsx/JournalDiscoveryPanel.tsx/
+   SubmissionPackagingSuite.tsx (converted this session). Recolored to the
+   navy secondary-button pair used throughout this session's own
+   conversions instead. */
 button.border-white\/10,
 button[class*="border-white/10"] {
-  border-color: #CBD5E1 !important;
-  color: #475569 !important;
-  background-color: #FAF8F5 !important;
+  border-color: var(--color-navy-4) !important;
+  color: #94A3B8 !important;
+  background-color: var(--color-navy-2) !important;
 }
 button.border-white\/10:hover,
 button[class*="border-white/10"]:hover {
-  background-color: #F1F5F9 !important;
-  color: #1A365D !important;
+  background-color: var(--color-navy-3) !important;
+  color: #E2E8F0 !important;
 }
 
-/* Intercept disabled primary buttons for correct high-contrast light theme */
+/* Intercept disabled buttons for correct contrast.
+   RECOLORED (sci-fi v3, 2026-07-29) — same bug class as the h2/h3/h4
+   !important override fixed earlier this session: this rule force-applied
+   a light-theme background/border to EVERY disabled <button> app-wide,
+   found while live-verifying UserProfileGate.tsx's signup form (disabled
+   "Submit Account Request" button rendered pale against its new navy
+   card). Uses the disabled-button token pair already established in
+   ManuscriptDraftingWorkspace.tsx/ManuscriptEditorWorkspace.tsx this
+   session (navy-4 surface, #94A3B8 text). */
 button:disabled {
-  background-color: #FAF6F0 !important;
-  border-color: #E2E8F0 !important;
+  background-color: var(--color-navy-4) !important;
+  border-color: var(--color-navy-4) !important;
   color: #94A3B8 !important;
   cursor: not-allowed !important;
   box-shadow: none !important;
