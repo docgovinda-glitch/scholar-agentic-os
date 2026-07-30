@@ -655,28 +655,28 @@ Return strictly valid JSON:
     <div className="space-y-6">
       
       {/* Top action header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-[#E5E7EB] rounded-2xl p-4 shadow-2xs">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-2xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-700 to-amber-900 flex items-center justify-center text-white shrink-0 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-[color:var(--color-luminous-blue)]/15 border border-[color:var(--color-luminous-blue)]/30 flex items-center justify-center text-[color:var(--color-luminous-blue)] shrink-0 shadow-sm">
             <BookOpen className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D]">Knowledge Vault Setup Wizard</h2>
-            <p className="text-[11px] text-gray-500 font-sans">Ground your AI research assistants with academic articles, theses, files, links, or media.</p>
+            <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0]">Knowledge Vault Setup Wizard</h2>
+            <p className="text-[11px] text-[#94A3B8] font-sans">Ground your AI research assistants with academic articles, theses, files, links, or media.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {onBack && (
             <button
               onClick={onBack}
-              className="px-4 py-2 border border-gray-300 hover:bg-neutral-50 rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-all"
+              className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-all text-[#E2E8F0]"
             >
               &larr; Back
             </button>
           )}
           <button
             onClick={onComplete}
-            className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm transition-all"
+            className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm transition-all"
           >
             Skip / Continue
           </button>
@@ -684,7 +684,7 @@ Return strictly valid JSON:
       </div>
 
       {uploadError && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs font-mono text-red-700 flex items-start gap-2.5">
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-xs font-mono text-red-400 flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{uploadError}</span>
         </div>
@@ -694,18 +694,18 @@ Return strictly valid JSON:
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* COLUMN 1: UPLOAD TABS & FILES LIST */}
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-2xs flex flex-col space-y-4">
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-2xs flex flex-col space-y-4">
           <div>
-            <span className="text-[9px] font-mono font-bold text-amber-800 uppercase tracking-widest block">Column 01</span>
-            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#1A365D] mt-0.5">Primary Ingestion Hub</h3>
+            <span className="text-[9px] font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-widest block">Column 01</span>
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mt-0.5">Primary Ingestion Hub</h3>
           </div>
 
           {/* Ingestion Tabs */}
-          <div className="flex bg-neutral-100 p-1 rounded-xl gap-1">
+          <div className="flex bg-[color:var(--color-navy-1)] p-1 rounded-xl gap-1">
             <button
               onClick={() => setActiveTab("files")}
               className={`flex-1 py-1.5 text-[9px] font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer ${
-                activeTab === "files" ? "bg-white text-[#1A365D] shadow-2xs" : "text-gray-500 hover:text-gray-700"
+                activeTab === "files" ? "bg-[color:var(--color-navy-3)] text-[#E2E8F0] shadow-2xs" : "text-[#94A3B8] hover:text-[#E2E8F0]"
               }`}
             >
               Files
@@ -713,7 +713,7 @@ Return strictly valid JSON:
             <button
               onClick={() => setActiveTab("url")}
               className={`flex-1 py-1.5 text-[9px] font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer ${
-                activeTab === "url" ? "bg-white text-[#1A365D] shadow-2xs" : "text-gray-500 hover:text-gray-700"
+                activeTab === "url" ? "bg-[color:var(--color-navy-3)] text-[#E2E8F0] shadow-2xs" : "text-[#94A3B8] hover:text-[#E2E8F0]"
               }`}
             >
               URL Link
@@ -721,7 +721,7 @@ Return strictly valid JSON:
             <button
               onClick={() => setActiveTab("doi")}
               className={`flex-1 py-1.5 text-[9px] font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer ${
-                activeTab === "doi" ? "bg-white text-[#1A365D] shadow-2xs" : "text-gray-500 hover:text-gray-700"
+                activeTab === "doi" ? "bg-[color:var(--color-navy-3)] text-[#E2E8F0] shadow-2xs" : "text-[#94A3B8] hover:text-[#E2E8F0]"
               }`}
             >
               DOI
@@ -729,7 +729,7 @@ Return strictly valid JSON:
             <button
               onClick={() => setActiveTab("media")}
               className={`flex-1 py-1.5 text-[9px] font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer ${
-                activeTab === "media" ? "bg-white text-[#1A365D] shadow-2xs" : "text-gray-500 hover:text-gray-700"
+                activeTab === "media" ? "bg-[color:var(--color-navy-3)] text-[#E2E8F0] shadow-2xs" : "text-[#94A3B8] hover:text-[#E2E8F0]"
               }`}
             >
               Media
@@ -738,11 +738,11 @@ Return strictly valid JSON:
 
           {/* Tab Ingestion Panes */}
           {isUploading ? (
-            <div className="flex flex-col items-center justify-center p-8 bg-[#FAF8F5] border border-amber-800/20 rounded-xl space-y-3 text-center min-h-[160px]">
-              <Loader2 className="w-8 h-8 text-amber-800 animate-spin" />
+            <div className="flex flex-col items-center justify-center p-8 bg-[color:var(--color-navy-1)] border border-[color:var(--color-luminous-blue)]/20 rounded-xl space-y-3 text-center min-h-[160px]">
+              <Loader2 className="w-8 h-8 text-[color:var(--color-luminous-blue)] animate-spin" />
               <div className="space-y-1">
-                <span className="text-xs font-serif font-bold text-[#1A1A1A]">Processing Resource...</span>
-                <p className="text-[10px] text-[#76726A] max-w-[200px]">Extracting data streams, structure, and referencing metadata.</p>
+                <span className="text-xs font-bold text-[#E2E8F0]">Processing Resource...</span>
+                <p className="text-[10px] text-[#94A3B8] max-w-[200px]">Extracting data streams, structure, and referencing metadata.</p>
               </div>
             </div>
           ) : (
@@ -755,8 +755,8 @@ Return strictly valid JSON:
                   onDrop={handleDrop}
                   className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl space-y-2 text-center cursor-pointer transition-all min-h-[160px] relative ${
                     isDragging
-                      ? "border-amber-800 bg-amber-50/40"
-                      : "border-amber-800/25 bg-[#FAF8F5]/80 hover:border-amber-800 hover:bg-[#FAF8F5]"
+                      ? "border-[color:var(--color-luminous-blue)] bg-[color:var(--color-luminous-blue)]/10"
+                      : "border-[color:var(--color-luminous-blue)]/25 bg-[color:var(--color-navy-1)]/80 hover:border-[color:var(--color-luminous-blue)] hover:bg-[color:var(--color-navy-1)]"
                   }`}
                 >
                   <input
@@ -769,14 +769,14 @@ Return strictly valid JSON:
                       if (file) handleFileUpload(file);
                     }}
                   />
-                  <div className="w-10 h-10 bg-amber-800/10 border border-amber-800/20 rounded-full flex items-center justify-center">
-                    <Upload className="w-4 h-4 text-amber-800" />
+                  <div className="w-10 h-10 bg-[color:var(--color-luminous-blue)]/10 border border-[color:var(--color-luminous-blue)]/20 rounded-full flex items-center justify-center">
+                    <Upload className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   </div>
                   <div className="space-y-0.5">
-                    <span className="text-[11px] font-mono font-bold text-[#1A1A1A] block">Drag & Drop Document</span>
-                    <span className="text-[8px] text-[#76726A] block">PDF, DOCX, CSV, TXT, PNG/JPG, MP3/WAV</span>
+                    <span className="text-[11px] font-mono font-bold text-[#E2E8F0] block">Drag & Drop Document</span>
+                    <span className="text-[8px] text-[#94A3B8] block">PDF, DOCX, CSV, TXT, PNG/JPG, MP3/WAV</span>
                   </div>
-                  <div className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded-lg text-[9px] font-mono uppercase tracking-wider font-bold">
+                  <div className="px-3 py-1 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-[9px] font-mono uppercase tracking-wider font-bold">
                     Choose File
                   </div>
                 </div>
@@ -786,22 +786,22 @@ Return strictly valid JSON:
               {activeTab === "url" && (
                 <form onSubmit={handleUrlIngest} className="space-y-3 min-h-[160px] flex flex-col justify-center">
                   <div className="space-y-1">
-                    <label className="text-[8px] font-mono font-bold text-gray-500 uppercase tracking-wider block">Website URL Link</label>
-                    <div className="relative">
-                      <LinkIcon className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <label className="text-[8px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Website URL Link</label>
+                    <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                      <LinkIcon className="absolute left-3 top-3 w-4 h-4 text-[#94A3B8] z-10" />
                       <input
                         type="url"
                         placeholder="https://wikipedia.org/wiki/Tribhuvan_University"
                         value={inputUrl}
                         onChange={(e) => setInputUrl(e.target.value)}
-                        className="w-full text-xs font-mono p-2.5 pl-9 bg-white border border-[#D1CEC7] rounded-xl focus:ring-1 focus:ring-amber-800 focus:outline-none"
+                        className="w-full text-xs font-mono p-2.5 pl-9 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
                         required
                       />
                     </div>
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-2 bg-amber-800 hover:bg-amber-900 text-white rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                    className="w-full py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" /> Ingest Web Page
                   </button>
@@ -812,22 +812,22 @@ Return strictly valid JSON:
               {activeTab === "doi" && (
                 <form onSubmit={handleDoiIngest} className="space-y-3 min-h-[160px] flex flex-col justify-center">
                   <div className="space-y-1">
-                    <label className="text-[8px] font-mono font-bold text-gray-500 uppercase tracking-wider block">CrossRef DOI Identifier</label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <label className="text-[8px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">CrossRef DOI Identifier</label>
+                    <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                      <Search className="absolute left-3 top-3 w-4 h-4 text-[#94A3B8] z-10" />
                       <input
                         type="text"
                         placeholder="e.g. 10.1038/s41586-020-2012-7"
                         value={inputDoi}
                         onChange={(e) => setInputDoi(e.target.value)}
-                        className="w-full text-xs font-mono p-2.5 pl-9 bg-white border border-[#D1CEC7] rounded-xl focus:ring-1 focus:ring-amber-800 focus:outline-none"
+                        className="w-full text-xs font-mono p-2.5 pl-9 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
                         required
                       />
                     </div>
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-2 bg-amber-800 hover:bg-amber-900 text-white rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                    className="w-full py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
                   >
                     <Database className="w-3.5 h-3.5" /> Lookup Reference
                   </button>
@@ -838,22 +838,22 @@ Return strictly valid JSON:
               {activeTab === "media" && (
                 <form onSubmit={handleMediaIngest} className="space-y-3 min-h-[160px] flex flex-col justify-center">
                   <div className="space-y-1">
-                    <label className="text-[8px] font-mono font-bold text-gray-500 uppercase tracking-wider block">YouTube / Podcast Link</label>
-                    <div className="relative">
-                      <Youtube className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <label className="text-[8px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">YouTube / Podcast Link</label>
+                    <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                      <Youtube className="absolute left-3 top-3 w-4 h-4 text-[#94A3B8] z-10" />
                       <input
                         type="url"
                         placeholder="https://www.youtube.com/watch?v=..."
                         value={inputMediaUrl}
                         onChange={(e) => setInputMediaUrl(e.target.value)}
-                        className="w-full text-xs font-mono p-2.5 pl-9 bg-white border border-[#D1CEC7] rounded-xl focus:ring-1 focus:ring-amber-800 focus:outline-none"
+                        className="w-full text-xs font-mono p-2.5 pl-9 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
                         required
                       />
                     </div>
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-2 bg-amber-800 hover:bg-amber-900 text-white rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                    className="w-full py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
                   >
                     <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Summarize Media Link
                   </button>
@@ -863,11 +863,11 @@ Return strictly valid JSON:
           )}
 
           {/* Uploaded Documents List */}
-          <div className="space-y-2.5 pt-2 border-t border-[#E5E7EB]">
-            <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Indexed Library ({files.length})</span>
+          <div className="space-y-2.5 pt-2 border-t border-[color:var(--color-navy-4)]">
+            <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Indexed Library ({files.length})</span>
             {files.length === 0 ? (
-              <div className="p-8 text-center bg-[#FAF8F5]/50 border border-[#E5E7EB] rounded-xl">
-                <span className="text-[10px] font-mono text-gray-400">No sources indexed yet.</span>
+              <div className="p-8 text-center bg-[color:var(--color-navy-1)]/50 border border-[color:var(--color-navy-4)] rounded-xl">
+                <span className="text-[10px] font-mono text-[#94A3B8]">No sources indexed yet.</span>
               </div>
             ) : (
               <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
@@ -892,17 +892,17 @@ Return strictly valid JSON:
                       }}
                       className={`p-3 border rounded-xl flex items-center justify-between cursor-pointer transition-all ${
                         isSelected
-                          ? "bg-amber-50/70 border-amber-700/60 shadow-2xs scale-98"
-                          : "bg-white hover:bg-neutral-50/70 border-[#E5E7EB]"
+                          ? "bg-[color:var(--color-luminous-blue)]/10 border-[color:var(--color-luminous-blue)]/60 shadow-2xs scale-98"
+                          : "bg-[color:var(--color-navy-2)] hover:bg-[color:var(--color-navy-3)] border-[color:var(--color-navy-4)]"
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <TypeIcon className={`w-4 h-4 shrink-0 ${isSelected ? "text-amber-800" : "text-gray-400"}`} />
+                        <TypeIcon className={`w-4 h-4 shrink-0 ${isSelected ? "text-[color:var(--color-luminous-blue)]" : "text-[#94A3B8]"}`} />
                         <div className="min-w-0 flex-1">
-                          <h4 className="text-[11px] font-mono font-bold text-gray-800 truncate" title={file.fileName}>
+                          <h4 className="text-[11px] font-mono font-bold text-[#E2E8F0] truncate" title={file.fileName}>
                             {file.fileName}
                           </h4>
-                          <span className="text-[9px] font-mono text-gray-500 block truncate">
+                          <span className="text-[9px] font-mono text-[#94A3B8] block truncate">
                             Tag: {file.parsedOverview?.citationTag || file.fileName}
                           </span>
                         </div>
@@ -910,7 +910,7 @@ Return strictly valid JSON:
                       <button
                         type="button"
                         onClick={(e) => handleDeleteFileLocal(file.id, e)}
-                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+                        className="p-1 text-[#94A3B8] hover:text-red-400 hover:bg-[color:var(--color-navy-3)] rounded-lg transition-colors cursor-pointer"
                         title="Delete Source"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -924,58 +924,58 @@ Return strictly valid JSON:
         </div>
 
         {/* COLUMN 2: ABSTRACT & CHAPTER STRUCTURE */}
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-2xs flex flex-col space-y-4">
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-2xs flex flex-col space-y-4">
           <div>
-            <span className="text-[9px] font-mono font-bold text-amber-800 uppercase tracking-widest block">Column 02</span>
-            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#1A365D] mt-0.5">Abstract & Chapters</h3>
+            <span className="text-[9px] font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-widest block">Column 02</span>
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mt-0.5">Abstract & Chapters</h3>
           </div>
 
           {!selectedFile ? (
-            <div className="flex flex-col items-center justify-center p-8 bg-[#FAF8F5]/30 border border-dashed border-[#E5E7EB] rounded-xl grow text-center min-h-[300px]">
-              <Sparkles className="w-8 h-8 text-neutral-300 mb-2" />
-              <span className="text-[11px] font-mono text-[#76726A] font-bold">No Source Selected</span>
-              <p className="text-[10px] text-[#76726A] max-w-[200px] mt-1 font-sans">Upload or select an indexed document from Column 1 to synthesize findings.</p>
+            <div className="flex flex-col items-center justify-center p-8 bg-[color:var(--color-navy-1)]/30 border border-dashed border-[color:var(--color-navy-4)] rounded-xl grow text-center min-h-[300px]">
+              <Sparkles className="w-8 h-8 text-[#94A3B8] mb-2" />
+              <span className="text-[11px] font-mono text-[#94A3B8] font-bold">No Source Selected</span>
+              <p className="text-[10px] text-[#94A3B8] max-w-[200px] mt-1 font-sans">Upload or select an indexed document from Column 1 to synthesize findings.</p>
             </div>
           ) : selectedFile.status === "processing" ? (
-            <div className="flex flex-col items-center justify-center p-8 bg-[#FAF8F5]/30 border border-dashed border-[#E5E7EB] rounded-xl grow text-center min-h-[300px] space-y-2">
-              <RefreshCw className="w-7 h-7 text-amber-700 animate-spin" />
-              <span className="text-[11px] font-mono text-amber-800 font-bold">Parsing text...</span>
+            <div className="flex flex-col items-center justify-center p-8 bg-[color:var(--color-navy-1)]/30 border border-dashed border-[color:var(--color-navy-4)] rounded-xl grow text-center min-h-[300px] space-y-2">
+              <RefreshCw className="w-7 h-7 text-[color:var(--color-luminous-blue)] animate-spin" />
+              <span className="text-[11px] font-mono text-[color:var(--color-luminous-blue)] font-bold">Parsing text...</span>
             </div>
           ) : (
             <div className="space-y-4 grow flex flex-col justify-between">
               
               <div className="space-y-3.5">
                 {/* Meta Header */}
-                <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB] rounded-xl space-y-1">
-                  <h4 className="text-[11px] font-mono font-bold text-[#1A365D] leading-tight break-words">
+                <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl space-y-1">
+                  <h4 className="text-[11px] font-mono font-bold text-[#E2E8F0] leading-tight break-words">
                     {selectedFile.parsedOverview?.title || selectedFile.fileName}
                   </h4>
-                  <span className="text-[9px] font-mono text-gray-500 block truncate">
+                  <span className="text-[9px] font-mono text-[#94A3B8] block truncate">
                     Author: {selectedFile.parsedOverview?.author || "Unknown"} ({selectedFile.parsedOverview?.year || "N/A"})
                   </span>
                 </div>
 
                 {/* Abstract Text */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Document Abstract</span>
-                  <div className="p-3.5 bg-white border border-[#E5E7EB] rounded-xl text-[11px] text-gray-600 leading-relaxed font-sans max-h-[140px] overflow-y-auto">
+                  <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Document Abstract</span>
+                  <div className="p-3.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl text-[11px] text-[#94A3B8] leading-relaxed font-sans max-h-[140px] overflow-y-auto">
                     {selectedFile.parsedOverview?.abstract || "No abstract or summary was generated."}
                   </div>
                 </div>
 
                 {/* Chapters / Sections */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Extracted Chapters & Sections</span>
-                  <div className="border border-[#E5E7EB] rounded-xl divide-y divide-[#E5E7EB] max-h-[150px] overflow-y-auto bg-white">
+                  <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Extracted Chapters & Sections</span>
+                  <div className="border border-[color:var(--color-navy-4)] rounded-xl divide-y divide-[color:var(--color-navy-4)] max-h-[150px] overflow-y-auto bg-[color:var(--color-navy-1)]">
                     {selectedFile.parsedOverview?.chapters && selectedFile.parsedOverview.chapters.length > 0 ? (
                       selectedFile.parsedOverview.chapters.map((ch, idx) => (
-                        <div key={idx} className="p-2.5 text-[10px] font-mono hover:bg-neutral-50/50">
-                          <span className="font-bold text-[#1A365D] block">{ch.name}</span>
-                          <span className="text-gray-500 text-[9px] mt-0.5 block font-sans">{ch.summary}</span>
+                        <div key={idx} className="p-2.5 text-[10px] font-mono hover:bg-[color:var(--color-navy-3)]/50">
+                          <span className="font-bold text-[#E2E8F0] block">{ch.name}</span>
+                          <span className="text-[#94A3B8] text-[9px] mt-0.5 block font-sans">{ch.summary}</span>
                         </div>
                       ))
                     ) : (
-                      <div className="p-3 text-center text-[10px] text-gray-400 font-mono">
+                      <div className="p-3 text-center text-[10px] text-[#94A3B8] font-mono">
                         No sections detected.
                       </div>
                     )}
@@ -988,22 +988,22 @@ Return strictly valid JSON:
         </div>
 
         {/* COLUMN 3: KEY DATA & FINDINGS + CITATION TRIGGER */}
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-2xs flex flex-col space-y-4">
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-2xs flex flex-col space-y-4">
           <div>
-            <span className="text-[9px] font-mono font-bold text-amber-800 uppercase tracking-widest block">Column 03</span>
-            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#1A365D] mt-0.5">Key Findings & Data</h3>
+            <span className="text-[9px] font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-widest block">Column 03</span>
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mt-0.5">Key Findings & Data</h3>
           </div>
 
           {!selectedFile ? (
-            <div className="flex flex-col items-center justify-center p-8 bg-[#FAF8F5]/30 border border-dashed border-[#E5E7EB] rounded-xl grow text-center min-h-[300px]">
-              <ShieldCheck className="w-8 h-8 text-neutral-300 mb-2" />
-              <span className="text-[11px] font-mono text-[#76726A] font-bold">Extraction Idle</span>
-              <p className="text-[10px] text-[#76726A] max-w-[200px] mt-1 font-sans">Select a document to extract data variables and research findings.</p>
+            <div className="flex flex-col items-center justify-center p-8 bg-[color:var(--color-navy-1)]/30 border border-dashed border-[color:var(--color-navy-4)] rounded-xl grow text-center min-h-[300px]">
+              <ShieldCheck className="w-8 h-8 text-[#94A3B8] mb-2" />
+              <span className="text-[11px] font-mono text-[#94A3B8] font-bold">Extraction Idle</span>
+              <p className="text-[10px] text-[#94A3B8] max-w-[200px] mt-1 font-sans">Select a document to extract data variables and research findings.</p>
             </div>
           ) : selectedFile.status === "processing" ? (
-            <div className="flex flex-col items-center justify-center p-8 bg-[#FAF8F5]/30 border border-dashed border-[#E5E7EB] rounded-xl grow text-center min-h-[300px] space-y-2">
-              <Loader2 className="w-7 h-7 text-amber-700 animate-spin" />
-              <span className="text-[11px] font-mono text-amber-800 font-bold">Synthesizing findings...</span>
+            <div className="flex flex-col items-center justify-center p-8 bg-[color:var(--color-navy-1)]/30 border border-dashed border-[color:var(--color-navy-4)] rounded-xl grow text-center min-h-[300px] space-y-2">
+              <Loader2 className="w-7 h-7 text-[color:var(--color-luminous-blue)] animate-spin" />
+              <span className="text-[11px] font-mono text-[color:var(--color-luminous-blue)] font-bold">Synthesizing findings...</span>
             </div>
           ) : (
             <div className="space-y-4 grow flex flex-col justify-between">
@@ -1011,50 +1011,50 @@ Return strictly valid JSON:
               <div className="space-y-3.5">
                 {/* Key Findings Card */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Key Research Findings</span>
-                  <div className="p-3 bg-amber-50/30 border border-amber-200/80 rounded-xl space-y-1.5 max-h-[140px] overflow-y-auto">
+                  <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Key Research Findings</span>
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1.5 max-h-[140px] overflow-y-auto">
                     {selectedFile.parsedOverview?.keyFindings && selectedFile.parsedOverview.keyFindings.length > 0 ? (
                       selectedFile.parsedOverview.keyFindings.map((finding, idx) => (
-                        <div key={idx} className="flex gap-2 text-[10px] font-sans text-amber-900 leading-normal">
-                          <span className="text-amber-700 shrink-0 font-bold">•</span>
+                        <div key={idx} className="flex gap-2 text-[10px] font-sans text-amber-300 leading-normal">
+                          <span className="text-amber-400 shrink-0 font-bold">•</span>
                           <span>{finding}</span>
                         </div>
                       ))
                     ) : (
-                      <span className="text-[10px] font-mono text-gray-400 block">No primary findings identified.</span>
+                      <span className="text-[10px] font-mono text-[#94A3B8] block">No primary findings identified.</span>
                     )}
                   </div>
                 </div>
 
                 {/* Key Data Points Card */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Key Statistical / Experimental Data</span>
-                  <div className="p-3 bg-emerald-50/20 border border-emerald-200/80 rounded-xl space-y-1.5 max-h-[140px] overflow-y-auto">
+                  <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Key Statistical / Experimental Data</span>
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-1.5 max-h-[140px] overflow-y-auto">
                     {selectedFile.parsedOverview?.keyDataPoints && selectedFile.parsedOverview.keyDataPoints.length > 0 ? (
                       selectedFile.parsedOverview.keyDataPoints.map((dataPt, idx) => (
-                        <div key={idx} className="flex gap-2 text-[10px] font-mono text-emerald-900 leading-normal">
-                          <span className="text-emerald-700 shrink-0 font-bold">#</span>
+                        <div key={idx} className="flex gap-2 text-[10px] font-mono text-emerald-300 leading-normal">
+                          <span className="text-emerald-400 shrink-0 font-bold">#</span>
                           <span>{dataPt}</span>
                         </div>
                       ))
                     ) : (
-                      <span className="text-[10px] font-mono text-gray-400 block">No key statistical variables parsed.</span>
+                      <span className="text-[10px] font-mono text-[#94A3B8] block">No key statistical variables parsed.</span>
                     )}
                   </div>
                 </div>
 
                 {/* Key Terms Badges */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#76726A] uppercase tracking-wider block">Extracted Key Terms</span>
+                  <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Extracted Key Terms</span>
                   <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto">
                     {selectedFile.parsedOverview?.keyTerms && selectedFile.parsedOverview.keyTerms.length > 0 ? (
                       selectedFile.parsedOverview.keyTerms.map((term, idx) => (
-                        <span key={idx} className="px-2 py-0.5 bg-neutral-100 border border-[#E5E7EB] text-neutral-800 rounded text-[9px] font-mono">
+                        <span key={idx} className="px-2 py-0.5 bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] text-[#94A3B8] rounded text-[9px] font-mono">
                           {term}
                         </span>
                       ))
                     ) : (
-                      <span className="text-[10px] font-mono text-gray-400">None detected.</span>
+                      <span className="text-[10px] font-mono text-[#94A3B8]">None detected.</span>
                     )}
                   </div>
                 </div>
@@ -1062,11 +1062,11 @@ Return strictly valid JSON:
 
               {/* Action Button: Lead to Citation Manager */}
               {!showNextStepPrompt && !isEditingCitation && (
-                <div className="pt-2 border-t border-[#E5E7EB]">
+                <div className="pt-2 border-t border-[color:var(--color-navy-4)]">
                   <button
                     type="button"
                     onClick={handleStartEdit}
-                    className="w-full bg-[#1A365D] hover:bg-[#122847] text-white p-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md shadow-[#1A365D]/10 hover:shadow-[#1A365D]/20 cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white p-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <Tag className="w-4 h-4" />
                     <span>Manage Citation & Referencing</span>
@@ -1083,32 +1083,32 @@ Return strictly valid JSON:
 
       {/* CITATION MANAGER / EDITOR WORKFLOW INTERFACE */}
       {selectedFile && isEditingCitation && (
-        <div className="bg-white border border-amber-200 rounded-2xl p-6 shadow-sm space-y-5 animate-scale-up">
-          <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-luminous-blue)]/30 rounded-2xl p-6 shadow-sm space-y-5 animate-scale-up">
+          <div className="flex items-center justify-between border-b border-[color:var(--color-navy-4)] pb-3">
             <div className="flex items-center gap-2">
-              <Tag className="w-4.5 h-4.5 text-amber-700" />
-              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D]">
-                Academic Reference Citation Editor
+              <Tag className="w-4.5 h-4.5 text-[color:var(--color-luminous-blue)]" />
+              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0]">
+              Academic Reference Citation Editor
               </h3>
             </div>
             <button
               type="button"
               onClick={() => setIsEditingCitation(false)}
-              className="text-gray-400 hover:text-gray-600 cursor-pointer"
+              className="text-[#94A3B8] hover:text-[#E2E8F0] cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Tab Navigation inside editor */}
-          <div className="flex border-b border-[#E5E7EB] pb-2 mb-4 gap-2 overflow-x-auto">
+          <div className="flex border-b border-[color:var(--color-navy-4)] pb-2 mb-4 gap-2 overflow-x-auto">
             {(["basic", "identifiers", "details", "previews"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setEditorTab(tab)}
                 className={`pb-2 px-3 text-xs font-mono font-bold uppercase border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-                  editorTab === tab ? "border-amber-800 text-amber-900 font-extrabold" : "border-transparent text-gray-500 hover:text-gray-700"
+                  editorTab === tab ? "border-[color:var(--color-luminous-blue)] text-[color:var(--color-luminous-blue)] font-extrabold" : "border-transparent text-[#94A3B8] hover:text-[#E2E8F0]"
                 }`}
               >
                 {tab === "basic" ? "Basic Info" : tab === "identifiers" ? "Identifiers & Access" : tab === "details" ? "Publisher Details" : "Citation Previews"}
@@ -1121,58 +1121,68 @@ Return strictly valid JSON:
             {editorTab === "basic" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Resource Type (Genre)</label>
-                  <select
-                    value={editForm.genre || "Journal Article"}
-                    onChange={(e) => setEditForm({ ...editForm, genre: e.target.value })}
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  >
-                    <option value="Journal Article">Journal Article</option>
-                    <option value="Book">Book</option>
-                    <option value="Book Chapter">Book Chapter</option>
-                    <option value="Conference Paper">Conference Paper</option>
-                    <option value="Patent">Patent</option>
-                    <option value="Thesis/Dissertation">Thesis / Dissertation</option>
-                    <option value="Preprint">Preprint</option>
-                    <option value="Dataset">Dataset</option>
-                    <option value="Web Resource">Web Resource</option>
-                  </select>
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Resource Type (Genre)</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <select
+                      value={editForm.genre || "Journal Article"}
+                      onChange={(e) => setEditForm({ ...editForm, genre: e.target.value })}
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    >
+                      <option value="Journal Article">Journal Article</option>
+                      <option value="Book">Book</option>
+                      <option value="Book Chapter">Book Chapter</option>
+                      <option value="Conference Paper">Conference Paper</option>
+                      <option value="Patent">Patent</option>
+                      <option value="Thesis/Dissertation">Thesis / Dissertation</option>
+                      <option value="Preprint">Preprint</option>
+                      <option value="Dataset">Dataset</option>
+                      <option value="Web Resource">Web Resource</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Publication Year</label>
-                  <input
-                    type="text"
-                    value={editForm.year || ""}
-                    onChange={(e) => setEditForm({ ...editForm, year: e.target.value })}
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Publication Year</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.year || ""}
+                      onChange={(e) => setEditForm({ ...editForm, year: e.target.value })}
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Document Title</label>
-                  <input
-                    type="text"
-                    value={editForm.title || ""}
-                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Document Title</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.title || ""}
+                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Author(s)</label>
-                  <input
-                    type="text"
-                    value={editForm.author || ""}
-                    onChange={(e) => setEditForm({ ...editForm, author: e.target.value })}
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Author(s)</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.author || ""}
+                      onChange={(e) => setEditForm({ ...editForm, author: e.target.value })}
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Journal / School / Institution</label>
-                  <input
-                    type="text"
-                    value={editForm.institutionOrJournal || ""}
-                    onChange={(e) => setEditForm({ ...editForm, institutionOrJournal: e.target.value })}
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Journal / School / Institution</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.institutionOrJournal || ""}
+                      onChange={(e) => setEditForm({ ...editForm, institutionOrJournal: e.target.value })}
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -1181,64 +1191,76 @@ Return strictly valid JSON:
             {editorTab === "identifiers" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Digital Object Identifier (DOI)</label>
-                  <input
-                    type="text"
-                    value={editForm.doiOrUrl?.startsWith("10.") ? editForm.doiOrUrl : ""}
-                    onChange={(e) => setEditForm({ ...editForm, doiOrUrl: e.target.value })}
-                    placeholder="e.g. 10.1038/s41586-020-2012-7"
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Digital Object Identifier (DOI)</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.doiOrUrl?.startsWith("10.") ? editForm.doiOrUrl : ""}
+                      onChange={(e) => setEditForm({ ...editForm, doiOrUrl: e.target.value })}
+                      placeholder="e.g. 10.1038/s41586-020-2012-7"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">URL / Link</label>
-                  <input
-                    type="text"
-                    value={editForm.doiOrUrl?.startsWith("http") ? editForm.doiOrUrl : ""}
-                    onChange={(e) => setEditForm({ ...editForm, doiOrUrl: e.target.value })}
-                    placeholder="https://example.com/article"
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">URL / Link</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.doiOrUrl?.startsWith("http") ? editForm.doiOrUrl : ""}
+                      onChange={(e) => setEditForm({ ...editForm, doiOrUrl: e.target.value })}
+                      placeholder="https://example.com/article"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">ISSN / ISBN</label>
-                  <input
-                    type="text"
-                    value={editForm.issnIsbn || ""}
-                    onChange={(e) => setEditForm({ ...editForm, issnIsbn: e.target.value })}
-                    placeholder="e.g. 0028-0836"
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">ISSN / ISBN</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.issnIsbn || ""}
+                      onChange={(e) => setEditForm({ ...editForm, issnIsbn: e.target.value })}
+                      placeholder="e.g. 0028-0836"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">arXiv Identifier</label>
-                  <input
-                    type="text"
-                    value={editForm.arxivId || ""}
-                    onChange={(e) => setEditForm({ ...editForm, arxivId: e.target.value })}
-                    placeholder="e.g. arXiv:2103.00020"
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">arXiv Identifier</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.arxivId || ""}
+                      onChange={(e) => setEditForm({ ...editForm, arxivId: e.target.value })}
+                      placeholder="e.g. arXiv:2103.00020"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">PubMed ID (PMID)</label>
-                  <input
-                    type="text"
-                    value={editForm.pmid || ""}
-                    onChange={(e) => setEditForm({ ...editForm, pmid: e.target.value })}
-                    placeholder="e.g. 32051586"
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">PubMed ID (PMID)</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.pmid || ""}
+                      onChange={(e) => setEditForm({ ...editForm, pmid: e.target.value })}
+                      placeholder="e.g. 32051586"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">PubMed Central ID (PMCID)</label>
-                  <input
-                    type="text"
-                    value={editForm.pmcid || ""}
-                    onChange={(e) => setEditForm({ ...editForm, pmcid: e.target.value })}
-                    placeholder="e.g. PMC7098200"
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">PubMed Central ID (PMCID)</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.pmcid || ""}
+                      onChange={(e) => setEditForm({ ...editForm, pmcid: e.target.value })}
+                      placeholder="e.g. PMC7098200"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -1247,44 +1269,52 @@ Return strictly valid JSON:
             {editorTab === "details" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Publisher</label>
-                  <input
-                    type="text"
-                    value={editForm.publisher || ""}
-                    onChange={(e) => setEditForm({ ...editForm, publisher: e.target.value })}
-                    placeholder="e.g. Nature Publishing Group"
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Publisher</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.publisher || ""}
+                      onChange={(e) => setEditForm({ ...editForm, publisher: e.target.value })}
+                      placeholder="e.g. Nature Publishing Group"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Volume & Issue</label>
-                  <input
-                    type="text"
-                    value={editForm.volumeIssue || ""}
-                    onChange={(e) => setEditForm({ ...editForm, volumeIssue: e.target.value })}
-                    placeholder="e.g. Vol. 578, No. 7795"
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Volume & Issue</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.volumeIssue || ""}
+                      onChange={(e) => setEditForm({ ...editForm, volumeIssue: e.target.value })}
+                      placeholder="e.g. Vol. 578, No. 7795"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Page Range</label>
-                  <input
-                    type="text"
-                    value={editForm.pages || ""}
-                    onChange={(e) => setEditForm({ ...editForm, pages: e.target.value })}
-                    placeholder="e.g. 201-215"
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Page Range</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.pages || ""}
+                      onChange={(e) => setEditForm({ ...editForm, pages: e.target.value })}
+                      placeholder="e.g. 201-215"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Access / Retrieval Date</label>
-                  <input
-                    type="text"
-                    value={editForm.accessDate || ""}
-                    onChange={(e) => setEditForm({ ...editForm, accessDate: e.target.value })}
-                    placeholder="e.g. 2026-06-30"
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5]"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Access / Retrieval Date</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={editForm.accessDate || ""}
+                      onChange={(e) => setEditForm({ ...editForm, accessDate: e.target.value })}
+                      placeholder="e.g. 2026-06-30"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -1294,17 +1324,19 @@ Return strictly valid JSON:
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">In-Text Citation Tag (APA)</label>
-                    <input
-                      type="text"
-                      value={editForm.citationTag || ""}
-                      onChange={(e) => setEditForm({ ...editForm, citationTag: e.target.value })}
-                      className="w-full p-2.5 border border-emerald-300 text-emerald-950 font-bold bg-emerald-50 rounded-lg focus:ring-1 focus:ring-emerald-600 focus:outline-none"
-                    />
+                    <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">In-Text Citation Tag (APA)</label>
+                    <div className="w-full rounded-lg border border-emerald-500/40 bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                      <input
+                        type="text"
+                        value={editForm.citationTag || ""}
+                        onChange={(e) => setEditForm({ ...editForm, citationTag: e.target.value })}
+                        className="w-full p-2.5 border-0 bg-transparent text-emerald-400 font-bold focus:outline-none"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <span className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Style Preformatted Previews</span>
-                    <div className="space-y-2 border border-[#E5E7EB] rounded-lg p-3 bg-neutral-50/50 max-h-[180px] overflow-y-auto">
+                    <span className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Style Preformatted Previews</span>
+                    <div className="space-y-2 border border-[color:var(--color-navy-4)] rounded-lg p-3 bg-[color:var(--color-navy-1)]/50 max-h-[180px] overflow-y-auto">
                       {(() => {
                         const alt = generateAlternativeCitations(editForm);
                         return [
@@ -1316,8 +1348,8 @@ Return strictly valid JSON:
                           { style: "Vancouver", val: alt.Vancouver }
                         ].map((item) => (
                           <div key={item.style} className="text-[10px] leading-relaxed">
-                            <span className="font-bold text-[#1A365D] uppercase text-[9px] mr-1.5">{item.style}:</span>
-                            <span className="text-gray-700 italic">{item.val}</span>
+                            <span className="font-bold text-[color:var(--color-luminous-blue)] uppercase text-[9px] mr-1.5">{item.style}:</span>
+                            <span className="text-[#94A3B8] italic">{item.val}</span>
                           </div>
                         ));
                       })()}
@@ -1326,30 +1358,32 @@ Return strictly valid JSON:
                 </div>
 
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">BibTeX Citation Snippet</label>
-                  <textarea
-                    rows={4}
-                    value={editForm.bibtex || ""}
-                    onChange={(e) => setEditForm({ ...editForm, bibtex: e.target.value })}
-                    className="w-full p-2.5 border border-[#D1CEC7] rounded-lg font-mono text-[10px] focus:ring-1 focus:ring-amber-800 focus:outline-none bg-[#FAF8F5] leading-relaxed"
-                  />
+                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">BibTeX Citation Snippet</label>
+                  <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <textarea
+                      rows={4}
+                      value={editForm.bibtex || ""}
+                      onChange={(e) => setEditForm({ ...editForm, bibtex: e.target.value })}
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0] font-mono text-[10px] leading-relaxed"
+                    />
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-[#E5E7EB]">
+          <div className="flex justify-end gap-2 pt-2 border-t border-[color:var(--color-navy-4)]">
             <button
               type="button"
               onClick={() => setIsEditingCitation(false)}
-              className="px-4 py-2 border border-gray-300 hover:bg-neutral-50 rounded-lg text-xs font-mono font-bold uppercase cursor-pointer"
+              className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-lg text-xs font-mono font-bold uppercase cursor-pointer text-[#E2E8F0]"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSaveCitation}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-sm"
             >
               <Save className="w-3.5 h-3.5" /> Save Citation Details
             </button>
@@ -1359,16 +1393,16 @@ Return strictly valid JSON:
 
       {/* PROMPT FLOW MODAL / BANNER CARD */}
       {selectedFile && showNextStepPrompt && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 animate-scale-up">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 animate-scale-up">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-400 shrink-0">
               <CheckCircle2 className="w-6.5 h-6.5" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-mono font-bold uppercase text-emerald-950 flex items-center gap-1.5">
+              <h3 className="text-sm font-mono font-bold uppercase text-emerald-300 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4" /> Citation Grounding Confirmed
               </h3>
-              <p className="text-[11px] text-emerald-800 leading-relaxed font-sans max-w-xl">
+              <p className="text-[11px] text-emerald-400 leading-relaxed font-sans max-w-xl">
                 Research source <strong>{selectedFile.fileName}</strong> is integrated. The AI will ground outputs using this source under reference tag <strong>{selectedFile.parsedOverview?.citationTag}</strong>.
               </p>
             </div>
@@ -1376,13 +1410,13 @@ Return strictly valid JSON:
           <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
             <button
               onClick={handleAddAnotherSource}
-              className="flex-1 md:flex-none px-4 py-2.5 border border-emerald-600 hover:bg-emerald-100/50 text-emerald-700 rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-all"
+              className="flex-1 md:flex-none px-4 py-2.5 border border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-all"
             >
               Add Another Source
             </button>
             <button
               onClick={onComplete}
-              className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-md transition-all flex items-center justify-center gap-1"
+              className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-md transition-all flex items-center justify-center gap-1"
             >
               <span>Continue to Workshop</span>
               <ChevronRight className="w-4 h-4" />
@@ -1397,35 +1431,35 @@ Return strictly valid JSON:
   if (viewMode === "manager") {
     return (
       <div className="w-full flex flex-col space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/50 border border-[#E5E7EB] rounded-2xl p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[color:var(--color-navy-2)]/50 border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm">
           <div>
-            <h2 className="text-lg font-bold text-[#1A365D] font-serif">Reference Library Integration</h2>
-            <p className="text-xs text-gray-500">Configure publications, references, and files for grounding your manuscript drafts.</p>
+            <h2 className="text-lg font-bold text-[#E2E8F0]">Reference Library Integration</h2>
+            <p className="text-xs text-[#94A3B8]">Configure publications, references, and files for grounding your manuscript drafts.</p>
           </div>
           <div className="flex items-center gap-2">
             {onBack && (
               <button
                 onClick={onBack}
-                className="px-4 py-2 border border-gray-300 hover:bg-gray-100 rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-all"
+                className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-all text-[#E2E8F0]"
               >
                 &larr; Back
               </button>
             )}
             <button
               onClick={onComplete}
-              className="px-4 py-2 bg-[#1A365D] hover:bg-[#122847] text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm transition-all"
+              className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm transition-all"
             >
               Skip / Complete
             </button>
             <button
               onClick={() => setViewMode("wizard")}
-              className="px-4 py-2 bg-gradient-to-br from-amber-700 to-amber-900 hover:from-amber-600 hover:to-amber-850 text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm transition-all"
+              className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm transition-all"
             >
               Upload Wizard
             </button>
           </div>
         </div>
-        <div className="h-[600px] overflow-hidden flex flex-col rounded-3xl border border-[#E5E7EB] shadow-sm">
+        <div className="h-[600px] overflow-hidden flex flex-col rounded-3xl border border-[color:var(--color-navy-4)] shadow-sm">
           <KnowledgeVaultManager
             project={project}
             updateProject={updateProject}
@@ -1442,7 +1476,7 @@ Return strictly valid JSON:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in overflow-y-auto">
-      <div className="w-full max-w-7xl my-auto bg-white rounded-3xl p-6 shadow-2xl">
+      <div className="w-full max-w-7xl my-auto bg-[color:var(--color-navy-2)] rounded-3xl p-6 shadow-2xl">
         {wizardContent}
       </div>
     </div>
