@@ -298,23 +298,44 @@ export default function ManuscriptEditorWorkspace({
   // territory), only to make sure the human actually SEES the real,
   // current QC result before self-attesting approval, rather than being
   // able to rubber-stamp blind.
+  //
+  // Extended (2026-07-30, same-day follow-up): QualityControlSuite.tsx runs
+  // TWO separate, differently-shaped integrity signals — runQualityControl
+  // (project.qcReport, checked above since the first pass) and the
+  // IntegrityReviewerAgent (project.integrityReviewReport, previously local
+  // component state only and invisible here entirely). Both now surfaced
+  // together so approval reflects the full picture, not just one signal.
   const handleApprove = () => {
     const report = project.qcReport;
-    let message: string;
-    if (!report) {
-      message =
-        "No quality-control audit has been run yet (Phase G: Quality Control).\n\n" +
-        "Approve this manuscript for submission anyway?";
-    } else {
-      const weaknessLines = report.weaknesses.length > 0
-        ? report.weaknesses.map((w) => `  • ${w}`).join("\n")
-        : "  (none noted)";
-      message =
-        `Last Quality Control audit result:\n` +
-        `  Compliance: ${report.complianceScore}%   Rigor: ${report.rigorScore}%   Dissertation Alignment: ${report.alignmentWithDissertationScore}%\n\n` +
-        `Weaknesses noted:\n${weaknessLines}\n\n` +
-        "Approve this manuscript for submission as-is?";
-    }
+    const integrity = project.integrityReviewReport;
+
+    const qcBlock = !report
+      ? "Quality Control audit: not run yet (Phase G)."
+      : (() => {
+          const weaknessLines = report.weaknesses.length > 0
+            ? report.weaknesses.map((w) => `  • ${w}`).join("\n")
+            : "  (none noted)";
+          return (
+            `Quality Control audit:\n` +
+            `  Compliance: ${report.complianceScore}%   Rigor: ${report.rigorScore}%   Dissertation Alignment: ${report.alignmentWithDissertationScore}%\n` +
+            `  Weaknesses:\n${weaknessLines}`
+          );
+        })();
+
+    const integrityBlock = !integrity
+      ? "Integrity & Ethics Review (Agent): not run yet (Phase G)."
+      : (() => {
+          const blockingLines = integrity.blockingIssues.length > 0
+            ? integrity.blockingIssues.map((i) => `  • ${i.description}`).join("\n")
+            : "  (none)";
+          return (
+            `Integrity & Ethics Review (Agent):\n` +
+            `  Structural Completeness: ${integrity.structuralCompleteness}%   Integrity: ${integrity.integrityScore}%   Ethics: ${integrity.ethicsScore}%\n` +
+            `  Blocking issues:\n${blockingLines}`
+          );
+        })();
+
+    const message = `${qcBlock}\n\n${integrityBlock}\n\nApprove this manuscript for submission as-is?`;
     if (!window.confirm(message)) return;
     updateProject({ manuscriptApproved: true });
   };

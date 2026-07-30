@@ -30,7 +30,7 @@ export default function QualityControlSuite({
   // functionality without being asked).
   const [integrityLoading, setIntegrityLoading] = useState(false);
   const [integrityError, setIntegrityError] = useState<string | null>(null);
-  const [integrityReport, setIntegrityReport] = useState<IntegrityReviewReport | null>(null);
+  const [integrityReport, setIntegrityReport] = useState<IntegrityReviewReport | null>(project.integrityReviewReport ?? null);
 
   const runIntegrityReview = async () => {
     setIntegrityLoading(true);
@@ -39,7 +39,14 @@ export default function QualityControlSuite({
       const input = buildIntegrityReviewerInput(project);
       const result = await executeAgent("integrity-reviewer", input);
       if (result.ok) {
-        setIntegrityReport(result.data as IntegrityReviewReport);
+        const report = result.data as IntegrityReviewReport;
+        setIntegrityReport(report);
+        // Real gap found and fixed (2026-07-30, approval-visibility
+        // follow-up): this used to be local component state only, lost the
+        // moment the user left this tab — invisible everywhere else,
+        // including at manuscript approval. Persisted so
+        // ManuscriptEditorWorkspace.tsx can surface it too.
+        updateProject({ integrityReviewReport: report });
       } else {
         setIntegrityError(result.error?.message || "Integrity review failed.");
       }
@@ -73,6 +80,7 @@ export default function QualityControlSuite({
       setPipelineStageErrors(result.errors);
       if (result.integrityReviewReport) {
         setIntegrityReport(result.integrityReviewReport);
+        updateProject({ integrityReviewReport: result.integrityReviewReport });
       } else {
         setPipelineError("The pipeline ran, but the terminal integrity-review stage did not complete — see stage errors below.");
       }

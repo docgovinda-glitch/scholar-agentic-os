@@ -1,3 +1,5 @@
+import type { IntegrityReviewReport } from "./agents/integrityReviewer";
+
 export const PROFILE_STATE_PREFIX = "phd_profile_state_";
 export const PROFILES_LIST_KEY = "phd_profiles_meta";
 export const DEFAULT_STATE = (username: string): PaperProject => ({
@@ -648,6 +650,16 @@ export interface PaperProject {
   complianceRules?: ComplianceRules;
   sections: Record<string, string>; // Maps section keys e.g. "Abstract" to drafted text
   qcReport?: QCReport;
+  /**
+   * IntegrityReviewerAgent's result (structural/completeness scan +
+   * literature-grounded comparable-source analysis), run from
+   * QualityControlSuite.tsx. Previously local component useState only —
+   * lost the moment the user left the Quality Control tab, invisible
+   * everywhere else including at manuscript approval. Persisted here so
+   * ManuscriptEditorWorkspace.tsx's approval flow can surface it alongside
+   * qcReport, giving a full picture of both integrity signals, not just one.
+   */
+  integrityReviewReport?: IntegrityReviewReport;
   submissionPack?: SubmissionPack;
 
   // New Analytics & Tracking fields
