@@ -286,8 +286,36 @@ export default function ManuscriptEditorWorkspace({
     updateProject({ sections: updatedSections });
   };
 
+  // Real gap found and fixed (integrity-audit follow-up, 2026-07-30):
+  // approval used to be a single generic confirm() with no reference to
+  // project.qcReport at all — approving with zero quality-control audit
+  // ever run, or after a QC run that surfaced real weaknesses, looked
+  // completely identical to approving a genuinely clean manuscript. This
+  // project's own established principle is to NEVER have the system
+  // itself issue an accept/reject verdict (see semantic-peer-review
+  // scoping's "do not attempt" list) — so the fix here is NOT to block
+  // approval on a bad score (that would cross into forbidden verdict
+  // territory), only to make sure the human actually SEES the real,
+  // current QC result before self-attesting approval, rather than being
+  // able to rubber-stamp blind.
   const handleApprove = () => {
-    if (!window.confirm("Are you sure you want to approve this manuscript for submission?\n\nThis confirms the manuscript is finalized and ready for the submission packaging phase.")) return;
+    const report = project.qcReport;
+    let message: string;
+    if (!report) {
+      message =
+        "No quality-control audit has been run yet (Phase G: Quality Control).\n\n" +
+        "Approve this manuscript for submission anyway?";
+    } else {
+      const weaknessLines = report.weaknesses.length > 0
+        ? report.weaknesses.map((w) => `  • ${w}`).join("\n")
+        : "  (none noted)";
+      message =
+        `Last Quality Control audit result:\n` +
+        `  Compliance: ${report.complianceScore}%   Rigor: ${report.rigorScore}%   Dissertation Alignment: ${report.alignmentWithDissertationScore}%\n\n` +
+        `Weaknesses noted:\n${weaknessLines}\n\n` +
+        "Approve this manuscript for submission as-is?";
+    }
+    if (!window.confirm(message)) return;
     updateProject({ manuscriptApproved: true });
   };
 
@@ -459,13 +487,13 @@ export default function ManuscriptEditorWorkspace({
           {/* Approval Status */}
           {isApproved ? (
             <div className="flex items-center gap-2">
-              <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-mono font-bold uppercase flex items-center gap-1.5">
+              <span className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg text-[10px] font-mono font-bold uppercase flex items-center gap-1.5">
                 <CheckCircle className="w-3.5 h-3.5" />
                 Manuscript Approved
               </span>
               <button
                 onClick={handleUnapprove}
-                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all flex items-center gap-1"
+                className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all flex items-center gap-1"
               >
                 <Unlock className="w-3 h-3" />
                 Revoke
@@ -602,8 +630,8 @@ export default function ManuscriptEditorWorkspace({
                     <span className="text-[#94A3B8] font-bold uppercase">Originality:</span>
                     <span className={`px-1.5 py-0.5 rounded font-bold ${
                       calculateOriginalityIndex(editingSection ? (project.sections[editingSection] || "") : "") >= 90 
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
-                        : "bg-amber-50 text-amber-700 border border-amber-200"
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" 
+                        : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
                     }`}>
                       {calculateOriginalityIndex(editingSection ? (project.sections[editingSection] || "") : "")}%
                     </span>
@@ -614,8 +642,8 @@ export default function ManuscriptEditorWorkspace({
                     <span className="text-[#94A3B8] font-bold uppercase">Style Errors:</span>
                     <span className={`px-1.5 py-0.5 rounded font-bold ${
                       checkAcademicTone(editingSection ? (project.sections[editingSection] || "") : "").length === 0 
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
-                        : "bg-amber-50 text-amber-700 border border-amber-200"
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" 
+                        : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
                     }`}>
                       {checkAcademicTone(editingSection ? (project.sections[editingSection] || "") : "").length} Warnings
                     </span>
@@ -627,7 +655,7 @@ export default function ManuscriptEditorWorkspace({
                   <div className="mt-1 pt-1.5 border-t border-[color:var(--color-navy-4)]/50 max-h-[50px] overflow-y-auto flex flex-wrap gap-1.5 text-[9px] text-[color:var(--color-luminous-blue)]">
                     <span className="font-bold text-[#94A3B8] mr-1">Suggestions:</span>
                     {checkAcademicTone(editingSection ? (project.sections[editingSection] || "") : "").slice(0, 4).map((warn, i) => (
-                      <span key={i} className="bg-amber-50 border border-amber-100 rounded px-1">
+                      <span key={i} className="bg-amber-500/10 border border-amber-500/20 rounded px-1">
                         "{warn.word}" → <span className="font-bold text-[#E2E8F0]">{warn.replacement}</span>
                       </span>
                     ))}
