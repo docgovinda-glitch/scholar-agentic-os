@@ -405,7 +405,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
   if (!profile) {
     if (error) {
       return (
-        <div className="p-4 bg-red-50 border border-red-200 text-[#9C2E2E] rounded-xl flex items-start gap-3 text-xs font-mono">
+        <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl flex items-start gap-3 text-xs font-mono">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <div>{error}</div>
         </div>
@@ -413,7 +413,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
     }
     return (
       <div className="flex items-center justify-center p-12">
-        <Loader2 className="w-6 h-6 text-[#1A365D] animate-spin" />
+        <Loader2 className="w-6 h-6 text-[color:var(--color-luminous-blue)] animate-spin" />
       </div>
     );
   }
@@ -432,35 +432,35 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
       
       {/* Messages */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-[#9C2E2E] rounded-xl flex items-start gap-3 text-xs font-mono">
+        <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl flex items-start gap-3 text-xs font-mono">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <div>{error}</div>
         </div>
       )}
 
       {success && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl flex items-start gap-3 text-xs font-mono">
-          <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl flex items-start gap-3 text-xs font-mono">
+          <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
           <div>{success}</div>
         </div>
       )}
 
       {bypassNotice && (
-        <div className="p-4 bg-[#FAF8F5] border border-amber-300 text-amber-800 rounded-xl flex flex-col gap-1.5 text-xs font-mono">
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex flex-col gap-1.5 text-xs font-mono">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
             <span className="font-bold uppercase tracking-wider text-[10px]">Testing Environment Notice</span>
           </div>
-          <p className="text-[11px] leading-relaxed select-all bg-white p-2.5 rounded border border-amber-200">{bypassNotice}</p>
+          <p className="text-[11px] leading-relaxed select-all bg-[color:var(--color-navy-1)] p-2.5 rounded border border-amber-500/30">{bypassNotice}</p>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Profile Card View & Edit Form */}
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-sm flex flex-col space-y-6">
-          <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#E5E7EB] pb-2 flex items-center gap-1.5">
-            <User className="w-4 h-4 text-[#C08A3E]" />
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm flex flex-col space-y-6">
+          <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+            <User className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
             Scholar Identity Profile
           </h2>
 
@@ -468,35 +468,35 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
             
             {/* Read-Only Identity Fields */}
             <div className="grid grid-cols-2 gap-4 text-xs font-mono">
-              <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB]/70 rounded-xl">
-                <span className="text-[#76726A] block text-[9px] uppercase">Scholar Username</span>
-                <span className="font-bold text-[#1A365D] break-all">{profile.username}</span>
+              <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl">
+                <span className="text-[#94A3B8] block text-[9px] uppercase">Scholar Username</span>
+                <span className="font-bold text-[#E2E8F0] break-all">{profile.username}</span>
               </div>
-              <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB]/70 rounded-xl">
-                <span className="text-[#76726A] block text-[9px] uppercase">Affiliation / Inst.</span>
-                <span className="font-bold text-[#1A365D] truncate block" title={profile.affiliation}>{profile.affiliation || "Not Set"}</span>
+              <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl">
+                <span className="text-[#94A3B8] block text-[9px] uppercase">Affiliation / Inst.</span>
+                <span className="font-bold text-[#E2E8F0] truncate block" title={profile.affiliation}>{profile.affiliation || "Not Set"}</span>
               </div>
-              <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB]/70 rounded-xl col-span-2">
-                <span className="text-[#76726A] block text-[9px] uppercase">Official Scholar Full Name</span>
-                <span className="font-bold text-[#1A365D] block truncate">{profile.fullName || profile.username}</span>
+              <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl col-span-2">
+                <span className="text-[#94A3B8] block text-[9px] uppercase">Official Scholar Full Name</span>
+                <span className="font-bold text-[#E2E8F0] block truncate">{profile.fullName || profile.username}</span>
               </div>
-              <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB]/70 rounded-xl col-span-2">
-                <span className="text-[#76726A] block text-[9px] uppercase">Authentic ID (Passport / Student ID Number)</span>
-                <span className="font-bold text-[#1A365D] block truncate">{profile.authenticId || "Not Set"}</span>
+              <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl col-span-2">
+                <span className="text-[#94A3B8] block text-[9px] uppercase">Authentic ID (Passport / Student ID Number)</span>
+                <span className="font-bold text-[#E2E8F0] block truncate">{profile.authenticId || "Not Set"}</span>
               </div>
               {profile.idDocument && (
-                <div className="p-3 bg-[#FAF8F5] border border-[#E5E7EB]/70 rounded-xl col-span-2 flex items-center justify-between">
+                <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl col-span-2 flex items-center justify-between">
                   <div>
-                    <span className="text-[#76726A] block text-[9px] uppercase">Identity Verification Proof</span>
-                    <span className="font-bold text-[#1A365D] flex items-center gap-1.5 mt-0.5">
-                      <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-[#94A3B8] block text-[9px] uppercase">Identity Verification Proof</span>
+                    <span className="font-bold text-[#E2E8F0] flex items-center gap-1.5 mt-0.5">
+                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
                       {profile.idDocumentName || "identity_document.pdf"}
                     </span>
                   </div>
                   <a 
                     href={profile.idDocument} 
                     download={profile.idDocumentName || "identity_proof"}
-                    className="p-2 border border-[#E5E7EB] hover:bg-neutral-50 rounded-lg text-[#1A365D] transition-colors cursor-pointer"
+                    className="p-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-lg text-[#E2E8F0] transition-colors cursor-pointer"
                     title="Download Uploaded Proof"
                   >
                     <FileDown className="w-4 h-4" />
@@ -510,117 +510,129 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
               
               {/* Full Name input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] flex items-center gap-1">
                   <User className="w-3.5 h-3.5" />
                   Official Full Name
                 </label>
-                <input
-                  type="text"
-                  value={newFullName}
-                  onChange={(e) => setNewFullName(e.target.value)}
-                  disabled={hasPending || loading}
-                  className="w-full text-xs font-mono p-3 bg-white border border-[#D1CEC7] rounded-xl focus:ring-2 focus:ring-[#1A365D] focus:outline-none transition-all disabled:opacity-50"
-                  required
-                />
-              </div>
-
-              {/* Email Input */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
-                  <Mail className="w-3.5 h-3.5" />
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  disabled={hasPending || loading}
-                  className="w-full text-xs font-mono p-3 bg-white border border-[#D1CEC7] rounded-xl focus:ring-2 focus:ring-[#1A365D] focus:outline-none transition-all disabled:opacity-50"
-                  required
-                />
-              </div>
-
-              {/* Phone split inputs */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5" />
-                  Contact Phone Number
-                </label>
-                <div className="flex gap-2">
-                  <select
-                    value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
-                    disabled={hasPending || loading}
-                    className="w-24 text-xs font-mono p-3 bg-white border border-[#D1CEC7] rounded-xl focus:ring-2 focus:ring-[#1A365D] focus:outline-none transition-all disabled:opacity-50 cursor-pointer animate-pulse-hover"
-                  >
-                    <option value="+977">+977 (NP)</option>
-                    <option value="+1">+1 (US)</option>
-                    <option value="+91">+91 (IN)</option>
-                    <option value="+44">+44 (UK)</option>
-                    <option value="+61">+61 (AU)</option>
-                    <option value="+86">+86 (CN)</option>
-                    <option value="+81">+81 (JP)</option>
-                    <option value="+49">+49 (DE)</option>
-                    <option value="+33">+33 (FR)</option>
-                    <option value="+971">+971 (AE)</option>
-                    <option value="">Other</option>
-                  </select>
+        <div className="w-full rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                   <input
                     type="text"
-                    value={phoneNum}
-                    onChange={(e) => setPhoneNum(e.target.value)}
+                    value={newFullName}
+                    onChange={(e) => setNewFullName(e.target.value)}
                     disabled={hasPending || loading}
-                    placeholder="e.g. 9851102891"
-                    className="flex-grow text-xs font-mono p-3 bg-white border border-[#D1CEC7] rounded-xl focus:ring-2 focus:ring-[#1A365D] focus:outline-none transition-all disabled:opacity-50"
+                    className="border-0 bg-transparent text-[#E2E8F0] w-full text-xs font-mono p-3 focus:outline-none transition-all disabled:opacity-50"
                     required
                   />
                 </div>
               </div>
 
+              {/* Email Input */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5" />
+                  Email Address
+                </label>
+        <div className="w-full rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    disabled={hasPending || loading}
+                    className="border-0 bg-transparent text-[#E2E8F0] w-full text-xs font-mono p-3 focus:outline-none transition-all disabled:opacity-50"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Phone split inputs */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] flex items-center gap-1">
+                  <Phone className="w-3.5 h-3.5" />
+                  Contact Phone Number
+                </label>
+                <div className="flex gap-2">
+         <div className="w-24 rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <select
+                      value={countryCode}
+                      onChange={(e) => setCountryCode(e.target.value)}
+                      disabled={hasPending || loading}
+                      className="border-0 bg-transparent text-[#E2E8F0] w-24 text-xs font-mono p-3 focus:outline-none transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      <option value="+977">+977 (NP)</option>
+                      <option value="+1">+1 (US)</option>
+                      <option value="+91">+91 (IN)</option>
+                      <option value="+44">+44 (UK)</option>
+                      <option value="+61">+61 (AU)</option>
+                      <option value="+86">+86 (CN)</option>
+                      <option value="+81">+81 (JP)</option>
+                      <option value="+49">+49 (DE)</option>
+                      <option value="+33">+33 (FR)</option>
+                      <option value="+971">+971 (AE)</option>
+                      <option value="">Other</option>
+                    </select>
+                  </div>
+         <div className="flex-grow rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                    <input
+                      type="text"
+                      value={phoneNum}
+                      onChange={(e) => setPhoneNum(e.target.value)}
+                      disabled={hasPending || loading}
+                      placeholder="e.g. 9851102891"
+                      className="border-0 bg-transparent text-[#E2E8F0] flex-grow text-xs font-mono p-3 focus:outline-none transition-all disabled:opacity-50"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Affiliation input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] flex items-center gap-1">
                   <Building className="w-3.5 h-3.5" />
                   Affiliation / University
                 </label>
-                <input
-                  type="text"
-                  value={newAffiliation}
-                  onChange={(e) => setNewAffiliation(e.target.value)}
-                  disabled={hasPending || loading}
-                  className="w-full text-xs font-mono p-3 bg-white border border-[#D1CEC7] rounded-xl focus:ring-2 focus:ring-[#1A365D] focus:outline-none transition-all disabled:opacity-50"
-                  placeholder="e.g. Tribhuvan University"
-                  required
-                />
+        <div className="w-full rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                  <input
+                    type="text"
+                    value={newAffiliation}
+                    onChange={(e) => setNewAffiliation(e.target.value)}
+                    disabled={hasPending || loading}
+                    className="border-0 bg-transparent text-[#E2E8F0] w-full text-xs font-mono p-3 focus:outline-none transition-all disabled:opacity-50"
+                    placeholder="e.g. Tribhuvan University"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Authentic ID Number Input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] flex items-center gap-1">
                   <FileText className="w-3.5 h-3.5" />
                   Authentic Identification (Passport / Student ID / citizenship)
                 </label>
-                <input
-                  type="text"
-                  value={newAuthenticId}
-                  onChange={(e) => setNewAuthenticId(e.target.value)}
-                  disabled={hasPending || loading}
-                  className="w-full text-xs font-mono p-3 bg-white border border-[#D1CEC7] rounded-xl focus:ring-2 focus:ring-[#1A365D] focus:outline-none transition-all disabled:opacity-50"
-                  placeholder="e.g. Student ID: 22-IR-401 or Passport No: 2819-2018"
-                  required
-                />
+        <div className="w-full rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                  <input
+                    type="text"
+                    value={newAuthenticId}
+                    onChange={(e) => setNewAuthenticId(e.target.value)}
+                    disabled={hasPending || loading}
+                    className="border-0 bg-transparent text-[#E2E8F0] w-full text-xs font-mono p-3 focus:outline-none transition-all disabled:opacity-50"
+                    placeholder="e.g. Student ID: 22-IR-401 or Passport No: 2819-2018"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Document upload field */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase text-[#76726A] flex items-center gap-1">
+                <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] flex items-center gap-1">
                   <Upload className="w-3.5 h-3.5" />
                   Upload ID Proof Document (Passport / ID Scan, Max 4MB)
                 </label>
                 
                 {newIdDocName ? (
-                  <div className="p-3 border border-emerald-200 bg-emerald-50/50 rounded-xl flex items-center justify-between text-xs font-mono">
-                    <span className="flex items-center gap-1.5 text-emerald-800 font-semibold truncate max-w-[80%]">
+                  <div className="p-3 border border-emerald-500/30 bg-emerald-500/10 rounded-xl flex items-center justify-between text-xs font-mono">
+                    <span className="flex items-center gap-1.5 text-emerald-400 font-semibold truncate max-w-[80%]">
                       <FileText className="w-4 h-4 shrink-0" />
                       {newIdDocName}
                     </span>
@@ -630,14 +642,14 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                         setNewIdDocBase64("");
                         setNewIdDocName("");
                       }}
-                      className="p-1 text-[#9C2E2E] hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                      className="p-1 text-red-400 hover:bg-red-500/10 rounded-lg cursor-pointer transition-colors"
                       title="Clear Document"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
                 ) : (
-                  <div className="relative border-2 border-dashed border-[#D1CEC7] rounded-xl p-6 flex flex-col items-center justify-center bg-[#FAF8F5]/50 hover:bg-[#FAF8F5] transition-colors cursor-pointer relative">
+                  <div className="relative border-2 border-dashed border-[color:var(--color-navy-4)] rounded-xl p-6 flex flex-col items-center justify-center bg-[color:var(--color-navy-1)]/50 hover:bg-[color:var(--color-navy-1)] transition-colors cursor-pointer relative">
                     <input
                       type="file"
                       accept=".pdf,.png,.jpg,.jpeg"
@@ -645,11 +657,11 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                       disabled={hasPending || loading}
                       className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
                     />
-                    <Upload className="w-6 h-6 text-gray-400 mb-1.5" />
-                    <span className="text-[11px] font-mono text-gray-500 font-semibold text-center">
+                    <Upload className="w-6 h-6 text-[#94A3B8] mb-1.5" />
+                    <span className="text-[11px] font-mono text-[#94A3B8] font-semibold text-center">
                       Click to choose file or drag & drop here
                     </span>
-                    <span className="text-[9px] text-[#76726A] text-center mt-0.5">
+                    <span className="text-[9px] text-[#94A3B8] text-center mt-0.5">
                       Accepted file formats: PDF, PNG, JPG, JPEG (Max 4MB)
                     </span>
                   </div>
@@ -660,7 +672,7 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-[#1A365D] hover:bg-[#122847] text-white p-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md shadow-[#1A365D]/10 hover:shadow-[#1A365D]/20 cursor-pointer flex items-center justify-center gap-1.5"
+                  className="w-full bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white p-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -675,10 +687,10 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
         </div>
 
         {/* Verification / Approval Box */}
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm flex flex-col justify-between">
           <div className="space-y-6">
-            <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#1A365D] border-b border-[#E5E7EB] pb-2 flex items-center gap-1.5">
-              <Key className="w-4 h-4 text-[#C08A3E]" />
+            <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+              <Key className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Update Verification
             </h2>
 
@@ -686,10 +698,10 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
               <div className="space-y-5">
                 
                 {/* Alert Alert Banner */}
-                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl flex items-start gap-3">
-                  <Clock className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 animate-pulse" />
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-start gap-3">
+                  <Clock className="w-5 h-5 shrink-0 mt-0.5 text-amber-400 animate-pulse" />
                   <div className="space-y-1">
-                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-amber-900 block">Approval Pending</span>
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-amber-300 block">Approval Pending</span>
                     <p className="text-[11px] leading-relaxed">
                       Your requested profile changes have been registered and must be authorized by an administrator. Please retrieve the activation key from the workspace manager.
                     </p>
@@ -697,62 +709,62 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                 </div>
 
                 {/* Proposed Changes list */}
-                <div className="p-4 bg-[#FAF8F5] border border-[#E5E7EB] rounded-xl space-y-3">
-                  <span className="text-[9px] font-mono text-[#76726A] uppercase font-bold tracking-wider block border-b border-[#E5E7EB] pb-1">Proposed Profile Updates</span>
+                <div className="p-4 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl space-y-3">
+                  <span className="text-[9px] font-mono text-[#94A3B8] uppercase font-bold tracking-wider block border-b border-[color:var(--color-navy-4)] pb-1">Proposed Profile Updates</span>
                   <div className="space-y-2 text-xs font-mono leading-relaxed">
                     {profile.pendingFullName && (
                       <div>
-                        <span className="text-[#76726A] block text-[9px] uppercase">New Full Name</span>
-                        <span className="font-bold text-[#1A365D]">{profile.pendingFullName}</span>
+                        <span className="text-[#94A3B8] block text-[9px] uppercase">New Full Name</span>
+                        <span className="font-bold text-[#E2E8F0]">{profile.pendingFullName}</span>
                       </div>
                     )}
                     {profile.pendingEmail && (
                       <div>
-                        <span className="text-[#76726A] block text-[9px] uppercase">New Email Address</span>
-                        <span className="font-bold text-[#1A365D] break-all">{profile.pendingEmail}</span>
+                        <span className="text-[#94A3B8] block text-[9px] uppercase">New Email Address</span>
+                        <span className="font-bold text-[#E2E8F0] break-all">{profile.pendingEmail}</span>
                       </div>
                     )}
                     {profile.pendingPhone && (
                       <div>
-                        <span className="text-[#76726A] block text-[9px] uppercase">New Phone Number</span>
-                        <span className="font-bold text-[#1A365D]">{profile.pendingPhone}</span>
+                        <span className="text-[#94A3B8] block text-[9px] uppercase">New Phone Number</span>
+                        <span className="font-bold text-[#E2E8F0]">{profile.pendingPhone}</span>
                       </div>
                     )}
                     {profile.pendingAffiliation && (
                       <div>
-                        <span className="text-[#76726A] block text-[9px] uppercase">New Affiliation</span>
-                        <span className="font-bold text-[#1A365D]">{profile.pendingAffiliation}</span>
+                        <span className="text-[#94A3B8] block text-[9px] uppercase">New Affiliation</span>
+                        <span className="font-bold text-[#E2E8F0]">{profile.pendingAffiliation}</span>
                       </div>
                     )}
                     {profile.pendingAuthenticId && (
                       <div>
-                        <span className="text-[#76726A] block text-[9px] uppercase">New Authentic ID</span>
-                        <span className="font-bold text-[#1A365D]">{profile.pendingAuthenticId}</span>
+                        <span className="text-[#94A3B8] block text-[9px] uppercase">New Authentic ID</span>
+                        <span className="font-bold text-[#E2E8F0]">{profile.pendingAuthenticId}</span>
                       </div>
                     )}
                     {profile.pendingIdDocument && (
                       <div>
-                        <span className="text-[#76726A] block text-[9px] uppercase">Uploaded ID Proof Doc</span>
-                        <div className="flex items-center justify-between mt-1 p-2 bg-white rounded border border-[#E5E7EB]">
-                          <span className="font-semibold text-emerald-800 truncate flex items-center gap-1 max-w-[70%]">
+                        <span className="text-[#94A3B8] block text-[9px] uppercase">Uploaded ID Proof Doc</span>
+                        <div className="flex items-center justify-between mt-1 p-2 bg-[color:var(--color-navy-2)] rounded border border-[color:var(--color-navy-4)]">
+                          <span className="font-semibold text-emerald-400 truncate flex items-center gap-1 max-w-[70%]">
                             <FileText className="w-3.5 h-3.5" />
                             {profile.pendingIdDocumentName || "identity_document"}
                           </span>
                           <a 
                             href={profile.pendingIdDocument} 
                             download={profile.pendingIdDocumentName || "pending_proof"}
-                            className="text-[10px] text-[#1A365D] hover:underline font-bold uppercase"
+                            className="text-[10px] text-[color:var(--color-luminous-blue)] hover:underline font-bold uppercase"
                           >
                             Download
                           </a>
                         </div>
                         {profile.pendingIdDocument.startsWith("data:image/") && (
-                          <div className="mt-2 text-center bg-white p-2 rounded border border-[#E5E7EB]">
-                            <span className="text-[8px] text-[#76726A] uppercase tracking-wider block mb-1">Image Preview</span>
+                          <div className="mt-2 text-center bg-[color:var(--color-navy-2)] p-2 rounded border border-[color:var(--color-navy-4)]">
+                            <span className="text-[8px] text-[#94A3B8] uppercase tracking-wider block mb-1">Image Preview</span>
                             <img 
                               src={profile.pendingIdDocument} 
                               alt="ID Proof Preview" 
-                              className="max-h-36 mx-auto object-contain rounded border border-[#E5E7EB]/50"
+                              className="max-h-36 mx-auto object-contain rounded border border-[color:var(--color-navy-4)]/50"
                             />
                           </div>
                         )}
@@ -764,18 +776,20 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                 {/* Key Entry Form */}
                 <form onSubmit={handleVerifyUpdateKey} className="space-y-3">
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-mono font-bold uppercase text-[#76726A] tracking-widest block">
+                    <label className="text-[9px] font-mono font-bold uppercase text-[#94A3B8] tracking-widest block">
                       Admin Update Key
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. UP-123456"
-                      value={enteredKey}
-                      onChange={(e) => setEnteredKey(e.target.value)}
-                      disabled={loading}
-                      className="w-full text-xs font-mono p-3 bg-white border border-[#D1CEC7] rounded-xl focus:ring-2 focus:ring-[#1A365D] focus:outline-none transition-all disabled:opacity-50 text-center uppercase tracking-widest"
-                      required
-                    />
+          <div className="w-full rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
+                      <input
+                        type="text"
+                        placeholder="e.g. UP-123456"
+                        value={enteredKey}
+                        onChange={(e) => setEnteredKey(e.target.value)}
+                        disabled={loading}
+                        className="border-0 bg-transparent text-[#E2E8F0] w-full text-xs font-mono p-3 focus:outline-none transition-all disabled:opacity-50 text-center uppercase tracking-widest"
+                        required
+                      />
+                    </div>
                   </div>
 
                   <div className="flex gap-3">
@@ -783,14 +797,14 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                       type="button"
                       onClick={handleCancelOwnRequest}
                       disabled={loading}
-                      className="grow-0 px-4 py-3 border border-[#E5E7EB] hover:bg-neutral-50 rounded-xl text-xs font-mono text-gray-500 hover:text-red-600 transition-all font-bold uppercase cursor-pointer"
+                      className="grow-0 px-4 py-3 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-xl text-xs font-mono text-[#94A3B8] hover:text-red-400 transition-all font-bold uppercase cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="grow bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md shadow-emerald-600/10 cursor-pointer flex items-center justify-center gap-1"
+                      className="grow bg-emerald-600 hover:bg-emerald-500 text-white p-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center justify-center gap-1"
                     >
                       {loading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -804,9 +818,9 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
               </div>
             ) : (
               <div className="h-48 flex flex-col items-center justify-center text-center p-6 space-y-2">
-                <ShieldCheck className="w-10 h-10 text-emerald-600/80" />
-                <span className="font-mono text-xs font-bold text-[#1A365D]">Identity Verified</span>
-                <p className="text-[11px] text-[#76726A] max-w-[240px] font-sans">
+                <ShieldCheck className="w-10 h-10 text-emerald-400/80" />
+                <span className="font-mono text-xs font-bold text-[#E2E8F0]">Identity Verified</span>
+                <p className="text-[11px] text-[#94A3B8] max-w-[240px] font-sans">
                   No pending profile changes. Your email, phone, and official identification records are fully approved and synchronized.
                 </p>
               </div>
@@ -818,11 +832,11 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
 
       {/* Admin Panel Panel View */}
       {isAdmin && (
-        <div className="bg-white border border-red-200 rounded-2xl p-6 shadow-sm space-y-6 relative overflow-hidden">
+        <div className="bg-[color:var(--color-navy-2)] border border-red-500/30 rounded-2xl p-6 shadow-sm space-y-6 relative overflow-hidden">
           {/* Subtle warning top line */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-red-600"></div>
 
-          <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-red-700 pb-2 border-b border-[#E5E7EB] flex items-center gap-2">
+          <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-red-400 pb-2 border-b border-[color:var(--color-navy-4)] flex items-center gap-2">
             <UserCheck className="w-4.5 h-4.5" />
             Administrator Approval Grid
           </h2>
@@ -831,44 +845,44 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
             <div className="overflow-x-auto">
               <table className="w-full text-xs font-mono text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[#E5E7EB] text-[#76726A]">
+                  <tr className="border-b border-[color:var(--color-navy-4)] text-[#94A3B8]">
                     <th className="pb-3 pr-4 font-bold uppercase">Scholar</th>
                     <th className="pb-3 pr-4 font-bold uppercase">Current Details</th>
                     <th className="pb-3 pr-4 font-bold uppercase">Requested Updates</th>
                     <th className="pb-3 text-right font-bold uppercase">Authorizations</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E5E7EB]/50">
+                <tbody className="divide-y divide-[color:var(--color-navy-4)]/50">
                   {pendingProfiles.map(u => (
-                    <tr key={u.username} className="hover:bg-neutral-50/55 transition-colors">
-                      <td className="py-4 pr-4 align-top font-bold text-[#1A365D]">
+                    <tr key={u.username} className="hover:bg-[color:var(--color-navy-1)]/60 transition-colors">
+                      <td className="py-4 pr-4 align-top font-bold text-[#E2E8F0]">
                         {u.username}
-                        <span className="block font-normal text-[10px] text-[#76726A]">{u.fullName || "No Name"}</span>
+                        <span className="block font-normal text-[10px] text-[#94A3B8]">{u.fullName || "No Name"}</span>
                       </td>
-                      <td className="py-4 pr-4 align-top text-gray-500 space-y-1.5 max-w-[250px]">
+                      <td className="py-4 pr-4 align-top text-[#94A3B8] space-y-1.5 max-w-[250px]">
                         <div>
-                          <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Name</span>
-                          <span className="font-semibold text-gray-700">{u.fullName || u.username}</span>
+                          <span className="text-[9px] uppercase tracking-wider text-[#94A3B8] block">Name</span>
+                          <span className="font-semibold text-[#E2E8F0]">{u.fullName || u.username}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Email</span>
-                          <span className="font-semibold text-gray-700 break-all">{u.email}</span>
+                          <span className="text-[9px] uppercase tracking-wider text-[#94A3B8] block">Email</span>
+                          <span className="font-semibold text-[#E2E8F0] break-all">{u.email}</span>
                         </div>
                         <div>
-                           <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Phone</span>
-                           <span className="font-semibold text-gray-700">{u.phone || "Not Set"}</span>
+                           <span className="text-[9px] uppercase tracking-wider text-[#94A3B8] block">Phone</span>
+                           <span className="font-semibold text-[#E2E8F0]">{u.phone || "Not Set"}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Affiliation</span>
-                          <span className="font-semibold text-gray-700 truncate block" title={u.affiliation}>{u.affiliation || "Not Set"}</span>
+                          <span className="text-[9px] uppercase tracking-wider text-[#94A3B8] block">Affiliation</span>
+                          <span className="font-semibold text-[#E2E8F0] truncate block" title={u.affiliation}>{u.affiliation || "Not Set"}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Authentic ID</span>
-                          <span className="font-semibold text-gray-700 block truncate" title={u.authenticId}>{u.authenticId || "Not Set"}</span>
+                          <span className="text-[9px] uppercase tracking-wider text-[#94A3B8] block">Authentic ID</span>
+                          <span className="font-semibold text-[#E2E8F0] block truncate" title={u.authenticId}>{u.authenticId || "Not Set"}</span>
                         </div>
                         {u.idDocument && (
                           <div>
-                            <span className="text-[9px] uppercase tracking-wider text-[#76726A] block">Active Document</span>
+                            <span className="text-[9px] uppercase tracking-wider text-[#94A3B8] block">Active Document</span>
                             <a href={u.idDocument} download={u.idDocumentName || "active_proof"} className="text-emerald-700 font-semibold flex items-center gap-1 text-[10px] hover:underline">
                               <FileText className="w-3 h-3" />
                               {u.idDocumentName || "download_document"}
@@ -876,58 +890,58 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                           </div>
                         )}
                       </td>
-                      <td className="py-4 pr-4 align-top text-[#1A365D] space-y-2 max-w-[300px]">
+                      <td className="py-4 pr-4 align-top text-[#E2E8F0] space-y-2 max-w-[300px]">
                         {u.pendingFullName && (
                           <div>
-                            <span className="text-[9px] uppercase tracking-wider text-amber-800 font-bold block">New Full Name</span>
-                            <span className="font-semibold text-amber-700 bg-amber-50/50 border border-amber-100 rounded px-1.5 py-0.5 inline-block">
+                            <span className="text-[9px] uppercase tracking-wider text-amber-400 font-bold block">New Full Name</span>
+                            <span className="font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5 inline-block">
                               {u.pendingFullName}
                             </span>
                           </div>
                         )}
                         {u.pendingEmail && (
                           <div>
-                            <span className="text-[9px] uppercase tracking-wider text-amber-800 font-bold block">New Email Address</span>
-                            <span className="font-semibold text-amber-700 bg-amber-50/50 border border-amber-100 rounded px-1.5 py-0.5 inline-block break-all">
+                            <span className="text-[9px] uppercase tracking-wider text-amber-400 font-bold block">New Email Address</span>
+                            <span className="font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5 inline-block break-all">
                               {u.pendingEmail}
                             </span>
                           </div>
                         )}
                         {u.pendingPhone && (
                           <div>
-                            <span className="text-[9px] uppercase tracking-wider text-amber-800 font-bold block">New Phone Number</span>
-                            <span className="font-semibold text-amber-700 bg-amber-50/50 border border-amber-100 rounded px-1.5 py-0.5 inline-block">
+                            <span className="text-[9px] uppercase tracking-wider text-amber-400 font-bold block">New Phone Number</span>
+                            <span className="font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5 inline-block">
                               {u.pendingPhone}
                             </span>
                           </div>
                         )}
                         {u.pendingAffiliation && (
                           <div>
-                            <span className="text-[9px] uppercase tracking-wider text-amber-800 font-bold block">New Affiliation</span>
-                            <span className="font-semibold text-amber-700 bg-amber-50/50 border border-amber-100 rounded px-1.5 py-0.5 inline-block">
+                            <span className="text-[9px] uppercase tracking-wider text-amber-400 font-bold block">New Affiliation</span>
+                            <span className="font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5 inline-block">
                               {u.pendingAffiliation}
                             </span>
                           </div>
                         )}
                         {u.pendingAuthenticId && (
                           <div>
-                            <span className="text-[9px] uppercase tracking-wider text-amber-800 font-bold block">New Authentic ID</span>
-                            <span className="font-semibold text-amber-700 bg-amber-50/50 border border-amber-100 rounded px-1.5 py-0.5 inline-block">
+                            <span className="text-[9px] uppercase tracking-wider text-amber-400 font-bold block">New Authentic ID</span>
+                            <span className="font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5 inline-block">
                               {u.pendingAuthenticId}
                             </span>
                           </div>
                         )}
                         {u.pendingIdDocument && (
                           <div>
-                            <span className="text-[9px] uppercase tracking-wider text-emerald-800 font-bold block">New ID Proof Document</span>
+                            <span className="text-[9px] uppercase tracking-wider text-emerald-400 font-bold block">New ID Proof Document</span>
                             <div className="flex items-center gap-2 mt-1">
-                              <a href={u.pendingIdDocument} download={u.pendingIdDocumentName || "pending_proof"} className="font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 flex items-center gap-1 text-[10px] hover:underline truncate max-w-[200px]">
+                              <a href={u.pendingIdDocument} download={u.pendingIdDocumentName || "pending_proof"} className="font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-1.5 py-0.5 flex items-center gap-1 text-[10px] hover:underline truncate max-w-[200px]">
                                 <FileText className="w-3.5 h-3.5" />
                                 {u.pendingIdDocumentName || "download_document"}
                               </a>
                             </div>
                             {u.pendingIdDocument.startsWith("data:image/") && (
-                              <div className="mt-1.5 bg-neutral-100 p-1.5 rounded border border-neutral-200 inline-block">
+                              <div className="mt-1.5 bg-[color:var(--color-navy-1)] p-1.5 rounded border border-[color:var(--color-navy-4)] inline-block">
                                 <img src={u.pendingIdDocument} alt="Admin pending preview" className="max-h-24 object-contain rounded" />
                               </div>
                             )}
@@ -937,13 +951,13 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
                       <td className="py-4 text-right align-top space-x-2 whitespace-nowrap">
                         <button
                           onClick={() => handleAdminReject(u.username)}
-                          className="px-3 py-1.5 border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-[10px] font-bold uppercase cursor-pointer transition-colors"
+                          className="px-3 py-1.5 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold uppercase cursor-pointer transition-colors"
                         >
                           Reject
                         </button>
                         <button
                           onClick={() => handleAdminApprove(u.username)}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold uppercase cursor-pointer transition-colors shadow-sm"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold uppercase cursor-pointer transition-colors shadow-sm"
                         >
                           Approve
                         </button>
@@ -954,10 +968,10 @@ export default function ProfileSettings({ currentUser, onProfileUpdated }: Profi
               </table>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center p-8 text-center space-y-2 border border-dashed border-[#D1CEC7] rounded-xl bg-[#FAF8F5]/50">
-              <ShieldCheck className="w-8 h-8 text-neutral-400" />
-              <span className="text-[11px] font-bold text-[#76726A]">No Pending Updates Found</span>
-              <p className="text-[10px] text-[#76726A] max-w-xs font-sans">
+            <div className="flex flex-col items-center justify-center p-8 text-center space-y-2 border border-dashed border-[color:var(--color-navy-4)] rounded-xl bg-[color:var(--color-navy-1)]/50">
+              <ShieldCheck className="w-8 h-8 text-[#94A3B8]" />
+              <span className="text-[11px] font-bold text-[#94A3B8]">No Pending Updates Found</span>
+              <p className="text-[10px] text-[#94A3B8] max-w-xs font-sans">
                 All scholar profiles across the workspace databases are synchronized and approved.
               </p>
             </div>
