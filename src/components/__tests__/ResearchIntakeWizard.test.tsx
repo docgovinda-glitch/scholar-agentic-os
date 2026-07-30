@@ -13,7 +13,7 @@
 // field visibility/requiredness, not the AI-drafting logic (out of scope).
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import ResearchIntakeWizard from "../ResearchIntakeWizard";
 import { DEFAULT_STATE, PaperProject, OutputFormat } from "../../types";
@@ -212,6 +212,10 @@ describe("ResearchIntakeWizard — Stage 4/5 field gating", () => {
   });
 
   describe("title-only alternative path (target-workflow.md Stage 5)", () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
     it("'Continue Setup' still blocks onNext when only a title is set (baseline unchanged)", () => {
       const { onNext } = renderWizard(
         buildProject("journal-article", {
@@ -236,8 +240,20 @@ describe("ResearchIntakeWizard — Stage 4/5 field gating", () => {
       expect(screen.getByText(/Please specify a research title/i)).toBeInTheDocument();
     });
 
-    it("'Start With Title Only' calls onNext with just a title, bypassing all other required-field gating", () => {
-      const { onNext } = renderWizard(
+    it("'Start With Title Only' genuinely invokes the agent blueprint auto-fill (target-workflow.md's 'agents populate the rest'), then calls onNext", async () => {
+      const { suggestFullBlueprint } = await import("../../services/aiService");
+      (suggestFullBlueprint as any).mockResolvedValue({
+        objectives: "1. Objective one.",
+        researchQuestions: "1. RQ one.",
+        methodology: "Mixed methods.",
+        field: "Test Field",
+        keywords: "test, keywords",
+        researchGap: "A real gap.",
+        articleType: "Empirical/Qualitative",
+      });
+      const updateProject = vi.fn();
+      const onNext = vi.fn();
+      renderWizard(
         buildProject("journal-article", {
           title: "A Title",
           field: "",
@@ -245,18 +261,46 @@ describe("ResearchIntakeWizard — Stage 4/5 field gating", () => {
           researchQuestions: "",
           researchGap: "",
           methodology: "",
-        })
+        }),
+        onNext,
+        updateProject
       );
 
       fireEvent.click(screen.getByText(/Start With Title Only/i));
-      expect(onNext).toHaveBeenCalled();
+
+      await waitFor(() => expect(onNext).toHaveBeenCalled());
+      expect(suggestFullBlueprint).toHaveBeenCalledWith({ title: "A Title", aiSettings: expect.anything() });
+      expect(updateProject).toHaveBeenCalledWith(
+        expect.objectContaining({ objectives: "1. Objective one.", researchQuestions: "1. RQ one." })
+      );
     });
 
-    it("'Start With Title Only' works even for formats whose guided path would normally require everything (research-proposal)", () => {
+    it("'Start With Title Only' still proceeds via onNext even when the AI blueprint call fails — no fabricated fallback, honest error instead", async () => {
+      const { suggestFullBlueprint } = await import("../../services/aiService");
+      (suggestFullBlueprint as any).mockRejectedValue(new Error("network down"));
+      const updateProject = vi.fn();
+      const onNext = vi.fn();
+      renderWizard(
+        buildProject("journal-article", { title: "A Title" }),
+        onNext,
+        updateProject
+      );
+
+      fireEvent.click(screen.getByText(/Start With Title Only/i));
+
+      await waitFor(() => expect(onNext).toHaveBeenCalled());
+      // No fields silently populated with invented content on failure.
+      expect(updateProject).not.toHaveBeenCalled();
+      expect(await screen.findByText(/AI blueprint generation failed/i)).toBeInTheDocument();
+    });
+
+    it("'Start With Title Only' works even for formats whose guided path would normally require everything (research-proposal)", async () => {
+      const { suggestFullBlueprint } = await import("../../services/aiService");
+      (suggestFullBlueprint as any).mockRejectedValue(new Error("no key configured"));
       const { onNext } = renderWizard(buildProject("research-proposal", { title: "A Title" }));
 
       fireEvent.click(screen.getByText(/Start With Title Only/i));
-      expect(onNext).toHaveBeenCalled();
+      await waitFor(() => expect(onNext).toHaveBeenCalled());
     });
   });
 });

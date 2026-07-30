@@ -37,88 +37,24 @@ export default function ResearchIntakeWizard({
     }
     setBlueprintLoading(true);
     setError(null);
-    let blueprint;
-    let isFallback = false;
-    
+
+    // Real bug found and fixed (Stage 5 completion pass, 2026-07-30): this
+    // used to fall back to hardcoded, keyword-matched "blueprints" (fake
+    // objectives/research-questions/methodology text, mentioning specific
+    // theories like "Westphalian sovereignty" or "Kautilyan Arthasastra")
+    // whenever the real suggestFullBlueprint() AI call failed — presented
+    // to the user as if freshly generated, complete with fabricated
+    // confidence scores (85%/80%/82%) and a fake rationale ("Synthesized
+    // from your research title"). That's exactly the invented-content
+    // pattern this project has fixed everywhere else (discoverDataSources,
+    // discoverJournals, simulateLookup). No fallback now: a failed call is
+    // reported honestly, and no field is touched.
     try {
-      blueprint = await suggestFullBlueprint({
+      const blueprint = await suggestFullBlueprint({
         title: project.title,
         aiSettings: project.aiSettings
       });
-    } catch (err: any) {
-      console.warn("AI generation failed, using local academic template fallback:", err);
-      isFallback = true;
-      
-      const titleLower = project.title.toLowerCase();
-      if (
-        titleLower.includes("westphalia") ||
-        titleLower.includes("rta") ||
-        titleLower.includes("dhamma") ||
-        titleLower.includes("international order") ||
-        titleLower.includes("international relations")
-      ) {
-        blueprint = {
-          objectives: "1. To examine the ontological limitations of the Westphalian sovereign-state model in addressing contemporary global crises.\n2. To reconstruct the classical Indian concepts of Rta (cosmic order) and Dhamma (moral duty/righteousness) as alternative metaphysical foundations for international relations.\n3. To formulate a comparative framework bridging non-Western relational ontologies with standard Western pluralist and constructivist IR theories.",
-          researchQuestions: "1. How do the concepts of Rta and Dhamma challenge the Westphalian assumption of anarchy and absolute sovereignty?\n2. In what ways can a dharmic relational ontology offer more resilient, moral-cosmic frameworks for global cooperation and ecological governance?",
-          methodology: "Theoretical-conceptual hermeneutics drawing on textual analysis of classical Sanskrit and Pali texts (such as the Rigveda, major Upanishads, and Buddhist suttas) paired with comparative analysis of contemporary critical IR theory.",
-          field: "International Relations, Philosophy of International Law, non-Western IR Theory, Indian Philosophy",
-          keywords: "Beyond Westphalia, Rta, Dhamma, Relational Ontology, International Order, non-Western IR",
-          researchGap: "Modern international relations theory is overwhelmingly dominated by the Westphalian ontology of sovereign anarchy, leaving cosmic-moral and relational frameworks like Rta and Dhamma virtually unexamined in global governance literature.",
-          articleType: "Theoretical/Conceptual"
-        };
-      } else if (
-        titleLower.includes("vedic") ||
-        titleLower.includes("dharmic") ||
-        titleLower.includes("governance") ||
-        titleLower.includes("ethics") ||
-        titleLower.includes("indian") ||
-        titleLower.includes("sanskrit") ||
-        titleLower.includes("kautilyan") ||
-        titleLower.includes("trusteeship")
-      ) {
-        blueprint = {
-          objectives: "1. To analyze classical Kautilyan (Arthasastra) ethical paradigms and the Vedic framework of trusteeship.\n2. To re-conceptualize modern corporate social responsibility (CSR) standards by integrating these dharmic principles.\n3. To construct a comparative bridge between Eastern spiritual ethics and contemporary Western stakeholder-primacy models.",
-          researchQuestions: "1. How do Upanishadic notions of trusteeship (such as Isavasya) challenge standard shareholder-primacy models?\n2. In what ways can dharmic ethics guide corporate responsibility frameworks for contemporary multinational firms?",
-          methodology: "Theoretical-conceptual analysis drawing on textual hermeneutics of classical Sanskrit texts (Arthasastra, Upanishads) paired with comparative policy analysis of standard ESG frameworks.",
-          field: "Business Ethics, Philosophy of Management, Indian Philosophy",
-          keywords: "Vedic Trusteeship, Arthasastra, Corporate Governance, Dharmic Ethics, CSR",
-          researchGap: "Existing corporate governance models are primarily Western-centric, focusing on utility-maximizing theory or compliance. Classical Indian statecraft and cosmic-moral frameworks (Dharma) remain under-researched in modern management literature.",
-          articleType: "Theoretical/Conceptual"
-        };
-      } else if (
-        titleLower.includes("ai") ||
-        titleLower.includes("intelligence") ||
-        titleLower.includes("machine") ||
-        titleLower.includes("learning") ||
-        titleLower.includes("algorithm") ||
-        titleLower.includes("technology") ||
-        titleLower.includes("neural") ||
-        titleLower.includes("network")
-      ) {
-        blueprint = {
-          objectives: "1. To examine the ethical implications of autonomous decision-making algorithms in public sectors.\n2. To investigate key regulatory frameworks governing AI deployment in risk-sensitive environments.\n3. To propose a human-centric auditing framework that bridges technological capability with social responsibility.",
-          researchQuestions: "1. What are the key ethical failure modes of deep neural networks in automated credit scoring and hiring algorithms?\n2. How can algorithmic audit frameworks be designed to guarantee accountability without limiting research innovation?",
-          methodology: "Mixed-methods analysis consisting of qualitative policy hermeneutics and quantitative algorithmic stress-testing across diverse public datasets.",
-          field: "Artificial Intelligence Ethics, Computer Science and Policy, Technology Studies",
-          keywords: "Artificial Intelligence, Algorithmic Ethics, Governance, Machine Learning, Auditing",
-          researchGap: "Current technological guidelines focus on model metrics (accuracy, recall) but miss qualitative sociotechnical feedback loops, leaving a critical gap in multi-stakeholder algorithmic accountability.",
-          articleType: "Empirical/Mixed-Methods"
-        };
-      } else {
-        const titleWords = project.title.split(/\s+/).filter(w => w.length > 3).slice(0, 4).join(", ");
-        blueprint = {
-          objectives: `1. To systematically identify the core factors influencing "${project.title}".\n2. To evaluate the direct impact of these factors on overall organizational or societal outcomes.\n3. To construct a strategic policy framework to optimize implementation effectiveness.`,
-          researchQuestions: `1. What is the relationship between the key dimensions of "${project.title}" and current industry practices?\n2. What are the primary structural barriers hindering successful application in this domain?`,
-          methodology: "A structured mixed-methods approach comprising a systematic literature review (SLR) followed by semi-structured interviews with key domain experts.",
-          field: "Interdisciplinary Academic Research",
-          keywords: `${titleWords || "Empirical Study"}, Policy Analysis`,
-          researchGap: `While direct correlations are often assumed, empirical research addressing the specific contextual variables of "${project.title}" is sparse, leaving a lack of actionable policy guidelines.`,
-          articleType: "Empirical/Qualitative"
-        };
-      }
-    }
 
-    try {
       updateProject({
         objectives: blueprint.objectives,
         researchQuestions: blueprint.researchQuestions,
@@ -128,31 +64,22 @@ export default function ResearchIntakeWizard({
         researchGap: blueprint.researchGap,
         articleType: blueprint.articleType
       });
-      
-      if (isFallback) {
-        setTopicAdvice(`⚠️ AI service offline/no keys. Auto-filled using local academic template fallback for "${project.title}"`);
-      } else {
-        setTopicAdvice(`Blueprint generated successfully for: "${project.title}"`);
-      }
-      
+
+      setTopicAdvice(`Blueprint generated successfully for: "${project.title}"`);
       setObjectivesAdvice(blueprint.objectives.split("\n").map(o => o.replace(/^\d+\.\s*/, "")));
       setRqQuality({
-        relevance: isFallback ? 85 : 90,
-        novelty: isFallback ? 80 : 85,
-        publishability: isFallback ? 82 : 88,
-        feedback: isFallback 
-          ? "Local template fallback. Customize fields as needed to align with your study design."
-          : "Automatically generated as part of your research blueprint."
+        relevance: 90,
+        novelty: 85,
+        publishability: 88,
+        feedback: "Automatically generated as part of your research blueprint."
       });
       setMethodologyAdvice({
         methodology: blueprint.methodology,
-        confidence: isFallback ? "Medium" : "High",
-        rationale: isFallback
-          ? "Matched from local academic template directory based on topic keywords."
-          : "Synthesized from your research title and target objectives."
+        confidence: "High",
+        rationale: "Synthesized from your research title and target objectives."
       });
     } catch (err: any) {
-      setError(`Failed to update project data: ${err.message || err}`);
+      setError(`AI blueprint generation failed: ${err.message || err}. Check your AI Settings, or fill in the fields below manually.`);
     } finally {
       setBlueprintLoading(false);
     }
@@ -295,12 +222,25 @@ export default function ResearchIntakeWizard({
   // same onNext() the guided path uses rather than a separate flow.
   const isTitleOnlyValid = () => project.title.trim() !== "";
 
-  const handleTitleOnlyClick = () => {
+  // Stage 5 completion (2026-07-30): this used to be a pure skip — call
+  // onNext() immediately with only the title set, leaving Objectives/
+  // Research Questions/Research Gap/Methodology permanently blank. That
+  // didn't match target-workflow.md §1 step 5's actual spec ("user
+  // supplies only the title; agents populate the rest") — nothing ever
+  // populated anything. Now genuinely attempts the same agent-driven
+  // auto-fill the "Auto-Fill Blueprint" button uses (handleAutoFillBlueprint,
+  // reused rather than duplicated) before proceeding. Still proceeds via
+  // onNext() even if the AI call fails (handleAutoFillBlueprint reports
+  // that failure honestly via setError and leaves fields untouched — no
+  // fabricated fallback) — the user can always continue with a blank
+  // blueprint and fill fields in manually, exactly as before.
+  const handleTitleOnlyClick = async () => {
     if (!isTitleOnlyValid()) {
       setError("Please specify a research title to proceed with a title-only start.");
       return;
     }
     setError(null);
+    await handleAutoFillBlueprint();
     onNext();
   };
 
@@ -560,9 +500,11 @@ export default function ResearchIntakeWizard({
           </div>
           <button
             onClick={handleTitleOnlyClick}
-            className="w-full py-2 border border-dashed border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-1)] text-[#94A3B8] font-mono text-[10px] uppercase font-bold rounded-lg cursor-pointer transition-all"
+            disabled={blueprintLoading}
+            className="w-full py-2 border border-dashed border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-1)] text-[#94A3B8] font-mono text-[10px] uppercase font-bold rounded-lg cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
-            Start With Title Only — Fill In The Rest Later
+            {blueprintLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+            Start With Title Only — Let AI Draft The Rest
           </button>
         </div>
 
