@@ -1,6 +1,18 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-30, production-readiness pass — security headers, dead-code removal, critical auth bug fixed, test coverage added — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-30, Stage 9 + Stage 5 both closed out — supersedes the section below)
+
+**Both stages closed via investigation-first, not blind rebuilding** — same discipline as the production-readiness pass below. Full detail in `docs/planning/target-workflow.md`'s Stage 5/Stage 9 sections.
+
+**Stage 9 (drafting/humanize/AI-use disclosure)** — all 3 previously-documented gaps turned out to be already resolved or non-issues: the flagged dead `draftSectionStream` function no longer exists at all (removed in a forgotten session), the detection-evasion prompt language was already fixed (confirmed via its own passing regression test), and the title-only path's interaction with the disclosure gate is safe by inspection (`aiDisclosureService.ts` already defaults empty state gracefully). No source-code behavior changed, docs updated to stop claiming open gaps that don't exist. Commit `005e587`.
+
+**Stage 5 (research input)** — the guided-path field-gating claim ("not verified end-to-end") checked out safe on inspection (every downstream consumer of the 4 conditionally-gated fields already defaults defensively). The title-only alternative path surfaced a **real, serious fabrication bug**: `handleAutoFillBlueprint` (the "Auto-Fill Blueprint" AI button) fell back to ~90 lines of hardcoded, keyword-matched fake blueprints when the real AI call failed — specific invented content presented as freshly generated, with fabricated confidence scores. Removed entirely; "Start With Title Only" now genuinely invokes the (fixed) auto-fill before proceeding, matching the spec's actual "agents populate the rest" requirement instead of being a pure skip button. Live-verified: typed a title, watched a real AI call attempt and fail honestly (no key configured), no fabricated content appeared, flow still proceeded. Commit `775f4ec`.
+
+- `tsc --noEmit` clean, full suite 1075/1075 throughout both stages' work (up from 1074, net +1 test from the Stage 5 rewiring).
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-30, production-readiness pass — security headers, dead-code removal, critical auth bug fixed, test coverage added — superseded by the section above)
 
 **User asked for a broad autonomous production-readiness pass** ("resolve all outstanding issues... until no meaningful implementation gaps remain"). Given the realistic scope of that ask against a codebase this size, this session triaged and executed the highest-leverage, lowest-ambiguity items directly and via 2 background agents, rather than attempting to touch everything — see the final report given to the user for the honest completeness assessment. Concrete outcomes:
 
