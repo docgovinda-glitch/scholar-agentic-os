@@ -1,6 +1,25 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-29, converting the ~28 never-touched components — 9/21 done, 2 severe global CSS bugs found and fixed — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-29, sci-fi v3 component sweep — ALL 30 components done, 5 global CSS bugs found and fixed — supersedes the section below)
+
+**The "~28 never-touched components" leftover is now fully closed.** All 30 components in `src/components/` (every `.tsx` file except `ManuscriptPDFViewer.tsx`, which deliberately renders a white printed-paper preview and is correct as-is) are converted to the sci-fi v3 navy/luminous-blue system, plus `App.tsx` itself (never in scope for any prior pass). Full detail in the section directly below this one (9/21 progress snapshot, superseded by this line) — this entry records the close-out.
+
+**3 more global CSS bugs found and fixed while live-verifying the final 12 files** (`eda5777`, plus a companion wordmark fix `bd1bfcd`), on top of the 2 already documented below — same failure class each time: an `!important` rule in `index.css` silently force-applying a light-theme color regardless of a component's own Tailwind class:
+4. `button:disabled` forced a pale cream background app-wide — recolored to the navy-4/#94A3B8 disabled pair.
+5. `button.border-white/10`/`button[class*="border-white/10"]` forced a light cream secondary-button look, hitting `CommandPalette.tsx`/`AppHeader.tsx` (pre-dating this redesign) and 3 files converted this session — recolored to navy-2/navy-4/#94A3B8.
+6. `.hover-lift:hover`'s border was a gold tint applied to any card using the class (`ResearchIntelligenceDashboard.tsx`, `ActiveAgentsPanel.tsx`, `UserProfileGate.tsx`) — violated the "gold is CTA+wordmark only" rule. Swapped to luminous-blue.
+- **`UserProfileGate.tsx`'s wordmark** used a navy-to-gold `.text-gradient` that faded to near-invisible at its start against the new navy card — replaced with the same white-"Scholar"+gold-"Agentic OS" pattern already used in `AppHeader.tsx`.
+- **Removed now-dead CSS**: `.os-card`, `.glass-effect` (base + its ~100-line nested-override block), and `.text-gradient` — all confirmed zero-referenced by any component after the conversion sweep, via grep across every `.tsx` file. Consistent with this project's own dead-code-removal discipline (see "Dead-component audit" section further down this file).
+
+**Second and third background-agent batches** (18 more files beyond the first batch's 8): `NonJournalRequirementsPanel.tsx`, `QCBasedRedraftingSuite.tsx`, `ComplianceChecklistPanel.tsx`, `QualityControlSuite.tsx`, `DataDiscoveryPanel.tsx`, `KnowledgeVaultEngineV2.tsx`, `ThesisReader.tsx`, `KnowledgeVaultManager.tsx`, `ProfileSettings.tsx`, `ResearchIntakeWizard.tsx`, `KnowledgeVaultWizard.tsx`, `UserProfileGate.tsx`. Unlike the first batch, these agents **did** do live-browser verification per file as instructed, and found their own real bugs along the way (missing worktree `.env` crashing `UserProfileGate` on load, a recurring `#1A365D`→`#E2E8F0` bulk-replace mistake landing on CTA backgrounds instead of text, several white form controls with no `bg-white` in their own JSX at all — only white via the global override, invisible to grep).
+
+**Known, deliberately out-of-scope residue, not a bug**: `GroundingMapDisplay.tsx`/`JournalDiscoveryPanel.tsx`/`SubmissionPackagingSuite.tsx` still contain `bg-white/5`, `text-gray-300/400`, `bg-brand-*` etc. — this is a *different*, already-dark theme that pre-dates this redesign (translucent glass overlays on a dark backdrop), not a light-mode leftover; only their `.glass-effect` usage and a couple of genuinely-white form controls needed fixing, which the first batch did. Similarly `AISetupWizard.tsx`/`ResearchIntelligenceDashboard.tsx` (converted in earlier sessions) still use `font-serif` on some headings and `text-gray-400` instead of the `#94A3B8` token — cosmetic token-consistency debt, not a contrast bug (verified: `text-[#E2E8F0]` is still correctly applied alongside `font-serif`, gray-400 still reads fine on navy). Not touched this session — out of scope for "the ~28 never-touched components," since these two files were already touched.
+
+- `tsc --noEmit` clean and full suite steady at 949/951 (same 2 pre-existing unrelated `supabaseClient.test.ts` failures) across every commit in this whole multi-agent effort. One test run showed a 3rd flaky failure in the same file, non-reproducible on immediate rerun — observed independently by both background agents and the main session, not a real regression.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-29, converting the ~28 never-touched components — 9/21 done, 2 severe global CSS bugs found and fixed — superseded by the section above)
 
 **Follow-up to Step 5's "closed" declaration below**: the user asked to actually complete the ~28-component leftover named at Step 5's close. A background agent (isolated worktree) converted 8 of ~20 files, then I (main session) merged its branch, live-verified its work (a gap the agent itself flagged skipping), and found two severe pre-existing bugs while doing so — worth reading in full before continuing this list.
 

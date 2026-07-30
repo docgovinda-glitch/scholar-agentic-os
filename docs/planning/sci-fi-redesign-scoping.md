@@ -410,6 +410,85 @@ sci-fi pass (including the 6 named above still using
 would be new, separately-scoped work, not a continuation of an open
 step.
 
+**The ~28-component leftover named above is now itself fully closed (same
+2026-07-29 session, continued).** Explicitly requested as a follow-up
+task. Converted via 3 sequential background agents (isolated worktrees,
+merged fast-forward into `main` after each), plus live verification and
+2 additional bug-fixing passes done directly by the orchestrating
+session — every `.tsx` file in `src/components/` is now on the navy
+system except `ManuscriptPDFViewer.tsx` (deliberately excluded — real
+printed-paper preview, correct as-is), and `App.tsx` itself (never in
+scope for any prior step) was converted too.
+
+- **First agent (8 files)**: `OutputFormatSelector.tsx`, `ErrorBoundary.tsx`,
+  `AIDisclosureReviewModal.tsx`, `OnboardingWizard.tsx`,
+  `GroundingMapDisplay.tsx`, `VedicDatabase.tsx`, `JournalDiscoveryPanel.tsx`,
+  `SubmissionPackagingSuite.tsx` (the last 3 fixing their own `.glass-effect`
+  usage, per the same-file-scoped pattern established in Step 5's
+  `AIControlCenter.tsx` finding above). **Skipped live-browser verification
+  "due to time"** — a real gap, closed by the orchestrating session next.
+- **Orchestrating session's own verification pass** found this gap and,
+  while checking it, found the two most consequential bugs in this entire
+  redesign: `index.css`'s `h2, h3, h4 { color: #1A365D !important }` (added
+  during the v2 token step with a comment explicitly deferring the color
+  fix to "the navy remap step," which never happened) was silently
+  force-overriding **every heading's color app-wide** regardless of any
+  component's own Tailwind class — measured 1.14-1.65:1 against every
+  navy shade, meaning every converted heading in every prior session had
+  been silently near-invisible the whole time. Also: `App.tsx`'s own root
+  `<div>` still used the old light `.blueprint-canvas` (`#F8FAFC`
+  background), and its "Main Panel Content" wrapper (`bg-white`) sits
+  behind literally every phase view A-I — the actual root cause of what
+  looked, live, like "a white frame behind every phase component." Both
+  fixed (`9351ef7`, `37b1ac2`), confirmed via `getComputedStyle` going
+  from `rgb(26,54,93)` to the correct `rgb(226,232,240)` on a real heading.
+- **Second agent (6 files)**: `NonJournalRequirementsPanel.tsx`,
+  `QCBasedRedraftingSuite.tsx`, `ComplianceChecklistPanel.tsx`,
+  `QualityControlSuite.tsx`, `DataDiscoveryPanel.tsx`,
+  `KnowledgeVaultEngineV2.tsx` — this time did live-verify every file as
+  instructed, catching several of its own real bugs along the way
+  (recurring `#1A365D`→`#E2E8F0` bulk-replace landing on CTA backgrounds
+  instead of text; white form controls with no `bg-white` in their own
+  JSX at all, invisible to grep, only caught by rendering the page).
+- **Third agent (6 files, resumed once after an API session-limit
+  interrupt with zero lost work)**: `ThesisReader.tsx`,
+  `KnowledgeVaultManager.tsx` (a confusingly-named *different* file from
+  the one above — `App.tsx` imports `ThesisReader.tsx`'s default export
+  AS `KnowledgeVaultManager`; verify by file path, not variable name),
+  `ProfileSettings.tsx`, `ResearchIntakeWizard.tsx`,
+  `KnowledgeVaultWizard.tsx`, `UserProfileGate.tsx`. Flagged (but didn't
+  fix, correctly out of its own per-component scope) that `index.css`'s
+  global `button:disabled` rule also hardcodes a light background.
+- **Orchestrating session's closing pass** fixed that flagged
+  `button:disabled` bug plus two more of the same failure class found by
+  auditing the rest of `index.css`'s `!important` rules directly:
+  `button.border-white/10` (forcing a light secondary-button look on
+  `CommandPalette.tsx`/`AppHeader.tsx` plus 3 files converted this
+  session) and `.hover-lift:hover`'s gold-tinted border (violating the
+  "gold is CTA+wordmark only" rule on 3 files that use the class on
+  plain cards, not CTAs) — both recolored (`eda5777`). Also fixed
+  `UserProfileGate.tsx`'s wordmark, which used a navy-to-gold
+  `.text-gradient` that faded to near-invisible against its own new navy
+  card (`bd1bfcd`), matching it to `AppHeader.tsx`'s established
+  white-"Scholar"+gold-"Agentic OS" pattern instead. **Removed now-dead
+  CSS**: `.os-card`, `.glass-effect` (base + its whole nested-override
+  block), and `.text-gradient` — all confirmed zero-referenced by any
+  component after this sweep, consistent with this project's own
+  dead-code-removal discipline.
+
+`tsc --noEmit` clean and the full suite steady at 949/951 throughout
+every commit across all 3 agent batches and the orchestrating session's
+own fixes. **Known, deliberately-left residue, not a bug**:
+`GroundingMapDisplay.tsx`/`JournalDiscoveryPanel.tsx`/
+`SubmissionPackagingSuite.tsx` still contain `bg-white/5`, `text-gray-300`,
+`bg-brand-*` etc. — a *different*, already-dark glassmorphic theme
+pre-dating this redesign, not a light-mode leftover (only their
+`.glass-effect` usage and genuinely-white form controls needed fixing).
+`AISetupWizard.tsx`/`ResearchIntelligenceDashboard.tsx` (converted in
+earlier sessions, out of this leftover's scope) still use `font-serif`
+on some headings and `text-gray-400` instead of the `#94A3B8` token —
+cosmetic token-consistency debt, not a contrast bug.
+
 **Step 3 finding, not a fabricated removal**: an exhaustive grep across
 `src/components/` for every one of the five unbuildable panels (`SYSTEM
 STATUS`/`CPU`/`GPU`, `Collaborator`, `Running Agents`, `Marketplace`,
