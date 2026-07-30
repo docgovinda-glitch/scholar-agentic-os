@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { PaperProject, DiscoveredDataSource } from "../types";
+import { PaperProject } from "../types";
 import {
   Database,
   Sparkles,
@@ -42,82 +42,6 @@ export default function DataDiscoveryPanel({
   const [uploading, setUploading] = useState(false);
   const [viewingFile, setViewingFile] = useState<UploadedFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const loadStandardDataSources = () => {
-    setError(null);
-    const titleLower = (project.title || "").toLowerCase();
-    
-    let standardSources: DiscoveredDataSource[];
-    
-    if (
-      titleLower.includes("westphalia") ||
-      titleLower.includes("rta") ||
-      titleLower.includes("dhamma") ||
-      titleLower.includes("international order") ||
-      titleLower.includes("international relations")
-    ) {
-      standardSources = [
-        {
-          name: "The Avalon Project (Yale Law School - Treaty of Westphalia)",
-          url: "https://avalon.law.yale.edu/",
-          type: "Qualitative",
-          relevance: "Provides the complete, authoritative English translation of the Treaties of Münster and Osnabrück (1648) for primary-text hermeneutic analysis of Westphalian sovereignty.",
-          reliability: "Highly reputable academic digital library maintained by Yale Law School.",
-          limitations: "Focuses strictly on the legal/diplomatic texts, requiring external interpretive frameworks for ontological analysis.",
-          status: "pending"
-        },
-        {
-          name: "SuttaCentral (Early Buddhist Texts and Pali Canon Archive)",
-          url: "https://suttacentral.net/",
-          type: "Qualitative",
-          relevance: "Offers side-by-side translation and primary text mapping of Pali Suttas to analyze the Buddhist ontological and moral conceptualization of Dhamma (cosmic-social order).",
-          reliability: "Comprehensive, peer-curated repository of early Buddhist literature with multi-language translation alignments.",
-          limitations: "Requires highly specialized hermeneutic retrieval to avoid mapping anachronistic modern IR categories onto ancient text structures.",
-          status: "pending"
-        },
-        {
-          name: "Rigveda Sanskrit-English Concordance (Sacred Texts Archive)",
-          url: "https://www.sacred-texts.com/",
-          type: "Qualitative",
-          relevance: "Contains full translations (e.g., Wilson, Griffith) of the Rigveda to locate and examine occurrences of 'Rta' (cosmic order) and 'Satya' (truth) as relational metaphysical realities.",
-          reliability: "Broadly referenced, open-access archive of cultural and philosophical texts.",
-          limitations: "Nineteenth-century translations must be cross-referenced with modern Sanskrit scholarship (e.g., Kangle, Radhakrishnan) to ensure philological accuracy.",
-          status: "pending"
-        }
-      ];
-    } else {
-      standardSources = [
-        {
-          name: "Harvard Dataverse (Indian CSR Policy Archive)",
-          url: "https://dataverse.harvard.edu/",
-          type: "Mixed",
-          relevance: "Provides extensive peer-curated qualitative studies and quantitative compliance disclosures tracing major Indian companies' corporate governance records.",
-          reliability: "Globally recognized, peer-vouched academic depository supported by Harvard of high permanence.",
-          limitations: "Mainly features public company filings; missing localized village-level ecological impact surveys.",
-          status: "pending"
-        },
-        {
-          name: "World Bank Open Data (World Governance Indicators)",
-          url: "https://data.worldbank.org/",
-          type: "Quantitative",
-          relevance: "Supplies crucial national tracking parameters assessing governmental accountability, rule of law and social stability indexes.",
-          reliability: "Premier institutional data pool compiled quarterly across official international bureaus.",
-          limitations: "Large data sets are aggregated at national tiers, meaning minor regional micro-trends are omitted.",
-          status: "pending"
-        },
-        {
-          name: "DOAJ (Directory of Indian Philosophical & Management Research)",
-          url: "https://doaj.org/",
-          type: "Qualitative",
-          relevance: "Indexes peer-reviewed research papers mapping Eastern ethic paradigms (Arthasastra, Vedic trusteeship) onto modern stakeholder management.",
-          reliability: "Strictly cataloged peer-reviewed open access repository ensuring academic validity.",
-          limitations: "Relies entirely on text keywords, making retrieval sensitive to translation variations of terms like 'Dharma' or 'Rajadharma'.",
-          status: "pending"
-        }
-      ];
-    }
-    updateProject({ dataSources: standardSources });
-  };
 
   const discoverSources = async () => {
     setLoading(true);
@@ -319,12 +243,6 @@ export default function DataDiscoveryPanel({
             >
               🔄 Retry Extraction
             </button>
-            <button
-              onClick={loadStandardDataSources}
-              className="px-3 py-1.5 bg-[color:var(--color-luminous-blue)]/10 hover:bg-[color:var(--color-luminous-blue)]/20 border border-[color:var(--color-luminous-blue)]/20 rounded text-xs text-[color:var(--color-luminous-blue)] font-mono transition-colors cursor-pointer"
-            >
-              📄 Load Verified Offline Directories
-            </button>
           </div>
         </div>
       )}
@@ -452,13 +370,6 @@ export default function DataDiscoveryPanel({
             >
               <Sparkles className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Query Authentic Directories
-            </button>
-            <button
-              onClick={loadStandardDataSources}
-              className="px-5 py-2.5 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] font-bold text-[#E2E8F0] text-xs rounded-xl transition-all duration-200 inline-flex items-center gap-2 cursor-pointer font-mono uppercase tracking-wider"
-            >
-              <Sparkles className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
-              Load Recommended Repositories
             </button>
           </div>
         </div>

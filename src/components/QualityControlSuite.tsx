@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { PaperProject, QCReport } from "../types";
+import { PaperProject } from "../types";
 import { ShieldCheck, Sparkles, RefreshCcw, CheckSquare, AlertTriangle, Play, HelpCircle, ArrowRight, CheckCircle2, Info, AlertCircle } from "lucide-react";
 import { runQualityControl } from "../services/aiService";
 import { executeAgent } from "../services/agentService";
@@ -83,39 +83,6 @@ export default function QualityControlSuite({
     }
   };
 
-  const loadStandardQCReport = () => {
-    setError(null);
-    const hasVaultFiles = project.knowledgeVault?.files.some((f: any) => f.isActive && f.status === "ready");
-    const groundingMessage = hasVaultFiles 
-      ? "Excellent alignment and citation continuity with uploaded Knowledge Vault research documents."
-      : "Solid alignment with standard theoretical constructs and research objectives.";
-
-    const standardReport: QCReport = {
-      complianceScore: 96,
-      rigorScore: 95,
-      alignmentWithDissertationScore: 98,
-      plagiarismOriginalityCheck: "High structural distinctiveness. Zero mechanical boilerplate styles found. The tone represents a high-density, authoritative elite academic register.",
-      strengths: [
-        "Strong conceptual integration and methodological coherence across all manuscript sections.",
-        groundingMessage,
-        "Clear academic register with appropriate technical terminology and structured arguments."
-      ],
-      weaknesses: [
-        "Verify that all DOI locators and reference entries follow exact target journal guidelines.",
-        "Ensure transitions between the literature review and methodology sections are fully articulated."
-      ],
-      actionableEditsPlan: [
-        "Check all in-text citations against the final compiled reference list in the Citation Center.",
-        "Perform a final proofread of tables and figures before generating the submission package."
-      ],
-      citationAudit: hasVaultFiles 
-        ? "Citations to uploaded Knowledge Vault primary documents are correctly incorporated across the introduction, literature review, and discussion sections."
-        : "In-text citations follow standard author-date formatting across key sections.",
-      ethicalVerification: "Complete compliance declarations section exists, ensuring clear transparency parameters regarding conflict of interest, funding sources, and data availability."
-    };
-    updateProject({ qcReport: standardReport });
-  };
-
   // Compile entire manuscript text for audit
   const compileManuscriptText = () => {
     let fullText = "";
@@ -178,12 +145,6 @@ export default function QualityControlSuite({
               className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded text-xs text-red-400 font-mono transition-colors cursor-pointer"
             >
               🔄 Retry Peer Audit
-            </button>
-            <button
-              onClick={loadStandardQCReport}
-              className="px-3 py-1.5 bg-[color:var(--color-luminous-blue)]/10 hover:bg-[color:var(--color-luminous-blue)]/20 border border-[color:var(--color-luminous-blue)]/40 rounded text-xs text-[#E2E8F0] font-mono transition-colors cursor-pointer"
-            >
-              📄 Load Verified Editorial Audit Report
             </button>
           </div>
         </div>
@@ -308,13 +269,6 @@ export default function QualityControlSuite({
             >
               <Play className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Run Compliance & Style Checks
-            </button>
-            <button
-              onClick={loadStandardQCReport}
-              className="px-5 py-2.5 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] font-medium text-[#E2E8F0] text-xs rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer font-bold uppercase tracking-wider font-mono shadow-xs"
-            >
-              <ShieldCheck className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
-              Skip & Load Recommended Pre-Flight Audit
             </button>
           </div>
         </div>

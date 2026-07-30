@@ -20,85 +20,6 @@ export default function JournalDiscoveryPanel({
   const [error, setError] = useState<string | null>(null);
   const [shortlist, setShortlist] = useState<RecommendJournal[] | null>(null);
 
-  const loadStandardJournals = () => {
-    setError(null);
-    const titleLower = (project.title || "").toLowerCase();
-    
-    let standardJournals: RecommendJournal[];
-    
-    if (
-      titleLower.includes("westphalia") ||
-      titleLower.includes("rta") ||
-      titleLower.includes("dhamma") ||
-      titleLower.includes("international order") ||
-      titleLower.includes("international relations")
-    ) {
-      standardJournals = [
-        {
-          name: "International Studies Quarterly",
-          publisher: "Oxford University Press (for ISA)",
-          scopeFit: "Excellent venue for theoretical contributions proposing alternative ontologies and non-Western perspectives to international order.",
-          ranking: "Scopus Q1, Web of Science, Top 5 IR Journal.",
-          feeStatus: "Zero APC for standard subscription publishing.",
-          submissionOpenness: "Average 8-12 weeks first response.",
-          reviewContext: "Double-blind, rigorous peer review from leading international relations scholars.",
-          whyFit: "Directly aligns with the paper's challenge to Westphalian hegemony and introduction of alternative global ontologies."
-        },
-        {
-          name: "European Journal of International Relations",
-          publisher: "SAGE Publications (for ECPR-SGIR)",
-          scopeFit: "Premier venue for critical international relations theory, philosophical foundations of IR, and relational ontologies.",
-          ranking: "Scopus Q1, Web of Science, Top-tier IR Journal.",
-          feeStatus: "Zero APC for standard subscription publishing.",
-          submissionOpenness: "Average 6-8 weeks first response.",
-          reviewContext: "Extremely rigorous double-blind peer review emphasizing theoretical originality.",
-          whyFit: "Perfect match for a hermeneutic reconstruction of Rta and Dhamma as alternatives to anarchy."
-        },
-        {
-          name: "Millennium: Journal of International Studies",
-          publisher: "SAGE Publications",
-          scopeFit: "Well-known for publishing boundary-pushing critical IR theory, post-colonial scholarship, and alternative cosmologies of order.",
-          ranking: "Scopus Q2/Q1, highly influential critical venue.",
-          feeStatus: "Zero APC subscription track available.",
-          submissionOpenness: "Average 4-6 weeks turnaround.",
-          reviewContext: "Double-blind, constructive reviews open to non-traditional frameworks.",
-          whyFit: "Directly matches the post-colonial and non-Western focus of leveraging classical Sanskrit-Vedic ontologies to rethink sovereignty."
-        }
-      ];
-    } else {
-      standardJournals = [
-        {
-          name: "AI and Ethics",
-          publisher: "Springer Nature",
-          scopeFit: "Direct fit for theoretical conceptual analysis blending Eastern ethical structures with statecraft and modern technological responsibility.",
-          ranking: "Scopus indexed, ESCI, high growth JIF.",
-          feeStatus: "No APC to publish under standard subscription option. Mandatory open access is fully optional.",
-          submissionOpenness: "Average 4-6 weeks first editorial feedback.",
-          reviewContext: "Double-blind constructive peer review, highly supportive of innovative global ethics perspectives.",
-          whyFit: "Direct editorial interest in international governance frameworks, global philosophies, and indigenous ethical systems."
-        },
-        {
-          name: "Journal of Business Ethics",
-          publisher: "Springer",
-          scopeFit: "The premier elite forum for publishing non-Western corporate accountability models, corporate governance philosophies, and systemic ethics.",
-          ranking: "FT50, Scopus Q1, Web of Science high JIF.",
-          feeStatus: "Zero fee subscription track available; high prestige peer venue.",
-          submissionOpenness: "Average 8-12 weeks comprehensive academic review.",
-          reviewContext: "Double-blind, prestigious board.",
-          whyFit: "Matches Dr. Govinda's high-rigor comparative text analyses aligning Upanishadic and Kautilyan theory."
-        }
-      ];
-    }
-    setShortlist(standardJournals);
-    // Auto-select the first one if none is selected
-    if (!project.targetJournal) {
-      updateProject({ 
-        targetJournal: standardJournals[0],
-        complianceRules: undefined
-      });
-    }
-  };
-
   const findJournals = async () => {
     setLoading(true);
     setError(null);
@@ -146,12 +67,6 @@ export default function JournalDiscoveryPanel({
             >
               🔄 Retry Extraction
             </button>
-            <button
-              onClick={loadStandardJournals}
-              className="px-3 py-1.5 bg-brand-500/30 hover:bg-brand-500/40 border border-brand-400/40 rounded text-xs text-brand-200 font-mono transition-colors cursor-pointer"
-            >
-              📄 Load Verified Springer / Springer Nature Index
-            </button>
           </div>
         </div>
       )}
@@ -174,13 +89,6 @@ export default function JournalDiscoveryPanel({
             >
               <Sparkles className="w-4 h-4" />
               Consult Bibliometric Indexes
-            </button>
-            <button
-              onClick={loadStandardJournals}
-              className="px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 font-medium text-gray-200 text-sm rounded-lg transition-all duration-200 inline-flex items-center gap-2 cursor-pointer text-xs"
-            >
-              <Sparkles className="w-4 h-4 text-brand-400" />
-              Skip & Load Recommended Journals
             </button>
           </div>
         </div>

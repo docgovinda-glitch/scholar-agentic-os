@@ -21,10 +21,16 @@ export default function SubmissionPackagingSuite({
   // Phase I Tracker simulation state
   const [submissionDate, setSubmissionDate] = useState("2026-06-16");
   const [portalStatus, setPortalStatus] = useState<"Draft" | "Submitted" | "Under Review" | "Minor Revisions" | "Accepted">("Draft");
-  const [reviewerResponses, setReviewerResponses] = useState([
-    "Reviewer 1: Suggested extending literature regarding Kautilyan economic trusteeship to contrast with modern welfare economics.",
-    "Reviewer 2: Minor typo corrections in scripture citations list. Check Gita formatting consistency."
-  ]);
+  // Real bug found and fixed (fabrication audit, 2026-07-30): this used to be
+  // hardcoded, specific fake reviewer comments about an unrelated dissertation
+  // topic (Kautilyan trusteeship, Gita citation formatting), shown under
+  // "Peer Reviewer Feedback Logs" as if they were real logged correspondence
+  // for THIS user's manuscript — directly contradicting the "No active
+  // reviewer email logs recorded" text shown elsewhere in this same panel.
+  // No manuscript's real reviewer feedback is ever fetched by this tracker
+  // (there is no real portal integration, only the status dropdown below) —
+  // this is now honest empty placeholder text the user replaces themselves.
+  const [reviewerResponses] = useState<string[]>([]);
 
   const loadStandardSubmissionPack = () => {
     if (!window.confirm("Are you sure you want to load the pre-compiled editorial package? This will replace any existing submission materials.")) return;
@@ -43,7 +49,7 @@ export default function SubmissionPackagingSuite({
         hasVaultFiles ? "Verify that Knowledge Vault source documents are cited accurately." : "Verify all primary source references.",
         "Submit Declarations of interest and funding declarations."
       ],
-      complianceSummary: "Word Count verified against target journal limits. All formatting and reference styles aligned.",
+      complianceSummary: "This is a pre-compiled template, not a verification result — confirm word count, formatting, and reference style against your target journal's actual requirements before submitting.",
       responseToReviewersDraft: "Dear Reviewers,\n\nThank you for your highly constructive and insightful feedback. We have meticulously updated the manuscript according to your recommendations."
     };
     updateProject({ submissionPack: standardPack });
@@ -282,11 +288,18 @@ export default function SubmissionPackagingSuite({
                     Peer Reviewer Feedback Logs
                   </span>
                   <div className="space-y-2">
-                    {reviewerResponses.map((rev, i) => (
-                      <p key={i} className="text-xs text-gray-300 pl-3 border-l-2 border-brand-400 leading-relaxed italic">
-                        "{rev}"
+                    {reviewerResponses.length > 0 ? (
+                      reviewerResponses.map((rev, i) => (
+                        <p key={i} className="text-xs text-gray-300 pl-3 border-l-2 border-brand-400 leading-relaxed italic">
+                          "{rev}"
+                        </p>
+                      ))
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">
+                        No reviewer feedback has been logged yet — this tracker doesn't connect to any real
+                        journal portal, so paste actual reviewer comments here once received.
                       </p>
-                    ))}
+                    )}
                   </div>
                 </div>
               )}

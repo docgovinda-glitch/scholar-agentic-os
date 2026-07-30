@@ -308,34 +308,13 @@ export default function ResearchIntakeWizard({
       const res = await suggestObjectives({ title: project.title, aiSettings: project.aiSettings });
       setObjectivesAdvice(res.objectives);
     } catch (err: any) {
-      console.warn("AI suggestObjectives failed, using local fallback:", err);
-      const lower = project.title.toLowerCase();
-      let fallbackObjs = [
-        "1. To identify key components and current state of research in this domain.",
-        "2. To evaluate structural challenges and implementation barriers.",
-        "3. To recommend policy adjustments or operational solutions based on analysis."
-      ];
-      if (lower.includes("westphalia") || lower.includes("rta") || lower.includes("dhamma") || lower.includes("international order") || lower.includes("international relations")) {
-        fallbackObjs = [
-          "1. To examine the ontological limitations of the Westphalian sovereign-state model in addressing contemporary global crises.",
-          "2. To reconstruct the classical Indian concepts of Rta (cosmic order) and Dhamma (moral duty/righteousness) as alternative metaphysical foundations for international relations.",
-          "3. To formulate a comparative framework bridging non-Western relational ontologies with standard Western pluralist and constructivist IR theories."
-        ];
-      } else if (lower.includes("vedic") || lower.includes("dharmic") || lower.includes("governance") || lower.includes("ethics")) {
-        fallbackObjs = [
-          "1. To analyze classical Indian ethical paradigms and Vedic governance models.",
-          "2. To evaluate modern CSR standards by integrating dharmic stewardship constructs.",
-          "3. To formulate a comparative framework bridging eastern and western business ethics."
-        ];
-      } else if (lower.includes("ai") || lower.includes("intelligence") || lower.includes("machine") || lower.includes("learning")) {
-        fallbackObjs = [
-          "1. To analyze systemic ethical vulnerabilities in autonomous algorithmic systems.",
-          "2. To evaluate existing regulatory policies governing automated decision tools.",
-          "3. To propose a practical checklist for human-centric AI model auditing."
-        ];
-      }
-      setObjectivesAdvice(fallbackObjs.map(o => o.replace(/^\d+\.\s*/, "")));
-      setTopicAdvice("⚠️ AI service offline. Populated objectives suggestions from local template fallback.");
+      // Real bug found and fixed (Stage 5 fabrication audit, 2026-07-30):
+      // this used to fall back to hardcoded, keyword-matched fake
+      // objectives (specific invented text about "Westphalian sovereignty",
+      // "Vedic governance", etc.) presented as if generated for this title,
+      // same pattern as handleAutoFillBlueprint's now-fixed fallback above.
+      // No fallback now: report the real failure honestly, touch nothing.
+      setError(`AI objectives suggestion failed: ${err.message || err}. Check your AI Settings, or write objectives manually.`);
     } finally {
       setObjectivesLoading(false);
     }
@@ -353,13 +332,12 @@ export default function ResearchIntakeWizard({
       const res = await checkRQsQuality({ questions: project.researchQuestions, aiSettings: project.aiSettings });
       setRqQuality(res);
     } catch (err: any) {
-      console.warn("AI checkRQsQuality failed, using local fallback:", err);
-      setRqQuality({
-        relevance: 80,
-        novelty: 75,
-        publishability: 78,
-        feedback: "⚠️ AI service offline. Local evaluation: The research questions focus on relevant themes, but should be refined to highlight clear, measurable parameters."
-      });
+      // Real bug found and fixed (Stage 5 fabrication audit, 2026-07-30):
+      // this used to fall back to fabricated quality scores (80/75/78) and
+      // a canned "feedback" sentence claiming to have evaluated the user's
+      // actual research questions, when no evaluation happened at all. No
+      // fallback now: report the real failure honestly, touch nothing.
+      setError(`AI research-question quality check failed: ${err.message || err}. Check your AI Settings.`);
     } finally {
       setRqLoading(false);
     }
@@ -377,34 +355,12 @@ export default function ResearchIntakeWizard({
       });
       setMethodologyAdvice(res);
     } catch (err: any) {
-      console.warn("AI suggestMethodology failed, using local fallback:", err);
-      const lower = (project.title || "").toLowerCase();
-      let fallbackMeth = {
-        methodology: "Conceptual analysis drawing on standard literature review paired with comparative case study analysis.",
-        confidence: "Medium",
-        rationale: "Selected local fallback based on general interdisciplinary research."
-      };
-      if (lower.includes("westphalia") || lower.includes("rta") || lower.includes("dhamma") || lower.includes("international order") || lower.includes("international relations")) {
-        fallbackMeth = {
-          methodology: "Theoretical-conceptual hermeneutics drawing on textual analysis of classical Sanskrit and Pali texts paired with comparative analysis of contemporary critical IR theory.",
-          confidence: "High",
-          rationale: "Selected local fallback based on Rta, Dhamma, and non-Western IR frameworks."
-        };
-      } else if (lower.includes("vedic") || lower.includes("dharmic") || lower.includes("governance") || lower.includes("ethics")) {
-        fallbackMeth = {
-          methodology: "Theoretical-conceptual analysis drawing on textual hermeneutics of classical Sanskrit texts paired with comparative policy analysis.",
-          confidence: "High",
-          rationale: "Selected local fallback based on Kautilyan and Vedic Trusteeship constructs."
-        };
-      } else if (lower.includes("ai") || lower.includes("intelligence") || lower.includes("machine") || lower.includes("learning")) {
-        fallbackMeth = {
-          methodology: "Mixed-methods analysis consisting of qualitative policy reviews and quantitative model checking using benchmark datasets.",
-          confidence: "High",
-          rationale: "Selected local fallback based on AI auditing and algorithmic governance."
-        };
-      }
-      setMethodologyAdvice(fallbackMeth);
-      setTopicAdvice("⚠️ AI service offline. Populated methodology suggestions from local template fallback.");
+      // Real bug found and fixed (Stage 5 fabrication audit, 2026-07-30):
+      // this used to fall back to hardcoded, keyword-matched fake
+      // methodology text (with a fabricated "High"/"Medium" confidence and
+      // a fake rationale), same pattern as the other fallbacks in this
+      // file. No fallback now: report the real failure honestly.
+      setError(`AI methodology suggestion failed: ${err.message || err}. Check your AI Settings, or fill in methodology manually.`);
     } finally {
       setMethodologyLoading(false);
     }
