@@ -672,8 +672,8 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
             <GraduationCap className="w-8 h-8 text-[color:var(--color-luminous-blue)]" />
           </div>
           <div className="space-y-1">
-            <h1 className="text-3xl font-serif font-bold tracking-tight text-gradient">
-              🎓 Scholar Agentic OS
+            <h1 className="wordmark text-3xl font-bold tracking-tight text-[#E2E8F0]">
+              🎓 Scholar <span style={{ color: "var(--color-gold-accent)" }}>Agentic OS</span>
             </h1>
             <p className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-luminous-blue)] font-sans">
               AI Research Operating System
