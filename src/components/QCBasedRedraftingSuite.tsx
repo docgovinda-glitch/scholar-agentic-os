@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { PaperProject, QCReport } from "../types";
+import { PaperProject } from "../types";
 import {
   ShieldCheck,
   Sparkles,

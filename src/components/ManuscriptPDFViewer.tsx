@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { PaperProject } from "../types";
-import { FileText, Printer, Copy, Columns, ZoomIn, ZoomOut, Download, AlertCircle, RefreshCw, Layers } from "lucide-react";
+import { FileText, Printer, Copy, Download, AlertCircle, RefreshCw, Layers } from "lucide-react";
 
 interface ManuscriptPDFViewerProps {
   project: PaperProject;
@@ -42,10 +42,6 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
   }, 0);
 
   const handlePrint = () => {
-    const printContent = printAreaRef.current?.innerHTML;
-    const originalContent = document.body.innerHTML;
-    
-    // Create print iframe or simple window print trigger
     window.print();
   };
 

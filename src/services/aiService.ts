@@ -1,5 +1,4 @@
 import { PaperProject, GroundingMap, DiscoveredDataSource, RecommendJournal, ComplianceRules, QCReport, SubmissionPack, AISettings, AIResponse, VaultFile, CitationMetadata } from "../types";
-import { decryptData } from "../utils/crypto";
 import AIGateway from "./aiGateway";
 import { isVaultActive, getActiveVaultContext, buildCitationPrompt, getRelevantChunksContext } from "./knowledgeVaultService";
 import { discoverLiterature, discoverStatisticalData } from "./literatureRetrievalService";

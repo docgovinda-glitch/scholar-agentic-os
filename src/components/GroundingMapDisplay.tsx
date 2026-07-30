@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { PaperProject, GroundingMap } from "../types";
+import { PaperProject } from "../types";
 import { Sparkles, BrainCircuit, Anchor, CheckCircle, RefreshCcw } from "lucide-react";
 import { generateDissertationGrounding } from "../services/aiService";
 

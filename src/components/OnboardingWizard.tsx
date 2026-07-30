@@ -1,10 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, lazy, Suspense } from "react";
 import { useAuth } from "../auth/authContext";
 import { PaperProject, OnboardingStep } from "../types";
 import { useProjectPersistence } from "../hooks/useProjectPersistence";
-import UserProfileGate from "./UserProfileGate";
-import AISetupWizard from "./AISetupWizard";
-import KnowledgeVaultWizard from "./KnowledgeVaultWizard";
 import {
   CheckCircle2,
   ChevronRight,
@@ -13,6 +10,15 @@ import {
   BookOpen,
   Sparkles
 } from "lucide-react";
+
+// Bundle-size pass (2026-07-30, Task 2): only one of these three onboarding
+// steps is ever mounted at a time (gated by onboardingStep below), so they're
+// split into their own chunks instead of being parsed upfront as part of the
+// initial bundle — same rationale/pattern as the phase/tab panels lazily
+// loaded in App.tsx.
+const UserProfileGate = lazy(() => import("./UserProfileGate"));
+const AISetupWizard = lazy(() => import("./AISetupWizard"));
+const KnowledgeVaultWizard = lazy(() => import("./KnowledgeVaultWizard"));
 
 const STEPS: { id: OnboardingStep; label: string; icon: React.ElementType }[] = [
   { id: "login", label: "Login / User Setup", icon: GraduationCap },
@@ -97,7 +103,9 @@ export default function OnboardingWizard() {
       <OnboardingProgressBar currentIndex={currentStepIndex >= 0 ? currentStepIndex : 0} />
       <div className="grow flex items-center justify-center p-6 sm:p-12 z-10">
         <div className="w-full max-w-4xl">
-          {activeContent}
+          <Suspense fallback={null}>
+            {activeContent}
+          </Suspense>
         </div>
       </div>
     </div>

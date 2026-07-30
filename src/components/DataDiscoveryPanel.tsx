@@ -39,7 +39,6 @@ export default function DataDiscoveryPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [uploading, setUploading] = useState(false);
   const [viewingFile, setViewingFile] = useState<UploadedFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -70,7 +69,6 @@ export default function DataDiscoveryPanel({
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setUploading(true);
 
     for (const file of Array.from(files)) {
       const sizeKb = Math.round(file.size / 1024);
@@ -135,7 +133,6 @@ export default function DataDiscoveryPanel({
         }
       }
     }
-    setUploading(false);
   };
 
   const readFileAsText = (file: File): Promise<string> => {

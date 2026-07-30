@@ -1,60 +1,65 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { PaperProject, WORKFLOW_PHASES } from "./types";
-import ResearchIntakeWizard from "./components/ResearchIntakeWizard";
 import OutputFormatSelector from "./components/OutputFormatSelector";
-import GroundingMapDisplay from "./components/GroundingMapDisplay";
-import DataDiscoveryPanel from "./components/DataDiscoveryPanel";
-import JournalDiscoveryPanel from "./components/JournalDiscoveryPanel";
-import ComplianceChecklistPanel from "./components/ComplianceChecklistPanel";
-import NonJournalRequirementsPanel from "./components/NonJournalRequirementsPanel";
-import ManuscriptDraftingWorkspace from "./components/ManuscriptDraftingWorkspace";
-import QualityControlSuite from "./components/QualityControlSuite";
-import QCBasedRedraftingSuite from "./components/QCBasedRedraftingSuite";
-import SubmissionPackagingSuite from "./components/SubmissionPackagingSuite";
-import ManuscriptPDFViewer from "./components/ManuscriptPDFViewer";
 import { AuthProvider, useAuth } from "./auth/authContext";
 import { useProjectPersistence } from "./hooks/useProjectPersistence";
 import { useHashNavigation } from "./hooks/useHashNavigation";
 import { useFocusOnNavigate } from "./hooks/useFocusOnNavigate";
 import { canEnterPhase, resolveFurthestPhase } from "./utils/phaseGating";
 import OnboardingWizard from "./components/OnboardingWizard";
-import ResearchIntelligenceDashboard from "./components/ResearchIntelligenceDashboard";
-import ManuscriptEditorWorkspace from "./components/ManuscriptEditorWorkspace";
-import CommandPalette from "./components/CommandPalette";
-import ActiveAgentsPanel from "./components/agents/ActiveAgentsPanel";
 import AppHeader from "./components/layout/AppHeader";
 import AppFooter from "./components/layout/AppFooter";
-
-// New components
-import KnowledgeVaultManager from "./components/ThesisReader";
-import VedicDatabase from "./components/VedicDatabase";
-import AIControlCenter from "./components/AIControlCenter";
-import ProfileSettings from "./components/ProfileSettings";
 import ErrorBoundary from "./components/ErrorBoundary";
 
-// Services
-import { draftSection } from "./services/aiService";
+// Bundle-size pass (2026-07-30, Task 2): these are all mutually-exclusive-
+// at-a-time views — only one research phase or one tab is ever mounted per
+// render — so they're split into their own chunks via React.lazy() instead
+// of being parsed eagerly as part of the initial bundle. Each usage site
+// below is wrapped in a <Suspense> boundary. OutputFormatSelector,
+// OnboardingWizard, AppHeader/AppFooter and ErrorBoundary stay static
+// imports: they're small and/or on the critical first-paint path.
+const ResearchIntakeWizard = lazy(() => import("./components/ResearchIntakeWizard"));
+const GroundingMapDisplay = lazy(() => import("./components/GroundingMapDisplay"));
+const DataDiscoveryPanel = lazy(() => import("./components/DataDiscoveryPanel"));
+const JournalDiscoveryPanel = lazy(() => import("./components/JournalDiscoveryPanel"));
+const ComplianceChecklistPanel = lazy(() => import("./components/ComplianceChecklistPanel"));
+const NonJournalRequirementsPanel = lazy(() => import("./components/NonJournalRequirementsPanel"));
+const ManuscriptDraftingWorkspace = lazy(() => import("./components/ManuscriptDraftingWorkspace"));
+const QualityControlSuite = lazy(() => import("./components/QualityControlSuite"));
+const QCBasedRedraftingSuite = lazy(() => import("./components/QCBasedRedraftingSuite"));
+const SubmissionPackagingSuite = lazy(() => import("./components/SubmissionPackagingSuite"));
+const ManuscriptPDFViewer = lazy(() => import("./components/ManuscriptPDFViewer"));
+const ResearchIntelligenceDashboard = lazy(() => import("./components/ResearchIntelligenceDashboard"));
+const ManuscriptEditorWorkspace = lazy(() => import("./components/ManuscriptEditorWorkspace"));
+const CommandPalette = lazy(() => import("./components/CommandPalette"));
+const ActiveAgentsPanel = lazy(() => import("./components/agents/ActiveAgentsPanel"));
+
+// New components
+const KnowledgeVaultManager = lazy(() => import("./components/ThesisReader"));
+const VedicDatabase = lazy(() => import("./components/VedicDatabase"));
+const AIControlCenter = lazy(() => import("./components/AIControlCenter"));
+const ProfileSettings = lazy(() => import("./components/ProfileSettings"));
 
 // Icons
 // (Sparkles, GraduationCap, BookOpen, Trash2, LogOut, LayoutDashboard, ArrowLeft
 // removed — they were only used by the inline header/footer JSX now replaced
 // by <AppHeader>/<AppFooter>, which import their own icons directly.)
 import {
-  ChevronRight,
-  Clock,
-  Key,
   FileText,
-  Settings,
-  User,
-  Send,
   Loader2,
   FileSpreadsheet,
   Award,
-  BookOpenCheck,
-  Check,
-  Lock,
-  PlusCircle
+  BookOpenCheck
 } from "lucide-react";
+
+function PanelLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center py-16 text-[#94A3B8]">
+      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+      <span className="text-xs font-mono uppercase tracking-wider">Loading…</span>
+    </div>
+  );
+}
 
 export default function AppWrapper() {
   return (
@@ -65,7 +70,7 @@ export default function AppWrapper() {
 }
 
 function App() {
-  const { user, logout, project, setProject, loginDirectly, onboardingStep, setOnboardingStep } = useAuth();
+  const { user, logout, project, setProject, onboardingStep, setOnboardingStep } = useAuth();
   const [activeTab, setActiveTab] = useState<"workspace" | "vault" | "agents" | "publishing" | "citation" | "settings" | "profile">("workspace");
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   // Multi-project management
@@ -298,20 +303,22 @@ function App() {
 
         {/* DASHBOARD VIEW */}
         {onboardingStep === "workshop" && viewMode === "dashboard" && (
-          <ResearchIntelligenceDashboard
-            project={project}
-            projects={allProjects}
-            onSelectProject={switchToProject}
-            onCreateProject={createNewProject}
-            onDeleteProject={deleteProject}
-            onNavigateToPhase={(phaseId) => {
-              if (project) {
-                updateProject({ currentPhase: phaseId });
-                setViewMode("workspace");
-                setActiveTab("workspace");
-              }
-            }}
-          />
+          <Suspense fallback={<PanelLoadingFallback />}>
+            <ResearchIntelligenceDashboard
+              project={project}
+              projects={allProjects}
+              onSelectProject={switchToProject}
+              onCreateProject={createNewProject}
+              onDeleteProject={deleteProject}
+              onNavigateToPhase={(phaseId) => {
+                if (project) {
+                  updateProject({ currentPhase: phaseId });
+                  setViewMode("workspace");
+                  setActiveTab("workspace");
+                }
+              }}
+            />
+          </Suspense>
         )}
 
         {/* WORKSPACE VIEW */}
@@ -375,6 +382,7 @@ function App() {
             {/* Main Panel Content */}
             <div className="flex-grow w-full rounded-3xl p-5 md:p-6 shadow-sm border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-2)] min-h-[500px]">
               <ErrorBoundary>
+              <Suspense fallback={<PanelLoadingFallback />}>
                 {project.currentPhase === "A" && !project.outputFormat && (
                   <OutputFormatSelector
                     onSelect={(format) => updateProject({ outputFormat: format })}
@@ -473,96 +481,109 @@ function App() {
                     onBack={navigateBack}
                   />
                 )}
+              </Suspense>
               </ErrorBoundary>
             </div>
           </div>
         )}
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "vault" && project && (
-          <div className="grid grid-cols-1 gap-6">
-            <KnowledgeVaultManager project={project} updateProject={updateProject} />
-            <VedicDatabase />
-          </div>
+          <Suspense fallback={<PanelLoadingFallback />}>
+            <div className="grid grid-cols-1 gap-6">
+              <KnowledgeVaultManager project={project} updateProject={updateProject} />
+              <VedicDatabase />
+            </div>
+          </Suspense>
         )}
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "agents" && (
-          <ActiveAgentsPanel project={project} />
+          <Suspense fallback={<PanelLoadingFallback />}>
+            <ActiveAgentsPanel project={project} />
+          </Suspense>
         )}
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "publishing" && (
-          <div className="grid grid-cols-1 gap-6">
-            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
-                Journal Matching Agent
-              </h2>
-              <JournalDiscoveryPanel
-                project={project}
-                updateProject={updateProject}
-                onNext={() => {}}
-                onBack={() => {}}
-              />
+          <Suspense fallback={<PanelLoadingFallback />}>
+            <div className="grid grid-cols-1 gap-6">
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Journal Matching Agent
+                </h2>
+                <JournalDiscoveryPanel
+                  project={project}
+                  updateProject={updateProject}
+                  onNext={() => {}}
+                  onBack={() => {}}
+                />
+              </div>
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Submission Packaging Workbench
+                </h2>
+                <SubmissionPackagingSuite
+                  project={project}
+                  updateProject={updateProject}
+                  onBack={() => {}}
+                />
+              </div>
             </div>
-            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
-                <FileSpreadsheet className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
-                Submission Packaging Workbench
-              </h2>
-              <SubmissionPackagingSuite
-                project={project}
-                updateProject={updateProject}
-                onBack={() => {}}
-              />
-            </div>
-          </div>
+          </Suspense>
         )}
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "citation" && (
-          <div className="grid grid-cols-1 gap-6">
-            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
-                <BookOpenCheck className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
-                Citation Discovery & Textual Grounding
-              </h2>
-              <DataDiscoveryPanel
-                project={project}
-                updateProject={updateProject}
-                onNext={() => {}}
-                onBack={() => {}}
-              />
+          <Suspense fallback={<PanelLoadingFallback />}>
+            <div className="grid grid-cols-1 gap-6">
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <BookOpenCheck className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Citation Discovery & Textual Grounding
+                </h2>
+                <DataDiscoveryPanel
+                  project={project}
+                  updateProject={updateProject}
+                  onNext={() => {}}
+                  onBack={() => {}}
+                />
+              </div>
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Author Guidelines Parsing & Auditing
+                </h2>
+                <ComplianceChecklistPanel
+                  project={project}
+                  updateProject={updateProject}
+                  onNext={() => {}}
+                  onBack={() => {}}
+                />
+              </div>
             </div>
-            <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
-                Author Guidelines Parsing & Auditing
-              </h2>
-              <ComplianceChecklistPanel
-                project={project}
-                updateProject={updateProject}
-                onNext={() => {}}
-                onBack={() => {}}
-              />
-            </div>
-          </div>
+          </Suspense>
         )}
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "settings" && (
-          <AIControlCenter
-            project={project}
-            updateProject={updateProject}
-            onRequireVault={() => {
-              setActiveTab("vault");
-            }}
-            activeSubTab={settingsSubTab as any}
-            onSubTabChange={(tab) => setSettingsSubTab(tab)}
-          />
+          <Suspense fallback={<PanelLoadingFallback />}>
+            <AIControlCenter
+              project={project}
+              updateProject={updateProject}
+              onRequireVault={() => {
+                setActiveTab("vault");
+              }}
+              activeSubTab={settingsSubTab as any}
+              onSubTabChange={(tab) => setSettingsSubTab(tab)}
+            />
+          </Suspense>
         )}
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "profile" && (
-          <ProfileSettings 
-            currentUser={user} 
-            onProfileUpdated={loadAllProjects} 
-          />
+          <Suspense fallback={<PanelLoadingFallback />}>
+            <ProfileSettings
+              currentUser={user}
+              onProfileUpdated={loadAllProjects}
+            />
+          </Suspense>
         )}
       </main>
 
@@ -586,40 +607,44 @@ function App() {
               </button>
             </div>
             <div className="overflow-y-auto grow bg-[color:var(--color-navy-1)]">
-              <ManuscriptPDFViewer project={project} />
+              <Suspense fallback={<PanelLoadingFallback />}>
+                <ManuscriptPDFViewer project={project} />
+              </Suspense>
             </div>
           </div>
         </div>
       )}
 
       {project && (
-        <CommandPalette
-          isOpen={isCommandPaletteOpen}
-          onClose={() => setIsCommandPaletteOpen(false)}
-          onNavigatePhase={(phaseId) => handlePhaseChange(phaseId as any)}
-          onNavigateTab={(tabId) => setActiveTab(tabId)}
-          onToggleFocusMode={() => setIsFocusMode((prev) => !prev)}
-          onExportLaTeX={handleExportLaTeX}
-          onDownloadDocx={() => {
-            window.dispatchEvent(new CustomEvent("trigger-download-docx"));
-          }}
-          onDownloadPdf={() => {
-            window.dispatchEvent(new CustomEvent("trigger-download-pdf"));
-          }}
-          onModelChange={(provider, model) => {
-            let updatedSettings = { ...project.aiSettings };
-            if (provider === "gemini") {
-              updatedSettings.provider = "gemini";
-            } else {
-              updatedSettings.provider = "openai";
-              updatedSettings.openaiModel = model || "gpt-4o";
-            }
-            updateProject({ aiSettings: updatedSettings });
-          }}
-          onResetWorkspace={resetAllProgress}
-          activeModel={project?.aiSettings?.provider === "openai" ? (project?.aiSettings?.openaiModel || "gpt-4o") : "gemini"}
-          isFocusModeActive={isFocusMode}
-        />
+        <Suspense fallback={null}>
+          <CommandPalette
+            isOpen={isCommandPaletteOpen}
+            onClose={() => setIsCommandPaletteOpen(false)}
+            onNavigatePhase={(phaseId) => handlePhaseChange(phaseId as any)}
+            onNavigateTab={(tabId) => setActiveTab(tabId)}
+            onToggleFocusMode={() => setIsFocusMode((prev) => !prev)}
+            onExportLaTeX={handleExportLaTeX}
+            onDownloadDocx={() => {
+              window.dispatchEvent(new CustomEvent("trigger-download-docx"));
+            }}
+            onDownloadPdf={() => {
+              window.dispatchEvent(new CustomEvent("trigger-download-pdf"));
+            }}
+            onModelChange={(provider, model) => {
+              let updatedSettings = { ...project.aiSettings };
+              if (provider === "gemini") {
+                updatedSettings.provider = "gemini";
+              } else {
+                updatedSettings.provider = "openai";
+                updatedSettings.openaiModel = model || "gpt-4o";
+              }
+              updateProject({ aiSettings: updatedSettings });
+            }}
+            onResetWorkspace={resetAllProgress}
+            activeModel={project?.aiSettings?.provider === "openai" ? (project?.aiSettings?.openaiModel || "gpt-4o") : "gemini"}
+            isFocusModeActive={isFocusMode}
+          />
+        </Suspense>
       )}
 
       {/* Knowledge Vault setup handled by OnboardingWizard */}

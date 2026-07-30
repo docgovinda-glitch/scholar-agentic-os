@@ -4,8 +4,7 @@ import { generateCitation, simulateLookup } from "../services/citationService";
 import { runCitationAIAction } from "../services/aiService";
 import {
   BookOpen, Search, Plus, Trash2, Copy, Check, Sparkles, ShieldCheck,
-  AlertCircle, ChevronRight, FileText, Upload, Calendar, Link as LinkIcon,
-  Star, Tag, Eye, Layers, Cpu, HelpCircle, RefreshCw, CheckCircle2
+  ChevronRight, Star, RefreshCw, CheckCircle2
 } from "lucide-react";
 
 interface KnowledgeVaultManagerProps {

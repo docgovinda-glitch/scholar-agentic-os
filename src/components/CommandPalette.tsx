@@ -18,7 +18,6 @@ import {
   Database,
   ArrowRight
 } from "lucide-react";
-import { WORKFLOW_PHASES } from "../types";
 
 interface CommandPaletteProps {
   isOpen: boolean;

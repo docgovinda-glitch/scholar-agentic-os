@@ -40,6 +40,27 @@ const PORT = 3000;
 // from `import.meta.url` in the ESM path (`tsx server.ts`, used by `npm run
 // dev`), and defer to the ambient one otherwise. Resolved once, at module
 // load, not per-request.
+//
+// Warning cleanup (2026-07-30): the `npm run build` esbuild invocation now
+// passes `--define:import.meta={}` — this is NOT a behavior change, only a
+// way to silence esbuild's own "import.meta is not available with the cjs
+// output format" warning. Confirmed by diffing the compiled output with and
+// without the flag: esbuild already substitutes bare `{}` for `import.meta`
+// in the CJS bundle by default (undocumented but consistent), so `--define`
+// just makes that existing substitution explicit instead of implicit,
+// producing identical compiled code either way. `typeof import.meta` stays
+// `"object"` (not `"undefined"`), `import.meta.url` stays `undefined`
+// (there's no `.url` property on `{}`), so this function's `if` branch is
+// exactly as unreachable in the CJS bundle as it always was — only the
+// dev/tsx ESM path (where esbuild's --define never applies) still takes it.
+// This does NOT migrate the server bundle to ESM output — `dist/server.cjs`
+// stays CJS, matching `"start": "node dist/server.cjs"` and this repo's
+// `--packages=external` choice (externals are `require()`'d, not
+// `import`'d, avoiding any CJS/ESM interop risk for the ~15 npm packages
+// server.ts pulls in). A full ESM migration was considered and rejected as
+// out of scope for a warning-only fix — it would change the actual output
+// format/interop behavior of every external import, not just silence a
+// cosmetic warning.
 function resolveServerDirname(): string {
   if (typeof import.meta !== "undefined" && import.meta.url) {
     return path.dirname(fileURLToPath(import.meta.url));
@@ -66,27 +87,15 @@ app.use(
 
 const USERS_DB_PATH = path.join(serverDirname, "users.json");
 
+// Trimmed to the fields server.ts actually reads (2026-07-30): this used to
+// mirror the full users.json record shape from the old custom auth routes
+// (registration/activation/passcode-reset), removed in commit d61a69b —
+// `username` (findUserByUsername) and `encryptedApiKeys` (resolveApiKey's
+// server-stored-API-key fallback) are the only fields any code in this file
+// still reads or writes. Type-only change, no runtime effect.
 interface UserRecord {
   username: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  affiliation: string;
-  authenticId: string;
-  is_approved: boolean;
-  activationKeyHash: string;
-  passcodeHash?: string;
-  tempPasscodeHash?: string;
-  resetApproved?: boolean;
-  modelPreferences?: {
-    provider?: string;
-    model?: string;
-    [key: string]: any;
-  };
   encryptedApiKeys?: {
-    [provider: string]: string;
-  };
-  apiKeyHashes?: {
     [provider: string]: string;
   };
 }

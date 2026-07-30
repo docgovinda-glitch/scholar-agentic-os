@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { UserProfile, PaperProject, PROFILE_STATE_PREFIX, PROFILES_LIST_KEY, DEFAULT_STATE, OnboardingStep } from '../types';
+import { UserProfile, PaperProject, PROFILE_STATE_PREFIX, PROFILES_LIST_KEY, OnboardingStep } from '../types';
 import { hashPassword, verifyPassword } from '../utils/crypto';
 
 interface AuthContextProps {
@@ -13,9 +13,6 @@ interface AuthContextProps {
   logout: () => void;
   signup: (partial: Partial<UserProfile>) => Promise<void>;
   activate: (activationKey: string) => Promise<void>;
-  socialSignIn: (name: string, email: string, provider: 'google' | 'facebook') => Promise<void>;
-  sendOtp: (phone: string) => Promise<void>;
-  verifyOtp: (code: string) => Promise<void>;
   setProject: React.Dispatch<React.SetStateAction<PaperProject | null>>;
 }
 
@@ -149,52 +146,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setProject(profile.projectState);
   };
 
-  const socialSignIn = async (name: string, email: string, provider: 'google' | 'facebook') => {
-    const username = name.trim();
-    const stateKey = `${PROFILE_STATE_PREFIX}${username}`;
-    const savedStateStr = localStorage.getItem(stateKey);
-    let targetProjectState: PaperProject;
-    if (savedStateStr) {
-      try {
-        const profile = JSON.parse(savedStateStr) as UserProfile;
-        targetProjectState = profile.projectState;
-        
-        // Force Step to 'ai-setup'
-        profile.onboardingStep = "ai-setup";
-        localStorage.setItem(stateKey, JSON.stringify(profile));
-      }
-      catch { targetProjectState = DEFAULT_STATE(username); }
-    } else {
-      targetProjectState = DEFAULT_STATE(username);
-      targetProjectState.authorDetails = `${username}, PhD Scholar (${provider === 'google' ? 'Google' : 'Facebook'} Verified)`;
-      
-      // Hash social auth passcode for consistency
-      const socialPasscode = `social_${provider}_auth_passcode`;
-      const hashedPasscode = await hashPassword(socialPasscode);
-      
-      const newProfile: UserProfile = {
-        username,
-        passcodeHash: hashedPasscode,
-        projectState: targetProjectState,
-        fullName: username,
-        email,
-        status: 'approved',
-        onboardingStep: 'ai-setup'
-      } as UserProfile;
-      localStorage.setItem(stateKey, JSON.stringify(newProfile));
-      const savedList = localStorage.getItem(PROFILES_LIST_KEY);
-      let list: string[] = [];
-      if (savedList) {
-        try { list = JSON.parse(savedList).profilesList || []; } catch (_) {}
-      }
-      if (!list.includes(username)) { list.push(username); localStorage.setItem(PROFILES_LIST_KEY, JSON.stringify({ profilesList: list })); }
-    }
-    setUser(username);
-    setProject(targetProjectState);
-    setOnboardingStepState("ai-setup");
-    localStorage.setItem('phd_active_session_username', username);
-  };
-
   const loginDirectly = (username: string, projectState: PaperProject) => {
     setUser(username);
     setProject(projectState);
@@ -212,8 +163,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.setItem('phd_active_session_username', username);
   };
 
-  const sendOtp = async (phone: string) => { console.log('Sending OTP to', phone); };
-  const verifyOtp = async (code: string) => { console.log('Verifying OTP code', code); };
 
   return (
     <AuthContext.Provider value={{
@@ -227,9 +176,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       logout,
       signup,
       activate,
-      socialSignIn,
-      sendOtp,
-      verifyOtp,
       setProject
     }}>
       {children}

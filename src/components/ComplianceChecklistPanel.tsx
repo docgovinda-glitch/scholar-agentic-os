@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { PaperProject, ComplianceRules } from "../types";
-import { FileSearch, Sparkles, ClipboardCheck, Edit3, CheckSquare, ListPlus, Upload } from "lucide-react";
+import { Sparkles, ClipboardCheck, CheckSquare, Upload } from "lucide-react";
 import { extractRequirements } from "../services/aiService";
 import { learnStructureFromSampleDocument } from "../services/sampleDocLearningService";
 
@@ -78,9 +78,7 @@ export default function ComplianceChecklistPanel({
         titleLower.includes("international order") ||
         titleLower.includes("international relations")
       ));
-      
-    const isEJIR = journalName === "European Journal of International Relations";
-    
+
     if (isISQ) {
       standardRules = {
         wordCountGoal: "8,000 - 10,000 words (including footnotes/references)",

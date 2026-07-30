@@ -30,7 +30,7 @@ import { PaperProject, VaultFile, KnowledgeVault, CitationMetadata } from "../ty
 import { uploadAndProcessFile } from "../services/knowledgeVaultService";
 import KnowledgeVaultManagerSuite from "./KnowledgeVaultManager";
 import KnowledgeVaultEngineV2 from "./KnowledgeVaultEngineV2";
-import { generateCitation, simulateLookup } from "../services/citationService";
+import { generateCitation } from "../services/citationService";
 
 interface KnowledgeVaultProps {
   project: PaperProject;
@@ -42,7 +42,6 @@ export default function KnowledgeVaultManager({ project, updateProject }: Knowle
   const [showV2Engine, setShowV2Engine] = useState(false);
   const [citationFormat, setCitationFormat] = useState("APA 7");
   const [copiedFormat, setCopiedFormat] = useState(false);
-  const [lookupLoading, setLookupLoading] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);

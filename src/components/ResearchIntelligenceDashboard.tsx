@@ -129,7 +129,6 @@ export default function ResearchIntelligenceDashboard({
   const draftArticles = projects.filter(p => p.status === "Draft" || !p.status).length;
   const submittedArticles = projects.filter(p => p.status === "Submitted").length;
   const acceptedArticles = projects.filter(p => p.status === "Accepted").length;
-  const rejectedArticles = projects.filter(p => p.status === "Rejected").length;
 
   // AI Usage calculations
   let totalCost = 0;
