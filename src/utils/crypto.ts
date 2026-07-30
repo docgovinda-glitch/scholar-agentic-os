@@ -100,14 +100,14 @@ export async function hashPassword(password: string): Promise<string> {
     },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
-    false,
+    true,
     ["encrypt", "decrypt"]
   );
-  
+
   const rawKey = await crypto.subtle.exportKey("raw", key);
   const hashB64 = btoa(String.fromCharCode(...new Uint8Array(rawKey)));
   const saltB64 = btoa(String.fromCharCode(...salt));
-  
+
   return `${saltB64}$${hashB64}`;
 }
 
@@ -142,10 +142,10 @@ export async function verifyPassword(password: string, storedHash: string): Prom
       },
       keyMaterial,
       { name: "AES-GCM", length: 256 },
-      false,
+      true,
       ["encrypt", "decrypt"]
     );
-    
+
     const rawKey = await crypto.subtle.exportKey("raw", key);
     const computedHashB64 = btoa(String.fromCharCode(...new Uint8Array(rawKey)));
     
