@@ -1,6 +1,18 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-07-30, manuscript approval no longer a blind rubber-stamp — supersedes the section below)
+## RESUME HERE TOMORROW (as of 2026-07-30, IntegrityReviewerAgent result now persisted + surfaced at approval — supersedes the section below)
+
+**Closed the exact gap flagged at the end of the QC-visibility fix below.** `IntegrityReviewerAgent`'s result (`structuralCompleteness`/`integrityScore`/`ethicsScore` + `blockingIssues`, run via `agentService.executeAgent()` in `QualityControlSuite.tsx`) was local component `useState` only — never persisted onto `PaperProject`, invisible everywhere outside that one tab. Commit `db52394`.
+
+Added `PaperProject.integrityReviewReport` (a type-only circular import from `agents/integrityReviewer.ts` back into `types.ts` — fine, `import type` is fully erased at compile time). `QualityControlSuite.tsx` now persists it via `updateProject()` in both places it computes a result (`runIntegrityReview`, `runFullPipelineReview`), and seeds its own display state from the persisted value so a prior result survives navigating away and back. `ManuscriptEditorWorkspace.tsx`'s approval confirm dialog now shows both integrity signals side by side (the QC report from the fix below, plus this one), each with an honest "not run yet" line when absent — same non-blocking, informed-consent design, not a new verdict gate.
+
+1 new test (6 total in `ManuscriptEditorWorkspace.approval.test.tsx`). `tsc --noEmit` clean, full suite 1081/1081 (+1), `npm run build` clean. Live-verified in a real browser: seeded both a real `qcReport` and a real `integrityReviewReport`, confirmed both signals' real numbers and real blocking-issue text appeared together in the native confirm dialog.
+
+This closes the integrity-audit thread that started with the fabrication sweep two sessions ago — both of the app's real integrity signals now reach the point where a human actually needs to see them, not just the one that happened to be checked first.
+
+---
+
+## RESUME HERE TOMORROW (as of 2026-07-30, manuscript approval no longer a blind rubber-stamp — superseded by the section above)
 
 **Follow-up to the fabrication audit below**: checked whether the app's real QC/integrity computation actually has any teeth at the approval step, or whether it's purely decorative. Found: `ManuscriptEditorWorkspace.tsx`'s `handleApprove()` never referenced `project.qcReport` at all — one generic `confirm()` dialog regardless of whether any QC audit had ever run, or had run and surfaced real weaknesses. Commit `b36da3f`.
 
