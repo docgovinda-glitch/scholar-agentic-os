@@ -1,4 +1,5 @@
 import express from "express";
+import helmet from "helmet";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
@@ -51,6 +52,17 @@ function resolveServerDirname(): string {
 const serverDirname = resolveServerDirname();
 
 const app = express();
+
+// Security headers (helmet) — previously entirely absent from this server.
+// CSP is skipped in dev: Vite's middleware-mode HMR needs inline
+// scripts/eval and a websocket connection that a strict default CSP would
+// block; production serves pre-built static assets instead and gets the
+// full default policy.
+app.use(
+  helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+  })
+);
 
 const USERS_DB_PATH = path.join(serverDirname, "users.json");
 
