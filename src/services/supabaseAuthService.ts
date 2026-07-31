@@ -337,11 +337,11 @@ export function onGoogleSignIn(
   callback: (user: { id: string; email: string; fullName: string }) => void
 ): () => void {
   const supabase = getSupabaseClient();
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((event, session) => {
-    if (event !== "SIGNED_IN" || !session?.user) return;
+  let fired = false;
+  const fireOnce = (session: { user: { id: string; email?: string; app_metadata?: any; user_metadata?: any } } | null | undefined) => {
+    if (fired || !session?.user) return;
     if (session.user.app_metadata?.provider !== "google") return;
+    fired = true;
     callback({
       id: session.user.id,
       email: session.user.email || "",
@@ -351,6 +351,29 @@ export function onGoogleSignIn(
         session.user.email ||
         "",
     });
+  };
+
+  // Bug fix (2026-07-31): this used to rely solely on onAuthStateChange
+  // firing a SIGNED_IN event after landing back from Google's redirect.
+  // Confirmed live (via Supabase's own auth logs — every OAuth attempt
+  // completed successfully server-side, a real session created every
+  // time) that the client was nonetheless still showing the login screen.
+  // UserProfileGate is React.lazy()-loaded, so this listener only
+  // registers once its chunk has fetched and the component has mounted —
+  // by then, Supabase's client-side session detection from the redirect
+  // URL may have already run and fired SIGNED_IN into a listener that
+  // didn't exist yet, a well-documented class of race in Supabase+React
+  // apps. Checking getSession() explicitly on registration catches a
+  // session that was already established by the time this subscribes,
+  // regardless of that timing; onAuthStateChange still covers a fresh
+  // sign-in that happens after.
+  supabase.auth.getSession().then(({ data }) => fireOnce(data.session));
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((event, session) => {
+    if (event !== "SIGNED_IN") return;
+    fireOnce(session);
   });
   return () => subscription.unsubscribe();
 }
