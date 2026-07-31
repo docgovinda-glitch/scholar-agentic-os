@@ -6,11 +6,21 @@
 // in incoming email to check for phishing, before a human ever opens the
 // message) silently triggered real approvals with zero human involvement,
 // completely bypassing the admin-review gate this function exists to
-// enforce. GET is now read-only: it renders a confirmation page showing the
-// scholar's details and a button. Only a POST (submitted by that button,
-// which an automated link-scanner won't do) actually flips `is_approved`.
-// This is the standard fix for "unsafe GET" — a state-changing action must
-// never be a side-effect-free-looking idempotent GET.
+// enforce. GET is now read-only; only a POST (submitted by a real button
+// click, which an automated link-scanner won't do) actually flips
+// `is_approved`. This is the standard fix for "unsafe GET" — a
+// state-changing action must never be a side-effect-free-looking
+// idempotent GET.
+//
+// Second fix, same day: this originally rendered the confirmation page's
+// HTML inline. Confirmed live that Supabase's Edge Function gateway forces
+// every response to `Content-Type: text/plain` plus a locked-down
+// sandboxed CSP, regardless of what Content-Type the function code sets —
+// so the "page" displayed as inert raw markup with no actual clickable
+// button, and nothing ever submitted. The confirmation UI now lives at
+// `/admin/approve-scholar` on the main app (server.ts), which has no such
+// restriction; this function redirects there for every human-facing state
+// and keeps only the privileged is_approved write + the two emails.
 //
 // Deploy: supabase functions deploy approve-registration
 // Requires project secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY (RESEND_FROM_EMAIL optional)
@@ -18,37 +28,24 @@
 import { createAdminClient } from "../_shared/adminClient.ts";
 import { sendEmail, brandedEmailHtml } from "../_shared/resend.ts";
 
-function htmlPage(title: string, bodyHtml: string): string {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head>
-     <body style="font-family: sans-serif; background:#FAF8F5; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0;">
-       <div style="max-width:500px; padding:40px; border:1px solid #D1CEC7; border-radius:24px; background:white; text-align:center; color:#1A365D;">
-         ${bodyHtml}
-       </div>
-     </body></html>`;
+// Single-tenant deployment — hardcoded rather than adding yet another
+// secret just for this. Update here if the production domain ever changes.
+const APP_URL = "https://scholar.gkshah.com.np";
+
+function redirectTo(path: string, params: Record<string, string>): Response {
+  const url = new URL(`${APP_URL}${path}`);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  return Response.redirect(url.toString(), 302);
 }
 
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   const userId = url.searchParams.get("userId");
 
-  // Bug fix (2026-07-31): the confirmation form's action was built from
-  // `url.toString()` (i.e. req.url as Deno's Edge Function runtime sees
-  // it) — confirmed live that this is NOT the public-facing URL. It
-  // rendered as `http://<ref>.supabase.co/approve-registration?userId=...`,
-  // missing the `/functions/v1/` prefix and downgraded to http — a real
-  // admin clicked "Approve Scholar" in production and got the exact same
-  // confirmation page back instead of an approval, because the form
-  // POSTed to a URL that doesn't route to this function at all. Built from
-  // the known public base instead (same pattern send-approval-email
-  // already uses for the link it emails), not from the request's own URL.
-  const functionsBaseUrl = Deno.env.get("SUPABASE_URL") + "/functions/v1";
-  const publicUrl = `${functionsBaseUrl}/approve-registration?userId=${encodeURIComponent(userId || "")}`;
-
   if (!userId) {
-    return new Response(htmlPage("Missing parameters", "<h3>Missing approval parameters.</h3>"), {
-      status: 400,
-      headers: { "Content-Type": "text/html" },
-    });
+    return redirectTo("/admin/approve-scholar", { notfound: "1" });
   }
 
   const supabase = createAdminClient();
@@ -60,42 +57,19 @@ Deno.serve(async (req) => {
     .single();
 
   if (profileError || !profile) {
-    return new Response(htmlPage("Not found", "<h3>Could not find a pending scholar for that approval link.</h3>"), {
-      status: 404,
-      headers: { "Content-Type": "text/html" },
-    });
+    return redirectTo("/admin/approve-scholar", { notfound: "1" });
   }
 
   if (profile.is_approved) {
-    return new Response(
-      htmlPage(
-        "Already approved",
-        `<h2 style="font-family: Georgia, serif; font-style: italic; color:#C08A3E;">Already Approved</h2>
-         <p>${profile.username} was already approved — no action needed.</p>`
-      ),
-      { status: 200, headers: { "Content-Type": "text/html" } }
-    );
+    return redirectTo("/admin/approve-scholar", { already: "1", username: profile.username });
   }
 
   if (req.method === "GET") {
-    return new Response(
-      htmlPage(
-        "Confirm Scholar Approval",
-        `<h2 style="font-family: Georgia, serif; font-style: italic; color:#C08A3E;">Confirm Approval</h2>
-         <p>Approve <strong>${profile.username}</strong> for the Scholar Agentic research workspace?</p>
-         <form method="POST" action="${publicUrl}">
-           <button type="submit" style="background-color:#C08A3E; color:white; padding:12px 24px; border:none; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer;">Approve Scholar</button>
-         </form>`
-      ),
-      { status: 200, headers: { "Content-Type": "text/html" } }
-    );
+    return redirectTo("/admin/approve-scholar", { userId, username: profile.username });
   }
 
   if (req.method !== "POST") {
-    return new Response(htmlPage("Method not allowed", "<h3>Method not allowed.</h3>"), {
-      status: 405,
-      headers: { "Content-Type": "text/html" },
-    });
+    return new Response("Method not allowed", { status: 405 });
   }
 
   const { data: updated, error: updateError } = await supabase
@@ -106,10 +80,7 @@ Deno.serve(async (req) => {
     .single();
 
   if (updateError || !updated) {
-    return new Response(htmlPage("Error", "<h3>Could not approve that scholar. Please try again.</h3>"), {
-      status: 500,
-      headers: { "Content-Type": "text/html" },
-    });
+    return redirectTo("/admin/approve-scholar", { error: "1" });
   }
 
   const { data: userData } = await supabase.auth.admin.getUserById(userId);
@@ -126,12 +97,5 @@ Deno.serve(async (req) => {
     });
   }
 
-  return new Response(
-    htmlPage(
-      "Scholar Approved",
-      `<h2 style="font-family: Georgia, serif; font-style: italic; color:#C08A3E;">Scholar Approved</h2>
-       <p>${updated.username} can now log in to the Scholar Agentic workspace.</p>`
-    ),
-    { status: 200, headers: { "Content-Type": "text/html" } }
-  );
+  return redirectTo("/admin/approve-scholar", { approved: "1", username: updated.username });
 });
