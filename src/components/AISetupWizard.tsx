@@ -42,6 +42,9 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   const [isTesting, setIsTesting] = useState(false);
   const [healthResults, setHealthResults] = useState<Record<string, HealthStatus>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  // Surfaced next to Validate & Continue — see runFinalValidation for why a
+  // silent failure there read as a dead button.
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Task 3 (BYOK vault passphrase) — a separate, in-memory-only secret used to
   // encrypt provider API keys, distinct from the login passcode. See
@@ -336,18 +339,58 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     }
   };
 
+  /**
+   * Validate the chosen providers and move on.
+   *
+   * Bug fix (2026-07-31): "Validate & Continue" could appear completely dead.
+   * Two causes, both fixed here.
+   *
+   * 1. Any throw landed in a catch that only called console.error — no
+   *    message, no state change, no advance. From the user's side the button
+   *    simply did nothing, with the reason visible only in devtools.
+   *    Validation is now per-provider and settled individually, so one failing
+   *    provider can never abort the whole step, and the wizard ALWAYS advances:
+   *    a provider that cannot be reached is a reason to continue in simulated
+   *    mode, not a reason to trap someone on this screen.
+   *
+   * 2. It called healthCheckAll, which probes every local runner in the
+   *    catalog plus every cloud provider holding a key. After the catalog grew
+   *    that meant ~9 loopback probes (3s timeout each) and a round of proxy
+   *    calls the user never asked for — slow enough to look hung, and prone to
+   *    tripping the server's own rate limiter (the 429s on /api/generate in the
+   *    reported console). Only the selected providers are checked now.
+   */
   const runFinalValidation = async () => {
     setIsTesting(true);
+    setValidationError(null);
     try {
-      // Create a test settings object with only selected providers. Commits
-      // first for the same reason testConnection does.
       const committed = await commitApiKeys();
       const testSettings = { ...committed, fallbackOrder: selectedProviders };
-      const results = await AIGateway.healthCheckAll(testSettings);
+
+      const settled = await Promise.allSettled(
+        selectedProviders.map(id => AIGateway.healthCheckProvider(id, testSettings))
+      );
+
+      const results: Record<string, HealthStatus> = {};
+      settled.forEach((outcome, i) => {
+        const id = selectedProviders[i];
+        results[id] = outcome.status === "fulfilled"
+          ? outcome.value
+          : {
+              provider: id,
+              status: "offline",
+              lastChecked: new Date().toISOString(),
+              error: (outcome.reason as Error)?.message || "Connection check failed",
+            };
+      });
       setHealthResults(prev => ({ ...prev, ...results }));
 
-      // Determine overall readiness
       const onlineCount = selectedProviders.filter(p => results[p]?.status === 'online').length;
+      if (onlineCount === 0) {
+        setValidationError(
+          "None of the selected providers responded. You can continue anyway — the app will run in simulated mode until a provider connects."
+        );
+      }
 
       const newSettings: AISettings = {
         ...testSettings,
@@ -359,7 +402,12 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
       setSettings(newSettings);
       setStep(3);
     } catch (e) {
+      // Reaching here means something outside the per-provider checks failed
+      // (e.g. encryption). Say so instead of leaving a dead button.
       console.error("Validation failed", e);
+      setValidationError(
+        e instanceof Error ? `Could not finish setting up: ${e.message}` : "Could not finish setting up."
+      );
     } finally {
       setIsTesting(false);
     }
@@ -754,6 +802,14 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             );
           })}
         </div>
+
+        {/* Never leave the primary action looking dead — see runFinalValidation. */}
+        {validationError && (
+          <div className="max-w-3xl mx-auto flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-[#E2E8F0] leading-relaxed">{validationError}</p>
+          </div>
+        )}
 
         <div className="flex justify-between items-center pt-8 border-t border-[color:var(--color-navy-4)] max-w-3xl mx-auto">
           <button

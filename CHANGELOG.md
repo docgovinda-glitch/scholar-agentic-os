@@ -2,6 +2,31 @@
 
 ## Unreleased — AI Configuration redesign (2026-07-31)
 
+### Fixed — Local AI blocked by upgrade-insecure-requests; dead Validate button
+
+- **Allowing localhost in `connect-src` did nothing on its own.** Helmet's
+  default directives include `upgrade-insecure-requests`, which rewrites every
+  `http://` request to `https://` before it is sent — so the browser never
+  requested `http://localhost:11434`, it requested `https://localhost:11434`
+  and got "An SSL error has occurred" against every runner port (seen in a
+  user's Safari console). Local AI servers speak plain HTTP on loopback and
+  have no certificate, so the upgrade can never succeed.
+
+  The directive must be set to `null`, not merely omitted: helmet defaults to
+  `useDefaults: true` and merges its defaults back over whatever is supplied,
+  so leaving the key out silently reinstates it. Verified against helmet
+  directly, then end-to-end in a browser.
+
+- **"Validate & Continue" could appear completely dead.** Any throw landed in a
+  `catch` that only called `console.error` — no message, no advance. It also
+  called `healthCheckAll`, probing every local runner (~9 loopback probes at a
+  3s timeout) plus every cloud provider holding a key, which was slow enough to
+  look hung and tripped the server's own rate limiter (the 429s on
+  `/api/generate` in the reported console). It now checks only the selected
+  providers, settles each independently, always advances, and shows the reason
+  when nothing connected.
+
+
 ### Fixed — API key entry was unusable (blocker)
 
 - **You could not enter an API key for any provider.** Every keystroke ran

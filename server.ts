@@ -151,12 +151,34 @@ const localRunnerSources = Array.from(
   )
 );
 
+// upgrade-insecure-requests fix (2026-07-31): allowing localhost in
+// connect-src above was necessary but did nothing on its own. Helmet's default
+// directives include `upgrade-insecure-requests`, which rewrites every http://
+// request to https:// BEFORE it is sent — so the browser never asked for
+// http://localhost:11434 at all, it asked for https://localhost:11434 and got
+// "An SSL error has occurred" (confirmed in a user's Safari console against
+// every runner port). Local AI programs serve plain HTTP on loopback and have
+// no certificate, so the upgrade can never succeed.
+//
+// The directive is dropped rather than overridden because it is all-or-nothing
+// — there is no per-source exemption. The protection lost is small here: every
+// other source in this policy is already an explicit https:// origin, and the
+// app's own assets are same-origin HTTPS, so there is no http:// subresource
+// left for it to upgrade. Loopback is exempt from mixed-content blocking by
+// spec precisely because it is not attacker-reachable.
+//
+// It MUST be set to null rather than simply omitted from the spread: helmet
+// defaults to `useDefaults: true` and merges its default directives back over
+// whatever is supplied, so leaving the key out silently reinstates it. Checked
+// against helmet directly — omitting keeps the directive in the header, null
+// removes it.
 const supabaseOrigin = process.env.VITE_SUPABASE_URL ? new URL(process.env.VITE_SUPABASE_URL).origin : undefined;
 app.use(
   helmet({
     contentSecurityPolicy: process.env.NODE_ENV === "production" ? {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "upgrade-insecure-requests": null,
         "connect-src": [
           "'self'",
           ...(supabaseOrigin ? [supabaseOrigin] : []),
