@@ -367,11 +367,28 @@ export function onGoogleSignIn(
   // session that was already established by the time this subscribes,
   // regardless of that timing; onAuthStateChange still covers a fresh
   // sign-in that happens after.
-  supabase.auth.getSession().then(({ data }) => fireOnce(data.session));
+  // TEMPORARY diagnostic logging (2026-07-31) — remove once the "Google
+  // sign-in bounces back to login" report is root-caused. Tagged
+  // [GoogleSignIn] to be easy to find/strip later.
+  supabase.auth.getSession().then(({ data, error }) => {
+    console.log("[GoogleSignIn] getSession() resolved", {
+      hasSession: !!data.session,
+      provider: data.session?.user?.app_metadata?.provider,
+      userId: data.session?.user?.id,
+      error,
+    });
+    fireOnce(data.session);
+  });
 
   const {
     data: { subscription },
   } = supabase.auth.onAuthStateChange((event, session) => {
+    console.log("[GoogleSignIn] onAuthStateChange event", {
+      event,
+      hasSession: !!session,
+      provider: session?.user?.app_metadata?.provider,
+      userId: session?.user?.id,
+    });
     if (event !== "SIGNED_IN") return;
     fireOnce(session);
   });
