@@ -301,6 +301,22 @@ export function onPasswordRecovery(callback: () => void): () => void {
   return () => subscription.unsubscribe();
 }
 
+// Set right before navigating to Google, read back after the redirect
+// returns — see onGoogleSignIn's doc comment for why this exists instead
+// of inspecting the session's provider metadata.
+const GOOGLE_OAUTH_PENDING_KEY = "phd_google_oauth_pending";
+
+/**
+ * Clears a pending-Google-redirect marker without waiting for it to be
+ * consumed by onGoogleSignIn. Call this at the start of a normal password
+ * login so an abandoned Google redirect (e.g. the user started it, then
+ * closed the tab before finishing) can't be mistakenly treated as "the
+ * user just came back from Google" by an unrelated later sign-in.
+ */
+export function clearPendingGoogleSignIn(): void {
+  localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY);
+}
+
 /**
  * Starts Supabase's own Google OAuth redirect flow. Replaces the old
  * client-side Google Identity Services implementation entirely — there is
@@ -315,6 +331,7 @@ export function onPasswordRecovery(callback: () => void): () => void {
  */
 export async function signInWithGoogle() {
   const supabase = getSupabaseClient();
+  localStorage.setItem(GOOGLE_OAUTH_PENDING_KEY, "1");
   return supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -327,21 +344,38 @@ export async function signInWithGoogle() {
  * Registers a callback for the moment Supabase establishes a real session
  * that came from Google OAuth (as opposed to this app's own
  * signInWithPassword call in signIn() above, which also fires SIGNED_IN).
- * Distinguished via session.user.app_metadata.provider, which Supabase
- * sets itself based on which provider actually authenticated the user —
- * not something this app has to track. Fires once per page load where the
- * user just landed back from Google's redirect (or already has an active
- * Google-authenticated session). Returns an unsubscribe function.
+ *
+ * Bug fix (2026-07-31): this used to distinguish via
+ * session.user.app_metadata.provider === "google". Confirmed live, with
+ * console logging, that this field reflects the account's ORIGINAL signup
+ * provider, not "how did this specific sign-in happen" — an account
+ * created via email/password keeps app_metadata.provider === "email"
+ * forever, even during a session that a Google OAuth redirect just
+ * established, because Supabase links Google as an additional identity by
+ * matching email rather than replacing the primary provider. This meant
+ * onGoogleSignIn's callback silently never fired for any scholar who'd
+ * registered with a password first and later used Google (it worked fine
+ * for a brand-new Google-only signup, where "google" genuinely is the
+ * original provider — which is why that case looked fine while this one
+ * didn't). Fixed by tracking "a Google redirect is in flight" explicitly
+ * via localStorage (survives the full-page navigation to Google and back,
+ * unlike React state) instead of inspecting ambiguous session metadata.
+ *
+ * Fires once per page load where the user just landed back from Google's
+ * redirect (or already has an active session established that way, if
+ * this listener registered late — see the getSession() call below).
+ * Returns an unsubscribe function.
  */
 export function onGoogleSignIn(
   callback: (user: { id: string; email: string; fullName: string }) => void
 ): () => void {
   const supabase = getSupabaseClient();
   let fired = false;
-  const fireOnce = (session: { user: { id: string; email?: string; app_metadata?: any; user_metadata?: any } } | null | undefined) => {
+  const fireOnce = (session: { user: { id: string; email?: string; user_metadata?: any } } | null | undefined) => {
     if (fired || !session?.user) return;
-    if (session.user.app_metadata?.provider !== "google") return;
+    if (localStorage.getItem(GOOGLE_OAUTH_PENDING_KEY) !== "1") return;
     fired = true;
+    localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY);
     callback({
       id: session.user.id,
       email: session.user.email || "",
@@ -353,11 +387,6 @@ export function onGoogleSignIn(
     });
   };
 
-  // Bug fix (2026-07-31): this used to rely solely on onAuthStateChange
-  // firing a SIGNED_IN event after landing back from Google's redirect.
-  // Confirmed live (via Supabase's own auth logs — every OAuth attempt
-  // completed successfully server-side, a real session created every
-  // time) that the client was nonetheless still showing the login screen.
   // UserProfileGate is React.lazy()-loaded, so this listener only
   // registers once its chunk has fetched and the component has mounted —
   // by then, Supabase's client-side session detection from the redirect
@@ -367,29 +396,11 @@ export function onGoogleSignIn(
   // session that was already established by the time this subscribes,
   // regardless of that timing; onAuthStateChange still covers a fresh
   // sign-in that happens after.
-  // TEMPORARY diagnostic logging (2026-07-31) — remove once the "Google
-  // sign-in bounces back to login" report is root-caused. Tagged
-  // [GoogleSignIn] to be easy to find/strip later.
-  supabase.auth.getSession().then(({ data, error }) => {
-    console.log("[GoogleSignIn] getSession() resolved", {
-      hasSession: !!data.session,
-      provider: data.session?.user?.app_metadata?.provider,
-      userId: data.session?.user?.id,
-      error,
-    });
-    fireOnce(data.session);
-  });
+  supabase.auth.getSession().then(({ data }) => fireOnce(data.session));
 
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange((event, session) => {
-    console.log("[GoogleSignIn] onAuthStateChange event", {
-      event,
-      hasSession: !!session,
-      provider: session?.user?.app_metadata?.provider,
-      userId: session?.user?.id,
-    });
-    if (event !== "SIGNED_IN") return;
+  } = supabase.auth.onAuthStateChange((_event, session) => {
     fireOnce(session);
   });
   return () => subscription.unsubscribe();

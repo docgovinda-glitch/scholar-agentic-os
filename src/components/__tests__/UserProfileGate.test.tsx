@@ -80,6 +80,7 @@ vi.mock("../../services/supabaseAuthService", () => ({
     }
     return error?.status ? `${fallback} (server error ${error.status}).` : fallback;
   },
+  clearPendingGoogleSignIn: vi.fn(),
 }));
 
 // Vitest's jsdom environment proxies window's own-enumerable properties onto

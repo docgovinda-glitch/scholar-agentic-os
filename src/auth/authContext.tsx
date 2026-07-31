@@ -164,7 +164,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const loginDirectly = (username: string, projectState: PaperProject) => {
-    console.log("[GoogleSignIn] loginDirectly called", { username });
     setUser(username);
     setProject(projectState);
     setOnboardingStepState("ai-setup");

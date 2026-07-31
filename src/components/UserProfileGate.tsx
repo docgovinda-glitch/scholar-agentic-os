@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { User, Lock, Eye, EyeOff, ShieldCheck, Check, AlertCircle, Sparkles, GraduationCap, ArrowRight, ShieldAlert, Key, Phone, Mail, Building, Landmark, Clock } from "lucide-react";
 import { UserProfile, PaperProject } from "../types";
-import { signUp, signIn, sendPasswordResetEmail, updatePassword, onPasswordRecovery, signInWithGoogle, onGoogleSignIn, safeAuthErrorMessage } from "../services/supabaseAuthService";
+import { signUp, signIn, sendPasswordResetEmail, updatePassword, onPasswordRecovery, signInWithGoogle, onGoogleSignIn, safeAuthErrorMessage, clearPendingGoogleSignIn } from "../services/supabaseAuthService";
 
 interface UserProfileGateProps {
   onProfileActive: (username: string, projectState: PaperProject) => void;
@@ -106,9 +106,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     // entirely. Supabase's own client handles the whole redirect round-trip
     // (including clearing its own hash fragment); this just reacts to the
     // session once it exists, same as onPasswordRecovery above.
-    console.log("[GoogleSignIn] UserProfileGate mounted, registering onGoogleSignIn listener");
     const unsubscribeGoogle = onGoogleSignIn((user) => {
-      console.log("[GoogleSignIn] onGoogleSignIn callback fired", user);
       handleSocialSignIn(user.fullName, user.email);
     });
 
@@ -323,7 +321,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
   };
 
   const handleSocialSignIn = async (name: string, emailStr: string) => {
-    console.log("[GoogleSignIn] handleSocialSignIn called", { name, emailStr });
     setLoading(true);
     setError(null);
 
@@ -336,7 +333,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
     const stateKey = `${PROFILE_STATE_PREFIX}${username}`;
     const savedStateStr = localStorage.getItem(stateKey);
-    console.log("[GoogleSignIn] resolved stateKey", { stateKey, hasExisting: !!savedStateStr });
 
     let targetProjectState: PaperProject;
 
@@ -386,11 +382,9 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
       }
     }
     
-    console.log("[GoogleSignIn] about to call onProfileActive", { username });
     setTimeout(() => {
       setLoading(false);
       onProfileActive(username, targetProjectState);
-      console.log("[GoogleSignIn] onProfileActive called", { username });
     }, 800);
   };
 
@@ -406,6 +400,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    clearPendingGoogleSignIn();
 
     const nameTrimmed = usernameInput.trim();
     if (!nameTrimmed) {
