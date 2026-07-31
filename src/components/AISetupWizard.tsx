@@ -127,12 +127,21 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             // Automatically pre-select Gemini
             setSelectedProviders(prev => Array.from(new Set([...prev, "gemini"])));
             
-            // Pre-fill geminiApiKey with "defined_on_server" dummy key
+            // Pre-fill geminiApiKey with "defined_on_server" dummy key.
+            // Requires an unlocked vault — encryptDataAsync refuses an empty
+            // secret — so this becomes effective on unlock, when vaultSecret
+            // changes and re-runs this effect.
+            if (!vaultSecret) return;
             const encryptedDummy = await encryptDataAsync("defined_on_server", vaultSecret);
             setSettings(prev => ({
               ...prev,
               geminiApiKey: encryptedDummy
             }));
+            // The hydration effect now keys off vaultSecret alone, so it will
+            // not observe this write — reflect the display label directly.
+            setDecryptedKeys(prev =>
+              prev.gemini ? prev : { ...prev, gemini: "Defined on Server (.env)" }
+            );
           }
         }
       } catch (e) {
@@ -179,12 +188,46 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   // waiting on the encrypt round-trip before echoing what was typed.
   const [decryptedKeys, setDecryptedKeys] = useState<Record<string, string>>({});
 
+  // Fields the user is actively editing. A ref, not state, so marking one
+  // dirty never re-runs the hydration effect below.
+  const dirtyKeysRef = React.useRef<Record<string, boolean>>({});
+
+  // Mirror of `settings` for the commit path, which must read the newest value
+  // synchronously — setSettings is async, so a Test Connection fired right
+  // after a blur would otherwise encrypt against a stale object.
+  const settingsRef = React.useRef(settings);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+
+  /**
+   * Hydrate the visible plaintext from stored ciphertext.
+   *
+   * Bug fix (2026-07-31) — this used to depend on `[settings, vaultSecret]`,
+   * which made API-key entry unusable. Every keystroke encrypted the field
+   * (PBKDF2, 100k iterations, ~55ms) and wrote `settings`; that write re-ran
+   * this effect, which decrypted EVERY key-requiring provider and then
+   * overwrote `decryptedKeys` wholesale — clobbering what the user had typed
+   * in the meantime with a value one round-trip out of date. Measured cost of
+   * entering one 73-character key: ~4s of encryption plus ~104s of decryption,
+   * on the main thread, while characters visibly disappeared from the field.
+   *
+   * Expanding the provider catalog from 12 to 26 tripled the decrypt half of
+   * that, turning a slow path into a completely blocked one.
+   *
+   * Now it depends on `[vaultSecret]` alone: hydration happens once when the
+   * vault unlocks, which is the only moment stored ciphertext can newly become
+   * readable. Typing performs no cryptography at all (see handleSettingChange);
+   * encryption happens once, on blur, in commitApiKey.
+   */
   useEffect(() => {
+    if (!vaultSecret) {
+      setDecryptedKeys({});
+      return;
+    }
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(
         AI_PROVIDERS.filter(p => p.requiresApiKey).map(async (p) => {
-          const cipher = (settings as any)[`${p.id}ApiKey`];
+          const cipher = (settingsRef.current as any)[`${p.id}ApiKey`];
           if (!cipher) return [p.id, ""] as const;
           try {
             const plain = await decryptDataAsync(cipher, vaultSecret);
@@ -196,16 +239,24 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
           }
         })
       );
-      if (!cancelled) setDecryptedKeys(Object.fromEntries(entries));
+      if (cancelled) return;
+      setDecryptedKeys(prev => {
+        const next: Record<string, string> = Object.fromEntries(entries);
+        // Never overwrite a field mid-edit — the whole failure above.
+        for (const id of Object.keys(dirtyKeysRef.current)) {
+          if (dirtyKeysRef.current[id]) next[id] = prev[id] ?? "";
+        }
+        return next;
+      });
     })();
     return () => { cancelled = true; };
-  }, [settings, vaultSecret]);
+  }, [vaultSecret]);
 
-  const handleSettingChange = async (provider: string, field: string, value: string) => {
+  /** Typing is pure state — no cryptography on the keystroke path. */
+  const handleSettingChange = (provider: string, field: string, value: string) => {
     if (field.toLowerCase().includes('apikey')) {
+      dirtyKeysRef.current[provider] = true;
       setDecryptedKeys(prev => ({ ...prev, [provider]: value }));
-      const finalValue = value ? await encryptDataAsync(value, vaultSecret) : "";
-      setSettings(prev => ({ ...prev, [`${provider}${field}`]: finalValue }));
       return;
     }
 
@@ -215,15 +266,62 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     }));
   };
 
+  /**
+   * Encrypt every edited key exactly once and fold it into settings.
+   *
+   * Returns the resulting settings rather than relying on the state update,
+   * so callers that immediately need it (connection tests, Continue) act on
+   * the committed values instead of a stale render.
+   */
+  const commitApiKeys = useCallback(async (): Promise<AISettings> => {
+    const dirty = Object.keys(dirtyKeysRef.current).filter(id => dirtyKeysRef.current[id]);
+    if (dirty.length === 0) return settingsRef.current;
+
+    let next: AISettings = { ...settingsRef.current };
+    for (const provider of dirty) {
+      const plain = decryptedKeys[provider] ?? "";
+      // The server-key placeholder is a display label, not a credential —
+      // encrypting it literally would store a key that cannot work.
+      if (plain === "Defined on Server (.env)") {
+        dirtyKeysRef.current[provider] = false;
+        continue;
+      }
+      const cipher = plain ? await encryptDataAsync(plain, vaultSecret) : "";
+      next = { ...next, [`${provider}ApiKey`]: cipher };
+      dirtyKeysRef.current[provider] = false;
+    }
+
+    settingsRef.current = next;
+    setSettings(next);
+    return next;
+  }, [decryptedKeys, vaultSecret]);
+
+  /**
+   * Where "back" goes from the current step, and what to call it.
+   *
+   * Named after the destination rather than just "Back" so the control says
+   * where it leads before it is pressed — on the vault screen in particular,
+   * an unlabelled Back reads as though it might discard the passphrase.
+   */
+  const { goBack, backLabel } = React.useMemo(() => {
+    if (step >= 3) return { goBack: () => setStep(2), backLabel: "Back to setup" };
+    if (step === 2) return { goBack: () => setStep(1), backLabel: "Back to providers" };
+    return { goBack: () => setStep(0), backLabel: "Back to AI modes" };
+  }, [step]);
+
   const testConnection = async (providerId: string) => {
     setIsTesting(true);
     try {
-      const result = await AIGateway.healthCheckProvider(providerId, settings);
+      // Encrypt anything still being edited first — otherwise a user who
+      // types a key and clicks Test without leaving the field would be
+      // testing the previous (or empty) value.
+      const committed = await commitApiKeys();
+      const result = await AIGateway.healthCheckProvider(providerId, committed);
       setHealthResults(prev => ({ ...prev, [providerId]: result }));
       
       // If Ollama is online, fetch models
       if (providerId === 'ollama' && result.status === 'online') {
-        const models = await AIGateway.getOllamaModels(settings.ollamaEndpoint);
+        const models = await AIGateway.getOllamaModels(committed.ollamaEndpoint);
         if (models.length > 0 && !settings.ollamaModel) {
           setSettings(prev => ({ ...prev, ollamaModel: models[0] }));
         }
@@ -241,8 +339,10 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   const runFinalValidation = async () => {
     setIsTesting(true);
     try {
-      // Create a test settings object with only selected providers
-      const testSettings = { ...settings, fallbackOrder: selectedProviders };
+      // Create a test settings object with only selected providers. Commits
+      // first for the same reason testConnection does.
+      const committed = await commitApiKeys();
+      const testSettings = { ...committed, fallbackOrder: selectedProviders };
       const results = await AIGateway.healthCheckAll(testSettings);
       setHealthResults(prev => ({ ...prev, ...results }));
 
@@ -579,6 +679,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                           value={decryptedKeys[provider.id] ?? ""}
                           className="border-0 bg-transparent w-full rounded-xl py-2.5 px-4 text-[#E2E8F0] focus:outline-none transition-all font-mono text-sm placeholder:text-gray-400"
                           onChange={(e) => handleSettingChange(provider.id, 'ApiKey', e.target.value)}
+                          onBlur={() => { void commitApiKeys(); }}
                         />
                         <button
                           onClick={() => setShowKeys(prev => ({ ...prev, [provider.id]: !prev[provider.id] }))}
@@ -790,6 +891,26 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
             ))}
           </div>
         </div>
+        )}
+
+        {/* Persistent Back control (2026-07-31).
+            Going back used to mean finding a small "← Change AI Mode" text
+            link buried in step 1's header, and on the vault-unlock screen
+            there was no way back at all — a user who picked the wrong
+            providers had to reload to escape. One control in the shell means
+            every step has the same affordance in the same place, and it can
+            never be missing from a step again. */}
+        {step > 0 && (
+          <div className="flex">
+            <button
+              type="button"
+              onClick={goBack}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[color:var(--color-navy-2)] text-xs font-mono font-semibold uppercase tracking-wider transition-all cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              {backLabel}
+            </button>
+          </div>
         )}
 
         {/* Wizard Content Card */}

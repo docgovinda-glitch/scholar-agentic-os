@@ -2,6 +2,29 @@
 
 ## Unreleased — AI Configuration redesign (2026-07-31)
 
+### Fixed — API key entry was unusable (blocker)
+
+- **You could not enter an API key for any provider.** Every keystroke ran
+  `encryptDataAsync` (PBKDF2, 100,000 iterations, measured at ~55-62ms), and a
+  hydration effect depending on `settings` then re-decrypted every
+  key-requiring provider and replaced the visible plaintext wholesale —
+  overwriting what had just been typed with a value one round-trip stale.
+  Entering one 73-character key cost roughly 4s of encryption and 104s of
+  decryption on the main thread while characters disappeared from the field.
+  Expanding the catalog from 12 to 26 providers tripled the decrypt half,
+  turning a slow path into a fully blocked one.
+
+  Typing now performs no cryptography at all; encryption happens once, on
+  blur, and is also forced before Test Connection and Continue so a key typed
+  without leaving the field is never lost. Guarded by
+  `AISetupWizard.keyEntry.test.tsx`.
+
+- **Added a persistent Back control to every wizard step.** Going back
+  previously meant finding a small "← Change AI Mode" text link in step 1's
+  header, and the vault-unlock screen had no way back at all — picking the
+  wrong providers meant reloading the page to escape.
+
+
 ### Fixed — follow-up round, from real user testing on the deployed site
 
 - **The onboarding wizard still showed the old five stacked cards.** The
