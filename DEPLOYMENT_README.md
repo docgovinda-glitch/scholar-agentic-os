@@ -34,7 +34,7 @@ Set these wherever the static frontend is hosted (Netlify/Vercel/Cloudflare Page
 
 | Variable | Scope | Description |
 |---|---|---|
-| `ADMIN_EMAIL` | Backend | `render.yaml` declares the key (`sync: false`) but **no Render service exists yet** — there's nothing to set in a dashboard until a service is actually created at deploy time; not a blocking to-do right now. Separate from the same-named Supabase secret, which the Edge Functions read instead. |
+| `ADMIN_EMAIL` | Backend | Set on the live Render service (`render.yaml` also declares it, `sync: false`). Separate from the same-named Supabase secret, which the Edge Functions read instead. |
 | `ENCRYPTION_KEY` | Backend | **Still needed — this repo's §5 previously said this would be removed once the old routes were deleted; it wasn't.** The old routes are gone, but `resolveApiKey`/`decryptServerKey` (server-stored provider API keys, a fallback path for `/api/generate*`) were deliberately kept and still read this at startup. |
 | `GEMINI_API_KEY` | Backend | Primary Google Gemini key for AI generation — unchanged, still needed. |
 | `GEMINI_API_KEY_BACKUP` | Backend | Secondary Gemini key — unchanged. |
@@ -42,7 +42,7 @@ Set these wherever the static frontend is hosted (Netlify/Vercel/Cloudflare Page
 | ~~`DATABASE_URL`~~ | — | **Removed.** The Postgres instance this pointed at is replaced by Supabase; nothing in `server.ts` reads this variable (it never actually connected to a live database in the first place — see `.claude/HANDOVER.md`'s ARCH-1/ARCH-2 findings). |
 | ~~`RESEND_API_KEY`~~ | — | **Not read by `server.ts` at all** — the auth/user/admin routes that used it were already removed. If this is set on your Render service, it does nothing; the real Resend config lives in Supabase Edge Function secrets (§1). |
 
-Deploy this interim backend the same way as before (Render Web Service, `npm install && npm run build`, `npm start`) — just without provisioning a database for it anymore.
+**Deployment mechanism corrected 2026-07-31**: the live Render service (`scholar-agentic-os`, confirmed via the Render API) runs as a **Docker** deployment of this repo's `Dockerfile`, not a Node buildpack — `render.yaml` previously described the latter (and a different, never-created service name) and has been corrected to match. The Dockerfile takes `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` as build `ARG`s (Render forwards matching env vars as build args automatically) so Vite can bake them into the built frontend bundle — this is why those two are also required as backend env vars, not just for `server.ts`.
 
 ## 4. Frontend (Static Hosting)
 

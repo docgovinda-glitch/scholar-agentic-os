@@ -3,13 +3,24 @@
 # lookup-doi, agents) that Phase 1 (docs/planning/hosting-and-topology.md)
 # didn't relocate. Auth/user/admin data no longer lives here — it moved to
 # Supabase, so the Postgres database this file used to provision is gone.
+#
+# Corrected 2026-07-31: this previously described a Node-buildpack service
+# named "scholar-assistant-backend" that was never actually created — the
+# real, live production service ("scholar-agentic-os", confirmed via the
+# Render API) has always run as a Docker deployment of this repo's
+# Dockerfile. This file was pure aspirational documentation, out of sync
+# with reality; updated to match what's actually live rather than changing
+# the running service to match this file. VITE_SUPABASE_URL/
+# VITE_SUPABASE_ANON_KEY are consumed as Docker build ARGs by the
+# Dockerfile (Render automatically forwards matching env vars as build
+# args), not just runtime env — required for Vite to bake them into the
+# built frontend bundle.
 services:
   - type: web
-    name: scholar-assistant-backend
-    env: node
-    plan: free
-    buildCommand: npm install && npm run build
-    startCommand: npm start
+    name: scholar-agentic-os
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
     envVars:
       - key: PORT
         value: 3000
@@ -20,4 +31,14 @@ services:
       - key: GEMINI_API_KEY_BACKUP
         sync: false
       - key: ADMIN_EMAIL
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
         sync: false
