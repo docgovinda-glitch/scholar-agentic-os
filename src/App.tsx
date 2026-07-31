@@ -258,7 +258,17 @@ function App() {
   };
 
   if (!user || !project) {
-    return <OnboardingWizard />;
+    // Bug fix (2026-07-31): this was the one major render path with no
+    // ErrorBoundary at all — unlike the authenticated workspace view below.
+    // A render exception here (or a lazy-loaded chunk failing to load —
+    // OnboardingWizard's children are all React.lazy()) had nothing to
+    // catch it, so React unmounted the entire tree with zero visible
+    // feedback: a silent blank white screen, reported live in production.
+    return (
+      <ErrorBoundary>
+        <OnboardingWizard />
+      </ErrorBoundary>
+    );
   }
 
   // Calculate Intake Progress
