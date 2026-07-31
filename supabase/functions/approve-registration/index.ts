@@ -31,6 +31,19 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const userId = url.searchParams.get("userId");
 
+  // Bug fix (2026-07-31): the confirmation form's action was built from
+  // `url.toString()` (i.e. req.url as Deno's Edge Function runtime sees
+  // it) — confirmed live that this is NOT the public-facing URL. It
+  // rendered as `http://<ref>.supabase.co/approve-registration?userId=...`,
+  // missing the `/functions/v1/` prefix and downgraded to http — a real
+  // admin clicked "Approve Scholar" in production and got the exact same
+  // confirmation page back instead of an approval, because the form
+  // POSTed to a URL that doesn't route to this function at all. Built from
+  // the known public base instead (same pattern send-approval-email
+  // already uses for the link it emails), not from the request's own URL.
+  const functionsBaseUrl = Deno.env.get("SUPABASE_URL") + "/functions/v1";
+  const publicUrl = `${functionsBaseUrl}/approve-registration?userId=${encodeURIComponent(userId || "")}`;
+
   if (!userId) {
     return new Response(htmlPage("Missing parameters", "<h3>Missing approval parameters.</h3>"), {
       status: 400,
@@ -70,7 +83,7 @@ Deno.serve(async (req) => {
         "Confirm Scholar Approval",
         `<h2 style="font-family: Georgia, serif; font-style: italic; color:#C08A3E;">Confirm Approval</h2>
          <p>Approve <strong>${profile.username}</strong> for the Scholar Agentic research workspace?</p>
-         <form method="POST" action="${url.toString()}">
+         <form method="POST" action="${publicUrl}">
            <button type="submit" style="background-color:#C08A3E; color:white; padding:12px 24px; border:none; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer;">Approve Scholar</button>
          </form>`
       ),
