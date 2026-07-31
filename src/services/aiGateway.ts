@@ -1,37 +1,71 @@
 /**
  * Unified AI Gateway — Provider Adapter Architecture
- * 
- * This module implements a clean adapter pattern for routing AI requests
- * through any of 8 supported providers. Each adapter implements a common
- * interface for generation and health checking.
+ *
+ * Routes AI requests through any configured provider behind one interface.
+ *
+ * 2026-07-31 rewrite — what changed and why:
+ *
+ *  1. The nine hand-written cloud adapters (gemini, openai, claude, deepseek,
+ *     qwen, cohere, groq, together, openrouter) were ~700 lines of copy-paste
+ *     that differed only in a URL and a default model. They are now generated
+ *     by createCloudAdapter() from src/config/providerCatalog.ts, so the
+ *     supported provider list went from 12 to 30+ without new adapter code.
+ *     That duplication was not cosmetic: it is exactly how Qwen ended up with
+ *     a client adapter and a streaming server branch but no non-streaming
+ *     server branch, making every Qwen request fail with a misleading error.
+ *
+ *  2. Health checks never inspected `response.ok`. A 401 from a wrong key, a
+ *     429 from a spent quota and a 400 for an unknown model all reported the
+ *     same "degraded — Unexpected response" while the real message was thrown
+ *     away. They now classify properly via src/services/aiErrors.ts.
+ *
+ *  3. Fallback caught every error identically, so an unusable key was retried
+ *     forever and a malformed request burned an attempt against every saved
+ *     provider. Failover is now driven by error kind and lives in
+ *     src/services/providerFailover.ts.
+ *
+ *  4. Keys are read from the persistent encrypted vault
+ *     (src/services/apiVault.ts) first, falling back to the legacy
+ *     `AISettings.<provider>ApiKey` ciphertext so existing users keep working
+ *     with no migration step.
  */
 
 import { AISettings, AIProviderInfo, AIRequest, AIResponse, HealthStatus } from "../types";
 import { decryptDataAsync } from "../utils/crypto";
 import { getEncryptionSecret } from "./vaultPassphrase";
+import {
+  CLOUD_PROVIDERS,
+  getCloudProvider,
+  resolveBaseUrl,
+  chatUrl,
+  buildAuthHeaders,
+  type CloudProviderSpec,
+  type FreeTierKind,
+} from "../config/providerCatalog";
+import {
+  LOCAL_RUNNERS,
+  getLocalRunner,
+  resolveRunnerEndpoint,
+  runnerHealthUrl,
+  type LocalRunnerSpec,
+} from "../config/localRunnerCatalog";
+import * as vault from "./apiVault";
+import {
+  classifyHttpError,
+  classifyThrownError,
+  classifyResponse,
+  type ClassifiedAIError,
+} from "./aiErrors";
+import {
+  executeWithFailover,
+  isFailoverFailure,
+  ProviderCallError,
+  buildContinuationRequest,
+} from "./providerFailover";
 
 // ─────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────
-
-// Task 3 (BYOK vault passphrase, 2026-07-24): every getEncryptionSecret() call
-// below used to read `phd_profile_state_<user>`'s `passcodeHash` field from
-// localStorage — the same blob the encrypted provider keys are stored in,
-// and (per UserProfileGate.tsx) actually just the user's raw login password,
-// not a real hash. That meant the decryption secret sat right next to the
-// ciphertext. Now sources from vaultPassphrase.ts's in-memory-only vault
-// passphrase instead (imported above) — "" (locked/no session) behaves the
-// same as before (decryptDataAsync throws / getApiKey callers already handle
-// an empty key).
-//
-// Task 2 (AES-GCM upgrade, 2026-07-24 follow-up session): getApiKey is now
-// async across all 8 provider adapters — decryptDataAsync (AES-GCM via Web
-// Crypto, src/utils/crypto.ts) replaces the legacy synchronous XOR cipher
-// (decryptData) used here previously. This is a breaking ciphertext-format
-// change: keys saved under the old cipher will no longer decrypt (silently
-// return "" — decryptDataAsync requires its own "v2:" prefix and rejects
-// anything else) and must be re-entered once. Same accepted tradeoff as the
-// vault-passphrase migration in the same session before this one.
 
 function cleanJsonString(text: string): string {
   let cleaned = text.trim();
@@ -46,6 +80,77 @@ function cleanJsonString(text: string): string {
   return cleaned.trim();
 }
 
+function jsonNudge(prompt: string, responseMimeType?: string): string {
+  if (responseMimeType !== "application/json") return prompt;
+  return (
+    prompt +
+    "\n\nIMPORTANT: Return strictly valid JSON only. Do not wrap it in markdown code blocks like ```json or anything else. Just the raw JSON string."
+  );
+}
+
+/**
+ * Resolve a provider's API key.
+ *
+ * The persistent vault is authoritative, but the legacy per-provider
+ * ciphertext on AISettings is still honoured so that users who saved keys
+ * before the vault existed are not silently logged out of their own
+ * providers. Both paths swallow decryption failures and return "" — a wrong
+ * passphrase, an empty field, or pre-AES-GCM ciphertext all mean the same
+ * thing to callers ("no usable key"), and throwing here would break the
+ * "which providers are available?" scan.
+ */
+async function resolveProviderKey(providerId: string, settings: AISettings): Promise<string> {
+  const fromVault = vault.getApiKey(providerId);
+  if (fromVault) return fromVault;
+
+  const legacyField = `${providerId}ApiKey` as keyof AISettings;
+  const cipher = (settings[legacyField] as string | undefined) || "";
+  if (!cipher) return "";
+
+  try {
+    return await decryptDataAsync(cipher, getEncryptionSecret());
+  } catch {
+    return "";
+  }
+}
+
+/** A user-supplied base URL override, vault first then legacy settings. */
+function resolveProviderBaseUrl(providerId: string, settings: AISettings): string | undefined {
+  const entry = vault.getEntry(providerId);
+  if (entry?.baseUrl) return entry.baseUrl;
+  return (settings as unknown as Record<string, unknown>)[`${providerId}BaseUrl`] as string | undefined;
+}
+
+/** The model to use, vault first, then legacy settings, then catalog default. */
+function resolveProviderModel(providerId: string, settings: AISettings, fallback: string): string {
+  const entry = vault.getEntry(providerId);
+  if (entry?.model) return entry.model;
+  const legacy = (settings as unknown as Record<string, unknown>)[`${providerId}Model`] as string | undefined;
+  return legacy || fallback;
+}
+
+function resolveLocalEndpoint(spec: LocalRunnerSpec, settings: AISettings): string {
+  // The three original local ids keep their dedicated settings fields so
+  // existing saved configurations keep working untouched.
+  const legacy: Record<string, string | undefined> = {
+    ollama: settings.ollamaEndpoint,
+    custom: settings.customEndpoint,
+    omniroute: settings.omnirouteEndpoint,
+  };
+  const override = legacy[spec.id] ?? settings.localEndpoints?.[spec.id];
+  return resolveRunnerEndpoint(spec, override);
+}
+
+function resolveLocalModel(spec: LocalRunnerSpec, settings: AISettings, requested?: string): string {
+  if (requested) return requested;
+  const legacy: Record<string, string | undefined> = {
+    ollama: settings.ollamaModel,
+    custom: settings.customModel,
+    omniroute: settings.omnirouteModel,
+  };
+  return legacy[spec.id] ?? settings.localModels?.[spec.id] ?? (spec.id === "ollama" ? "llama3.1:8b" : "default");
+}
+
 // ─────────────────────────────────────────────────────────
 // PROVIDER ADAPTER INTERFACE
 // ─────────────────────────────────────────────────────────
@@ -53,7 +158,7 @@ function cleanJsonString(text: string): string {
 export interface AIProviderAdapter {
   id: string;
   name: string;
-  type: 'cloud' | 'local' | 'proxy';
+  type: "cloud" | "local" | "proxy";
   defaultModel: string;
   availableModels: string[];
   requiresApiKey: boolean;
@@ -68,937 +173,113 @@ export interface AIProviderAdapter {
 // PROVIDER REGISTRY (metadata for UI)
 // ─────────────────────────────────────────────────────────
 
-export const AI_PROVIDERS: AIProviderInfo[] = [
-  {
-    id: "gemini",
-    name: "Google Gemini",
-    type: "cloud",
-    icon: "✦",
-    description: "Google's multimodal AI with fast inference and generous free tier",
-    defaultModel: "gemini-2.5-flash",
-    availableModels: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
-    requiresApiKey: true,
-    pricingTier: "freemium",
-    color: "#4285F4"
-  },
-  {
-    id: "openai",
-    name: "OpenAI GPT",
-    type: "cloud",
-    icon: "◉",
-    description: "Industry-leading GPT models with strong reasoning and writing",
-    defaultModel: "gpt-4o-mini",
-    availableModels: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "o4-mini"],
-    requiresApiKey: true,
-    pricingTier: "paid",
-    color: "#10A37F"
-  },
-  {
-    id: "claude",
-    name: "Anthropic Claude",
-    type: "cloud",
-    icon: "◈",
-    description: "Thoughtful, nuanced AI excelling at academic and analytical tasks",
-    defaultModel: "claude-sonnet-4-20250514",
-    availableModels: ["claude-sonnet-4-20250514", "claude-3-5-haiku-20241022", "claude-opus-4-20250514"],
-    requiresApiKey: true,
-    pricingTier: "paid",
-    color: "#D4A574"
-  },
-  {
-    id: "deepseek",
-    name: "DeepSeek",
-    type: "cloud",
-    icon: "◆",
-    description: "Cost-effective Chinese AI with strong reasoning and coding capabilities",
-    defaultModel: "deepseek-chat",
-    availableModels: ["deepseek-chat", "deepseek-coder", "deepseek-reasoner"],
-    requiresApiKey: true,
-    pricingTier: "paid",
-    color: "#5B6AFF"
-  },
-  {
-    id: "qwen",
-    name: "Qwen (Alibaba)",
-    type: "cloud",
-    icon: "◇",
-    description: "Alibaba's multilingual AI with competitive pricing via DashScope",
-    defaultModel: "qwen-plus",
-    availableModels: ["qwen-plus", "qwen-turbo", "qwen-max"],
-    requiresApiKey: true,
-    pricingTier: "paid",
-    color: "#FF6A13"
-  },
-  {
-    id: "cohere",
-    name: "Cohere",
-    type: "cloud",
-    icon: "◎",
-    description: "Enterprise-grade AI optimized for search and retrieval tasks",
-    defaultModel: "command-r-plus",
-    availableModels: ["command-r-plus", "command-r", "command-a-03-2025"],
-    requiresApiKey: true,
-    pricingTier: "paid",
-    color: "#39594D"
-  },
-  {
-    id: "ollama",
-    name: "Ollama (Local)",
-    type: "local",
-    icon: "🦙",
-    description: "Run open-source AI models locally — completely free and private",
-    defaultModel: "llama3.1:8b",
-    availableModels: ["llama3.1:8b", "mistral:7b", "qwen2:7b", "deepseek-coder:6.7b", "gemma2:9b", "phi3:mini"],
-    requiresApiKey: false,
-    pricingTier: "free",
-    color: "#FFFFFF"
-  },
-  {
-    id: "custom",
-    name: "Custom Server (LM Studio/OmniRoute/vLLM)",
-    type: "local",
-    icon: "⚙",
-    description: "Connect any OpenAI-compatible local server (LM Studio, vLLM, etc.)",
-    defaultModel: "default",
-    availableModels: [],
-    requiresApiKey: false,
-    pricingTier: "free",
-    color: "#8B5CF6"
-  },
-  {
-    id: "omniroute",
-    name: "OmniRoute",
-    type: "local",
-    icon: "⇄",
-    description: "Self-hosted router that automatically switches across free and paid cloud providers — install once, then no per-provider key juggling.",
-    defaultModel: "auto",
-    availableModels: ["auto"],
-    requiresApiKey: false,
-    pricingTier: "free",
-    color: "#22D3EE"
-  },
-  {
-    id: "groq",
-    name: "Groq",
-    type: "cloud",
-    icon: "▲",
-    description: "Ultra-fast inference with a usable free tier",
-    defaultModel: "llama-3.3-70b-versatile",
-    availableModels: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
-    requiresApiKey: true,
-    pricingTier: "freemium",
-    color: "#F55036"
-  },
-  {
-    id: "together",
-    name: "Together AI",
-    type: "cloud",
-    icon: "◐",
-    description: "Broad open-model catalog with competitive pricing",
-    defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-    availableModels: ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-7B-Instruct-Turbo"],
-    requiresApiKey: true,
-    pricingTier: "paid",
-    color: "#0F6FFF"
-  },
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    type: "cloud",
-    icon: "◇",
-    description: "One API key, hundreds of models across many providers",
-    defaultModel: "openai/gpt-4o-mini",
-    availableModels: ["openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.0-flash-001"],
-    requiresApiKey: true,
-    pricingTier: "freemium",
-    color: "#6467F2"
-  }
-];
+/** Catalog free-tier language mapped onto the existing UI vocabulary. */
+function toPricingTier(freeTier: FreeTierKind): AIProviderInfo["pricingTier"] {
+  if (freeTier === "free") return "free";
+  if (freeTier === "freemium") return "freemium";
+  return "paid";
+}
 
-// ─────────────────────────────────────────────────────────
-// CONCRETE ADAPTERS
-// ─────────────────────────────────────────────────────────
-
-// --- Gemini Adapter ---
-const GeminiAdapter: AIProviderAdapter = {
-  id: "gemini",
-  name: "Google Gemini",
-  type: "cloud",
-  defaultModel: "gemini-2.5-flash",
-  availableModels: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
+const CLOUD_PROVIDER_INFO: AIProviderInfo[] = CLOUD_PROVIDERS.map((spec) => ({
+  id: spec.id,
+  name: spec.name,
+  type: "cloud" as const,
+  icon: spec.icon,
+  description: spec.description,
+  defaultModel: spec.defaultModel,
+  availableModels: spec.models,
   requiresApiKey: true,
+  pricingTier: toPricingTier(spec.freeTier),
+  color: spec.color,
+}));
 
-  async getApiKey(settings: AISettings): Promise<string> {
-    try {
-      return await decryptDataAsync(settings.geminiApiKey || "", getEncryptionSecret());
-    } catch {
-      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
-      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
-      // treated the same as "no key configured" rather than a crash.
-      return "";
-    }
-  },
-
-  getEndpoint(): string {
-    return "https://generativelanguage.googleapis.com/v1beta";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    const apiKey = await this.getApiKey(settings);
-    if (apiKey) {
-      // Direct REST call
-      const model = request.model || this.defaultModel;
-      const url = `${this.getEndpoint(settings)}/models/${model}:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: request.prompt }] }],
-          systemInstruction: { parts: [{ text: request.systemInstruction }] },
-          generationConfig: {
-            temperature: request.temperature,
-            responseMimeType: request.responseMimeType
-          }
-        })
-      });
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(`Gemini API Error: ${errJson.error?.message || response.statusText}`);
-      }
-      const data = await response.json();
-      return (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
-    }
-    // Fall through to server proxy
-    return callServerProxy(request, "gemini", "", settings);
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const apiKey = await this.getApiKey(settings);
-    try {
-      if (apiKey) {
-        const resp = await fetch(`${this.getEndpoint(settings)}/models/gemini-2.5-flash?key=${apiKey}`, {
-          signal: AbortSignal.timeout(5000)
-        });
-        if (!resp.ok) throw new Error(`Status ${resp.status}`);
-        return { provider: "gemini", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      // Try server proxy health
-      const resp = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "gemini", prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
-        signal: AbortSignal.timeout(8000)
-      });
-      const data = await resp.json();
-      if (data.text?.includes("OK")) {
-        return { provider: "gemini", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      return { provider: "gemini", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
-    } catch (e: any) {
-      return { provider: "gemini", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
-
-// --- OpenAI Adapter ---
-const OpenAIAdapter: AIProviderAdapter = {
-  id: "openai",
-  name: "OpenAI GPT",
-  type: "cloud",
-  defaultModel: "gpt-4o-mini",
-  availableModels: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "o4-mini"],
-  requiresApiKey: true,
-
-  async getApiKey(settings: AISettings): Promise<string> {
-    try {
-      return await decryptDataAsync(settings.openaiApiKey || "", getEncryptionSecret());
-    } catch {
-      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
-      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
-      // treated the same as "no key configured" rather than a crash.
-      return "";
-    }
-  },
-
-  getEndpoint(): string {
-    return "https://api.openai.com/v1";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "openai", await this.getApiKey(settings), settings);
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const apiKey = await this.getApiKey(settings);
-    if (!apiKey) return { provider: "openai", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
-    try {
-      const resp = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "openai", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
-        signal: AbortSignal.timeout(10000)
-      });
-      const data = await resp.json();
-      if (data.text?.includes("OK")) {
-        return { provider: "openai", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      return { provider: "openai", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
-    } catch (e: any) {
-      return { provider: "openai", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
-
-// --- Claude Adapter ---
-const ClaudeAdapter: AIProviderAdapter = {
-  id: "claude",
-  name: "Anthropic Claude",
-  type: "cloud",
-  defaultModel: "claude-sonnet-4-20250514",
-  availableModels: ["claude-sonnet-4-20250514", "claude-3-5-haiku-20241022", "claude-opus-4-20250514"],
-  requiresApiKey: true,
-
-  async getApiKey(settings: AISettings): Promise<string> {
-    try {
-      return await decryptDataAsync(settings.claudeApiKey || "", getEncryptionSecret());
-    } catch {
-      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
-      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
-      // treated the same as "no key configured" rather than a crash.
-      return "";
-    }
-  },
-
-  getEndpoint(): string {
-    return "https://api.anthropic.com/v1";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "claude", await this.getApiKey(settings), settings);
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const apiKey = await this.getApiKey(settings);
-    if (!apiKey) return { provider: "claude", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
-    try {
-      const resp = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "claude", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
-        signal: AbortSignal.timeout(10000)
-      });
-      const data = await resp.json();
-      if (data.text?.includes("OK")) {
-        return { provider: "claude", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      return { provider: "claude", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
-    } catch (e: any) {
-      return { provider: "claude", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
-
-// --- DeepSeek Adapter ---
-const DeepSeekAdapter: AIProviderAdapter = {
-  id: "deepseek",
-  name: "DeepSeek",
-  type: "cloud",
-  defaultModel: "deepseek-chat",
-  availableModels: ["deepseek-chat", "deepseek-coder", "deepseek-reasoner"],
-  requiresApiKey: true,
-
-  async getApiKey(settings: AISettings): Promise<string> {
-    try {
-      return await decryptDataAsync(settings.deepseekApiKey || "", getEncryptionSecret());
-    } catch {
-      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
-      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
-      // treated the same as "no key configured" rather than a crash.
-      return "";
-    }
-  },
-
-  getEndpoint(): string {
-    return "https://api.deepseek.com";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "deepseek", await this.getApiKey(settings), settings);
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const apiKey = await this.getApiKey(settings);
-    if (!apiKey) return { provider: "deepseek", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
-    try {
-      const resp = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "deepseek", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
-        signal: AbortSignal.timeout(10000)
-      });
-      const data = await resp.json();
-      if (data.text?.includes("OK")) {
-        return { provider: "deepseek", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      return { provider: "deepseek", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
-    } catch (e: any) {
-      return { provider: "deepseek", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
-
-// --- Qwen Adapter ---
-const QwenAdapter: AIProviderAdapter = {
-  id: "qwen",
-  name: "Qwen (Alibaba)",
-  type: "cloud",
-  defaultModel: "qwen-plus",
-  availableModels: ["qwen-plus", "qwen-turbo", "qwen-max"],
-  requiresApiKey: true,
-
-  async getApiKey(settings: AISettings): Promise<string> {
-    try {
-      return await decryptDataAsync(settings.qwenApiKey || "", getEncryptionSecret());
-    } catch {
-      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
-      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
-      // treated the same as "no key configured" rather than a crash.
-      return "";
-    }
-  },
-
-  getEndpoint(): string {
-    return "https://dashscope.aliyuncs.com/compatible-mode/v1";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "qwen", await this.getApiKey(settings), settings);
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const apiKey = await this.getApiKey(settings);
-    if (!apiKey) return { provider: "qwen", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
-    try {
-      const resp = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "qwen", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
-        signal: AbortSignal.timeout(10000)
-      });
-      const data = await resp.json();
-      if (data.text?.includes("OK")) {
-        return { provider: "qwen", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      return { provider: "qwen", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
-    } catch (e: any) {
-      return { provider: "qwen", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
-
-// --- Cohere Adapter ---
-const CohereAdapter: AIProviderAdapter = {
-  id: "cohere",
-  name: "Cohere",
-  type: "cloud",
-  defaultModel: "command-r-plus",
-  availableModels: ["command-r-plus", "command-r", "command-a-03-2025"],
-  requiresApiKey: true,
-
-  async getApiKey(settings: AISettings): Promise<string> {
-    try {
-      return await decryptDataAsync(settings.cohereApiKey || "", getEncryptionSecret());
-    } catch {
-      // Wrong/missing vault passphrase, empty ciphertext, or old pre-AES-GCM
-      // ciphertext format (decryptDataAsync requires its own "v2:" prefix) —
-      // treated the same as "no key configured" rather than a crash.
-      return "";
-    }
-  },
-
-  getEndpoint(): string {
-    return "https://api.cohere.ai/v1";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "cohere", await this.getApiKey(settings), settings);
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const apiKey = await this.getApiKey(settings);
-    if (!apiKey) return { provider: "cohere", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
-    try {
-      const resp = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "cohere", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
-        signal: AbortSignal.timeout(10000)
-      });
-      const data = await resp.json();
-      if (data.text?.includes("OK")) {
-        return { provider: "cohere", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      return { provider: "cohere", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
-    } catch (e: any) {
-      return { provider: "cohere", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
-
-// --- Ollama Adapter ---
-const OllamaAdapter: AIProviderAdapter = {
-  id: "ollama",
-  name: "Ollama (Local)",
-  type: "local",
-  defaultModel: "llama3.1:8b",
-  availableModels: ["llama3.1:8b", "mistral:7b", "qwen2:7b", "deepseek-coder:6.7b", "gemma2:9b"],
+const LOCAL_PROVIDER_INFO: AIProviderInfo[] = LOCAL_RUNNERS.map((spec) => ({
+  id: spec.id,
+  name: spec.id === "ollama" ? "Ollama (Local)" : spec.name,
+  type: "local" as const,
+  icon: spec.icon,
+  description: spec.description,
+  defaultModel: spec.id === "ollama" ? "llama3.1:8b" : "default",
+  availableModels: [],
   requiresApiKey: false,
+  pricingTier: "free" as const,
+  color: "#8B5CF6",
+}));
 
-  async getApiKey(): Promise<string> {
-    return "";
-  },
-
-  getEndpoint(settings: AISettings): string {
-    return settings.ollamaEndpoint || "http://localhost:11434";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    const endpoint = this.getEndpoint(settings);
-    const model = request.model || settings.ollamaModel || this.defaultModel;
-    let fullPrompt = request.prompt;
-    if (request.responseMimeType === "application/json") {
-      fullPrompt += "\n\nIMPORTANT: Return strictly valid JSON only. Do not wrap it in markdown code blocks like ```json or anything else. Just the raw JSON string.";
-    }
-
-    const response = await fetch(`${endpoint}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: request.systemInstruction },
-          { role: "user", content: fullPrompt }
-        ],
-        stream: false,
-        options: { temperature: request.temperature }
-      })
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => "Unknown error");
-      throw new Error(`Ollama connection failed (status ${response.status}): ${errText}`);
-    }
-
-    const data = await response.json();
-    let text = data.message?.content || "";
-    if (request.responseMimeType === "application/json") {
-      text = cleanJsonString(text);
-    }
-    return text.trim();
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const endpoint = this.getEndpoint(settings);
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const resp = await fetch(`${endpoint}/api/tags`, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (!resp.ok) throw new Error(`Status ${resp.status}`);
-      const data = await resp.json();
-      const models = (data.models || []).map((m: any) => m.name);
-      return {
-        provider: "ollama",
-        status: "online",
-        latencyMs: Date.now() - start,
-        lastChecked: new Date().toISOString(),
-        availableModels: models
-      };
-    } catch (e: any) {
-      return { provider: "ollama", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
-
-// --- Custom/vLLM Adapter ---
-const CustomAdapter: AIProviderAdapter = {
+/**
+ * `custom` predates the local-runner catalog and is referenced by
+ * src/config/aiModes.ts, by AISettings.provider's union type, and by saved
+ * user configurations, so it stays as its own entry rather than being folded
+ * into `lmstudio` (which shares its default port).
+ */
+const CUSTOM_PROVIDER_INFO: AIProviderInfo = {
   id: "custom",
-  name: "Custom Server",
+  name: "Custom Server (LM Studio/OmniRoute/vLLM)",
   type: "local",
+  icon: "⚙",
+  description: "Connect any OpenAI-compatible local server (LM Studio, vLLM, etc.)",
   defaultModel: "default",
   availableModels: [],
   requiresApiKey: false,
-
-  async getApiKey(): Promise<string> {
-    return "";
-  },
-
-  getEndpoint(settings: AISettings): string {
-    return settings.customEndpoint || "http://localhost:1234/v1";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    const endpoint = this.getEndpoint(settings);
-    const model = request.model || settings.customModel || this.defaultModel;
-    let fullPrompt = request.prompt;
-    if (request.responseMimeType === "application/json") {
-      fullPrompt += "\n\nIMPORTANT: Return strictly valid JSON only. Do not wrap it in markdown code blocks like ```json or anything else. Just the raw JSON string.";
-    }
-
-    const cleanEndpoint = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
-    const url = `${cleanEndpoint}/chat/completions`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: request.systemInstruction },
-          { role: "user", content: fullPrompt }
-        ],
-        temperature: request.temperature
-      })
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => "Unknown error");
-      throw new Error(`Custom local server connection failed (status ${response.status}): ${errText}`);
-    }
-
-    const data = await response.json();
-    let text = data.choices?.[0]?.message?.content || "";
-    if (request.responseMimeType === "application/json") {
-      text = cleanJsonString(text);
-    }
-    return text.trim();
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const endpoint = this.getEndpoint(settings);
-    try {
-      const cleanEndpoint = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const resp = await fetch(`${cleanEndpoint}/models`, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (!resp.ok) throw new Error(`Status ${resp.status}`);
-      const data = await resp.json();
-      const models = (data.data || []).map((m: any) => m.id);
-      return {
-        provider: "custom",
-        status: "online",
-        latencyMs: Date.now() - start,
-        lastChecked: new Date().toISOString(),
-        availableModels: models
-      };
-    } catch (e: any) {
-      return { provider: "custom", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
+  pricingTier: "free",
+  color: "#8B5CF6",
 };
 
-// --- OmniRoute Adapter ("Smart Gateway", replaces the old "Smart AI") ---
-// Follow-up correction (2026-07-28): the old Pollinations-backed "Smart AI"
-// was confirmed to only simulate success in some paths rather than reliably
-// deliver, and has been removed. OmniRoute replaces it as Option 1 — a
-// self-hosted router (npm/Docker/Electron/Termux/PWA, verified real package
-// in docs/planning/ai-modes-reconciliation.md §2) that the user runs
-// locally and which then reaches real cloud providers with automatic
-// fallback across their free tiers. This is NOT a zero-install/no-account
-// experience like the old Option 1 claimed — it needs a real install step,
-// and inference itself happens in the cloud via whichever provider
-// OmniRoute selects, not locally. Mechanically the same shape as
-// CustomAdapter (generic OpenAI-compatible local endpoint) but kept as its
-// own adapter/id rather than folded into "custom" so status/diagnostics
-// surfaces can honestly label it "OmniRoute", not "Custom".
-const OmniRouteAdapter: AIProviderAdapter = {
-  id: "omniroute",
-  name: "OmniRoute",
-  type: "local",
-  defaultModel: "auto",
-  availableModels: ["auto"],
-  requiresApiKey: false,
-
-  async getApiKey(): Promise<string> {
-    return "";
-  },
-
-  getEndpoint(settings: AISettings): string {
-    return settings.omnirouteEndpoint || "http://localhost:20128/v1";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    const endpoint = this.getEndpoint(settings);
-    const model = request.model || settings.omnirouteModel || this.defaultModel;
-    let fullPrompt = request.prompt;
-    if (request.responseMimeType === "application/json") {
-      fullPrompt += "\n\nIMPORTANT: Return strictly valid JSON only. Do not wrap it in markdown code blocks like ```json or anything else. Just the raw JSON string.";
-    }
-
-    const cleanEndpoint = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
-    const response = await fetch(`${cleanEndpoint}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: request.systemInstruction },
-          { role: "user", content: fullPrompt }
-        ],
-        temperature: request.temperature
-      })
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => "Unknown error");
-      throw new Error(`OmniRoute connection failed (status ${response.status}): ${errText}`);
-    }
-
-    const data = await response.json();
-    let text = data.choices?.[0]?.message?.content || "";
-    if (request.responseMimeType === "application/json") {
-      text = cleanJsonString(text);
-    }
-    return text.trim();
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const endpoint = this.getEndpoint(settings);
-    try {
-      const cleanEndpoint = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const resp = await fetch(`${cleanEndpoint}/models`, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (!resp.ok) throw new Error(`Status ${resp.status}`);
-      const data = await resp.json();
-      const models = (data.data || []).map((m: any) => m.id);
-      return {
-        provider: "omniroute",
-        status: "online",
-        latencyMs: Date.now() - start,
-        lastChecked: new Date().toISOString(),
-        availableModels: models
-      };
-    } catch (e: any) {
-      return { provider: "omniroute", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
-
-// --- Groq Adapter ("Cloud AI Providers") ---
-// OpenAI-compatible REST API, routed through the existing /api/generate
-// server proxy (same pattern as OpenAI/Claude/DeepSeek above) rather than
-// direct-from-browser — consistent with this app's established proxy
-// architecture for BYOK cloud providers, not a new pattern.
-const GroqAdapter: AIProviderAdapter = {
-  id: "groq",
-  name: "Groq",
-  type: "cloud",
-  defaultModel: "llama-3.3-70b-versatile",
-  availableModels: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
-  requiresApiKey: true,
-
-  async getApiKey(settings: AISettings): Promise<string> {
-    try {
-      return await decryptDataAsync(settings.groqApiKey || "", getEncryptionSecret());
-    } catch {
-      return "";
-    }
-  },
-
-  getEndpoint(): string {
-    return "https://api.groq.com/openai/v1";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "groq", await this.getApiKey(settings), settings);
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const apiKey = await this.getApiKey(settings);
-    if (!apiKey) return { provider: "groq", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
-    try {
-      const resp = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "groq", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
-        signal: AbortSignal.timeout(10000)
-      });
-      const data = await resp.json();
-      if (data.text?.includes("OK")) {
-        return { provider: "groq", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      return { provider: "groq", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
-    } catch (e: any) {
-      return { provider: "groq", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
-
-// --- Together AI Adapter ("Cloud AI Providers") ---
-const TogetherAdapter: AIProviderAdapter = {
-  id: "together",
-  name: "Together AI",
-  type: "cloud",
-  defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-  availableModels: ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-7B-Instruct-Turbo"],
-  requiresApiKey: true,
-
-  async getApiKey(settings: AISettings): Promise<string> {
-    try {
-      return await decryptDataAsync(settings.togetherApiKey || "", getEncryptionSecret());
-    } catch {
-      return "";
-    }
-  },
-
-  getEndpoint(): string {
-    return "https://api.together.xyz/v1";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "together", await this.getApiKey(settings), settings);
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const apiKey = await this.getApiKey(settings);
-    if (!apiKey) return { provider: "together", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
-    try {
-      const resp = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "together", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
-        signal: AbortSignal.timeout(10000)
-      });
-      const data = await resp.json();
-      if (data.text?.includes("OK")) {
-        return { provider: "together", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      return { provider: "together", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
-    } catch (e: any) {
-      return { provider: "together", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
-
-// --- OpenRouter Adapter ("Cloud AI Providers") ---
-// Aggregates many providers/models behind one OpenAI-compatible API and
-// explicitly supports direct client-side/browser usage as an intended use
-// case (ai-gateway.md Tier 2's original candidate) — routed through the
-// existing /api/generate server proxy here for consistency with every
-// other BYOK cloud provider in this app, same as Groq/Together above.
-const OpenRouterAdapter: AIProviderAdapter = {
-  id: "openrouter",
-  name: "OpenRouter",
-  type: "cloud",
-  defaultModel: "openai/gpt-4o-mini",
-  availableModels: ["openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.0-flash-001"],
-  requiresApiKey: true,
-
-  async getApiKey(settings: AISettings): Promise<string> {
-    try {
-      return await decryptDataAsync(settings.openrouterApiKey || "", getEncryptionSecret());
-    } catch {
-      return "";
-    }
-  },
-
-  getEndpoint(): string {
-    return "https://openrouter.ai/api/v1";
-  },
-
-  async generate(request: AIRequest, settings: AISettings): Promise<string> {
-    return callServerProxy(request, "openrouter", await this.getApiKey(settings), settings);
-  },
-
-  async healthCheck(settings: AISettings): Promise<HealthStatus> {
-    const start = Date.now();
-    const apiKey = await this.getApiKey(settings);
-    if (!apiKey) return { provider: "openrouter", status: "unchecked", lastChecked: new Date().toISOString(), error: "No API key configured" };
-    try {
-      const resp = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "openrouter", apiKey, prompt: "Respond with exactly the word: OK", systemInstruction: "You are a test agent.", temperature: 0 }),
-        signal: AbortSignal.timeout(10000)
-      });
-      const data = await resp.json();
-      if (data.text?.includes("OK")) {
-        return { provider: "openrouter", status: "online", latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
-      }
-      return { provider: "openrouter", status: "degraded", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: "Unexpected response" };
-    } catch (e: any) {
-      return { provider: "openrouter", status: "offline", latencyMs: Date.now() - start, lastChecked: new Date().toISOString(), error: e.message };
-    }
-  }
-};
+export const AI_PROVIDERS: AIProviderInfo[] = [
+  ...CLOUD_PROVIDER_INFO,
+  ...LOCAL_PROVIDER_INFO,
+  CUSTOM_PROVIDER_INFO,
+];
 
 // ─────────────────────────────────────────────────────────
 // SERVER PROXY HELPER
 // ─────────────────────────────────────────────────────────
 
-async function callServerProxy(request: AIRequest, provider: string, apiKey: string, settings: AISettings): Promise<string> {
-  const maxRetries = 3;
-  let attempt = 0;
-  let delay = 1000;
-
-  while (attempt <= maxRetries) {
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider,
-          apiKey: apiKey || "",
-          model: request.model || "",
-          systemInstruction: request.systemInstruction,
-          prompt: request.prompt,
-          temperature: request.temperature,
-          responseMimeType: request.responseMimeType,
-          taskType: request.taskType,
-          username: localStorage.getItem("phd_active_session_username") || ""
-        })
-      });
-
-      if (!response.ok) {
-        if ((response.status === 429 || response.status >= 500) && attempt < maxRetries) {
-          attempt++;
-          console.warn(`[Client Proxy API] Attempt ${attempt} failed with status ${response.status}. Retrying in ${delay}ms...`);
-          await new Promise(r => setTimeout(r, delay));
-          delay *= 2;
-          continue;
-        }
-        const errText = await response.text().catch(() => "Unknown error");
-        throw new Error(`Server AI proxy failed (status ${response.status}): ${errText}`);
-      }
-
-      const data = await response.json();
-      return data.text || "";
-    } catch (error: any) {
-      if (attempt < maxRetries) {
-        attempt++;
-        console.warn(`[Client Proxy API] Attempt ${attempt} net error: ${error.message}. Retrying in ${delay}ms...`);
-        await new Promise(r => setTimeout(r, delay));
-        delay *= 2;
-        continue;
-      }
-      throw error;
-    }
+/**
+ * Call a cloud provider through this app's own /api/generate proxy.
+ *
+ * Retry/backoff used to live here (three attempts on 429/5xx). It has moved
+ * to providerFailover.ts so there is exactly one retry policy in the app —
+ * previously a failing request could be retried three times here and then
+ * again once per fallback provider, turning a dead key into a 30-second hang.
+ * This function now fails fast with a classified error and lets the failover
+ * layer decide what that means.
+ */
+async function callServerProxy(
+  request: AIRequest,
+  provider: string,
+  apiKey: string,
+  settings: AISettings,
+  baseUrl?: string
+): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider,
+        apiKey: apiKey || "",
+        model: request.model || "",
+        baseUrl: baseUrl || "",
+        systemInstruction: request.systemInstruction,
+        prompt: request.prompt,
+        temperature: request.temperature,
+        responseMimeType: request.responseMimeType,
+        taskType: request.taskType,
+        username: localStorage.getItem("phd_active_session_username") || "",
+      }),
+    });
+  } catch (e) {
+    throw new ProviderCallError(provider, classifyThrownError(e, { url: "/api/generate" }));
   }
-  throw new Error("Maximum retry attempts reached.");
+
+  if (!response.ok) {
+    throw new ProviderCallError(provider, await classifyResponse(response));
+  }
+
+  const data = await response.json();
+  return data.text || "";
 }
 
 export async function callServerProxyStream(
@@ -1008,41 +289,43 @@ export async function callServerProxyStream(
   settings: AISettings,
   onToken: (token: string) => void
 ): Promise<string> {
-  const isLocal = provider === "ollama" || provider === "custom";
+  const runner = getLocalRunner(provider) || (provider === "custom" ? getLocalRunner("lmstudio") : undefined);
+  const isLocal = provider === "ollama" || provider === "custom" || !!getLocalRunner(provider);
 
-  if (isLocal) {
-    const endpoint = provider === "ollama" 
-      ? (settings.ollamaEndpoint || "http://localhost:11434") 
-      : (settings.customEndpoint || "http://localhost:1234/v1");
-
-    const url = provider === "ollama" ? `${endpoint}/api/chat` : `${endpoint}/chat/completions`;
-    const model = provider === "ollama" ? (settings.ollamaModel || "llama3.1:8b") : (settings.customModel || "default");
+  if (isLocal && runner) {
+    const endpoint =
+      provider === "custom"
+        ? resolveRunnerEndpoint(runner, settings.customEndpoint)
+        : resolveLocalEndpoint(runner, settings);
+    const isOllamaStyle = runner.apiStyle === "ollama-native";
+    const url = isOllamaStyle ? `${endpoint}/api/chat` : `${endpoint}/chat/completions`;
+    const model = resolveLocalModel(runner, settings, request.model);
 
     try {
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          provider === "ollama"
+          isOllamaStyle
             ? {
                 model,
                 messages: [
                   { role: "system", content: request.systemInstruction },
-                  { role: "user", content: request.prompt }
+                  { role: "user", content: request.prompt },
                 ],
                 stream: true,
-                options: { temperature: request.temperature }
+                options: { temperature: request.temperature },
               }
             : {
                 model,
                 messages: [
                   { role: "system", content: request.systemInstruction },
-                  { role: "user", content: request.prompt }
+                  { role: "user", content: request.prompt },
                 ],
                 temperature: request.temperature,
-                stream: true
+                stream: true,
               }
-        )
+        ),
       });
 
       if (!response.ok) throw new Error(`Local stream failed (status ${response.status})`);
@@ -1064,7 +347,7 @@ export async function callServerProxyStream(
           for (const line of lines) {
             const cleaned = line.trim();
             if (!cleaned) continue;
-            if (provider === "ollama") {
+            if (isOllamaStyle) {
               try {
                 const json = JSON.parse(cleaned);
                 const text = json.message?.content || "";
@@ -1102,18 +385,18 @@ export async function callServerProxyStream(
       provider,
       apiKey: apiKey || "",
       model: request.model || "",
+      baseUrl: resolveProviderBaseUrl(provider, settings) || "",
       systemInstruction: request.systemInstruction,
       prompt: request.prompt,
       temperature: request.temperature,
       responseMimeType: request.responseMimeType,
       taskType: request.taskType,
-      username: localStorage.getItem("phd_active_session_username") || ""
-    })
+      username: localStorage.getItem("phd_active_session_username") || "",
+    }),
   });
 
   if (!response.ok) {
-    const errText = await response.text().catch(() => "Unknown error");
-    throw new Error(`Server streaming failed: ${errText}`);
+    throw new ProviderCallError(provider, await classifyResponse(response));
   }
 
   const reader = response.body?.getReader();
@@ -1134,17 +417,27 @@ export async function callServerProxyStream(
         const cleaned = line.trim();
         if (!cleaned) continue;
         if (cleaned.startsWith("data: ")) {
+          let payload: { error?: string; status?: number; text?: string } | null = null;
           try {
-            const json = JSON.parse(cleaned.slice(6));
-            if (json.error) {
-              throw new Error(json.error);
-            }
-            const text = json.text || "";
-            if (text) {
-              fullText += text;
-              onToken(text);
-            }
-          } catch (e) {}
+            payload = JSON.parse(cleaned.slice(6));
+          } catch {
+            continue;
+          }
+          // The server reports mid-stream provider failures as an SSE `error`
+          // frame. Surfacing it as a classified throw is what lets failover
+          // pick this up and continue the work elsewhere instead of returning
+          // a silently truncated answer.
+          if (payload?.error) {
+            throw new ProviderCallError(
+              provider,
+              classifyHttpError(payload.status ?? 500, payload.error, null)
+            );
+          }
+          const text = payload?.text || "";
+          if (text) {
+            fullText += text;
+            onToken(text);
+          }
         }
       }
     }
@@ -1153,47 +446,250 @@ export async function callServerProxyStream(
 }
 
 // ─────────────────────────────────────────────────────────
+// ADAPTER FACTORIES
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Build an adapter for any cloud provider in the catalog.
+ *
+ * Gemini is the sole provider called directly from the browser (it is the
+ * only one whose CORS policy permits it, and doing so avoids a proxy hop for
+ * the most common free tier). Everything else goes through /api/generate,
+ * which keeps keys off the wire to third-party origins and sidesteps
+ * per-provider CORS entirely.
+ */
+function createCloudAdapter(spec: CloudProviderSpec): AIProviderAdapter {
+  return {
+    id: spec.id,
+    name: spec.name,
+    type: "cloud",
+    defaultModel: spec.defaultModel,
+    availableModels: spec.models,
+    requiresApiKey: true,
+
+    async getApiKey(settings: AISettings): Promise<string> {
+      return resolveProviderKey(spec.id, settings);
+    },
+
+    getEndpoint(settings: AISettings): string {
+      return resolveBaseUrl(spec, resolveProviderBaseUrl(spec.id, settings));
+    },
+
+    async generate(request: AIRequest, settings: AISettings): Promise<string> {
+      const apiKey = await this.getApiKey(settings);
+      const model = request.model || resolveProviderModel(spec.id, settings, spec.defaultModel);
+      const baseUrlOverride = resolveProviderBaseUrl(spec.id, settings);
+
+      if (spec.apiStyle === "gemini" && apiKey) {
+        const base = resolveBaseUrl(spec, baseUrlOverride);
+        const url = `${base}/models/${model}:generateContent?key=${apiKey}`;
+        let response: Response;
+        try {
+          response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: request.prompt }] }],
+              systemInstruction: { parts: [{ text: request.systemInstruction }] },
+              generationConfig: {
+                temperature: request.temperature,
+                responseMimeType: request.responseMimeType,
+              },
+            }),
+          });
+        } catch (e) {
+          throw new ProviderCallError(spec.id, classifyThrownError(e, { url }));
+        }
+        if (!response.ok) {
+          throw new ProviderCallError(spec.id, await classifyResponse(response));
+        }
+        const data = await response.json();
+        return (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+      }
+
+      return callServerProxy({ ...request, model }, spec.id, apiKey, settings, baseUrlOverride);
+    },
+
+    async healthCheck(settings: AISettings): Promise<HealthStatus> {
+      const start = Date.now();
+      const apiKey = await this.getApiKey(settings);
+
+      if (!apiKey) {
+        return {
+          provider: spec.id,
+          status: "unchecked",
+          lastChecked: new Date().toISOString(),
+          error: "No API key configured",
+        };
+      }
+
+      try {
+        await this.generate(
+          {
+            systemInstruction: "You are a test agent.",
+            prompt: "Respond with exactly the word: OK",
+            temperature: 0,
+            taskType: "health-check",
+          },
+          settings
+        );
+        return {
+          provider: spec.id,
+          status: "online",
+          latencyMs: Date.now() - start,
+          lastChecked: new Date().toISOString(),
+        };
+      } catch (e) {
+        // Real classification, unlike the previous blanket "degraded —
+        // Unexpected response": an invalid key is reported as offline with the
+        // actual reason, a rate limit as degraded (the key is fine, it is just
+        // busy) so the UI does not tell users to replace a working key.
+        const classified: ClassifiedAIError =
+          e instanceof ProviderCallError ? e.classified : classifyThrownError(e);
+        const status: HealthStatus["status"] =
+          classified.kind === "rate_limit" || classified.kind === "server_error" ? "degraded" : "offline";
+        return {
+          provider: spec.id,
+          status,
+          latencyMs: Date.now() - start,
+          lastChecked: new Date().toISOString(),
+          error: classified.remedy ? `${classified.label}. ${classified.remedy}` : classified.label,
+        };
+      }
+    },
+  };
+}
+
+/** Build an adapter for a local runner (Ollama's own API, or OpenAI-compatible). */
+function createLocalAdapter(spec: LocalRunnerSpec, overrideId?: string): AIProviderAdapter {
+  const id = overrideId || spec.id;
+
+  return {
+    id,
+    name: spec.name,
+    type: "local",
+    defaultModel: spec.apiStyle === "ollama-native" ? "llama3.1:8b" : "default",
+    availableModels: [],
+    requiresApiKey: false,
+
+    async getApiKey(): Promise<string> {
+      return "";
+    },
+
+    getEndpoint(settings: AISettings): string {
+      return resolveLocalEndpoint({ ...spec, id }, settings);
+    },
+
+    async generate(request: AIRequest, settings: AISettings): Promise<string> {
+      const endpoint = this.getEndpoint(settings);
+      const model = resolveLocalModel({ ...spec, id }, settings, request.model);
+      const prompt = jsonNudge(request.prompt, request.responseMimeType);
+      const isOllamaStyle = spec.apiStyle === "ollama-native";
+      const url = isOllamaStyle ? `${endpoint}/api/chat` : `${endpoint}/chat/completions`;
+
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            isOllamaStyle
+              ? {
+                  model,
+                  messages: [
+                    { role: "system", content: request.systemInstruction },
+                    { role: "user", content: prompt },
+                  ],
+                  stream: false,
+                  options: { temperature: request.temperature },
+                }
+              : {
+                  model,
+                  messages: [
+                    { role: "system", content: request.systemInstruction },
+                    { role: "user", content: prompt },
+                  ],
+                  temperature: request.temperature,
+                }
+          ),
+        });
+      } catch (e) {
+        throw new ProviderCallError(id, classifyThrownError(e, { url }));
+      }
+
+      if (!response.ok) {
+        throw new ProviderCallError(id, await classifyResponse(response));
+      }
+
+      const data = await response.json();
+      let text = isOllamaStyle ? data.message?.content || "" : data.choices?.[0]?.message?.content || "";
+      if (request.responseMimeType === "application/json") text = cleanJsonString(text);
+      return text.trim();
+    },
+
+    async healthCheck(settings: AISettings): Promise<HealthStatus> {
+      const start = Date.now();
+      const endpoint = this.getEndpoint(settings);
+      const url = `${endpoint}${spec.healthPath}`;
+      try {
+        const resp = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        if (!resp.ok) throw new Error(`Status ${resp.status}`);
+        const data = await resp.json();
+        const models: string[] =
+          spec.apiStyle === "ollama-native"
+            ? (data.models || []).map((m: any) => m.name)
+            : (data.data || []).map((m: any) => m.id);
+        return {
+          provider: id,
+          status: "online",
+          latencyMs: Date.now() - start,
+          lastChecked: new Date().toISOString(),
+          availableModels: models,
+        };
+      } catch (e: any) {
+        return {
+          provider: id,
+          status: "offline",
+          latencyMs: Date.now() - start,
+          lastChecked: new Date().toISOString(),
+          error: e.message,
+        };
+      }
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────
 // ADAPTER REGISTRY
 // ─────────────────────────────────────────────────────────
 
-const ADAPTERS: Record<string, AIProviderAdapter> = {
-  gemini: GeminiAdapter,
-  openai: OpenAIAdapter,
-  claude: ClaudeAdapter,
-  deepseek: DeepSeekAdapter,
-  qwen: QwenAdapter,
-  cohere: CohereAdapter,
-  ollama: OllamaAdapter,
-  custom: CustomAdapter,
-  omniroute: OmniRouteAdapter,
-  groq: GroqAdapter,
-  together: TogetherAdapter,
-  openrouter: OpenRouterAdapter,
-};
+const ADAPTERS: Record<string, AIProviderAdapter> = {};
+
+for (const spec of CLOUD_PROVIDERS) {
+  ADAPTERS[spec.id] = createCloudAdapter(spec);
+}
+for (const spec of LOCAL_RUNNERS) {
+  ADAPTERS[spec.id] = createLocalAdapter(spec);
+}
+// `custom` is LM Studio's shape under its own historical id — see
+// CUSTOM_PROVIDER_INFO above for why it is preserved separately.
+ADAPTERS.custom = createLocalAdapter(getLocalRunner("lmstudio")!, "custom");
 
 // ─────────────────────────────────────────────────────────
 // AUTO-MODE TASK ROUTING
 // ─────────────────────────────────────────────────────────
 
-async function resolveProvider(taskType: string, settings: AISettings): Promise<{ provider: string; model?: string; apiKey?: string }> {
+async function resolveProvider(
+  taskType: string,
+  settings: AISettings
+): Promise<{ provider: string; model?: string; apiKey?: string }> {
   const provider = settings.provider || "gemini";
 
   if (provider !== "auto") {
     const adapter = ADAPTERS[provider];
     if (adapter) {
       const apiKey = adapter.requiresApiKey ? await adapter.getApiKey(settings) : "";
-      let model = "";
-      if (provider === "openai") model = settings.openaiModel || "gpt-4o-mini";
-      else if (provider === "claude") model = settings.claudeModel || "claude-sonnet-4-20250514";
-      else if (provider === "deepseek") model = settings.deepseekModel || "deepseek-chat";
-      else if (provider === "cohere") model = settings.cohereModel || "command-r-plus";
-      else if (provider === "qwen") model = settings.qwenModel || "qwen-plus";
-      else if (provider === "ollama") model = settings.ollamaModel || "llama3.1:8b";
-      else if (provider === "custom") model = settings.customModel || "default";
-      else if (provider === "groq") model = settings.groqModel || "llama-3.3-70b-versatile";
-      else if (provider === "together") model = settings.togetherModel || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
-      else if (provider === "openrouter") model = settings.openrouterModel || "openai/gpt-4o-mini";
-      else if (provider === "omniroute") model = settings.omnirouteModel || "auto";
+      const model = resolveProviderModel(provider, settings, adapter.defaultModel);
       return { provider, model, apiKey };
     }
     return { provider, apiKey: "" };
@@ -1213,21 +709,31 @@ async function resolveProvider(taskType: string, settings: AISettings): Promise<
     targetProvider = "qwen";
   }
 
-  // 3. Key availability fallback — reuses each adapter's own getApiKey
-  // (already safely try/catch-wrapped) instead of duplicating decrypt-error
-  // handling here.
-  if (targetProvider === "deepseek") {
-    const key = await ADAPTERS.deepseek.getApiKey(settings);
-    if (key) return { provider: "deepseek", model: settings.deepseekModel || "deepseek-chat", apiKey: key };
-  } else if (targetProvider === "qwen") {
-    const key = await ADAPTERS.qwen.getApiKey(settings);
-    if (key) return { provider: "qwen", model: settings.qwenModel || "qwen-plus", apiKey: key };
-  } else if (targetProvider === "gemini") {
-    const key = await ADAPTERS.gemini.getApiKey(settings);
-    if (key) return { provider: "gemini", model: "gemini-2.5-flash", apiKey: key };
+  // 3. Key availability fallback
+  for (const candidate of [targetProvider, "gemini"]) {
+    const adapter = ADAPTERS[candidate];
+    if (!adapter) continue;
+    const key = await adapter.getApiKey(settings);
+    if (key) {
+      return { provider: candidate, model: resolveProviderModel(candidate, settings, adapter.defaultModel), apiKey: key };
+    }
   }
 
-  // 4. Check if any local server is healthy (cached)
+  // 4. Any other provider with a key in the vault
+  const vaultChain = vault.getFailoverChain();
+  if (vaultChain.length > 0) {
+    const first = vaultChain[0];
+    const adapter = ADAPTERS[first];
+    if (adapter) {
+      return {
+        provider: first,
+        model: resolveProviderModel(first, settings, adapter.defaultModel),
+        apiKey: await adapter.getApiKey(settings),
+      };
+    }
+  }
+
+  // 5. Check if any local server is healthy (cached)
   if (settings.providerHealth?.ollama?.status === "online") {
     return { provider: "ollama", model: settings.ollamaModel || "llama3.1:8b" };
   }
@@ -1235,137 +741,214 @@ async function resolveProvider(taskType: string, settings: AISettings): Promise<
     return { provider: "custom", model: settings.customModel || "default" };
   }
 
-  // 5. Last resort: server proxy
+  // 6. Last resort: server proxy
   return { provider: "server", model: "gemini-2.5-flash", apiKey: "" };
 }
+
+/**
+ * Build the ordered list of providers to try for one request.
+ *
+ * The primary comes first, then whatever the user ordered in the vault, then
+ * the legacy `settings.fallbackOrder`. Only providers that are actually usable
+ * (a key present, or no key needed) are included, so failover never wastes an
+ * attempt on a provider that was never configured.
+ */
+async function buildCandidateChain(primary: string, settings: AISettings): Promise<string[]> {
+  const ordered = [
+    primary,
+    ...vault.getFailoverChain(),
+    ...(settings.fallbackOrder || ["ollama", "custom", "gemini"]),
+  ];
+
+  const seen = new Set<string>();
+  const usable: string[] = [];
+
+  for (const id of ordered) {
+    const resolved = id === "server" ? "gemini" : id;
+    if (seen.has(resolved)) continue;
+    seen.add(resolved);
+
+    const adapter = ADAPTERS[resolved];
+    if (!adapter) continue;
+    if (adapter.requiresApiKey && !(await adapter.getApiKey(settings))) continue;
+    usable.push(resolved);
+  }
+
+  return usable;
+}
+
+const DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
+  AI_PROVIDERS.map((p) => [p.id, p.name])
+);
 
 // ─────────────────────────────────────────────────────────
 // AI GATEWAY — PUBLIC API
 // ─────────────────────────────────────────────────────────
 
+export interface GenerateOptions {
+  /** Notified when the gateway switches provider so the UI can say so */
+  onFailoverEvent?: (message: string) => void;
+  signal?: AbortSignal;
+}
+
 export const AIGateway = {
   /**
-   * Generate content through the appropriate provider adapter.
+   * Generate content, automatically continuing on another provider if the
+   * chosen one is rate limited, out of quota, timing out, or erroring.
    */
-  async generate(request: AIRequest, settings: AISettings): Promise<AIResponse> {
+  async generate(request: AIRequest, settings: AISettings, options?: GenerateOptions): Promise<AIResponse> {
     const startTime = Date.now();
-    const { provider, model, apiKey } = await resolveProvider(request.taskType, settings);
+    const { provider } = await resolveProvider(request.taskType, settings);
     const inputWords = (request.systemInstruction + "\n" + request.prompt).split(/\s+/).length;
 
-    let text = "";
-    let fromFallback = false;
-    let usedProvider = provider;
-    let usedModel = model || "unknown";
+    const candidates = await buildCandidateChain(provider, settings);
 
-    const adapter = ADAPTERS[provider] || ADAPTERS[provider === "server" ? "gemini" : provider];
-
-    if (adapter) {
-      try {
-        if (provider === "server") {
-          // Server proxy mode
-          text = await callServerProxy(request, "gemini", apiKey || "", settings);
-        } else {
-          const augmentedRequest = { ...request, model: model };
-          text = await adapter.generate(augmentedRequest, settings);
-        }
-      } catch (error: any) {
-        console.warn(`[AIGateway] Primary provider ${provider} failed: ${error.message}. Attempting fallback...`);
-        // Try fallback chain
-        const fallbackResult = await this.tryFallbackChain(request, settings, provider);
-        if (fallbackResult) {
-          text = fallbackResult.text;
-          usedProvider = fallbackResult.provider;
-          usedModel = fallbackResult.model;
-          fromFallback = true;
-        } else {
-          throw error; // Re-throw if all fallbacks fail
-        }
+    const result = await executeWithFailover(
+      async (providerId) => {
+        const adapter = ADAPTERS[providerId];
+        if (!adapter) throw new Error(`Unknown provider: ${providerId}`);
+        const model = resolveProviderModel(providerId, settings, adapter.defaultModel);
+        const text = await adapter.generate({ ...request, model }, settings);
+        return { text, model };
+      },
+      {
+        candidates,
+        displayNames: DISPLAY_NAMES,
+        signal: options?.signal,
+        onEvent: (event) => {
+          if (event.userMessage) options?.onFailoverEvent?.(event.userMessage);
+        },
       }
-    } else {
-      text = await callServerProxy(request, provider, apiKey || "", settings);
+    );
+
+    if (isFailoverFailure(result)) {
+      const error = new Error(
+        result.error.remedy ? `${result.error.message} ${result.error.remedy}` : result.error.message
+      );
+      (error as Error & { classified?: ClassifiedAIError }).classified = result.error;
+      throw error;
     }
 
-    const outputWords = text.split(/\s+/).length;
+    const outputWords = result.value.text.split(/\s+/).length;
     return {
-      text,
-      provider: usedProvider,
-      model: usedModel,
+      text: result.value.text,
+      provider: result.providerId,
+      model: result.value.model,
       inputWords,
       outputWords,
       latencyMs: Date.now() - startTime,
-      fromFallback
+      fromFallback: result.usedFallback,
     };
   },
 
   /**
-   * Generate content and stream back tokens in real-time.
+   * Streaming generation with failover that preserves what the user can
+   * already see.
+   *
+   * When a stream dies partway, the text emitted so far is kept and the next
+   * provider is asked to continue from exactly that point (see
+   * buildContinuationRequest in providerFailover.ts) rather than starting
+   * over. The caller's onToken keeps receiving tokens across the switch, so
+   * from the reader's perspective the text simply pauses and resumes.
    */
   async generateStream(
     request: AIRequest,
     settings: AISettings,
-    onToken: (token: string) => void
+    onToken: (token: string) => void,
+    options?: GenerateOptions
   ): Promise<AIResponse> {
     const startTime = Date.now();
-    const { provider, model, apiKey } = await resolveProvider(request.taskType, settings);
+    const { provider } = await resolveProvider(request.taskType, settings);
     const inputWords = (request.systemInstruction + "\n" + request.prompt).split(/\s+/).length;
+    const candidates = await buildCandidateChain(provider, settings);
 
-    let text = "";
-    let fromFallback = false;
-    let usedProvider = provider;
-    let usedModel = model || "unknown";
+    // Accumulated across providers — this is the "no work lost" state.
+    let preserved = "";
 
-    try {
-      text = await callServerProxyStream(request, provider, apiKey || "", settings, onToken);
-    } catch (error: any) {
-      console.warn(`[AIGateway] Primary stream provider ${provider} failed: ${error.message}. Attempting fallback (non-streaming)...`);
-      const fallbackResult = await this.tryFallbackChain(request, settings, provider);
-      if (fallbackResult) {
-        text = fallbackResult.text;
-        usedProvider = fallbackResult.provider;
-        usedModel = fallbackResult.model;
-        fromFallback = true;
-        onToken(text);
-      } else {
-        throw error;
+    const result = await executeWithFailover(
+      async (providerId) => {
+        const adapter = ADAPTERS[providerId];
+        const model = resolveProviderModel(providerId, settings, adapter?.defaultModel || "");
+        // Anything already streamed becomes context for the replacement, so
+        // it continues rather than repeating the work.
+        const effectiveRequest = preserved
+          ? buildContinuationRequest({ ...request, model }, preserved)
+          : { ...request, model };
+
+        const apiKey = adapter?.requiresApiKey ? await adapter.getApiKey(settings) : "";
+        const chunk = await callServerProxyStream(effectiveRequest, providerId, apiKey, settings, (token) => {
+          preserved += token;
+          onToken(token);
+        });
+        return { text: preserved || chunk, model };
+      },
+      {
+        candidates,
+        displayNames: DISPLAY_NAMES,
+        signal: options?.signal,
+        onEvent: (event) => {
+          if (event.userMessage) options?.onFailoverEvent?.(event.userMessage);
+        },
       }
+    );
+
+    if (isFailoverFailure(result)) {
+      // Partial output is still worth returning — throwing away a mostly
+      // complete draft because the last provider failed is the exact data
+      // loss this design exists to prevent.
+      if (preserved.trim()) {
+        return {
+          text: preserved,
+          provider: "partial",
+          model: "unknown",
+          inputWords,
+          outputWords: preserved.split(/\s+/).length,
+          latencyMs: Date.now() - startTime,
+          fromFallback: true,
+        };
+      }
+      const error = new Error(
+        result.error.remedy ? `${result.error.message} ${result.error.remedy}` : result.error.message
+      );
+      (error as Error & { classified?: ClassifiedAIError }).classified = result.error;
+      throw error;
     }
 
-    const outputWords = text.split(/\s+/).length;
+    const text = result.value.text;
     return {
       text,
-      provider: usedProvider,
-      model: usedModel,
+      provider: result.providerId,
+      model: result.value.model,
       inputWords,
-      outputWords,
+      outputWords: text.split(/\s+/).length,
       latencyMs: Date.now() - startTime,
-      fromFallback
+      fromFallback: result.usedFallback,
     };
   },
 
   /**
    * Attempt fallback providers when the primary fails.
+   *
+   * Retained for backward compatibility — generate()/generateStream() now do
+   * this internally through providerFailover.ts, so new code should not call
+   * this directly.
    */
-  async tryFallbackChain(request: AIRequest, settings: AISettings, failedProvider: string): Promise<{ text: string; provider: string; model: string } | null> {
-    const fallbackOrder = settings.fallbackOrder || ["ollama", "custom", "gemini", "server"];
-    
+  async tryFallbackChain(
+    request: AIRequest,
+    settings: AISettings,
+    failedProvider: string
+  ): Promise<{ text: string; provider: string; model: string } | null> {
+    const fallbackOrder = settings.fallbackOrder || ["ollama", "custom", "gemini"];
+
     for (const fb of fallbackOrder) {
       if (fb === failedProvider) continue;
       const adapter = ADAPTERS[fb];
       if (!adapter) continue;
-      
-      // Check if this provider is configured
       if (adapter.requiresApiKey && !(await adapter.getApiKey(settings))) continue;
-      
+
       try {
-        console.log(`[AIGateway] Trying fallback provider: ${fb}`);
-        if (fb === "server") {
-          const text = await callServerProxy(request, "gemini", "", settings);
-          return { text, provider: "server", model: "gemini-2.5-flash" };
-        }
         const text = await adapter.generate(request, settings);
-        const model = fb === "ollama" ? (settings.ollamaModel || "llama3.1:8b") : 
-                      fb === "custom" ? (settings.customModel || "default") : adapter.defaultModel;
-        return { text, provider: fb, model };
+        return { text, provider: fb, model: resolveProviderModel(fb, settings, adapter.defaultModel) };
       } catch {
         continue;
       }
@@ -1375,33 +958,39 @@ export const AIGateway = {
 
   /**
    * Run health checks on all configured providers in parallel.
+   *
+   * Only providers the user has actually set up are contacted — with 30
+   * providers in the catalog, checking every one would fire 30 requests and
+   * report 28 irrelevant failures.
    */
   async healthCheckAll(settings: AISettings): Promise<Record<string, HealthStatus>> {
-    const checks: Promise<HealthStatus>[] = [];
-    const providerIds: string[] = [];
+    const configured = new Set<string>([
+      ...vault.getFailoverChain(),
+      ...LOCAL_RUNNERS.map((r) => r.id),
+      "custom",
+    ]);
+    if (settings.provider && settings.provider !== "auto") configured.add(settings.provider);
 
-    for (const [id, adapter] of Object.entries(ADAPTERS)) {
-      providerIds.push(id);
-      checks.push(adapter.healthCheck(settings));
+    for (const spec of CLOUD_PROVIDERS) {
+      if ((settings as unknown as Record<string, unknown>)[`${spec.id}ApiKey`]) configured.add(spec.id);
     }
 
-    const results = await Promise.allSettled(checks);
+    const ids = [...configured].filter((id) => ADAPTERS[id]);
+    const results = await Promise.allSettled(ids.map((id) => ADAPTERS[id].healthCheck(settings)));
+
     const healthMap: Record<string, HealthStatus> = {};
-
     results.forEach((result, index) => {
-      const id = providerIds[index];
-      if (result.status === "fulfilled") {
-        healthMap[id] = result.value;
-      } else {
-        healthMap[id] = {
-          provider: id,
-          status: "offline",
-          lastChecked: new Date().toISOString(),
-          error: result.reason?.message || "Health check failed"
-        };
-      }
+      const id = ids[index];
+      healthMap[id] =
+        result.status === "fulfilled"
+          ? result.value
+          : {
+              provider: id,
+              status: "offline",
+              lastChecked: new Date().toISOString(),
+              error: (result.reason as Error)?.message || "Health check failed",
+            };
     });
-
     return healthMap;
   },
 
@@ -1411,7 +1000,12 @@ export const AIGateway = {
   async healthCheckProvider(providerId: string, settings: AISettings): Promise<HealthStatus> {
     const adapter = ADAPTERS[providerId];
     if (!adapter) {
-      return { provider: providerId, status: "offline", lastChecked: new Date().toISOString(), error: "Unknown provider" };
+      return {
+        provider: providerId,
+        status: "offline",
+        lastChecked: new Date().toISOString(),
+        error: "Unknown provider",
+      };
     }
     return adapter.healthCheck(settings);
   },
@@ -1419,9 +1013,6 @@ export const AIGateway = {
   /**
    * Get list of currently available (online/configured) providers.
    */
-  // Unused anywhere else in this codebase today (confirmed by grep) — async
-  // because getApiKey now decrypts via encryptDataAsync's AES-GCM (Web Crypto),
-  // which has no synchronous form.
   async getAvailableProviders(settings: AISettings): Promise<AIProviderInfo[]> {
     const checks = await Promise.all(
       AI_PROVIDERS.map(async (p) => {
@@ -1437,23 +1028,30 @@ export const AIGateway = {
 
   /**
    * Auto-detect local AI servers running on standard ports.
+   *
+   * Probes every runner in the catalog, not just the original three, so a
+   * user running Jan or KoboldCPP is discovered without configuring anything.
    */
-  async detectLocalServers(): Promise<{ ollama: HealthStatus; custom: HealthStatus; omniroute: HealthStatus }> {
-    const defaultOllamaSettings: AISettings = { provider: "ollama", ollamaEndpoint: "http://localhost:11434" };
-    const defaultCustomSettings: AISettings = { provider: "custom", customEndpoint: "http://localhost:1234/v1" };
-    const defaultOmniRouteSettings: AISettings = { provider: "omniroute", omnirouteEndpoint: "http://localhost:20128/v1" };
+  async detectLocalServers(): Promise<Record<string, HealthStatus>> {
+    const results = await Promise.allSettled(
+      LOCAL_RUNNERS.map(async (spec) => {
+        const adapter = ADAPTERS[spec.id];
+        return adapter.healthCheck({ provider: "auto" } as AISettings);
+      })
+    );
 
-    const [ollama, custom, omniroute] = await Promise.allSettled([
-      OllamaAdapter.healthCheck(defaultOllamaSettings),
-      CustomAdapter.healthCheck(defaultCustomSettings),
-      OmniRouteAdapter.healthCheck(defaultOmniRouteSettings)
-    ]);
-
-    return {
-      ollama: ollama.status === "fulfilled" ? ollama.value : { provider: "ollama", status: "offline", lastChecked: new Date().toISOString() },
-      custom: custom.status === "fulfilled" ? custom.value : { provider: "custom", status: "offline", lastChecked: new Date().toISOString() },
-      omniroute: omniroute.status === "fulfilled" ? omniroute.value : { provider: "omniroute", status: "offline", lastChecked: new Date().toISOString() }
-    };
+    const map: Record<string, HealthStatus> = {};
+    LOCAL_RUNNERS.forEach((spec, i) => {
+      const result = results[i];
+      map[spec.id] =
+        result.status === "fulfilled"
+          ? result.value
+          : { provider: spec.id, status: "offline", lastChecked: new Date().toISOString() };
+    });
+    // `custom` shares LM Studio's port; mirror the result so existing callers
+    // that only look at `custom` keep working.
+    map.custom = { ...map.lmstudio, provider: "custom" };
+    return map;
   },
 
   /**
@@ -1462,16 +1060,53 @@ export const AIGateway = {
   async getOllamaModels(endpoint?: string): Promise<string[]> {
     const url = endpoint || "http://localhost:11434";
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const resp = await fetch(`${url}/api/tags`, { signal: controller.signal });
-      clearTimeout(timeout);
+      const resp = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(3000) });
       if (!resp.ok) return [];
       const data = await resp.json();
       return (data.models || []).map((m: any) => m.name);
     } catch {
       return [];
     }
+  },
+
+  /**
+   * List the models a provider's key can actually use.
+   *
+   * The catalog's model list is only a suggestion — providers retire and
+   * rename models constantly — so the UI offers this to replace guesses with
+   * the live truth for that specific account.
+   */
+  async discoverModels(providerId: string, settings: AISettings): Promise<string[]> {
+    const spec = getCloudProvider(providerId);
+    if (spec) {
+      if (!spec.modelsPath) return spec.models;
+      const apiKey = await resolveProviderKey(providerId, settings);
+      if (!apiKey) return spec.models;
+      try {
+        const base = resolveBaseUrl(spec, resolveProviderBaseUrl(providerId, settings));
+        const resp = await fetch(`${base}${spec.modelsPath}`, {
+          headers: buildAuthHeaders(spec, apiKey),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!resp.ok) return spec.models;
+        const data = await resp.json();
+        const ids: string[] = (data.data || data.models || [])
+          .map((m: any) => m.id || m.name)
+          .filter(Boolean);
+        return ids.length ? ids.sort() : spec.models;
+      } catch {
+        // A CORS refusal here is expected for several providers and is not an
+        // error worth surfacing — the catalog list remains perfectly usable.
+        return spec.models;
+      }
+    }
+
+    const runner = getLocalRunner(providerId);
+    if (runner) {
+      const health = await ADAPTERS[providerId]?.healthCheck(settings);
+      return health?.availableModels || [];
+    }
+    return [];
   },
 
   /**
@@ -1492,8 +1127,8 @@ export const AIGateway = {
    * Resolve which provider would be used for a given task type.
    */
   resolveProvider(taskType: string, settings: AISettings) {
-    return resolveProvider(taskType, settings); // async now — callers must await
-  }
+    return resolveProvider(taskType, settings); // async — callers must await
+  },
 };
 
 export default AIGateway;

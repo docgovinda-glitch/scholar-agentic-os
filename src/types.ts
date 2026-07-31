@@ -185,7 +185,21 @@ export interface AIResponse {
 }
 
 export interface AISettings {
-  provider: "auto" | "server" | "gemini" | "openai" | "ollama" | "custom" | "claude" | "deepseek" | "cohere" | "qwen" | "omniroute" | "groq" | "together" | "openrouter";
+  /**
+   * The active provider id.
+   *
+   * The named members are the historical ids that have dedicated settings
+   * fields below and are referenced by name across the codebase. The trailing
+   * `(string & {})` admits the ~20 additional providers added in 2026-07 from
+   * src/config/providerCatalog.ts and the local runners from
+   * src/config/localRunnerCatalog.ts, whose keys/endpoints live in the vault
+   * and in localEndpoints/localModels rather than in their own fields — while
+   * still giving editors autocomplete for the common ones.
+   */
+  provider:
+    | "auto" | "server" | "gemini" | "openai" | "ollama" | "custom" | "claude" | "deepseek"
+    | "cohere" | "qwen" | "omniroute" | "groq" | "together" | "openrouter"
+    | (string & {});
   ollamaModel?: string;
   ollamaEndpoint?: string;
   customModel?: string;
@@ -214,6 +228,18 @@ export interface AISettings {
   providerHealth?: Record<string, HealthStatus>;
   fallbackOrder?: string[];
   aiReadiness?: 'validated' | 'simulated' | 'unchecked';
+
+  /**
+   * Endpoints and models for local runners added in 2026-07 (LM Studio, Jan,
+   * LocalAI, llama.cpp, KoboldCPP, vLLM, Text Generation WebUI). Keyed by the
+   * runner id in src/config/localRunnerCatalog.ts.
+   *
+   * The three original local providers (ollama/custom/omniroute) keep their
+   * dedicated fields above rather than moving here, so existing saved
+   * configurations continue to load untouched.
+   */
+  localEndpoints?: Record<string, string>;
+  localModels?: Record<string, string>;
 }
 
 export interface ProjectVersion {
