@@ -8,7 +8,7 @@
 // for why fidelity to existing behavior was prioritized over redesigning it.
 //
 // Deploy: supabase functions deploy request-profile-update
-// Requires project secrets: RESEND_API_KEY, ADMIN_EMAIL
+// Requires project secrets: RESEND_API_KEY, ADMIN_EMAIL (RESEND_FROM_EMAIL optional)
 
 import { ADMIN_EMAIL } from "../_shared/adminClient.ts";
 import { sendEmail, brandedEmailHtml } from "../_shared/resend.ts";

@@ -7,7 +7,7 @@
 // staging and this call.
 //
 // Deploy: supabase functions deploy approve-password-reset
-// Requires project secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY
+// Requires project secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY (RESEND_FROM_EMAIL optional)
 
 import { createAdminClient } from "../_shared/adminClient.ts";
 import { sendEmail, brandedEmailHtml } from "../_shared/resend.ts";

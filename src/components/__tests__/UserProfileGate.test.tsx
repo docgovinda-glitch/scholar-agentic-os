@@ -7,12 +7,24 @@
 // a locked-in behavioral baseline. It has since been updated to mock
 // supabaseAuthService.ts instead of fetch, following the cutover — most
 // assertions are unchanged (same UI behavior, same onProfileActive calls),
-// but three flows are NOT "the same test against a different backend":
-//   - OTP dispatch: collapsed from 2 tests to 1. There's no Supabase
-//     equivalent of the old /api/register OTP-email call, so the two old
-//     "server sent it" / "server couldn't, bypass shown" branches collapse
-//     into a single always-bypass behavior (see UserProfileGate.tsx's
-//     handleCreateProfile comment).
+// but these flows are NOT "the same test against a different backend":
+//   - Email-OTP step: removed entirely (2026-07-30 auth production-
+//     readiness pass). It never actually emailed a code — the "Credentials
+//     for Resend not fully configured" message was a hardcoded, always-on
+//     placeholder shown regardless of any real configuration (see git
+//     history for the removed handleVerifyDualOtp/showDualVerifyScreen).
+//     Submitting the signup form now calls signUp() directly and moves
+//     straight to the pending-approval screen.
+//   - Login: used to require a local-device profile cache to already exist
+//     BEFORE calling signIn() at all, so an approved Supabase account could
+//     never log in from a second browser/device. signIn() is now called
+//     first, unconditionally; the local cache is read if present and
+//     created fresh from signIn()'s returned profile otherwise. The old
+//     network-failure fallback (comparing the entered password against a
+//     locally-cached plaintext value under the misleadingly-named
+//     `passcodeHash` field) was removed along with it — a signIn() network
+//     error now surfaces a clear error message instead of silently trusting
+//     that local cache.
 //   - Activation: entirely restructured. There's no activation-key concept
 //     under Supabase (approval is the admin flipping is_approved directly);
 //     "activation" is now a "check approval status" login attempt.
@@ -58,6 +70,16 @@ vi.mock("../../services/supabaseAuthService", () => ({
   onPasswordRecovery: vi.fn(() => () => {}),
   signInWithGoogle: vi.fn(),
   onGoogleSignIn: vi.fn(() => () => {}),
+  // Real implementation (not a vi.fn()) — a pure, deterministic helper with
+  // no network/Supabase dependency, so there's nothing to mock; the
+  // component under test calls it directly (see its own doc comment in
+  // supabaseAuthService.ts for what it's guarding against).
+  safeAuthErrorMessage: (error: { message?: string; status?: number } | null | undefined, fallback: string): string => {
+    if (error?.message && error.message.trim() && error.message.trim() !== "{}") {
+      return error.message;
+    }
+    return error?.status ? `${fallback} (server error ${error.status}).` : fallback;
+  },
 }));
 
 // Vitest's jsdom environment proxies window's own-enumerable properties onto
@@ -143,43 +165,12 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
     });
   });
 
-  describe("signup — OTP dispatch (step 1 -> dual-verify screen)", () => {
-    it("always shows the OTP screen with the bypass code (no Supabase equivalent of the old email-dispatch call exists)", async () => {
-      render(<UserProfileGate onProfileActive={onProfileActive} />);
-      await fillSignupForm();
-      fireEvent.click(screen.getByText("Submit Account Request"));
-
-      expect(await screen.findByText("Email OTP Scholar Verification")).toBeInTheDocument();
-      expect(screen.getByText(/Sandbox Bypass Code/)).toHaveTextContent(/\d{6}/);
-      expect(signUpMock).not.toHaveBeenCalled(); // signUp only happens after OTP verification
-    });
-  });
-
-  describe("signup — OTP verification (step 2 -> registration submit -> pending screen)", () => {
-    async function getToOtpScreenWithKnownCode(): Promise<string> {
-      render(<UserProfileGate onProfileActive={onProfileActive} />);
-      await fillSignupForm();
-      fireEvent.click(screen.getByText("Submit Account Request"));
-      const bypassEl = await screen.findByText(/Sandbox Bypass Code/);
-      const match = bypassEl.textContent!.match(/(\d{6})/);
-      return match![1];
-    }
-
-    it("rejects an incorrect OTP", async () => {
-      await getToOtpScreenWithKnownCode();
-      fireEvent.change(screen.getByPlaceholderText("Enter email code..."), { target: { value: "000000" } });
-      fireEvent.click(screen.getByText("Verify & Request Account"));
-      expect(
-        await screen.findByText("Invalid verification code. Please enter the correct Email OTP.")
-      ).toBeInTheDocument();
-    });
-
-    it("on correct OTP, calls signUp and moves to the pending-approval screen", async () => {
-      const code = await getToOtpScreenWithKnownCode();
+  describe("signup — direct registration (no email-OTP step)", () => {
+    it("on submit, calls signUp directly and moves to the pending-approval screen", async () => {
       signUpMock.mockResolvedValue({ success: true });
-
-      fireEvent.change(screen.getByPlaceholderText("Enter email code..."), { target: { value: code } });
-      fireEvent.click(screen.getByText("Verify & Request Account"));
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      await fillSignupForm();
+      fireEvent.click(screen.getByText("Submit Account Request"));
 
       expect(await screen.findByText("Request Pending Admin Verification")).toBeInTheDocument();
       expect(signUpMock).toHaveBeenCalledWith(
@@ -192,25 +183,23 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
       // account was created but the admin-notification email couldn't be
       // sent (see supabaseAuthService.ts). This must actually render on the
       // pending screen, not just be stored in state.
-      const code = await getToOtpScreenWithKnownCode();
       signUpMock.mockResolvedValue({
         success: true,
         error: "Registered, but the admin notification email couldn't be sent: RESEND_API_KEY not configured.",
       });
-
-      fireEvent.change(screen.getByPlaceholderText("Enter email code..."), { target: { value: code } });
-      fireEvent.click(screen.getByText("Verify & Request Account"));
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      await fillSignupForm();
+      fireEvent.click(screen.getByText("Submit Account Request"));
 
       expect(await screen.findByText("Request Pending Admin Verification")).toBeInTheDocument();
       expect(await screen.findByText(/admin notification email couldn't be sent/)).toBeInTheDocument();
     });
 
-    it("on signUp failure, shows the error and stays on the OTP screen", async () => {
-      const code = await getToOtpScreenWithKnownCode();
+    it("on signUp failure, shows the error and stays on the signup screen", async () => {
       signUpMock.mockResolvedValue({ success: false, error: "Email address already registered." });
-
-      fireEvent.change(screen.getByPlaceholderText("Enter email code..."), { target: { value: code } });
-      fireEvent.click(screen.getByText("Verify & Request Account"));
+      render(<UserProfileGate onProfileActive={onProfileActive} />);
+      await fillSignupForm();
+      fireEvent.click(screen.getByText("Submit Account Request"));
 
       expect(await screen.findByText("Email address already registered.")).toBeInTheDocument();
     });
@@ -224,11 +213,6 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
       fireEvent.change(countrySelect, { target: { value: "+91" } });
       fireEvent.click(screen.getByText("Submit Account Request"));
 
-      const bypassEl = await screen.findByText(/Sandbox Bypass Code/);
-      const code = bypassEl.textContent!.match(/(\d{6})/)![1];
-      fireEvent.change(screen.getByPlaceholderText("Enter email code..."), { target: { value: code } });
-      fireEvent.click(screen.getByText("Verify & Request Account"));
-
       await waitFor(() => expect(signUpMock).toHaveBeenCalled());
       expect(signUpMock).toHaveBeenCalledWith(expect.objectContaining({ phone: "919800000000" }));
     });
@@ -240,10 +224,6 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
       render(<UserProfileGate onProfileActive={onProfileActive} />);
       await fillSignupForm();
       fireEvent.click(screen.getByText("Submit Account Request"));
-      const bypassEl = await screen.findByText(/Sandbox Bypass Code/);
-      const code = bypassEl.textContent!.match(/(\d{6})/)![1];
-      fireEvent.change(screen.getByPlaceholderText("Enter email code..."), { target: { value: code } });
-      fireEvent.click(screen.getByText("Verify & Request Account"));
       await screen.findByText("Request Pending Admin Verification");
     }
 
@@ -275,19 +255,29 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
   });
 
   describe("login", () => {
-    it("rejects a username with no local profile on this device", async () => {
+    it("logs in successfully on a device with no local profile cache (cross-device fix), creating one from signIn's response", async () => {
       // A device with zero profiles defaults to the signup tab (and the tab
       // switcher itself only renders once profiles.length > 0) — seed an
-      // unrelated profile so the login form is reachable at all.
+      // unrelated profile so the login form is reachable at all. "newuser"
+      // itself has no local cache — this is the new-device/cleared-storage
+      // scenario the cross-device login fix (2026-07-30) targets: signIn()
+      // must be tried regardless, not rejected before ever contacting Supabase.
       seedExistingProfile("someoneelse");
+      signInMock.mockResolvedValue({
+        success: true,
+        isApproved: true,
+        profile: { fullName: "New Device User", email: "newdevice@example.com", phone: "111", affiliation: "Some U", authenticId: "None" },
+      });
+
       render(<UserProfileGate onProfileActive={onProfileActive} />);
-      fireEvent.change(screen.getByPlaceholderText("Enter your username..."), { target: { value: "ghost" } });
-      fireEvent.change(screen.getByPlaceholderText("Enter your password..."), { target: { value: "whatever" } });
+      fireEvent.change(screen.getByPlaceholderText("Enter your username..."), { target: { value: "newuser" } });
+      fireEvent.change(screen.getByPlaceholderText("Enter your password..."), { target: { value: "CorrectPassw0rd!" } });
       fireEvent.click(screen.getByText("Launch Scholar Workspace"));
-      expect(
-        await screen.findByText(/Scholar identity not found on this device/)
-      ).toBeInTheDocument();
-      expect(signInMock).not.toHaveBeenCalled();
+
+      expect(signInMock).toHaveBeenCalledWith({ username: "newuser", password: "CorrectPassw0rd!" });
+      await waitFor(() => expect(onProfileActive).toHaveBeenCalledWith("newuser", expect.any(Object)));
+      const stored = JSON.parse(localStorage.getItem(`${PROFILE_STATE_PREFIX}newuser`)!);
+      expect(stored.fullName).toBe("New Device User");
     });
 
     it("logs in successfully when signIn confirms approval, syncing profile fields", async () => {
@@ -338,7 +328,11 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
       expect(onProfileActive).not.toHaveBeenCalled();
     });
 
-    it("falls back to the local passcode check when signIn throws (network failure)", async () => {
+    it("shows a clear network error when signIn throws, without calling onProfileActive (no insecure local fallback)", async () => {
+      // The old behavior here fell back to comparing the entered password
+      // against a locally-cached plaintext value — removed as part of the
+      // cross-device login fix (2026-07-30), since signIn() is now always
+      // the source of truth.
       seedExistingProfile("offlineuser");
       signInMock.mockRejectedValue(new Error("network down"));
 
@@ -347,7 +341,8 @@ describe("UserProfileGate — characterization (new Supabase-backed path)", () =
       fireEvent.change(screen.getByPlaceholderText("Enter your password..."), { target: { value: "CorrectPassw0rd!" } });
       fireEvent.click(screen.getByText("Launch Scholar Workspace"));
 
-      await waitFor(() => expect(onProfileActive).toHaveBeenCalledWith("offlineuser", expect.any(Object)));
+      expect(await screen.findByText("network down")).toBeInTheDocument();
+      expect(onProfileActive).not.toHaveBeenCalled();
     });
   });
 

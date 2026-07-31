@@ -15,6 +15,12 @@ export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean;
     return { sent: false, error: "RESEND_API_KEY not configured on this Supabase project (set via `supabase secrets set`)." };
   }
 
+  // Defaults to Resend's shared sandbox sender, which only delivers to the
+  // Resend account owner's own verified email — real recipient delivery
+  // requires a custom domain verified in Resend and RESEND_FROM_EMAIL set
+  // to an address on it (`supabase secrets set RESEND_FROM_EMAIL=...`).
+  const fromAddress = Deno.env.get("RESEND_FROM_EMAIL") || "Scholar Agentic <onboarding@resend.dev>";
+
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -23,7 +29,7 @@ export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean;
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: "Scholar Agentic <onboarding@resend.dev>",
+        from: fromAddress,
         to: input.to,
         subject: input.subject,
         html: input.html,

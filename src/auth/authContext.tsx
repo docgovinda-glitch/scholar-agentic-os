@@ -95,11 +95,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(false);
   };
 
+  // Bug fix (2026-07-30): this used to only clear this app's own local
+  // session key — it never called Supabase's signOut(), so the real
+  // Supabase auth session (persisted independently by supabase-js) stayed
+  // alive after "logout". Fire-and-forget: clearing local state must not
+  // block on network, and failing to reach Supabase shouldn't prevent the
+  // user from being logged out of this app locally. Dynamically imported
+  // rather than a top-level import — authContext.tsx is eagerly loaded
+  // (AuthProvider wraps the whole app), and a static import here would pull
+  // @supabase/supabase-js into the main bundle chunk just for this one
+  // fire-and-forget call.
   const logout = () => {
     setUser(null);
     setProject(null);
     setOnboardingStepState("login");
     localStorage.removeItem('phd_active_session_username');
+    import('../services/supabaseClient').then(({ getSupabaseClient, isSupabaseConfigured }) => {
+      if (isSupabaseConfigured()) {
+        getSupabaseClient().auth.signOut().catch((err) => {
+          console.warn('[Auth] Supabase signOut failed:', err);
+        });
+      }
+    });
   };
 
   const signup = async (partial: Partial<UserProfile>) => {

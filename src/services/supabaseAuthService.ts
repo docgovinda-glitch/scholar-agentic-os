@@ -31,6 +31,24 @@ export interface ServiceResult {
 }
 
 /**
+ * Bug fix (2026-07-30): for 5xx-class Supabase Auth failures, supabase-js
+ * wraps the error as an AuthRetryableFetchError whose own `.message` is
+ * frequently just the literal string "{}" — losing the real server message
+ * (e.g. a genuine failure was confirmed, via direct network inspection, to
+ * return the raw body `{"code":"unexpected_failure","message":"Error
+ * sending confirmation email"}`, yet `error.message` here was "{}"). Using
+ * `error.message` directly would show that literal "{}" to the user. Falls
+ * back to a status-aware, still-honest message instead of ever surfacing
+ * that artifact.
+ */
+export function safeAuthErrorMessage(error: { message?: string; status?: number } | null | undefined, fallback: string): string {
+  if (error?.message && error.message.trim() && error.message.trim() !== "{}") {
+    return error.message;
+  }
+  return error?.status ? `${fallback} (server error ${error.status}).` : fallback;
+}
+
+/**
  * Registers a new scholar. Supabase Auth creates the auth.users row;
  * the on_auth_user_created trigger (supabase/schema.sql) creates the
  * matching profiles row with is_approved = false. Then invokes the
@@ -55,7 +73,7 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
   });
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: safeAuthErrorMessage(error, "Registration failed. Please try again or contact the administrator if this persists.") };
   }
   if (!data.user) {
     return { success: false, error: "Sign-up did not return a user record." };
@@ -246,7 +264,7 @@ export async function sendPasswordResetEmail(email: string): Promise<ServiceResu
     redirectTo: window.location.origin,
   });
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: safeAuthErrorMessage(error, "Failed to send the password reset email. Please try again shortly.") };
   }
   return { success: true };
 }
@@ -260,7 +278,7 @@ export async function updatePassword(newPassword: string): Promise<ServiceResult
   const supabase = getSupabaseClient();
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: safeAuthErrorMessage(error, "Failed to update the password. Please try again.") };
   }
   return { success: true };
 }

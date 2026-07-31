@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { User, Lock, Eye, EyeOff, ShieldCheck, Check, AlertCircle, Sparkles, GraduationCap, ArrowRight, ShieldAlert, Key, Phone, Mail, Building, Landmark, Clock } from "lucide-react";
 import { UserProfile, PaperProject } from "../types";
-import { signUp, signIn, sendPasswordResetEmail, updatePassword, onPasswordRecovery, signInWithGoogle, onGoogleSignIn } from "../services/supabaseAuthService";
+import { signUp, signIn, sendPasswordResetEmail, updatePassword, onPasswordRecovery, signInWithGoogle, onGoogleSignIn, safeAuthErrorMessage } from "../services/supabaseAuthService";
 
 interface UserProfileGateProps {
   onProfileActive: (username: string, projectState: PaperProject) => void;
@@ -58,16 +58,9 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
   // Activation Screen States
   const [pendingUser, setPendingUser] = useState<UserProfile | null>(null);
   const [debugCodeMsg, setDebugCodeMsg] = useState<string | null>(null);
-  
+
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Registration Email-OTP & Forgot Password states
-  const [showDualVerifyScreen, setShowDualVerifyScreen] = useState(false);
-  const [generatedEmailOtp, setGeneratedEmailOtp] = useState("");
-  const [enteredEmailOtp, setEnteredEmailOtp] = useState("");
-  const [dualVerifyError, setDualVerifyError] = useState<string | null>(null);
-  const [dualVerifyBypass, setDualVerifyBypass] = useState<string | null>(null);
 
   const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
@@ -140,13 +133,21 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
   const strengthScore = getPasswordStrength();
 
-  // Handle Registration signup submit (triggers Email OTP dispatch)
+  // Handle Registration signup submit — registers directly with Supabase
+  // Auth and moves straight to the pending-admin-approval screen. There is
+  // no email-OTP step: Supabase's own email confirmation is intentionally
+  // disabled in favor of the admin-approval gate below (see
+  // .claude/HANDOVER.md), so a pre-account OTP check has no real backend
+  // counterpart to verify against — a prior version of this screen faked
+  // one client-side (generating a code and displaying it back to the user
+  // instead of emailing it), which is what the "Credentials for Resend not
+  // fully configured" bypass message actually was. Removed rather than
+  // wired to a real Supabase OTP send, since the admin-approval gate below
+  // already gatekeeps account activation.
   const handleCreateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setDebugCodeMsg(null);
-    setDualVerifyError(null);
-    setDualVerifyBypass(null);
 
     const nameTrimmed = usernameInput.trim();
     if (!nameTrimmed) {
@@ -167,41 +168,6 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
     setLoading(true);
 
-    const emailOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedEmailOtp(emailOtp);
-
-    // No backend OTP-dispatch equivalent exists under Supabase — Supabase's
-    // own email confirmation is intentionally disabled (the admin-approval
-    // gate below replaces it; see .claude/HANDOVER.md), so there's nothing
-    // to relocate this call to. This is now a client-side-only
-    // self-verification step: the code is never actually emailed, only
-    // shown via the same sandbox-bypass message the old code fell back to
-    // whenever Resend wasn't configured.
-    setDualVerifyBypass(`⚠️ Credentials for Resend not fully configured on server. Please use the following bypass code for validation:\n\n📧 Email OTP (Sandbox Bypass Code): ${emailOtp}\n`);
-    setShowDualVerifyScreen(true);
-    setLoading(false);
-  };
-
-  // Handle Email OTP Verification and pending user creation
-  const handleVerifyDualOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setDualVerifyError(null);
-
-    const emailOtpEntered = enteredEmailOtp.trim();
-
-    if (!emailOtpEntered) {
-      setDualVerifyError("Please enter the verification OTP code.");
-      return;
-    }
-
-    if (emailOtpEntered !== generatedEmailOtp) {
-      setDualVerifyError("Invalid verification code. Please enter the correct Email OTP.");
-      return;
-    }
-
-    setLoading(true);
-
-    const nameTrimmed = usernameInput.trim();
     const cleanPh = `${countryCode}${phone.trim()}`.replace(/[+\s()-]/g, "");
     const defaultProject = DEFAULT_STATE(nameTrimmed);
 
@@ -225,7 +191,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
       });
 
       if (!result.success) {
-        setDualVerifyError(result.error || "An error occurred finalizing the workspace registration.");
+        setError(result.error || "An error occurred finalizing the workspace registration.");
         setLoading(false);
         return;
       }
@@ -262,20 +228,19 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
       setTimeout(() => {
         setLoading(false);
-        setShowDualVerifyScreen(false);
         setPendingUser(pendingProfile);
         setActiveTab("activation");
         if (result.error) {
           // signUp() returns success:true with an error string when
           // registration itself succeeded but the admin-notification email
-          // failed to send — surfaced the same way the old bypass message was.
+          // failed to send — surfaced here so it isn't silently swallowed.
           setDebugCodeMsg(`⚠️ ${result.error}`);
         }
       }, 800);
 
     } catch (err: any) {
       console.error(err);
-      setDualVerifyError("An error occurred finalizing the workspace registration.");
+      setError("An error occurred finalizing the workspace registration.");
       setLoading(false);
     }
   };
@@ -351,7 +316,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
     setError(null);
     const { error: oauthError } = await signInWithGoogle();
     if (oauthError) {
-      setError(`Google Sign-In failed: ${oauthError.message}`);
+      setError(`Google Sign-In failed: ${safeAuthErrorMessage(oauthError, "unknown error, please try again")}`);
     }
   };
 
@@ -424,6 +389,14 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
   };
 
   // Handle Login submit
+  // Cross-device fix (2026-07-30): this used to require a local-device
+  // profile cache to exist BEFORE ever contacting Supabase, so an approved
+  // scholar logging in from a second browser/device (or after clearing
+  // storage) was rejected immediately with "Scholar identity not found on
+  // this device" — the real Supabase account was never even checked.
+  // Supabase's signIn() is now the source of truth, checked first; the
+  // local cache (used only for this app's own client-side project data) is
+  // read if present and created fresh otherwise, never gating the attempt.
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -439,67 +412,63 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
       return;
     }
 
-    const savedStateStr = localStorage.getItem(`${PROFILE_STATE_PREFIX}${nameTrimmed}`);
-    if (!savedStateStr) {
-      setError("Scholar identity not found on this device. Double-check your spelling or create a new profile.");
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const parsedProfile = JSON.parse(savedStateStr) as UserProfile;
+      const signInResult = await signIn({ username: nameTrimmed, password: passwordInput });
 
-      // 1. Verify credentials and check admin approval status via Supabase Auth
-      try {
-        const signInResult = await signIn({ username: nameTrimmed, password: passwordInput });
-
-        if (!signInResult.success) {
-          if (signInResult.isApproved === false) {
-            setError("Awaiting Admin Approval. Your registration or password reset is currently in the Admin Queue.");
-            setLoading(false);
-            return;
-          } else {
-            setError(signInResult.error || "Authentication failed.");
-            setLoading(false);
-            return;
-          }
-        }
-
-        // Sync database details back to localStorage profile
-        parsedProfile.fullName = signInResult.profile?.fullName || parsedProfile.fullName;
-        parsedProfile.email = signInResult.profile?.email || parsedProfile.email;
-        parsedProfile.phone = signInResult.profile?.phone || parsedProfile.phone;
-        parsedProfile.affiliation = signInResult.profile?.affiliation || parsedProfile.affiliation;
-        parsedProfile.authenticId = signInResult.profile?.authenticId || parsedProfile.authenticId;
-        parsedProfile.passcodeHash = passwordInput; // update passcode hash (in case it was reset by admin)
-        parsedProfile.status = "approved"; // since Supabase returned success, it is approved!
-
-        localStorage.setItem(`${PROFILE_STATE_PREFIX}${nameTrimmed}`, JSON.stringify(parsedProfile));
-      } catch (syncErr) {
-        console.warn("Failed to check approval status on server, falling back to local credentials:", syncErr);
-        if (!parsedProfile.passcodeHash || parsedProfile.passcodeHash !== passwordInput) {
-          setError("Incorrect password credentials. Please verify and try again.");
-          setLoading(false);
-          return;
-        }
-        if (parsedProfile.status === "pending") {
-          setError("Awaiting Admin Approval. (offline check)");
-          setLoading(false);
-          return;
-        }
+      if (!signInResult.success) {
+        setError(
+          signInResult.isApproved === false
+            ? "Awaiting Admin Approval. Your registration or password reset is currently in the Admin Queue."
+            : (signInResult.error || "Authentication failed.")
+        );
+        setLoading(false);
+        return;
       }
 
-      // Safeguard: Ensure aiSettings exists
+      const savedStateStr = localStorage.getItem(`${PROFILE_STATE_PREFIX}${nameTrimmed}`);
+      const parsedProfile: UserProfile = savedStateStr
+        ? (JSON.parse(savedStateStr) as UserProfile)
+        : {
+            username: nameTrimmed,
+            projectState: DEFAULT_STATE(nameTrimmed),
+            status: "approved"
+          };
+
+      // Sync database details back to the local profile cache (first login
+      // on a new device populates it from scratch; the research-project
+      // data itself is client-side only and has no server copy to restore).
+      parsedProfile.fullName = signInResult.profile?.fullName || parsedProfile.fullName;
+      parsedProfile.email = signInResult.profile?.email || parsedProfile.email;
+      parsedProfile.phone = signInResult.profile?.phone || parsedProfile.phone;
+      parsedProfile.affiliation = signInResult.profile?.affiliation || parsedProfile.affiliation;
+      parsedProfile.authenticId = signInResult.profile?.authenticId || parsedProfile.authenticId;
+      parsedProfile.passcodeHash = passwordInput; // update passcode hash (in case it was reset by admin)
+      parsedProfile.status = "approved"; // since Supabase returned success, it is approved!
+
       if (!parsedProfile.projectState.aiSettings) {
         parsedProfile.projectState.aiSettings = DEFAULT_SETTINGS;
       }
 
+      localStorage.setItem(`${PROFILE_STATE_PREFIX}${nameTrimmed}`, JSON.stringify(parsedProfile));
+
+      if (!profiles.includes(nameTrimmed)) {
+        const savedList = localStorage.getItem(PROFILES_LIST_KEY);
+        let list: string[] = [];
+        if (savedList) {
+          try { list = (JSON.parse(savedList) as { profilesList: string[] }).profilesList || []; } catch (_) {}
+        }
+        list.push(nameTrimmed);
+        localStorage.setItem(PROFILES_LIST_KEY, JSON.stringify({ profilesList: list }));
+        setProfiles(list);
+      }
+
       setLoading(false);
       onProfileActive(nameTrimmed, parsedProfile.projectState);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError("Failed to read secure profile credentials from local storage.");
+      setError(err?.message || "Network error during login. Please check your connection and try again.");
       setLoading(false);
     }
   };
@@ -592,7 +561,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
         </div>
 
         {/* Tab Selection toggle bar */}
-        {!showDualVerifyScreen && activeTab !== "activation" && profiles.length > 0 && (
+        {activeTab !== "activation" && profiles.length > 0 && (
           <div className="grid grid-cols-2 gap-1.5 p-1 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)]/50 rounded-2xl text-xs font-mono shrink-0">
             <button
               onClick={() => {
@@ -639,82 +608,7 @@ export default function UserProfileGate({ onProfileActive }: UserProfileGateProp
 
         {/* Forms Container */}
         <div className="grow">
-          {showDualVerifyScreen ? (
-            <form onSubmit={handleVerifyDualOtp} className="space-y-5 animate-fade-in">
-              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-xs text-amber-300">
-                <h4 className="font-bold uppercase font-mono tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="w-4.5 h-4.5 text-amber-400" />
-                  Email OTP Scholar Verification
-                </h4>
-                <p className="text-xs leading-normal">
-                  To protect scholar data, we require verification of your registered **Email Address** before launching your workspace.
-                </p>
-              </div>
-
-              {dualVerifyError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2.5">
-                  <AlertCircle className="w-4.5 h-4.5 text-red-400 shrink-0 mt-0.5" />
-                  <span className="leading-relaxed font-sans font-medium">{dualVerifyError}</span>
-                </div>
-              )}
-
-              {dualVerifyBypass && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs leading-normal font-mono select-all">
-                  {dualVerifyBypass}
-                </div>
-              )}
-
-              {/* Email OTP Input */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
-                  6-Digit Email Verification OTP
-                </label>
-                <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
-                  <Mail className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5 z-10" />
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="Enter email code..."
-                    className="w-full border-0 bg-transparent pl-10 pr-4 py-3 text-xs text-[#E2E8F0] focus:outline-none font-mono tracking-[0.2em] text-center"
-                    value={enteredEmailOtp}
-                    onChange={(e) => {
-                      setEnteredEmailOtp(e.target.value);
-                      setDualVerifyError(null);
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDualVerifyScreen(false);
-                    setDualVerifyError(null);
-                    setDualVerifyBypass(null);
-                  }}
-                  className="w-1/3 py-3 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[10px] font-mono uppercase text-[#94A3B8] rounded-xl cursor-pointer transition-all"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-2/3 py-3 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--color-navy-4)] text-white text-[11px] font-mono uppercase tracking-widest font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5"
-                >
-                  {loading ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Verify & Request Account</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          ) : isPasswordRecoveryMode ? (
+          {isPasswordRecoveryMode ? (
             <form onSubmit={handleUpdatePasswordRecovery} className="space-y-5 animate-fade-in">
               <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-xs text-amber-300">
                 <h4 className="font-bold uppercase font-mono tracking-wider flex items-center gap-1.5">

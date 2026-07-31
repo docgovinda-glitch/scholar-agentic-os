@@ -5,7 +5,7 @@
 // password does NOT take effect until approve-password-reset runs.
 //
 // Deploy: supabase functions deploy request-password-reset
-// Requires project secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, ADMIN_EMAIL
+// Requires project secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, ADMIN_EMAIL (RESEND_FROM_EMAIL optional)
 
 import { createAdminClient, ADMIN_EMAIL } from "../_shared/adminClient.ts";
 import { sendEmail, brandedEmailHtml } from "../_shared/resend.ts";

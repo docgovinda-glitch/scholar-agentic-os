@@ -4,7 +4,7 @@
 // details table and an Approve & Set Approved link).
 //
 // Deploy: supabase functions deploy send-approval-email
-// Requires project secrets: RESEND_API_KEY, ADMIN_EMAIL
+// Requires project secrets: RESEND_API_KEY, ADMIN_EMAIL (RESEND_FROM_EMAIL optional)
 
 import { ADMIN_EMAIL } from "../_shared/adminClient.ts";
 import { sendEmail, brandedEmailHtml } from "../_shared/resend.ts";
