@@ -134,22 +134,12 @@ export const CLOUD_PROVIDERS: CloudProviderSpec[] = [
     icon: "◍",
     color: "#F26B3A",
   },
-  {
-    id: "githubmodels",
-    name: "GitHub Models",
-    apiStyle: "openai-compatible",
-    baseUrl: "https://models.github.ai/inference",
-    chatPath: "/chat/completions",
-    modelsPath: "/models",
-    defaultModel: "openai/gpt-4.1-mini",
-    models: ["openai/gpt-4.1-mini", "openai/gpt-4o-mini", "openai/gpt-4.1", "meta/Llama-4-Scout-17B-16E-Instruct"],
-    freeTier: "free",
-    freeTierNote: "Free for any GitHub account using a personal access token — rate limits scale with your Copilot plan.",
-    getKeyUrl: "https://github.com/settings/personal-access-tokens",
-    description: "Free access to models from OpenAI, Meta, Mistral and others using a GitHub token — no new account needed.",
-    icon: "◐",
-    color: "#8B949E",
-  },
+  // GitHub Models was listed here until it was found, by live probe on
+  // 2026-07-31, to return HTTP 410 with
+  // `{"code":"github_models_retirement_brownout"}` — the service is being
+  // retired. The base URL was correct; the product is going away. Advertising
+  // it as "free for any GitHub account" would have been untrue, so the entry
+  // is removed rather than left to fail for every user who chose it.
   {
     id: "openrouter",
     name: "OpenRouter",

@@ -26,6 +26,11 @@ import AIGateway from "../services/aiGateway";
 import { saveModelPreferences, saveApiKeys } from "../services/supabaseAuthService";
 import { AI_MODES, getAIMode, getModeForProvider, AIModeId } from "../config/aiModes";
 import AIModeCard from "./ai/AIModeCard";
+import AIModeAccordion from "./ai/AIModeAccordion";
+import HardwareCheckPanel from "./ai/HardwareCheckPanel";
+import VaultGate from "./ai/VaultGate";
+import ProviderKeyManager from "./ai/ProviderKeyManager";
+import * as apiVault from "../services/apiVault";
 import type { HealthStatus } from "../types";
 
 type SettingsSubTab = "mode" | "status" | "credentials" | "local" | "keys" | "advanced" | "diagnostics";
@@ -99,6 +104,14 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
   // Now uses vaultPassphrase.ts's in-memory-only passphrase; no fallback.
   const [vaultUnlocked, setVaultUnlockedState] = useState(isVaultUnlocked());
   const [vaultInput, setVaultInput] = useState("");
+
+  // Bumped on every persistent-vault mutation (2026-07-31). The vault keeps its
+  // decrypted contents in a module-scope variable rather than React state — so
+  // that a key is never accidentally serialised into a component tree or a
+  // persisted project blob — which means React cannot see those changes on its
+  // own. This counter is the explicit re-render signal, and doubles as a `key`
+  // to remount the manager with fresh vault reads after an import or removal.
+  const [vaultRevision, setVaultRevision] = useState(0);
 
   // Decrypted keys state
   const [geminiKey, setGeminiKey] = useState("");
@@ -455,17 +468,16 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
               </div>
             </div>
 
-            {/* Same 5 mode cards as onboarding — identical terminology and hierarchy */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {AI_MODES.map((mode) => (
-                <AIModeCard
-                  key={mode.id}
-                  mode={mode}
-                  isSelected={currentModeId === mode.id}
-                  onSelect={() => setActiveSubTab("credentials")}
-                />
-              ))}
-            </div>
+            {/* Redesign (2026-07-31): the five modes were a grid of tall cards
+                that collapsed to a single stacked column below `md`, so a phone
+                user scrolled five full-height cards to see the options. They are
+                now an accordion — one compact row each, one expanded at a time —
+                which also lets the two desktop-only modes be genuinely omitted on
+                mobile rather than merely hidden with CSS. See AIModeAccordion. */}
+            <AIModeAccordion
+              selectedMode={currentModeId}
+              onSelectMode={() => setActiveSubTab("credentials")}
+            />
           </div>
         );
       })()}
@@ -911,79 +923,27 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
         </div>
       )}
 
-      {/* SUB TAB: API KEYS (Step 5 — grouped, always masked, behind the same vault gate as Providers) */}
-      {activeSubTab === "keys" && !vaultUnlocked && (
-        <div className="space-y-6 animate-fade-in max-w-xl mx-auto text-center py-8">
-          <div className="w-14 h-14 bg-[color:var(--color-luminous-blue)]/15 border border-[color:var(--color-navy-4)] rounded-full flex items-center justify-center mx-auto">
-            <Key className="w-7 h-7 text-[color:var(--color-luminous-blue)]" />
-          </div>
-          <h3 className="text-xl font-bold text-[#E2E8F0] mb-1">Unlock Your Key Vault</h3>
-          <p className="text-[#94A3B8] text-sm">Enter your vault passphrase to view your configured API keys (masked).</p>
-          <div className="flex flex-col gap-3">
-            <div className="rounded-xl border border-[color:var(--color-navy-4)] focus-within:border-[color:var(--color-luminous-blue)] focus-within:ring-2 focus-within:ring-[color:var(--color-luminous-blue)]/20">
-            <input
-              type="password"
-              value={vaultInput}
-              onChange={(e) => setVaultInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleUnlockVault()}
-              placeholder="Vault passphrase"
-              className="border-0 bg-transparent w-full rounded-xl py-2.5 px-4 text-[#E2E8F0] focus:outline-none transition-all font-mono text-sm"
+      {/* SUB TAB: API KEYS — rebuilt 2026-07-31 on the persistent vault.
+          Previously this listed six hardcoded providers, so keys for Groq,
+          Together, OpenRouter and OmniRoute (all selectable in onboarding)
+          could never be viewed, retested or corrected here afterwards. It now
+          renders every provider in src/config/providerCatalog.ts, and the
+          vault survives reloads instead of relocking on every page load. */}
+      {activeSubTab === "keys" && (
+        <div className="space-y-4 animate-fade-in max-w-3xl">
+          <VaultGate onUnlocked={() => setVaultRevision((n) => n + 1)} />
+          {apiVault.isVaultUnlocked() && (
+            <ProviderKeyManager
+              key={vaultRevision}
+              settings={project.aiSettings || { provider: "gemini" }}
+              activeProvider={project.aiSettings?.provider}
+              onVaultChanged={() => setVaultRevision((n) => n + 1)}
+              onSelectProvider={(providerId) => {
+                updateProject({
+                  aiSettings: { ...(project.aiSettings || { provider: "gemini" }), provider: providerId },
+                });
+              }}
             />
-            </div>
-            <button
-              onClick={handleUnlockVault}
-              disabled={!vaultInput.trim()}
-              className="px-5 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 uppercase tracking-wider font-mono"
-            >
-              Unlock Vault
-            </button>
-          </div>
-        </div>
-      )}
-
-      {activeSubTab === "keys" && vaultUnlocked && (
-        <div className="space-y-4 animate-fade-in max-w-2xl">
-          <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl text-[11px] text-[#94A3B8]">
-            Keys are grouped by provider and always shown masked. Test verifies the key still works; Remove clears it (encrypted empty value saved, same as clearing the field in Providers).
-          </div>
-          <div className="border border-[color:var(--color-navy-4)] rounded-2xl divide-y divide-[color:var(--color-navy-4)] overflow-hidden">
-            {KEY_FIELDS.map((field) => {
-              const configured = !!field.value;
-              return (
-                <div key={field.id} className="p-4 flex items-center justify-between gap-3">
-                  <div>
-                    <span className="text-sm font-bold text-[#E2E8F0] block">{field.label}</span>
-                    <span className="text-[11px] font-mono text-[#94A3B8]">
-                      {configured ? maskKey(field.value) : "Not configured"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => handleTestConnection(field.id)}
-                      disabled={!configured || testingProvider !== null}
-                      className="px-2.5 py-1 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[10px] font-mono font-semibold uppercase text-[#94A3B8] rounded-lg cursor-pointer disabled:opacity-40"
-                    >
-                      {testingProvider === field.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Test"}
-                    </button>
-                    <button
-                      onClick={() => handleRemoveKey(field)}
-                      disabled={!configured}
-                      className="px-2.5 py-1 border border-red-500/30 hover:bg-red-500/10 text-[10px] font-mono font-semibold uppercase text-red-400 rounded-lg cursor-pointer disabled:opacity-40"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {testResult.status && (
-            <div className={`p-3 rounded-lg border text-xs font-sans flex items-center gap-2 animate-fade-in ${
-              testResult.status === "success" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-red-500/10 border-red-500/30 text-red-400"
-            }`}>
-              {testResult.status === "success" ? <CheckCircle className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
-              <span>{testResult.message}</span>
-            </div>
           )}
         </div>
       )}
@@ -1000,6 +960,21 @@ export default function AIControlCenter({ project, updateProject, onRequireVault
               </p>
             </div>
           </div>
+
+          {/* Hardware pre-check (2026-07-31) — sits above backend detection on
+              purpose. A local model is a multi-gigabyte download, and a machine
+              that cannot hold it will swap and crawl, so "what can this computer
+              actually run?" has to be answered before anything is recommended. */}
+          <HardwareCheckPanel
+            onSelectModel={(ollamaTag) =>
+              updateProject({
+                aiSettings: {
+                  ...(project.aiSettings || { provider: "gemini" }),
+                  ollamaModel: ollamaTag,
+                },
+              })
+            }
+          />
 
           <div className="border border-[color:var(--color-navy-4)] rounded-2xl overflow-hidden">
             <div className="p-4 bg-[color:var(--color-navy-2)] border-b border-[color:var(--color-navy-4)] flex items-center justify-between">

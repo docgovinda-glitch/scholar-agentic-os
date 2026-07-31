@@ -40,7 +40,9 @@ The system acts as a scholarly research collaborator, proposing structural impro
 - ⚠️ Only `src/ai` (AIKernel) is consumed outside its own module (by `src/research`). `KnowledgeKernel`, `WritingKernel`, `PublicationKernel`, `WorkspaceKernel`, and `CollaborationKernel`, plus `src/orchestrator` and `src/agents`, are implemented but not imported by `server.ts` or the React app (`src/App.tsx`, `src/components/`) — treat them as standalone library code, not as active parts of the running product, until something wires them in.
 
 ### Architecture Status
-- ✅ Multi-provider AI integration (Gemini, Ollama, OpenAI-compatible endpoints)
+- ✅ Multi-provider AI integration — 26 cloud providers and 9 local runners, defined once in `src/config/providerCatalog.ts` and `src/config/localRunnerCatalog.ts` and consumed by both the browser bundle and `server.ts`. Adding a provider is one catalog entry; do NOT add a new adapter or a new `if (aiProvider === ...)` branch (see `docs/adr/ADR-0011-AIProviderCatalogAndVault.md`)
+- ✅ Encrypted API key vault (`src/services/apiVault.ts`) with device-bound or passphrase unlock, plus backup/restore
+- ✅ Error-kind-driven provider failover (`src/services/aiErrors.ts`, `src/services/providerFailover.ts`)
 - ✅ Event-driven architecture with plugin system
 - ✅ Knowledge Vault for literature management
 - ✅ Citation compliance formatters (APA 7th, IEEE, MLA 9th, Chicago, Harvard, Vancouver)
@@ -63,11 +65,11 @@ The system acts as a scholarly research collaborator, proposing structural impro
 
 ### Build Status
 - ✅ Vite-based build system configured (`npx tsc --noEmit` and `npm run build` both pass)
-- ✅ TypeScript strict mode enabled
+- ⚠️ TypeScript: `tsconfig.json` sets no `strict` flag, so `strictNullChecks` is OFF. Consequence worth knowing before writing code: TypeScript will NOT narrow a discriminated union through `if (!result.ok)`. Use an explicit type predicate instead — see `isFailoverSuccess`/`isFailoverFailure` in `src/services/providerFailover.ts`
 - ✅ Tailwind CSS v4 integration
 
 ### Test Status
-- ✅ Test runner: **Vitest** (`npm test` / `npm run test:coverage`), not Jest — 18 `*.test.ts` files on disk, 330 tests, all passing as of this writing (run `npm test` to reconfirm)
+- ✅ Test runner: **Vitest** (`npm test` / `npm run test:coverage`), not Jest — 106 test files, 1200 tests, all passing as of 2026-07-31 (run `npm test` to reconfirm). jsdom suites must wire localStorage themselves via the `Object.defineProperty(globalThis, "localStorage", ...)` preamble used across the existing suites; `fake-indexeddb/auto` is available for IndexedDB-backed code
 
 ---
 
