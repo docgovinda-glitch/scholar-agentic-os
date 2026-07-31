@@ -79,9 +79,36 @@ const app = express();
 // scripts/eval and a websocket connection that a strict default CSP would
 // block; production serves pre-built static assets instead and gets the
 // full default policy.
+//
+// Bug fix (2026-07-31): this used to pass `contentSecurityPolicy: undefined`
+// in production, which makes helmet apply its bare default directives —
+// including `connect-src` falling back to `default-src 'self'` (same-origin
+// only). That silently blocked every browser-side fetch() to any other
+// origin, confirmed live in production: registration failed with a generic
+// "Load failed" (Safari) / "TypeError: Failed to fetch" (Chrome) because
+// the client's calls to Supabase Auth/REST/Edge Functions
+// (`*.supabase.co`) never left the browser. The same gap also silently
+// broke every literature/citation/dataset-discovery feature that fetches
+// directly from the browser (OpenAlex, Crossref, DataCite, World Bank,
+// OECD SDMX) — none of these go through server.ts as a proxy. Explicit
+// `connect-src` added on top of helmet's other defaults (left unchanged)
+// to allow exactly the origins this app's client-side code actually calls.
 app.use(
   helmet({
-    contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+    contentSecurityPolicy: process.env.NODE_ENV === "production" ? {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "connect-src": [
+          "'self'",
+          "https://*.supabase.co",
+          "https://api.openalex.org",
+          "https://api.crossref.org",
+          "https://api.datacite.org",
+          "https://api.worldbank.org",
+          "https://sdmx.oecd.org",
+        ],
+      },
+    } : false,
   })
 );
 
