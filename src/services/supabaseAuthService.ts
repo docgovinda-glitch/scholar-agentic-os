@@ -288,14 +288,48 @@ export async function updatePassword(newPassword: string): Promise<ServiceResult
  * fires once when the client parses a recovery-type session from the URL
  * fragment on page load (i.e. the user just clicked the link from
  * sendPasswordResetEmail's email). Returns an unsubscribe function.
+ *
+ * Bug fix (2026-07-31): same class of race as onGoogleSignIn — this
+ * listener only registers once UserProfileGate's lazy chunk has fetched
+ * and the component has mounted, by which point Supabase's client-side
+ * session detection from the redirect URL may already have run and fired
+ * PASSWORD_RECOVERY into a listener that didn't exist yet, landing the
+ * user back on the plain login screen instead of the set-new-password
+ * form. Checking the URL directly for Supabase's own `type=recovery`
+ * marker (present in the query string or hash fragment) catches this
+ * regardless of that timing, in addition to the live event for a recovery
+ * link that's processed after this subscribes.
+ *
+ * TEMPORARY diagnostic logging, tagged [PasswordRecovery] — remove once
+ * confirmed fixed live.
  */
 export function onPasswordRecovery(callback: () => void): () => void {
   const supabase = getSupabaseClient();
+  let fired = false;
+  const fireOnce = (source: string) => {
+    console.log("[PasswordRecovery] firing", { source });
+    if (fired) return;
+    fired = true;
+    callback();
+  };
+
+  const url = new URL(window.location.href);
+  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+  const typeParam = url.searchParams.get("type") || hashParams.get("type");
+  console.log("[PasswordRecovery] checking URL on register", {
+    href: window.location.href,
+    typeParam,
+  });
+  if (typeParam === "recovery") {
+    fireOnce("url-check");
+  }
+
   const {
     data: { subscription },
   } = supabase.auth.onAuthStateChange((event) => {
+    console.log("[PasswordRecovery] onAuthStateChange event", { event });
     if (event === "PASSWORD_RECOVERY") {
-      callback();
+      fireOnce("auth-state-change");
     }
   });
   return () => subscription.unsubscribe();
