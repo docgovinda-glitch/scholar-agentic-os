@@ -93,6 +93,24 @@ const app = express();
 // OECD SDMX) — none of these go through server.ts as a proxy. Explicit
 // `connect-src` added on top of helmet's other defaults (left unchanged)
 // to allow exactly the origins this app's client-side code actually calls.
+//
+// `form-action` fix (2026-07-31, same day): helmet's default directives
+// also include `form-action 'self'`, which silently blocked the real
+// <form method="POST"> at /admin/approve-scholar from submitting to the
+// approve-registration Edge Function (a different origin) — confirmed
+// live via a direct form.submit() call producing zero network request and
+// no visible error. Added a Supabase source here too.
+//
+// Wildcard-to-exact-origin fix (2026-07-31, same day): `https://*.supabase.co`
+// worked in Chrome but confirmed live to NOT match in Safari — WebKit's CSP
+// wildcard-matching didn't recognize the project's actual hostname
+// (gfjhsijrwodjvkisouzw.supabase.co) against that pattern, so Safari
+// refused the form-action with a CSP violation while Chrome allowed it
+// silently. A single-tenant deployment only ever talks to one specific
+// Supabase project anyway, so the wildcard bought nothing — replaced with
+// the exact origin (derived from VITE_SUPABASE_URL, already required) in
+// both directives, which is unambiguous across every browser.
+const supabaseOrigin = process.env.VITE_SUPABASE_URL ? new URL(process.env.VITE_SUPABASE_URL).origin : undefined;
 app.use(
   helmet({
     contentSecurityPolicy: process.env.NODE_ENV === "production" ? {
@@ -100,13 +118,14 @@ app.use(
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         "connect-src": [
           "'self'",
-          "https://*.supabase.co",
+          ...(supabaseOrigin ? [supabaseOrigin] : []),
           "https://api.openalex.org",
           "https://api.crossref.org",
           "https://api.datacite.org",
           "https://api.worldbank.org",
           "https://sdmx.oecd.org",
         ],
+        "form-action": ["'self'", ...(supabaseOrigin ? [supabaseOrigin] : [])],
       },
     } : false,
   })
