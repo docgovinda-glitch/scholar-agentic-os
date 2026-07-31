@@ -147,15 +147,28 @@ export const CLOUD_PROVIDERS: CloudProviderSpec[] = [
     baseUrl: "https://openrouter.ai/api/v1",
     chatPath: "/chat/completions",
     modelsPath: "/models",
-    defaultModel: "openai/gpt-4o-mini",
+    // Bug fix (2026-07-31): this defaulted to openai/gpt-4o-mini, which is a
+    // PAID model ($0.15/M prompt tokens). OpenRouter is listed here as a free
+    // tier, so a user signing up for a free account and accepting the default
+    // hit "insufficient credits" the moment they tested the connection — the
+    // provider was fine, our default was not. A `:free` model is the only
+    // correct default for a provider presented as free.
+    //
+    // OpenRouter rotates which models carry `:free` fairly often, so treat
+    // these as a starting point, not a fixed list: the UI allows free-text
+    // model entry and refreshes the real list from /models for the user's own
+    // key. If a `:free` id here 404s, that is the rotation, not a broken key.
+    defaultModel: "google/gemma-4-31b-it:free",
     models: [
+      "google/gemma-4-31b-it:free",
+      "nvidia/nemotron-3-super-120b-a12b:free",
+      "inclusionai/ling-3.0-flash:free",
       "openai/gpt-4o-mini",
       "meta-llama/llama-3.3-70b-instruct",
-      "google/gemini-2.0-flash-001",
       "deepseek/deepseek-chat",
     ],
     freeTier: "freemium",
-    freeTierNote: "Several models carry a `:free` suffix and cost nothing; the rest are pay-as-you-go.",
+    freeTierNote: "Models ending in `:free` cost nothing — the default here is one of them. Others are pay-as-you-go.",
     getKeyUrl: "https://openrouter.ai/keys",
     description: "One key, hundreds of models across many providers — the single most flexible option here.",
     icon: "◇",

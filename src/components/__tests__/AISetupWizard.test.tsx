@@ -30,6 +30,16 @@ import "@testing-library/jest-dom/vitest";
 import AISetupWizard from "../AISetupWizard";
 import { DEFAULT_STATE, PaperProject } from "../../types";
 
+// Mode selection changed shape in the 2026-07-31 redesign: the five cards
+// became an accordion (AIModeAccordion), so a mode's call-to-action only
+// exists once its row is expanded — selecting is expand-then-confirm rather
+// than one click. `ai-mode-card-<id>` still identifies the confirm button.
+function selectMode(modeId: string) {
+  fireEvent.click(screen.getByTestId(`ai-mode-row-${modeId}`));
+  fireEvent.click(screen.getByTestId(`ai-mode-card-${modeId}`));
+}
+
+
 vi.mock("../../services/aiGateway", async () => {
   const actual = await vi.importActual<typeof import("../../services/aiGateway")>("../../services/aiGateway");
   return {
@@ -97,7 +107,7 @@ describe("AISetupWizard — AI Mode selection screen", () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
-    fireEvent.click(screen.getByTestId("ai-mode-card-local"));
+    selectMode("local");
 
     expect(await screen.findByText("Ollama")).toBeInTheDocument();
     expect(screen.getByText("LM Studio")).toBeInTheDocument();
@@ -110,7 +120,7 @@ describe("AISetupWizard — AI Mode selection screen", () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
-    fireEvent.click(screen.getByTestId("ai-mode-card-omniroute"));
+    selectMode("omniroute");
 
     expect(await screen.findByText("OmniRoute")).toBeInTheDocument();
     expect(screen.getByText(/npm install -g omniroute/i)).toBeInTheDocument();
@@ -120,7 +130,7 @@ describe("AISetupWizard — AI Mode selection screen", () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
-    fireEvent.click(screen.getByTestId("ai-mode-card-cloud"));
+    selectMode("cloud");
 
     expect(await screen.findByText("Google Gemini")).toBeInTheDocument();
     expect(screen.getByText("Groq")).toBeInTheDocument();
@@ -132,7 +142,7 @@ describe("AISetupWizard — AI Mode selection screen", () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
-    fireEvent.click(screen.getByTestId("ai-mode-card-byok"));
+    selectMode("byok");
 
     expect(await screen.findByText("OpenAI")).toBeInTheDocument();
     expect(screen.getByText("Anthropic Claude")).toBeInTheDocument();
@@ -143,9 +153,14 @@ describe("AISetupWizard — AI Mode selection screen", () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
+    // In the accordion the coming-soon note lives in the expanded panel, and
+    // a coming-soon mode renders NO confirm button at all — a stronger
+    // guarantee than the old card, which rendered a CTA that did nothing.
+    fireEvent.click(screen.getByTestId("ai-mode-row-partner"));
     expect(screen.getByText(/don't have a live partner offer/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("ai-mode-card-partner"));
-    // Should not navigate away from the mode screen
+    expect(screen.queryByTestId("ai-mode-card-partner")).not.toBeInTheDocument();
+
+    // Still on the mode screen.
     expect(screen.getByText(/how would you like your ai assistant to work/i)).toBeInTheDocument();
   });
 
@@ -153,8 +168,11 @@ describe("AISetupWizard — AI Mode selection screen", () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
-    const card = screen.getByTestId("ai-mode-card-local");
-    const cta = card.querySelector("button")!;
+    // The testid now sits on the CTA button itself rather than on a wrapping
+    // card, so it is queried directly instead of via querySelector.
+    fireEvent.click(screen.getByTestId("ai-mode-row-local"));
+    const cta = screen.getByTestId("ai-mode-card-local");
+    expect(cta.tagName).toBe("BUTTON");
     cta.focus();
     expect(document.activeElement).toBe(cta);
     fireEvent.click(cta);
@@ -165,7 +183,7 @@ describe("AISetupWizard — AI Mode selection screen", () => {
   it("is keyboard-operable: pressing Space on a provider card toggles its selection", async () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
-    fireEvent.click(screen.getByTestId("ai-mode-card-byok"));
+    selectMode("byok");
     await screen.findByText("OpenAI");
 
     const providerCard = screen.getByText("OpenAI").closest('[role="button"]')!;
@@ -180,7 +198,7 @@ describe("AISetupWizard — AI Mode selection screen", () => {
   it("provides a way back to the mode screen from the provider step", async () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
-    fireEvent.click(screen.getByTestId("ai-mode-card-local"));
+    selectMode("local");
     await screen.findByText("Ollama");
 
     fireEvent.click(screen.getByText(/change ai mode/i));
@@ -193,7 +211,7 @@ describe("AISetupWizard — provider-selection step (characterization, unchanged
   it("still requires at least one provider selected before Continue is enabled", async () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
-    fireEvent.click(screen.getByTestId("ai-mode-card-byok"));
+    selectMode("byok");
     await screen.findByText("OpenAI");
 
     const continueButton = screen.getByText(/^continue$/i).closest("button")!;

@@ -5,7 +5,7 @@ import AIGateway, { AI_PROVIDERS } from '../services/aiGateway';
 import { encryptDataAsync, decryptDataAsync } from '../utils/crypto';
 import { setVaultPassphrase, getVaultPassphrase, isVaultUnlocked } from '../services/vaultPassphrase';
 import { AI_MODES, getAIMode, AIModeId } from '../config/aiModes';
-import AIModeCard from './ai/AIModeCard';
+import AIModeAccordion from './ai/AIModeAccordion';
 import { resolveWizardRoute } from '../utils/aiSetupWizardRouting';
 import { useFocusOnNavigate } from '../hooks/useFocusOnNavigate';
 
@@ -300,16 +300,14 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {AI_MODES.map((mode) => (
-          <AIModeCard
-            key={mode.id}
-            mode={mode}
-            isSelected={selectedMode === mode.id}
-            onSelect={handleSelectMode}
-          />
-        ))}
-      </div>
+      {/* Redesign (2026-07-31): this was a grid of five AIModeCards that
+          collapsed to one full-width column below `md`, producing the long
+          scroll this step was known for — five tall cards before reaching
+          anything else. Now the same accordion used by AIControlCenter's AI
+          Mode tab, so onboarding and settings present the modes identically
+          and the desktop-only rules (Smart Gateway and Local AI need a locally
+          running program) apply in both places rather than only in settings. */}
+      <AIModeAccordion selectedMode={selectedMode ?? undefined} onSelectMode={handleSelectMode} />
     </div>
   );
 
@@ -549,6 +547,20 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                     </div>
                   )}
                 </div>
+
+                {/* Diagnostics (2026-07-31): the status pill above shows only
+                    the word OFFLINE, and health.error — which now carries a
+                    specific, actionable reason from src/services/aiErrors.ts
+                    ("Invalid API key", "Quota exhausted", "Blocked by the
+                    browser (CORS)" plus what to do) — was being discarded.
+                    A user whose key was fine but whose selected model was
+                    paid-only had no way to tell that apart from a bad key. */}
+                {health && health.status !== "online" && health.error && (
+                  <div className="mb-4 flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-xl p-3">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-[#E2E8F0] leading-relaxed">{health.error}</p>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   {/* API Key Input for Cloud */}

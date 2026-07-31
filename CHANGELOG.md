@@ -2,6 +2,29 @@
 
 ## Unreleased — AI Configuration redesign (2026-07-31)
 
+### Fixed — follow-up round, from real user testing on the deployed site
+
+- **The onboarding wizard still showed the old five stacked cards.** The
+  redesign had only been applied to `AIControlCenter.tsx` (Settings), not to
+  `AISetupWizard.tsx` — which is the page users actually land on at
+  "Step 2: AI API Configuration". Both now use the same `AIModeAccordion`,
+  so the desktop-only rules apply in onboarding too.
+- **Local AI could never connect from the deployed site.** Production CSP had
+  no localhost source in `connect-src`, so a user running Ollama was blocked
+  by policy before the request left the browser — while Local AI was still
+  offered as one of five modes. The runner ports from
+  `localRunnerCatalog.ts` are now allowed, plus a port wildcard.
+  Note this is necessary but not sufficient: Ollama also refuses cross-origin
+  requests unless `OLLAMA_ORIGINS` is set, which the diagnostics now say.
+- **OpenRouter failed validation on a free account.** It is listed under
+  "Free tier" but defaulted to `openai/gpt-4o-mini`, a PAID model — verified
+  against OpenRouter's own /models endpoint ($0.15/M prompt tokens) — so a
+  free account with no credits was rejected on the first test. Now defaults
+  to a `:free` model.
+- **The wizard discarded the reason a connection failed**, rendering only
+  "OFFLINE". It now shows the classified diagnosis and remedy.
+
+
 ### Fixed — connection failures
 
 - **Qwen was unusable.** `/api/generate` had no `qwen` branch, so every

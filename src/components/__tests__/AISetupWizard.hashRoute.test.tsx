@@ -21,6 +21,16 @@ import AISetupWizard from "../AISetupWizard";
 import { DEFAULT_STATE, PaperProject } from "../../types";
 import { clearVaultPassphrase } from "../../services/vaultPassphrase";
 
+// Mode selection changed shape in the 2026-07-31 redesign: the five cards
+// became an accordion (AIModeAccordion), so a mode's call-to-action only
+// exists once its row is expanded — selecting is expand-then-confirm rather
+// than one click. `ai-mode-card-<id>` still identifies the confirm button.
+function selectMode(modeId: string) {
+  fireEvent.click(screen.getByTestId(`ai-mode-row-${modeId}`));
+  fireEvent.click(screen.getByTestId(`ai-mode-card-${modeId}`));
+}
+
+
 vi.mock("../../services/aiGateway", async () => {
   const actual = await vi.importActual<typeof import("../../services/aiGateway")>("../../services/aiGateway");
   return {
@@ -125,7 +135,7 @@ describe("AISetupWizard — browser back/forward moves between steps, not just i
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
-    fireEvent.click(screen.getByTestId("ai-mode-card-local"));
+    selectMode("local");
     await screen.findByText("Ollama");
 
     // jsdom's history.back()/forward() dispatch their own real "hashchange"
@@ -149,7 +159,7 @@ describe("AISetupWizard — no state loss on navigation, including rapid consecu
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
-    fireEvent.click(screen.getByTestId("ai-mode-card-byok"));
+    selectMode("byok");
     await screen.findByText("OpenAI");
     fireEvent.click(screen.getByText("OpenAI"));
 
@@ -176,7 +186,7 @@ describe("AISetupWizard — focus management on step change", () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
-    fireEvent.click(screen.getByTestId("ai-mode-card-local"));
+    selectMode("local");
     await screen.findByText("Ollama");
 
     const contentCard = screen.getByText("Ollama").closest('div[tabindex="-1"]');

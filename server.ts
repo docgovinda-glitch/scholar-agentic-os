@@ -30,6 +30,7 @@ import {
   buildAuthHeaders,
   type CloudProviderSpec,
 } from "./src/config/providerCatalog.ts";
+import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
 dotenv.config();
 
 const PORT = 3000;
@@ -127,6 +128,29 @@ const app = express();
 // worked fine — an inversion that made the failure very hard to interpret.
 // DIRECT_BROWSER_CALL_ORIGINS in src/config/providerCatalog.ts is the list any
 // future direct-from-browser provider must be added to as well.
+// Local AI fix (2026-07-31): "Local AI" is one of this app's five advertised
+// AI modes, but production CSP had no localhost source — so a user running
+// Ollama on their own machine could never connect from the deployed site, and
+// the failure surfaced as a bare "could not reach" with no hint that the
+// policy, not the program, was the obstacle. Local AI was effectively dead in
+// production while being offered in the UI.
+//
+// Allowing localhost in connect-src only lets THIS app's own pages talk to
+// the user's own machine, which is precisely the feature; it grants nothing
+// to any other origin. Both a port wildcard and the catalog's explicit
+// default ports are listed: the wildcard covers custom ports, and the
+// explicit entries are the safety net after `https://*.supabase.co` was
+// confirmed live not to match in Safari — if WebKit treats a port wildcard
+// the same way, the default runner ports still work.
+const localRunnerSources = Array.from(
+  new Set(
+    LOCAL_RUNNERS.flatMap((runner) => {
+      const port = new URL(runner.defaultEndpoint).port;
+      return port ? [`http://localhost:${port}`, `http://127.0.0.1:${port}`] : [];
+    })
+  )
+);
+
 const supabaseOrigin = process.env.VITE_SUPABASE_URL ? new URL(process.env.VITE_SUPABASE_URL).origin : undefined;
 app.use(
   helmet({
@@ -137,6 +161,9 @@ app.use(
           "'self'",
           ...(supabaseOrigin ? [supabaseOrigin] : []),
           "https://generativelanguage.googleapis.com",
+          "http://localhost:*",
+          "http://127.0.0.1:*",
+          ...localRunnerSources,
           "https://api.openalex.org",
           "https://api.crossref.org",
           "https://api.datacite.org",

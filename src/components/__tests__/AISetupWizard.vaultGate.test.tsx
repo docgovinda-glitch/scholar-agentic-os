@@ -64,9 +64,20 @@ function renderWizard(overrides: Partial<PaperProject> = {}) {
   render(<AISetupWizard project={project} updateProject={vi.fn()} onComplete={vi.fn()} />);
 }
 
+// Mode selection changed shape in the 2026-07-31 redesign: the five cards
+// became an accordion (AIModeAccordion), so a mode's call-to-action only
+// exists once its row is expanded. Selecting is now expand-then-confirm
+// rather than a single click on a card. `ai-mode-card-<id>` still identifies
+// the confirm button, so only this one helper needed to change.
+function selectMode(modeTestId: string) {
+  const modeId = modeTestId.replace("ai-mode-card-", "");
+  fireEvent.click(screen.getByTestId(`ai-mode-row-${modeId}`));
+  fireEvent.click(screen.getByTestId(modeTestId));
+}
+
 async function goToKeyEntryStep(modeTestId: string, providerLabel: string) {
   await screen.findByText(/how would you like your ai assistant to work/i);
-  fireEvent.click(screen.getByTestId(modeTestId));
+  selectMode(modeTestId);
   await screen.findByText(providerLabel);
   fireEvent.click(screen.getByText(providerLabel));
   fireEvent.click(screen.getByText(/^continue$/i));
@@ -84,7 +95,7 @@ describe("AISetupWizard — vault-passphrase gate before key entry", () => {
   it("does not require unlocking the vault for Local AI (no key needed)", async () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
-    fireEvent.click(screen.getByTestId("ai-mode-card-local"));
+    selectMode("ai-mode-card-local");
     await screen.findByText("Ollama");
     fireEvent.click(screen.getByText("Ollama"));
     fireEvent.click(screen.getByText(/^continue$/i));
@@ -97,7 +108,7 @@ describe("AISetupWizard — vault-passphrase gate before key entry", () => {
     renderWizard();
     await screen.findByText(/how would you like your ai assistant to work/i);
 
-    fireEvent.click(screen.getByTestId("ai-mode-card-omniroute"));
+    selectMode("ai-mode-card-omniroute");
 
     // Standard flow: provider-selection step renders (not skipped), showing
     // the real OmniRoute option with its detection state.
@@ -206,7 +217,7 @@ describe("AISetupWizard — vault-gate regression, parametrized over the real co
     async ({ modeTestId, label }) => {
       renderWizard();
       await screen.findByText(/how would you like your ai assistant to work/i);
-      fireEvent.click(screen.getByTestId(modeTestId));
+      selectMode(modeTestId);
       await screen.findByText(label);
       fireEvent.click(screen.getByText(label));
       fireEvent.click(screen.getByText(/^continue$/i));
