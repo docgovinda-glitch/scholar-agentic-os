@@ -24,6 +24,12 @@ import { HarvardFormatter } from "./src/citation_compliance/formatters/harvard.t
 import { VancouverFormatter } from "./src/citation_compliance/formatters/vancouver.ts";
 import { importBibTex } from "./src/citation_compliance/importers/bibtexImporter.ts";
 import { importRis } from "./src/citation_compliance/importers/risImporter.ts";
+import {
+  getCloudProvider,
+  chatUrl,
+  buildAuthHeaders,
+  type CloudProviderSpec,
+} from "./src/config/providerCatalog.ts";
 dotenv.config();
 
 const PORT = 3000;
@@ -110,6 +116,17 @@ const app = express();
 // Supabase project anyway, so the wildcard bought nothing — replaced with
 // the exact origin (derived from VITE_SUPABASE_URL, already required) in
 // both directives, which is unambiguous across every browser.
+// Gemini BYOK fix (2026-07-31): every cloud provider except Gemini is called
+// through this server's own /api/generate proxy, so `'self'` covered them.
+// Gemini is the one exception — GeminiAdapter.generate() in
+// src/services/aiGateway.ts calls generativelanguage.googleapis.com DIRECTLY
+// from the browser whenever the user has supplied their own Gemini key, and
+// only falls back to the proxy when no client key is set. That origin was
+// missing here, so "Bring Your Own Gemini key" was silently CSP-blocked in
+// production (a bare `TypeError: Failed to fetch`) while leaving the key blank
+// worked fine — an inversion that made the failure very hard to interpret.
+// DIRECT_BROWSER_CALL_ORIGINS in src/config/providerCatalog.ts is the list any
+// future direct-from-browser provider must be added to as well.
 const supabaseOrigin = process.env.VITE_SUPABASE_URL ? new URL(process.env.VITE_SUPABASE_URL).origin : undefined;
 app.use(
   helmet({
@@ -119,6 +136,7 @@ app.use(
         "connect-src": [
           "'self'",
           ...(supabaseOrigin ? [supabaseOrigin] : []),
+          "https://generativelanguage.googleapis.com",
           "https://api.openalex.org",
           "https://api.crossref.org",
           "https://api.datacite.org",
@@ -190,6 +208,88 @@ function resolveApiKey(provider: string, apiKey: string, username?: string): str
     }
   }
   return activeApiKey;
+}
+
+// ─────────────────────────────────────────────────────────
+// GENERIC CLOUD-PROVIDER PROXY (src/config/providerCatalog.ts driven)
+// ─────────────────────────────────────────────────────────
+//
+// Replaces five near-identical `if (aiProvider === "openai" | "deepseek" |
+// "groq" | "together" | "openrouter")` blocks that differed only in a URL and
+// a default model string. That copy-paste shape is what produced the Qwen bug:
+// Qwen had a client adapter and a streaming branch here, but nobody added the
+// sixth non-streaming block, so every non-streaming Qwen request returned
+// `400 Unsupported provider: qwen` regardless of how valid the user's key was
+// — and because the client's health check never inspected response.ok, the UI
+// reported it as a vague "degraded — Unexpected response" instead. Driving
+// both endpoints off the shared catalog removes that whole class of bug and
+// means a new provider needs no server change at all.
+
+/**
+ * Guards the optional client-supplied base URL.
+ *
+ * Cloudflare Workers AI embeds the user's account id in its address, so the
+ * catalog cannot know the full URL ahead of time and the client has to send
+ * it. That makes this endpoint an SSRF surface: without a check, a caller
+ * could point the proxy at cloud metadata services (169.254.169.254) or hosts
+ * inside the deployment's private network and read the response. So an
+ * override is accepted only when it is HTTPS and resolves to a public
+ * hostname; anything else falls back to the catalog's own base URL.
+ */
+function isSafeOutboundBaseUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) return false;
+  if (host === "[::1]" || host === "::1") return false;
+
+  // Literal IPv4 addresses in private / link-local / loopback ranges.
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if (a === 127 || a === 10 || a === 0) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 192 && b === 168) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+  }
+  return true;
+}
+
+function resolveProviderChatUrl(spec: CloudProviderSpec, baseUrlOverride?: string): string | null {
+  if (baseUrlOverride && isSafeOutboundBaseUrl(baseUrlOverride)) {
+    return chatUrl(spec, baseUrlOverride);
+  }
+  // Providers whose catalog entry has no base URL (Cloudflare) are unusable
+  // without a valid override — better an explicit error than a request to "".
+  if (!spec.baseUrl) return null;
+  return chatUrl(spec);
+}
+
+function openAICompatibleBody(
+  spec: CloudProviderSpec,
+  opts: {
+    model?: string;
+    systemInstruction?: string;
+    prompt: string;
+    temperature?: number;
+    stream?: boolean;
+  }
+): string {
+  return JSON.stringify({
+    model: opts.model || spec.defaultModel,
+    messages: [
+      { role: "system", content: opts.systemInstruction || "You are a helpful assistant." },
+      { role: "user", content: opts.prompt },
+    ],
+    temperature: opts.temperature ?? 0.5,
+    ...(opts.stream ? { stream: true } : {}),
+  });
 }
 
 function readUsersDb(): UserRecord[] {
@@ -985,7 +1085,7 @@ Abstract: ${item.abstract || "Abstract not provided in CrossRef registry metadat
 // SSE Streaming Generation Proxy
 app.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
   try {
-    const { provider, apiKey, model, systemInstruction, prompt, temperature, responseMimeType, username } = req.body;
+    const { provider, apiKey, model, systemInstruction, prompt, temperature, responseMimeType, username, baseUrl } = req.body;
     if (!prompt) {
       return res.status(400).json({ error: "Missing required parameter: prompt" });
     }
@@ -1087,52 +1187,44 @@ app.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
       return res.end();
     }
 
-    if (["openai", "deepseek", "qwen", "groq", "together", "openrouter"].includes(aiProvider)) {
+    // Every OpenAI-compatible provider in the catalog, streaming variant —
+    // mirrors the non-streaming block in /api/generate so the two endpoints
+    // can no longer support different provider sets (which is exactly how
+    // Qwen ended up streamable but not generatable).
+    const streamSpec = getCloudProvider(aiProvider);
+    if (streamSpec && streamSpec.apiStyle === "openai-compatible") {
       if (!activeApiKey) {
-        res.write(`data: ${JSON.stringify({ error: `${aiProvider.toUpperCase()} API Key is required.` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: `${streamSpec.name} API key is required.` })}\n\n`);
         return res.end();
       }
 
-      let url = "https://api.openai.com/v1/chat/completions";
-      let targetModel = model || "gpt-4o-mini";
-
-      if (aiProvider === "deepseek") {
-        url = "https://api.deepseek.com/chat/completions";
-        targetModel = model || "deepseek-chat";
-      } else if (aiProvider === "qwen") {
-        url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-        targetModel = model || "qwen-plus";
-      } else if (aiProvider === "groq") {
-        url = "https://api.groq.com/openai/v1/chat/completions";
-        targetModel = model || "llama-3.3-70b-versatile";
-      } else if (aiProvider === "together") {
-        url = "https://api.together.xyz/v1/chat/completions";
-        targetModel = model || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
-      } else if (aiProvider === "openrouter") {
-        url = "https://openrouter.ai/api/v1/chat/completions";
-        targetModel = model || "openai/gpt-4o-mini";
+      const url = resolveProviderChatUrl(streamSpec, baseUrl);
+      if (!url) {
+        res.write(
+          `data: ${JSON.stringify({ error: `${streamSpec.name} needs a full API address. ${streamSpec.customBaseUrlHint || ""}`.trim() })}\n\n`
+        );
+        return res.end();
       }
 
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${activeApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: targetModel,
-          messages: [
-            { role: "system", content: systemInstruction || "You are a helpful assistant." },
-            { role: "user", content: prompt }
-          ],
-          temperature: temperature ?? 0.5,
-          stream: true
-        })
+        headers: buildAuthHeaders(streamSpec, activeApiKey),
+        body: openAICompatibleBody(streamSpec, {
+          model,
+          systemInstruction,
+          prompt,
+          temperature,
+          stream: true,
+        }),
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        res.write(`data: ${JSON.stringify({ error: `API stream failed: ${errText}` })}\n\n`);
+        // Status code included so the client can classify this properly
+        // rather than showing a generic failure (src/services/aiErrors.ts).
+        res.write(
+          `data: ${JSON.stringify({ error: `${streamSpec.name} stream failed (status ${response.status}): ${errText}`, status: response.status })}\n\n`
+        );
         return res.end();
       }
 
@@ -1212,7 +1304,12 @@ app.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
     }
 
     if (aiProvider === "cohere") {
-      if (!apiKey) {
+      // Bug fix (2026-07-31): this branch alone used the raw `apiKey` from the
+      // request body instead of `activeApiKey`, so Cohere was the one provider
+      // for which resolveApiKey()'s server-stored-key fallback never applied —
+      // a user relying on a server-side Cohere key got "API Key is required"
+      // while every other provider worked.
+      if (!activeApiKey) {
         res.write(`data: ${JSON.stringify({ error: "Cohere API Key is required." })}\n\n`);
         return res.end();
       }
@@ -1220,7 +1317,7 @@ app.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
       const response = await fetch("https://api.cohere.ai/v1/chat", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${activeApiKey}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -1272,7 +1369,7 @@ app.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
 // AI Generation Proxy (With Caching Layer)
 app.post("/api/generate", aiAbuseLimit, async (req, res) => {
   try {
-    const { provider, apiKey, model, systemInstruction, prompt, temperature, responseMimeType, username } = req.body;
+    const { provider, apiKey, model, systemInstruction, prompt, temperature, responseMimeType, username, baseUrl } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: "Missing required parameter: prompt" });
@@ -1317,33 +1414,36 @@ app.post("/api/generate", aiAbuseLimit, async (req, res) => {
       return sendCachedJson(res, cacheKey, { text: response.text?.trim() || "" });
     }
 
-    // 2. OpenAI ChatGPT
-    if (aiProvider === "openai") {
+    // 2. Every OpenAI-compatible provider in the catalog — one block, ~24
+    // providers (OpenAI, DeepSeek, Qwen, Groq, Together, OpenRouter, Mistral,
+    // Cerebras, SambaNova, Fireworks, DeepInfra, Novita, Hyperbolic, Nebius,
+    // Hugging Face, GitHub Models, Cloudflare, xAI, Perplexity, AI21,
+    // Moonshot, Z.ai, Chutes, ...). Adding another needs no change here.
+    const openAISpec = getCloudProvider(aiProvider);
+    if (openAISpec && openAISpec.apiStyle === "openai-compatible") {
       if (!activeApiKey) {
-        return res.status(400).json({ error: "OpenAI API Key is required." });
+        return res.status(400).json({ error: `${openAISpec.name} API key is required.` });
       }
 
-      let messages = [
-        { role: "system", content: systemInstruction || "You are a helpful assistant." },
-        { role: "user", content: prompt }
-      ];
+      const url = resolveProviderChatUrl(openAISpec, baseUrl);
+      if (!url) {
+        return res.status(400).json({
+          error: `${openAISpec.name} needs a full API address. ${openAISpec.customBaseUrlHint || ""}`.trim(),
+        });
+      }
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${activeApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: model || "gpt-4o-mini",
-          messages,
-          temperature: temperature ?? 0.5
-        })
+        headers: buildAuthHeaders(openAISpec, activeApiKey),
+        body: openAICompatibleBody(openAISpec, { model, systemInstruction, prompt, temperature }),
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        return res.status(response.status).json({ error: `OpenAI API failed: ${errText}` });
+        // Status is forwarded verbatim (not collapsed to 500) so the client
+        // can tell 401-invalid-key from 429-rate-limit from 5xx — see
+        // classifyHttpError in src/services/aiErrors.ts.
+        return res.status(response.status).json({ error: `${openAISpec.name} API failed: ${errText}` });
       }
 
       const data: any = await response.json();
@@ -1381,38 +1481,7 @@ app.post("/api/generate", aiAbuseLimit, async (req, res) => {
       return sendCachedJson(res, cacheKey, { text: data.content?.[0]?.text?.trim() || "" });
     }
 
-    // 4. DeepSeek
-    if (aiProvider === "deepseek") {
-      if (!activeApiKey) {
-        return res.status(400).json({ error: "DeepSeek API Key is required." });
-      }
-
-      const response = await fetch("https://api.deepseek.com/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${activeApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: model || "deepseek-chat",
-          messages: [
-            { role: "system", content: systemInstruction || "You are a helpful assistant." },
-            { role: "user", content: prompt }
-          ],
-          temperature: temperature ?? 0.5
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        return res.status(response.status).json({ error: `DeepSeek API failed: ${errText}` });
-      }
-
-      const data: any = await response.json();
-      return sendCachedJson(res, cacheKey, { text: data.choices?.[0]?.message?.content?.trim() || "" });
-    }
-
-    // 5. Cohere
+    // 4. Cohere
     if (aiProvider === "cohere") {
       if (!activeApiKey) {
         return res.status(400).json({ error: "Cohere API Key is required." });
@@ -1439,99 +1508,6 @@ app.post("/api/generate", aiAbuseLimit, async (req, res) => {
 
       const data: any = await response.json();
       return sendCachedJson(res, cacheKey, { text: data.text?.trim() || "" });
-    }
-
-    // 6. Groq — OpenAI-compatible chat completions
-    if (aiProvider === "groq") {
-      if (!activeApiKey) {
-        return res.status(400).json({ error: "Groq API Key is required." });
-      }
-
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${activeApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: model || "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: systemInstruction || "You are a helpful assistant." },
-            { role: "user", content: prompt }
-          ],
-          temperature: temperature ?? 0.5
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        return res.status(response.status).json({ error: `Groq API failed: ${errText}` });
-      }
-
-      const data: any = await response.json();
-      return sendCachedJson(res, cacheKey, { text: data.choices?.[0]?.message?.content?.trim() || "" });
-    }
-
-    // 7. Together AI — OpenAI-compatible chat completions
-    if (aiProvider === "together") {
-      if (!activeApiKey) {
-        return res.status(400).json({ error: "Together AI API Key is required." });
-      }
-
-      const response = await fetch("https://api.together.xyz/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${activeApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: model || "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-          messages: [
-            { role: "system", content: systemInstruction || "You are a helpful assistant." },
-            { role: "user", content: prompt }
-          ],
-          temperature: temperature ?? 0.5
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        return res.status(response.status).json({ error: `Together AI API failed: ${errText}` });
-      }
-
-      const data: any = await response.json();
-      return sendCachedJson(res, cacheKey, { text: data.choices?.[0]?.message?.content?.trim() || "" });
-    }
-
-    // 8. OpenRouter — OpenAI-compatible chat completions
-    if (aiProvider === "openrouter") {
-      if (!activeApiKey) {
-        return res.status(400).json({ error: "OpenRouter API Key is required." });
-      }
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${activeApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: model || "openai/gpt-4o-mini",
-          messages: [
-            { role: "system", content: systemInstruction || "You are a helpful assistant." },
-            { role: "user", content: prompt }
-          ],
-          temperature: temperature ?? 0.5
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        return res.status(response.status).json({ error: `OpenRouter API failed: ${errText}` });
-      }
-
-      const data: any = await response.json();
-      return sendCachedJson(res, cacheKey, { text: data.choices?.[0]?.message?.content?.trim() || "" });
     }
 
     return res.status(400).json({ error: `Unsupported provider: ${aiProvider}` });

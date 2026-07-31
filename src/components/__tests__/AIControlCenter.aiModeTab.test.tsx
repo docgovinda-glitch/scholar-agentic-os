@@ -39,7 +39,13 @@ function renderControlCenter(providerOverride = "gemini") {
 }
 
 describe("AIControlCenter — AI Mode tab is the default view", () => {
-  it("shows the Current AI Mode status card and the 5-mode grid on open, without clicking any tab", () => {
+  // Redesign (2026-07-31): the 5-card grid became an accordion (see
+  // AIModeAccordion.tsx) so five full-height cards no longer stack down a
+  // phone screen. Every mode is still present and still exposed as a heading —
+  // this assertion is unchanged in intent, only in the layout it describes.
+  // jsdom reports innerWidth 1024 with a fine pointer, so useDeviceClass
+  // classifies it as desktop and the two desktop-only modes render here.
+  it("shows the Current AI Mode status card and all 5 modes on open, without clicking any tab", () => {
     renderControlCenter();
 
     expect(screen.getByText("Current AI Mode")).toBeInTheDocument();
@@ -48,6 +54,19 @@ describe("AIControlCenter — AI Mode tab is the default view", () => {
     expect(screen.getByRole("heading", { name: "Local AI" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Bring Your Own AI" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Partner Subscription" })).toBeInTheDocument();
+  });
+
+  it("keeps each mode collapsed until opened, so the whole set fits without scrolling", () => {
+    renderControlCenter("auto");
+
+    // Collapsed rows expose the toggle state; none is expanded on first paint.
+    const rows = screen.getAllByRole("button", { expanded: false });
+    expect(rows.length).toBeGreaterThanOrEqual(5);
+
+    // A mode's full description only appears once its row is opened.
+    expect(screen.queryByText(/Install a small self-hosted gateway/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("ai-mode-row-omniroute"));
+    expect(screen.getByText(/Install a small self-hosted gateway/i)).toBeInTheDocument();
   });
 
   it("resolves the current provider (gemini) to its real user-facing mode name (Cloud AI Providers), not the raw provider id", () => {
@@ -82,10 +101,15 @@ describe("AIControlCenter — AI Mode tab is the default view", () => {
     expect(await screen.findByText(/synchronous xor cipher encryption|api keys configuration|unlock your key vault/i)).toBeInTheDocument();
   });
 
-  it("selecting a mode card in the grid also switches to the Credentials tab", async () => {
+  // Same intent as before the redesign — choosing a mode moves the user on to
+  // configuring it — but selection is now the call-to-action inside the
+  // expanded row rather than a click anywhere on a card, so the row has to be
+  // opened first.
+  it("selecting a mode switches to the Credentials tab", async () => {
     renderControlCenter();
     await waitFor(() => expect(healthCheckProviderMock).toHaveBeenCalled());
 
+    fireEvent.click(screen.getByTestId("ai-mode-row-byok"));
     fireEvent.click(screen.getByTestId("ai-mode-card-byok"));
 
     expect(await screen.findByText(/synchronous xor cipher encryption|api keys configuration|unlock your key vault/i)).toBeInTheDocument();

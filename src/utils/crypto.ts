@@ -229,6 +229,60 @@ export async function encryptDataAsync(text: string, secret: string): Promise<st
   return "v2:" + btoa(String.fromCharCode(...combined));
 }
 
+// ============================================================================
+// RAW CryptoKey ENCRYPTION (for the device-bound API vault)
+// ============================================================================
+//
+// encryptDataAsync/decryptDataAsync above derive their key from a string
+// secret, which means the secret must exist as a JavaScript string at some
+// point. The API vault's "stay unlocked on this device" mode deliberately
+// avoids that: it generates a NON-EXTRACTABLE AES-GCM CryptoKey and keeps it
+// in IndexedDB, so the raw key material can never be read out by any script —
+// including a script injected by an XSS attack, which can use the key while
+// the page is open but cannot exfiltrate it for offline decryption. These two
+// helpers are the encrypt/decrypt path for a key held that way.
+//
+// Same wire format as v2 minus the salt, since there is no derivation step:
+// "k1:" + base64(iv | ciphertext).
+
+/** Encrypt with an existing AES-GCM CryptoKey. Returns a "k1:"-prefixed string. */
+export async function encryptWithKey(text: string, key: CryptoKey): Promise<string> {
+  if (!text) return "";
+  const iv = new Uint8Array(crypto.getRandomValues(new Uint8Array(IV_LENGTH)));
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, TEXT_ENCODER.encode(text));
+
+  const encryptedArray = new Uint8Array(encrypted);
+  const combined = new Uint8Array(iv.length + encryptedArray.length);
+  combined.set(iv, 0);
+  combined.set(encryptedArray, iv.length);
+
+  return "k1:" + btoa(String.fromCharCode(...combined));
+}
+
+/** Decrypt data produced by encryptWithKey. Throws on a wrong key or tampering. */
+export async function decryptWithKey(cipher: string, key: CryptoKey): Promise<string> {
+  if (!cipher) return "";
+  if (!cipher.startsWith("k1:")) {
+    throw new Error("decryptWithKey requires k1 format encrypted data");
+  }
+  const combined = Uint8Array.from(atob(cipher.slice(3)), (c) => c.charCodeAt(0));
+  const iv = combined.slice(0, IV_LENGTH);
+  const encrypted = combined.slice(IV_LENGTH);
+
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encrypted);
+  return TEXT_DECODER.decode(decrypted);
+}
+
+/**
+ * Generate a fresh, non-extractable AES-GCM-256 key.
+ *
+ * `extractable: false` is the entire point — exportKey() on the result throws,
+ * so the key can be used but never read.
+ */
+export async function generateDeviceKey(): Promise<CryptoKey> {
+  return crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+
 /**
  * Decrypt AES-GCM encrypted data (v2 format).
  */

@@ -300,14 +300,17 @@ export async function updatePassword(newPassword: string): Promise<ServiceResult
  * regardless of that timing, in addition to the live event for a recovery
  * link that's processed after this subscribes.
  *
- * TEMPORARY diagnostic logging, tagged [PasswordRecovery] — remove once
- * confirmed fixed live.
+ * Confirmed working in production 2026-07-31; the temporary
+ * [PasswordRecovery]-tagged console logging used to diagnose it has been
+ * removed, leaving the fix itself unchanged.
  */
 export function onPasswordRecovery(callback: () => void): () => void {
   const supabase = getSupabaseClient();
   let fired = false;
-  const fireOnce = (source: string) => {
-    console.log("[PasswordRecovery] firing", { source });
+  // Both paths below can legitimately trigger for the same visit — the URL
+  // marker is present AND the event fires — so the guard keeps the caller
+  // from being switched into recovery mode twice.
+  const fireOnce = () => {
     if (fired) return;
     fired = true;
     callback();
@@ -316,20 +319,15 @@ export function onPasswordRecovery(callback: () => void): () => void {
   const url = new URL(window.location.href);
   const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
   const typeParam = url.searchParams.get("type") || hashParams.get("type");
-  console.log("[PasswordRecovery] checking URL on register", {
-    href: window.location.href,
-    typeParam,
-  });
   if (typeParam === "recovery") {
-    fireOnce("url-check");
+    fireOnce();
   }
 
   const {
     data: { subscription },
   } = supabase.auth.onAuthStateChange((event) => {
-    console.log("[PasswordRecovery] onAuthStateChange event", { event });
     if (event === "PASSWORD_RECOVERY") {
-      fireOnce("auth-state-change");
+      fireOnce();
     }
   });
   return () => subscription.unsubscribe();

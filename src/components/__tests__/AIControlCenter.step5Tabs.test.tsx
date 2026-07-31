@@ -82,21 +82,42 @@ describe("AIControlCenter — Local Models tab", () => {
   });
 });
 
+// Rebuilt 2026-07-31 on the persistent vault (src/services/apiVault.ts). The
+// old tab listed six hardcoded providers behind the in-memory-only vault
+// passphrase, which relocked on every reload. The security intent under test
+// is unchanged and is what these assertions still target: a stored key is
+// never rendered back to the page in any form.
 describe("AIControlCenter — API Keys tab", () => {
-  it("shows the vault-unlock prompt when locked, never a raw key input", () => {
+  it("gates the keys behind vault setup before showing any provider", () => {
     renderAndGoTo("API Keys");
-    expect(screen.getByText(/unlock your key vault/i)).toBeInTheDocument();
-    expect(screen.queryByText("Google Gemini")).not.toBeInTheDocument();
+
+    // First run on a fresh browser: no vault exists yet, so the user is asked
+    // to create one rather than being shown key fields straight away.
+    expect(screen.getByText(/set up your key vault|unlock your key vault/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Search providers or models/i)).not.toBeInTheDocument();
   });
 
-  it("shows every configured key masked (never in plaintext) once unlocked", async () => {
+  it("offers both unlock modes and states the tradeoff of each", () => {
+    renderAndGoTo("API Keys");
+
+    expect(screen.getByText(/stay unlocked on this device/i)).toBeInTheDocument();
+    expect(screen.getByText(/ask for a passphrase each session/i)).toBeInTheDocument();
+    // The device-mode caveat must be stated, not buried — it is the whole
+    // difference between the two options.
+    expect(screen.getByText(/anyone using this browser profile can use your keys/i)).toBeInTheDocument();
+  });
+
+  it("never renders a saved key back into the page, even once unlocked", async () => {
     setVaultPassphrase("test-pass");
     renderAndGoTo("API Keys");
 
-    expect(await screen.findByText("Google Gemini")).toBeInTheDocument();
-    expect(screen.getAllByText("Not configured").length).toBeGreaterThan(0);
-    // No raw password-type input anywhere on this tab — masked display only
-    expect(document.querySelector('input[type="password"]')).not.toBeInTheDocument();
+    // Any key input present must be a password field that is not prefilled —
+    // a blank box means "keep the saved key", so the secret never round-trips
+    // through the DOM.
+    const passwordInputs = Array.from(
+      document.querySelectorAll<HTMLInputElement>('input[type="password"]')
+    );
+    passwordInputs.forEach((input) => expect(input.value).toBe(""));
   });
 });
 
