@@ -8,6 +8,7 @@ import { useFocusOnNavigate } from "./hooks/useFocusOnNavigate";
 import { canEnterPhase, resolveFurthestPhase } from "./utils/phaseGating";
 import OnboardingWizard from "./components/OnboardingWizard";
 import AppHeader from "./components/layout/AppHeader";
+import { AgentOrchestrationDashboard } from "./components/AgentOrchestrationDashboard";
 import AppFooter from "./components/layout/AppFooter";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -508,7 +509,13 @@ function App() {
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "agents" && (
           <Suspense fallback={<PanelLoadingFallback />}>
-            <ActiveAgentsPanel project={project} />
+            <div className="grid grid-cols-1 gap-6">
+              <AgentOrchestrationDashboard
+                project={project}
+                updateProject={updateProject}
+              />
+              <ActiveAgentsPanel project={project} />
+            </div>
           </Suspense>
         )}
 
