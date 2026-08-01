@@ -66,7 +66,7 @@ export function useProjectPersistence(
   }, [setProject]);
 
   // Load ALL projects belonging to this user from storage
-  const loadAllProjects = useCallback(async () => {
+  const loadAllProjects = useCallback(async (isCancelled?: () => boolean) => {
     if (!user) return;
     try {
       const metadata = storage.loadMetadata(user);
@@ -80,9 +80,11 @@ export function useProjectPersistence(
         })
       );
 
+      if (isCancelled?.()) return;
       setAllProjects(projects.filter((p): p is PaperProject => p !== null));
     } catch (e) {
       console.error("Failed to load projects:", e);
+      if (isCancelled?.()) return;
       // Fallback to localStorage-only
       const stateStr = localStorage.getItem(`${PROFILE_STATE_PREFIX}${user}`);
       if (!stateStr) return;
@@ -99,8 +101,20 @@ export function useProjectPersistence(
     }
   }, [user, setAllProjects]);
 
+  // Bug fix (2026-08-01): this effect used to fire-and-forget loadAllProjects()
+  // with no unmount guard. In tests, a component using this hook unmounts
+  // before the async storage.loadProject()/IndexedDBService.init() chain
+  // resolves; the eventual setAllProjects() call then fires post-teardown and
+  // throws "window is not defined" when React tries to schedule the resulting
+  // render — surfaced as a flaky "Unhandled Error" in CI (Node 22 only, timing
+  // dependent). The cancelled flag stops the stale update from ever reaching
+  // setState once the effect has been cleaned up.
   useEffect(() => {
-    void loadAllProjects();
+    let cancelled = false;
+    void loadAllProjects(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [loadAllProjects, project]);
 
   // Client-side migration runner to support cost metrics, model preferences and usage logs
