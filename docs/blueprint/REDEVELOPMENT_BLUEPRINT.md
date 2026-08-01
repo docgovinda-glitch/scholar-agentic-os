@@ -225,70 +225,280 @@ The AI-agents market is ~$10.9B in 2026 growing ~50% CAGR, with **research & sum
 
 ---
 
-# Part V — Target Architecture
+## 4.5 New Non-Negotiable Requirements (2026-08-01)
 
-## 5.1 Shape
+Three binding constraints reshape the product and business model:
 
-Evolution, not rewrite: **PWA client (kept) + modular API + Postgres**, then scale-out.
+### 1. Student Provisioning of Free Cloud Services (Zero Operational Cost Until 1,000 Users)
+- Scholar provides no backend infrastructure for free users (Phases 0–2)
+- Instead, students learn to provision their own Supabase project, API keys, and optional storage (Cloudflare R2, Vercel KV)
+- On-screen guides: "5-minute Supabase setup," "free-tier cost calculator," disclosure of quotas and per-service costs
+- Students own their data and can migrate away without loss (no lock-in)
+- Scholar's infrastructure cost = $0 until 1,000+ users and subscription revenue justify backend spend
 
-```
-┌─ Client (React PWA — kept) ──────────────────────────────┐
-│ phase workflow · editors · vault UI · local-runner mode  │
-│ offline cache (IndexedDB, replaces localStorage blob)    │
-└───────────────┬──────────────────────────────────────────┘
-                │ HTTPS + Supabase JWT
-┌─ API layer ───┴──────────────────────────────────────────┐
-│ /v1/projects /v1/vault /v1/agents /v1/ai /v1/exports     │
-│ authn (Supabase JWT) · authz (owner/RLS) · OpenAPI       │
-│ AI proxy (catalog-driven, kept) · retrieval cache        │
-└───────┬───────────────┬──────────────┬───────────────────┘
-        │               │              │
-  Postgres (Supabase)  Object store   Queue/events (pg-boss →
-  RLS · pgvector       (PDFs, exports) SQS/Temporal at scale)
-        │
-  Agent workers (orchestrator, Part VI) · embeddings · telemetry
-```
+### 2. Mandatory Human Approval Gates Before Final Submission
+- Every phase transition requires explicit human sign-off (not auto-advance)
+- Drafting: human must approve AI sections before advancing to refinement
+- Refinement: human edits → AI quality-check → human approval before compliance
+- Compliance: human reviews every flagged issue and signs off (or documents exception)
+- Submission: final checklist confirmation before export, including "I confirm this is my work"
+- Creates audit trail: every section carries approval timestamps and edit history
+- Enforces academic integrity: no auto-submitted, no hidden AI work
 
-**Justifications (each decision, per the brief):**
-- **Supabase Postgres + RLS for v1** — already the auth provider; RLS gives per-user isolation without building an authz layer; pgvector gives RAG without a second datastore; managed backups solve DR on day one. Exit path exists (it's just Postgres). Alternative rejected: bespoke API + RDS now — more control, but months earlier spend for no user-visible gain at <10k users.
-- **Client stays thick, storage moves** — the phase components and their tests are the accumulated product value; only `useProjectPersistence` (one hook, already the single choke point) changes its backend from localStorage to API+IndexedDB cache. Offline-first is preserved: IndexedDB is the cache, Postgres is the truth, sync is last-write-wins per artifact initially (documents get CRDT/OT only when collaboration ships — not before; that's the "measure before optimizing" line).
-- **Event-driven where async is real** (agent pipelines, embeddings, export rendering, disclosure generation) via `pg-boss` on the same Postgres — no new infra; swap to SQS/Temporal when queue depth says so, behind one queue interface.
-- **AI routing kept as-is** — the catalog/vault/failover layer is already multi-model routing done right. Add per-user server-side key escrow (encrypted with KMS-held keys) as an *option* alongside the client vault, because server-side agents can't reach a browser vault.
-- **RAG** — embeddings per vault chunk into pgvector; retrieval scoped by RLS to the owning user; citations returned with every generation (grounding is a product guarantee, not just quality).
-- **Local mode survives** — fully-local operation (local runner + local vault + IndexedDB, no account) remains a supported first-class configuration; it is the privacy story and the free-tier floor.
-
-## 5.2 Data architecture
-
-Core tables (all RLS `owner_id = auth.uid()` unless noted): `projects`, `project_phases` (A–I state, gate history), `manuscripts` + `manuscript_sections` (versioned; provenance per section: model, prompt id, timestamp, human-edit flag), `vault_items` (metadata + object-store ref) + `vault_chunks` (text + embedding), `citations` (identifier, verification status, registry snapshot), `qc_reports`, `integrity_reports`, `disclosures`, `agent_runs` (input/output/confidence/cost — the audit log), `journal_targets` (persisted shortlist — fixes a known gap), `usage_events` (analytics), `prompt_registry` (Part VII). Object storage for binaries (Supabase Storage → S3). Migration: one-time import of the localStorage blob on first login after upgrade, with export-to-file fallback; the blob format is already versioned JSON, making this low-risk.
-
-## 5.3 Security & privacy model
-
-- **Tiers**: local-only mode (nothing leaves device) · standard (encrypted at rest, RLS-isolated) · zero-retention AI (provider calls with no-log flags where the catalog supports them).
-- AuthZ: RLS everywhere; API validates Supabase JWT; AI routes become authenticated (closes §1.8's open-proxy risk); admin approval moves from GET link to POST with single-use token.
-- Key handling: client vault kept; optional server escrow via KMS envelope encryption; never both silently — explicit user choice.
-- GDPR/FERPA posture: export-all and delete-all endpoints from day one (cheap now, painful later); data-processing register; EU region option via Supabase project region.
-- Pipeline: dependency audit + secret scanning in CI; CSP maintained (the repo's hard-won CSP lessons are documented and kept).
-
-## 5.4 Scalability to 100k+ users
-
-Stateless API + Postgres scales past 100k active users on managed infra with read replicas; the real scaling constraints are **AI spend and retrieval quotas**, addressed by: per-user/plan token budgets (enforced in the proxy, which already classifies errors), shared retrieval cache (Crossref/OpenAlex responses are cacheable — today every user pays every lookup), embedding batch workers, and rate limits moved from in-memory to Postgres/Redis so they survive horizontal scale. Load-test gates at 1k/10k/100k simulated users are roadmap exit criteria, not aspirations.
-
-## 5.5 Observability, analytics, deployment
-
-- OpenTelemetry traces on API + agent runs; Sentry (client + server); structured logs; per-provider cost/latency dashboards (the telemetry hooks in `src/ai/telemetry` are a usable seed).
-- Product analytics on `usage_events` (phase funnel, verification rates, disclosure exports) — the success metrics in §4.3 must be queryable, or they're decoration.
-- CI/CD: GitHub Actions — typecheck (strict), tests, build, dependency audit → preview deploys → staged production; DB migrations via checked-in SQL with rollback scripts; feature flags for phase-level rollout; disaster recovery = managed PITR + weekly restore drills.
+### 3. Output is Assignment-Submission Ready + Optional Writing Humanization
+- Final manuscript is polished, humanized (indistinguishable from human-written), and ready for journal submission with <5 min review
+- Integrate with a public, open-source GitHub repo for writing humanization (research candidates: `jeannie-ai/jeannie-humanizer`, OpenAI cookbook examples, academic writing guides)
+- Phase 7 "Refinement" adds optional "Humanize Section" button: shows before/after diff, user accepts/rejects
+- Goal: eliminate the "AI-generated sounding" problem without creating a secondary quality/humanness gating system
+- Optional, not mandatory: users who want full control can skip it
 
 ---
 
-# Part VI — AI Multi-Agent Architecture
+# Part V — Target Architecture
+
+## 5.1 Phased Evolution: Local-First Through Scale (Honoring Cost Constraints)
+
+**Constraint-driven design**: No backend infrastructure investment until revenue exists to justify it. Students provision their own free-tier cloud services. This inverts the typical SaaS model but aligns with our educational mission and zero operational cost target through 1,000 users.
+
+### Phase 0–2 (Months 1–5, Growth to 10k free users): Enhanced Browser-Local
+
+```
+┌─ Client (React PWA) ─────────────────────────────────────┐
+│ phase workflow A→I · editors · vault UI · local runners │
+│ Data: localStorage (compressed) + IndexedDB (vault)      │
+│ Daily automated backup export (encrypted, to Downloads)  │
+│ Backup/restore wizard for recovery                       │
+│ Quota tracking: warns at 4MB localStorage, 50MB IndexedDB│
+└──────────────────────────────────────────────────────────┘
+  ↓
+Express server (stateless AI proxy only)
+  - /api/generate, /api/stream-generate (AI routing, catalog-driven, kept)
+  - /api/parse-file, /api/lookup-doi (document intelligence, retrieval)
+  - No project persistence; all user data stays in browser
+  - Auth: Supabase JWT (login/approval only; no user-data backend)
+  ↓
+External APIs (retrieval, AI)
+  - Crossref, OpenAlex, PubMed, DataCite, S2, Tavily (retrieval)
+  - OpenAI, Anthropic, Groq, etc. via student-provided keys (AI)
+```
+
+**Why this shape:**
+- **Cost**: Zero backend infrastructure. Student's Supabase + cloud storage are their costs, outside Scholar's P&L.
+- **Privacy**: All research data never reaches Scholar's servers; backup is under user control (their Downloads folder or their Supabase).
+- **Learning**: Students learn to configure free-tier cloud services — a professional skill they'll use beyond this course.
+- **Data limit**: 5MB localStorage → 50MB+ via IndexedDB + compression (see Part V.B). Sufficient for 50+ PDFs + metadata per device. Reaching limit is a signal to the user, not a hidden failure mode.
+
+### Phase 3+ (Month 6, Breakeven + Monetization): Optional Cloud Sync
+
+When subscription revenue exists (Pro tier $12/mo, Submission Pack $29):
+
+```
+┌─ Client (React PWA, as before) ──────────────────────────┐
+│ Persistence layer selector: "Local Only" or "Cloud Sync" │
+└───────────────┬─────────────────────────────────────────┘
+        ┌───────┴────────┐
+        │                │
+   localStorage      (or) User's Supabase project
+   IndexedDB               (optional, Pro-tier only)
+        │                  │
+        └────────┬─────────┘
+                 │
+    Sync service (on-demand or scheduled)
+    - User controls frequency (manual, hourly, daily)
+    - Passphrase-locked end-to-end
+    - Can be toggled off; localStorage is always the fallback
+```
+
+**Why this shape:**
+- **Revenue-justified**: Supabase cost (~$25–50/mo at 10k users) now covered by Pro subscription revenue ($2,400+/mo gross from 200 Pro users).
+- **User choice**: Free users keep localStorage-only (no cost); Pro users get cloud backup but only if they opt in (GDPR compliant).
+- **Data ownership**: User's Supabase account, encrypted in transit and at rest. Scholar never holds plaintext research data.
+- **Vendor flexibility**: User can sync to their own Supabase project, or add Cloudflare R2 for file storage, or keep everything local. They own the migration path.
+
+---
+
+## 5.B Storage Strategy: Lifting the 5MB Ceiling (Phase 1)
+
+localStorage bottleneck: 5MB per origin. Solution: three independent Tier 1 changes (Phase 1, weeks 3–6).
+
+### Tier 1.1: Move Vault Files to IndexedDB (Biggest Win)
+
+**Current**: Parsed PDFs stored in localStorage JSON → 80–90% of blob size.  
+**Change**: Move file content to IndexedDB (50+ MB capacity), keep only metadata in localStorage.
+
+```
+Before:  localStorage 5 MB (hits limit at ~10–15 PDFs)
+After:   localStorage 500 KB + IndexedDB 50 MB (50+ PDFs)
+```
+
+Implementation: Change `useProjectPersistence.ts` to split profile; add `vaultFileStore.ts` service with async get/put/delete; migrate existing vault on first load. Effort: 1–2 days, backward compatible.
+
+### Tier 1.2: Compress the localStorage Blob
+
+**Change**: gzip JSON before storing, gunzip on load (pako already in deps).
+
+```
+Before:  5 MB (raw JSON)
+After:   1.5–2 MB (60–70% compression ratio)
+```
+
+Benefit: Stacks with split-to-IndexedDB; extends breathing room. Effort: 3 hours, ~50 lines.
+
+### Tier 1.3: Archive Old Projects (Deferred Loading)
+
+**Change**: Mark old projects as archived; only load metadata until explicitly opened.
+
+```
+Active workspace:  500 KB (current + recent projects)
+Archived metadata: unbounded (100+ projects as tiny records)
+On-open loading:   brief delay (~50–100 ms) when user opens archived project
+```
+
+Benefit: Active users stay under 2MB localStorage comfortably; can accumulate 100+ projects without bloat. Effort: 1 day, ~300 lines.
+
+**Combined Tier 1 impact**: From 5MB (10–15 PDFs) → 50+ MB effective capacity (50+ PDFs + 100+ projects). Sufficient through Phase 2 and beyond. Cost: $0, no external APIs.
+
+### Tier 2: FileSystemAccess API (Phase 1+, Optional)
+
+For power users: allow saving encrypted backups to their own folder (e.g., `~/Downloads/Scholar/`). Disk-unlimited, more durable than browser storage. Effort: 1 day, opt-in.
+
+### Tier 3: Cloud Backup (Phase 3, Revenue-Funded)
+
+Pro users sync to their Supabase project, removing storage concerns entirely. See Phase 3+ section above.
+
+## 5.2 Data Architecture (Phased)
+
+### Phase 0–2: Browser-Local (localStorage + IndexedDB)
+
+**localStorage profile structure** (compressed JSON):
+```
+{
+  version: 2,
+  compressed: true,
+  projects: [...],
+  citations: [...],
+  settings: { aiProvider, disclosure, ... },
+  vault: [{ id, filename, metadata, storedInIndexedDB: true }],
+  qcReports: [...],
+  disclosures: [...],
+  versionHistory: [{ timestamp, change, approvedBy }]  ← new: edit history
+}
+```
+
+**IndexedDB vault_files store**:
+```
+{ id, filename, parsedText, uploadDate, size, ... }
+```
+
+**Supabase (auth-only, no project data)**:
+```
+profiles (id, username, email, created_at)  ← identity only
+```
+
+### Phase 3+: Server-Backed (Optional, Pro-Tier Only)
+
+When student opts into cloud sync, data syncs to their own Supabase project:
+
+Core tables (all RLS `owner_id = auth.uid()`): `projects`, `project_phases` (A–I state, gate history), `manuscripts` + `manuscript_sections` (versioned; **provenance: model, prompt id, timestamp, human-edit flag, approval status**), `vault_items` (metadata + object-store ref) + `vault_chunks` (text + embedding for RAG), `citations` (identifier, verification status, registry snapshot), `qc_reports`, `integrity_reports`, `disclosures` (audit trail), `agent_runs` (input/output/confidence/cost — the audit log), `journal_targets` (persisted shortlist), `usage_events` (analytics), `prompt_registry` (Part VII). Object storage for binaries (Supabase Storage or Cloudflare R2 — student's choice).
+
+**Migration (Phase 3 onboarding)**: One-time import of localStorage blob into student's Supabase project (or skip; localStorage always works). Blob format is already versioned JSON, making this low-risk. Export-to-file fallback always available.
+
+## 5.3 Security & Privacy Model
+
+### Phase 0–2: Local-First Privacy
+
+- **Default**: Nothing leaves the device. All research data in browser, all keys in browser vault.
+- **Key handling**: AES-GCM vault, device-bound (non-extractable IndexedDB key) or passphrase-locked, kept entirely client-side.
+- **Backup**: Encrypted export to user's Downloads folder (user controls where backup lives; Scholar never touches it).
+- **AI calls**: Routed through Scholar's stateless proxy, but keys come from client vault; Scholar never holds plaintext keys.
+- **Zero log**: All Provider calls include no-log flags where available (Anthropic, Groq, OpenRouter support this).
+
+### Phase 3+: Optional Cloud with User Control
+
+- **Tiers**: local-only (Phase 0–2 default) · cloud-sync-opt-in (Pro-tier students) · zero-retention AI (provider calls with no-log flags).
+- **AuthZ**: RLS everywhere; API validates Supabase JWT; AI routes authenticated (closes §1.8's open-proxy risk); admin approval moves from GET link to POST with single-use token.
+- **Key handling**: Client vault kept (always); optional server escrow via KMS envelope encryption (never both silently — explicit user choice).
+- **End-to-end encryption**: Sync to student's Supabase project is encrypted end-to-end (passphrase-locked); Scholar proxy never sees plaintext data in transit.
+- **GDPR/FERPA posture**: Export-all and delete-all endpoints from day one; data-processing register; EU region option via student's Supabase project region selection.
+- **Pipeline**: Dependency audit + secret scanning in CI; CSP maintained (the repo's hard-won CSP lessons documented and kept).
+
+### Human Approval Audit Trail (Phase 1+)
+
+Every section carries edit history: `{ authorType, timestamp, change, approvalStatus }`. Exportable with final manuscript. Enables verification that human reviewed and approved final output before submission.
+
+## 5.4 Scalability
+
+### Phase 0–2: Browser-Scale
+
+Scholar's infrastructure scales to millions of users because each user's data lives in their browser, not Scholar's servers. Scholar's cost per user = ~$0.01/month (stateless API + retrieval proxies). The real constraint is **retrieval quota and student's AI spend** (on their own keys or free-tier accounts). No database sharding, no replication strategy needed — each user is independent.
+
+### Phase 3+: Back-End Scale
+
+Stateless API + managed Postgres (Supabase) scales past 100k active users with read replicas. Real constraints then become: **AI spend and retrieval quotas**, addressed by per-user/plan token budgets (enforced in proxy), shared retrieval cache (Crossref/OpenAlex are cacheable), embedding batch workers, rate limits moved to Postgres. Load-test gates: 1k/10k/100k simulated concurrent users are exit criteria.
+
+## 5.5 Observability, Analytics, Deployment
+
+### Phase 0–2: Client-Side Observability Only
+
+- **Error reporting**: Sentry (client-side only); no backend logs to expose user data.
+- **Analytics**: Privacy-preserving event tracking (Plausible, not Google Analytics); tracked events: phase funnel, vault size, backup exports, AI provider choices (no prompt content, no manuscript text).
+- **Telemetry**: Cost per AI call tracked client-side; no transmission of actual provider calls or keys.
+- **CI/CD**: GitHub Actions — typecheck (strict on new code), tests, build, dependency audit, secret scanning; preview deploys on branches; production = main branch only.
+
+### Phase 3+: Server-Side Observability Added
+
+- **OpenTelemetry traces** on API + agent runs; Sentry (client + server); structured logs (no PII); per-provider cost/latency dashboards.
+- **Product analytics** on `usage_events` (phase funnel, approval rates, humanization adoption, Pro conversion) — success metrics in §4.3 must be queryable.
+- **CI/CD**: GitHub Actions + database migrations via checked-in SQL with rollback scripts; feature flags for safe phase-level rollout; disaster recovery = Supabase managed PITR + weekly restore drills.
+
+### Audit Trail & Compliance
+
+- **Every edit and approval** is timestamped and attributed (AI, human, timestamp, change delta).
+- **Export includes provenance**: final manuscript shows which sections were AI-drafted, which human-edited, approval dates/times.
+- **Queryable from analytics**: "What % of final manuscripts had full human approval trail?" "What % used humanization?" These become success metrics.
+
+---
+
+# Part VI — AI Multi-Agent Architecture (With Mandatory Human Approval Gates)
 
 Seed: the existing 8 agents + skills framework + `AgentExecutor` (timeout/retry) + the already-scoped orchestrator design (`docs/planning/agent-ui-adapter-scoping.md` steps 2–3). This becomes:
 
-- **Coordinator** (new, server-side worker): runs declared agent DAGs (e.g., knowledgeGap → researchQuestion → methodologyAdvisor → statisticalAnalysis → integrityReviewer), threading typed `AgentResult.data` between stages — the chain that today exists only as optional type fields.
-- **Per-agent contract** (mostly already present in `AgentMetadata`/`AgentResult`, formalized): responsibilities & non-goals; **independent memory** = its own `agent_runs` history + scratch context; **shared memory** = the project record + vault RAG (organizational memory); **communication** = typed results on the queue, never free-text between agents; **planning** = coordinator-issued task specs; **self-evaluation** = existing `diagnostics.confidence` made mandatory and calibrated against outcomes; **failure recovery** = executor retry → failover provider → degrade to deterministic skill mode (all three mechanisms exist today, composed rather than new).
-- **Human approval checkpoints**: phase-gate transitions, any writing into the manuscript, disclosure generation, and submission packaging always require explicit user confirmation — extending the repo's existing informed-consent dialogs, which are the right pattern.
+- **Coordinator** (new, queue-based worker): runs declared agent DAGs (e.g., knowledgeGap → researchQuestion → methodologyAdvisor → statisticalAnalysis → integrityReviewer), threading typed `AgentResult.data` between stages — the chain that today exists only as optional type fields. Initially client-side (Phase 0–2); optionally server-side for Pro users (Phase 3+).
+- **Per-agent contract** (mostly already present in `AgentMetadata`/`AgentResult`, formalized): responsibilities & non-goals; **independent memory** = its own `agent_runs` history + scratch context; **shared memory** = the project record + vault RAG (organizational memory); **communication** = typed results, never free-text between agents; **planning** = coordinator-issued task specs; **self-evaluation** = existing `diagnostics.confidence` made mandatory, calibrated against outcomes; **failure recovery** = executor retry → failover provider → degrade to deterministic skill mode (all three exist today, composed).
+
+### Mandatory Human Approval Gates (Binding Requirement)
+
+Every AI contribution is gated by explicit human sign-off before advancing:
+
+1. **Drafting (Phase 6)**: AI proposes section → human marks as "approved" → only then can user advance to Phase 7. Section shows approval timestamp.
+2. **Refinement (Phase 7)**: Human edits AI section → optional AI quality-check → human approves edits → only then advance to Phase 8. Edit history carried forward.
+3. **Compliance (Phase 8)**: AI flags compliance issues → human reviews each one, signs off ("fixed" or "exception: [reason]") → only then advance to Phase 9.
+4. **Submission (Phase 9)**: Final checklist (human confirms "I reviewed this manuscript, all citations accurate, AI use disclosed, this is my work") → only then can user export or submit.
+
+**Technical implementation**:
+- Each section carries `{ approvalStatus, approvedBy (user), approvalTime, editHistory: [...] }`
+- Phase gating: `furthestPhase` only advances when all sections in current phase have `approvalStatus = 'approved'`
+- Export includes approval stamps: "Section 3.2: AI-drafted by Claude 2026-07-28, human-reviewed and approved by [user] 2026-07-29 14:22"
+- Audit trail is immutable (logged) and exportable with final manuscript
+
+**Why this matters**:
+- Proves academic integrity: human oversight is documented and verifiable
+- Catches AI hallucinations, logical gaps, missed citations before submission
+- Forces students to deeply engage with material (not just copy AI output)
+- Creates legal defensibility: if paper plagiarizes, there's a human approval signature on record
+
 - **No duplicated work**: agents call the same retrieval/citation services the panels use (single execution path — the repo already learned this lesson; keep its rule).
+
+### Integration with Writing Humanization (Phase 7+)
+
+Phase 7 "Refinement" UI adds optional "Humanize Section" button:
+1. User selects a section they want humanized
+2. Scholar runs the section through a public GitHub humanization repo (candidates: `jeannie-ai/jeannie-humanizer`, OpenAI cookbook examples, academic writing guides)
+3. Shows before/after diff with suggested rewrites (adds hedging, transitions, varied sentence structure, specificity)
+4. User accepts/rejects each suggestion
+5. Updated section re-enters the approval gate (human must re-approve after humanization)
+
+**Goal**: Eliminate "obviously AI-written" tone without creating a secondary quality gating system. Optional, not mandatory.
 
 ---
 
@@ -304,18 +514,30 @@ Principles: learn from outcomes, never self-modify code or weights; every learne
 
 ---
 
-# Part VIII — Business Model
+# Part VIII — Business Model (Revenue-Justified Infrastructure)
 
-## 8.1 Monetization
+## 8.1 Monetization (Three Tiers, Students Provision Own Cloud)
 
-- **Free / Local**: full pipeline in local-only mode (own keys or local runners), 1 active project, community support. (Costs us ~nothing; it is the funnel and the privacy story.)
-- **Scholar Pro — ~$12/mo student-priced**: cloud sync/backup, multi-device, RAG over vault, agent pipelines, unlimited projects, managed AI allowance with BYOK top-up. Positioned under Jenni+Paperpal combined ($35/mo) while covering both jobs.
-- **Submission Pack — ~$29 one-time per manuscript** (or included annually): full compliance run, journal-formatted exports, disclosure statement — priced ~10% of the $200+ human alternative. Monetizes the sharpest pain without a subscription.
-- **Programs/Institutions — per-seat**: supervisor visibility into disclosures, policy templates, SSO. (Later; requires the audit layer to exist first.)
+- **Free / Local (Phase 0–2)**: Full pipeline in browser-local mode (own AI keys or local runners), localStorage + IndexedDB, auto-backup export to Downloads, 1 active project, community support. Costs Scholar ~$0 (students provision their own Supabase if they want cloud). Entry funnel; privacy story.
+  
+- **Scholar Pro (Phase 3+) — ~$12/month student-priced**: Cloud sync to student's own Supabase project (Scholar teaches setup in 5-minute guide), unlimited projects, RAG over vault, full agent pipelines, managed AI allowance with BYOK top-up. Positioned under Jenni+Paperpal ($35/mo combined). At 10k users, 2% Pro conversion = 200 students × $12 = $2,400/mo (covers ~$50/mo backend infrastructure).
 
-## 8.2 User acquisition
+- **Submission Pack — ~$29 one-time per manuscript** (or $29/year bundle): Full automated compliance run (requirements extraction → checklist → journal-formatted PDF + DOC + disclosure statement), priced ~10% of the $200+ human alternative. Available to both free and Pro users. At 10k users, 10% attach = 1,000 purchases = $29k/year ≈ $2,400/mo additional revenue.
 
-Beachhead: PhD communities where integrity anxiety is loudest (r/PhD, thesis-writing groups, supervisor networks in South Asia/SEA where the founder has presence); content SEO on "AI disclosure statement," "journal compliance checklist," "verify citations" (queries competitors don't own); freemium local mode as zero-CAC entry; institutional pilots via the supervisor-visibility story; partnership channel with university writing centers. Metric discipline: CAC by channel from day one via `usage_events` attribution.
+- **Programs/Institutions — per-seat** (Phase 4+): Supervisor visibility into disclosures, policy templates, per-cohort dashboards, SSO. Requires audit/approval layer (exists by Phase 4). Pilot goal: 1 institution by end of Phase 6.
+
+## 8.2 User Acquisition (Educational Angle)
+
+**Beachhead**: PhD communities where integrity anxiety is loudest (r/PhD, thesis-writing Discord/Slack groups, supervisor networks in South Asia/SEA where founder has presence). **Messaging angle**: "Learn to use free cloud services + AI with integrity disclosure — skills that employers value."
+
+**Channels**:
+1. **Content SEO**: "How to set up Supabase for free," "AI disclosure statement for your thesis," "Journal compliance checklist," "Verify your citations live" (queries competitors don't own).
+2. **Freemium local mode**: Zero CAC entry; free forever if you use local runners + browser storage; proven way to use AI safely.
+3. **Institutional pilots**: University writing centers as distribution + co-marketing (Scholar provides compliance tool, writing center provides adoption).
+4. **Supervisor networks**: Blog posts on "how to supervise AI use" (supervisor-visibility tier is Phase 4+, but the conversation starts now).
+5. **Public guides**: "Free-tier AI provider setup guide," "Supabase for student research," "Don't lose your thesis: backup strategies" — SEO + brand.
+
+**Metric discipline**: CAC by channel from day one via `usage_events` (which channel, which first-touch, conversion funnel). Target: CAC < $5 (free local tier as low-cost acquisition).
 
 ## 8.3 Analytics & success metrics
 
@@ -323,53 +545,283 @@ North star: **manuscripts reaching submission-ready with verified citations + di
 
 ---
 
-# Part IX — Execution Roadmap
+# Part IX — Execution Roadmap (6-Phase Model, Zero Backend Cost Until Breakeven)
 
-> Complexity: S/M/L/XL. Every phase ships behind CI (typecheck-strict on new code, tests, audit) with preview deploys, feature flags for risky surfaces, and a defined rollback. No phase begins until the prior phase's exit metrics are green.
-
-**Phase 0 — Consolidation (2–3 wks, M).** Delete dead subsystems (§2.2 kill list) after tagged archive; single documented phase model; strict TS on new/changed files; GitHub Actions CI; Sentry both sides; split `server.ts` into route modules. *Risk*: hidden imports from "dead" code — mitigated by the import tracing already done here + full suite. *Rollback*: git revert; no data involved. *Exit*: suite green, bundle not larger, docs match code.
-
-**Phase 1 — Real persistence (4–6 wks, XL — the keystone).** Supabase schema (§5.2), API layer with JWT auth, `useProjectPersistence` re-backed by API + IndexedDB cache, localStorage import wizard, export/delete-all, authenticated AI routes, POST-based approvals. *Risks*: migration data loss (mitigate: import is copy-not-move + file export first); offline regressions (flagged rollout, local mode untouched as fallback). *Rollback*: flag off server persistence per user; localStorage path retained one full release. *Exit*: 0 lost-profile reports, sync round-trip <2s p95, all 1,207+ tests green.
-
-**Phase 2 — RAG + retrieval cache (3–4 wks, L).** Vault chunking + pgvector embeddings; grounded drafting citing vault sources; shared Crossref/OpenAlex cache; persisted journal shortlists. *Exit*: grounded-answer acceptance >60%; retrieval API spend −50%/user.
-
-**Phase 3 — Agent orchestration (4–6 wks, L).** Coordinator + DAG runs server-side on queue; agent-runs audit UI; confidence surfaced; approval checkpoints. *Exit*: full pipeline run completes on a real project with every checkpoint exercised; agent-run cost visible per run.
-
-**Phase 4 — Submission Pack (3–4 wks, M — first monetization).** Compliance automation productized: requirements extraction → checklist → formatted export → disclosure statement, paywalled per manuscript; billing (Stripe). *Exit*: first paid conversions; compliance-check pass rate measured.
-
-**Phase 5 — Pro tier + growth loop (ongoing).** Multi-device polish, quotas/budgets, dashboards (§5.5), Pro billing, acquisition experiments (§8.2). *Exit*: Pro conversion ≥3% of WAU; NPS baseline.
-
-**Phase 6 — Learning + institutions (after 5).** Prompt registry + evals (Part VII), supervisor visibility, SSO, per-seat licensing. *Exit*: first institutional pilot live; one learned-prompt promotion through the full governance path.
+> Complexity: S/M/L/XL. Every phase ships behind CI (typecheck-strict on new code, tests, audit) with preview deploys, feature flags for risky surfaces, and defined rollback. No phase begins until the prior phase's exit metrics are green. **Constraint**: Phase 0–2 incur $0 backend cost (localStorage/IndexedDB); Phase 3+ funded by subscription revenue.
 
 ---
 
-# Part X — Prioritized Backlog (top of stack)
+## Phase 0 — Foundation & Dead-Code Cleanup (Weeks 1–2, M)
 
-| # | Item | Phase | Size | Value rationale |
-|---|---|---|---|---|
-| 1 | Kill-list deletion + archive tag | 0 | M | Unblocks honest docs; −~⅓ dead LOC |
-| 2 | CI pipeline + Sentry + strict-TS-on-touch | 0 | M | Every later phase depends on it |
-| 3 | `server.ts` modularization + OpenAPI | 0 | M | Prereq for authenticated API |
-| 4 | Supabase artifact schema + RLS + migrations | 1 | L | The keystone |
-| 5 | API-backed `useProjectPersistence` + IndexedDB cache | 1 | L | Single choke point, highest risk — flag-gated |
-| 6 | localStorage import wizard + export/delete-all | 1 | M | Migration safety + GDPR |
-| 7 | Authenticated AI routes + per-user budgets | 1 | M | Closes open-proxy risk; enables plans |
-| 8 | Vault chunking + pgvector + grounded drafting | 2 | L | Core product quality leap |
-| 9 | Shared retrieval cache | 2 | S | Immediate cost win |
-| 10 | Journal-shortlist persistence | 2 | S | Known gap; dashboard unblocking |
-| 11 | Agent coordinator + DAG runs + audit UI | 3 | L | The "agentic" promise, governed |
-| 12 | Submission Pack + Stripe | 4 | M | First revenue |
-| 13 | Prompt registry + eval harness | 6 | M | Learning foundation |
-| 14 | Supervisor visibility / institutional | 6 | L | B2B expansion |
+Delete dead subsystems (§1.7 kill list) after tagged archive; single documented phase model (lettered A–I only); strict TS on new/changed files; GitHub Actions CI (test + typecheck + audit); Sentry client-side; split `server.ts` into route modules.
 
-**Milestones**: M1 "Clean foundation" (end P0) · M2 "Your data survives" (end P1) · M3 "Grounded" (end P2) · M4 "Agentic" (end P3) · M5 "First dollar" (end P4) · M6 "Scale & learn" (P5–6).
+**Deliverables**: Clean source tree, accurate docs, passing CI.
+**Risk**: Hidden imports from "dead" code → mitigated by import tracing + full suite.
+**Rollback**: git revert; no data involved.
+**Exit criteria**: Suite green, bundle size stable, docs match code.
 
 ---
 
-# Appendix — Development Principles (binding)
+## Phase 1 — Local-First Data Safety + Storage Lift (Weeks 3–6, L)
 
-Simplicity over speculative abstraction (the kernel lesson) · every module independently testable (the suite is an asset — keep it green through every phase) · strict typing on all new code · measure before optimizing (no CRDTs before collaboration, no Temporal before queue depth) · single execution path per capability (no parallel skill paths — repo rule, kept) · document decisions as ADRs at each phase boundary · the integrity discipline (real retrieval, disclosed AI, human verdicts) is a product invariant, not a style preference — it survives every redesign.
+**Client-side only; zero backend cost.**
+
+Three Tier 1 storage improvements (§5.B):
+1. Move vault files to IndexedDB (5 MB → 50+ MB effective capacity)
+2. Compress localStorage blob (JSON compresses 60–70%)
+3. Archive old projects (deferred loading)
+
+Humanization setup: research GitHub repo candidates (`jeannie-ai/jeannie-humanizer`, etc.), plan integration points.
+
+Human approval gates: add approval-status UI to sections (timestamp, edit history), phase-gating logic.
+
+Mandatory user backup flow: daily auto-backup export wizard, clear-cache warning UX, restore-from-backup flow, storage quota tracking.
+
+**Deliverables**: Users can safely backup/restore and understand localStorage limits; storage capacity 50+ MB practical ceiling.
+**Risks**: IndexedDB migration, performance on compress/decompress.
+**Exit criteria**: Vault files successfully split; 0 data-loss incidents in internal testing; approve/edit history UI complete.
 
 ---
 
-*End of blueprint. Next action on approval: Phase 0 kick-off (kill-list PR + CI). Nothing in this document has been implemented.*
+## Phase 2 — Growth to 10k Free Users (Months 2–5, L)
+
+**Still zero backend cost (localStorage/IndexedDB); local runners + student-provided AI keys.**
+
+Agent orchestrator: implement coordinator (chain knowledgeGap → researchQuestion → methodologyAdvisor → statisticalAnalysis → integrityReviewer with data threading).
+
+Full agent UI integration: all 9 phases can call agents, with approval gates at each step.
+
+Performance & caching: batching, retrieval caching (Crossref/OpenAlex shared cache), vault chunking for future RAG.
+
+Community & content: public examples, case studies, blog posts, public guides (Supabase setup, AI provider guides, free-tier disclosure).
+
+Telemetry (privacy-preserving): Plausible analytics (no Google Analytics), phase funnel tracking, Sentry client-side, no user-data logging.
+
+Onboarding polish: smooth new-user flow, phase gating, example projects.
+
+**Deliverables**: 10k monthly active free users, product-market fit signal (NPS >50, D30 retention >30%).
+**Risks**: Scale of caching, performance on agent runs.
+**Exit criteria**: 10k+ MAU, NPS baseline >50, D30 >30%, agent full-pipeline works end-to-end.
+
+---
+
+## Phase 3 — Breakeven & Monetization (Month 6–8, M)
+
+**Backend infrastructure enters Phase 3 because subscription revenue now justifies cost.**
+
+Cloud setup wizard: guide students through Supabase sign-up, project creation, API key entry (5-minute guide in Settings).
+
+Cloud sync service: optional, on-demand or scheduled sync (localStorage → student's Supabase). Encrypted end-to-end, passphrase-locked, user controls frequency.
+
+Free/Pro/Pack tier gates: implement feature flags (localStorage stays free; cloud features behind Pro flag). Introduce Stripe billing.
+
+Pro ($12/mo): cloud backup, unlimited projects, full agent pipelines.
+Submission Pack ($29/1x or annual): full compliance run + formatted exports + disclosure statement.
+
+Compliance automation: requirements extraction, interactive checklist UI, formatted export.
+
+**Revenue target**: 2% Pro conversion (200 users × $12 = $2.4k/mo) + Submission Pack (10% attach = $2.4k/mo) = ~$4.8k/mo gross (covers $50/mo backend + margin).
+
+**Deliverables**: Pro tier live, first paid conversions, compliance automation productized.
+**Risks**: Free tier doesn't migrate to cloud; Pro adoption < 2%.
+**Exit criteria**: First paid user; Pro conversion ≥1%; compliance-check pass rate ≥80%.
+
+---
+
+## Phase 4 — RAG + Agent Orchestration at Scale (Months 9–12, L)
+
+pgvector integration: vault chunking + embeddings (OpenAI API or bring-your-own), grounded drafting (AI cites vault sources).
+
+Full agent orchestrator UI: see agents run in real-time, edit prompts, replay runs.
+
+Institutional tier (first pilot): supervisor dashboard, cohort visibility, SSO.
+
+Humanization integration (Phase 1 research → Phase 4 ship): "Humanize Section" button in Phase 7, before/after diff, user can accept/reject suggestions.
+
+**Deliverables**: Grounded drafting (AI answers "based on your vault, not hallucinations"), first institutional pilot, humanization UX live.
+**Risks**: Embedding cost, RAG quality.
+**Exit criteria**: Grounded-answer acceptance >60%, first institutional contract signed.
+
+---
+
+## Phase 5 — Learning Framework & Scale (Months 13–18, M)
+
+Prompt registry + eval harness: versioned prompts, A/B evals, promotion workflow (draft → test → approve).
+
+Outcome signals: capture user accept/edit/reject, QC scores, compliance pass rates as learning signals.
+
+Multi-device for Pro: user logs in on new device, pulls latest cloud sync.
+
+Dashboards (Product analytics): phase funnel, Pro conversion %, Submission Pack attach rate, grounded-answer acceptance, humanization adoption.
+
+**Deliverables**: Learned prompts in production (under governance), multi-device UX, analytics dashboard.
+**Exit criteria**: One prompt successfully promoted through full governance workflow; Pro conversion ≥3%; D90 retention ≥40%.
+
+---
+
+## Phase 6 — Institutional Expansion (Year 2, M+)
+
+Per-seat licensing: university programs, writing centers, supervisor networks.
+Advanced compliance: custom journal templates, policy customization per institution.
+Collaboration (optional): shared projects, asynchronous co-authoring, comments.
+Mobile web polish.
+
+**Exit criteria**: 5+ institutional pilots, 500+ seat-based users, one multi-year contract.
+
+---
+
+## Financial Projection (Cost vs Revenue, Honoring Constraints)
+
+| Phase | Timeline | Scholar cost | User cost | Revenue | Viability |
+|---|---|---|---|---|---|
+| 0 | Weeks 1–2 | Dev only (~$2k) | $0 | $0 | ✓ One-time |
+| 1 | Weeks 3–6 | Dev only (~$5k) | $0 (student provides cloud) | $0 | ✓ Free forever |
+| 2 | Months 2–5 | Dev only (~$15k) + minimal proxies (~$100/mo) | $0 | $0 | ✓ Acquisition focus |
+| 3 | Months 6–8 | Supabase (~$30–50/mo) + dev (~$10k) | Pro: $12/mo (opt-in) | ~$4.8k/mo | ✓ **Breakeven** |
+| 4–6 | Year 2+ | Supabase (~$50–100/mo), workers, embeddings | Free/Pro/Inst | $25k+/mo | ✓ Profitable |
+
+**Key**: Phases 0–2 incur ~$0 backend cost (students provision cloud if they want it). Phase 3 introduces backend cost (~$50/mo) only after revenue justifies it. Phase 3 breakeven: $4.8k/mo revenue covers infrastructure + small team.
+
+---
+
+# Part X — Prioritized Backlog (Phases 0–6)
+
+## Phase 0 (Weeks 1–2)
+
+| # | Item | Size | Value rationale |
+|---|---|---|---|
+| 1 | Kill-list deletion + archive tag | M | Unblocks honest docs; −~⅓ dead LOC |
+| 2 | CI pipeline + Sentry + strict-TS-on-touch | M | Every later phase depends on it |
+| 3 | `server.ts` modularization | M | Foundation for later API growth |
+
+**M0 Exit**: Suite green, docs match code.
+
+---
+
+## Phase 1 (Weeks 3–6, Storage + Approval Gates)
+
+| # | Item | Size | Value rationale |
+|---|---|---|---|
+| 1 | Move vault files to IndexedDB | L | 5MB → 50MB+ (biggest win) |
+| 2 | Compress localStorage blob | S | 60–70% reduction, stacks with #1 |
+| 3 | Archive old projects (deferred loading) | M | Active workspace stays small |
+| 4 | Approval-gate UI + section edit history | M | Audit trail for integrity |
+| 5 | Backup export + restore wizard | M | Data safety, no silent loss |
+| 6 | Storage quota tracking + warnings | S | User sees limit before hitting it |
+| 7 | Research writing humanization repos | S | Plan Phase 4 integration |
+
+**M1 Exit**: Vault split complete, backup flows work, 0 data-loss incidents in testing.
+
+---
+
+## Phase 2 (Months 2–5, Growth to 10k)
+
+| # | Item | Size | Value rationale |
+|---|---|---|---|
+| 1 | Agent coordinator (DAG running) | L | Threads data between agents |
+| 2 | Full agent UI integration (9 phases) | M | All phases can use agents + approval gates |
+| 3 | Retrieval caching (Crossref/OpenAlex) | M | 50% API cost reduction per user |
+| 4 | Vault chunking + structure | M | Prep for future RAG (Phase 4) |
+| 5 | Journal shortlist persistence | S | Known UX gap |
+| 6 | Privacy-preserving analytics (Plausible) | S | Phase funnel tracking |
+| 7 | Institutional pilots (writing centers) | S | Adoption channel testing |
+
+**M2 Exit**: 10k+ MAU, NPS >50, D30 >30%, agent pipelines end-to-end work.
+
+---
+
+## Phase 3 (Months 6–8, Breakeven & Monetization)
+
+| # | Item | Size | Value rationale |
+|---|---|---|---|
+| 1 | Cloud setup wizard (Supabase) | M | Teach students to provision own cloud |
+| 2 | Cloud sync service (encrypted, opt-in) | L | Pro feature; encrypted end-to-end |
+| 3 | Free/Pro/Pack tier gates (Stripe) | M | Monetization plumbing |
+| 4 | Compliance automation (requirements → checklist → export) | L | First revenue product |
+| 5 | Disclosure statement generation | M | Tied to compliance |
+| 6 | Multi-device UX setup (Pro) | S | Later polish |
+
+**M3 Exit**: First paid user, Pro ≥1%, compliance pass rate ≥80%, revenue ≥$2k/mo.
+
+---
+
+## Phase 4 (Months 9–12, RAG + Humanization)
+
+| # | Item | Size | Value rationale |
+|---|---|---|---|
+| 1 | pgvector embeddings (OpenAI or BYOK) | L | Grounded drafting, no hallucinations |
+| 2 | Grounded drafting UI | M | Cite vault sources |
+| 3 | Humanization integration (Phase 1 research) | M | Optional "Humanize Section" button |
+| 4 | Institutional tier pilot (supervisor visibility) | L | B2B expansion starts |
+| 5 | Agent runs audit UI (confidence, cost) | M | Operator visibility |
+
+**M4 Exit**: Grounded-answer acceptance >60%, first institutional contract, humanization UX live.
+
+---
+
+## Phase 5 (Months 13–18, Learning & Multi-Device)
+
+| # | Item | Size | Value rationale |
+|---|---|---|---|
+| 1 | Prompt registry + eval harness | M | Versioned prompts, A/B testing |
+| 2 | Learning governance workflow | M | Draft → test → approve path |
+| 3 | Multi-device polish (Pro) | M | Cloud sync user experience |
+| 4 | Product analytics dashboard | M | Query phase funnel, metrics |
+| 5 | Outcome-signal capture | S | User accept/edit/reject tracking |
+
+**M5 Exit**: One prompt promoted through governance, Pro ≥3%, D90 ≥40%.
+
+---
+
+## Phase 6 (Year 2, Institutional Scale)
+
+| # | Item | Size | Value rationale |
+|---|---|---|---|
+| 1 | Per-seat licensing (universities, writing centers) | M | B2B growth |
+| 2 | Custom journal templates | M | Institutional customization |
+| 3 | Collaboration (shared projects, comments) | L | Advanced teamwork |
+| 4 | Mobile web polish | M | Responsive UI |
+
+**M6 Exit**: 5+ institutional pilots, 500+ seat users, one multi-year contract.
+
+---
+
+## Milestones Summary
+
+- **M0** (end Phase 0): Clean foundation, CI passing, docs honest
+- **M1** (end Phase 1): Data survives, 50+ MB capacity, approval gates UI complete
+- **M2** (end Phase 2): 10k free users, product-market fit signal, agents end-to-end
+- **M3** (end Phase 3): **Breakeven** ($4.8k/mo), first paid user, compliance live
+- **M4** (end Phase 4): Grounded drafting, first institutional pilot
+- **M5** (end Phase 5): Learning framework, multi-device, analytics
+- **M6** (end Phase 6): Institutional scale (500+ seats), multi-year contracts
+
+---
+
+# Appendix — Development Principles & Constraints (Binding)
+
+## Design Principles
+
+Simplicity over speculative abstraction (the kernel lesson) · every module independently testable (the suite is an asset — keep it green through every phase) · strict typing on all new code · measure before optimizing (no CRDTs before collaboration, no Temporal before queue depth) · single execution path per capability (no parallel skill paths — repo rule, kept) · document decisions as ADRs at each phase boundary.
+
+## Non-Negotiable Product Constraints (Binding)
+
+1. **Student Provisioning of Free Cloud Services**: Scholar provides zero backend infrastructure for free users (Phases 0–2). Students learn to provision their own Supabase projects, free-tier AI API keys, optional cloud storage. Scholar teaches via on-screen guides; students own their data.
+
+2. **Mandatory Human Approval Gates**: Every AI contribution is gated by explicit human sign-off. Sections carry approval timestamps, edit history, and attribution. Before advancing phases, submitting manuscripts, or exporting, the human must review and approve. Creates audit trail proving human oversight.
+
+3. **Assignment-Submission Ready Output + Humanization**: Final manuscripts are polished, humanized (not obviously AI-written), and ready for journal submission with <5 min review. Optional "Humanize Section" UX integrates a public GitHub humanization repo. Quality bar: indistinguishable from human-written academic prose.
+
+## Integrity Discipline (Product Invariant)
+
+Real retrieval everywhere (no invented citations or data) · disclosed AI use (exportable disclosure statement + per-section provenance) · human verdicts on all high-stakes decisions (agent confidence, compliance warnings, submission readiness) · verifiable citations (DOI/PMID lookup against live registries). This discipline survives every redesign and is non-negotiable.
+
+## Cost & Scale Targets
+
+- **Phases 0–2**: $0 Scholar backend cost; students provision own cloud if desired. Target: 10k free monthly active users.
+- **Phase 3**: Revenue ($4.8k/mo from 2% Pro conversion + Submission Pack) justifies backend cost (~$50/mo). Breakeven.
+- **Phase 4+**: Profitable, scale to 100k+ users (cost per user becomes AI/retrieval spend, not infrastructure).
+
+---
+
+*End of blueprint. Awaiting owner approval of all sections. Next action on approval: Phase 0 kick-off (kill-list PR + CI + modularize server.ts). Nothing in this document has been implemented.*
