@@ -110,7 +110,8 @@ describe("ResearchIntakeWizard — Stage 4/5 field gating", () => {
   it("shows the current format in the banner and 'Change Format' clears outputFormat", () => {
     const { updateProject } = renderWizard(buildProject("journal-article"));
 
-    expect(screen.getByText("Journal Article")).toBeInTheDocument();
+    const banner = screen.getByText("Output format:");
+    expect(banner.textContent).toContain("Journal Article");
     fireEvent.click(screen.getByText("Change Format"));
     expect(updateProject).toHaveBeenCalledWith({ outputFormat: "" });
   });
