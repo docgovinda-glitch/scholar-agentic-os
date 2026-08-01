@@ -41,6 +41,7 @@ const VedicDatabase = lazy(() => import("./components/VedicDatabase"));
 const AIControlCenter = lazy(() => import("./components/AIControlCenter"));
 const ProfileSettings = lazy(() => import("./components/ProfileSettings"));
 const CoverLetterGenerator = lazy(() => import("./components/CoverLetterGenerator"));
+const SubmissionChecklistBuilder = lazy(() => import("./components/SubmissionChecklistBuilder"));
 
 // Icons
 // (Sparkles, GraduationCap, BookOpen, Trash2, LogOut, LayoutDashboard, ArrowLeft
@@ -559,6 +560,23 @@ function App() {
                       submissionPack: {
                         ...(project.submissionPack || {}),
                         coverLetter: content
+                      } as any
+                    });
+                  }}
+                />
+              </div>
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <BookOpenCheck className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Submission Checklist
+                </h2>
+                <SubmissionChecklistBuilder
+                  project={project}
+                  onUpdate={(checklist) => {
+                    updateProject({
+                      submissionPack: {
+                        ...(project.submissionPack || {}),
+                        checklists: checklist
                       } as any
                     });
                   }}
