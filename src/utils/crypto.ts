@@ -169,14 +169,6 @@ const SALT_LENGTH = 16;
 const IV_LENGTH = 12;
 
 /**
- * Convert Uint8Array to ArrayBuffer (for WebCrypto compatibility)
- */
-function toArrayBuffer(uint8: Uint8Array): ArrayBuffer {
-  const array = new Uint8Array(uint8);
-  return array.slice().buffer;
-}
-
-/**
  * Derive an AES-GCM key from a secret using PBKDF2.
  */
 async function deriveKey(secret: string, salt: Uint8Array): Promise<CryptoKey> {
@@ -187,11 +179,11 @@ async function deriveKey(secret: string, salt: Uint8Array): Promise<CryptoKey> {
     false,
     ["deriveKey"]
   );
-  
+
   return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: toArrayBuffer(salt),
+      salt,
       iterations: 100000,
       hash: "SHA-256"
     },
@@ -208,10 +200,10 @@ async function deriveKey(secret: string, salt: Uint8Array): Promise<CryptoKey> {
 export async function encryptDataAsync(text: string, secret: string): Promise<string> {
   if (!text) return "";
   if (!secret) throw new Error("Encryption requires a secret key - no hardcoded fallback allowed");
-  
+
   // Use secure random values
-  const salt = new Uint8Array(crypto.getRandomValues(new Uint8Array(SALT_LENGTH)));
-  const iv = new Uint8Array(crypto.getRandomValues(new Uint8Array(IV_LENGTH)));
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
   const key = await deriveKey(secret, salt);
   
   const encrypted = await crypto.subtle.encrypt(
