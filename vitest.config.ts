@@ -12,6 +12,10 @@ export default mergeConfig(
           url: 'http://localhost:3000/',
         },
       },
+      // See src/testSetup.ts — registers @testing-library/react's cleanup()
+      // in afterEach, which doesn't happen automatically since test.globals
+      // is off here.
+      setupFiles: ['./src/testSetup.ts'],
     },
   })
 );
