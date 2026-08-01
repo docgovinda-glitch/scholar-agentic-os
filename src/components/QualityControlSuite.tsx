@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { PaperProject } from "../types";
+import { getDocumentType } from "../types/documentTypes";
 import { ShieldCheck, Sparkles, RefreshCcw, CheckSquare, AlertTriangle, Play, HelpCircle, ArrowRight, CheckCircle2, Info, AlertCircle } from "lucide-react";
 import { runQualityControl } from "../services/aiService";
 import { executeAgent } from "../services/agentService";
@@ -140,6 +141,34 @@ export default function QualityControlSuite({
           </p>
         </div>
       </div>
+
+      {/* Document Type Quality Gates */}
+      {project.documentType && (
+        <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-[#E2E8F0] uppercase tracking-wider flex items-center gap-2">
+              <CheckSquare className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+              Document Type Checklist: {getDocumentType(project.documentType)?.label}
+            </h3>
+          </div>
+
+          {getDocumentType(project.documentType)?.qualityGates && (
+            <div className="space-y-3">
+              {getDocumentType(project.documentType)!.qualityGates.map((gate) => (
+                <div key={gate.id} className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg space-y-1">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-mono font-semibold text-slate-200">{gate.name}</p>
+                      <p className="text-xs text-slate-400 leading-relaxed">{gate.description}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm space-y-3">

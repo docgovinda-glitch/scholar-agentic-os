@@ -17,17 +17,15 @@ for real.
 
 ## Confirmed current state
 
-- **`LiteratureReviewAgent.fetchWebStudies()` — still a stub**, `src/agents/literatureReview.ts:185-191`:
-  ```ts
-  private async fetchWebStudies(input, context): Promise<unknown[]> {
-    // Would call web search providers through abstraction
-    return [];
-  }
-  ```
-  Called at line 147 whenever `executionMode !== "deterministic"`. It never
-  touches any of the real retrieval services built during the fabrication
-  audit. Wiring this agent into a panel today would show empty/degraded
-  results where the equivalent live panel currently shows real data.
+- **`LiteratureReviewAgent.fetchWebStudies()` — fixed**, `src/agents/literatureReview.ts` (see its own header comment,
+  "Agent-UI adapter, Step 2a"). It now calls the same real, fabrication-audit-verified
+  `literatureRetrievalService.discoverLiterature()` path the live panels already use
+  (Crossref/OpenAlex/PubMed/Semantic Scholar), mapping results into the same shape
+  `literatureReviewSkill.ts`'s dedup/classify logic expects from local studies — honest
+  empty array on failure or no results, never fabricated. **Recommendation 1 below (fix
+  the stub) is done; recommendations 2-4 (orchestrator, converged skill path, regression
+  coverage) remain unstarted — this note's "no code written" status still applies to the
+  adapter itself, only the one prerequisite bug is closed.**
 
 - **Every other agent** (`researchPlanner.ts`, `knowledgeGap.ts`,
   `researchQuestion.ts`, `methodologyAdvisor.ts`, `statisticalAnalysis.ts`,
@@ -65,8 +63,8 @@ for real.
 
 ## Recommended sequencing for the actual build (future session)
 
-1. Fix `LiteratureReviewAgent.fetchWebStudies()` stub (small, isolated,
-   testable on its own — do this first, independent of adapter work).
+1. ~~Fix `LiteratureReviewAgent.fetchWebStudies()` stub~~ **Done** — see
+   "Confirmed current state" above.
 2. Build the orchestrator that chains `knowledgeGap → researchQuestion →
    methodologyAdvisor → statisticalAnalysis → integrityReviewer` using real
    `AgentResult.data`, with its own test coverage.
@@ -75,5 +73,5 @@ for real.
    with a regression test against the existing direct-service behavior it
    would replace or supplement.
 
-Each of the three steps above is itself a full task, not a subtask of one
-session — flagged as "substantial" in the original task list for that reason.
+Steps 2-3 are each still a full task, not a subtask of one session — flagged
+as "substantial" in the original task list for that reason.

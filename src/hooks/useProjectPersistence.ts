@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { PaperProject, PROFILE_STATE_PREFIX, DEFAULT_STATE, UserProfile } from "../types";
+import * as storage from "../services/storageService";
 
 export interface UseProjectPersistenceResult {
   loadAllProjects: () => void;
@@ -26,7 +27,7 @@ export function useProjectPersistence(
   setAllProjects: React.Dispatch<React.SetStateAction<PaperProject[]>>,
   allProjects: PaperProject[],
   setViewMode: React.Dispatch<React.SetStateAction<"dashboard" | "workspace">>,
-  setActiveTab: React.Dispatch<React.SetStateAction<string>>
+  setActiveTab: React.Dispatch<React.SetStateAction<"workspace" | "vault" | "agents" | "publishing" | "citation" | "settings" | "profile">>
 ): UseProjectPersistenceResult {
   // Fixes a real race: updateProject() used to close over the `project`
   // argument from the render that created it. Two updateProject() calls in
@@ -64,68 +65,95 @@ export function useProjectPersistence(
     };
   }, [setProject]);
 
-  // Load ALL projects belonging to this user from localStorage
-  const loadAllProjects = useCallback(() => {
+  // Load ALL projects belonging to this user from storage
+  const loadAllProjects = useCallback(async (isCancelled?: () => boolean) => {
     if (!user) return;
-    const stateStr = localStorage.getItem(`${PROFILE_STATE_PREFIX}${user}`);
-    if (!stateStr) return;
     try {
-      const profile = JSON.parse(stateStr) as UserProfile;
-      // Multi-project support: collect from projects[] array or create from projectState
-      let projects: PaperProject[] = profile.projects || [];
-      // Always ensure the current active project is included
-      if (profile.projectState && !projects.find(p => p.id === profile.projectState?.id)) {
-        projects = [profile.projectState, ...projects];
-      }
-      setAllProjects(projects.filter(Boolean));
+      const metadata = storage.loadMetadata(user);
+      const projectList = metadata.projectList || [];
+
+      // Load full projects from storage (will fetch from IndexedDB or localStorage)
+      const projects = await Promise.all(
+        projectList.map(async (info) => {
+          const project = await storage.loadProject(user, info.id);
+          return project || null;
+        })
+      );
+
+      if (isCancelled?.()) return;
+      setAllProjects(projects.filter((p): p is PaperProject => p !== null));
     } catch (e) {
-      console.error("Failed to load projects list:", e);
+      console.error("Failed to load projects:", e);
+      if (isCancelled?.()) return;
+      // Fallback to localStorage-only
+      const stateStr = localStorage.getItem(`${PROFILE_STATE_PREFIX}${user}`);
+      if (!stateStr) return;
+      try {
+        const profile = JSON.parse(stateStr) as UserProfile;
+        let projects: PaperProject[] = profile.projects || [];
+        if (profile.projectState && !projects.find(p => p.id === profile.projectState?.id)) {
+          projects = [profile.projectState, ...projects];
+        }
+        setAllProjects(projects.filter(Boolean));
+      } catch (parseErr) {
+        console.error("Failed to parse projects from fallback storage:", parseErr);
+      }
     }
   }, [user, setAllProjects]);
 
+  // Bug fix (2026-08-01): this effect used to fire-and-forget loadAllProjects()
+  // with no unmount guard. In tests, a component using this hook unmounts
+  // before the async storage.loadProject()/IndexedDBService.init() chain
+  // resolves; the eventual setAllProjects() call then fires post-teardown and
+  // throws "window is not defined" when React tries to schedule the resulting
+  // render — surfaced as a flaky "Unhandled Error" in CI (Node 22 only, timing
+  // dependent). The cancelled flag stops the stale update from ever reaching
+  // setState once the effect has been cleaned up.
   useEffect(() => {
-    loadAllProjects();
+    let cancelled = false;
+    void loadAllProjects(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [loadAllProjects, project]);
 
   // Client-side migration runner to support cost metrics, model preferences and usage logs
   const updateProject = useCallback((newFields: Partial<PaperProject>) => {
     if (!user || !projectRef.current) return;
     const updated = { ...projectRef.current, ...newFields, lastActivity: new Date().toISOString() };
-    projectRef.current = updated; // synchronous, so a second call in the same tick sees this immediately
+    projectRef.current = updated;
     setProject(updated);
 
-    const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-    let existingProfile: any = {};
-    if (savedStateStr) {
-      try {
-        existingProfile = JSON.parse(savedStateStr);
-      } catch (e) {
-        console.error("Failed to parse existing profile for update:", e);
+    // Use hybrid storage (localStorage metadata + IndexedDB large data)
+    storage.saveProject(user, updated).catch((e) => {
+      console.error("Failed to save project to hybrid storage:", e);
+      // Fall back to localStorage-only on error
+      const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
+      let existingProfile: any = {};
+      if (savedStateStr) {
+        try {
+          existingProfile = JSON.parse(savedStateStr);
+        } catch (err) {
+          console.error("Failed to parse existing profile for fallback:", err);
+        }
       }
-    }
+      const currentProjects: PaperProject[] = existingProfile.projects || [];
+      const idx = currentProjects.findIndex((p: PaperProject) => p.id === updated.id);
+      if (idx >= 0) {
+        currentProjects[idx] = updated;
+      } else {
+        currentProjects.unshift(updated);
+      }
+      const profileData = {
+        ...existingProfile,
+        username: user,
+        projectState: updated,
+        projects: currentProjects
+      };
+      localStorage.setItem(`phd_profile_state_${user}`, JSON.stringify(profileData));
+    });
 
-    // Update in projects array too
-    const currentProjects: PaperProject[] = existingProfile.projects || [];
-    const idx = currentProjects.findIndex((p: PaperProject) => p.id === updated.id);
-    if (idx >= 0) {
-      currentProjects[idx] = updated;
-    } else {
-      currentProjects.unshift(updated);
-    }
-
-    const profileData = {
-      ...existingProfile,
-      username: user,
-      projectState: updated,
-      projects: currentProjects
-    };
-    localStorage.setItem(`phd_profile_state_${user}`, JSON.stringify(profileData));
-
-    // Dispatch event to notify other components of project state update
     window.dispatchEvent(new CustomEvent("scholar_project_updated", { detail: updated }));
-    // Deliberately no `project` dependency — this reads/writes projectRef.current
-    // instead, so its identity stays stable across renders and it always acts
-    // on the true latest value regardless of when React last re-rendered.
   }, [user, setProject]);
 
   useEffect(() => {
@@ -169,26 +197,31 @@ export function useProjectPersistence(
       lastActivity: new Date().toISOString()
     };
 
-    const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-    let existingProfile: any = {};
-    if (savedStateStr) {
-      try { existingProfile = JSON.parse(savedStateStr); } catch (_) {}
-    }
-    const currentProjects: PaperProject[] = existingProfile.projects || [];
-    // Ensure old active is persisted
-    if (project && !currentProjects.find(p => p.id === project.id)) {
-      currentProjects.unshift(project);
-    }
-    currentProjects.unshift(newProject);
+    // Save new project using hybrid storage
+    storage.saveProject(user, newProject).catch((e) => {
+      console.error("Failed to save new project:", e);
+    });
 
-    const profileData = {
-      ...existingProfile,
+    const metadata = storage.loadMetadata(user);
+    const currentProjects: PaperProject[] = [];
+
+    // Collect existing projects
+    if (project && !metadata.projectList.find(p => p.id === project.id)) {
+      currentProjects.push(project);
+    }
+    currentProjects.push(newProject);
+
+    // Update metadata
+    storage.saveMetadata(user, {
       username: user,
-      projectState: newProject,
-      projects: currentProjects,
-      activeProjectId: newProject.id
-    };
-    localStorage.setItem(`phd_profile_state_${user}`, JSON.stringify(profileData));
+      activeProjectId: newProject.id,
+      projectList: currentProjects.map(p => ({
+        id: p.id,
+        name: p.title || "Untitled",
+        lastActivity: p.lastActivity
+      }))
+    });
+
     setProject(newProject);
     setAllProjects(currentProjects);
     setViewMode("workspace");
@@ -198,19 +231,14 @@ export function useProjectPersistence(
   // Switch to a different project from the dashboard
   const switchToProject = useCallback((projectId: string) => {
     const found = allProjects.find(p => p.id === projectId);
-    if (!found) return;
+    if (!found || !user) return;
 
-    const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-    let existingProfile: any = {};
-    if (savedStateStr) {
-      try { existingProfile = JSON.parse(savedStateStr); } catch (_) {}
-    }
-    const profileData = {
-      ...existingProfile,
-      projectState: found,
+    const metadata = storage.loadMetadata(user);
+    storage.saveMetadata(user, {
+      ...metadata,
       activeProjectId: projectId
-    };
-    localStorage.setItem(`phd_profile_state_${user}`, JSON.stringify(profileData));
+    });
+
     setProject(found);
     setViewMode("workspace");
     setActiveTab("workspace");
@@ -221,13 +249,11 @@ export function useProjectPersistence(
     if (!user) return;
     if (!window.confirm("Are you sure you want to permanently delete this workspace? This action cannot be undone.")) return;
 
-    const savedStateStr = localStorage.getItem(`phd_profile_state_${user}`);
-    let existingProfile: any = {};
-    if (savedStateStr) {
-      try { existingProfile = JSON.parse(savedStateStr); } catch (_) {}
-    }
-    let currentProjects: PaperProject[] = existingProfile.projects || [];
-    currentProjects = currentProjects.filter((p: PaperProject) => p.id !== projectId);
+    storage.deleteProject(user, projectId).catch((e) => {
+      console.error("Failed to delete project:", e);
+    });
+
+    let currentProjects = allProjects.filter((p) => p.id !== projectId);
 
     // If we deleted the active project, switch to another or create a fresh one
     const wasActive = project?.id === projectId;
@@ -235,21 +261,26 @@ export function useProjectPersistence(
     if (wasActive && !newActive) {
       newActive = { ...DEFAULT_STATE(user), id: `${user}-${Date.now()}`, lastActivity: new Date().toISOString() };
       currentProjects.unshift(newActive);
+      storage.saveProject(user, newActive).catch((e) => {
+        console.error("Failed to save new fallback project:", e);
+      });
     }
 
-    const profileData = {
-      ...existingProfile,
+    storage.saveMetadata(user, {
       username: user,
-      projectState: newActive,
-      projects: currentProjects,
-      activeProjectId: newActive?.id
-    };
-    localStorage.setItem(`phd_profile_state_${user}`, JSON.stringify(profileData));
+      activeProjectId: newActive?.id,
+      projectList: currentProjects.map(p => ({
+        id: p.id,
+        name: p.title || "Untitled",
+        lastActivity: p.lastActivity
+      }))
+    });
+
     setAllProjects(currentProjects);
     if (wasActive && newActive) {
       setProject(newActive);
     }
-  }, [user, project, setProject, setAllProjects]);
+  }, [user, project, allProjects, setProject, setAllProjects]);
 
   return {
     loadAllProjects,

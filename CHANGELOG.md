@@ -1,5 +1,32 @@
 # CHANGELOG - Scholar Agentic Operating System
 
+## Unreleased — correctness-bug sweep, doc reconciliation (2026-08-01)
+
+### Investigated
+
+- User asked to fix remaining correctness bugs. The four items most recently
+  flagged as open in the project's own docs — `LiteratureReviewAgent.fetchWebStudies()`,
+  `IntegrityReviewerSkill.evaluateReportingCompliance()`, `ResearchQuestionAgent`'s
+  `recommendedDatasets` stub, and the detection-evasion prompt language in
+  `aiService.ts` — were confirmed **already fixed** in earlier sessions (each has
+  its own passing regression test). `docs/planning/target-workflow.md` already
+  recorded three of the four fixes; only `docs/planning/agent-ui-adapter-scoping.md`
+  was stale (still described `fetchWebStudies()` as "still a stub") — corrected.
+- A fresh, doc-independent sweep for stub/mock/simulated/hardcoded patterns across
+  `src/services`, `src/agents`, `src/skills`, `src/components`, and `server.ts`
+  found no further live fabrication bugs — every remaining hit was either an
+  already-fixed-and-documented case or a legitimate use (ID generation, retry
+  jitter).
+
+### Fixed
+
+- **`KnowledgeVaultWizard.tsx`'s three AI-metadata handlers (URL, DOI, media
+  ingestion) named their real `project.aiSettings` value `mockSettings`.** It was
+  never mock data — it's the same real settings object passed to a real
+  `AIGateway.generate()` call — but the name could mislead a future reader into
+  thinking the AI call was faked. Renamed to `resolvedAiSettings`; no behavior
+  change.
+
 ## Unreleased — AI Configuration redesign (2026-07-31)
 
 ### Fixed — Local AI blocked by upgrade-insecure-requests; dead Validate button

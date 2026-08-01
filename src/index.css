@@ -459,3 +459,286 @@ button:disabled {
   overflow-y: auto !important;
   padding: 2rem 1rem !important;
 }
+
+/* ==========================================
+   PHASE 1: SCI-FI GLASSMORPHIC EFFECTS
+   ========================================== */
+
+/* Glassmorphic card — frosted glass effect with neon border */
+.glassmorphic {
+  background: rgba(10, 14, 39, 0.4) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(59, 156, 255, 0.2) !important;
+  border-radius: 12px !important;
+}
+
+.glassmorphic:hover {
+  background: rgba(10, 14, 39, 0.5) !important;
+  border-color: rgba(59, 156, 255, 0.4) !important;
+  box-shadow: 0 0 20px rgba(59, 156, 255, 0.15) !important;
+}
+
+/* Glowing border effect */
+.border-glow {
+  box-shadow: 0 0 10px rgba(59, 156, 255, 0.3), inset 0 0 10px rgba(59, 156, 255, 0.05) !important;
+}
+
+.border-glow-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* ==========================================
+   LOADING & SPINNER ANIMATIONS
+   ========================================== */
+
+@keyframes spinnerPulse {
+  0% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1) rotate(180deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(360deg);
+    opacity: 0.8;
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(59, 156, 255, 0.3), inset 0 0 10px rgba(59, 156, 255, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 156, 255, 0.6), inset 0 0 15px rgba(59, 156, 255, 0.1);
+  }
+}
+
+@keyframes statusPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Spinner component */
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(59, 156, 255, 0.2);
+  border-top-color: var(--color-luminous-blue);
+  border-radius: 50%;
+  animation: spinnerPulse 1.2s linear infinite;
+}
+
+/* Pulse indicator (status dot) */
+.status-pulse {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.status-pulse.success {
+  color: #10b981;
+}
+
+.status-pulse.warning {
+  color: #f59e0b;
+}
+
+.status-pulse.error {
+  color: #ef4444;
+}
+
+/* Progress bar with gradient */
+.progress-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-luminous-blue), var(--color-luminous-blue));
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(59, 156, 255, 0.4);
+  animation: shimmer 2s infinite;
+  background-size: 1000px 100%;
+}
+
+/* Loading skeleton shimmer */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(59, 156, 255, 0.1),
+    rgba(59, 156, 255, 0.2),
+    rgba(59, 156, 255, 0.1)
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* ==========================================
+   PHASE INDICATOR STYLING
+   ========================================== */
+
+/* Animated phase ring */
+.phase-ring {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--color-luminous-blue);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-luminous-blue);
+  box-shadow: 0 0 15px rgba(59, 156, 255, 0.3), inset 0 0 10px rgba(59, 156, 255, 0.05);
+  animation: glowPulse 3s ease-in-out infinite;
+  position: relative;
+}
+
+.phase-ring::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 1px solid rgba(59, 156, 255, 0.15);
+  border-radius: 50%;
+  animation: spin 20s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Phase label styling */
+.phase-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-luminous-blue);
+}
+
+/* ==========================================
+   ENHANCED FOCUS & INTERACTION STATES
+   ========================================== */
+
+/* Updated focus ring for nav-friendly appearance */
+:focus-visible {
+  outline: 2px solid var(--color-luminous-blue) !important;
+  outline-offset: 2px !important;
+  border-radius: 4px;
+}
+
+/* Interactive button states with glow */
+button:not(:disabled):hover {
+  box-shadow: 0 0 15px rgba(59, 156, 255, 0.2) !important;
+  transition: all var(--motion-duration-base) var(--motion-ease);
+}
+
+button:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+/* Input focus glow */
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px rgba(59, 156, 255, 0.2) !important;
+  border-color: var(--color-luminous-blue) !important;
+}
+
+/* ==========================================
+   MOBILE OPTIMIZATIONS (PHASE 1)
+   ========================================== */
+
+@media (max-width: 768px) {
+  /* Larger touch targets */
+  button {
+    min-height: 44px !important;
+    padding: 12px 16px !important;
+  }
+
+  input,
+  textarea,
+  select {
+    min-height: 48px !important;
+    font-size: 16px !important; /* Prevents zoom on iOS */
+  }
+
+  /* Simplify panels on mobile */
+  .glassmorphic {
+    border-radius: 8px !important;
+  }
+
+  /* Bottom sheet animations */
+  .bottom-sheet {
+    animation: slideUp 0.3s var(--motion-ease);
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* Hide desktop-only elements */
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  /* Hide mobile-only elements */
+  .mobile-only {
+    display: none !important;
+  }
+
+  /* Spacious desktop layout */
+  .workspace-container {
+    padding: 2rem !important;
+    gap: 1.5rem;
+  }
+}
+
+/* ==========================================
+   ACCESSIBILITY: PREFERS REDUCED MOTION
+   ========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .spinnerPulse,
+  .glowPulse,
+  .statusPulse,
+  .shimmer,
+  .border-glow-pulse,
+  .phase-ring,
+  .phase-ring::before {
+    animation: none !important;
+  }
+
+  button:not(:disabled):hover {
+    box-shadow: none !important;
+  }
+
+  button:not(:disabled):active {
+    transform: none !important;
+  }
+}

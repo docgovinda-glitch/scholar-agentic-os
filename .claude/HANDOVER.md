@@ -1,5 +1,17 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
+## RESUME HERE TOMORROW (as of 2026-08-01, correctness-bug sweep found nothing left to fix — code was already ahead of its own docs — supersedes the section below)
+
+**Asked to fix "remaining correctness bugs."** The four items most recently on record as open — `LiteratureReviewAgent.fetchWebStudies()`'s stub, `IntegrityReviewerSkill.evaluateReportingCompliance()`'s hardcoded output, `ResearchQuestionAgent`'s `recommendedDatasets: ["dataset-1"]` stub, and `aiService.ts`'s detection-evasion prompt language — turned out to be **already fixed**, each with its own passing regression test, confirmed by reading the live implementations directly rather than trusting any doc. `docs/planning/target-workflow.md` already had accurate "Fixed" annotations for three of the four; `docs/planning/agent-ui-adapter-scoping.md` was the one stale holdout (still called `fetchWebStudies()` "still a stub") — corrected this session, including its "Recommended sequencing" step 1.
+
+**A doc-independent fresh sweep** (grep for stub/mock/simulate/hardcoded/fabricat/TODO/FIXME across `src/services`, `src/agents`, `src/skills`, `src/components`, `server.ts`) turned up nothing further live. One real but minor finding: `KnowledgeVaultWizard.tsx`'s three AI-metadata handlers (URL/DOI/media ingestion) stored their real `project.aiSettings` value in a variable named `mockSettings` — never actually mock data, just a misleading name that could fool a future reader into thinking the AI call was faked. Renamed to `resolvedAiSettings` in all 3 call sites, zero behavior change.
+
+**Not investigated this pass, worth knowing**: `simulateLookup()` in `citationService.ts` has the same category of misleading name (it's a real Crossref/OpenAlex/PubMed/OpenLibrary lookup, per its own header comment) but is a public function used across 3 files — left alone since renaming it is a slightly larger, riskier change than this session's scope, not because the name is fine. Also: **`HANDOVER.md` still has a 1-day gap** — the entire "AI Configuration redesign" (7 commits, 2026-07-31: 26-provider catalog expansion, encrypted-vault UX, `AIModeAccordion`, CSP/localhost fix, API-key-entry perf fix) shipped with full `CHANGELOG.md` coverage but no session entry here. Flagged, not written this session (out of scope for "fix correctness bugs" specifically) — natural next doc-catch-up item.
+
+`tsc --noEmit` clean, full suite 1207/1207 (unchanged — no test needed to change since no behavior changed), `npm run build` clean.
+
+---
+
 ## RESUME HERE TOMORROW (as of 2026-07-30, IntegrityReviewerAgent result now persisted + surfaced at approval — supersedes the section below)
 
 **Closed the exact gap flagged at the end of the QC-visibility fix below.** `IntegrityReviewerAgent`'s result (`structuralCompleteness`/`integrityScore`/`ethicsScore` + `blockingIssues`, run via `agentService.executeAgent()` in `QualityControlSuite.tsx`) was local component `useState` only — never persisted onto `PaperProject`, invisible everywhere outside that one tab. Commit `db52394`.

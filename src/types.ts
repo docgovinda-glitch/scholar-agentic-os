@@ -1,4 +1,5 @@
 import type { IntegrityReviewReport } from "./agents/integrityReviewer";
+import type { DocumentType } from "./types/documentTypes";
 
 export const PROFILE_STATE_PREFIX = "phd_profile_state_";
 export const PROFILES_LIST_KEY = "phd_profiles_meta";
@@ -666,6 +667,7 @@ export interface PaperProject {
   
   // Project metadata
   status?: "Draft" | "Submitted" | "Accepted" | "Rejected";
+  documentType?: DocumentType;
   lastActivity?: string;
   lockedSections?: string[]; // Array of section names that are locked
   

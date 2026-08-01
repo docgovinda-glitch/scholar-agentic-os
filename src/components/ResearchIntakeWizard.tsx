@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { PaperProject, AISettings, OutputFormat } from "../types";
+import type { DocumentType } from "../types/documentTypes";
 import { FileText, Sparkles, BookOpen, AlertCircle, Play, Check, HelpCircle, Loader2 } from "lucide-react";
 import {
   suggestTopic,
@@ -11,6 +12,7 @@ import {
   suggestFullBlueprint
 } from "../services/aiService";
 import { OUTPUT_FORMAT_FIELD_CONFIG, OUTPUT_FORMAT_OPTIONS } from "../config/outputFormats";
+import { DocumentTypeSelector } from "./DocumentTypeSelector";
 
 interface ResearchIntakeWizardProps {
   project: PaperProject;
@@ -29,6 +31,10 @@ export default function ResearchIntakeWizard({
 }: ResearchIntakeWizardProps) {
   const [error, setError] = useState<string | null>(null);
   const [blueprintLoading, setBlueprintLoading] = useState(false);
+
+  const handleDocumentTypeChange = (type: DocumentType) => {
+    updateProject({ documentType: type });
+  };
 
   const handleAutoFillBlueprint = async () => {
     if (!project.title.trim()) {
@@ -390,6 +396,15 @@ export default function ResearchIntakeWizard({
         >
           Change Format
         </button>
+      </div>
+
+      {/* Document Type Selection */}
+      <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+        <DocumentTypeSelector
+          value={project.documentType}
+          onChange={handleDocumentTypeChange}
+          displayMode="grid"
+        />
       </div>
 
       {/* 1. Dashboard Row */}

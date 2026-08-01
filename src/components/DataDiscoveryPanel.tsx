@@ -13,6 +13,7 @@ import {
   Eye
 } from "lucide-react";
 import { discoverDataSources } from "../services/aiService";
+import { DataSourceApprovalPanel } from "./DataSourceApprovalPanel";
 
 interface DataDiscoveryPanelProps {
   project: PaperProject;
@@ -493,6 +494,16 @@ export default function DataDiscoveryPanel({
                 </div>
               ))}
             </div>
+
+            {/* Discovered Sources Approval Workflow */}
+            {project.dataSources && project.dataSources.length > 0 && (
+              <div className="pt-6 border-t border-[color:var(--color-navy-4)]">
+                <DataSourceApprovalPanel
+                  project={project}
+                  updateProject={updateProject}
+                />
+              </div>
+            )}
 
             <div className="flex justify-between items-center pt-4 border-t border-[color:var(--color-navy-4)]">
               <button

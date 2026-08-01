@@ -86,7 +86,7 @@ export class AgentExecutor {
         // Execute with timeout
         const result = await this.withTimeout(
           agent.execute(input, context),
-          mergedConfig.timeoutMs
+          mergedConfig.timeoutMs ?? 30000
         );
 
         // Cleanup agent

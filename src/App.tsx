@@ -8,6 +8,7 @@ import { useFocusOnNavigate } from "./hooks/useFocusOnNavigate";
 import { canEnterPhase, resolveFurthestPhase } from "./utils/phaseGating";
 import OnboardingWizard from "./components/OnboardingWizard";
 import AppHeader from "./components/layout/AppHeader";
+import { AgentOrchestrationDashboard } from "./components/AgentOrchestrationDashboard";
 import AppFooter from "./components/layout/AppFooter";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -39,6 +40,11 @@ const KnowledgeVaultManager = lazy(() => import("./components/ThesisReader"));
 const VedicDatabase = lazy(() => import("./components/VedicDatabase"));
 const AIControlCenter = lazy(() => import("./components/AIControlCenter"));
 const ProfileSettings = lazy(() => import("./components/ProfileSettings"));
+const CoverLetterGenerator = lazy(() => import("./components/CoverLetterGenerator"));
+const SubmissionChecklistBuilder = lazy(() => import("./components/SubmissionChecklistBuilder"));
+const DocumentExportPipeline = lazy(() => import("./components/DocumentExportPipeline"));
+const SubmissionTracker = lazy(() => import("./components/SubmissionTracker"));
+const ReviewerResponseManager = lazy(() => import("./components/ReviewerResponseManager"));
 
 // Icons
 // (Sparkles, GraduationCap, BookOpen, Trash2, LogOut, LayoutDashboard, ArrowLeft
@@ -508,13 +514,28 @@ function App() {
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "agents" && (
           <Suspense fallback={<PanelLoadingFallback />}>
-            <ActiveAgentsPanel project={project} />
+            <div className="grid grid-cols-1 gap-6">
+              <AgentOrchestrationDashboard
+                project={project}
+                updateProject={updateProject}
+              />
+              <ActiveAgentsPanel project={project} />
+            </div>
           </Suspense>
         )}
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "publishing" && (
           <Suspense fallback={<PanelLoadingFallback />}>
             <div className="grid grid-cols-1 gap-6">
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Document Export Pipeline
+                </h2>
+                <DocumentExportPipeline
+                  project={project}
+                />
+              </div>
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
                 <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
                   <Award className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
@@ -536,6 +557,101 @@ function App() {
                   project={project}
                   updateProject={updateProject}
                   onBack={() => {}}
+                />
+              </div>
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Cover Letter Generator
+                </h2>
+                <CoverLetterGenerator
+                  project={project}
+                  journalName={project.targetJournal?.name || ""}
+                  onSave={(content: string) => {
+                    updateProject({
+                      submissionPack: {
+                        ...(project.submissionPack || {}),
+                        coverLetter: content
+                      } as any
+                    });
+                  }}
+                />
+              </div>
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <BookOpenCheck className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Submission Checklist
+                </h2>
+                <SubmissionChecklistBuilder
+                  project={project}
+                  onUpdate={(checklist: Record<string, unknown>) => {
+                    updateProject({
+                      submissionPack: {
+                        ...(project.submissionPack || {}),
+                        checklists: checklist
+                      } as any
+                    });
+                  }}
+                />
+              </div>
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Submission Tracker
+                </h2>
+                <SubmissionTracker
+                  submissions={(project.submissionPack as any)?.submissions || []}
+                  onAddSubmission={(submission: any) => {
+                    const newSubmission: any = {
+                      id: Math.random().toString(36).substr(2, 9),
+                      ...submission,
+                      statusUpdatedAt: new Date().toISOString()
+                    };
+                    const submissions = [(project.submissionPack as any)?.submissions || [], newSubmission].flat();
+                    updateProject({
+                      submissionPack: {
+                        ...(project.submissionPack || {}),
+                        submissions
+                      } as any
+                    });
+                  }}
+                  onUpdateSubmission={(id: string, update: any) => {
+                    const submissions = ((project.submissionPack as any)?.submissions || []).map((s: any) =>
+                      s.id === id ? { ...s, ...update, statusUpdatedAt: new Date().toISOString() } : s
+                    );
+                    updateProject({
+                      submissionPack: {
+                        ...(project.submissionPack || {}),
+                        submissions
+                      } as any
+                    });
+                  }}
+                  onDeleteSubmission={(id: string) => {
+                    const submissions = ((project.submissionPack as any)?.submissions || []).filter((s: any) => s.id !== id);
+                    updateProject({
+                      submissionPack: {
+                        ...(project.submissionPack || {}),
+                        submissions
+                      } as any
+                    });
+                  }}
+                />
+              </div>
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Reviewer Response Manager
+                </h2>
+                <ReviewerResponseManager
+                  project={project}
+                  onSaveDraft={(draft: any) => {
+                    updateProject({
+                      submissionPack: {
+                        ...(project.submissionPack || {}),
+                        responseDraft: draft
+                      } as any
+                    });
+                  }}
                 />
               </div>
             </div>

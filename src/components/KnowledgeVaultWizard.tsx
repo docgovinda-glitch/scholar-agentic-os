@@ -346,7 +346,7 @@ export default function KnowledgeVaultWizard({
       const data = await res.json();
       
       // Use AI to extract overview/summary details from the webpage text
-      const mockSettings = project.aiSettings || {} as any;
+      const resolvedAiSettings = project.aiSettings || {} as any;
       const response = await AIGateway.generate({
         systemInstruction: "You are a senior research paper analyst. Extract structured metadata from this website/HTML text.",
         prompt: `Analyze the website text and extract a structured JSON representation.
@@ -391,7 +391,7 @@ Return JSON in this format:
         temperature: 0.1,
         responseMimeType: "application/json",
         taskType: "vault-overview"
-      }, mockSettings);
+      }, resolvedAiSettings);
 
       const overview: VaultFileOverview = cleanAndParseJson<VaultFileOverview>(response.text);
       // Determinism Policy: author/year require AI judgment from unstructured
@@ -434,7 +434,7 @@ Return JSON in this format:
       const data = await res.json();
       
       // Get AI to summarize the metadata and populate chapters, keyFindings, and keyDataPoints
-      const mockSettings = project.aiSettings || {} as any;
+      const resolvedAiSettings = project.aiSettings || {} as any;
       const response = await AIGateway.generate({
         systemInstruction: "You are an expert research cataloger. Expand the paper catalog metadata into structural findings and chapters.",
         prompt: `Analyze the research paper bibliographic details:
@@ -481,7 +481,7 @@ Return strictly valid JSON:
         temperature: 0.1,
         responseMimeType: "application/json",
         taskType: "vault-overview"
-      }, mockSettings);
+      }, resolvedAiSettings);
 
       const aiData = cleanAndParseJson<any>(response.text);
       // Determinism Policy: title/author/year/journal/DOI are already known
@@ -544,7 +544,7 @@ Return strictly valid JSON:
     setIsEditingCitation(false);
 
     try {
-      const mockSettings = project.aiSettings || {} as any;
+      const resolvedAiSettings = project.aiSettings || {} as any;
       const response = await AIGateway.generate({
         systemInstruction: "You are a senior research summarizer. Analyze external media resources and extract academic grounding summaries.",
         prompt: `Look up, transcribe and summarize the media source: "${inputMediaUrl.trim()}".
@@ -579,7 +579,7 @@ Return strictly valid JSON:
         temperature: 0.1,
         responseMimeType: "application/json",
         taskType: "vault-overview"
-      }, mockSettings);
+      }, resolvedAiSettings);
 
       const overview: VaultFileOverview = cleanAndParseJson<VaultFileOverview>(response.text);
       addProcessedSource(overview.title, ".media", `Media link registered: ${inputMediaUrl.trim()}`, overview);
