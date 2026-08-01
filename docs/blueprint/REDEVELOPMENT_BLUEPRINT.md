@@ -254,22 +254,106 @@ Three binding constraints reshape the product and business model:
 
 ---
 
+## 4.6 Multi-Document-Type System (Research-Backed, Phase 0–1)
+
+Scholar supports **10 academic writing types** from day one, not just journal articles. Each type has custom workflows, quality checks, and guidance.
+
+### Why This Matters
+
+**Student pain point**: "I use 4–6 tools per paper" (Elicit for extraction → SciSpace for corpus chat → Jenni for drafting → Paperpal for polish → Turnitin for plagiarism → manual formatting). Scholar becomes the single workspace.
+
+**Market expansion**: PhD/graduate writers (~5–10M globally) → College/undergrad coursework (~50–100M globally, 5–10x larger).
+
+**Competitive moat**: No competitor covers end-to-end workflows for 10 document types with integrity discipline + guidance.
+
+### The 10 Types (Research-Validated)
+
+| # | Type | Student Level | Typical Length | Key Difference | Integrity Risk |
+|---|---|---|---|---|---|
+| 1 | **Journal Article** | Graduate/PhD | 20–35 pages | IMRAD, peer-reviewed | Hallucinated citations, fabricated methodology |
+| 2 | **Research Paper** (Conference) | Undergrad+/Grad | 15–25 pages | IMRAD, more flexible formatting | Similar to journal |
+| 3 | **Term Paper** | Undergrad | 8–15 pages | Simple structure (no Abstract/Methods), rubric-based | Wholesale AI-written content (hardest to detect) |
+| 4 | **Lab Report** | Undergrad (STEM) | 5–10 pages | IMRAD + data focus, figures/tables required | Data fabrication, selective reporting (highest risk) |
+| 5 | **Research Proposal** | Graduate/PhD | 12–20 pages | No results section, feasibility-focused | Over-promising capabilities, unrealistic timelines |
+| 6 | **Literature Review** | Undergrad+/Grad | 15–30 pages | Standalone survey, thematic synthesis | Incomplete searching, selective representation |
+| 7 | **Project Report** | Undergrad (capstone) | 15–30 pages | Executive summary + findings + recommendations | Selective data presentation favoring client |
+| 8 | **Book Review** | Undergrad | 4–8 pages | Summary + critical evaluation (integrated) | Cherry-picked quotes, misrepresenting author |
+| 9 | **Case Study** | Undergrad+/Grad | 12–20 pages | Theory-driven analysis of a single case | Over-generalization, misapplied theory |
+| 10 | **Notes & Synthesis** | Any | Variable | Private study aids (no submission) | N/A (private) |
+
+### Per-Type Customization
+
+**Each type includes**:
+- **Custom input form** (assignment prompt + rubric for coursework; research questions + methodology for research; book + author info for reviews)
+- **Type-specific workflow phases** (term paper emphasizes rubric alignment, lab report emphasizes data accuracy, proposal emphasizes feasibility)
+- **Tailored quality checks** (assignment: plagiarism + formatting + rubric alignment; lab report: data accuracy spot-check + figure captions + statistics; proposal: timeline realism + budget justification)
+- **Format-specific outputs** (assignment: DOCX for LMS/Turnitin; lab report: DOCX with embedded figures; proposal: PDF for funder)
+- **Contextual guidance** (in-UI instructions at each phase, with examples)
+
+### User Guidance System (All Settings)
+
+Every setting, configuration, and workflow includes:
+1. **Tooltips** (hover: "what this does")
+2. **Help text** (inline: "why you might need it")
+3. **Interactive wizards** (citation style finder, rubric creator if not provided)
+4. **Learning links** (full guides with examples)
+
+**Coverage**: AI provider selection (free vs. pay-per-use vs. local), data backup/restore, citation verification, document type selection, submission method (LMS, Turnitin, email, journal portal).
+
+### Research Findings: Student Pain Points & AI Assistance Mapping
+
+**Top pain points** (across all types):
+1. Fragmentation (4–6 tools per paper)
+2. Journal/format targeting complexity
+3. Citation verification anxiety
+4. Synthesis vs. summary difficulty
+5. Integrity anxiety ("avoid AI or risk misconduct")
+
+**Where AI helps most** (highest value, safe):
+- Journal articles (literature discovery, journal targeting, compliance automation)
+- Literature reviews (thematic synthesis, gap identification)
+- Term papers (outline generation, rubric alignment feedback)
+- Proposals (methodology design validation, feasibility assessment)
+
+**Where AI is risky** (needs guardrails):
+- Lab reports (data interpretation—accuracy-critical, easy to hallucinate)
+- Problem sets (defeats learning if AI solves it)
+- Book reviews (requires close reading, personal engagement)
+
+**Integrity concerns** (per type, highest to lowest):
+- Lab reports / Problem sets: Data fabrication
+- Term papers: Wholesale AI-written content
+- Journal articles / Proposals: Hallucinated citations, over-promising
+- Literature reviews: Incomplete searching, selective representation
+- Reports / Case studies: Selective data presentation
+- Book reviews: Misrepresenting author's argument
+
+---
+
 # Part V — Target Architecture
 
 ## 5.1 Phased Evolution: Local-First Through Scale (Honoring Cost Constraints)
 
 **Constraint-driven design**: No backend infrastructure investment until revenue exists to justify it. Students provision their own free-tier cloud services. This inverts the typical SaaS model but aligns with our educational mission and zero operational cost target through 1,000 users.
 
-### Phase 0–2 (Months 1–5, Growth to 10k free users): Enhanced Browser-Local
+### Phase 0–2 (Months 1–5, Growth to 10k free users): Enhanced Browser-Local, Multi-Document-Type
 
 ```
-┌─ Client (React PWA) ─────────────────────────────────────┐
-│ phase workflow A→I · editors · vault UI · local runners │
-│ Data: localStorage (compressed) + IndexedDB (vault)      │
-│ Daily automated backup export (encrypted, to Downloads)  │
-│ Backup/restore wizard for recovery                       │
-│ Quota tracking: warns at 4MB localStorage, 50MB IndexedDB│
-└──────────────────────────────────────────────────────────┘
+┌─ Client (React PWA) ──────────────────────────────────────────┐
+│ Multi-document-type support (10 types: journal, assignment,   │
+│ term paper, lab report, proposal, notes, lit review, etc.)    │
+│ Type-specific workflows (phases customize per document type)   │
+│ Type-specific quality checks (assignment: rubric score,        │
+│   lab report: data accuracy, proposal: feasibility, etc.)      │
+│ Guidance system (tooltips, help text, wizards for all         │
+│   settings + type-specific in-UI instructions)                │
+│ phase workflow A→I (customized per type) · editors · vault UI │
+│ · local runners                                               │
+│ Data: localStorage (compressed) + IndexedDB (vault)           │
+│ Daily automated backup export (encrypted, to Downloads)       │
+│ Backup/restore wizard for recovery                            │
+│ Quota tracking: warns at 4MB localStorage, 50MB IndexedDB     │
+└──────────────────────────────────────────────────────────────┘
   ↓
 Express server (stateless AI proxy only)
   - /api/generate, /api/stream-generate (AI routing, catalog-driven, kept)
@@ -693,12 +777,13 @@ Mobile web polish.
 | 1 | Kill-list deletion + archive tag | M | Unblocks honest docs; −~⅓ dead LOC |
 | 2 | CI pipeline + Sentry + strict-TS-on-touch | M | Every later phase depends on it |
 | 3 | `server.ts` modularization | M | Foundation for later API growth |
+| 4 | Multi-document-type system design + UI mockups | M | Plan 10 types, phase customization, guidance UX |
 
-**M0 Exit**: Suite green, docs match code.
+**M0 Exit**: Suite green, docs match code, multi-type design finalized.
 
 ---
 
-## Phase 1 (Weeks 3–6, Storage + Approval Gates)
+## Phase 1 (Weeks 3–8, Storage + Approval Gates + Multi-Document-Type)
 
 | # | Item | Size | Value rationale |
 |---|---|---|---|
@@ -709,12 +794,19 @@ Mobile web polish.
 | 5 | Backup export + restore wizard | M | Data safety, no silent loss |
 | 6 | Storage quota tracking + warnings | S | User sees limit before hitting it |
 | 7 | Research writing humanization repos | S | Plan Phase 4 integration |
+| 8 | Document type selector (10 types) | M | Dropdown at Phase A, stores type in project |
+| 9 | Type-specific input forms | L | Assignment prompt + rubric, lab procedure, proposal objectives, etc. |
+| 10 | Type-specific workflow phases | M | Show/hide phases based on document type (e.g., skip "Data Analysis" for term papers) |
+| 11 | Type-specific quality checks | L | Assignment: rubric scoring; Lab: data accuracy; Proposal: feasibility assessment |
+| 12 | Guidance system (tooltips + wizards) | M | Help text for every setting, interactive wizards (citation style finder, rubric creator) |
 
-**M1 Exit**: Vault split complete, backup flows work, 0 data-loss incidents in testing.
+**M1 Exit**: Vault split complete, backup flows work, 0 data-loss incidents in testing, document type selector live, 3+ types fully functional (journal, assignment, lab report).
+
+**Note**: Phase 1 extends from 4–6 weeks to 6 weeks to accommodate multi-type implementation (added ~2 weeks effort).
 
 ---
 
-## Phase 2 (Months 2–5, Growth to 10k)
+## Phase 2 (Months 2–5, Growth to 10k + Multi-Type Completion)
 
 | # | Item | Size | Value rationale |
 |---|---|---|---|
@@ -725,8 +817,10 @@ Mobile web polish.
 | 5 | Journal shortlist persistence | S | Known UX gap |
 | 6 | Privacy-preserving analytics (Plausible) | S | Phase funnel tracking |
 | 7 | Institutional pilots (writing centers) | S | Adoption channel testing |
+| 8 | Complete remaining document types (7+ types) | M | Finish implementation: proposal, notes, lit review, project report, book review, case study |
+| 9 | Type-specific content library (videos, guides, examples) | M | 30–60 second videos, example documents, checklists per type |
 
-**M2 Exit**: 10k+ MAU, NPS >50, D30 >30%, agent pipelines end-to-end work.
+**M2 Exit**: 10k+ MAU, NPS >50, D30 >30%, agent pipelines end-to-end work, all 10 document types live and tested, institutional pilots launched.
 
 ---
 
@@ -811,6 +905,8 @@ Simplicity over speculative abstraction (the kernel lesson) · every module inde
 2. **Mandatory Human Approval Gates**: Every AI contribution is gated by explicit human sign-off. Sections carry approval timestamps, edit history, and attribution. Before advancing phases, submitting manuscripts, or exporting, the human must review and approve. Creates audit trail proving human oversight.
 
 3. **Assignment-Submission Ready Output + Humanization**: Final manuscripts are polished, humanized (not obviously AI-written), and ready for journal submission with <5 min review. Optional "Humanize Section" UX integrates a public GitHub humanization repo. Quality bar: indistinguishable from human-written academic prose.
+
+4. **Multi-Document-Type Support from Day One**: Scholar supports 10 academic writing types (journal articles, assignments, term papers, lab reports, proposals, notes, literature reviews, project reports, book reviews, case studies) with custom workflows, quality checks, and guidance. No single workflow fits all. Users select document type at project creation; phases, checks, and guidance customize accordingly. Research-backed: each type has distinct pain points, integrity risks, and AI assistance opportunities.
 
 ## Integrity Discipline (Product Invariant)
 
