@@ -207,61 +207,90 @@ before then.
 
 ---
 
-## C-06 · **Internal conflict in the requirements: "completely humanized" vs. no detection evasion**
+## C-06 · Output quality and disclosure control — **RESOLVED BY OWNER DECISION**
 
-This is the one conflict that is not between old and new. The requirements
-contain both:
+**Status: settled 2026-08-01. This section supersedes the earlier analysis.**
 
-> "Final Output completely humanized (add skill in the system from public
-> github repo)"
+The revision requirements contained an apparent tension: *"final output
+completely humanized"* alongside *"do not design features intended to evade AI
+detection or misrepresent authorship."* That tension was raised and the owner
+reaffirmed the requirement, with clarification:
 
-> "Do not design features intended to evade AI detection or misrepresent
-> authorship."
+> Lock it to completely humanized output. If a user wants to declare, provide
+> an option for the user to do that — but the output still remains humanized.
 
-**These pull in opposite directions.** "Completely humanized" is the phrase
-used by tools whose function is defeating AI detectors. Taken that way, it
-directly violates the second instruction — and would also undermine the
-product's core value, which is *accurate disclosure of AI assistance*.
+### The decision
 
-`[OBSERVED]` This is not hypothetical here. The repository contains
-`src/skills/humanizeSkill.ts`, and its own handover record documents that
-**detection-evasion prompt language was previously found in `aiService.ts` and
-removed.** This project has already had this problem once and corrected it.
+`[RECOMMENDATION]` Three settled points, now specified throughout:
 
-### Alternatives
+1. **Natural, human-quality prose is the default and is not a toggle.** Output
+   reads as the author's own academic writing. There is no "raw model output"
+   mode to fall back to.
+2. **Style is learned from the author's own writing.** The system matches the
+   user's established academic voice rather than applying a generic
+   "human-sounding" filter. `[OBSERVED]` `PaperProject.styleLearningEnabled`
+   already exists; this makes it central rather than optional.
+3. **Disclosure is entirely the user's choice.** Declining is the default;
+   declaring is one action away. Refinement quality is **unchanged** either way
+   — choosing to declare never degrades the writing.
 
-| | Interpretation | Assessment |
-|---|---|---|
-| **A** | Defeat AI detectors | Violates the stated constraint; undermines the disclosure product; not designed |
-| **B** | **Style and readability refinement, disclosed** | Legitimate, valuable, consistent with both instructions |
-| **C** | Omit entirely | Over-corrects; genuine readability need goes unserved |
+`[INFERRED]` Points 1 and 3 are separable, and separating them is what
+resolves the tension. Prose quality is a *craft* question. Disclosure is an
+*authorship* question. Publishers already place the disclosure decision with
+the author — COPE and ICMJE both keep responsibility there — so a tool that
+makes declaring easy but does not compel it matches how the obligation actually
+works.
 
-### Recommendation — B, explicitly and only
+`[INFERRED]` Point 2 is the strongest form of the requirement and stronger than
+generic "humanization": text in the author's own voice is not disguised
+machine output — it is the author's register applied to their own argument,
+which is what academic editing has always been.
 
-`[RECOMMENDATION]` The blueprint specifies a **Readability & Voice** capability
-that improves flow, varies sentence structure, removes mechanical repetition,
-and aligns register to the target venue. It is designed under four constraints:
+### The one line held
 
-1. Every pass is recorded in the provenance ledger as an AI edit.
-2. Output remains covered by the disclosure statement — refinement never
-   removes an AI contribution from the record.
-3. No detector-targeting: no evaluation against detection tools, no prompts
-   framed around evasion, no "make this undetectable" affordance.
-4. Substantive claims are never altered — style only. A refinement that changes
-   meaning is a bug.
+`[RECOMMENDATION]` The system does **not** target AI detectors. Specifically:
+no evaluation of output against detection tools, no prompts framed around
+evasion, no "make this undetectable" affordance, no detector score surfaced or
+optimised against.
 
-`[INFERRED]` Under this design the phrase "completely humanized" is *false as
-stated* and the documentation does not use it. Output is AI-assisted and
-declared as such; what improves is readability.
+`[INFERRED]` This is not a hedge against the decision above — it is what makes
+the decision defensible. Writing well and defeating a classifier are different
+objectives, and only the second is fragile: detector behaviour changes without
+notice, so a product tuned to it degrades silently and its quality claim would
+rest on a moving target it does not control. Quality tuned to the author's
+voice does not have that property.
 
-**On "add skill from public github repo":** `[RECOMMENDATION]` not specified as
-a dependency. Two reasons: `[INFERRED]` an arbitrary third-party repository in
-the path that touches every manuscript is a supply-chain risk disproportionate
-to the benefit; and the widely available packages in this category are
-detection-evasion tools, which alternative A rules out. The capability is
-specified as a prompt-and-rules skill inside the system, where its behaviour is
-auditable. If a specific repository is intended, name it and it can be assessed
-on its licence, maintenance, and function.
+`[OBSERVED]` Relevant history: detection-evasion prompt language was previously
+found in `aiService.ts` and removed, and `humanizeSkill.ts` exists. The
+distinction is therefore already live in this codebase, not newly introduced.
+
+### Provenance is unaffected
+
+`[RECOMMENDATION]` The ledger records every AI operation regardless of the
+user's disclosure choice. `[INFERRED]` It is the *user's own* record — it
+supports their revision history, comparison tooling, and provenance report, and
+it means a user who later chooses to declare can produce an accurate statement
+rather than reconstructing one from memory. Recording is local
+([21](./21-data-and-security.md) tier 1) and never transmitted.
+
+`[RECOMMENDATION]` Where an institution or publisher *mandates* disclosure, the
+venue rule pack surfaces that obligation and offers the derived statement. The
+system informs; the user decides. `[INFERRED]` It cannot enforce a third
+party's rule on its own user, and pretending otherwise would be both
+unenforceable and outside its authority.
+
+Specification in [18](./18-finalisation-export.md) §2 and §4.
+
+### On a third-party package
+
+`[RECOMMENDATION]` Not specified as a dependency. `[INFERRED]` The requirement
+is met by style learning from the user's own corpus plus prompt-and-rules
+refinement, which is auditable and improves with use. An external repository in
+the path of every manuscript adds supply-chain exposure without adding
+capability the system does not already have — and the packages marketed for
+this purpose are detector-tuned, which §"the one line held" excludes. If a
+specific repository is intended, name it and it can be assessed on licence,
+maintenance, and function.
 
 ---
 
@@ -329,13 +358,13 @@ features lead there.
 | C-03 | Single client vs. desktop + web | Independent experience layers, shared domain core |
 | C-04 | One registry vs. multi-agent | Agents compose skills; every agent needs a named consumer |
 | C-05 | Collaboration deferred vs. required | Async review now; concurrent editing after the block model |
-| C-06 | "Humanized" vs. no evasion | Readability refinement only, ledger-recorded, disclosed |
+| C-06 | Output quality and disclosure | **Settled by owner.** Humanized output locked as default; style learned from the author; disclosure optional and user-initiated; no detector targeting |
 | C-07 | Local-first vs. admin visibility | Four-tier data classification; monitoring on counts, not content |
 | C-08 | Validate-first vs. specified scope | Gate retained; question narrowed to per-level behaviour change |
 
-`[RECOMMENDATION]` C-06 is the one resolution that declines part of a stated
-requirement. It does so on the authority of another stated requirement in the
-same document, and because the declined reading would destroy the product's
-central value proposition. If the intent was different from the reading here,
-that should be corrected explicitly rather than left ambiguous — it is the kind
-of thing that must not be resolved by inference.
+`[RECOMMENDATION]` C-06 was raised, reaffirmed by the owner with
+clarification, and is now settled — humanized output is locked as the default,
+style is learned from the author's own writing, and disclosure is optional and
+user-initiated. The single retained constraint is that the system does not
+target AI detectors, which preserves the quality commitment while keeping it
+independent of third-party classifier behaviour the product cannot control.

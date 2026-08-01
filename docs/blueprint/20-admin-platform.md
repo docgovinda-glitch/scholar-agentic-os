@@ -179,7 +179,85 @@ that.
 
 ---
 
-## 9. Audit logging
+## 9. Notifications
+
+`[RECOMMENDATION]` Administrators compose and push notifications to users from
+the admin panel. This is the only channel through which the platform initiates
+contact inside the product.
+
+### Composition
+
+| Field | Purpose |
+|---|---|
+| Title, body | Plain text or restrained markdown; no embedded scripts |
+| Category | Announcement · maintenance · policy change · release · security · tip |
+| Severity | Info · important · critical |
+| Audience | All · degree level · discipline · client (desktop/web) · app version · entitlement tier |
+| Delivery | In-app · email (opt-in) · both |
+| Schedule | Immediate · scheduled · recurring |
+| Expiry | Auto-dismiss date |
+| Action | Optional label + **internal** destination |
+
+`[RECOMMENDATION]` Audience targeting uses **tier 3 attributes only** —
+degree level, discipline, client, version, entitlement. `[INFERRED]` Targeting
+on manuscript content would require reading it, which
+[C-07](./11-requirements-conflicts.md#c-07--local-first-vs-administrator-visibility)
+forbids. An administrator can notify "all PhD users on desktop"; never "users
+writing about X".
+
+### Categories that matter most
+
+`[INFERRED]` Two justify the feature on their own:
+
+- **Policy change.** `[OBSERVED — external]` Publisher AI policies change and
+  diverge. When a venue rule pack updates, affected users need to know —
+  `[INFERRED]` this is the delivery mechanism that keeps R-13 (stale rules)
+  from becoming silent user harm.
+- **Security.** The only channel for advising a client update or a credential
+  action.
+
+### User controls
+
+`[RECOMMENDATION]`
+
+- An inbox with unread state, history, and search.
+- **Per-category opt-out**, except `critical` security notices.
+- Email delivery is opt-in per category, never by default.
+- Quiet hours honoured for non-critical notifications.
+- Dismissal is permanent per notification; nothing re-nags.
+
+`[INFERRED]` The opt-out floor is deliberate: a security notice the user has
+silenced is a notice that did not exist. Everything else is theirs to turn off.
+
+### Constraints
+
+`[RECOMMENDATION]`
+
+- **No marketing.** Categories are operational. `[INFERRED]` A channel used to
+  upsell gets muted, and the security notices go with it.
+- **Read receipts are counts, not identities** — *"1,240 of 3,900 read"*, never
+  a per-user list.
+- **Actions stay in-app.** A notification may deep-link to a settings page or a
+  rule-pack update; it may not link to arbitrary external URLs. `[INFERRED]`
+  Admin-pushed external links are a phishing vector against the platform's own
+  users.
+- **Every send is in the admin audit log** (§10) — who, what, to whom, when.
+- **Delivery is server → client pull.** `[INFERRED]` The server does not need
+  to know a user's device or project state to notify them; the client fetches
+  on connect, which keeps the tier boundary intact and works offline-first.
+- **Local-only users still receive them** on next connect. Notifications do not
+  require sync to be enabled.
+
+### Rate limiting
+
+`[RECOMMENDATION]` A per-audience send cap and a confirmation step for any
+notification reaching more than a threshold number of users. `[INFERRED]` The
+failure mode is an administrator notifying the entire user base by accident;
+that is unrecoverable, since a notification cannot be unsent.
+
+---
+
+## 10. Audit logging
 
 `[RECOMMENDATION]` Two distinct logs, never merged:
 
@@ -199,7 +277,7 @@ worthless.
 
 ---
 
-## 10. What the administrator cannot do
+## 11. What the administrator cannot do
 
 `[RECOMMENDATION]` Stated explicitly, because the absences are design
 decisions:

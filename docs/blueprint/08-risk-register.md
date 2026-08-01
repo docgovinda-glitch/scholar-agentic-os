@@ -292,20 +292,56 @@ rules that changed after their build shipped.
 of the application ([20](./20-admin-platform.md) §8), with a supported minimum
 and in-client upgrade prompts.
 
-### R-20 · Readability refinement drifts toward evasion · **Medium × High**
+### R-20 · Quality commitment drifts toward detector tuning · **Medium × High**
 
-`[OBSERVED]` This has already happened once here — detection-evasion prompt
-language was found in `aiService.ts` and removed, and `humanizeSkill.ts` exists.
+`[RECOMMENDATION]` Humanized output is now a locked product commitment
+([C-06](./11-requirements-conflicts.md#c-06--output-quality-and-disclosure-control--resolved-by-owner-decision)),
+delivered through voice learning from the author's own writing.
 
-`[INFERRED]` The pressure recurs whenever a user asks why their text still
-"sounds like AI". Yielding would destroy the product's central claim and
-contradict a stated requirement.
+`[INFERRED]` The risk is not the commitment but its drift: when a user asks why
+their text still "reads like AI", the shortest path is to start measuring
+against a detector. That path is fragile — classifier behaviour changes without
+notice, so quality tuned to it degrades silently and the product's central
+claim ends up resting on a third party's model.
 
-**Signal:** any prompt, test, or metric referencing detection tools or
-"undetectable"; any request to benchmark against a detector.
+`[OBSERVED]` The drift has occurred here before: detection-evasion prompt
+language was found in `aiService.ts` and removed.
 
-**Mitigation:** `[RECOMMENDATION]` The four constraints in
-[18](./18-finalisation-export.md) §2, and no third-party humanizer dependency.
+**Signal:** any prompt, test, metric, or roadmap item referencing detection
+tools, detector scores, or "undetectable"; any request to benchmark against a
+classifier.
+
+**Mitigation:** `[RECOMMENDATION]` The two constraints in
+[18](./18-finalisation-export.md) §2 — meaning never altered, no detector
+targeting — and no third-party humanizer dependency. `[INFERRED]` Voice learned
+from the author is a stable target the product controls; a classifier is not.
+
+### R-24 · Local setup abandonment · **High × Medium**
+
+`[INFERRED]` Local inference is what makes the product free and private — the
+two properties the cost-constrained student segment cares about most. A setup
+flow that loses users forfeits both, and the users least able to self-serve are
+exactly the ones the widened audience adds.
+
+**Signal:** local-setup funnel drop-off; users on managed allowance exhaustion
+who do not convert to local or BYOK.
+
+**Mitigation:** `[RECOMMENDATION]` [22](./22-local-setup.md) — capability
+detection before recommendation, bundled runtime where possible, honest speed
+reporting, and never leaving a user without a working fallback.
+
+### R-25 · Notification channel loses trust · **Medium × Medium**
+
+`[INFERRED]` Admin-pushed notifications ([20](./20-admin-platform.md) §9) are
+the only channel for policy-change and security notices. If it carries
+marketing or over-sends, users mute it — and the security notices go with it.
+
+**Signal:** rising per-category opt-out rates; falling read rates on
+`important` and `critical`.
+
+**Mitigation:** `[RECOMMENDATION]` Operational categories only, per-audience
+send caps, confirmation above a threshold, and an opt-out floor that keeps only
+critical security notices non-silenceable.
 
 ### R-21 · Admin platform erodes the local-first boundary · **Medium × High**
 

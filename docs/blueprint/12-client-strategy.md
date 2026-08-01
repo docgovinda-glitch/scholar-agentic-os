@@ -61,7 +61,7 @@ No wizard flow after onboarding.
 
 | Capability | Rationale |
 |---|---|
-| **Local inference** | Ollama, LM Studio, custom endpoints. `[OBSERVED]` 11 local runners already catalogued. Zero marginal cost, full confidentiality, offline. |
+| **Local inference** | Ollama, LM Studio, custom endpoints. `[OBSERVED]` 11 local runners already catalogued. Zero marginal cost, full confidentiality, offline. Setup is assisted end-to-end — [22](./22-local-setup.md). |
 | **Hardware-aware model selection** | Recommends models the machine can actually run. `[OBSERVED]` `src/ai/hardware` exists but is unreachable — a candidate for adoption. |
 | **Filesystem-native library** | Watch a folder; ingest as files arrive; no upload step. |
 | **Bulk ingestion** | Hundreds of PDFs in one pass, using local CPU. |

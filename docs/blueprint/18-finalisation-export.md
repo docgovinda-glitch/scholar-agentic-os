@@ -12,53 +12,76 @@ proposals the user accepts or rejects. None applies silently.
 | Stage | Does | Never does |
 |---|---|---|
 | Language refinement | Grammar, punctuation, academic register, clarity | Change what a claim asserts |
-| **Readability & voice** | Flow, sentence variety, remove mechanical repetition, align register to venue | **Target AI detectors** (§2) |
+| **Voice & refinement** | Flow, sentence variety, remove model tells, match the author's learned voice | **Target AI detectors** (§2) |
 | Formatting | Apply venue rule pack: styles, margins, headings, numbering | Alter content |
 | Consistency | Terminology, citation style, heading depth, tense, spelling variant | Resolve ambiguity unilaterally |
 | Structure review | Sections and word budgets vs. output type | Reorganise without approval |
 | Plagiarism awareness | Unattributed quotation, near-duplication of approved sources | Report a similarity score (§3) |
-| Disclosure | Derive the statement from the ledger | Understate or omit AI involvement |
+| Disclosure | Derive an accurate statement **if the user opts in** (§4) | Overstate or understate what the ledger records |
 
-`[RECOMMENDATION]` Every stage writes a ledger entry. `[INFERRED]` A
-readability pass *is* AI assistance; omitting it from the record would make the
-disclosure understate the AI's role — precisely the misrepresentation
-requirement #8 prohibits.
+`[RECOMMENDATION]` Every stage writes a ledger entry, including voice
+refinement. `[INFERRED]` The ledger is the user's own complete record; whether
+any of it is *published* as a disclosure is a separate, user-controlled
+decision (§4).
 
 ---
 
-## 2. Readability and voice — scope and boundary
+## 2. Output quality — humanized by default
 
-Resolves [C-06](./11-requirements-conflicts.md#c-06--internal-conflict-in-the-requirements-completely-humanized-vs-no-detection-evasion).
+Settled by owner decision; see
+[C-06](./11-requirements-conflicts.md#c-06--output-quality-and-disclosure-control--resolved-by-owner-decision).
 
-**What it does.** Improves prose quality: varies sentence length and opening
-structure, removes mechanical repetition and filler, aligns register to the
-target venue, improves paragraph transitions.
+`[RECOMMENDATION]` **Natural, human-quality prose is the default state of all
+output, not an optional pass.** There is no "raw model output" mode. Every
+drafted section passes through voice refinement before the user sees it.
 
-**Four hard constraints:**
+### Voice learning
 
-1. Every pass is recorded in the ledger as an AI edit.
-2. Refined text remains covered by the disclosure statement. Refinement never
-   removes an AI contribution from the record.
-3. No detector targeting — no evaluation against AI-detection tools, no prompts
-   framed around evasion, no "make this undetectable" affordance.
-4. Substantive claims are never altered. A refinement that changes meaning is a
-   bug, and comparison tooling exists to catch it.
+`[RECOMMENDATION]` The system learns the author's academic voice from material
+they supply — prior drafts, published work, submitted coursework, thesis
+chapters — and writes in it.
 
-`[RECOMMENDATION]` The phrase *"completely humanized"* is **not used** in
-product or documentation. `[INFERRED]` It is false as stated — the output is
-AI-assisted and declared as such. What improves is readability.
+`[OBSERVED]` `PaperProject.styleLearningEnabled` already exists. This decision
+makes it central rather than an option.
 
-`[OBSERVED]` This is not hypothetical: the repository already contains
-`humanizeSkill.ts`, and its own record documents detection-evasion prompt
-language being found in `aiService.ts` and removed. The constraint exists
-because the failure has occurred here before.
+Learned characteristics: sentence length distribution and rhythm · preferred
+connectives and transitions · hedging strength (*"suggests"* vs *"demonstrates"*)
+· terminology and preferred synonyms · paragraph length and argument shape ·
+citation density and integration style (integral vs. parenthetical).
 
-**On third-party "humanizer" packages** `[RECOMMENDATION]`: not specified as a
-dependency. `[INFERRED]` The widely available packages in this category are
-detection-evasion tools, which constraint 3 rules out; and an arbitrary
-third-party repository in the path that touches every manuscript is a
-supply-chain risk disproportionate to the benefit. The capability is a
-prompt-and-rules skill inside the system, where its behaviour is auditable.
+`[RECOMMENDATION]` The voice profile is **tier 1 data** — derived on the
+device, stored locally, never transmitted
+([21](./21-data-and-security.md)). `[INFERRED]` It is among the most personally
+identifying artifacts the system holds; a writing fingerprint is not something
+to sync casually.
+
+`[RECOMMENDATION]` With no corpus supplied, the system falls back to
+discipline-appropriate academic register and says so — *"Writing in general
+academic style. Add samples of your writing to match your voice."*
+
+### Refinement
+
+Applied continuously, not as a final step: sentence variety, natural
+transitions, removal of mechanical repetition and model tells, register
+alignment to the venue, and consistency with the learned voice.
+
+### Two constraints
+
+`[RECOMMENDATION]`
+
+1. **Meaning is never altered.** Refinement changes expression, never the
+   claim. Comparison tooling exists to verify this, and a refinement that
+   changes meaning is a defect.
+2. **No detector targeting.** No evaluation against AI-detection tools, no
+   prompts framed around evasion, no detector score surfaced or optimised
+   against.
+
+`[INFERRED]` The second constraint serves the quality commitment rather than
+qualifying it. Detector behaviour changes without notice and is outside the
+product's control; a system tuned to it degrades silently as classifiers
+change. Voice learned from the author is a stable target that improves with
+use. The stronger claim — *"this reads like you, because it learned how you
+write"* — is also the more durable one.
 
 ---
 
@@ -84,22 +107,28 @@ similarity check."*
 
 ---
 
-## 4. Disclosure
+## 4. Disclosure — user-controlled
 
-`[RECOMMENDATION]` **Derived from the ledger, never typed by the user.**
+Settled by owner decision; see
+[C-06](./11-requirements-conflicts.md#c-06--output-quality-and-disclosure-control--resolved-by-owner-decision).
 
-`[OBSERVED]` Today `aiUseDisclosure.disclosureText` is text the user confirms —
-an assertion. Derivation converts it into an audit trail, which is the
-institutional value identified in [04](./04-market-position.md).
+`[RECOMMENDATION]` **Declining is the default. Declaring is one action away.
+Output quality is identical either way.**
 
-### Derivation
+`[INFERRED]` The last clause matters most. If declaring produced worse prose,
+the choice would be coerced. Refinement and disclosure operate on different
+things — expression and attribution — so they are independent by construction.
+
+### If the user chooses to declare
+
+`[RECOMMENDATION]` The statement is **derived from the ledger, never typed.**
 
 ```
 1  Read ledger entries for this manuscript
-2  Group by model, by task, by section
+2  Group by model, task, and section
 3  Apply the venue's disclosure template and placement
-4  Present for review — user may edit or decline
-5  Record the outcome
+4  Present for review — user may edit
+5  Record the choice
 ```
 
 Illustrative output:
@@ -109,24 +138,44 @@ Illustrative output:
 >
 > During the preparation of this work the author used Claude (Opus 5) to draft
 > initial text in the Introduction and Discussion sections, and Gemini 2.5 Pro
-> to summarise 14 approved sources supporting the Literature Review. A
-> readability pass was applied to the Discussion. All AI-generated content was
-> reviewed and edited by the author, who takes full responsibility for the
-> content of the publication.
+> to summarise 14 approved sources supporting the Literature Review. All
+> AI-generated content was reviewed and edited by the author, who takes full
+> responsibility for the content of the publication.
 
-`[RECOMMENDATION]` Accuracy in both directions. Overstating is as wrong as
-understating — a statement claiming AI drafted sections the user wrote
-themselves misrepresents authorship just as much.
+`[RECOMMENDATION]` Accuracy runs both ways. Overstating misrepresents
+authorship as much as understating — a statement claiming AI drafted sections
+the author wrote is equally wrong.
 
-`[RECOMMENDATION]` **User-controlled**, per requirement #8: the user may edit
-the derived text or decline disclosure entirely. Declining is recorded and
-export proceeds without it. `[INFERRED]` The system's role is to make accurate
-disclosure easy and correct, not to compel it.
+`[OBSERVED]` Placement comes from the venue rule pack. Elsevier requires the
+declaration at the end of the manuscript, immediately above the references,
+under a specific title; the current implementation already does this for one
+publisher, and the rule pack generalises it.
 
-`[OBSERVED]` Placement comes from the venue rule pack — Elsevier requires it at
-the end of the manuscript, immediately above the references, under a specific
-title. The current implementation already does this for one publisher; the rule
-pack generalises it.
+### If the user declines
+
+`[RECOMMENDATION]` Export proceeds with no disclosure section. The choice is
+recorded locally. Prose is unchanged.
+
+`[RECOMMENDATION]` Where the venue rule pack marks disclosure **mandatory**,
+the readiness view states the obligation plainly and offers the derived
+statement:
+
+> *This venue requires an AI-use declaration. You have chosen not to include
+> one. → Add declaration*
+
+`[INFERRED]` Advisory, never blocking. The system cannot enforce a third
+party's rule on its own user, and attempting to would be both unenforceable and
+outside its authority. Informing the user is the honest limit of what it can
+do — and it is what COPE and ICMJE mean by responsibility remaining with the
+author.
+
+### The ledger is unaffected
+
+`[RECOMMENDATION]` Provenance is recorded regardless of disclosure choice.
+`[INFERRED]` It is the *user's own* record: it drives revision history,
+comparison, and the provenance report, and it means a user who later decides to
+declare — or whose supervisor asks — can produce an accurate statement instead
+of reconstructing one from memory. Tier 1, local, never transmitted.
 
 ---
 

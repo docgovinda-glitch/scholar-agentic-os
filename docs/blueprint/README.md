@@ -16,9 +16,14 @@ conflict with the original, **[11](./11-requirements-conflicts.md) is
 authoritative.**
 
 Read [11](./11-requirements-conflicts.md) first. It records eight conflicts,
-the alternatives considered, and the recommendation for each — including one
-conflict *internal to the requirements themselves* (C-06) that is resolved on
-its merits rather than by picking a side.
+the alternatives considered, and the resolution for each.
+
+**C-06 is settled by owner decision** (2026-08-01): humanized output is locked
+as the default and is not a toggle; style is learned from the author's own
+writing; disclosure is optional and user-initiated, with output quality
+identical either way. The single retained constraint is that the system does
+not target AI detectors — see
+[18](./18-finalisation-export.md) §2.
 
 ## Why this exists
 
@@ -74,6 +79,7 @@ is traceable to a file, a symbol, or a re-runnable command.
 | 19 | [Agent Architecture](./19-agent-architecture.md) | Multi-agent design and adaptive control (#10) |
 | 20 | [Administrator Platform](./20-admin-platform.md) | Operations within the data boundary (#11) |
 | 21 | [Data and Security](./21-data-and-security.md) | Local-first residency and security (#12, #13) |
+| 22 | [Assisted Local Setup](./22-local-setup.md) | Guided local model/agent install, seamless integration |
 
 **Execution**
 

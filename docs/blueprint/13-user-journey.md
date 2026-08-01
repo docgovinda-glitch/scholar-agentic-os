@@ -101,6 +101,11 @@ tier limits.
   a slower onramp.
 - **Desktop offers local first**, web does not offer it at all
   ([12](./12-client-strategy.md)).
+- **Anything requiring a download is handled by the system, not the user.**
+  `[RECOMMENDATION]` Where a local model or runtime would improve output, the
+  wizard detects what the machine can run, explains the benefit in plain terms,
+  installs what it can, and verifies with a real generation — never "go install
+  X". Full flow in [22](./22-local-setup.md).
 
 ---
 
