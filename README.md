@@ -41,7 +41,7 @@ See `docs/architecture/02-Scholar-System-Architecture.md` for the current verifi
 
 ## Getting Started
 
-**Prerequisites**: Node.js v18+
+**Prerequisites**: Node.js v20+
 
 ```bash
 npm install
