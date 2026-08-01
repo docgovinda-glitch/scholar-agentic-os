@@ -1,5 +1,10 @@
 # 10 — Contributor Guide
 
+> **Revised 2026-08-01** for the product revision requirements. Where this
+> document conflicts with them, [11 — Requirements Conflict Analysis]
+> (./11-requirements-conflicts.md) is authoritative. See also documents
+> 12–21 for the product and system design they specify.
+
 How to work on this codebase without repeating the mistakes it already made.
 Written from observed failures, not from general best practice.
 

@@ -1,5 +1,10 @@
 # 08 — Risk Register
 
+> **Revised 2026-08-01** for the product revision requirements. Where this
+> document conflicts with them, [11 — Requirements Conflict Analysis]
+> (./11-requirements-conflicts.md) is authoritative. See also documents
+> 12–21 for the product and system design they specify.
+
 What can kill this, and the observable signal that says it is happening.
 
 `[RECOMMENDATION]` Every risk carries an **early-warning signal** — something
@@ -235,6 +240,111 @@ stricter than `npm run build` and was not run locally.
 
 **Mitigation:** `[RECOMMENDATION]` Required status check plus pre-commit hook —
 Stage 0 of [07](./07-roadmap.md).
+
+---
+
+## Revision-driven risks
+
+Introduced by the scope in [11](./11-requirements-conflicts.md) and documents
+12–21.
+
+### R-17 · Breadth dilutes the product · **High × Medium**
+
+`[INFERRED]` Four degree levels and a dozen-plus output types
+([14](./14-output-catalog.md)) is a far wider surface than the original
+single-workflow product. The failure mode is a system that serves every level
+adequately and none well.
+
+**Signal:** completion rates diverging sharply by degree level; support load
+concentrated in one segment.
+
+**Mitigation:** `[RECOMMENDATION]` C-01's resolution — depth stays in the
+engine, breadth lives in rule packs and output definitions, which are editorial
+work. If breadth starts requiring *engine* changes per level, the resolution has
+failed and should be revisited.
+
+### R-18 · Two clients diverge · **High × High**
+
+`[OBSERVED]` The repository already contains five duplicated-concept failures
+because nothing prevented a second implementation. Two independent clients
+multiply that risk structurally.
+
+`[INFERRED]` The specific danger is gate divergence: a manuscript that passes on
+desktop and fails on web destroys trust in the compliance claim, which is the
+product.
+
+**Signal:** any gate-parity test failure; any capability appearing in one client
+without an entry in the [12](./12-client-strategy.md) §4 register.
+
+**Mitigation:** `[RECOMMENDATION]` Shared domain core as a hard boundary,
+gate-parity asserted by test, feature differences declared rather than emergent.
+
+### R-19 · Desktop distribution and update lag · **Medium × Medium**
+
+`[INFERRED]` Web releases are server-controlled; desktop users may run old
+versions indefinitely. A publisher policy change must reach users in days, and
+a desktop release cycle cannot guarantee that.
+
+**Signal:** version telemetry showing a long tail on old builds; users hitting
+rules that changed after their build shipped.
+
+**Mitigation:** `[RECOMMENDATION]` Rule packs version and ship **independently**
+of the application ([20](./20-admin-platform.md) §8), with a supported minimum
+and in-client upgrade prompts.
+
+### R-20 · Readability refinement drifts toward evasion · **Medium × High**
+
+`[OBSERVED]` This has already happened once here — detection-evasion prompt
+language was found in `aiService.ts` and removed, and `humanizeSkill.ts` exists.
+
+`[INFERRED]` The pressure recurs whenever a user asks why their text still
+"sounds like AI". Yielding would destroy the product's central claim and
+contradict a stated requirement.
+
+**Signal:** any prompt, test, or metric referencing detection tools or
+"undetectable"; any request to benchmark against a detector.
+
+**Mitigation:** `[RECOMMENDATION]` The four constraints in
+[18](./18-finalisation-export.md) §2, and no third-party humanizer dependency.
+
+### R-21 · Admin platform erodes the local-first boundary · **Medium × High**
+
+`[INFERRED]` Every conventional admin need — support access, content
+moderation, debugging a user's problem — pushes toward reading user data. Each
+individually looks reasonable; together they would make the local-first promise
+false.
+
+**Signal:** any admin feature request requiring visibility into tier 1 or 2
+data; any support process that asks users to send their manuscript.
+
+**Mitigation:** `[RECOMMENDATION]` The explicit "cannot do" table in
+[20](./20-admin-platform.md) §10, published as a user-facing guarantee — which
+makes erosion a visible broken promise rather than a quiet drift.
+
+### R-22 · Prompt injection through uploaded sources · **Medium × Medium**
+
+`[INFERRED]` The system's core function is feeding user-supplied documents to
+inference. A PDF containing text aimed at the model is a realistic vector, and
+source volume only grows.
+
+**Signal:** anomalous agent output; instructions appearing in generated text.
+
+**Mitigation:** `[RECOMMENDATION]` Sources are data, never instructions; the
+approval gate limits exposure to material a human chose; all output is
+reviewed before entering the manuscript. `[INFERRED]` This reduces but does not
+eliminate the risk.
+
+### R-23 · Evaluation sandbox becomes a data back door · **Low × High**
+
+`[INFERRED]` Pre-release evaluation ([20](./20-admin-platform.md) §7) needs
+realistic fixtures, and the most realistic fixtures are real user manuscripts —
+which the architecture promises never to transmit.
+
+**Signal:** any proposal to source evaluation fixtures from user data without
+explicit per-user consent.
+
+**Mitigation:** `[RECOMMENDATION]` Synthetic or explicitly consented material
+only, stated as a constraint on the sandbox rather than a policy preference.
 
 ---
 

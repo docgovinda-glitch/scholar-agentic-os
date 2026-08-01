@@ -3,6 +3,10 @@
 Reconstructed from the codebase at `main` (`4e46f2f`), 2026-08-01. No prior
 documentation was used as evidence.
 
+**Revised** to incorporate the product revision requirements. Where this
+summary conflicts with the original reconstruction,
+[11](./11-requirements-conflicts.md) records the conflict and its resolution.
+
 ---
 
 ## What was found
@@ -50,15 +54,29 @@ assistant.
 
 ## What the product actually is
 
-`[INFERRED]` A **zero-backend-cost, offline-capable manuscript production line
-that turns a finished thesis into a submittable journal package, and enforces
-the evidence-approval and AI-disclosure rules publishers now require.**
+`[INFERRED]` What the code builds today is a **zero-backend-cost,
+offline-capable manuscript production line that turns a finished thesis into a
+submittable journal package, and enforces the evidence-approval and
+AI-disclosure rules publishers now require.**
 
 Not an AI research assistant. `[OBSERVED]` The distinctive machinery is
 refusal, not generation: unapproved sources cannot enter AI context or a
 bibliography (four independent call sites), export is gated on confirmed
 disclosure, and phases cannot be entered out of order. A tool built primarily
 to write would implement none of these.
+
+**Revised target** `[RECOMMENDATION]`: an **AI-native academic operating
+system** serving undergraduate through PhD students across a dozen-plus output
+types — thesis, dissertation, journal article, conference paper, literature
+review, proposal, coursework, policy paper, and more
+([14](./14-output-catalog.md)) — while preserving human authorship as the
+organising constraint.
+
+`[INFERRED]` The widening does **not** dilute the position, because the
+compliance engine does not care whether the governing rules come from Elsevier
+or an undergraduate handbook. Both are *a venue with rules*. Breadth multiplies
+the rule packs and output definitions — editorial work — not the engine. See
+[C-01](./11-requirements-conflicts.md#c-01--audience-narrow-segment-vs-all-degree-levels).
 
 Full reasoning in [03](./03-product-definition.md).
 
@@ -133,16 +151,18 @@ wedge, then rebuild the core.**
 
 | Stage | Purpose | Exit criterion |
 |---|---|---|
-| **0** Stop the bleeding | Duplicated UI, dead code, citation tests, CI enforcement | No user-visible defects; one provider abstraction |
-| **1** Prove the wedge | Venue rules as data; instrument gates; **user research** | Evidence that disclosure compliance is valued |
-| **2** Provenance core | Block/claim model, ledger, evidence graph | Disclosure derived, not asserted |
-| **3** Multi-device | Encrypted sync, block-level merge | Two devices, no server-side plaintext |
-| **4** Scale readiness | Distributed limits, quota, static/API split | Load evidence at target scale |
-| **5** Ecosystem | Venue rule packs, import adapters, plugins | Third-party rule pack without app changes |
+| **0** Stop the bleeding | Duplicated UI, dead code, citation tests, CI enforcement, **telemetry, RLS audit** | No user-visible defects; usage measurable |
+| **1** Output-first foundation | Output catalogue + venue rules as data; readiness view; revised onboarding; **user research at every degree level** | An undergraduate and a PhD candidate each reach a compliant export |
+| **2** Provenance core | Block/claim model, ledger, evidence graph, derived disclosure | Disclosure derived, not asserted |
+| **3** Clients and collaboration | Desktop + web as independent products; encrypted sync; async review | Two devices, no server-side plaintext; supervisor review works |
+| **4** Agents and administration | Agent contracts; admin platform; evaluation sandbox | Every agent has a consumer; candidates promote without changing a gate |
+| **5** Scale and ecosystem | Distributed limits, quota, contributions, imports | Load evidence; third-party rule pack without app changes |
 
-`[RECOMMENDATION]` Stage 1 gates Stage 2 deliberately. If research contradicts
-the wedge, stop and revisit the product definition rather than pushing through
-— Stage 2 is expensive and entirely predicated on it.
+`[RECOMMENDATION]` Stage 1 gates Stage 2 deliberately. `[INFERRED]` The
+validation question matters *more* after the audience widened — a PhD candidate
+submitting to Elsevier has an obvious reason to care about disclosure; a
+second-year undergraduate may not. A negative result there changes which
+features lead, not whether to proceed.
 
 ---
 

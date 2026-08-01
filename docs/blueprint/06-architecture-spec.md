@@ -1,5 +1,10 @@
 # 06 — Architecture Specification
 
+> **Revised 2026-08-01** for the product revision requirements. Where this
+> document conflicts with them, [11 — Requirements Conflict Analysis]
+> (./11-requirements-conflicts.md) is authoritative. See also documents
+> 12–21 for the product and system design they specify.
+
 Module contracts, data flow, and control flow for the target system in
 [05](./05-target-blueprint.md). Implementation-agnostic: shapes and
 responsibilities, not code.

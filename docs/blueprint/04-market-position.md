@@ -1,5 +1,10 @@
 # 04 — Market Position
 
+> **Revised 2026-08-01** for the product revision requirements. Where this
+> document conflicts with them, [11 — Requirements Conflict Analysis]
+> (./11-requirements-conflicts.md) is authoritative. See also documents
+> 12–21 for the product and system design they specify.
+
 External research, conducted August 2026. Sources listed at the end. Combined
 with the product reading in [03](./03-product-definition.md).
 

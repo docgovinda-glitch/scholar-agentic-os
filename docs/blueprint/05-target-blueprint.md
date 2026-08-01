@@ -1,5 +1,10 @@
 # 05 — Target Blueprint
 
+> **Revised 2026-08-01** for the product revision requirements. Where this
+> document conflicts with them, [11 — Requirements Conflict Analysis]
+> (./11-requirements-conflicts.md) is authoritative. See also documents
+> 12–21 for the product and system design they specify.
+
 A redesign, not a refactor. Assumes a multi-year horizon and 100,000+ users.
 
 Depends on the strategic choice in [03 §Strategic tension](./03-product-definition.md)

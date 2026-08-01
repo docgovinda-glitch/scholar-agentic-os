@@ -1,5 +1,10 @@
 # 03 — Product Definition
 
+> **Revised 2026-08-01** for the product revision requirements. Where this
+> document conflicts with them, [11 — Requirements Conflict Analysis]
+> (./11-requirements-conflicts.md) is authoritative. See also documents
+> 12–21 for the product and system design they specify.
+
 What this software *is*, derived from what it does. Product claims made in
 prior documents were not used as input.
 

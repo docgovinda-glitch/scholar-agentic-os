@@ -1,5 +1,10 @@
 # 02 — Engineering Assessment
 
+> **Revised 2026-08-01** for the product revision requirements. Where this
+> document conflicts with them, [11 — Requirements Conflict Analysis]
+> (./11-requirements-conflicts.md) is authoritative. See also documents
+> 12–21 for the product and system design they specify.
+
 Unsparing evaluation. Evidence in [01](./01-system-inventory.md).
 
 ---
