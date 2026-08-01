@@ -56,7 +56,9 @@ async function loadPdfMake() {
     // throws "File 'data/Times-Bold.afm' not found in virtual file system"
     // (or the Helvetica equivalent) the first time a run in that font is
     // measured.
+    // @ts-ignore — pdfmake fonts don't have type declarations
     import("pdfmake/build/standard-fonts/Times.js"),
+    // @ts-ignore — pdfmake fonts don't have type declarations
     import("pdfmake/build/standard-fonts/Helvetica.js"),
   ]);
   return { pdfMake, timesFontContainer, helveticaFontContainer };

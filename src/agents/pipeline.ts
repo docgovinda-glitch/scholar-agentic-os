@@ -125,8 +125,8 @@ export async function runResearchPipeline(
   if (!plannerResult.ok) errors.push({ agentId: "research-planner", message: plannerResult.error?.message ?? "Unknown error" });
   if (!literatureResult.ok) errors.push({ agentId: "literature-review", message: literatureResult.error?.message ?? "Unknown error" });
 
-  const researchPlan = plannerResult.ok ? plannerResult.data : null;
-  const literatureReview = literatureResult.ok ? literatureResult.data : null;
+  const researchPlan: ResearchPlan | null = plannerResult.ok ? plannerResult.data ?? null : null;
+  const literatureReview: LiteratureReview | null = literatureResult.ok ? literatureResult.data ?? null : null;
 
   const knowledgeGapResult = await executor.execute(
     new KnowledgeGapAgent(),
@@ -135,7 +135,7 @@ export async function runResearchPipeline(
     { maxRetries: 1 }
   );
   if (!knowledgeGapResult.ok) errors.push({ agentId: "knowledge-gap", message: knowledgeGapResult.error?.message ?? "Unknown error" });
-  const knowledgeGapReport = knowledgeGapResult.ok ? knowledgeGapResult.data : null;
+  const knowledgeGapReport: KnowledgeGapReport | null = knowledgeGapResult.ok ? knowledgeGapResult.data ?? null : null;
 
   const researchQuestionResult = await executor.execute(
     new ResearchQuestionAgent(),
@@ -144,7 +144,7 @@ export async function runResearchPipeline(
     { maxRetries: 1 }
   );
   if (!researchQuestionResult.ok) errors.push({ agentId: "research-question", message: researchQuestionResult.error?.message ?? "Unknown error" });
-  const researchQuestionReport = researchQuestionResult.ok ? researchQuestionResult.data : null;
+  const researchQuestionReport: ResearchQuestionReport | null = researchQuestionResult.ok ? researchQuestionResult.data ?? null : null;
 
   const methodologyResult = await executor.execute(
     new MethodologyAdvisorAgent(),
@@ -157,7 +157,7 @@ export async function runResearchPipeline(
     { maxRetries: 1 }
   );
   if (!methodologyResult.ok) errors.push({ agentId: "methodology-advisor", message: methodologyResult.error?.message ?? "Unknown error" });
-  const methodologyReport = methodologyResult.ok ? methodologyResult.data : null;
+  const methodologyReport: MethodologyReport | null = methodologyResult.ok ? methodologyResult.data ?? null : null;
 
   const statisticalResult = await executor.execute(
     new StatisticalAnalysisAdvisor(),
@@ -169,7 +169,7 @@ export async function runResearchPipeline(
     { maxRetries: 1 }
   );
   if (!statisticalResult.ok) errors.push({ agentId: "statistical-analysis-advisor", message: statisticalResult.error?.message ?? "Unknown error" });
-  const statisticalAnalysisReport = statisticalResult.ok ? statisticalResult.data : null;
+  const statisticalAnalysisReport: StatisticalAnalysisReport | null = statisticalResult.ok ? statisticalResult.data ?? null : null;
 
   const manuscriptText = Object.values(project.sections || {}).filter(Boolean).join("\n\n") || undefined;
 
@@ -194,7 +194,7 @@ export async function runResearchPipeline(
     { maxRetries: 1 }
   );
   if (!integrityResult.ok) errors.push({ agentId: "integrity-reviewer", message: integrityResult.error?.message ?? "Unknown error" });
-  const integrityReviewReport = integrityResult.ok ? integrityResult.data : null;
+  const integrityReviewReport: IntegrityReviewReport | null = integrityResult.ok ? integrityResult.data ?? null : null;
 
   return {
     researchPlan,

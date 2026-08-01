@@ -272,7 +272,7 @@ export class IntegrityReviewerSkill implements Skill<IntegrityReviewerInput, Int
         id: "ip-placeholder-1",
         severity: "high",
         category: "integrity",
-        description: `Found ${placeholderMatches.length} leftover placeholder/scaffold marker(s) in the manuscript text (e.g. "${placeholderMatches[0].slice(0, 80)}").`,
+        description: `Found ${placeholderMatches.length} leftover placeholder/scaffold marker(s) in the manuscript text (e.g. "${placeholderMatches[0]?.slice(0, 80) ?? '...'}").`,
         recommendation: "Replace all placeholder text with real drafted content before submission.",
       });
     }

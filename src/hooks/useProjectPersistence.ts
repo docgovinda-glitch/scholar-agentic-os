@@ -26,7 +26,7 @@ export function useProjectPersistence(
   setAllProjects: React.Dispatch<React.SetStateAction<PaperProject[]>>,
   allProjects: PaperProject[],
   setViewMode: React.Dispatch<React.SetStateAction<"dashboard" | "workspace">>,
-  setActiveTab: React.Dispatch<React.SetStateAction<string>>
+  setActiveTab: React.Dispatch<React.SetStateAction<"workspace" | "vault" | "agents" | "publishing" | "citation" | "settings" | "profile">>
 ): UseProjectPersistenceResult {
   // Fixes a real race: updateProject() used to close over the `project`
   // argument from the render that created it. Two updateProject() calls in

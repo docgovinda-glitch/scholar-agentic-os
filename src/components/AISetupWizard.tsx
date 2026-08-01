@@ -159,7 +159,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     const detectLocal = async () => {
       try {
         const results = await AIGateway.detectLocalServers();
-        const autoSelected = [];
+        const autoSelected: string[] = [];
         if (results.ollama.status === 'online') autoSelected.push('ollama');
         if (results.custom.status === 'online') autoSelected.push('custom');
         if (results.omniroute.status === 'online') autoSelected.push('omniroute');

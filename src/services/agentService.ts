@@ -28,6 +28,7 @@ import {
 } from "../agents/index";
 import { SkillRegistry } from "../skills/registry";
 import { runSkill as runRegisteredSkill } from "../skills/executor";
+import type { Skill } from "../skills/types";
 import { ResearchPlanningSkill } from "../skills/researchPlanningSkill";
 import { LiteratureReviewSkill } from "../skills/literatureReviewSkill";
 import { KnowledgeGapSkill } from "../skills/knowledgeGapSkill";
@@ -59,7 +60,7 @@ skillRegistry.register(new MethodologyAdvisorSkill());
 skillRegistry.register(new StatisticalAnalysisSkill());
 skillRegistry.register(new IntegrityReviewerSkill());
 skillRegistry.register(new ManuscriptWriterSkill());
-skillRegistry.register(new HumanizeSkill());
+skillRegistry.register(new HumanizeSkill() as Skill<unknown, unknown>);
 
 /** The one real AgentContext builder — real runSkill wired to the same SkillRegistry
  *  every agent uses. Exported so src/agents/pipeline.ts (the multi-agent orchestrator)

@@ -15,7 +15,8 @@
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "types": ["jest", "node"],
+    "strict": true,
+    "types": ["node"],
     "paths": {
       "@/*": [
         "./*"
@@ -24,5 +25,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["supabase/functions", "dist", "node_modules"]
+  "exclude": ["supabase/functions", "dist", "node_modules", "**/__tests__/**"]
 }

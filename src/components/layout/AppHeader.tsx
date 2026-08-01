@@ -209,7 +209,7 @@ export default function AppHeader({
       )}
 
       {/* Status bar — only in workspace view */}
-      {viewMode === "workspace" && (
+      {viewMode === "workspace" && project && (
       <div className="chrome-dark px-6 py-2 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono text-[#94A3B8] gap-2">
         <div className="flex items-center gap-4 flex-wrap">
           <span className="flex items-center gap-1 text-[#E2E8F0]">
