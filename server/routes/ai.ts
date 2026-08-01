@@ -1,28 +1,373 @@
 import express from "express";
+import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
-import { rateLimit } from "../src/middleware/rateLimit.js";
-import { resolveApiKey } from "../utils/apiKeyCrypto.js";
-import {
-  generateWithSettings,
-  selectGeminiKey,
-  getGeminiClient,
-  generateContentWithRetry,
-  cleanJsonString,
-  requestCache,
-  CACHE_TTL_MS,
-  getCacheKey,
-  sendCachedJson,
-} from "../services/aiService.js";
+import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "../../src/citation_compliance/model/reference.ts";
+import { CitationStyleRegistry, CitationFormatterFactory } from "../../src/citation_compliance/formattingEngine.ts";
+import { getCloudProvider, chatUrl, buildAuthHeaders, type CloudProviderSpec } from "../../src/config/providerCatalog.ts";
 
-const aiAbuseLimit = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  limitBy: "ip",
-});
+// ==========================================
+// GLOBAL STATE
+// ==========================================
 
-const router = express.Router();
+// Local request memory cache
+const requestCache = new Map<string, { timestamp: number; response: any }>();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache expiration
 
-router.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
+let requestCount = 0;
+
+// ==========================================
+// HELPER FUNCTIONS
+// ==========================================
+
+function selectGeminiKey(clientKey?: string): string {
+  if (clientKey && clientKey !== "defined_on_server" && clientKey !== "") {
+    return clientKey;
+  }
+  const keys = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_BACKUP || process.env.GEMINI_API_KEY_2
+  ].filter(Boolean) as string[];
+
+  if (keys.length === 0) return "";
+
+  const selected = keys[requestCount % keys.length];
+  requestCount++;
+  return selected;
+}
+
+function isSafeOutboundBaseUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) return false;
+  if (host === "[::1]" || host === "::1") return false;
+
+  // Literal IPv4 addresses in private / link-local / loopback ranges.
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if (a === 127 || a === 10 || a === 0) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 192 && b === 168) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+  }
+  return true;
+}
+
+function resolveProviderChatUrl(spec: CloudProviderSpec, baseUrlOverride?: string): string | null {
+  if (baseUrlOverride && isSafeOutboundBaseUrl(baseUrlOverride)) {
+    return chatUrl(spec, baseUrlOverride);
+  }
+  // Providers whose catalog entry has no base URL (Cloudflare) are unusable
+  // without a valid override — better an explicit error than a request to "".
+  if (!spec.baseUrl) return null;
+  return chatUrl(spec);
+}
+
+function openAICompatibleBody(
+  spec: CloudProviderSpec,
+  opts: {
+    model?: string;
+    systemInstruction?: string;
+    prompt: string;
+    temperature?: number;
+    stream?: boolean;
+  }
+): string {
+  return JSON.stringify({
+    model: opts.model || spec.defaultModel,
+    messages: [
+      { role: "system", content: opts.systemInstruction || "You are a helpful assistant." },
+      { role: "user", content: opts.prompt },
+    ],
+    temperature: opts.temperature ?? 0.5,
+    ...(opts.stream ? { stream: true } : {}),
+  });
+}
+
+function resolveApiKey(provider: string, apiKey: string, username?: string): string {
+  let activeApiKey = apiKey;
+  if ((!activeApiKey || activeApiKey === "defined_on_server" || activeApiKey === "") && username) {
+    // Note: in production this would need access to decryptServerKey and users DB
+    // For now, this is a placeholder
+  }
+  return activeApiKey;
+}
+
+// Helper to initialize Gemini API Client safely (Lazy Initialization pattern)
+function getGeminiClient() {
+  const apiKey = selectGeminiKey();
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY environment variable is not defined pin the Secrets panel.");
+  }
+  return new GoogleGenAI({
+    apiKey: apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
+      },
+    },
+  });
+}
+
+// Automatic backoff and retry helper for Gemini API calls to safeguard against transient 503/429 errors
+async function generateContentWithRetry(
+  aiClient: any,
+  params: {
+    model: string;
+    contents: any;
+    config?: any;
+  },
+  maxRetries = 4,
+  initialDelayMs = 1500
+): Promise<any> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await aiClient.models.generateContent(params);
+    } catch (error: any) {
+      attempt++;
+      const errorMessage = error.message || "";
+      const errorStatus = error.status || error.code || 0;
+
+      const isTransient =
+        errorStatus === 503 ||
+        errorStatus === 429 ||
+        errorStatus === 504 ||
+        errorMessage.includes("503") ||
+        errorMessage.includes("429") ||
+        errorMessage.includes("high demand") ||
+        errorMessage.includes("UNAVAILABLE") ||
+        errorMessage.includes("RESOURCE_EXHAUSTED") ||
+        errorMessage.includes("overloaded") ||
+        errorMessage.includes("transient");
+
+      if (isTransient && attempt < maxRetries) {
+        // Exponential backoff with jitter (e.g. attempt 1: ~1.5s, 2: ~3s, 3: ~6s)
+        const delay = initialDelayMs * Math.pow(2, attempt - 1) * (0.85 + Math.random() * 0.3);
+        console.warn(`[Gemini API] Transient error encountered (status: ${errorStatus}, msg: ${errorMessage}). Retrying attempt ${attempt}/${maxRetries} in ${Math.round(delay)}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // If we ran out of retries or it's not a transient error, propagate it
+      console.error(`[Gemini API] API call failed definitely on attempt ${attempt}. Error:`, error);
+      throw error;
+    }
+  }
+}
+
+// Helper to clean JSON strings returned by local models which might be wrapped in markdown code blocks
+function cleanJsonString(text: string): string {
+  let cleaned = text.trim();
+  // Strip Markdown code block syntax if present
+  if (cleaned.startsWith("```json")) {
+    cleaned = cleaned.substring(7);
+  } else if (cleaned.startsWith("```")) {
+    cleaned = cleaned.substring(3);
+  }
+  if (cleaned.endsWith("```")) {
+    cleaned = cleaned.substring(0, cleaned.length - 3);
+  }
+  return cleaned.trim();
+}
+
+// Unified function to handle content generation based on the selected AI provider
+async function generateWithSettings(params: {
+  systemInstruction: string;
+  prompt: string;
+  temperature: number;
+  responseMimeType?: string;
+  aiSettings?: any;
+}): Promise<string> {
+  const provider = params.aiSettings?.provider || "gemini";
+
+  if (provider === "gemini") {
+    const ai = getGeminiClient();
+    const response = await generateContentWithRetry(ai, {
+      model: "gemini-3.5-flash",
+      contents: params.prompt,
+      config: {
+        systemInstruction: params.systemInstruction,
+        responseMimeType: params.responseMimeType,
+        temperature: params.temperature,
+      }
+    });
+    return response.text?.trim() || "";
+  }
+
+  if (provider === "ollama") {
+    const endpoint = params.aiSettings?.ollamaEndpoint || "http://localhost:11434";
+    const model = params.aiSettings?.ollamaModel || "llama3";
+
+    let fullPrompt = params.prompt;
+    if (params.responseMimeType === "application/json") {
+      fullPrompt += "\n\nIMPORTANT: Return strictly valid JSON only. Do not wrap it in markdown code blocks like ```json or anything else. Just the raw JSON string.";
+    }
+
+    console.log(`[Ollama Generation] URL: ${endpoint}/api/chat, Model: ${model}`);
+    const response = await fetch(`${endpoint}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: "system", content: params.systemInstruction },
+          { role: "user", content: fullPrompt }
+        ],
+        stream: false,
+        options: {
+          temperature: params.temperature
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "Unknown error");
+      throw new Error(`Ollama connection failed (status ${response.status}): ${errText}`);
+    }
+
+    const data: any = await response.json();
+    let text = data.message?.content || "";
+    if (params.responseMimeType === "application/json") {
+      text = cleanJsonString(text);
+    }
+    return text.trim();
+  }
+
+  if (provider === "custom") {
+    const endpoint = params.aiSettings?.customEndpoint || "http://localhost:1234/v1";
+    const model = params.aiSettings?.customModel || "llama3";
+
+    let fullPrompt = params.prompt;
+    if (params.responseMimeType === "application/json") {
+      fullPrompt += "\n\nIMPORTANT: Return strictly valid JSON only. Do not wrap it in markdown code blocks like ```json or anything else. Just the raw JSON string.";
+    }
+
+    const cleanEndpoint = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
+    const url = `${cleanEndpoint}/chat/completions`;
+    console.log(`[Custom local AI Generation] URL: ${url}, Model: ${model}`);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: "system", content: params.systemInstruction },
+          { role: "user", content: fullPrompt }
+        ],
+        temperature: params.temperature
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "Unknown error");
+      throw new Error(`Custom local server connection failed (status ${response.status}): ${errText}`);
+    }
+
+    const data: any = await response.json();
+    let text = data.choices?.[0]?.message?.content || "";
+    if (params.responseMimeType === "application/json") {
+      text = cleanJsonString(text);
+    }
+    return text.trim();
+  }
+
+  throw new Error(`Unsupported AI provider: ${provider}`);
+}
+
+function getCacheKey(body: any): string {
+  const str = JSON.stringify({
+    provider: body.provider,
+    model: body.model,
+    systemInstruction: body.systemInstruction,
+    prompt: body.prompt,
+    temperature: body.temperature,
+    responseMimeType: body.responseMimeType
+  });
+  return crypto.createHash("sha256").update(str).digest("hex");
+}
+
+const sendCachedJson = (res: any, cacheKey: string, payload: any) => {
+  requestCache.set(cacheKey, { timestamp: Date.now(), response: payload });
+  return res.json(payload);
+};
+
+function resolveCitationStyleId(desiredStyle: string | undefined): string {
+  const normalized = (desiredStyle || "").toLowerCase();
+  if (normalized.includes("apa")) return "apa-7";
+  if (normalized.includes("ieee")) return "ieee";
+  if (normalized.includes("mla")) return "mla-9";
+  if (normalized.includes("chicago")) return "chicago-author-date";
+  if (normalized.includes("harvard")) return "harvard";
+  if (normalized.includes("vancouver")) return "vancouver";
+  return "apa-7";
+}
+
+function toPlainCitationText(citation: string): string {
+  return citation
+    .replace(/\*/g, "")
+    .replace(/\s+([.,;:])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function extractedMetadataToReference(meta: any, sourceType: string | undefined): CanonicalReference {
+  const kindMap: Record<string, ReferenceKind> = {
+    "journal article": "JournalArticle",
+    "book": "Book",
+    "website": "Website",
+    "report": "TechnicalReport",
+    "thesis/dissertation": "Dissertation",
+  };
+  const kind = kindMap[(sourceType || "").toLowerCase()] ?? "JournalArticle";
+
+  // Split on "&"/"and" first (these separate distinct authors), then parse
+  // each segment as either "Last, First" or "First Last" - a bare comma
+  // split would incorrectly treat "Smith, J. A." as two separate authors.
+  const authorSegments = String(meta?.author || "")
+    .split(/\s*(?:&|,?\s+and)\s*/i)
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+  const authors: ReferenceAuthor[] = authorSegments.map((segment: string, order: number) => {
+    if (segment.includes(",")) {
+      const [last, firstAndMiddle] = segment.split(",").map((p) => p.trim());
+      const [firstName, ...middleParts] = (firstAndMiddle || "").split(/\s+/).filter(Boolean);
+      return { firstName: firstName || "", middleName: middleParts.join(" ") || undefined, lastName: last || segment, order };
+    }
+    const parts = segment.split(/\s+/);
+    const lastName = parts.pop() || segment;
+    return { firstName: parts.join(" "), lastName, order };
+  });
+
+  return {
+    kind,
+    title: meta?.title || "Untitled",
+    authors,
+    source: meta?.publisherOrJournal || "",
+    journal: kind === "JournalArticle" ? meta?.publisherOrJournal : undefined,
+    publisher: kind !== "JournalArticle" ? meta?.publisherOrJournal : undefined,
+    doi: meta?.doiOrUrl,
+    url: meta?.doiOrUrl,
+    year: meta?.year,
+    publicationDate: meta?.year,
+  };
+}
+
+// ==========================================
+// ROUTE HANDLERS
+// ==========================================
+
+export function registerAIRoutes(app: express.Express, aiAbuseLimit: any, citationStyleRegistry: CitationStyleRegistry): void {
+  // SSE Streaming Generation Proxy
+  app.post("/api/stream-generate", aiAbuseLimit, async (req, res) => {
   try {
     const { provider, apiKey, model, systemInstruction, prompt, temperature, responseMimeType, username } = req.body;
     if (!prompt) {
