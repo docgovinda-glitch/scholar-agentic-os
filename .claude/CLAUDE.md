@@ -27,7 +27,7 @@ Scholar is intended to become an AI-native operating system for research and sch
 
 The system acts as a scholarly research collaborator, proposing structural improvements while maintaining strict adherence to academic standards and Vedic Samhitas alignment where applicable.
 
-**Note**: this 10-phase model is defined in `src/lifecycle/ResearchLifecycleEngine.ts`, but that module isn't imported anywhere else in the codebase. The live UI runs a separate, lettered phase model (`"A" | "B" | ... | "I"`, with `G1`/`G2` sub-phases) defined in `src/types.ts` and referenced throughout `src/components/` and `src/services/aiService.ts`. See `.claude/HANDOVER.md` §3 ("Research Lifecycle") for the mapping before assuming a "phase" reference means the 10-phase list above.
+**Note**: this 10-phase model is aspirational — it describes the product vision, not a module in the codebase. It was previously defined in `src/lifecycle/ResearchLifecycleEngine.ts`, which was **deleted in Phase 0** (commit `4afb6c8`) as unwired dead code; see `docs/adr/ADR-0012-KernelModuleRemoval.md`. The only phase model that actually executes is the lettered one (`"A" | "B" | ... | "I"`, with `G1`/`G2` sub-phases) defined in `src/types.ts` and referenced throughout `src/components/` and `src/services/aiService.ts`. Assume a "phase" reference means the lettered model unless stated otherwise; see `.claude/HANDOVER.md` §3 ("Research Lifecycle") for the mapping.
 
 ---
 
@@ -37,7 +37,8 @@ The system acts as a scholarly research collaborator, proposing structural impro
 - ✅ Phase 1-5: Implemented
 - ✅ Phase 6: Document Intelligence in progress
 - ⏳ Phase 7-10: Planned
-- ⚠️ Only `src/ai` (AIKernel) is consumed outside its own module (by `src/research`). `KnowledgeKernel`, `WritingKernel`, `PublicationKernel`, `WorkspaceKernel`, and `CollaborationKernel`, plus `src/orchestrator` and `src/agents`, are implemented but not imported by `server.ts` or the React app (`src/App.tsx`, `src/components/`) — treat them as standalone library code, not as active parts of the running product, until something wires them in.
+- ⚠️ **The unwired kernel modules no longer exist.** `KnowledgeKernel`, `WritingKernel`, `PublicationKernel`, `WorkspaceKernel`, `CollaborationKernel`, `src/orchestrator` (the full workflow-orchestration package), and `src/lifecycle` were **deleted in Phase 0** (commit `4afb6c8`): 46 files, 8,303 lines, with zero importers outside their own directories. Rationale, restore instructions, and the case for reinstating them are in `docs/adr/ADR-0012-KernelModuleRemoval.md`. Do not write code against these APIs — recover them from git history first if they're wanted back.
+- The surviving library modules are `src/ai` (AIKernel — consumed by `src/research`), `src/research`, and `src/agents`. `src/agents` is real and live: it's reached from the UI via `src/services/agentService.ts` and `AgentOrchestrationDashboard.tsx`.
 
 ### Architecture Status
 - ✅ Multi-provider AI integration — 26 cloud providers and 9 local runners, defined once in `src/config/providerCatalog.ts` and `src/config/localRunnerCatalog.ts` and consumed by both the browser bundle and `server.ts`. Adding a provider is one catalog entry; do NOT add a new adapter or a new `if (aiProvider === ...)` branch (see `docs/adr/ADR-0011-AIProviderCatalogAndVault.md`)
@@ -69,7 +70,8 @@ The system acts as a scholarly research collaborator, proposing structural impro
 - ✅ Tailwind CSS v4 integration
 
 ### Test Status
-- ✅ Test runner: **Vitest** (`npm test` / `npm run test:coverage`), not Jest — 107 test files, 1207 tests, all passing as of 2026-08-01 (run `npm test` to reconfirm). jsdom suites must wire localStorage themselves via the `Object.defineProperty(globalThis, "localStorage", ...)` preamble used across the existing suites; `fake-indexeddb/auto` is available for IndexedDB-backed code
+- ✅ Test runner: **Vitest** (`npm test` / `npm run test:coverage`), not Jest — 106 test files, 1104 tests, all passing as of 2026-08-01 (run `npm test` to reconfirm). The drop from 1207 is the orchestrator suite deleted in Phase 0, not lost coverage of live code. jsdom suites must wire localStorage themselves via the `Object.defineProperty(globalThis, "localStorage", ...)` preamble used across the existing suites; `fake-indexeddb/auto` is available for IndexedDB-backed code
+- ⚠️ **CI gates on `npm run lint` (`tsc --noEmit`), which is stricter than `npm run build`.** Vite transpiles without full type-checking, so a green build does **not** mean a green CI. Always run `npm run lint` before pushing — several commits were merged red because only `build` and `test` were checked locally.
 
 ---
 

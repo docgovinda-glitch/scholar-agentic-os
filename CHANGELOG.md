@@ -1,5 +1,84 @@
 # CHANGELOG - Scholar Agentic Operating System
 
+## Unreleased — Phase 0-2: foundation, storage lift, submission workflow (2026-08-01)
+
+Merged via PRs #1, #2, #3. **Not deployed** — the repo has no deployment
+pipeline; `.github/workflows/ci.yml` runs type-check, tests, build, and a
+bundle-size check only.
+
+### Added
+
+- **Hybrid browser persistence** (`src/services/storageService.ts`) — IndexedDB
+  primary with automatic, silent `localStorage` fallback, lifting the ~5 MB
+  `localStorage` ceiling that blocked multi-document work. Compression above
+  100 KB with a self-describing `z1:` prefix; `migrateToHybridStorage()` moves
+  existing profiles across on first run. See
+  `docs/adr/ADR-0013-HybridBrowserStorage.md`.
+- **Multi-document type system** (`src/types/documentTypes.ts`,
+  `DocumentTypeSelector.tsx`) — 10 academic document types with per-type
+  metadata, section sets, word-count targets, and quality gates. Wired into
+  Phase A intake and the QC suite.
+- **Sci-fi UI foundation** (`src/components/SciFiComponents.tsx`) — 10 reusable
+  components (Spinner, PhaseIndicator, GlassmorphicCard, ProgressBar,
+  StatusIndicator, LoadingSkeleton, ProcessingOverlay, NeonButton, GlowBox,
+  PhaseBadge) plus supporting animations in `src/index.css`. Design record in
+  `docs/design/PHASE1_UI_REDESIGN.md`.
+- **Research materials approval workflow** (`DataSourceApprovalPanel.tsx`) —
+  filterable, expandable approval gate for Phase C data sources.
+- **Agent Orchestration Dashboard** (`AgentOrchestrationDashboard.tsx`) —
+  surfaces all 7 research agents with input-availability gating, per-agent
+  status, and overall progress.
+- **Submission workflow suite** (Phase 2) — `src/types/submissionTypes.ts`
+  (submission records across 8 states, reviewer comments, response drafts,
+  cover-letter templates, 7 readiness quality gates) plus four UI components:
+  `CoverLetterGenerator`, `SubmissionChecklistBuilder`, `SubmissionTracker`,
+  and `ReviewerResponseManager`.
+- **GitHub Actions CI** (`.github/workflows/ci.yml`) — type-check, test, build,
+  bundle-size, on Node 20.x and 22.x.
+- **Global test cleanup** (`src/testSetup.ts`) — registers
+  `@testing-library/react`'s `cleanup()` in `afterEach` via vitest
+  `setupFiles`.
+
+### Changed
+
+- Strict TypeScript enforcement; `server.ts` decomposed into route modules.
+- `useProjectPersistence.ts` is now async, matching the new storage API.
+- `DocumentExportPipeline.tsx` delegates to the existing, tested
+  `documentExportService.ts` rather than reimplementing PDF/DOCX generation.
+
+### Removed
+
+- **46 files, 8,303 lines of unwired code** — `src/orchestrator`,
+  `src/knowledge`, `src/lifecycle`, `src/publication`, `src/writing`,
+  `src/collaboration`, `src/workspace`. Zero importers outside their own
+  directories at the time of deletion. Test count 1207 → 1104; the entire delta
+  is the deleted orchestrator suite, not lost coverage of live code.
+  Rationale, restore instructions, and revisit criteria in
+  `docs/adr/ADR-0012-KernelModuleRemoval.md`. **This shipped in Phase 0 without
+  an ADR** — documented retroactively.
+
+### Fixed
+
+- CI Node matrix corrected 18.x → 20.x/22.x; PBKDF2 salt passed as `Uint8Array`
+  rather than via an unnecessary `ArrayBuffer` conversion.
+- Missing `default` exports on five lazy-loaded Phase 2 components, which broke
+  `React.lazy()` under `tsc --noEmit`.
+- `loadAllProjects()` could `setState` after unmount; now guarded by a
+  `cancelled` flag set in the effect's cleanup.
+- `AIControlCenter.step5Tabs.test.tsx` clicked the Refresh button while it was
+  still `disabled` mid-scan, so the click was a no-op and the assertion
+  compared a count to itself. Now waits for the mount-time scan to finish.
+
+### Known gaps
+
+- **Not deployed.** No hosting pipeline exists.
+- **Duplication, unresolved**: `CoverLetterGenerator`,
+  `SubmissionChecklistBuilder`, and part of `SubmissionTracker` overlap
+  functionality already present in `SubmissionPackagingSuite.tsx` (cover-letter
+  generation, pre-flight checklist, single-submission status tracking). Both
+  are live in the Publishing tab. Consolidation is an open decision.
+- Persistence is single-device; clearing browser data destroys projects.
+
 ## Unreleased — correctness-bug sweep, doc reconciliation (2026-08-01)
 
 ### Investigated
