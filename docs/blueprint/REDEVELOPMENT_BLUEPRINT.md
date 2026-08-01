@@ -665,9 +665,11 @@ Human approval gates: add approval-status UI to sections (timestamp, edit histor
 
 Mandatory user backup flow: daily auto-backup export wizard, clear-cache warning UX, restore-from-backup flow, storage quota tracking.
 
-**Deliverables**: Users can safely backup/restore and understand localStorage limits; storage capacity 50+ MB practical ceiling.
-**Risks**: IndexedDB migration, performance on compress/decompress.
-**Exit criteria**: Vault files successfully split; 0 data-loss incidents in internal testing; approve/edit history UI complete.
+Sci-Fi UI/UX Completion: transform Scholar from standard academic tool to immersive sci-fi workspace (Blade Runner/Tron aesthetic). Complete partial v3 transition: dark form inputs with glowing focus states, glassmorphism on all cards (frosted-glass + neon borders), phase progression timeline with animated nodes, sci-fi data visualization (glowing charts), mobile optimization (reduced blur, 44px+ touch targets, vertical layouts), WCAG AA accessibility (4.5:1 contrast, visible focus, motion preferences respected). Differentiator: users feel like operating "future-tech research instrument."
+
+**Deliverables**: Users can safely backup/restore and understand localStorage limits; storage capacity 50+ MB practical ceiling; UI transformed to sci-fi aesthetic (all forms glowing, all cards holographic, all animations fluid).
+**Risks**: IndexedDB migration, performance on compress/decompress, UI/UX scope creep, mobile optimization performance (backdrop-filter blur).
+**Exit criteria**: Vault files successfully split; 0 data-loss incidents in internal testing; approve/edit history UI complete; all forms dark + glowing, all cards glassmorphic, phase timeline animated, mobile-optimized (44px+ targets, prefers-reduced-motion respected), WCAG AA contrast verified.
 
 ---
 
@@ -806,8 +808,9 @@ Mobile web polish.
 | 11 | Type-specific quality checks | L | Assignment: rubric scoring; Lab: data accuracy; Proposal: feasibility assessment |
 | 12 | Guidance system (tooltips + wizards) | M | Help text for every setting, interactive wizards (citation style finder, rubric creator) |
 | 13 | Research Materials & Inputs (approval-based, optional user input) | L | User optionally inputs research outline, primary/secondary data, sources (only if they have/want); Scholar autonomously finds materials regardless; all materials (user/Scholar) require explicit user approval before Scholar cites them; Phase H verifies all materials approved before submission |
+| 14 | Sci-Fi UI/UX Completion (desktop + mobile, glassmorphism, glowing forms, animations) | L | Complete partial v3 transition: dark form inputs, glassmorphism cards, phase timeline animation, sci-fi data visualization, mobile optimization; transforms Scholar from standard academic tool to next-generation immersive workspace (Blade Runner/Tron aesthetic); competitive differentiator |
 
-**Phase 1 Phase 1.13: Research Materials & Inputs (Weeks 4–7) — Optional User Input, Mandatory Approval for All Materials**
+**Phase 1 Item 1.13: Research Materials & Inputs (Weeks 4–7) — Optional User Input, Mandatory Approval for All Materials**
 
 *Status: Core integrity feature; binding requirement that ALL materials (user-provided or Scholar-discovered) require manual user approval before inclusion. User input is optional: if user has data/sources, they can provide; otherwise, Scholar finds autonomously.*
 
@@ -864,6 +867,65 @@ Can be revoked by user anytime
 **M1 Exit**: Vault split complete, backup flows work, 0 data-loss incidents in testing, document type selector live, 3+ types fully functional (journal, assignment, lab report), Research Materials & Inputs end-to-end working (user inputs → Scholar recommends → user approves → Scholar cites approved only → Phase H verifies).
 
 **Note**: Phase 1 extends from 4–6 weeks to 6 weeks to accommodate multi-type implementation + Research Materials & Inputs (added ~3 weeks effort, fits within 6-week window with parallel execution).
+
+---
+
+**Phase 1 Item 1.14: Sci-Fi UI/UX Completion (Weeks 5–8, overlaps Phase 1) — Immersive Aesthetic Transformation**
+
+*Status: High-impact differentiator; completes partial sci-fi v3 transition; transforms user experience from "standard academic tool" to "next-generation research workspace."*
+
+**Design**: Transform Scholar's UI from standard SaaS aesthetic to immersive sci-fi (Blade Runner, Tron, Neuromancer inspiration). Complete partial v3 transition (dark navy surfaces + luminous blue accents already in place; forms/components/mobile/animations not yet done). Goal: every interactive surface glows, every card feels holographic, every action feels like controlling a future-tech instrument.
+
+**Components** (10 days, ~1,500 lines CSS/React):
+
+- **Form Inputs: Dark + Glowing** (1 day, ~200 lines): Replace white/grey form backgrounds with dark navy + glowing focus state. Inputs: `background: rgba(3, 8, 16, 0.6)`, `border: 1px solid rgba(59, 156, 255, 0.3)`, on focus: `border-color: #3B9CFF`, `box-shadow: 0 0 12px rgba(59, 156, 255, 0.4)`. Apply to all text inputs, textareas, selects across desktop + mobile.
+
+- **Card Glassmorphism** (1 day, ~200 lines): Convert all `.card`, `.panel`, `.container` components to glassmorphism: `background: rgba(10, 23, 43, 0.85)`, `backdrop-filter: blur(12px)`, `border: 1px solid rgba(59, 156, 255, 0.2)`, `box-shadow: 0 8px 32px rgba(59, 156, 255, 0.1)`. On hover: increase glow intensity. Affects: research intake cards, phase panels, vault browser, editor sidebar.
+
+- **Buttons: Neon Glow + Glitch Effects** (1 day, ~300 lines): Primary CTA buttons: gold gradient `linear-gradient(135deg, #E0A83D 0%, #D99E2E 100%)` with glow shadow on hover. Secondary buttons: transparent background + luminous-blue border + glow. Add subtle glitch effect on hover (clipped text layer with slight offset). Apply across all CTAs, phase navigation, approval buttons.
+
+- **Phase Progression Timeline** (2 days, ~400 lines JSX/CSS): Replace text-based phase gating with animated timeline visualization. Shows phase nodes (active = blue glow + pulse, completed = green checkmark, locked = greyed). Animated track connecting nodes. Implements: `.timeline-node` with CSS states, `.node-pulse` keyframe animation, `.timeline-track` gradient line. Desktop: horizontal bar; mobile: vertical stack.
+
+- **Data Visualization: Sci-Fi Charts** (1 day, ~300 lines): Convert progress bars, metrics displays to neon-styled charts. Bars: gradient `linear-gradient(to top, rgba(59, 156, 255, 0.8)...)` + glow on hover + subtle scan-line effect overlay. Applies to: storage quota bar, word count progress, phase completion %, approval coverage tracking.
+
+- **Mobile Optimization** (2 days, ~400 lines): Reduce `backdrop-filter: blur()` to 6px on mobile (performance). Increase touch targets to 44px+ (buttons, inputs). Stack timeline vertically instead of horizontal. Full-width cards (no multi-column). Respect `prefers-reduced-motion` (disable blur/pulse if user prefers). Test on iOS Safari + Chrome Android.
+
+- **Accessibility: Contrast + Focus** (1 day, ~100 lines): Ensure WCAG AA contrast (≥4.5:1 on all text). Visible focus rings (luminous-blue 2px ring on all interactive elements). No color-only status indication (use icons + color). Test with axe DevTools, keyboard nav, screen reader (VoiceOver/NVDA).
+
+- **Color Tokens + CSS Variables** (0.5 day, ~50 lines): Add to `src/index.css`: `--color-glow-blue`, `--color-glow-blue-intense`, `--color-neon-edge`, `--glass-blur`, `--glass-blur-mobile`, `--shadow-glow-sm/md/lg`. Ref these throughout to ensure consistency.
+
+- **Component Conversions** (checklist, parallel with above):
+  - AppHeader: ✓ glass chrome (done in v3)
+  - AppFooter: ✓ glass chrome (done in v3)
+  - Research intake wizard: dark forms + glass panels (this phase)
+  - Manuscript editor: glass-frosted panels + neon dividers (this phase)
+  - QC suite: glass cards + neon status indicators (this phase)
+  - Citation center: dark inputs + glow on selection (this phase)
+  - Phase timeline: animated nodes + pulse (this phase)
+  - Modals/overlays: glass background + neon border (this phase)
+  - Alerts/notifications: neon border + toast-style (this phase)
+  - Charts/progress: sci-fi bars + scan effects (this phase)
+
+- **Tests: Visual + Functional** (0.5 day, ~50 lines): Snapshot tests for timeline animation. Functional tests: form inputs glow on focus, buttons have hover glow, accessibility props present. Visual regression: Chromatic or manual screenshots (desktop 1920px, tablet 768px, mobile 375px).
+
+**Design Principles**:
+
+1. **No Light Theme Flash**: Use `prefers-color-scheme: dark` default or CSS-in-JS to lock dark mode at load (no white flash on page load).
+2. **Glassmorphism Everywhere**: Cards are transparent + blurred background, not opaque blocks. Creates illusion of holographic displays.
+3. **Glowing Interactive Elements**: Buttons, inputs, and timeline nodes glow on interaction (hover/focus). Glow intensity reflects importance (CTAs > secondary actions).
+4. **Mobile ≠ Desktop Lite**: Reduced blur, vertical layouts, touch-friendly targets, but still sci-fi (neon borders still glow, cards still glass).
+5. **Accessibility First**: Glows supplement color; focus visible; motion respectable; 4.5:1 contrast minimum.
+
+**Competitive Advantage**:
+
+Competitors (Jenni, Paperpal, Consensus): generic SaaS design (flat, minimalist, boring light-only theme).
+Scholar after completion: immersive sci-fi aesthetic (Blade Runner/Tron), premium feel, mobile-optimized without losing appeal, accessibility baked in. Users feel like they're operating "future-tech research instrument," not filling a form.
+
+**Fits in Phase 1 timeline**: ✓ Yes (6 weeks total; this is weeks 5–8, runs in parallel with other Phase 1 items; overlaps final week of Materials item).
+
+**M1 Exit**: Vault split complete, backup flows work, 0 data-loss incidents in testing, document type selector live, 3+ types fully functional (journal, assignment, lab report), Research Materials & Inputs end-to-end working, **Sci-Fi UI/UX complete** (all forms dark + glowing, all cards glassmorphic, phase timeline animated, mobile optimized, WCAG AA contrast verified).
+
+**Note**: Phase 1.14 effort (~10 days) overlaps Phase 1.13 (weeks 5–8 vs 4–7), requiring one developer focusing on UI/UX while another completes Materials logic. Both ship in Phase 1.
 
 ---
 
