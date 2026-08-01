@@ -73,7 +73,14 @@ describe("AIControlCenter — Local Models tab", () => {
 
   it("Refresh button re-runs real health checks for every backend", async () => {
     renderAndGoTo("Local Models");
-    await waitFor(() => expect(healthCheckProviderMock).toHaveBeenCalled());
+    // Wait for the mount-time scan to FINISH, not merely to start. Refresh is
+    // disabled={scanningLocalBackends} while a scan is in flight, so clicking
+    // it mid-scan is a silent no-op and the call count never moves — the test
+    // then fails as "expected N to be greater than N". Waiting only for
+    // toHaveBeenCalled() resolved on the scan's first health check, leaving
+    // the rest of that same scan (and the disabled button) in flight: a real
+    // race that surfaced as an intermittent CI failure on Node 20.x.
+    await waitFor(() => expect(screen.getByText("Refresh")).toBeEnabled());
     const callsBefore = healthCheckProviderMock.mock.calls.length;
 
     fireEvent.click(screen.getByText("Refresh"));
