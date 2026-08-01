@@ -43,6 +43,7 @@ const ProfileSettings = lazy(() => import("./components/ProfileSettings"));
 const CoverLetterGenerator = lazy(() => import("./components/CoverLetterGenerator"));
 const SubmissionChecklistBuilder = lazy(() => import("./components/SubmissionChecklistBuilder"));
 const DocumentExportPipeline = lazy(() => import("./components/DocumentExportPipeline"));
+const SubmissionTracker = lazy(() => import("./components/SubmissionTracker"));
 
 // Icons
 // (Sparkles, GraduationCap, BookOpen, Trash2, LogOut, LayoutDashboard, ArrowLeft
@@ -587,6 +588,49 @@ function App() {
                       submissionPack: {
                         ...(project.submissionPack || {}),
                         checklists: checklist
+                      } as any
+                    });
+                  }}
+                />
+              </div>
+              <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
+                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
+                  Submission Tracker
+                </h2>
+                <SubmissionTracker
+                  submissions={(project.submissionPack as any)?.submissions || []}
+                  onAddSubmission={(submission) => {
+                    const newSubmission: any = {
+                      id: Math.random().toString(36).substr(2, 9),
+                      ...submission,
+                      statusUpdatedAt: new Date().toISOString()
+                    };
+                    const submissions = [(project.submissionPack as any)?.submissions || [], newSubmission].flat();
+                    updateProject({
+                      submissionPack: {
+                        ...(project.submissionPack || {}),
+                        submissions
+                      } as any
+                    });
+                  }}
+                  onUpdateSubmission={(id, update) => {
+                    const submissions = ((project.submissionPack as any)?.submissions || []).map((s: any) =>
+                      s.id === id ? { ...s, ...update, statusUpdatedAt: new Date().toISOString() } : s
+                    );
+                    updateProject({
+                      submissionPack: {
+                        ...(project.submissionPack || {}),
+                        submissions
+                      } as any
+                    });
+                  }}
+                  onDeleteSubmission={(id) => {
+                    const submissions = ((project.submissionPack as any)?.submissions || []).filter((s: any) => s.id !== id);
+                    updateProject({
+                      submissionPack: {
+                        ...(project.submissionPack || {}),
+                        submissions
                       } as any
                     });
                   }}
