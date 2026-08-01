@@ -657,7 +657,7 @@ Three Tier 1 storage improvements (§5.B):
 
 Multi-document-type system: document type selector (10 types), type-specific input forms, type-specific workflow phases, type-specific quality checks, guidance system (tooltips + wizards).
 
-Research Materials & Inputs: user inputs research outline, primary/secondary data, literature; Scholar recommends sources → user explicitly approves → Scholar cites only approved materials; Phase H compliance verifies all materials approved before submission.
+Research Materials & Inputs: user CAN input research outline, primary/secondary data, literature (optional); Scholar autonomously finds/recommends sources → user explicitly approves → Scholar cites only approved materials; Phase H compliance verifies all materials approved before submission. User input skipped if user doesn't have data/materials.
 
 Humanization setup: research GitHub repo candidates (`jeannie-ai/jeannie-humanizer`, etc.), plan integration points.
 
@@ -803,34 +803,38 @@ Mobile web polish.
 | 10 | Type-specific workflow phases | M | Show/hide phases based on document type (e.g., skip "Data Analysis" for term papers) |
 | 11 | Type-specific quality checks | L | Assignment: rubric scoring; Lab: data accuracy; Proposal: feasibility assessment |
 | 12 | Guidance system (tooltips + wizards) | M | Help text for every setting, interactive wizards (citation style finder, rubric creator) |
-| 13 | Research Materials & Inputs (approval-based) | L | User inputs research outline, primary/secondary data, sources; Scholar recommends → user approves → Scholar cites approved only; Phase H verifies all materials approved before submission |
+| 13 | Research Materials & Inputs (approval-based, optional user input) | L | User optionally inputs research outline, primary/secondary data, sources (only if they have/want); Scholar autonomously finds materials regardless; all materials (user/Scholar) require explicit user approval before Scholar cites them; Phase H verifies all materials approved before submission |
 
-**Phase 1 Phase 1.13: Research Materials & Inputs (Weeks 4–7) — Mandatory User Approval for All Scholar-Added Materials**
+**Phase 1 Phase 1.13: Research Materials & Inputs (Weeks 4–7) — Optional User Input, Mandatory Approval for All Materials**
 
-*Status: Core integrity feature; binding requirement that Scholar-added materials require manual user approval before inclusion.*
+*Status: Core integrity feature; binding requirement that ALL materials (user-provided or Scholar-discovered) require manual user approval before inclusion. User input is optional: if user has data/sources, they can provide; otherwise, Scholar finds autonomously.*
+
+**Design**: User inputs research materials ONLY if they have them or want to contribute. If no user input → Scholar autonomously searches, finds, and recommends → user still must approve each before use.
 
 **Components** (17 days, ~2,500 lines):
-- **UI: Research Outline Editor** (1 day): Rich text editor for research questions, hypotheses, arguments
-- **UI: Primary Data Uploader** (1 day): File upload with metadata, preview, Scholar analysis requests
-- **UI: Secondary Data Manager** (1 day): External datasets with approval workflow for Scholar recommendations
-- **UI: Source Library Core** (3 days): List/filter/sort/edit sources by status (approved/pending/rejected); tags, relevance scores
-- **UI: Approval Workflow** (2 days): Approve/reject/ask-more buttons; Scholar explains relevance and reasoning
-- **UI: Constraints Display** (1 day): Auto-populated from rubric/document type; coverage tracking dashboard
-- **Service: Materials Storage** (1 day): localStorage/IndexedDB persistence for all material types
+- **UI: Research Outline Editor** (optional, 1 day): Rich text editor for user to describe research questions, hypotheses, arguments (optional; Scholar can infer from document type + rubric)
+- **UI: Primary Data Uploader** (optional, 1 day): File upload for user's experiments/surveys/observations; grayed out if user has no data (Scholar skips this phase if not needed)
+- **UI: Secondary Data Manager** (1 day): Display Scholar-recommended external datasets with approval workflow; user can also add their own
+- **UI: Source Library Core** (3 days): List/filter/sort/edit sources by status (approved/pending/rejected); Scholar's autonomous recommendations + user-provided sources merged in same interface
+- **UI: Approval Workflow** (2 days): Approve/reject/ask-more buttons; Scholar explains why it recommends each source (relevance score, abstract, journal)
+- **UI: Constraints Display** (1 day): Auto-populated from rubric/document type; coverage tracking dashboard (what's required, what's approved, what's still needed)
+- **Service: Materials Storage** (1 day): localStorage/IndexedDB persistence for all material types (user-provided + Scholar-recommended)
 - **Service: Coverage Checker** (1 day): Validates all required materials (from rubric/type) are approved before submission
-- **Service: Scholar Integration** (2 days): When Scholar finds sources (Phase C–E), add to "pending approval" (never auto-include)
+- **Service: Scholar Integration** (2 days): When Scholar autonomously finds sources (Phase C–E), add to "pending approval" (never auto-include); works regardless of user input
 - **Service: Approval Enforcement** (1 day): Scholar agent only cites sources with `status = 'approved'`; blocks citations to pending/rejected
-- **Tests: Approval workflow** (1 day): Verify Scholar respects approval status; test rejection/revocation flows
+- **Tests: Approval workflow** (1 day): Verify Scholar respects approval status; test rejection/revocation flows; test with/without user input
 - **Tests: Coverage validation** (1 day): Verify Phase H catches missing materials, type-specific requirements
-- **Integration w/ Multi-Type** (1 day): Type-specific material requirements (rubric extracts constraints; lab reports auto-populate data fields; proposals auto-populate feasibility checks)
-- **Documentation** (0.5 day): User guide, in-app help, integrity guarantee messaging
+- **Integration w/ Multi-Type** (1 day): Type-specific material requirements (rubric extracts constraints; lab reports auto-populate data fields IF user provides; proposals auto-populate feasibility requirements)
+- **Documentation** (0.5 day): User guide clarifying which inputs are optional, how Scholar works autonomously if user skips input, integrity guarantee messaging
 
-**Approval Workflow**:
-1. **Scholar recommends** → All recommended sources/data marked `status = 'pending'` (never auto-approved)
-2. **User reviews** → Reads abstract, checks journal/date/relevance, decides: approve/reject/need-more-info
-3. **Scholar cites approved only** → During draft generation, Scholar only includes `status = 'approved'` materials
-4. **Phase H compliance** → Before submission, verifies: all sources in paper are approved, all required materials present, no Scholar-added materials without explicit user approval
-5. **User can revoke anytime** → Changing `status = 'approved'` → `'rejected'` removes citations from draft; audit trail maintained
+**Approval Workflow** (works with or without user input):
+1. **User provides materials (optional)** → User can input research outline, upload primary data, add literature if they have it. OR user skips this and lets Scholar find everything.
+2. **Scholar autonomously searches** → Regardless of user input, Scholar searches for sources, external datasets, relevant literature (triggered by document type + rubric + user input if provided)
+3. **Scholar recommends** → All Scholar-found sources/data marked `status = 'pending'` (never auto-approved). Scholar explains relevance score and reasoning.
+4. **User reviews** → Reads abstract, checks journal/date/relevance, decides: approve/reject/need-more-info (same interface for user-provided + Scholar-found)
+5. **Scholar cites approved only** → During draft generation, Scholar only includes `status = 'approved'` materials (regardless of source: user-provided or Scholar-found)
+6. **Phase H compliance** → Before submission, verifies: all sources in paper are approved, all required materials present, no Scholar-added materials without explicit user approval
+7. **User can revoke anytime** → Changing `status = 'approved'` → `'rejected'` removes citations from draft; audit trail maintained
 
 **Integration with Multi-Type System**:
 - **Assignment**: Rubric parser auto-extracts material constraints ("10+ sources", "50% peer-reviewed", "1 non-English source"); coverage tracker shows progress
@@ -848,7 +852,10 @@ Used in: Section 3.2, 2.1 (2 citations)
 Can be revoked by user anytime
 ```
 
-**Key Design Principle**: Any source, data, or content that Scholar discovers, recommends, or generates must be: (1) presented to user as "pending" (not automatically included), (2) user explicitly approves (conscious action, not passive), (3) only then used in draft (Scholar cites approved only), (4) user can revoke anytime (approval can be withdrawn).
+**Key Design Principle**: 
+- **User input is optional**: Users input materials ONLY if they have them or want to contribute. If they skip input → Scholar finds materials autonomously.
+- **Approval is mandatory for ALL materials**: Any source, data, or content that Scholar discovers, recommends, or generates (regardless of source) must be: (1) presented to user as "pending" (not automatically included), (2) user explicitly approves (conscious action, not passive), (3) only then used in draft (Scholar cites approved only), (4) user can revoke anytime (approval can be withdrawn).
+- **Same interface, merged sources**: User-provided materials and Scholar-found materials appear in the same approval interface, with clear labels showing origin (user-provided vs. Scholar-recommended).
 
 **Fits in Phase 1 timeline**: ✓ Yes (6 weeks total; this is weeks 4–7, runs in parallel with other Phase 1 items).
 
