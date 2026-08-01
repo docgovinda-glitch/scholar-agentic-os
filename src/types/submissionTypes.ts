@@ -152,7 +152,7 @@ export const SUBMISSION_QUALITY_GATES: SubmissionQualityGate[] = [
     description: "Sufficient references cited",
     check: (project) => {
       const targetCount = project.targetReferenceCount || 30;
-      const dataSourceCount = project.dataSources?.filter(s => s.status === "approved").length || 0;
+      const dataSourceCount = project.dataSources?.filter((s: any) => s.status === "approved").length || 0;
       return dataSourceCount >= Math.max(10, Math.round(targetCount * 0.5));
     },
     message: "Ensure adequate peer-reviewed references are cited (min 10-15)",

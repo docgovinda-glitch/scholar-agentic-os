@@ -32,7 +32,7 @@ const STATUS_LABELS: Record<SubmissionStatus, string> = {
   desk_rejected: "Desk Rejected"
 };
 
-export function SubmissionTracker({
+function SubmissionTracker({
   submissions = [],
   onAddSubmission,
   onUpdateSubmission,
@@ -407,3 +407,5 @@ export function SubmissionTracker({
     </div>
   );
 }
+
+export default SubmissionTracker;

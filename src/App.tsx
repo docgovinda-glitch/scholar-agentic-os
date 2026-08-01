@@ -567,7 +567,7 @@ function App() {
                 <CoverLetterGenerator
                   project={project}
                   journalName={project.targetJournal?.name || ""}
-                  onSave={(content) => {
+                  onSave={(content: string) => {
                     updateProject({
                       submissionPack: {
                         ...(project.submissionPack || {}),
@@ -584,7 +584,7 @@ function App() {
                 </h2>
                 <SubmissionChecklistBuilder
                   project={project}
-                  onUpdate={(checklist) => {
+                  onUpdate={(checklist: Record<string, unknown>) => {
                     updateProject({
                       submissionPack: {
                         ...(project.submissionPack || {}),
@@ -601,7 +601,7 @@ function App() {
                 </h2>
                 <SubmissionTracker
                   submissions={(project.submissionPack as any)?.submissions || []}
-                  onAddSubmission={(submission) => {
+                  onAddSubmission={(submission: any) => {
                     const newSubmission: any = {
                       id: Math.random().toString(36).substr(2, 9),
                       ...submission,
@@ -615,7 +615,7 @@ function App() {
                       } as any
                     });
                   }}
-                  onUpdateSubmission={(id, update) => {
+                  onUpdateSubmission={(id: string, update: any) => {
                     const submissions = ((project.submissionPack as any)?.submissions || []).map((s: any) =>
                       s.id === id ? { ...s, ...update, statusUpdatedAt: new Date().toISOString() } : s
                     );
@@ -626,7 +626,7 @@ function App() {
                       } as any
                     });
                   }}
-                  onDeleteSubmission={(id) => {
+                  onDeleteSubmission={(id: string) => {
                     const submissions = ((project.submissionPack as any)?.submissions || []).filter((s: any) => s.id !== id);
                     updateProject({
                       submissionPack: {
@@ -644,7 +644,7 @@ function App() {
                 </h2>
                 <ReviewerResponseManager
                   project={project}
-                  onSaveDraft={(draft) => {
+                  onSaveDraft={(draft: any) => {
                     updateProject({
                       submissionPack: {
                         ...(project.submissionPack || {}),

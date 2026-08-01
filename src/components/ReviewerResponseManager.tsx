@@ -9,7 +9,7 @@ interface ReviewerResponseManagerProps {
   onSaveDraft?: (draft: ResponseDraft) => void;
 }
 
-export function ReviewerResponseManager({
+function ReviewerResponseManager({
   project,
   onSaveDraft
 }: ReviewerResponseManagerProps) {
@@ -526,3 +526,5 @@ export function ReviewerResponseManager({
     </div>
   );
 }
+
+export default ReviewerResponseManager;

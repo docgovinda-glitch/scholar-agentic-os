@@ -10,7 +10,7 @@ interface CoverLetterGeneratorProps {
   onSave?: (content: string) => void;
 }
 
-export function CoverLetterGenerator({
+function CoverLetterGenerator({
   project,
   journalName = "",
   onSave
@@ -233,3 +233,5 @@ export function CoverLetterGenerator({
     </div>
   );
 }
+
+export default CoverLetterGenerator;

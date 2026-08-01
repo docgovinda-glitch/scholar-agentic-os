@@ -9,7 +9,7 @@ interface SubmissionChecklistBuilderProps {
   onUpdate?: (checklist: Record<string, SubmissionChecklist[]>) => void;
 }
 
-export function SubmissionChecklistBuilder({
+function SubmissionChecklistBuilder({
   project,
   onUpdate
 }: SubmissionChecklistBuilderProps) {
@@ -278,3 +278,5 @@ export function SubmissionChecklistBuilder({
     </div>
   );
 }
+
+export default SubmissionChecklistBuilder;
