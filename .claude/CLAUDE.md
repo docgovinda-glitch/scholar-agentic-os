@@ -69,7 +69,7 @@ The system acts as a scholarly research collaborator, proposing structural impro
 - ✅ Tailwind CSS v4 integration
 
 ### Test Status
-- ✅ Test runner: **Vitest** (`npm test` / `npm run test:coverage`), not Jest — 106 test files, 1200 tests, all passing as of 2026-07-31 (run `npm test` to reconfirm). jsdom suites must wire localStorage themselves via the `Object.defineProperty(globalThis, "localStorage", ...)` preamble used across the existing suites; `fake-indexeddb/auto` is available for IndexedDB-backed code
+- ✅ Test runner: **Vitest** (`npm test` / `npm run test:coverage`), not Jest — 107 test files, 1207 tests, all passing as of 2026-08-01 (run `npm test` to reconfirm). jsdom suites must wire localStorage themselves via the `Object.defineProperty(globalThis, "localStorage", ...)` preamble used across the existing suites; `fake-indexeddb/auto` is available for IndexedDB-backed code
 
 ---
 
