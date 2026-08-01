@@ -646,7 +646,7 @@ Delete dead subsystems (§1.7 kill list) after tagged archive; single documented
 
 ---
 
-## Phase 1 — Local-First Data Safety + Storage Lift (Weeks 3–6, L)
+## Phase 1 — Local-First Data Safety + Storage Lift + Multi-Document-Type + Materials Approval (Weeks 3–8, L)
 
 **Client-side only; zero backend cost.**
 
@@ -655,9 +655,13 @@ Three Tier 1 storage improvements (§5.B):
 2. Compress localStorage blob (JSON compresses 60–70%)
 3. Archive old projects (deferred loading)
 
+Multi-document-type system: document type selector (10 types), type-specific input forms, type-specific workflow phases, type-specific quality checks, guidance system (tooltips + wizards).
+
+Research Materials & Inputs: user inputs research outline, primary/secondary data, literature; Scholar recommends sources → user explicitly approves → Scholar cites only approved materials; Phase H compliance verifies all materials approved before submission.
+
 Humanization setup: research GitHub repo candidates (`jeannie-ai/jeannie-humanizer`, etc.), plan integration points.
 
-Human approval gates: add approval-status UI to sections (timestamp, edit history), phase-gating logic.
+Human approval gates: add approval-status UI to sections (timestamp, edit history), phase-gating logic; applies to all sections including Research Materials & Inputs.
 
 Mandatory user backup flow: daily auto-backup export wizard, clear-cache warning UX, restore-from-backup flow, storage quota tracking.
 
@@ -799,10 +803,58 @@ Mobile web polish.
 | 10 | Type-specific workflow phases | M | Show/hide phases based on document type (e.g., skip "Data Analysis" for term papers) |
 | 11 | Type-specific quality checks | L | Assignment: rubric scoring; Lab: data accuracy; Proposal: feasibility assessment |
 | 12 | Guidance system (tooltips + wizards) | M | Help text for every setting, interactive wizards (citation style finder, rubric creator) |
+| 13 | Research Materials & Inputs (approval-based) | L | User inputs research outline, primary/secondary data, sources; Scholar recommends → user approves → Scholar cites approved only; Phase H verifies all materials approved before submission |
 
-**M1 Exit**: Vault split complete, backup flows work, 0 data-loss incidents in testing, document type selector live, 3+ types fully functional (journal, assignment, lab report).
+**Phase 1 Phase 1.13: Research Materials & Inputs (Weeks 4–7) — Mandatory User Approval for All Scholar-Added Materials**
 
-**Note**: Phase 1 extends from 4–6 weeks to 6 weeks to accommodate multi-type implementation (added ~2 weeks effort).
+*Status: Core integrity feature; binding requirement that Scholar-added materials require manual user approval before inclusion.*
+
+**Components** (17 days, ~2,500 lines):
+- **UI: Research Outline Editor** (1 day): Rich text editor for research questions, hypotheses, arguments
+- **UI: Primary Data Uploader** (1 day): File upload with metadata, preview, Scholar analysis requests
+- **UI: Secondary Data Manager** (1 day): External datasets with approval workflow for Scholar recommendations
+- **UI: Source Library Core** (3 days): List/filter/sort/edit sources by status (approved/pending/rejected); tags, relevance scores
+- **UI: Approval Workflow** (2 days): Approve/reject/ask-more buttons; Scholar explains relevance and reasoning
+- **UI: Constraints Display** (1 day): Auto-populated from rubric/document type; coverage tracking dashboard
+- **Service: Materials Storage** (1 day): localStorage/IndexedDB persistence for all material types
+- **Service: Coverage Checker** (1 day): Validates all required materials (from rubric/type) are approved before submission
+- **Service: Scholar Integration** (2 days): When Scholar finds sources (Phase C–E), add to "pending approval" (never auto-include)
+- **Service: Approval Enforcement** (1 day): Scholar agent only cites sources with `status = 'approved'`; blocks citations to pending/rejected
+- **Tests: Approval workflow** (1 day): Verify Scholar respects approval status; test rejection/revocation flows
+- **Tests: Coverage validation** (1 day): Verify Phase H catches missing materials, type-specific requirements
+- **Integration w/ Multi-Type** (1 day): Type-specific material requirements (rubric extracts constraints; lab reports auto-populate data fields; proposals auto-populate feasibility checks)
+- **Documentation** (0.5 day): User guide, in-app help, integrity guarantee messaging
+
+**Approval Workflow**:
+1. **Scholar recommends** → All recommended sources/data marked `status = 'pending'` (never auto-approved)
+2. **User reviews** → Reads abstract, checks journal/date/relevance, decides: approve/reject/need-more-info
+3. **Scholar cites approved only** → During draft generation, Scholar only includes `status = 'approved'` materials
+4. **Phase H compliance** → Before submission, verifies: all sources in paper are approved, all required materials present, no Scholar-added materials without explicit user approval
+5. **User can revoke anytime** → Changing `status = 'approved'` → `'rejected'` removes citations from draft; audit trail maintained
+
+**Integration with Multi-Type System**:
+- **Assignment**: Rubric parser auto-extracts material constraints ("10+ sources", "50% peer-reviewed", "1 non-English source"); coverage tracker shows progress
+- **Lab Report**: Primary data fields auto-populated from uploaded procedure; constraints verify all experimental procedures are referenced and raw data included
+- **Research Proposal**: Auto-populated feasibility constraints; Scholar validates timeline realism and budget justification against similar projects
+- **Other types**: Inherit same approval workflow; type-specific field requirements
+
+**Audit Trail** (for integrity verification):
+```
+Material: Chen et al. (2023)
+Status: APPROVED
+Approved by: User, 2026-08-01 14:35
+Added by: Scholar (2026-07-31, auto-recommendation)
+Used in: Section 3.2, 2.1 (2 citations)
+Can be revoked by user anytime
+```
+
+**Key Design Principle**: Any source, data, or content that Scholar discovers, recommends, or generates must be: (1) presented to user as "pending" (not automatically included), (2) user explicitly approves (conscious action, not passive), (3) only then used in draft (Scholar cites approved only), (4) user can revoke anytime (approval can be withdrawn).
+
+**Fits in Phase 1 timeline**: ✓ Yes (6 weeks total; this is weeks 4–7, runs in parallel with other Phase 1 items).
+
+**M1 Exit**: Vault split complete, backup flows work, 0 data-loss incidents in testing, document type selector live, 3+ types fully functional (journal, assignment, lab report), Research Materials & Inputs end-to-end working (user inputs → Scholar recommends → user approves → Scholar cites approved only → Phase H verifies).
+
+**Note**: Phase 1 extends from 4–6 weeks to 6 weeks to accommodate multi-type implementation + Research Materials & Inputs (added ~3 weeks effort, fits within 6-week window with parallel execution).
 
 ---
 
