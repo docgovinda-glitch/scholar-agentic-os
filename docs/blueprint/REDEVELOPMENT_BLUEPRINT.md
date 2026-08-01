@@ -671,7 +671,7 @@ Mandatory user backup flow: daily auto-backup export wizard, clear-cache warning
 
 ---
 
-## Phase 2 — Growth to 10k Free Users (Months 2–5, L)
+## Phase 2 — Growth to 10k Free Users + Custom Format Learning (Months 2–5, L)
 
 **Still zero backend cost (localStorage/IndexedDB); local runners + student-provided AI keys.**
 
@@ -686,6 +686,8 @@ Community & content: public examples, case studies, blog posts, public guides (S
 Telemetry (privacy-preserving): Plausible analytics (no Google Analytics), phase funnel tracking, Sentry client-side, no user-data logging.
 
 Onboarding polish: smooth new-user flow, phase gating, example projects.
+
+Custom format learning: users upload institution-specific document formats (syllabus PDF, template .docx); system extracts constraints (page limits, section requirements, rubric, citation style), learns format structure, auto-suggests on similar document creation, auto-populates guidance and quality checks per learned format. Enables per-institution customization without code changes.
 
 **Deliverables**: 10k monthly active free users, product-market fit signal (NPS >50, D30 retention >30%).
 **Risks**: Scale of caching, performance on agent runs.
@@ -878,8 +880,66 @@ Can be revoked by user anytime
 | 7 | Institutional pilots (writing centers) | S | Adoption channel testing |
 | 8 | Complete remaining document types (7+ types) | M | Finish implementation: proposal, notes, lit review, project report, book review, case study |
 | 9 | Type-specific content library (videos, guides, examples) | M | 30–60 second videos, example documents, checklists per type |
+| 10 | Custom Format Learning Engine | M | Upload institution-specific formats (PDF, .docx); extract constraints (page limits, section order, rubric, citation style); auto-suggest on similar type creation; adapt guidance + quality checks per learned format; enable per-institution customization without code changes |
 
-**M2 Exit**: 10k+ MAU, NPS >50, D30 >30%, agent pipelines end-to-end work, all 10 document types live and tested, institutional pilots launched.
+**Phase 2 Item #10: Custom Format Learning Engine (Weeks 8–14 of Phase 2) — Dynamic Format Adaptation**
+
+*Status: Core feature for institutional adoption; enables single-format-upload to enable school-wide guidance customization.*
+
+**Design**: Users upload custom document formats (syllabus PDF, template .docx, example well-formatted paper). System extracts structure and constraints. System learns format, auto-suggests when user creates similar document type, auto-populates guidance and quality checks specific to learned format.
+
+**Components** (15 days, ~2,000 lines):
+
+- **UI: Format Upload** (1 day): Drag-drop .docx/.pdf upload; user confirms detection ("Is this a term paper template?")
+- **Service: Format Parser** (2 days): Extract from PDF/DOCX: section names, page counts (if specified), fonts/spacing (if specified), required sections, structure nesting; detect rubric if present (table or list)
+- **Service: Rubric Extractor** (2 days): If syllabus contains rubric (table with criteria + weights), parse and extract; store as constraints
+- **Service: Format Recognition** (2 days): When user creates new project of same type, detect if learned format exists; suggest: "Use [Institution] [Type] format from [date]?"
+- **Service: Constraint Auto-Population** (2 days): Extract from learned format: section names, page/word count expectations, required sections, order, citation style, submission format; merge with generic type constraints
+- **Service: Institution-Specific Library** (1 day): Store learned formats tagged by institution/course/context; allow user to tag "This is PSYCH 101" or "Harvard Business School"
+- **UI: Adaptive Guidance** (2 days): Phase F–H guidance adapts to learned format; Phase F shows "Expected ~3 pages for Methods section (from your format)"; Phase H checks "Format requirement: 5 figures required; you have 4"
+- **Service: Format Compliance Checks** (2 days): Learn formatting rules (font, heading style, spacing, caption format); Phase H checks: titles match learned format, spacing correct, required sections present; flags deviations
+- **Tests: Format extraction & recognition** (1 day): Test PDF/DOCX parsing, format matching, constraint extraction
+- **Integration w/ Multi-Type** (1 day): Type selection → check for learned formats → suggest or apply automatically
+- **Documentation** (0.5 day): "Upload your institution's format once, Scholar remembers it"
+
+**Format Learning Workflow**:
+1. **User uploads format** (syllabus, template, or example) → System analyzes
+2. **System extracts** → Section structure, page counts, rubric (if present), citation style, required fields
+3. **System learns** → Stores as "Term Paper – PSYCH 101" or "Lab Report – Org Chem"
+4. **User creates new document** → System detects type match → suggests "Use learned PSYCH 101 format?"
+5. **Auto-population** → Page limit: 8–10 pages ✓, Rubric: Thesis 25%, Evidence 35%, Org 20%, Grammar 20% ✓, Abstract: required ✓
+6. **Adaptive guidance** → Phase F shows expected word counts per section; Phase H checks format compliance
+7. **Feedback loop** → System learns what formats work (accepted papers matched learned format) vs. rejected
+
+**Integration with Multi-Type System**:
+- User selects "Term Paper" + has learned 3 term paper formats → system asks "Which format? (PSYCH 101 2026, Intro Writing 2025, History 200 2026)"
+- User selects "Lab Report" + uploads new lab template → system learns new format, suggests on next lab report
+- Type-specific guidance + learned format guidance both shown in UI
+- Research Materials & Inputs integrates: "Based on your PSYCH 101 format, you need 10+ sources, 50% peer-reviewed, 1 non-English source"
+
+**Success Criteria**:
+- ✓ Users can upload custom format (PDF, DOCX) without errors
+- ✓ System extracts section structure correctly (80%+ accuracy on typical formats)
+- ✓ Rubric extraction works for table-based rubrics (90%+ accuracy)
+- ✓ Format auto-suggested on document creation if match exists
+- ✓ Constraints auto-populated and shown to user
+- ✓ Guidance adapts per learned format (Phase F–H show format-specific instructions)
+- ✓ Phase H checks format compliance (flags missing sections, wrong formatting)
+- ✓ Format library persists (user can see/manage all learned formats)
+- ✓ End-to-end: upload → recognize → suggest → auto-populate → adapt guidance → check compliance
+
+**Key Design Principles**:
+- **One-time setup**: Upload format once per institution/course, system remembers
+- **No code changes needed**: Per-institution customization via learning, not via adding 1000 hardcoded formats
+- **Graceful fallback**: If format extraction fails, system falls back to generic type workflow (no breaking)
+- **User control**: User can edit auto-extracted constraints ("Actually, 12 pages is OK for my format")
+- **Institution pilots**: Writing centers can upload formats; all students inherit constraints + guidance
+
+**Fits in Phase 2 timeline**: ✓ Yes (5 months total; this is weeks 8–14, runs in parallel with other Phase 2 items).
+
+**M2 Exit**: Vault split complete, backup flows work, 0 data-loss incidents in testing, document type selector live, 3+ types fully functional (journal, assignment, lab report), Research Materials & Inputs end-to-end working, Custom Format Learning end-to-end working (upload → recognize → suggest → auto-populate → adapt guidance → check compliance).
+
+**M2 Exit (Original, retained)**: 10k+ MAU, NPS >50, D30 >30%, agent pipelines end-to-end work, all 10 document types live and tested, institutional pilots launched, custom format learning live (students can upload institution formats for auto-guidance).
 
 ---
 
@@ -943,7 +1003,7 @@ Can be revoked by user anytime
 
 - **M0** (end Phase 0): Clean foundation, CI passing, docs honest
 - **M1** (end Phase 1): Data survives, 50+ MB capacity, approval gates UI complete
-- **M2** (end Phase 2): 10k free users, product-market fit signal, agents end-to-end
+- **M2** (end Phase 2): 10k free users, product-market fit signal, agents end-to-end, all 10 document types live, custom format learning live (students can upload institution formats for auto-guidance)
 - **M3** (end Phase 3): **Breakeven** ($4.8k/mo), first paid user, compliance live
 - **M4** (end Phase 4): Grounded drafting, first institutional pilot
 - **M5** (end Phase 5): Learning framework, multi-device, analytics
@@ -966,6 +1026,8 @@ Simplicity over speculative abstraction (the kernel lesson) · every module inde
 3. **Assignment-Submission Ready Output + Humanization**: Final manuscripts are polished, humanized (not obviously AI-written), and ready for journal submission with <5 min review. Optional "Humanize Section" UX integrates a public GitHub humanization repo. Quality bar: indistinguishable from human-written academic prose.
 
 4. **Multi-Document-Type Support from Day One**: Scholar supports 10 academic writing types (journal articles, assignments, term papers, lab reports, proposals, notes, literature reviews, project reports, book reviews, case studies) with custom workflows, quality checks, and guidance. No single workflow fits all. Users select document type at project creation; phases, checks, and guidance customize accordingly. Research-backed: each type has distinct pain points, integrity risks, and AI assistance opportunities.
+
+5. **Custom Format Learning from Institution Uploads** (Phase 2): Users can upload their institution's document format (syllabus PDF, template, example paper). Scholar extracts constraints (section structure, page limits, rubric, citation style) and learns the format. On future documents of the same type, Scholar auto-suggests the learned format and auto-populates guidance and quality checks specific to that institution's requirements. Enables per-institution customization without code changes; unlocks institutional adoption (writing centers upload format once, all students inherit constraints).
 
 ## Integrity Discipline (Product Invariant)
 
