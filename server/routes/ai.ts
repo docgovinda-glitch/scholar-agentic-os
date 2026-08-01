@@ -645,7 +645,7 @@ export function registerAIRoutes(app: express.Express, aiAbuseLimit: any, citati
 });
 
 // AI Generation Proxy (With Caching Layer)
-router.post("/api/generate", aiAbuseLimit, async (req, res) => {
+app.post("/api/generate", aiAbuseLimit, async (req, res) => {
   try {
     const { provider, apiKey, model, systemInstruction, prompt, temperature, responseMimeType, username } = req.body;
 
@@ -826,7 +826,7 @@ router.post("/api/generate", aiAbuseLimit, async (req, res) => {
 
 
 // Phase B: Dissertation Grounding Agent
-router.post("/api/generate/dissertation-grounding", aiAbuseLimit, async (req, res) => {
+app.post("/api/generate/dissertation-grounding", aiAbuseLimit, async (req, res) => {
   try {
     const { 
       title, objectives, researchQuestions, researchGap, 
@@ -879,7 +879,7 @@ Generate a comprehensive "Dissertation Grounding Map" in JSON format. Ensure all
 });
 
 // Phase C: Research Data Discovery
-router.post("/api/generate/data-discovery", aiAbuseLimit, async (req, res) => {
+app.post("/api/generate/data-discovery", aiAbuseLimit, async (req, res) => {
   try {
     const { title, methodology, field, keywords, aiSettings } = req.body;
 
@@ -925,7 +925,7 @@ Return strictly valid JSON in this format:
 });
 
 // Phase D: Journal Discovery
-router.post("/api/generate/journal-discovery", aiAbuseLimit, async (req, res) => {
+app.post("/api/generate/journal-discovery", aiAbuseLimit, async (req, res) => {
   try {
     const { title, keywords, field, preferredJournalScope, articleType, aiSettings } = req.body;
 
@@ -973,7 +973,7 @@ Generate a shortlist of exactly 3 to 4 reputable journals. Return strictly valid
 });
 
 // Phase E: Journal Requirements Compliance Setup
-router.post("/api/generate/extract-requirements", aiAbuseLimit, async (req, res) => {
+app.post("/api/generate/extract-requirements", aiAbuseLimit, async (req, res) => {
   try {
     const { journalName, guidelinesText, aiSettings } = req.body;
 
@@ -1011,7 +1011,7 @@ Produce a high-fidelity checklists and internal compliance guidelines in JSON fo
 });
 
 // Phase F: Manuscript Section Co-Drafting Agent
-router.post("/api/generate/draft-section", aiAbuseLimit, async (req, res) => {
+app.post("/api/generate/draft-section", aiAbuseLimit, async (req, res) => {
   try {
     const {
       projectState,         // Title, RQs, Gap, Methodology, Journal, GroundingMap etc
@@ -1091,7 +1091,7 @@ Write the draft section in full, ready-to-publish academic prose. Do not leave p
 });
 
 // Phase G: Quality Control (QC) Agent
-router.post("/api/generate/quality-control", aiAbuseLimit, async (req, res) => {
+app.post("/api/generate/quality-control", aiAbuseLimit, async (req, res) => {
   try {
     const { projectState, currentDraft } = req.body;
     const aiSettings = projectState?.aiSettings;
@@ -1146,7 +1146,7 @@ Compile a comprehensive evaluation in JSON. Return strictly valid JSON with form
 });
 
 // Phase H: Compilation & Submission Pack Generator (Cover Letter)
-router.post("/api/generate/submission-pack", aiAbuseLimit, async (req, res) => {
+app.post("/api/generate/submission-pack", aiAbuseLimit, async (req, res) => {
   try {
     const { projectState, authorDetails, revisionsStatus } = req.body;
     const aiSettings = projectState?.aiSettings;
@@ -1184,7 +1184,7 @@ Generate a comprehensive "Submission Package" in JSON. Return strictly valid JSO
 });
 
 // Expert Academic Citation Engine
-router.post("/api/generate/citation-engine", aiAbuseLimit, async (req, res) => {
+app.post("/api/generate/citation-engine", aiAbuseLimit, async (req, res) => {
   try {
     const { sourceInput, desiredStyle, aiSettings } = req.body;
 
@@ -1266,6 +1266,5 @@ Return strictly valid JSON in this exact structure:
     console.error("Citation engine error:", error);
     res.status(500).json({ error: error.message || "Failed to generate citation formatting" });
   }
-});
-
-export default router;
+  });
+}
