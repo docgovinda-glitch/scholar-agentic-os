@@ -50,16 +50,19 @@ export function DocumentTypeSelector({
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {documentTypes.map((type) => (
-          <GlassmorphicCard
+          <div
             key={type.id}
             onClick={() => onChange(type.id)}
-            className={`p-4 cursor-pointer transition-all ${
-              value === type.id
-                ? "border-luminous-blue ring-1 ring-luminous-blue/50 bg-luminous-blue/5"
-                : "hover:border-luminous-blue/50"
-            }`}
+            className="cursor-pointer"
           >
-            <div className="flex items-start gap-3">
+            <GlassmorphicCard
+              className={`p-4 transition-all ${
+                value === type.id
+                  ? "border-luminous-blue ring-1 ring-luminous-blue/50 bg-luminous-blue/5"
+                  : "hover:border-luminous-blue/50"
+              }`}
+            >
+              <div className="flex items-start gap-3">
               <div className="flex-1">
                 <h4 className="font-mono font-semibold text-slate-100 text-sm">
                   {type.label}
@@ -75,7 +78,8 @@ export function DocumentTypeSelector({
                 <div className="w-3 h-3 rounded-full bg-luminous-blue flex-shrink-0 mt-1" />
               )}
             </div>
-          </GlassmorphicCard>
+            </GlassmorphicCard>
+          </div>
         ))}
       </div>
     </div>

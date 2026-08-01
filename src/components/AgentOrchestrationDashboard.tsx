@@ -121,7 +121,7 @@ export function AgentOrchestrationDashboard({
       "literature review": !!project.groundingMap,
       "research plan": !!project.sections?.["Research Plan"],
       "knowledge gap": !!project.sections?.["Knowledge Gap"],
-      "research questions": !!project.sections?.["Research Questions"],
+      "research questions report": !!project.sections?.["Research Questions"],
       "manuscript": Object.keys(project.sections || {}).length > 0,
     };
 
