@@ -1,7 +1,8 @@
-import React, { useState, lazy, Suspense } from "react";
+import React, { useState, lazy, Suspense, useEffect } from "react";
 import { useAuth } from "../auth/authContext";
 import { PaperProject, OnboardingStep } from "../types";
 import { useProjectPersistence } from "../hooks/useProjectPersistence";
+import telemetry from "../services/telemetryService";
 import {
   CheckCircle2,
   ChevronRight,
@@ -29,6 +30,24 @@ const STEPS: { id: OnboardingStep; label: string; icon: React.ElementType }[] = 
 
 export default function OnboardingWizard() {
   const { user, project, onboardingStep, setOnboardingStep, logout, setProject, loginDirectly } = useAuth();
+  const [previousStep, setPreviousStep] = useState<OnboardingStep | null>(null);
+
+  // Track onboarding step transitions for telemetry
+  useEffect(() => {
+    if (onboardingStep === 'login' && previousStep !== 'login') {
+      telemetry.record('user:registration', { step: 'login' });
+    } else if (onboardingStep === 'ai-setup' && previousStep === 'login') {
+      telemetry.recordOnboardingStep('ai_setup', 'started');
+    } else if (onboardingStep === 'knowledge-vault' && previousStep === 'ai-setup') {
+      telemetry.recordOnboardingStep('ai_setup', 'completed');
+      telemetry.recordOnboardingStep('vault', 'started');
+    } else if (onboardingStep === 'workshop' && previousStep === 'knowledge-vault') {
+      telemetry.recordOnboardingStep('vault', 'completed');
+      telemetry.recordOnboardingStep('workspace', 'started');
+      telemetry.record('onboarding:workspace_entered');
+    }
+    setPreviousStep(onboardingStep);
+  }, [onboardingStep, previousStep]);
 
   const currentStepIndex = STEPS.findIndex(s => s.id === onboardingStep);
 
