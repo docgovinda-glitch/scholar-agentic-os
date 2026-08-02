@@ -37,7 +37,7 @@ interface KnowledgeVaultProps {
   updateProject: (fields: Partial<PaperProject>) => void;
 }
 
-export default function KnowledgeVaultManager({ project, updateProject }: KnowledgeVaultProps) {
+export default function KnowledgeVaultWorkspace({ project, updateProject }: KnowledgeVaultProps) {
   const [showSuiteModal, setShowSuiteModal] = useState(false);
   const [showV2Engine, setShowV2Engine] = useState(false);
   const [citationFormat, setCitationFormat] = useState("APA 7");
