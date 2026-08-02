@@ -4,6 +4,7 @@ import { FileText, Sparkles, Send, Copy, Clipboard, CheckCircle2, RefreshCcw, La
 import { generateSubmissionPack } from "../services/aiService";
 
 const CoverLetterGenerator = lazy(() => import("./CoverLetterGenerator"));
+const SubmissionChecklistBuilder = lazy(() => import("./SubmissionChecklistBuilder"));
 
 interface SubmissionPackagingSuiteProps {
   project: PaperProject;
@@ -169,20 +170,16 @@ export default function SubmissionPackagingSuite({
               {/* Right Side: Compliance Summary & Checklists (lg:5) */}
               <div className="lg:col-span-5 space-y-6 flex flex-col">
                 
-                {/* Checklist bento */}
-                <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-4 grow">
-                  <h3 className="text-sm font-semibold text-brand-300 font-mono uppercase tracking-wider border-b border-white/5 pb-2">
-                    Pre-Flight Submission Checklist
-                  </h3>
-                  <div className="space-y-2.5">
-                    {pack.submissionChecklist.map((item, i) => (
-                      <div key={i} className="flex gap-2.5 items-start text-xs text-gray-300">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {/* Checklist — Using SubmissionChecklistBuilder */}
+                <Suspense fallback={<div className="p-4 text-gray-400">Loading submission checklist...</div>}>
+                  <SubmissionChecklistBuilder
+                    project={project}
+                    onUpdate={(checklist: Record<string, unknown>) => {
+                      // Update project with checklist state
+                      // The builder manages its own state; this is for persistence if needed
+                    }}
+                  />
+                </Suspense>
 
                 {/* Templates & letters */}
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-4">
