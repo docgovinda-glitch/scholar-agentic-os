@@ -1,8 +1,22 @@
 # Production Deployment Guide — Scholar Agentic Operating System
 
-**Status: Phase 1 of `docs/planning/hosting-and-topology.md` in progress.** This replaces the previous Render + self-hosted Postgres guide, which described a backend this project no longer runs for auth/user data. Auth, profiles, and admin-approval now run on Supabase. See `docs/planning/hosting-and-topology.md` §4 for the full reasoning and what's changed.
+**Status: Production hosting stack decided (Task 9, 2026-08-02).**
 
-**Important interim reality, not a simplification**: `server.ts` still needs to run somewhere. Only the auth/user/admin routes moved to Supabase in this phase — AI generation (`/api/generate*`) and four "leftover bucket" routes (`/api/parse-file`, `/api/parse-external-link`, `/api/lookup-doi`, `/api/agents*`) are unchanged and still served by Express, pending Phase 2 (`docs/planning/ai-gateway.md`) and a resolution for the leftover bucket. **This is not yet a fully static, serverless deployment** — that's a later milestone, not this one.
+**Hosting Stack**:
+- **Platform**: Render (free tier, Docker deployment of full-stack app)
+- **DNS**: Cloudflare
+- **User Database**: Supabase (auth, profiles, admin config)
+- **Email**: Resend (approval/reset notifications via Supabase Edge Functions)
+
+`server.ts` runs on Render free tier and serves:
+- AI generation routes (`/api/generate*`, `/api/stream-generate`)
+- Parse/document intelligence routes (`/api/parse-file`, `/api/parse-external-link`, `/api/lookup-doi`)
+- Agent execution (`/api/agents*`)
+- Admin approval UI (`/admin/approve-scholar`)
+- Health check (`/api/health`)
+
+Auth/user/admin data: Supabase (not local Postgres or server-side storage)
+Email delivery: Resend (not server.ts)
 
 ---
 
@@ -44,9 +58,17 @@ Set these wherever the static frontend is hosted (Netlify/Vercel/Cloudflare Page
 
 **Deployment mechanism corrected 2026-07-31**: the live Render service (`scholar-agentic-os`, confirmed via the Render API) runs as a **Docker** deployment of this repo's `Dockerfile`, not a Node buildpack — `render.yaml` previously described the latter (and a different, never-created service name) and has been corrected to match. The Dockerfile takes `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` as build `ARG`s (Render forwards matching env vars as build args automatically) so Vite can bake them into the built frontend bundle — this is why those two are also required as backend env vars, not just for `server.ts`.
 
-## 4. Frontend (Static Hosting)
+## 4. Frontend & Backend Hosting (Render)
 
-Unchanged in spirit from before, still via [`netlify.toml`](netlify.toml) (build command `npm run build`, publish directory `dist`, SPA redirect already configured) — Netlify, Vercel, or Cloudflare Pages all work equally well per `docs/planning/hosting-and-topology.md` §1. Add the two `VITE_SUPABASE_*` variables from §2 in whichever provider's dashboard is used.
+Primary hosting via [`render.yaml`](render.yaml) — Render's free tier (starter plan) with Docker deployment. The frontend (`npm run build`, publish directory `dist`) and backend (`server.ts`) are bundled together as a single full-stack service.
+
+**Stack (decision: Task 9, 2026-08-02)**:
+- **Platform**: Render (free tier, Docker deployment)
+- **DNS**: Cloudflare
+- **Database**: Supabase (user auth, profiles, admin config)
+- **Email**: Resend (via Supabase Edge Functions)
+
+Set the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from §2 as Render environment variables (the Dockerfile consumes them as build args). Add `GEMINI_API_KEY`, `GEMINI_API_KEY_BACKUP`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `ADMIN_EMAIL`, and `ENCRYPTION_KEY` as Render environment variables (sync: false — these are secrets, not synced from the repo).
 
 ---
 
