@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, lazy, Suspense } from "react";
 import { PaperProject, SubmissionPack } from "../types";
 import { FileText, Sparkles, Send, Copy, Clipboard, CheckCircle2, RefreshCcw, Landmark, Clock, ExternalLink } from "lucide-react";
 import { generateSubmissionPack } from "../services/aiService";
+
+const CoverLetterGenerator = lazy(() => import("./CoverLetterGenerator"));
 
 interface SubmissionPackagingSuiteProps {
   project: PaperProject;
@@ -16,7 +18,6 @@ export default function SubmissionPackagingSuite({
 }: SubmissionPackagingSuiteProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isCopied, setIsCopied] = useState(false);
 
   // Phase I Tracker simulation state
   const [submissionDate, setSubmissionDate] = useState("2026-06-16");
@@ -74,12 +75,6 @@ export default function SubmissionPackagingSuite({
     }
   };
 
-  const copyCoverLetter = () => {
-    if (!project.submissionPack) return;
-    navigator.clipboard.writeText(project.submissionPack.coverLetter);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
 
   const pack = project.submissionPack;
 
@@ -157,30 +152,18 @@ export default function SubmissionPackagingSuite({
             {/* Split layout: Cover letter vs checks */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
               
-              {/* Left Side: Formal Cover Letter (lg:7) */}
+              {/* Left Side: Formal Cover Letter (lg:7) — Using CoverLetterGenerator */}
               <div className="lg:col-span-7 flex flex-col border border-white/5 bg-brand-950/10 rounded-xl overflow-hidden min-h-[400px]">
-                <div className="border-b border-white/5 bg-brand-950/30 px-4 py-3 flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-gray-300">
-                    FORMAL COVER LETTER TO JOURNAL EDITORS
-                  </span>
-                  <button
-                    onClick={copyCoverLetter}
-                    className="p-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    {isCopied ? "Copied!" : "Copy Text"}
-                  </button>
-                </div>
-                <div className="grow p-5">
-                  <textarea
-                    className="w-full h-full bg-transparent border-0 text-xs text-gray-200 leading-relaxed font-sans focus:ring-0 focus:outline-none resize-none whitespace-pre-line"
-                    value={pack.coverLetter}
-                    onChange={(e) => {
-                      const updated = { ...pack, coverLetter: e.target.value };
+                <Suspense fallback={<div className="p-4 text-gray-400">Loading cover letter editor...</div>}>
+                  <CoverLetterGenerator
+                    project={project}
+                    journalName={project.targetJournal?.name || ""}
+                    onSave={(content: string) => {
+                      const updated = { ...pack, coverLetter: content };
                       updateProject({ submissionPack: updated });
                     }}
                   />
-                </div>
+                </Suspense>
               </div>
 
               {/* Right Side: Compliance Summary & Checklists (lg:5) */}
