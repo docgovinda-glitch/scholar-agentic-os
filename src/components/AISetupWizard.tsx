@@ -8,6 +8,7 @@ import { AI_MODES, getAIMode, AIModeId } from '../config/aiModes';
 import AIModeAccordion from './ai/AIModeAccordion';
 import { resolveWizardRoute } from '../utils/aiSetupWizardRouting';
 import { useFocusOnNavigate } from '../hooks/useFocusOnNavigate';
+import telemetry from '../services/telemetryService';
 
 interface AISetupWizardProps {
   project: PaperProject;
@@ -417,6 +418,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
     setSelectedMode(id);
     setSelectedProviders([]);
     setStep(1);
+    telemetry.record('onboarding:ai_mode_selected', { mode: id });
   };
 
   const renderStep0 = () => (

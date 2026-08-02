@@ -36,7 +36,7 @@ const CommandPalette = lazy(() => import("./components/CommandPalette"));
 const ActiveAgentsPanel = lazy(() => import("./components/agents/ActiveAgentsPanel"));
 
 // New components
-const KnowledgeVaultManager = lazy(() => import("./components/ThesisReader"));
+const KnowledgeVaultWorkspace = lazy(() => import("./components/KnowledgeVaultWorkspace"));
 const VedicDatabase = lazy(() => import("./components/VedicDatabase"));
 const AIControlCenter = lazy(() => import("./components/AIControlCenter"));
 const ProfileSettings = lazy(() => import("./components/ProfileSettings"));
@@ -506,7 +506,7 @@ function App() {
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "vault" && project && (
           <Suspense fallback={<PanelLoadingFallback />}>
             <div className="grid grid-cols-1 gap-6">
-              <KnowledgeVaultManager project={project} updateProject={updateProject} />
+              <KnowledgeVaultWorkspace project={project} updateProject={updateProject} />
               <VedicDatabase />
             </div>
           </Suspense>

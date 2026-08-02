@@ -1,6 +1,69 @@
 # HANDOVER.md — Scholar Agentic Operating System Developer Handover
 
-## RESUME HERE TOMORROW (as of 2026-08-01, correctness-bug sweep found nothing left to fix — code was already ahead of its own docs — supersedes the section below)
+## RESUME HERE (as of 2026-08-01, Phase 0-2 merged to `main`, CI green — supersedes everything below)
+
+**Three PRs merged**: #1 (Phase 0-2 feature work), #2 (test-teardown fix), #3
+(test-race fix). `main` tip is green on both Node 20.x and 22.x. Full suite
+1104/1104, `npm run lint` and `npm run build` clean.
+
+**Read `CHANGELOG.md`'s Phase 0-2 entry first** — it is the complete record of
+what shipped. The two architectural decisions have ADRs:
+`docs/adr/ADR-0012-KernelModuleRemoval.md` and
+`docs/adr/ADR-0013-HybridBrowserStorage.md`.
+
+### Four things to know before touching anything
+
+**1. `NOT DEPLOYED`.** There is no deployment pipeline — `ci.yml` is the only
+workflow and it has no deploy step. Merged ≠ shipped. The static-hosting
+migration noted further down this file is still un-cut-over.
+
+**2. CI gates on `npm run lint` (`tsc --noEmit`), which is stricter than
+`npm run build`.** Vite transpiles without full type-checking, so a green
+build is *not* a green CI. Several commits were merged red because only
+`build` + `test` were run locally. Run `npm run lint` before every push.
+
+**3. The unwired kernels are gone.** Phase 0 (`4afb6c8`) deleted
+`src/orchestrator`, `src/knowledge`, `src/lifecycle`, `src/publication`,
+`src/writing`, `src/collaboration`, `src/workspace` — 46 files, 8,303 lines,
+zero importers. `CLAUDE.md` §2/§3 have been corrected (they described these as
+present, and cited `ResearchLifecycleEngine` as the source of the 10-phase
+model — that file no longer exists; the 10-phase model is now prose only).
+Restore commands are in ADR-0012. This deletion shipped without an ADR, which
+`CLAUDE.md` §5 forbids; ADR-0012 was written retroactively to close that.
+
+**4. Async persistence introduced an unmount hazard.** `storageService.ts` is
+Promise-based, so effects can resolve after teardown. Two guards exist and
+should be preserved: the `cancelled` flag in `useProjectPersistence.ts`, and
+the global RTL `cleanup()` in `src/testSetup.ts` (wired via vitest
+`setupFiles` — this project keeps `test.globals` off, so RTL's automatic
+cleanup does *not* self-register and every render would otherwise stay mounted
+across test files).
+
+### Open item, needs a decision — duplicated submission UI
+
+Phase 2 added `CoverLetterGenerator`, `SubmissionChecklistBuilder`, and
+`SubmissionTracker`. **`SubmissionPackagingSuite.tsx` already did all three**
+in simpler, single-journal form (AI-generated cover letter with a template
+fallback, pre-flight checklist, portal status tracker). Both are now mounted in
+the Publishing tab, so a user sees two cover-letter editors and two checklists.
+
+This was flagged in PR #1's description and deliberately not resolved — it is a
+product decision, not a cleanup. Three viable paths:
+
+1. **Retire the old panel's overlapping sections**, keeping its AI generation
+   and folding it into `CoverLetterGenerator`. Most work, best result.
+2. **Retire the new components**, keeping `SubmissionPackagingSuite` as the
+   single surface. Loses multi-journal tracking and reviewer-response
+   management, which the old panel has no equivalent for.
+3. **Split by scope**: old panel = "compile this submission", new components =
+   "track submissions across journals over time". Least code churn, but the
+   cover-letter/checklist overlap remains and needs UI framing to not confuse.
+
+`ReviewerResponseManager` does **not** overlap and should survive any of these
+— the old panel only ever had a static response *template*, never real
+reviewer-comment tracking.
+
+## Previous session (as of 2026-08-01, correctness-bug sweep found nothing left to fix — code was already ahead of its own docs)
 
 **Asked to fix "remaining correctness bugs."** The four items most recently on record as open — `LiteratureReviewAgent.fetchWebStudies()`'s stub, `IntegrityReviewerSkill.evaluateReportingCompliance()`'s hardcoded output, `ResearchQuestionAgent`'s `recommendedDatasets: ["dataset-1"]` stub, and `aiService.ts`'s detection-evasion prompt language — turned out to be **already fixed**, each with its own passing regression test, confirmed by reading the live implementations directly rather than trusting any doc. `docs/planning/target-workflow.md` already had accurate "Fixed" annotations for three of the four; `docs/planning/agent-ui-adapter-scoping.md` was the one stale holdout (still called `fetchWebStudies()` "still a stub") — corrected this session, including its "Recommended sequencing" step 1.
 

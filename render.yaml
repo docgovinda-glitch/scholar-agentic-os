@@ -1,20 +1,23 @@
-# Interim backend only — see DEPLOYMENT_README.md §3. Serves AI generation
-# and the "leftover bucket" routes (parse-file, parse-external-link,
-# lookup-doi, agents) that Phase 1 (docs/planning/hosting-and-topology.md)
-# didn't relocate. Auth/user/admin data no longer lives here — it moved to
-# Supabase, so the Postgres database this file used to provision is gone.
+# Scholar Agentic OS Deployment Configuration
+# Primary hosting stack (Task 9 decision, 2026-08-02):
+# - Render: Full-stack hosting (frontend + backend, Docker deployment)
+# - Supabase: User authentication and database (profiles, admin approvals)
+# - Resend: Transactional emails (approval/reset notifications)
+# - Cloudflare: DNS management
 #
-# Corrected 2026-07-31: this previously described a Node-buildpack service
-# named "scholar-assistant-backend" that was never actually created — the
-# real, live production service ("scholar-agentic-os", confirmed via the
-# Render API) has always run as a Docker deployment of this repo's
-# Dockerfile. This file was pure aspirational documentation, out of sync
-# with reality; updated to match what's actually live rather than changing
-# the running service to match this file. VITE_SUPABASE_URL/
-# VITE_SUPABASE_ANON_KEY are consumed as Docker build ARGs by the
-# Dockerfile (Render automatically forwards matching env vars as build
-# args), not just runtime env — required for Vite to bake them into the
-# built frontend bundle.
+# Serves:
+# - AI generation routes (/api/generate*, /api/stream-generate)
+# - Parse/parsing routes (/api/parse-file, /api/parse-external-link, /api/lookup-doi)
+# - Agent execution routes (/api/agents, /api/agents/execute)
+# - Admin approval UI (/admin/approve-scholar)
+# - Health check endpoint (/api/health)
+#
+# Auth/user/admin data: Supabase (not local Postgres)
+# Email delivery: Resend Edge Functions (not server.ts)
+#
+# VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are consumed as Docker build ARGs
+# by the Dockerfile (Render automatically forwards matching env vars as build args),
+# not just runtime env — required for Vite to bake them into the built frontend bundle.
 services:
   - type: web
     name: scholar-agentic-os
