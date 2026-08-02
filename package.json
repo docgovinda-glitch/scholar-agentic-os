@@ -14,7 +14,8 @@
     "migrate:users-to-supabase": "tsx scripts/migrate-users-to-supabase.ts",
     "generate:knowledge": "node .claude/scripts/generate-knowledge.js",
     "validate:knowledge": "node .claude/scripts/validate-knowledge.js",
-    "check:knowledge": "node .claude/scripts/check-drift.js"
+    "check:knowledge": "node .claude/scripts/check-drift.js",
+    "prepare": "husky install"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -51,6 +52,7 @@
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "fake-indexeddb": "^6.2.5",
+    "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "supertest": "^7.2.2",
     "tailwindcss": "^4.1.14",
