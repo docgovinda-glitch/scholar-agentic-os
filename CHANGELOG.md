@@ -1,5 +1,58 @@
 # CHANGELOG - Scholar Agentic Operating System
 
+## Unreleased — Phase 1: free-tier deployment hardening (2026-08-02)
+
+Makes the live deployment correct for the plan it actually runs on. Full
+reasoning in `docs/adr/ADR-0014-FreeTierColdStartHardening.md`.
+
+### Fixed
+
+- **`render.yaml` declared `plan: starter`** — Render's paid ($7/mo) always-on
+  plan, contradicting the free-tier-only constraint the same file's comments
+  described. A blueprint sync would have silently provisioned a billable
+  service. Now `plan: free`, with `healthCheckPath: /api/health`.
+- **`PORT` was hardcoded to 3000**, ignoring the `$PORT` Render assigns. It
+  worked only because `render.yaml` pinned a matching value. Now reads the
+  environment variable.
+- **No `.dockerignore` existed**, so `COPY . .` pulled the host's
+  `node_modules`, the full `.git` history, and any local `.env` into the build
+  context — meaning secrets could be baked into an image layer. Added, with
+  `.env*` excluded.
+- **`/api/generate` calls had no timeout at all**, so a sleeping or wedged
+  instance hung the request indefinitely. Now bounded by `PROXY_TIMEOUT_MS`.
+- **Body limits were `50mb` on a 512 MB instance.** Express buffers the raw
+  body, the decoded string, and — for `/api/parse-file` — the base64-decoded
+  Buffer, so concurrent uploads could OOM-kill the container and force a fresh
+  cold start on the next visitor. Replaced by `MAX_UPLOAD_MB` (default 25).
+
+### Added
+
+- **Cold-start handling** (`src/services/serverWarmup.ts`, 13 tests) — the free
+  plan idles the instance out after ~15 min, and the next request waits tens of
+  seconds for the container to boot. A probe fired at app boot
+  (`src/main.tsx`) starts that wake while the user is still reading the page,
+  moving the wait off the interaction path. Concurrent callers collapse to a
+  single wake request, and the error path never blocks on an in-flight probe.
+- **`server_waking` error kind** (`src/services/aiErrors.ts`) with
+  `failoverWorthwhile: false`. Every cloud provider reaches its API through the
+  same proxy on the same instance, so a cold start previously walked the entire
+  failover chain for nothing and then blamed whichever provider was last. It
+  now reports the wake honestly and retries the same provider instead.
+  `callServerProxy` also treats Render's mid-boot 502/503/504 as a wake rather
+  than a provider outage.
+
+### Changed
+
+- **`Dockerfile` rebuilt as two stages** — a builder holding the toolchain, a
+  runtime carrying only `dist/` plus production dependencies, running as
+  non-root `node`. The previous single-stage image shipped vite, vitest,
+  typescript, esbuild, tailwind and the full source tree into the running
+  container, and cold-start time scales with image size.
+- **`vite` import in `server.ts` made dynamic**, inside the existing dev-only
+  branch, so production no longer resolves a bundler at startup. `vite`,
+  `@vitejs/plugin-react`, and `@tailwindcss/vite` moved to `devDependencies`.
+  Runtime install drops from **542 packages to 225**.
+
 ## Unreleased — Phase 0-2: foundation, storage lift, submission workflow (2026-08-01)
 
 Merged via PRs #1, #2, #3. **Not deployed** — the repo has no deployment

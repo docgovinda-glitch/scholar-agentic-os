@@ -54,8 +54,10 @@ import {
   classifyHttpError,
   classifyThrownError,
   classifyResponse,
+  serverWakingError,
   type ClassifiedAIError,
 } from "./aiErrors";
+import { isServerAsleep, PROXY_TIMEOUT_MS } from "./serverWarmup";
 import {
   executeWithFailover,
   isFailoverFailure,
@@ -257,6 +259,10 @@ async function callServerProxy(
     response = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      // Previously unbounded, so a sleeping or wedged instance hung the call
+      // with no ceiling at all. Sized in serverWarmup.ts to outlast a cold
+      // start plus a genuine generation rather than to be tight.
+      signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
       body: JSON.stringify({
         provider,
         apiKey: apiKey || "",
@@ -271,10 +277,28 @@ async function callServerProxy(
       }),
     });
   } catch (e) {
+    // Ambiguous on its own: the provider may be down, or this app's own
+    // instance may simply have idled out and be booting. One health probe
+    // separates them, and only on the path where something already failed.
+    if (await isServerAsleep()) {
+      throw new ProviderCallError(provider, serverWakingError(String((e as Error)?.message ?? e)));
+    }
     throw new ProviderCallError(provider, classifyThrownError(e, { url: "/api/generate" }));
   }
 
   if (!response.ok) {
+    // Render's router answers 502/503/504 while an idled instance starts back
+    // up — by status alone that is indistinguishable from a provider outage,
+    // and misreading it walks the whole failover chain for nothing.
+    if (
+      (response.status === 502 || response.status === 503 || response.status === 504) &&
+      (await isServerAsleep())
+    ) {
+      throw new ProviderCallError(
+        provider,
+        serverWakingError(`HTTP ${response.status} from /api/generate`)
+      );
+    }
     throw new ProviderCallError(provider, await classifyResponse(response));
   }
 

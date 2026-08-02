@@ -2,7 +2,6 @@ import express from "express";
 import helmet from "helmet";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import crypto from "crypto";
@@ -35,7 +34,12 @@ import { registerHealthRoutes, registerAdminRoutes, registerParseRoutes, registe
 
 dotenv.config();
 
-const PORT = 3000;
+// Honour $PORT rather than hardcoding. Render assigns the port it expects the
+// service to listen on through this variable; the literal 3000 happened to
+// work only because render.yaml pins PORT=3000 to match. Reading the variable
+// removes that coupling — a platform-assigned port now just works instead of
+// producing a service that binds somewhere nothing is routed to.
+const PORT = Number(process.env.PORT) || 3000;
 
 // Production-readiness pass (2026-07-24): this used to be
 // `const __filename = fileURLToPath(import.meta.url); const __dirname =
@@ -383,9 +387,25 @@ function selectGeminiKey(clientKey?: string): string {
 }
 
 
-// Body parser middleware
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+// Body parser middleware.
+//
+// The limit was a hardcoded "50mb", which sits badly on the free plan's
+// 512 MB of RAM (render.yaml): express buffers the raw body, then the decoded
+// string, and /api/parse-file additionally base64-decodes it into a Buffer —
+// so one 50 MB upload transiently costs a multiple of that, and two
+// concurrent ones can push the instance into an OOM kill. On Render an OOM
+// kill restarts the container, which means the next visitor pays a fresh
+// cold start; the memory ceiling and the cold-start budget are the same
+// problem viewed from two sides.
+//
+// Made configurable rather than merely smaller, so that moving to a
+// larger plan is an env-var change and not a code change. At 25 MB of JSON
+// the real ceiling is roughly an 18 MB file once base64's ~33% expansion is
+// accounted for, which covers ordinary article and thesis PDFs.
+const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 25;
+const BODY_LIMIT = `${MAX_UPLOAD_MB}mb`;
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));
 
 // ==========================================
 // T006 — Rate limiting & brute-force protection
@@ -442,6 +462,13 @@ registerAIRoutes(app, aiAbuseLimit, citationStyleRegistry);
 // ==========================================
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    // Imported lazily, not at module top level. Vite is a dev-only concern —
+    // this branch is the only thing that touches it — but a top-level import
+    // becomes an unconditional require() in the esbuild CJS bundle, which
+    // dragged Vite and its dependency tree into the production image and made
+    // it load on every cold start. Inside the branch, production never
+    // resolves the module at all.
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

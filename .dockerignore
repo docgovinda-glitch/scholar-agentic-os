@@ -1,0 +1,34 @@
+# Build-context exclusions. Without this file `COPY . .` shipped the host's
+# node_modules, the full .git history, and every doc/test into the image —
+# slowing the build and inflating the layer that Render's free tier has to
+# pull and unpack on every cold start.
+
+# Never let local secrets reach an image layer.
+.env
+.env.*
+!.env.example
+
+node_modules
+dist
+coverage
+.git
+.gitignore
+.github
+.husky
+
+# Docs / agent notes: not inputs to `npm run build`.
+docs
+.claude
+AGENTS.md
+CHANGELOG.md
+DEPLOYMENT_README.md
+README.md
+
+# Test-only tooling and fixtures.
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+vitest.config.ts
+
+Dockerfile
+.dockerignore

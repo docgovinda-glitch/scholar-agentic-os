@@ -29,6 +29,13 @@ export type AIErrorKind =
   | "timeout"
   | "cors_blocked"
   | "network_unreachable"
+  /**
+   * This app's own server is still booting. Distinct from
+   * `network_unreachable` because the remedy is completely different: nothing
+   * is misconfigured and nothing needs checking, the user just has to wait a
+   * moment. See src/services/serverWarmup.ts.
+   */
+  | "server_waking"
   | "bad_request"
   | "model_not_found"
   | "unsupported_provider"
@@ -66,6 +73,7 @@ const KIND_LABELS: Record<AIErrorKind, string> = {
   timeout: "Request timed out",
   cors_blocked: "Blocked by the browser (CORS)",
   network_unreachable: "Could not reach the service",
+  server_waking: "Server is starting up",
   bad_request: "Request rejected",
   model_not_found: "Model not available",
   unsupported_provider: "Provider not supported",
@@ -259,6 +267,33 @@ export function classifyThrownError(error: unknown, opts?: { url?: string }): Cl
     detail: message,
     retryable: true,
     failoverWorthwhile: true,
+  };
+}
+
+/**
+ * The classified form of "this app's own server is still waking up" — the
+ * normal consequence of Render's free plan idling the instance out, not a
+ * fault. See src/services/serverWarmup.ts.
+ *
+ * `retryable` is true and `failoverWorthwhile` is false, and that combination
+ * is the entire reason this kind exists. Every cloud provider reaches its API
+ * through the same /api/generate proxy on the same instance, so while that
+ * instance is booting, the next provider in the failover chain cannot succeed
+ * either — walking the chain would multiply one unavoidable wait by the number
+ * of configured providers, and end by blaming whichever provider happened to
+ * be last. Retrying the same provider, by contrast, is exactly right: the
+ * container is on its way up.
+ */
+export function serverWakingError(detail?: string): ClassifiedAIError {
+  return {
+    kind: "server_waking",
+    label: KIND_LABELS.server_waking,
+    message:
+      "The server had gone to sleep and is starting back up. This happens after a spell of inactivity and usually takes under a minute.",
+    remedy: "Give it a few seconds and try again — nothing needs changing in your settings.",
+    detail,
+    retryable: true,
+    failoverWorthwhile: false,
   };
 }
 

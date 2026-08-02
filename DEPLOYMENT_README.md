@@ -60,15 +60,27 @@ Set these wherever the static frontend is hosted (Netlify/Vercel/Cloudflare Page
 
 ## 4. Frontend & Backend Hosting (Render)
 
-Primary hosting via [`render.yaml`](render.yaml) — Render's free tier (starter plan) with Docker deployment. The frontend (`npm run build`, publish directory `dist`) and backend (`server.ts`) are bundled together as a single full-stack service.
+Primary hosting via [`render.yaml`](render.yaml) — Render's **free** web-service plan, deployed from the repo's `Dockerfile`. The frontend (`npm run build` → `dist`) and the backend (`server.ts`) ship together as one full-stack service.
+
+> Earlier revisions of this file and of `render.yaml` said "free tier (starter plan)". Those are two different things: `starter` is Render's **paid** $7/month always-on plan. `render.yaml` now correctly declares `plan: free`.
 
 **Stack (decision: Task 9, 2026-08-02)**:
-- **Platform**: Render (free tier, Docker deployment)
+- **Platform**: Render (free plan, Docker deployment)
 - **DNS**: Cloudflare
 - **Database**: Supabase (user auth, profiles, admin config)
 - **Email**: Resend (via Supabase Edge Functions)
 
-Set the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from §2 as Render environment variables (the Dockerfile consumes them as build args). Add `GEMINI_API_KEY`, `GEMINI_API_KEY_BACKUP`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `ADMIN_EMAIL`, and `ENCRYPTION_KEY` as Render environment variables (sync: false — these are secrets, not synced from the repo).
+### What the free plan imposes
+
+- **Idles out after ~15 minutes without traffic.** The next request waits tens of seconds while the container boots. This is inherent to the plan, not a bug. The app handles it rather than hiding it — see `docs/adr/ADR-0014-FreeTierColdStartHardening.md`: a probe at app boot starts the wake early, and a request that does land mid-boot is reported as "server is starting up" instead of as a network or provider fault.
+- **512 MB RAM.** `MAX_UPLOAD_MB` (default 25) caps request bodies against this. Raise it only alongside a plan with more memory — see `server.ts` for why the ceiling and the cold start are the same problem.
+- **750 instance-hours/month**, shared across every free service on the account.
+
+If cold starts become unacceptable, the two honest options are to serve the frontend from Cloudflare Pages (leaving Render for `/api/*` only), or to move to `plan: starter`. Both are discussed in ADR-0014; keep-alive pinging is not a solution, as it consumes essentially the whole monthly allowance.
+
+### Environment variables
+
+Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from §2 in the Render dashboard — Vite inlines these at **build** time, and Render forwards same-named env vars to the Dockerfile as build args, so they must be set before a build, not merely at runtime. Add `GEMINI_API_KEY`, `GEMINI_API_KEY_BACKUP`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `ADMIN_EMAIL`, and `ENCRYPTION_KEY` as secrets (`sync: false` — never committed). `PORT` and `MAX_UPLOAD_MB` are declared in `render.yaml` with defaults.
 
 ---
 

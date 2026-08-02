@@ -23,12 +23,33 @@ services:
     name: scholar-agentic-os
     env: docker
     dockerfilePath: ./Dockerfile
-    plan: starter
+    # `free`, not `starter`. This file previously declared `starter`, which is
+    # Render's PAID ($7/mo) always-on plan — it contradicted the stated
+    # free-tier-only constraint, and a blueprint sync would have silently
+    # provisioned a billable service.
+    #
+    # What the free plan actually imposes, and what the code now assumes:
+    #   * spins down after ~15 min idle; the next request pays a cold start
+    #     (tens of seconds for a Docker service) — see src/services/
+    #     serverWarmup.ts, which probes /api/health at app boot so the
+    #     container wakes while the user is still reading the page, and
+    #     reports "waking" honestly instead of surfacing a generic failure
+    #   * 512 MB RAM — MAX_UPLOAD_MB in server.ts is sized against this
+    #   * 750 instance-hours/month across all free services in the account
+    plan: free
+    # Gives Render a readiness signal, and gives the warmup probe a cheap,
+    # dependency-free endpoint to hit.
+    healthCheckPath: /api/health
     envVars:
       - key: PORT
         value: 3000
       - key: NODE_ENV
         value: production
+      # Caps the JSON/urlencoded body size server.ts will buffer. Default 25
+      # is chosen for the free plan's 512 MB; raise it only alongside a plan
+      # with more memory (see server.ts for the full reasoning).
+      - key: MAX_UPLOAD_MB
+        value: 25
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_API_KEY_BACKUP
