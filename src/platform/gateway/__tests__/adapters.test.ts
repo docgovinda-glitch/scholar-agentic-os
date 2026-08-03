@@ -64,6 +64,27 @@ describe("platform/gateway/adapters: Gemini", () => {
     expect(result.text).toBe("Hello");
   });
 
+  it("sets responseMimeType when responseFormat is json", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }),
+    });
+    global.fetch = fetchMock;
+
+    const adapter = getAdapter("gemini")!;
+    await adapter.complete({
+      provider: "gemini",
+      apiKey: "k",
+      taskClass: "drafting",
+      userPrompt: "hi",
+      responseFormat: "json",
+      segments: [],
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.generationConfig.responseMimeType).toBe("application/json");
+  });
+
   it("throws AdapterHttpError with the status preserved on a failed request", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
@@ -105,6 +126,29 @@ describe("platform/gateway/adapters: Cohere", () => {
   it("has no stream() — the gateway falls back to complete() for this provider", () => {
     const adapter = getAdapter("cohere")!;
     expect(adapter.stream).toBeUndefined();
+  });
+});
+
+describe("platform/gateway/adapters: OpenAI-compatible", () => {
+  it("sets response_format to json_object when responseFormat is json", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "{}" } }] }),
+    });
+    global.fetch = fetchMock;
+
+    const adapter = getAdapter("openai")!;
+    await adapter.complete({
+      provider: "openai",
+      apiKey: "k",
+      taskClass: "drafting",
+      userPrompt: "hi",
+      responseFormat: "json",
+      segments: [],
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.response_format).toEqual({ type: "json_object" });
   });
 });
 

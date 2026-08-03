@@ -95,6 +95,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
       ],
       temperature: req.temperature ?? 0.3,
       ...(req.maxTokens ? { max_tokens: req.maxTokens } : {}),
+      ...(req.responseFormat === "json" ? { response_format: { type: "json_object" } } : {}),
       ...(stream ? { stream: true } : {}),
     });
   }
@@ -195,6 +196,7 @@ class GeminiAdapter implements ProviderAdapter {
       generationConfig: {
         temperature: req.temperature ?? 0.3,
         ...(req.maxTokens ? { maxOutputTokens: req.maxTokens } : {}),
+        ...(req.responseFormat === "json" ? { responseMimeType: "application/json" } : {}),
       },
     };
   }
