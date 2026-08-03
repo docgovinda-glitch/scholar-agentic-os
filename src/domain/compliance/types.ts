@@ -26,7 +26,7 @@ export interface RuleSource {
 }
 
 /** The deterministic evaluator kinds implemented so far (docs 31 §5.1's "immediate/fast" tier). */
-export type EvaluatorKind = "word_count" | "structural_presence" | "metadata_presence" | "claim_support" | "readability";
+export type EvaluatorKind = "word_count" | "structural_presence" | "metadata_presence" | "claim_support" | "readability" | "position_in_text";
 
 export interface WordCountParams {
   max?: number;
@@ -72,7 +72,26 @@ export interface ClaimSupportParams {
 export interface ReadabilityParams {
   /** If set, evaluates only the block whose id matches this key (same convention as StructuralPresenceParams.sectionKey). Unset evaluates the whole document. */
   sectionKey?: string;
-  maxGradeLevel: number;
+  /** At least one of maxGradeLevel / maxJargonDensity must be set — the compiler (app/rubric/fromAtlas.ts's compileReadabilityGateRules) always sets exactly the one(s) its source QualityGateSpec.readabilityGate names. */
+  maxGradeLevel?: number;
+  /** 0-1, checked against domain/language/readability.ts's jargonDensity metric (fraction of 3+ syllable words). */
+  maxJargonDensity?: number;
+}
+
+/**
+ * Checks whether at least one of `keywords` (case-insensitive substring
+ * match) appears within the first `withinWords` words of the document (or
+ * one section, via `sectionKey`) — e.g. OT-20's "the recommendation is
+ * stated within the first 200 words". A heuristic proxy for "is the
+ * recommendation actually here", same honesty as textStats.ts's
+ * passive-voice regex: literal keyword presence, not semantic
+ * understanding of whether the sentence containing it truly is a
+ * recommendation.
+ */
+export interface PositionInTextParams {
+  keywords: string[];
+  withinWords: number;
+  sectionKey?: string;
 }
 
 export interface Rule {
@@ -86,7 +105,8 @@ export interface Rule {
     | { kind: "structural_presence"; params: StructuralPresenceParams }
     | { kind: "metadata_presence"; params: MetadataPresenceParams }
     | { kind: "claim_support"; params: ClaimSupportParams }
-    | { kind: "readability"; params: ReadabilityParams };
+    | { kind: "readability"; params: ReadabilityParams }
+    | { kind: "position_in_text"; params: PositionInTextParams };
   message: string;
   remedy: string;
   autoFixable: boolean;

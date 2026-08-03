@@ -60,7 +60,10 @@ function docWithWords(n: number): CanonicalDocument {
   return d;
 }
 
-function readabilityRule(overrides: Partial<Rule> = {}, params: { sectionKey?: string; maxGradeLevel: number } = { maxGradeLevel: 8 }): Rule {
+function readabilityRule(
+  overrides: Partial<Rule> = {},
+  params: { sectionKey?: string; maxGradeLevel?: number; maxJargonDensity?: number } = { maxGradeLevel: 8 }
+): Rule {
   return {
     id: "r-readability",
     source: { document: "test", locator: "x", quote: "x", extractedAt: "now", confidence: 1 },
@@ -70,6 +73,25 @@ function readabilityRule(overrides: Partial<Rule> = {}, params: { sectionKey?: s
     evaluator: { kind: "readability", params },
     message: "reading level check",
     remedy: "simplify",
+    autoFixable: false,
+    userModified: false,
+    ...overrides,
+  };
+}
+
+function positionInTextRule(
+  overrides: Partial<Rule> = {},
+  params: { keywords: string[]; withinWords: number; sectionKey?: string } = { keywords: ["recommend"], withinWords: 200 }
+): Rule {
+  return {
+    id: "r-position",
+    source: { document: "test", locator: "x", quote: "x", extractedAt: "now", confidence: 1 },
+    type: "structural",
+    scope: params.sectionKey ? "section" : "document",
+    severity: "blocking",
+    evaluator: { kind: "position_in_text", params },
+    message: "key point stated early",
+    remedy: "move it earlier",
     autoFixable: false,
     userModified: false,
     ...overrides,
@@ -314,6 +336,103 @@ describe("domain/compliance: readability evaluator", () => {
       "The multidisciplinary epistemological ramifications of postmodern deconstructionist methodology necessitate comprehensive institutional reconceptualization."
     );
     const rule = readabilityRule({ severity: "required", waived: { reason: "supervisor approved", at: "now" } }, { maxGradeLevel: 8 });
+    const finding = evaluateRule(rule, withText);
+    expect(finding.status).toBe("warn");
+  });
+
+  it("checks jargon density independently of grade level when only maxJargonDensity is set", () => {
+    const doc = emptyDocument("d1", "Test");
+    const withText = appendBlock(doc, "b1", "paragraph", "A cat sat on a mat and the dog ran.");
+    const finding = evaluateRule(readabilityRule({}, { maxJargonDensity: 0.5 }), withText);
+    expect(finding.status).toBe("pass");
+    expect(finding.expected).toContain("jargon");
+    expect(finding.expected).not.toContain("grade");
+  });
+
+  it("fails on jargon density even when grade level would pass, when both are set", () => {
+    const doc = emptyDocument("d1", "Test");
+    // Short sentences (low grade level) built almost entirely from complex words.
+    const withText = appendBlock(doc, "b1", "paragraph", "Extraordinary. Multidisciplinary. Reconceptualization.");
+    const finding = evaluateRule(readabilityRule({}, { maxGradeLevel: 20, maxJargonDensity: 0.1 }), withText);
+    expect(finding.status).toBe("fail");
+    expect(finding.message).toContain("jargon");
+  });
+});
+
+describe("domain/compliance: position_in_text evaluator", () => {
+  it("passes when a keyword appears within the word window", () => {
+    const doc = emptyDocument("d1", "Test");
+    const withText = appendBlock(doc, "b1", "paragraph", "We recommend adopting the pilot programme immediately.");
+    const finding = evaluateRule(positionInTextRule({}, { keywords: ["recommend"], withinWords: 200 }), withText);
+    expect(finding.status).toBe("pass");
+  });
+
+  it("fails when no keyword appears within the word window", () => {
+    const doc = emptyDocument("d1", "Test");
+    const withText = appendBlock(doc, "b1", "paragraph", "This document discusses background context only.");
+    const finding = evaluateRule(positionInTextRule({}, { keywords: ["recommend"], withinWords: 200 }), withText);
+    expect(finding.status).toBe("fail");
+    expect(finding.remedy).toBeDefined();
+  });
+
+  it("fails when the keyword appears, but after the word window", () => {
+    const doc = emptyDocument("d1", "Test");
+    const filler = Array.from({ length: 200 }, () => "word").join(" ");
+    const withText = appendBlock(doc, "b1", "paragraph", `${filler} we recommend this.`);
+    const finding = evaluateRule(positionInTextRule({}, { keywords: ["recommend"], withinWords: 200 }), withText);
+    expect(finding.status).toBe("fail");
+  });
+
+  it("is case-insensitive", () => {
+    const doc = emptyDocument("d1", "Test");
+    const withText = appendBlock(doc, "b1", "paragraph", "We RECOMMEND this option.");
+    const finding = evaluateRule(positionInTextRule({}, { keywords: ["recommend"], withinWords: 200 }), withText);
+    expect(finding.status).toBe("pass");
+  });
+
+  it("matches any one of several keywords", () => {
+    const doc = emptyDocument("d1", "Test");
+    const withText = appendBlock(doc, "b1", "paragraph", "Our proposal is to proceed with option B.");
+    const finding = evaluateRule(positionInTextRule({}, { keywords: ["recommend", "our proposal"], withinWords: 200 }), withText);
+    expect(finding.status).toBe("pass");
+  });
+
+  it("scopes to one section by sectionKey", () => {
+    let doc = emptyDocument("d1", "Test");
+    doc = appendBlock(doc, "intro", "paragraph", "Background with no key term here.");
+    doc = appendBlock(doc, "recommendation", "paragraph", "We recommend option B.");
+    const finding = evaluateRule(positionInTextRule({}, { keywords: ["recommend"], withinWords: 200, sectionKey: "recommendation" }), doc);
+    expect(finding.status).toBe("pass");
+    expect(finding.location).toEqual({ sectionKey: "recommendation" });
+  });
+
+  it("returns not_applicable for a missing scoped section", () => {
+    const doc = emptyDocument("d1", "Test");
+    const finding = evaluateRule(positionInTextRule({}, { keywords: ["recommend"], withinWords: 200, sectionKey: "recommendation" }), doc);
+    expect(finding.status).toBe("not_applicable");
+  });
+
+  it("returns not_applicable for an empty whole document", () => {
+    const doc = emptyDocument("d1", "Test");
+    const finding = evaluateRule(positionInTextRule(), doc);
+    expect(finding.status).toBe("not_applicable");
+  });
+
+  it("does NOT downgrade a blocking-severity rule even if somehow marked waived", () => {
+    const doc = emptyDocument("d1", "Test");
+    const withText = appendBlock(doc, "b1", "paragraph", "No key term.");
+    const rule = positionInTextRule({ severity: "blocking", waived: { reason: "x", at: "now" } }, { keywords: ["recommend"], withinWords: 200 });
+    const finding = evaluateRule(rule, withText);
+    expect(finding.status).toBe("fail");
+  });
+
+  it("downgrades to warn when waived and not blocking severity", () => {
+    const doc = emptyDocument("d1", "Test");
+    const withText = appendBlock(doc, "b1", "paragraph", "No key term.");
+    const rule = positionInTextRule(
+      { severity: "required", waived: { reason: "supervisor approved", at: "now" } },
+      { keywords: ["recommend"], withinWords: 200 }
+    );
     const finding = evaluateRule(rule, withText);
     expect(finding.status).toBe("warn");
   });

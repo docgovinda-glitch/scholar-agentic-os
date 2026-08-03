@@ -4,9 +4,9 @@
  * Spec: docs/03-workflow/31-SUBMISSION-COMPLIANCE-ARCHITECTURE.md §5.1:
  * "Roughly 80% of rules are deterministic, which is what makes continuous
  * evaluation feasible offline and within NFR-PERF-4's 300ms budget."
- * word_count, structural_presence, metadata_presence, claim_support, and
- * readability are that 80% case for the rule types app/rubric/fromAtlas.ts
- * can compile directly from an Atlas spec.
+ * word_count, structural_presence, metadata_presence, claim_support,
+ * readability, and position_in_text are that 80% case for the rule types
+ * app/rubric/fromAtlas.ts can compile directly from an Atlas spec.
  */
 
 import type { CanonicalDocument } from "../document/model";
@@ -14,7 +14,7 @@ import { wordCount } from "../document/ops";
 import type { ClaimEvidenceGraph } from "../claim/types";
 import { unsupportedClaims } from "../claim/graph";
 import { analyzeReadability } from "../language/readability";
-import type { Finding, Rule, WordCountParams, StructuralPresenceParams, MetadataPresenceParams, ClaimSupportParams, ReadabilityParams } from "./types";
+import type { Finding, Rule, WordCountParams, StructuralPresenceParams, MetadataPresenceParams, ClaimSupportParams, ReadabilityParams, PositionInTextParams } from "./types";
 import { isEffectivelyWaived } from "./types";
 
 function excludingSections(doc: CanonicalDocument, exclude: string[]): CanonicalDocument {
@@ -162,11 +162,13 @@ function evaluateClaimSupport(rule: Rule, _params: ClaimSupportParams, claimGrap
 }
 
 /**
- * Checks Flesch-Kincaid grade level against `params.maxGradeLevel`.
- * `not_applicable` for missing/empty text (a section that doesn't exist yet
- * has no reading level to assess — `structural_presence` is what reports a
- * missing required section as a failure, this evaluator doesn't duplicate
- * that job).
+ * Checks whichever of `params.maxGradeLevel` / `params.maxJargonDensity`
+ * are set (at least one always is, per the compiler) — a rule fails if any
+ * configured threshold fails, AND semantics. `not_applicable` for
+ * missing/empty text (a section that doesn't exist yet has no reading
+ * level to assess — `structural_presence` is what reports a missing
+ * required section as a failure, this evaluator doesn't duplicate that
+ * job).
  */
 function evaluateReadability(rule: Rule, params: ReadabilityParams, doc: CanonicalDocument): Finding {
   const text = params.sectionKey
@@ -185,19 +187,73 @@ function evaluateReadability(rule: Rule, params: ReadabilityParams, doc: Canonic
   }
 
   const { metrics } = analyzeReadability(text);
-  const withinThreshold = metrics.fleschKincaidGradeLevel <= params.maxGradeLevel;
+  const failures: string[] = [];
+  if (params.maxGradeLevel !== undefined && metrics.fleschKincaidGradeLevel > params.maxGradeLevel) {
+    failures.push(`reading level (grade ${metrics.fleschKincaidGradeLevel}) exceeds the target of grade ${params.maxGradeLevel}`);
+  }
+  if (params.maxJargonDensity !== undefined && metrics.jargonDensity > params.maxJargonDensity) {
+    failures.push(`jargon density (${metrics.jargonDensity}) exceeds the target of ${params.maxJargonDensity}`);
+  }
+  const withinThreshold = failures.length === 0;
 
   return {
     ruleId: rule.id,
     status: withinThreshold ? "pass" : isEffectivelyWaived(rule) ? "warn" : "fail",
     severity: rule.severity,
     location: params.sectionKey ? { sectionKey: params.sectionKey } : undefined,
-    actual: `grade ${metrics.fleschKincaidGradeLevel}`,
-    expected: `≤ grade ${params.maxGradeLevel}`,
-    message: withinThreshold
-      ? `Reading level (grade ${metrics.fleschKincaidGradeLevel}) is at or below the target of grade ${params.maxGradeLevel}.`
-      : `Reading level (grade ${metrics.fleschKincaidGradeLevel}) exceeds the target of grade ${params.maxGradeLevel}.`,
-    remedy: withinThreshold ? undefined : "Shorten sentences and prefer shorter, more common words to lower the reading level.",
+    actual: [
+      params.maxGradeLevel !== undefined ? `grade ${metrics.fleschKincaidGradeLevel}` : undefined,
+      params.maxJargonDensity !== undefined ? `jargon ${metrics.jargonDensity}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(", "),
+    expected: [
+      params.maxGradeLevel !== undefined ? `≤ grade ${params.maxGradeLevel}` : undefined,
+      params.maxJargonDensity !== undefined ? `jargon ≤ ${params.maxJargonDensity}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(", "),
+    message: withinThreshold ? "Within the target reading level and jargon density." : `${failures.join("; ")}.`,
+    remedy: withinThreshold ? undefined : "Shorten sentences and prefer shorter, more common words to lower the reading level and jargon density.",
+  };
+}
+
+/**
+ * Checks that at least one of `params.keywords` appears (case-insensitive
+ * substring match) within the first `params.withinWords` words of the
+ * text — see PositionInTextParams's doc comment for the heuristic caveat.
+ * `not_applicable` for missing/empty (scoped) text, same discipline as
+ * evaluateReadability.
+ */
+function evaluatePositionInText(rule: Rule, params: PositionInTextParams, doc: CanonicalDocument): Finding {
+  const text = params.sectionKey
+    ? (doc.blocks.find((b) => b.id === params.sectionKey)?.text ?? "")
+    : doc.blocks.map((b) => b.text).join("\n\n");
+
+  if (text.trim().length === 0) {
+    return {
+      ruleId: rule.id,
+      status: "not_applicable",
+      severity: rule.severity,
+      message: params.sectionKey
+        ? `Section "${params.sectionKey}" is missing or empty — nothing to check.`
+        : "The document has no text yet — nothing to check.",
+    };
+  }
+
+  const words = text.trim().split(/\s+/);
+  const window = words.slice(0, params.withinWords).join(" ").toLowerCase();
+  const found = params.keywords.some((kw) => window.includes(kw.toLowerCase()));
+
+  return {
+    ruleId: rule.id,
+    status: found ? "pass" : isEffectivelyWaived(rule) ? "warn" : "fail",
+    severity: rule.severity,
+    location: params.sectionKey ? { sectionKey: params.sectionKey } : undefined,
+    message: found
+      ? `Found within the first ${params.withinWords} words.`
+      : `None of the expected terms (${params.keywords.join(", ")}) appear within the first ${params.withinWords} words.`,
+    remedy: found ? undefined : `Move the key point earlier — it should appear within the first ${params.withinWords} words.`,
   };
 }
 
@@ -224,6 +280,8 @@ export function evaluateRule(rule: Rule, doc: CanonicalDocument, claimGraph?: Cl
       return evaluateClaimSupport(rule, rule.evaluator.params, claimGraph);
     case "readability":
       return evaluateReadability(rule, rule.evaluator.params, doc);
+    case "position_in_text":
+      return evaluatePositionInText(rule, rule.evaluator.params, doc);
     default:
       return {
         ruleId: rule.id,

@@ -508,28 +508,56 @@ Alongside that legacy pipeline, a new `app/mesh` has started at
 before a run executes, evaluates declared QA checkpoints afterward (§8.1 —
 a failed checkpoint fails the run and withholds output), and enforces a
 `budgetMs` timeout (§8.3). `registry.ts` is an in-process id-to-manifest
-lookup. One real agent is wired through it: **AG-18, the Readability
-Analyst** (`agents/ag18ReadabilityAnalyst.ts`), backed by new pure logic in
-`domain/language/readability.ts` — Flesch Reading Ease, Flesch-Kincaid grade
-level, passive-voice ratio (reusing the same heuristic `voiceProfile.ts`
-uses, now shared via `domain/language/textStats.ts`), and jargon density,
-with an audience-relative grade-level finding. AG-18 was picked specifically
-because it's fully deterministic, so the runtime's capability enforcement
-and QA-checkpoint machinery could be proven end-to-end without also
-standing up a Foundry/prompt/golden-set pipeline.
+lookup, populated by `agents/index.ts`'s `registerBuiltinAgents()` — though
+nothing calls that yet either. Four real agents are wired through it, all
+picked specifically because they're fully deterministic, so the runtime's
+capability enforcement and QA-checkpoint machinery could be proven
+end-to-end without also standing up a Foundry/prompt/golden-set pipeline:
+
+- **AG-14, the Citation Manager** (`agents/ag14CitationManager.ts`) wraps
+  `src/citation_compliance/`'s already-built formatters (APA 7, MLA 9,
+  Chicago author-date, Chicago Notes-Bibliography, Harvard, IEEE,
+  Vancouver) rather than reimplementing citation formatting. "Missing and
+  orphaned entries" is computed by array index, not a real citation key —
+  `CanonicalReference` has none — see the module's own comment.
+- **AG-18, the Readability Analyst** (`agents/ag18ReadabilityAnalyst.ts`),
+  backed by new pure logic in `domain/language/readability.ts` — Flesch
+  Reading Ease, Flesch-Kincaid grade level, passive-voice ratio (reusing
+  the same heuristic `voiceProfile.ts` uses, now shared via
+  `domain/language/textStats.ts`), and jargon density.
+- **AG-25, the Privacy Guard** (`agents/ag25PrivacyGuard.ts`) is a thin
+  pass-through to `platform/warden/warden.ts`'s `evaluate()` — "the
+  Warden's agent face" made real without moving any logic out of the
+  Warden itself.
+- **AG-26, the Workflow Coordinator** (`agents/ag26WorkflowCoordinator.ts`)
+  wraps `app/conductor`'s `summarize()`/`nextOutstandingGate()`/
+  `isProjectComplete()` — the deterministic half of "evaluates gate
+  criteria, proposes next actions" only; "proposes" here means a
+  rule-based description of the next gate's state, not a model-generated
+  suggestion, and it never schedules a run or detects a stall (both need
+  `services/queue` integration this increment doesn't add).
+
+Building these three agents required extending `services/capabilities`'s
+registry beyond §4.1's 18-entry table — that table is not actually
+exhaustive of what §3's per-agent "Permissions:" lines assign (`write:
+citations` for AG-14, `read:egress_request`/`write:egress_decision` for
+AG-25, `read:gates`/`write:schedule` for AG-26 were all missing from it) —
+and `app/mesh/types.ts`'s `MemoryTier` to add a fourth `"none"` value for
+AG-25's "Memory: none — stateless by design," which §6's three-tier table
+also doesn't account for.
 
 | Current | Target |
 |---|---|
-| 9 legacy agents; 1 new-architecture agent (AG-18) wired through `app/mesh` | 26 agents in 7 groups |
+| 9 legacy agents; 4 new-architecture agents (AG-14, AG-18, AG-25, AG-26) wired through `app/mesh` | 26 agents in 7 groups |
 | `app/mesh`'s executor enforces declared permissions via `services/capabilities`, but nothing calls it yet — not `app/conductor`, not any HTTP route | Declared, service tier-enforced capability grants, actually driving agent runs in the product |
 | No versioning or channels (an `AgentManifest.channel` field exists but nothing acts on it) | Full lifecycle with evaluation-gated promotion |
 | `AgentManifest.memory` is declared but not implemented — no tier actually persists anything | Three tiers with opt-in workspace memory |
-| Legacy agents in code; AG-18 in a typed in-process object | Behaviour in signed, versioned configuration |
+| Legacy agents in code; the four new ones are typed in-process objects | Behaviour in signed, versioned configuration |
 | No golden sets | Per-agent evaluation suites |
-| QA checkpoints declared and enforced at runtime for AG-18 | Declared checkpoints enforced at runtime, for all 26 |
+| QA checkpoints declared and enforced at runtime for all four wired agents | Declared checkpoints enforced at runtime, for all 26 |
 | Legacy pipeline exists; `app/mesh`'s executor runs one agent at a time, with no composition layer yet | Conductor-composed with typed artifacts and no agent-to-agent calls |
 | `humanizeSkill` | **Retired** (`32` §12) |
 
 The registry/executor/mode design carries forward. Permissions and QA
-checkpoints are now real for one agent; versioning, channels, memory-tier
+checkpoints are now real for four agents; versioning, channels, memory-tier
 persistence, and the Foundry remain new construction.

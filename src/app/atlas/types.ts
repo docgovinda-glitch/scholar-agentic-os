@@ -106,16 +106,30 @@ export interface QualityGateSpec {
    */
   usesClaimGraph?: boolean;
   /**
-   * Set when this gate is a target-reading-level check (e.g. OT-17's
-   * participant information sheet, which must be plain-language for a lay
-   * reviewer). When set, `app/rubric/fromAtlas.ts`'s
+   * Set when this gate is a target-reading-level and/or jargon-density
+   * check (e.g. OT-17's participant information sheet, which must be
+   * plain-language for a lay reviewer; OT-20's audience-appropriate and
+   * jargon-density gates). When set, `app/rubric/fromAtlas.ts`'s
    * `compileReadabilityGateRules` compiles this into a `readability` Rule
-   * at the gate's own severity, checking Flesch-Kincaid grade level via
-   * `domain/language/readability.ts`. `sectionKey` scopes the check to one
-   * document section (matched the same way `structural_presence` does);
-   * omitted, it checks the whole document.
+   * at the gate's own severity, checking Flesch-Kincaid grade level and/or
+   * jargon density via `domain/language/readability.ts`. `sectionKey`
+   * scopes the check to one document section (matched the same way
+   * `structural_presence` does); omitted, it checks the whole document. At
+   * least one of `maxGradeLevel`/`maxJargonDensity` must be set — a gate
+   * setting neither wouldn't check anything.
    */
-  readabilityGate?: { maxGradeLevel: number; sectionKey?: string };
+  readabilityGate?: { maxGradeLevel?: number; maxJargonDensity?: number; sectionKey?: string };
+  /**
+   * Set when this gate is a "does the key point appear early enough" check
+   * — e.g. OT-20's "the recommendation is stated within the first 200
+   * words" gate. When set, `app/rubric/fromAtlas.ts`'s
+   * `compilePositionInTextGateRules` compiles this into a
+   * `position_in_text` Rule at the gate's own severity. `keywords` is a
+   * heuristic proxy (literal, case-insensitive substring match) for
+   * whether the actual content described by the gate is present — see
+   * `domain/compliance/types.ts`'s `PositionInTextParams` doc comment.
+   */
+  positionInTextGate?: { keywords: string[]; withinWords: number; sectionKey?: string };
 }
 
 export interface ExportDefaults {
