@@ -66,4 +66,10 @@ describe("architecture: egress boundary", () => {
     const mod = await import("../gateway/gateway");
     expect(Object.keys(mod)).not.toContain("getAdapter");
   });
+
+  it("server/routes/studio.ts (the new architecture's route) does not call fetch() directly", () => {
+    const file = resolve(process.cwd(), "server/routes/studio.ts");
+    const content = readFileSync(file, "utf8");
+    expect(/\bfetch\s*\(/.test(content)).toBe(false);
+  });
 });
