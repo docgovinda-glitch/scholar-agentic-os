@@ -93,12 +93,12 @@ function openAICompatibleBody(
   });
 }
 
+// Intentionally a no-op passthrough: server-stored/decryptable per-user API
+// keys (the server.ts decryptServerKey/users.json path this was once meant
+// to call into) were dead code and have been removed (13 §8.2, Phase 4 of
+// the ai.ts migration). Live traffic is 100% client-supplied (BYOK) keys.
 function resolveApiKey(provider: string, apiKey: string, username?: string): string {
-  let activeApiKey = apiKey;
-  if ((!activeApiKey || activeApiKey === "defined_on_server" || activeApiKey === "") && username) {
-    // Note: in production this would need access to decryptServerKey and users DB
-  }
-  return activeApiKey;
+  return apiKey;
 }
 
 function getGeminiClient() {

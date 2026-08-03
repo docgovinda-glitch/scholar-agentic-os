@@ -4,8 +4,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import crypto from "crypto";
-import fs from "fs";
 
 import { rateLimit } from "./server/src/middleware/rateLimit.ts";
 import { PDFParser } from "./src/document_intelligence/parser/parsers/pdfParser.ts";
@@ -205,67 +203,6 @@ app.use(
   })
 );
 
-const USERS_DB_PATH = path.join(serverDirname, "users.json");
-
-// Trimmed to the fields server.ts actually reads (2026-07-30): this used to
-// mirror the full users.json record shape from the old custom auth routes
-// (registration/activation/passcode-reset), removed in commit d61a69b —
-// `username` (findUserByUsername) and `encryptedApiKeys` (resolveApiKey's
-// server-stored-API-key fallback) are the only fields any code in this file
-// still reads or writes. Type-only change, no runtime effect.
-interface UserRecord {
-  username: string;
-  encryptedApiKeys?: {
-    [provider: string]: string;
-  };
-}
-
-// Production-readiness pass (2026-07-24): this used to fall back to a
-// hardcoded literal ("scholar-agentic-secure-vault-32ch") whenever
-// ENCRYPTION_KEY wasn't set — the exact same class of vulnerability fixed
-// for the BYOK vault passphrase in an earlier session (a known constant
-// standing in for a real secret defeats the point of encrypting at all).
-// No fallback now: if unset, decryptServerKey refuses to decrypt (returns
-// "" — resolveApiKey's caller already treats that as "no server-stored key
-// available", not a crash) instead of silently using a guessable key.
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
-if (!ENCRYPTION_KEY) {
-  console.warn(
-    "[Security] ENCRYPTION_KEY is not set — server-stored provider API keys (resolveApiKey's users.json fallback) cannot be decrypted until it's configured."
-  );
-}
-
-function decryptServerKey(text: string): string {
-  if (!ENCRYPTION_KEY) return "";
-  try {
-    let cipherKey = Buffer.alloc(32);
-    cipherKey.write(ENCRYPTION_KEY, 'utf-8');
-
-    const parts = text.split(':');
-    const iv = Buffer.from(parts.shift() || '', 'hex');
-    const encryptedText = Buffer.from(parts.join(':'), 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', cipherKey, iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
-  } catch (err) {
-    console.error("Failed to decrypt server key:", err);
-    return "";
-  }
-}
-
-function resolveApiKey(provider: string, apiKey: string, username?: string): string {
-  let activeApiKey = apiKey;
-  if ((!activeApiKey || activeApiKey === "defined_on_server" || activeApiKey === "") && username) {
-    const db = readUsersDb();
-    const userRec = findUserByUsername(db, username);
-    if (userRec && userRec.encryptedApiKeys && userRec.encryptedApiKeys[provider]) {
-      activeApiKey = decryptServerKey(userRec.encryptedApiKeys[provider]);
-    }
-  }
-  return activeApiKey;
-}
-
 // ─────────────────────────────────────────────────────────
 // GENERIC CLOUD-PROVIDER PROXY (src/config/providerCatalog.ts driven)
 // ─────────────────────────────────────────────────────────
@@ -346,27 +283,6 @@ function openAICompatibleBody(
     temperature: opts.temperature ?? 0.5,
     ...(opts.stream ? { stream: true } : {}),
   });
-}
-
-function readUsersDb(): UserRecord[] {
-  try {
-    if (!fs.existsSync(USERS_DB_PATH)) {
-      fs.writeFileSync(USERS_DB_PATH, JSON.stringify({ users: [] }, null, 2));
-      return [];
-    }
-    const raw = fs.readFileSync(USERS_DB_PATH, "utf-8");
-    const parsed = JSON.parse(raw);
-    return parsed.users || [];
-  } catch (err) {
-    console.error("Failed to read users database:", err);
-    return [];
-  }
-}
-
-/** Find a user record by username, trimming the lookup value for consistency. */
-function findUserByUsername(db: UserRecord[], username: unknown): UserRecord | undefined {
-  const trimmed = String(username ?? "").trim();
-  return db.find((u) => u.username === trimmed);
 }
 
 let requestCount = 0;
