@@ -399,16 +399,41 @@ How agents get better over time (`REQ-AI-8`), within privacy constraints.
 
 ## 12. Current state
 
-`src/services/aiGateway.ts`, `aiService.ts`, `providerFailover.ts`,
-`aiErrors.ts`, `apiVault.ts`, and `connectionTester.ts` exist.
+**The Warden and a new server-side Gateway are implemented and tested**,
+alongside the pre-existing client-side gateway this section used to describe
+exclusively.
 
-| Current | Target |
+### 12.1 New (this revision)
+
+| Module | Path | Covers |
+|---|---|---|
+| Warden | `src/platform/warden/` | §5 in full: classification (`classify.ts`), policy (`policy.ts`), `evaluate()`/consent/restricted-scope/audit (`warden.ts`). 23 tests |
+| Gateway | `src/platform/gateway/` | §2–§3: `complete()` as the sole sanctioned entry point, OpenAI-compatible and Anthropic adapters built on the existing `providerCatalog.ts`. 9 tests |
+| Architectural enforcement | `src/platform/__tests__/architecture.test.ts` | The "no bypass" rule: no `fetch()` to a provider outside `gateway/adapters.ts`, and no `src/app/*` file reaching a provider except through `platform/gateway` |
+| First consumer | `src/app/studio/`, `server/routes/studio.ts` | The Studio's model-backed levels (2–5) are the first real traffic through this path, end-to-end tested including a live server boot |
+
+### 12.2 Scope note — the legacy path is not yet migrated, by design
+
+`src/services/aiGateway.ts` (browser, posts to `/api/generate`) and
+`server/routes/ai.ts` (the pre-existing Express proxy with 30+ providers
+already wired, including Gemini/Cohere/local-runner support the new Gateway
+does not implement yet) **continue to run exactly as before**. They are not
+routed through the Warden. This is the documented next migration step
+(`13` §8.1), not a silent gap:
+
+| Current (legacy path, unchanged) | Target (new path, built for new features) |
 |---|---|
-| Gemini primary with a backup key | Twelve providers including three local runtimes |
-| Server-side proxy holds keys | Keys in the platform keystore; direct client-to-provider calls |
-| No egress control | The Warden as a mandatory chokepoint |
-| No task-level binding | Nine task classes with per-class binding and presets |
-| No local model support | Local-first by default |
-| No cost tracking | Per-request, run, project, and workspace budgets |
-| Static model list | Signed, cloud-delivered model registry |
-| Classified errors with failover | **Carries forward** — this part is right |
+| 30+ providers via `providerCatalog.ts` | 2 providers (OpenAI-compatible, Anthropic) via `platform/gateway/adapters.ts` — the same catalog, a narrower adapter set so far |
+| No egress control | The Warden, mandatory, architecturally enforced |
+| No task-level classification | Nine task classes, each with default Egress Class behaviour |
+| Client-side encrypted key vault (`apiVault.ts`) | Keys passed per-request to the server Gateway (BYOK, matching the existing model); a managed-KMS custody path per `44` §3.1 is not yet built |
+| Classified errors with failover (`providerFailover.ts`, `aiErrors.ts`) | Not yet reused by `platform/gateway` — it currently surfaces raw adapter errors. Reusing the existing, working classification is the next gateway improvement, not a rewrite |
+| — | Local model support (Ollama/LM Studio) is withdrawn in revision 2 (`01` §12.2); not applicable to either path |
+
+**Practical effect today:** existing AI features (drafting, chat, etc. built
+on the legacy path) are unaffected and keep working. New features — starting
+with the Studio — are built exclusively on the Warden-gated path. Migrating
+`ai.ts` onto `platform/gateway` retires the duplication; it has not been
+attempted yet because it is a larger, riskier change than building new
+functionality correctly from the start, and is better done as its own
+reviewed unit of work.

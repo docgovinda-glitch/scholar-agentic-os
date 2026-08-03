@@ -340,38 +340,91 @@ Revision 2's largest practical gain: the existing repository is a React web
 application with an Express backend and Supabase. That is the target shape, not
 something to migrate away from.
 
+**This section is updated as implementation proceeds — it is a live status
+record, not a one-time plan.** Actual module locations are given where code
+exists; everything else remains the intended target.
+
 ### 8.1 Carries forward
 
-| Current | Becomes | Change required |
+| Current | Becomes | Status |
 |---|---|---|
-| React 19 + Vite + Tailwind client | `client/*` | Restructure into two shells sharing an editor |
-| Express server | `platform/api` + `app/*` | Split routes from logic; add the service tier |
-| Supabase auth + Postgres | `platform/auth`, `services/store` | Extend the schema; keep row-level security |
-| `src/citation_compliance/` | `domain/reference` | Add Chicago notes; make formatters pure |
-| `src/document_intelligence/` | `app/ingestion` + `domain/document` | Split pure model from I/O; add OCR and media |
-| `src/agents/`, `src/skills/` | `app/mesh` | Add capability enforcement, versioning, channels |
-| `src/services/providerFailover.ts`, `aiErrors.ts` | `platform/gateway` | Generalise beyond Gemini; interpose the Warden |
-| `src/core/project/` | `domain/project` | Add the gate state machine |
-| `src/types/documentTypes.ts` | `app/atlas` | Versioned data; expand 10 → 24; add intake schemas |
-| `src/services/knowledgeVaultService.ts` | `app/vault` | Add encryption, vector index, scale work |
-| `src/services/documentExportService.ts` | `app/export` | Add ODT; render from CDM; add pre-flight |
-| **`src/skills/humanizeSkill.ts`** | **`app/studio` + `domain/language`** | **Expand to five levels, voice matching, L1 support, meaning verification (`32` §13)** |
+| React 19 + Vite + Tailwind client | `client/*` | Not started — the client still predates the Desk/Pocket split |
+| Express server | `platform/api` + `app/*` | **In progress.** `server/routes/studio.ts` is the first route built on the new architecture; the rest of `server/routes/` (ai.ts, parse.ts, admin.ts) is unchanged |
+| Supabase auth + Postgres | `platform/auth`, `services/store` | Not started |
+| `src/citation_compliance/` | `domain/reference` | Not started (still needs Chicago notes + purity pass) |
+| `src/document_intelligence/` | `app/ingestion` + `domain/document` | **Partially done.** A new, independent `domain/document` (blocks/ranges/ops, 13 tests) is built at `src/domain/document/` — see §8.1a. It does not yet ingest from `src/document_intelligence/`'s parsers; that integration is still open |
+| `src/agents/`, `src/skills/` | `app/mesh` | Not started |
+| `src/services/providerFailover.ts`, `aiErrors.ts` | `platform/gateway` | **Partially done, and not yet reused.** `src/platform/gateway/` exists and is Warden-gated, but currently has its own (simpler) error handling rather than the existing classified-error/failover logic — see `41` §12.2 |
+| `src/core/project/` | `domain/project` | Not started |
+| `src/types/documentTypes.ts` | `app/atlas` | Not started |
+| `src/services/knowledgeVaultService.ts` | `app/vault` | Not started |
+| `src/services/documentExportService.ts` | `app/export` | Not started |
+| **`src/skills/humanizeSkill.ts`** | **`app/studio` + `domain/language`** | **Built.** `src/domain/language/` (6 modules, 35 tests) and `src/app/studio/` (3 modules, 21 tests) implement the full six-stage pipeline per `32` §13. `humanizeSkill.ts` itself is untouched and still referenced by the legacy agent pipeline — retiring it is the next step once a client calls `/api/studio/refine` instead of the skill |
+
+#### 8.1a What actually exists today (2026-08-03)
+
+| Module | Path | Tests |
+|---|---|---|
+| `platform/warden` | `src/platform/warden/` | 23 |
+| `platform/gateway` | `src/platform/gateway/` | 9 |
+| Architectural enforcement | `src/platform/__tests__/architecture.test.ts` | 4 |
+| `domain/document` (CDM) | `src/domain/document/` | 13 |
+| `domain/language` | `src/domain/language/` | 35 |
+| `app/studio` | `src/app/studio/` | 21 |
+| API route | `server/routes/studio.ts` | 10 (integration, via supertest against the live app) |
+
+115 new tests. Full repository suite: 119 files, 1,252 tests, `tsc --noEmit`
+clean, verified against a live `npx tsx server.ts` boot as well as the test
+suite.
 
 ### 8.2 Retired
 
-| Current | Reason |
-|---|---|
-| Server-side API key decryption (`resolveApiKey`, `decryptServerKey`, `ENCRYPTION_KEY`) | Replaced by managed KMS (`44` §3.1) |
-| `users.json`, `database_schema.sql` | Already unused |
-| Monolithic workspace components in `src/components/` | Replaced by the region and panel model |
+| Current | Reason | Status |
+|---|---|---|
+| Server-side API key decryption (`resolveApiKey`, `decryptServerKey`, `ENCRYPTION_KEY`) | Replaced by managed KMS (`44` §3.1) | Not yet retired — still in `server/routes/ai.ts`, unchanged. The new Gateway takes a per-request API key (BYOK) rather than server-held keys, but a KMS-backed custody path is not built |
+| `users.json`, `database_schema.sql` | Already unused | Unchanged |
+| Monolithic workspace components in `src/components/` | Replaced by the region and panel model | Unchanged — no client restructure yet |
 
 ### 8.3 New construction
 
-`services/*` in full · `platform/warden` · **`domain/language` and `app/studio`**
-· `app/rubric` and `domain/compliance` · `app/conductor` · `domain/claim` ·
-`app/plugins` · `client/pocket-shell` · `admin/foundry`.
+| Module | Status |
+|---|---|
+| `platform/warden` | **Built** |
+| `platform/gateway` (OpenAI-compatible + Anthropic adapters) | **Built**, narrower provider coverage than the legacy path — see `41` §12.2 |
+| `domain/language` and `app/studio` | **Built** |
+| `services/*` | Not started. This is the largest near-term gap: the Studio's session-policy store (`src/app/studio/sessionPolicyStore.ts`) is an explicitly-labelled in-memory stand-in for what `services/store` should provide, and does not survive a restart or scale past one process |
+| `app/rubric` and `domain/compliance` | Not started |
+| `app/conductor` | Not started |
+| `domain/claim` | Not started |
+| `app/plugins` | Not started |
+| `client/pocket-shell` | Not started |
+| `admin/foundry` | Not started |
 
 ### 8.4 Sequencing note
 
 `platform/warden` must exist before the first provider call, and
-`domain/language` before `app/studio`. Everything else can be staged — see `51`.
+`domain/language` before `app/studio` — **this ordering was followed**: the
+Warden and Gateway were built first, the CDM second, `domain/language` and
+`app/studio` third, and the API wiring last, each with passing tests before
+the next began. Everything else can be staged — see `51`.
+
+### 8.5 Honest assessment of what remains
+
+Building the full 34-document specification is a multi-month, multi-person
+effort by the roadmap's own estimate (`50` §1: ~7 months to a public 1.0 with
+a 2–4 person team). What is built so far is a real, working, tested vertical
+slice through the two pieces of Phase 1 with the highest architectural
+leverage and the highest product priority: the mandatory egress boundary
+(because everything else that touches a model provider depends on it existing
+correctly from the start) and the Language & Voice Studio (because it was the
+explicitly prioritised feature). It is not a demo — every module has tests
+that fail if the behaviour regresses, the architectural rules are enforced by
+CI-shaped tests rather than convention, and the API has been exercised
+against a live server boot, not just mocks.
+
+What has *not* been built yet, stated plainly: the two-shell client (Desk and
+Pocket do not exist — there is no editor UI at all yet), Atlas and the output
+type catalog, the gate model and Conductor, the Rubric compliance engine,
+source approval and the corpus, the agent Mesh, the Vault, export, and the
+admin plane. `51-IMPLEMENTATION-PHASES.md` is still the accurate map of what
+those require and in what order.

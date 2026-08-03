@@ -500,21 +500,32 @@ depended on. Its meaning-preservation checkpoints remain and are strengthened.
 
 ## 13. Current state
 
-`src/skills/humanizeSkill.ts` exists.
+**Implemented.** The Studio described in this document is built and tested,
+not just specified. Location and what each piece covers:
 
-**Revision 1 retired it. Revision 2 keeps and substantially expands it** as the
-Studio's foundation. What changes:
+| Module | Path | Covers |
+|---|---|---|
+| Level definitions, deterministic mechanics engine | `src/domain/language/mechanics.ts` | §4 Level 1 — a real, curated, tested rule set (double spaces, repeated words, missing space after a full stop, sentence-start capitalisation, a/an agreement, plural-subject/singular-verb agreement). Runs with no model call |
+| Diff construction | `src/domain/language/diff.ts` | §7 — LCS-based word-level diffing with exact per-hunk accept/reject round-trip |
+| Meaning verification | `src/domain/language/meaningGuard.ts` | §3 stage 4 — deterministically catches claim-strength shifts (the "suggest"→"demonstrate" example is a passing test, verbatim), added/removed negation, and changed numbers; reclassifies them as `content` and sorts them first |
+| Voice Profile | `src/domain/language/voiceProfile.ts` | §5 — statistics from writing samples, disabled below 1,000 words, drift reporting that never vetoes a change |
+| L1 pattern catalogue | `src/domain/language/l1Patterns.ts` | §6.1 — all 20 declared-L1 languages from this spec |
+| Quotation protection | `src/domain/language/quotations.ts` | §12 — applied to every refinement path, deterministic and model-backed alike |
+| Discipline register | `src/domain/language/register.ts` | §4 Level 4 |
+| Orchestration | `src/app/studio/studio.ts` | The six-stage pipeline. Levels 2–5 call `platform/gateway`, which enforces the Warden exactly as any other model call |
+| Structured per-change reasons | `src/app/studio/structuredDiff.ts` | Asks the model for JSON with a reason per change rather than one generic label; falls back to a heuristic whole-passage diff if a model doesn't comply |
+| API | `server/routes/studio.ts` | `POST /api/studio/refine`, `/consent`, `/restrict`, `GET /egress-audit` |
 
-| Current | Target |
+**What is not yet built**, tracked rather than hidden:
+
+| Gap | Status |
 |---|---|
-| One undifferentiated operation | Five intervention levels |
-| No voice preservation | Voice Profile matching |
-| No second-language support | L1 profiles, explanatory mode, pattern reporting |
-| No meaning verification | Stage 4 meaning and claim-strength checking |
-| Whole-text replacement | Per-change reviewable diff with reasons |
-| No discipline awareness | Register calibration per discipline |
-| Framed around detection | Framed around quality and voice (`01` §7) |
+| Session-policy persistence | In-memory only (`src/app/studio/sessionPolicyStore.ts`); durable, account-scoped storage needs `services/store` and the auth wiring this codebase doesn't have end-to-end yet — see `13` §8.3 |
+| Explanatory mode UI, pattern reporting UI | §6.2–6.3 are specified; no client surface yet (Desk/Pocket editors are unbuilt) |
+| Writing History | §8 is specified; not yet implemented — depends on the same persistence layer as session policy |
+| `domain/language`'s 98% branch coverage target (`13` §6) | Coverage is strong (35 tests across 5 files) but not yet measured against the formal target |
 
-The skill name should become `refinementSkill` in code — not because "humanize"
-is forbidden in the UI (`02` §9.1 permits it), but because the code should name
-what the function does, and what it does is refinement across five levels.
+`src/skills/humanizeSkill.ts` is untouched — it is the legacy skill this Studio
+replaces, per `13` §8.1, and is still referenced by the legacy agent pipeline.
+Retiring it is the next migration step once a client surface calls the new
+`/api/studio/refine` route instead.
