@@ -1,6 +1,7 @@
 # Plugin Architecture
 
 > **Doc ID:** 47 · **Status:** Design · **Depends on:** `40`, `46`, `48`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 How Scholar OS is extended without compromising the security model or the
 integrity guarantees.
@@ -173,7 +174,7 @@ would defeat `40` §2.1.
 | `agent` | An agent with a manifest (`42` §2) | varies |
 | `editor_tool` | A command or decoration | `read:draft`, `write:suggestions` |
 | `export_target` | A format writer | `write:artifact` |
-| `panel` | A Workbench panel | varies |
+| `panel` | A Desk panel | varies |
 | `compliance_rule` | A custom rule evaluator | `read:draft`, `read:rubric` |
 
 ### 5.1 Agent plugins

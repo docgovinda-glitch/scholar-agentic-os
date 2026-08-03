@@ -1,6 +1,7 @@
 # Product Specification — Scholar OS
 
 > **Doc ID:** 11 · **Status:** Design · **Depends on:** `01`, `02`, `10`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 This document describes how Scholar OS behaves as a whole system: its surfaces,
 its object lifecycle, its state machines, and the rules that hold across every
@@ -38,7 +39,7 @@ acts*.
                         │  (only what Warden permits)        │
               ┌─────────▼──────────┐              ┌──────────▼─────────┐
               │   AI PROVIDERS     │              │   CLOUD PLANE      │
-              │ local · cloud APIs │              │ Identity · Relay   │
+              │ local · cloud APIs │              │ Identity · sync service   │
               └────────────────────┘              │ Registry · Admin   │
                                                   └─────────┬──────────┘
                                                             │
@@ -51,7 +52,7 @@ acts*.
 Two properties are worth stating explicitly because they constrain everything
 downstream:
 
-1. **The Kernel runs on the device.** There is no server-side orchestration of
+1. **The service tier runs on the device.** There is no server-side orchestration of
    user documents. The cloud plane never holds plaintext content.
 2. **The Warden is the only egress path.** No component calls a provider
    directly. This is what makes privacy policy enforceable rather than
@@ -61,32 +62,33 @@ downstream:
 
 ## 2. Surfaces and their contract
 
-| | **Workbench** (desktop) | **Console** (web) | **Mobile** (responsive Console) |
-|---|---|---|---|
-| Role | Primary workspace | Companion | Check-in and approve |
-| Session length | Hours | Minutes | Under 2 minutes |
-| Offline | Full | Read cached + queue actions | Read cached |
-| Compute | Local, heavy | None | None |
-| Layout | Dockable multi-panel | Single-focus pages | Single-column, thumb-first |
-| Editing | Full authoring | Light editing | Comment and approve only |
-| Local models | Yes | No | No |
-| Plugins | Yes | No | No |
-| Vault access | Full | Search + read via sync | Search + read via sync |
-| Agent runs | All | Short-running only | None |
+| | **Desk** (≥1024 px) | **Pocket** (<1024 px) |
+|---|---|---|
+| Role | Working environment | Companion |
+| Session length | Hours | Minutes |
+| Offline | Edit cached documents | Read cached |
+| Layout | Four regions | One view at a time |
+| Editing | Full authoring | Text edits and comments |
+| Studio | Invoke and review | Review a diff |
+| Plugins | Yes | No |
+| Agent runs | All | View and interrupt only |
+
+Both are served from one codebase and one URL space; the layout shell differs
+(`20` §10).
 
 **The rule that keeps these honest:** a capability appears on a surface only if
-that surface can *do it well*. The Console does not get a degraded panel layout;
+that surface can *do it well*. The Pocket does not get a degraded panel layout;
 it gets a different design for a different job. Section 6 of
 `20-INFORMATION-ARCHITECTURE.md` holds the normative capability matrix.
 
 ### 2.1 Cross-surface behaviour
 
-- **Handoff.** A user reviewing a draft on the Console can send it to the
-  Workbench; the Workbench opens the same section at the same scroll position.
+- **Handoff.** A user reviewing a draft on Pocket can send it to the
+  Desk; the Desk opens the same section at the same scroll position.
 - **Divergence.** When a capability is unavailable on the current surface, the UI
   states why and offers the handoff — never a disabled control with no
   explanation.
-- **Sync dependency.** The Console shows only what sync has been enabled for. A
+- **Sync dependency.** The Pocket shows only what sync has been enabled for. A
   local-only user sees an honest empty state explaining that their work is on
   their device by choice, with a link to enable sync.
 
@@ -184,7 +186,7 @@ still recorded. Speed comes from good defaults, not from removing the decision.
 Nine stages, specified in `25-ONBOARDING-ARCHITECTURE.md`. Product-level rules:
 
 - Local-only use requires no account. Account creation is required only for sync,
-  Console access, and licensing.
+  Pocket access, and licensing.
 - The AI Setup Wizard is the highest-leverage screen in the product: it is where
   privacy posture is set. It leads with local models.
 - Every stage after login is skippable; skipping is recorded so the system can
@@ -248,7 +250,8 @@ Section-scoped, agent-assisted, human-reviewed. The pipeline is specified in
 `30` §6. Product-level rules:
 
 - Drafting is invoked per section, never for the whole document at once.
-- Every generated span is `ai_generated_unreviewed` until the human reviews it.
+- Generated text arrives as a pending proposal and is not part of the accepted
+  draft until the user accepts it.
 - Claims bind to evidence at generation time or are flagged.
 - The user can interrupt any run.
 
@@ -256,7 +259,7 @@ Section-scoped, agent-assisted, human-reviewed. The pipeline is specified in
 
 A professional editor with the full complement in `REQ-EDT-1`. The distinguishing
 properties are provenance-aware tracked changes and citation insertion restricted
-to the Approved Corpus. Specified in `22-DESKTOP-UX-SPECIFICATION.md` §5.
+to the Approved Corpus. Specified in `22-DESKTOP-WEB-UX-SPECIFICATION.md` §5.
 
 ### 5.8 Refinement and authorship
 
@@ -320,9 +323,9 @@ preference toggle.
 | Channel | Used for | Surfaces |
 |---|---|---|
 | In-app inline | Findings, suggestions, validation | All |
-| Status bar | Authorship ratio, active runs, sync state, budget | Workbench |
+| Status bar | Authorship ratio, active runs, sync state, budget | Desk |
 | Notification centre | Completed runs, gate readiness, announcements | All |
-| Push / email | Long-run completion, security events, admin announcements | Console, Mobile |
+| Push / email | Long-run completion, security events, admin announcements | Pocket, Mobile |
 
 Push notifications are opt-in per category. Security events are the only category
 that cannot be disabled entirely.
@@ -335,12 +338,12 @@ Tier definitions inform architecture; final pricing is `OQ-01`.
 
 | | **Free** | **Scholar** | **Lab** | **Institution** |
 |---|---|---|---|---|
-| Workbench | Full | Full | Full | Full |
+| Desk | Full | Full | Full | Full |
 | Local models | Unlimited | Unlimited | Unlimited | Unlimited |
 | Bring-your-own key | Yes | Yes | Yes | Yes |
 | Projects | 3 active | Unlimited | Unlimited | Unlimited |
 | Vault | 200 docs | Unlimited | Unlimited | Unlimited |
-| Console + sync | — | Yes | Yes | Yes |
+| Pocket + sync | — | Yes | Yes | Yes |
 | Managed model credits | — | Monthly allowance | Larger allowance | Pooled |
 | Plugins | Community | Community + verified | + private | + private registry |
 | Shared workspaces | — | — | Yes | Yes |

@@ -1,6 +1,7 @@
 # User Journey Maps
 
 > **Doc ID:** 26 · **Status:** Design · **Depends on:** `10`, `20`–`25`, `30`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 Nine end-to-end journeys. Each traces a real person through the system, records
 what they feel, and names where the design must hold. Failure branches are

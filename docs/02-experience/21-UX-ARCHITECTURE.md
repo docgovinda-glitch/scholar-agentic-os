@@ -1,9 +1,10 @@
 # UX Architecture — Scholar OS
 
 > **Doc ID:** 21 · **Status:** Design · **Depends on:** `01`, `20`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 The interaction principles, AI affordance rules, and design system that hold
-across every surface. Surface-specific detail lives in `22`, `23`, and `24`.
+across every surface. Surface-specific detail lives in `22` and `23`.
 
 ---
 
@@ -136,15 +137,16 @@ forms (`11` §6.1); each has a fixed visual and behavioural contract.
 | AI-9 | Citations offered by AI resolve to approved sources or the suggestion is not offered |
 | AI-10 | The user can disable any AI category without disabling the product |
 
-### 3.3 The unreviewed-AI treatment
+### 3.3 Pending-content treatment
 
-Text with origin `ai_generated_unreviewed` has a **permanent, non-disableable**
-visual treatment: a left margin rule in the warning colour and a subtle
-background tint.
+Agent-produced text that has arrived in the document but has not yet been
+accepted by the user carries a distinct treatment: a left margin rule and a
+subtle tint, until the user accepts, edits, or rejects it.
 
-This is the one visual affordance the user cannot turn off, because its entire
-purpose is to prevent the failure of text silently becoming invisible. Once
-reviewed, the treatment disappears — the incentive is to review, not to hide.
+**Revision 2:** this is a *pending-review* state, not a permanent provenance
+mark. Once the user has acted on it, the treatment clears and nothing further is
+recorded in the document's appearance. The mandatory provenance overlay is
+withdrawn (`32` §8.2).
 
 ### 3.4 Suggestion presentation
 
@@ -262,11 +264,11 @@ one's own writing, with AI as the marked case.
 
 | Mode | Row height | Use |
 |---|---|---|
-| Comfortable | 40 px | Default; Console; onboarding |
-| Compact | 32 px | Workbench default for lists |
+| Comfortable | 40 px | Default; Pocket; onboarding |
+| Compact | 32 px | Desk default for lists |
 | Dense | 26 px | Power users; long corpus lists |
 
-Workbench users may set density globally. Document text is never affected.
+Desk users may set density globally. Document text is never affected.
 
 ### 5.4 Motion
 
@@ -295,7 +297,7 @@ WCAG 2.2 AA across all surfaces (`NFR-A11Y-1`), with these specifics.
 
 | Area | Requirement |
 |---|---|
-| Keyboard | Every Workbench function reachable without a mouse, including docking, splitting, and panel focus |
+| Keyboard | Every Desk function reachable without a mouse, including docking, splitting, and panel focus |
 | Focus | Visible focus indicator at 3:1 contrast against adjacent colours |
 | Screen readers | Editor exposes document structure, provenance state, and findings as accessible annotations |
 | Contrast | 4.5:1 body, 3:1 large text and UI components |

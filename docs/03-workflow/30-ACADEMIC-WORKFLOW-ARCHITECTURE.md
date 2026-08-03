@@ -1,6 +1,7 @@
 # Academic Workflow Architecture — The Conductor
 
 > **Doc ID:** 30 · **Status:** Design · **Depends on:** `11`, `14`, `42`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 The eight-gate model, the state machine that enforces it, and the drafting
 pipeline. The Conductor is the subsystem that owns all of it.
@@ -21,7 +22,7 @@ Academic work fails in predictable ways, and almost all of those failures are
 | Text nobody read | Generation without review | `G4` |
 | First draft submitted | No review stage | `G5` |
 | Desk rejection on formatting | Compliance checked once, at the end | `G6` |
-| AI text submitted unknowingly | No integrity check before export | `G7` |
+| A broken or non-compliant file submitted | No pre-flight before export | `G7` |
 
 A gate is a **decision the human must make before the cost of not having made it
 compounds**. That framing determines everything about the design: gates exist
@@ -230,14 +231,15 @@ cold.
 |---|---|
 | **Entry** | `G6` signed off |
 | **Activities** | Pre-flight; integrity check; format selection; render; verify; deliver |
-| **Exit** | Pre-flight passes or is explicitly overridden · zero `ai_generated_unreviewed` spans, or a recorded override · output validates structurally |
+| **Exit** | Pre-flight passes · every blocking compliance finding resolved · required assets present · output validates structurally |
 | **Sign-off** | "Export this" |
 | **Agents** | Export, Privacy Guard |
 | **Typical** | 2–5 min |
 
-**The integrity check is the last gate and the least negotiable.** It blocks by
-default and is overridable only with a recorded, reasoned decision
-(`REQ-INT-4`).
+**Revision 2:** the authorship integrity check is withdrawn (`32` §8.2).
+`G7` blocks only on correctness — unresolved blocking compliance findings,
+missing figures, unresolvable cross-references, and output that fails structural
+validation (`33` §3).
 
 ---
 

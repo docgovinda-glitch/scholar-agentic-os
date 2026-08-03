@@ -1,229 +1,223 @@
 # Roadmap
 
-> **Doc ID:** 50 · **Status:** Design · **Depends on:** `10`, `51`
+> **Doc ID:** 50 · **Status:** Design · **Revision:** 2 (website-only)
 
-The multi-year arc. Phase-level work breakdown is in `51`; this document
-explains *what lands when and why that order*.
-
----
-
-## 1. Sequencing logic
-
-The order is driven by four dependencies that cannot be reordered:
-
-1. **Provenance before drafting.** Retrofitting span-level provenance onto an
-   editor built without it is substantially harder than building it in
-   (`13` §8.4). The Ledger and the editor are Phase 1.
-2. **The Warden before any provider call.** An egress chokepoint added later is
-   an egress chokepoint with bypasses. Phase 1.
-3. **Approval before discovery.** Building discovery first creates pressure to
-   let results flow into the corpus. The queue exists before anything fills it.
-4. **Security before extensibility.** The plugin sandbox depends on the
-   capability system, which depends on the kernel's trust model.
-
-Everything else is sequenced by user value.
+The release arc. Phase-level work breakdown is in `51`; this explains what
+lands when and why that order.
 
 ---
 
-## 2. The arc
+## 1. What revision 2 changed
+
+Revision 1 planned a desktop application over roughly 20 months, with the first
+public release at month 13. Website-only removes the entire foundations phase —
+no local kernel, no encrypted local store, no capability system before anything
+user-visible, no cross-platform installer pipeline — and lets the existing
+codebase carry forward rather than be replaced.
+
+| | Revision 1 | Revision 2 |
+|---|---|---|
+| First public release | ~13 months | **~7 months** |
+| Phases before user-visible work | 1 (2 months) | 0 |
+| Existing code reused | Little | Most |
+| Surfaces to build | 3 | 2, sharing a codebase |
+
+---
+
+## 2. Sequencing logic
+
+Three dependencies drive the order:
+
+1. **Approval before discovery.** Building discovery first creates pressure to
+   let results flow into the corpus. The approval queue exists before anything
+   fills it — this is what makes fabricated citations structurally impossible
+   rather than merely discouraged.
+2. **The Warden before any provider call.** An egress boundary added later is an
+   egress boundary with bypasses.
+3. **Editor before Studio.** The Language & Voice Studio operates on document
+   spans and needs a document model to operate on.
+
+Everything else is sequenced by user value, and the Studio is pulled as early as
+its dependencies allow because it is the product's differentiator.
+
+---
+
+## 3. The arc
 
 | | Theme | Duration | Ships |
 |---|---|---|---|
-| **Phase 0** | Foundations | 2 months | Kernel, store, event log, crypto, capability system |
-| **Phase 1** | The honest editor | 4 months | Workbench shell, editor, **Ledger**, **Warden**, Gateway, local models |
-| **Phase 2** | The academic workflow | 4 months | Atlas, gates, sources with approval, Rubric, drafting pipeline |
-| **Phase 3** | Complete the loop | 3 months | Export, compliance reporting, integrity gate, onboarding, Workshop |
-| **Phase 4** | Memory and reach | 3 months | Vault, discovery, Console, sync |
-| **Phase 5** | Platform | 4 months | Plugins, Foundry, admin plane, institutional features |
+| **Phase 1** | Foundation and editor | 2 months | Restructured services, auth, Desk shell, editor, Gateway, Warden |
+| **Phase 2** | The academic workflow | 3 months | Atlas, gates, sources with approval, Rubric, drafting |
+| **Phase 3** | Voice and output | 2 months | **The Studio**, export, onboarding — **public 1.0** |
+| **Phase 4** | Reach | 2 months | Pocket, discovery, Vault |
+| **Phase 5** | Platform | 3 months | Plugins, Foundry, admin plane, institutional tier |
 | **Phase 6+** | Depth | ongoing | Catalog breadth, collaboration, advanced agents |
 
-**First public release: end of Phase 3** (~13 months). That is the earliest
-point at which a user can complete a real project end to end and export a
-submittable file — which is the only meaningful definition of a first release for
-this product.
+**First public release at the end of Phase 3, roughly month 7.**
 
 ---
 
-## 3. Release milestones
+## 4. Milestones
 
 ### M1 — Internal alpha (end of Phase 1)
 
-**Can do:** write in a provenance-tracked editor, with local or cloud models,
-with egress controlled and visible.
+**Can do:** write in a browser-based editor with AI assistance, with egress
+controlled and visible.
 
-**Cannot do:** anything academic. No output types, no sources, no compliance,
-no export.
+**Cannot do:** anything academic. No output types, no sources, no compliance.
 
-**Purpose:** validate the hardest technical bet (`53` `RISK-01`) before building
-on it. If span-level provenance through arbitrary editing does not work at
-150k words, we need to know at month 6, not month 13.
+**Purpose:** prove the editor and the egress boundary before building on them.
 
 ### M2 — Private beta (end of Phase 2)
 
-**Can do:** create a project from an output type, establish requirements,
-approve sources, agree a structure, draft sections with evidence binding.
+**Can do:** create a project from an output type, establish requirements, approve
+sources, agree a structure, draft sections bound to evidence.
 
-**Cannot do:** export. Deliberately — beta users work with us on the workflow
-before the product can produce a file.
+**Cannot do:** refine language, or export.
 
-**Cohort:** ~30 users across the six personas, recruited for willingness to
-report friction rather than for enthusiasm.
+**Cohort:** ~30 users across the personas, recruited for willingness to report
+friction. **At least a third must be second-language writers** — they are the
+primary user of the feature landing next, and their input shapes Phase 3.
 
 ### M3 — Public 1.0 (end of Phase 3)
 
-**Can do:** a complete project, `G0` through `G7`, exported to DOCX or ODT, with
-onboarding and the Workshop.
+**Can do:** a complete project, `G0` through `G7`, with the full Language & Voice
+Studio, exported to DOCX or ODT.
 
-**Tiers:** Free and Scholar. Free is fully capable with local models
-(`11` §7).
+**Surfaces:** Desk only. Pocket ships in Phase 4.
 
-**Surfaces:** Workbench only. No Console, no sync, no Vault.
+**Tiers:** Free and Scholar.
 
-That is a defensible 1.0: the product does one thing completely rather than
-several things partially.
+A defensible 1.0: it does one thing completely.
 
 ### M4 — 1.5 (end of Phase 4)
 
-Vault, discovery, Console, sync. The product becomes multi-device and gains its
-long-term memory.
+Pocket, discovery, and the Vault. The product becomes usable from a phone and
+gains long-term memory.
 
 ### M5 — 2.0 (end of Phase 5)
 
-Plugins, the Foundry, institutional tiers. The product becomes a platform.
+Plugins, Foundry, institutional tiers. The product becomes a platform.
 
 ---
 
-## 4. What each phase delivers, and why then
+## 5. What each phase delivers, and why then
 
-### Phase 0 — Foundations (2 months)
+### Phase 1 — Foundation and editor (2 months)
 
-Kernel process, encrypted store, event log, snapshots, crypto and key hierarchy,
-capability system, IPC.
+Restructure the existing Express server into API and service tiers · auth,
+sessions, MFA · the Desk region shell · the CDM and editor · autosave and
+recovery · the Gateway with multiple providers · **the Warden** · the AI
+provider setup flow.
 
-**Why first:** everything sits on it, and it is the layer where mistakes are most
-expensive to correct. Nothing user-visible ships.
+**Why first:** the editor and the egress boundary are the two things everything
+else sits on. Both are hard to retrofit.
 
-### Phase 1 — The honest editor (4 months)
+**Reuses:** the React client, Express server, Supabase auth, and provider
+failover that already exist.
 
-Workbench shell with the panel system · CDM and the editor · **the Provenance
-Ledger** · **the Warden** · the Gateway with local and cloud providers · the AI
-Setup Wizard.
+### Phase 2 — The academic workflow (3 months)
 
-**Why now:** the two irreversible architectural bets (`P1` provenance, `P3`
-egress control) are proved here. The editor is the highest-risk build and gets
-the most time.
+Atlas with 24 output types · intake generation · the gate model · source upload
+and ingestion · **the approval queue** · the Rubric with extraction and
+continuous evaluation · the drafting pipeline · agents AG-01 to AG-16.
 
-**Deliberately excluded:** anything academic. Building output types before the
-editor works would produce a workflow around an editor that then needs replacing.
+**Why now:** this is the product's substance and it needs only Phase 1.
 
-### Phase 2 — The academic workflow (4 months)
+**Discovery is excluded**, deliberately, until approval is proven with uploaded
+sources.
 
-Atlas with 24 output types · intake generation · the gate model and Conductor ·
-source upload, ingestion, and the approval queue · the Rubric with extraction and
-continuous evaluation · the drafting pipeline and the first agent cohort.
+### Phase 3 — Voice and output (2 months)
 
-**Why now:** this is the product's actual value. It requires Phase 1's editor and
-Ledger to exist, and nothing else.
+**The Language & Voice Studio in full**: five levels, voice profiles, L1 support,
+explanatory mode, meaning verification, the diff · export to DOCX, ODT, PDF ·
+onboarding and the Workshop · optional Writing History · agents AG-17 to AG-24.
 
-**Discovery is excluded** and lands in Phase 4 — approval must be proven with
-user-uploaded sources before we add a firehose to it.
+**Why now:** it makes the product shippable, and the Studio is what people will
+tell each other about.
 
-### Phase 3 — Complete the loop (3 months)
+### Phase 4 — Reach (2 months)
 
-Export (DOCX, ODT, PDF) · compliance reporting · the export integrity gate ·
-authorship reports and optional disclosure · onboarding and the Workshop ·
-language refinement.
+**Pocket** in full, including the approval queue and refinement review · PWA with
+share target and push · literature discovery · the Knowledge Vault.
 
-**Why now:** it makes the product shippable. A user who cannot export has not
-completed anything.
+**Why now:** Pocket needs a working product to be a companion to. Discovery needs
+a proven approval queue.
 
-### Phase 4 — Memory and reach (3 months)
+### Phase 5 — Platform (3 months)
 
-The Vault with local indexing · literature discovery · the Console · E2E sync.
+Plugin runtime · Foundry with agent release channels · admin plane with two-plane
+isolation · institutional tier with SSO and institution profiles.
 
-**Why now:** these are multipliers on a working product rather than parts of it.
-The Vault is more valuable once a user has projects to draw it into; the Console
-is only meaningful once there is something to review.
+### Phase 6+ — Depth
 
-### Phase 5 — Platform (4 months)
-
-Plugin runtime · the Foundry and agent release channels · the admin plane ·
-institutional tiers · SSO.
-
-**Why now:** extensibility is what makes the catalog scale past what we can
-maintain, and institutional features are the growth path (`01` §11). Both
-require the security model to be finished.
-
-### Phase 6+ — Depth (ongoing)
-
-Catalog breadth, discipline variants, more agents, reviewer-response workflow,
-collaboration (`55` §2), mobile native if warranted.
+Catalog breadth, discipline variants, reviewer-response workflow, remaining
+export formats, collaboration.
 
 ---
 
-## 5. Deliberate non-goals per phase
-
-Stated so that scope pressure meets a written answer.
+## 6. Deliberate non-goals per phase
 
 | Phase | Will not do | Why |
 |---|---|---|
-| 0 | Any UI | Foundations are not demonstrable, and pretending otherwise wastes the phase |
-| 1 | Output types, sources, compliance | Prove the editor first |
-| 2 | Discovery, export | Approval before firehose; workflow before output |
-| 3 | Vault, Console, sync | 1.0 is a complete single-device product |
-| 4 | Plugins, admin plane | Extensibility needs the security model finished |
-| 5 | Real-time collaboration | Conflicts with local-first E2E; a distinct design problem (`55` §2) |
+| 1 | Output types, sources, compliance | Prove the editor and egress first |
+| 2 | Discovery, export, Studio | Approval before firehose; workflow before polish |
+| 3 | Pocket, Vault | 1.0 is a complete single-surface product |
+| 4 | Plugins, admin plane | Extensibility after the product works |
+| 5 | Real-time collaboration | A distinct design problem (`55` §2) |
 
 ---
 
-## 6. Cadence
+## 7. Cadence
 
 | Item | Frequency |
 |---|---|
-| Desktop release | Every 2 weeks (`stable`), weekly (`beta`), nightly |
-| Registry publish | As needed, minutes to effect |
+| Production deploy | Continuous; several times weekly |
+| Feature flag changes | Immediate |
 | Agent version | As needed, evaluation-gated |
-| Phase review | End of each phase, against exit criteria (`51`) |
+| Phase review | End of each phase, against exit criteria |
 | Roadmap revision | Quarterly |
+
+Continuous deployment is one of website-only's largest gains: no version
+fragmentation, no installer pipeline, no users stranded on an old build during a
+four-year doctorate.
 
 ---
 
-## 7. Resourcing assumption
+## 8. Resourcing
 
-Two to four people (`10` §6). The phase durations assume:
+Two to four people. Phase durations assume:
 
 | Role | Phases |
 |---|---|
-| Platform / kernel | 0, 1, 5 |
+| Full-stack / services | 1, 2, 5 |
 | Frontend / editor | 1, 2, 3, 4 |
 | Product engineering | 2, 3, 4 |
 | Part-time design and academic domain input | throughout |
 
-**If the team is two people, every duration roughly doubles.** The sequencing
-does not change — the dependencies in §1 are structural, not resource-driven.
+At two people, roughly double every duration. The sequencing does not change.
 
 ---
 
-## 8. What would change the plan
+## 9. What would change the plan
 
 | Signal | Response |
 |---|---|
-| Provenance-through-editing proves infeasible at scale (M1) | Stop. Re-architect the editor. This is the product's foundation and there is no version of it without this |
-| Rule extraction quality is poor (Phase 2) | Ship with venue profiles and manual entry; extraction becomes a Phase 4 quality push |
-| Local models are too weak on baseline hardware (Phase 1) | Adjust default presets toward cloud, keep local as the privacy option, and say so honestly rather than overselling |
-| Institutional interest arrives early | Pull SSO and institutional profiles forward from Phase 5; do not pull plugins forward with them |
-| A competitor ships provenance tracking | Continue. The workflow, catalog, and compliance engine are the harder half |
+| Editor performance inadequate in-browser at length (M1) | Address before Phase 2. Section-scoped loading and virtualisation are the levers |
+| Rule extraction quality poor (Phase 2) | Ship with venue profiles and manual entry; extraction becomes a Phase 4 quality push |
+| **Studio output does not satisfy second-language beta users (Phase 3)** | **Hold 1.0.** This is the differentiator; shipping it weak wastes the launch |
+| Voice matching does not perceptibly work | Ship the five levels without it; voice matching becomes Phase 4 |
+| Institutional interest arrives early | Pull SSO and institution profiles forward; do not pull plugins with them |
+| Server costs exceed projection | Tighten deterministic-first routing and free-tier caps before reducing capability |
 
 ---
 
-## 9. Success gates
-
-Each release must clear these before the next phase starts.
+## 10. Success gates
 
 | Milestone | Gate |
 |---|---|
-| M1 | Provenance survives a 150k-word editing session; egress-path architectural test passes; editor latency < 50 ms |
-| M2 | 30 beta users complete `G0`–`G4`; zero citations to unapproved sources; median time-to-first-draft < 90 min |
-| M3 | Offline end-to-end test passes; exported DOCX opens cleanly in all three targets; onboarding completion ≥ 70% |
-| M4 | Vault search < 800 ms at 5,000 documents; sync conflicts never lose data; Console Lighthouse ≥ 90 |
+| M1 | Editor latency < 50 ms at 100k words; no model call bypasses the Warden; autosave loses nothing across forced refresh |
+| M2 | 30 beta users complete `G0`–`G4`; **zero citations to unapproved sources**; median time to first structured draft < 90 min |
+| M3 | Exported DOCX opens cleanly in Word, LibreOffice, and Google Docs; **Studio satisfaction ≥ 4.5/5 among second-language beta users**; onboarding completion ≥ 70% |
+| M4 | Pocket Lighthouse ≥ 90 performance, 100 accessibility; approval queue fully usable at 360 px with a screen reader |
 | M5 | Plugin sandbox escape tests pass; two-plane isolation verified; agent promotion gated by evaluation |

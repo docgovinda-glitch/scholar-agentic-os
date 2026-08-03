@@ -1,6 +1,6 @@
 # Open Questions
 
-> **Doc ID:** 54 · **Status:** Design · **Depends on:** all
+> **Doc ID:** 54 · **Status:** Design · **Revision:** 2 (website-only)
 
 Decisions deliberately deferred, with what each blocks, what would answer it,
 and when it must be answered. A question without a deadline is a decision being
@@ -41,51 +41,43 @@ under real usage.
 
 ---
 
-## OQ-02 — Kernel implementation language
+## OQ-02 — Editor engine
 
-**Blocks:** Phase 0 in its entirety.
-**Answer by:** before Phase 0 starts. **This is the most urgent question here.**
+**Blocks:** Phase 1 editor work.
+**Answer by:** before Phase 1 starts. **The most urgent question here.**
 
-Rust or TypeScript-on-Node for the Kernel process (`40` §10).
+The editor must support the CDM, tracked changes, comments, inline suggestion
+decorations, and the Studio's per-change diff overlay, at 100k words in a
+browser.
 
-| | Rust | TypeScript/Node |
-|---|---|---|
-| Memory footprint | Much better against the 8 GB baseline | Worse |
-| Memory safety in the trusted process | Strong | Weaker |
-| Shared domain logic with the Console | None — duplicate implementations | Full reuse |
-| Existing code reuse | None | Citation, document, and project logic already exists |
-| Team velocity | Lower initially | Higher |
-| WASM plugin host | Natural | Workable |
+Options: build the document model over an existing text engine (ProseMirror,
+Lexical, or similar), or build the editing surface from scratch.
 
-**Leaning:** Rust for `kernel/*` and `platform/*`; TypeScript for `domain/*`
-compiled to WASM so it is shared with the Console. This gets memory safety where
-it matters and reuse where it pays, at the cost of a more complex build.
+**Leaning:** build over an existing engine. The CDM lives above it as our own
+structure; the engine handles text layout, selection, and input handling, which
+are large and unrewarding to reimplement.
 
-**Deciding:** a two-week Phase 0 spike measuring footprint and build complexity
-for the hybrid against pure TypeScript.
+**Deciding:** a two-week spike measuring input latency at 100k words with
+tracked changes and decorations active, on the target baseline.
 
 ---
 
-## OQ-03 — Sync protocol: snapshot-merge or CRDT
+## OQ-03 — Vector store
 
-**Blocks:** Phase 4 sync; constrains future collaboration.
+**Blocks:** Phase 4 Vault semantic search.
 **Answer by:** Phase 4.
 
-`44` §5.4 leans snapshot-and-merge for v1: simpler, adequate for single-user
-multi-device, and does not commit the data model prematurely.
+pgvector inside the existing Postgres, or a dedicated vector database.
 
-The cost is that real-time collaboration (`55` §2) would likely need CRDTs, and
-retrofitting them onto a snapshot model is expensive.
+pgvector keeps the stack small — one database, one backup regime, one thing to
+operate, which matters for a team of two to four (`RISK-13`). A dedicated store
+performs better past a few million vectors.
 
-**The complication:** the Ledger is append-only and merges by union regardless,
-so provenance is unaffected by this choice. The question is only about draft
-text.
+**Leaning:** pgvector. At 5,000 documents per user it is comfortably sufficient,
+and the operational simplicity is worth more than headroom we may never need.
 
-**Leaning:** snapshot-merge for v1, with the CDM designed so a CRDT layer could
-be introduced without changing the document model.
-
-**Deciding:** whether collaboration lands within two years of 1.0. If it will,
-paying the CRDT cost early is cheaper.
+**Deciding:** measured recall and latency at the `NFR-SCALE-1` target, on
+representative hardware.
 
 ---
 
@@ -98,9 +90,9 @@ Three levels: (a) export `.tex` + `.bib` for users who continue in LaTeX —
 currently specified (`33` §6.5); (b) import from LaTeX; (c) LaTeX as a first-class
 authoring surface.
 
-(c) is effectively a different product and conflicts with the provenance model —
-provenance over LaTeX source is a distinct and harder problem than provenance
-over a structured document model.
+(c) is effectively a different product: LaTeX authoring means a source editor,
+a compile loop, and package management, none of which the CDM, the Rubric, or
+the Studio operate on.
 
 **Leaning:** (a) in Phase 6, (b) if demand warrants, (c) never.
 
@@ -118,12 +110,12 @@ Handwritten lab notes and lecture notes are explicitly in scope for the Vault.
 Local handwriting OCR is substantially harder than printed OCR, and quality
 varies enormously by handwriting.
 
-Options: local model only (private, weaker); Warden-gated cloud OCR with explicit
-consent (better, but sends images of the user's notes); or ship image storage and
-search-by-metadata without transcription.
+Options: a self-hosted recognition model in our service tier; a third-party
+vision model via the Warden with explicit consent; or image storage with
+metadata search and no transcription.
 
-**Leaning:** local first, with an explicit opt-in cloud path for users who
-accept the trade-off, and honest quality expectations either way.
+**Leaning:** self-hosted where quality permits, so handwritten notes do not
+leave for a third party. Explicit opt-in to a vision provider where it does not.
 
 **Deciding:** measured accuracy of available local handwriting models on real
 academic notes.
@@ -195,17 +187,16 @@ profiles.
 
 ## OQ-09 — Institutional policy enforcement model
 
-**Blocks:** `REQ-SEC-8` MFA enforcement; `32` §11 policy expression.
+**Blocks:** `REQ-SEC-8` MFA enforcement; institutional AI policy expression.
 **Answer by:** Phase 5.
 
 How far can an institution's policy reach into a user's workspace? MFA
-enforcement is uncontroversial. AI policy enforcement (`32` §11) is harder: what
-happens when a student's personal project sits in an institutional workspace, and
-what happens when they disagree with the policy?
+enforcement is uncontroversial. AI policy is harder: what happens when a
+student's personal project sits in an institutional workspace, and what happens
+when they disagree with the policy?
 
 **Boundaries already fixed:** policy must be visible to the user; institutions
-never receive documents or reports automatically; escrow requires a visible
-indicator.
+never receive documents or Writing History automatically (`32` §8.4).
 
 **Leaning:** policy applies per-workspace, is always visible, and a user may
 create a personal workspace outside institutional control — with the institution
@@ -231,16 +222,16 @@ in 8 GB, re-evaluated each release rather than fixed — the registry design
 
 ---
 
-## OQ-11 — Console rendering for export
+## OQ-11 — Pocket rendering for export
 
-**Blocks:** `REQ-EXP` on the Console (`20` §6).
+**Blocks:** `REQ-EXP` on Pocket (`20` §6).
 **Answer by:** Phase 4.
 
-The capability matrix permits Console export for synced projects. But rendering
+The capability matrix permits Pocket export for synced projects. But rendering
 DOCX server-side means the server briefly handles plaintext, which contradicts
 `44` §2.
 
-Options: refuse Console export entirely; render in the browser from synced,
+Options: refuse Pocket export entirely; render in the browser from synced,
 client-decrypted content; or accept a consented server-side path.
 
 **Leaning:** browser-side rendering from client-decrypted content. It preserves
@@ -275,19 +266,22 @@ Recorded so they are not silently reopened.
 
 | Question | Answer | Where |
 |---|---|---|
-| Should AI disclosure be mandatory? | No — optional, user-editable, generated from fact | `32` §9.2 |
-| Should we offer detection evasion? | No, permanently | `01` §5, `32` §6.1 |
-| Should we produce a plagiarism similarity score? | No — attribution findings only | `32` §10.2 |
-| Should the Console replicate the Workbench? | No | `20` §6, `23` §2 |
-| Should refinement lower the authorship ratio? | No | `32` §5.3 |
-| Should the operator be able to read user content for support? | No | `49` §3, `49` §7 |
-| Should institutions receive authorship reports automatically? | No | `32` §11, `49` §9 |
+| Desktop application? | **No.** Website only, two surfaces | `01` §8 |
+| Should Pocket replicate Desk? | No | `20` §6, `23` §2 |
+| **Do we optimise output against AI detectors?** | **No, permanently** | `01` §7 |
+| **Do we claim output will pass detection?** | **No.** No surface, page, or document may imply it | `02` §9.1 |
+| May the UI use the word "humanize"? | Yes, meaning *read naturally and sound like me*. Not in any detection claim | `02` §9.1 |
+| Do we measure human-vs-AI authorship? | No. Withdrawn in revision 2 | `32` §8.2 |
+| Do we block export on unreviewed AI text? | No. Withdrawn in revision 2 | `32` §8.2 |
+| Is Writing History mandatory? | No — off by default, user-owned, blocks nothing | `32` §8.4 |
+| Is AI disclosure mandatory? | No — optional, user-editable | `32` §8.5 |
+| Do we produce a plagiarism similarity score? | No — attribution findings only | `32` §9 |
+| Does refinement have a capped intervention level? | No — level 5 substantially rewrites | `32` §4 |
+| Do we train on user content? | Never | `41` §11 |
+| Can staff browse user content? | No routine access; break-glass only, with user notification | `44` §4 |
+| Do institutions receive student work automatically? | No | `32` §8.4 |
 | Can users bulk-approve sources? | No — bulk reject only | `12` F-SRC-3 |
-| Can users mark all spans reviewed at once? | No | `32` §6.4 |
-| Is the Knowledge Vault required? | No — architecturally optional | `43` §1.1 |
-| Do we train on user content? | Never | `01` §5, `41` §11 |
-
----
+| Is the Knowledge Vault required? | No | `43` §1.1 |
 
 ## Review
 

@@ -1,6 +1,6 @@
 # Future Enhancements
 
-> **Doc ID:** 55 · **Status:** Design · **Depends on:** `10`, `50`
+> **Doc ID:** 55 · **Status:** Design · **Revision:** 2 (website-only)
 
 Explicitly out of scope now, plausible later. Each entry states why it is
 deferred and what would justify building it — so that "not yet" is a decision
@@ -20,40 +20,30 @@ the kind of investment they represent.
 
 ### 2. Real-time collaborative editing
 
-**Deferred because:** it conflicts with local-first E2E encryption at a
-fundamental level. Collaborative editing needs a shared, mutable, low-latency
-state; E2E encryption with client-held keys makes server-mediated merging
-impossible without either key sharing or a server that can decrypt. Both
-undermine `44`.
+**Deferred because:** it is a large investment and the dominant collaboration
+pattern in our personas — supervisor review — is already served by DOCX round
+trips and comment threads.
 
-It also interacts badly with the Ledger: co-authored spans need multi-actor
-provenance, which is a genuine extension of the data model rather than a feature
-on top of it.
+Revision 2 removes the architectural blocker: with server-side state and no
+client-held keys, collaborative editing is now merely difficult rather than
+contradictory. That makes it a scheduling question rather than a design conflict.
 
-**Would require:** a CRDT-based CDM (`OQ-03`), multi-actor provenance, group key
-management with membership changes, and a conflict model for gates — who signs
-off when there are three authors.
+**Would require:** a CRDT or OT layer over the CDM, presence, multi-actor
+comment threads, and a conflict model for gate sign-off — who signs off when
+there are three authors.
 
 **Trigger:** sustained demand from co-authored research teams, and evidence that
-asynchronous review (which the product already supports) is insufficient.
-
-**Interim:** asynchronous review with DOCX round-trip already serves the
-supervisor relationship, which is the dominant collaboration pattern in the
-personas (`26` Journey 2).
+asynchronous review is insufficient.
 
 ### 3. Native mobile applications
 
-**Deferred because:** the responsive Console PWA covers the four mobile jobs
-(`24` §1) and native adds cost without adding capability. Local models, local
-indexing, and plugins are not viable on phones, so a native app would be the same
-feature set in a more expensive package.
-
-**Would require:** platform-specific builds, app store operations, and a second
-notification pipeline.
+**Deferred because:** Pocket as a PWA covers the four mobile jobs (`23` §1).
+Native would add app store operations and a second notification pipeline without
+adding capability.
 
 **Trigger:** PWA limitations blocking a core job — most plausibly if push
-notification support or offline storage limits materially degrade the approval
-queue on iOS.
+notification or offline storage limits materially degrade the approval queue on
+iOS.
 
 ### 4. Supervisor and reviewer accounts
 
@@ -63,7 +53,7 @@ anything (`26` Journey 2). The DOCX round-trip works because it meets them
 where they are.
 
 **Would require:** a lightweight review surface, invitation flows, and a sharing
-model that does not compromise E2E encryption.
+model with scoped, revocable, time-boxed access.
 
 **Trigger:** institutional customers where the supervisor relationship is already
 mediated by a system we integrate with.
@@ -74,9 +64,9 @@ mediated by a system we integrate with.
 
 ### 5. LaTeX as a first-class authoring surface
 
-**Deferred because:** provenance over LaTeX source is a materially different and
-harder problem than provenance over a structured document model, and LaTeX users
-have strong existing tooling. `OQ-04` leans toward never.
+**Deferred because:** LaTeX authoring means a source editor, a compile loop, and
+package management — none of which the CDM, the Rubric, or the Studio operate on.
+LaTeX users also have strong existing tooling. `OQ-04` leans toward never.
 
 **Interim:** `.tex` + `.bib` export for users who continue in LaTeX
 (`33` §6.5).
@@ -107,34 +97,31 @@ harder than binding a sentence.
 
 ## Integrity and assurance
 
-### 8. Attested authorship reports
+### 8. A local processing option
 
-**Deferred because:** `32` §8.1 accepts that a local-first Ledger cannot defend
-against a user who fabricates their own record, and argues this is acceptable
-because the Ledger's purpose is to let honest users demonstrate honesty.
+**Deferred because:** revision 2 chose server-side processing for reach and
+speed to market (`44` §11). That trade is right for launch and wrong for a
+minority of users whose ethics approval or institutional policy forbids sending
+participant data to any third party.
 
-An attested report — where the client signs the chain head with a key it does not
-expose, and an institution can verify the signature — would strengthen the claim
-for institutions that require it.
+The `restricted` path (`44` §5.3) serves them partially — deterministic features
+with no egress — but not fully.
 
-**Would require:** hardware-backed attestation, a verification service, and a
-careful analysis of what attestation actually proves (it proves the record was
-produced by an unmodified client, not that the human read anything).
+**Would require:** either a downloadable companion that processes locally and
+syncs results, or WASM-based in-browser processing for a reduced feature set.
+Both are substantial.
 
-**Trigger:** institutional customers requiring assurance beyond the voluntary
-report, without demanding surveillance (`RISK-11`).
-
-**Caution:** this edges toward the surveillance boundary. Any design must remain
-user-initiated and voluntary.
+**Trigger:** institutional or clinical customers for whom the `restricted` path
+is insufficient, in enough volume to justify a second processing architecture.
 
 ### 9. Cross-project self-plagiarism detection
 
 **Deferred because:** the Vault already enables self-overlap detection within a
-workspace (`32` §10.1). Cross-workspace and cross-account detection would require
-either a shared index (impossible under E2E) or content transmission (contrary to
-`44`).
+workspace (`32` §9). Cross-account detection would require indexing every user's
+work against every other's, which we will not build — it is a surveillance
+capability regardless of intent.
 
-**Trigger:** none foreseeable that does not break the privacy model.
+**Trigger:** none. This is closer to a permanent exclusion than a deferral.
 
 ---
 
@@ -145,8 +132,7 @@ either a shared index (impossible under E2E) or content transmission (contrary t
 **Deferred because:** it requires institutional customers first, and every LMS
 integration is bespoke.
 
-**Would require:** LTI support, assignment import, and a submission path — the
-last of which raises the question of what leaves the device.
+**Would require:** LTI support, assignment import, and a submission path.
 
 **Trigger:** institutional tier traction (Phase 5+).
 
@@ -186,35 +172,35 @@ non-English system. Likely earlier than most items here.
 
 ## Platform depth
 
-### 14. Direct model execution
+### 14. Self-hosted inference
 
-**Deferred because:** Ollama and LM Studio are good, users already manage them,
-and embedding an inference engine adds significant binary size and maintenance
-(`41` §10.1).
+**Deferred because:** provider APIs are cheaper than operating GPUs until volume
+is high, and provider choice is a user-facing benefit (`41` §3).
 
-**Trigger:** a material share of users struggling to install a runtime, or
-requirements the existing runtimes cannot meet.
+**Would require:** GPU capacity, model operations, and an on-call surface a small
+team does not have (`RISK-13`).
+
+**Trigger:** inference cost (`RISK-05`) exceeding the cost of operating capacity,
+or a privacy tier that requires inference never leaving our infrastructure.
 
 ### 15. Team and lab workspaces
 
-**Deferred because:** shared workspaces require the group key management that
-collaboration (§2) also needs, and the sharing model must not compromise E2E
-encryption.
+**Deferred because:** shared workspaces need a permission model, shared billing,
+and the sharing infrastructure collaboration (§2) also needs.
 
 **Trigger:** Lab-tier demand (`11` §7 already anticipates it).
 
 ### 16. Voice and dictation authoring
 
 **Deferred because:** dictation exists at the OS level and works today. A
-first-class voice authoring mode with provenance implications — dictated text is
-`human_typed`, but what about dictated text corrected by an AI transcription
-model — is a design question, not just a feature.
+first-class voice authoring mode — with transcription, correction, and the
+Studio operating on spoken drafts — is a design problem, not just a feature.
 
 **Trigger:** accessibility demand, which would raise its priority substantially.
 
 ### 17. Research data management
 
-**Deferred because:** datasets are ingestible today (`43` §2) but full RDM —
+**Deferred because:** datasets are ingestible (`43` §2) but full RDM —
 versioned datasets, DMP generation, repository deposit — is adjacent to a
 different product category.
 
@@ -224,23 +210,22 @@ different product category.
 
 ## Things we will not build, ever
 
-Restated from `01` §5 because a future-enhancements document is exactly where
-refused features try to reappear.
+Restated because a future-enhancements document is exactly where refused features
+try to reappear.
 
 | Never | Because |
 |---|---|
-| One-click document generation | Violates `P1`; it is the thing the product exists not to be |
-| Detection evasion in any framing | `32` §6.1 |
-| Plagiarism similarity scores | `32` §10.2 |
+| **Output optimised against AI detectors** | `01` §7 — does not work durably, destroys the institutional market, and is the wrong answer to the real problem |
+| **Any claim that our output passes detection** | We cannot hold it, and a user misled into complacency ends up worse off than if they had never used us |
+| Fabricated citations, or any path permitting them | `P2` |
+| Plagiarism similarity scores | `32` §9 |
 | Training on user content | `41` §11 |
-| Silent institutional surveillance | `32` §11, `49` §9 |
-| Server-side storage of drafts as the default | `44` |
-| Ghost-authorship services | Out of scope permanently |
+| Cross-account content comparison | §9 |
+| Automatic institutional reporting of student work | `32` §8.4 |
+| Ghost-authorship services | Different business |
 
 An item moving from this table to the roadmap is not a scope change. It is a
 different product, and it would require replacing `01-PRODUCT-VISION.md`.
-
----
 
 ## Review
 

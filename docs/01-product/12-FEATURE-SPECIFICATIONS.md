@@ -1,6 +1,7 @@
 # Feature Specifications — Scholar OS
 
 > **Doc ID:** 12 · **Status:** Design · **Depends on:** `10`, `11`, `14`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 Per-feature behavioural specifications. Each feature states its purpose, its
 behaviour, its acceptance criteria, and — the part most specs omit — its failure
@@ -34,7 +35,7 @@ a privacy-and-cost decision they will not regret.
 
 1. Detect environment: OS, RAM, CPU cores, GPU and VRAM, existing Ollama or LM
    Studio installations, available disk.
-2. Present the provider landscape as a comparison, local-first in ordering.
+2. Present the provider landscape as a comparison, with privacy implications stated per provider.
 3. For each provider the user opens, show the full information card (§2.1).
 4. On key entry, validate live with a minimal-cost call; report the specific
    failure on rejection.
@@ -89,8 +90,8 @@ a privacy-and-cost decision they will not regret.
 | Key valid but account has no credit | Detect where the API reports it; warn before the user relies on it |
 | User pastes a key into the wrong provider | Format validation catches common cases before the live call |
 
-**Surfaces.** Workbench (full). Console (cloud providers only; local providers
-shown as Workbench-only with an explanation).
+**Surfaces.** Desk (full). Pocket (cloud providers only; local providers
+shown as Desk-only with an explanation).
 
 ---
 
@@ -133,7 +134,7 @@ shown as Workbench-only with an explanation).
 | Disk fills during ingestion | Stop cleanly, retain what completed, state space required |
 | User forgets passphrase later | Unrecoverable by design; the Recovery Kit is the only path, and the UI said so |
 
-**Surfaces.** Workbench only. The Console can search a synced Vault but cannot
+**Surfaces.** Desk only. The Pocket can search a synced Vault but cannot
 create one.
 
 ---
@@ -169,7 +170,7 @@ create one.
 - Skipping is possible at any point without penalty.
 - Re-running from Help works with a fresh sample project.
 
-**Surfaces.** Workbench (full). Console (abridged: integrity, privacy, citation
+**Surfaces.** Desk (full). Pocket (abridged: integrity, privacy, citation
 verification).
 
 ---
@@ -210,7 +211,7 @@ verification).
 | User's artefact is not in the catalog | OT-24 with the free-text purpose logged as catalog input |
 | User picks the wrong type and notices at `G4` | Type change is permitted with an explicit warning about structural impact and a diff of what changes |
 
-**Surfaces.** Workbench (full). Console (create project, select type; intake
+**Surfaces.** Desk (full). Pocket (create project, select type; intake
 continues on either surface).
 
 ---
@@ -257,7 +258,7 @@ continues on either surface).
 | User abandons mid-form | State saved; resumable; a reminder after 48 hours if opted in |
 | Conflicting values (brief says 2000 words, user typed 3000) | Surface the conflict explicitly and ask which governs |
 
-**Surfaces.** Workbench (full). Console (full — this is a legitimate quick task).
+**Surfaces.** Desk (full). Pocket (full — this is a legitimate quick task).
 
 ---
 
@@ -304,7 +305,7 @@ continues on either surface).
 | Very large file (> 500 MB) | Warn about time and space; allow proceed |
 | Duplicate of existing source | Detect by content hash and by identifier; offer merge |
 
-**Surfaces.** Workbench (full). Console (upload for later processing; parsing
+**Surfaces.** Desk (full). Pocket (upload for later processing; parsing
 happens on the desktop or in a limited server-side path only with explicit
 consent).
 
@@ -352,7 +353,7 @@ consent).
 | Service returns malformed data | Discard that result, log, continue |
 | Paywalled full text | Show metadata and abstract; mark full text unavailable; offer institutional-access guidance |
 
-**Surfaces.** Workbench (full). Console (initiate discovery, review queue).
+**Surfaces.** Desk (full). Pocket (initiate discovery, review queue).
 
 ---
 
@@ -404,7 +405,7 @@ For each candidate, present:
 | Summary generation fails | Show metadata and abstract; approval remains possible |
 | Queue grows beyond ~100 | Prioritise by relevance; offer filters; suggest narrowing the query |
 
-**Surfaces.** Workbench (full). Console and Mobile (full — this is the flagship
+**Surfaces.** Desk (full). Pocket and Mobile (full — this is the flagship
 Quick Task, deliberately designed to work on a phone).
 
 ---
@@ -455,7 +456,7 @@ write.
 | No machine-checkable rules found | Say so honestly; offer manual entry; do not fabricate rules |
 | Rule is real but not automatable ("write clearly") | Compile as an advisory checklist item, marked non-automated |
 
-**Surfaces.** Workbench (full). Console (review and confirm proposals).
+**Surfaces.** Desk (full). Pocket (review and confirm proposals).
 
 ---
 
@@ -497,7 +498,7 @@ write.
 | Contradictory rules both fire | Surface as a rule conflict, not a document defect |
 | Evaluation becomes slow at length | Incremental evaluation over changed regions only |
 
-**Surfaces.** Workbench (full, inline). Console (summary and finding list).
+**Surfaces.** Desk (full, inline). Pocket (summary and finding list).
 
 ---
 
@@ -513,7 +514,7 @@ with recorded provenance.
 1. User selects a section and invokes drafting.
 2. The pipeline runs (`30` §6): retrieve relevant approved evidence → plan the
    section → draft with citations → verify claims → check style.
-3. Output arrives as `ai_generated_unreviewed` spans with claim bindings attached.
+3. Output arrives as pending proposals with claim bindings attached.
 4. The user reviews span by span, accepting, editing, or rejecting.
 
 **Rules.**
@@ -546,7 +547,7 @@ with recorded provenance.
 | Run exceeds budget | Pause and ask before continuing |
 | Context exceeds the model's window | Chunk with a stated strategy; disclose that the model did not see everything at once |
 
-**Surfaces.** Workbench only. Long drafting runs are not a Console job.
+**Surfaces.** Desk only. Long drafting runs are not a Pocket job.
 
 ---
 
@@ -592,74 +593,79 @@ distinguishing behaviours:
 | Paste from an external source | Origin `imported`; prompt to attribute or mark as quotation |
 | Crash mid-edit | Recover from the event log to the last consistent state |
 
-**Surfaces.** Workbench (full). Console (light editing: text edits, comments,
+**Surfaces.** Desk (full). Pocket (light editing: text edits, comments,
 accepting suggestions — no drafting runs, no structural changes).
 
 ---
 
-### F-EDT-2 — Language Refinement
+### F-EDT-2 — Language & Voice Studio
 
-**Purpose.** Help Yusuf write better English without touching his authorship.
+**Purpose.** Take Yusuf's writing to the standard his research deserves, in his
+voice. Full specification in `32`; this records the acceptance criteria.
+
+**Revision 2:** expanded from three intervention levels to five, with voice
+matching, L1-aware support, and meaning verification. It is now the product's
+primary differentiator, not a secondary editing aid.
 
 **Behaviour.**
 
-1. User selects text and requests refinement, choosing an intervention level:
-   minimal (grammar and mechanics only), moderate (clarity and flow), or
-   thorough (register and structure).
+1. User selects text and requests refinement, choosing one of five intervention
+   levels: proofread, clarity, flow, register, or rewrite (`32` §4).
 2. The system produces a diff, not a replacement.
 3. Each change is individually acceptable or rejectable, with the reason stated.
-4. Accepted changes record `ai_refined_accepted`, preserving the underlying
-   human origin.
+4. Meaning-altering changes are separated from language changes and presented
+   first (`32` §7).
 
 **Rules.**
 
-- Refinement MUST operate on human-authored text. Offering it on
-  `ai_generated_unreviewed` spans MUST be blocked with an explanation
-  (`32` §6.2).
-- Every change MUST be individually reviewable (`REQ-INT-9`).
+- Every change MUST be individually reviewable with a stated reason.
 - Refinement MUST NOT alter the meaning of a claim; meaning-altering changes MUST
-  be flagged separately as content edits, not language edits.
-- The system MUST NOT frame this as making text sound human or evading detection
-  (`02` §9).
-- Minimal mode MUST be genuinely minimal: no restructuring, no vocabulary
-  elevation.
+  be surfaced separately as content edits, before language edits.
+- Level 1 MUST be genuinely minimal: no restructuring, no vocabulary elevation,
+  no change to any word that is not an error.
+- Level 5 MAY substantially rewrite. There is no cap on how much the Studio may
+  improve text.
+- Voice matching, when active, MUST NOT reintroduce an error to preserve a habit.
+- Quotations MUST be detected and protected from refinement.
+- The system MUST NOT claim or imply any AI-detection outcome (`01` §7).
 
 **Acceptance.**
 
-- Refining human text produces a reviewable diff with per-change reasons.
-- Underlying human origin is preserved through refinement in the Ledger.
-- Attempting refinement on unreviewed AI text is blocked with a clear
-  explanation.
-- Minimal mode changes no word that is not a grammatical error.
-- Authorship ratio does not fall when human text is refined.
+- Every level produces a reviewable diff with a reason per change.
+- Meaning-altering edits are separated in 100% of golden-set cases.
+- Level 1 changes no word that is not an error.
+- Quotations are never altered.
+- Voice-match acceptance ≥ 75% among users with a profile.
+- Studio satisfaction ≥ 4.5/5 among second-language users.
 
-**Surfaces.** Workbench (full). Console (short selections).
+**Surfaces.** Desk (invoke and review). Pocket (review a diff, one change at a
+time — `20` §6.1).
 
 ---
 
 ## 7. Integrity features
 
-### F-INT-1 — Authorship Reporting
+### F-INT-1 — Writing History *(revised in revision 2)*
 
-**Purpose.** Let a user see, and if they choose, prove, how their document was
-written.
+**Purpose.** Give the user a private record of how they worked, which they may
+produce if challenged. Off by default; no score; blocks nothing (`32` §8).
 
 **Behaviour.**
 
-1. Compute the authorship ratio continuously from the Ledger.
+1. Record, when enabled, which passages were drafted with agent assistance and which were refined.
 2. Display in the status bar; expand to a breakdown by origin, by section, and
    over time.
 3. On request, generate an exportable authorship report.
 
 **Rules.**
 
-- The ratio MUST be visible without navigation (`REQ-INT-3`).
+- The feature MUST be off by default and enabled explicitly.
 - The report MUST be voluntary; the system MUST NOT transmit it anywhere
   automatically (`REQ-INT-8`).
 - The report MUST state its own limitations: it describes recorded provenance
   within Scholar OS and cannot speak to text pasted from outside.
-- Reports MUST be tamper-evident (signed against the Ledger hash) so that a
-  supervisor can trust a report the student hands them.
+- No authorship ratio, percentage, or score is computed or displayed.
+- The record MUST never be transmitted anywhere automatically.
 
 **Acceptance.**
 
@@ -669,7 +675,7 @@ written.
 - The report verifies against the project's Ledger; a modified report fails
   verification.
 
-**Surfaces.** Workbench (full). Console (view ratio and report).
+**Surfaces.** Desk (full). Pocket (view ratio and report).
 
 ---
 
@@ -711,11 +717,17 @@ written.
 | User requests a "no AI used" statement with AI use recorded | The system declines to generate it and explains why; the user may still write their own |
 | Ledger is incomplete (imported document) | The statement says so explicitly |
 
-**Surfaces.** Workbench (full). Console (view and edit).
+**Surfaces.** Desk (full). Pocket (view and edit).
 
 ---
 
-### F-INT-3 — Export Integrity Gate
+### F-INT-3 — Export Integrity Gate *(withdrawn in revision 2)*
+
+**Status:** Removed. Export is never blocked on authorship grounds
+(`32` §8.2). Export pre-flight still blocks on unresolved *compliance* findings
+and missing assets (`33` §3) — that is a correctness gate, not an authorship one.
+
+The original specification follows for reference only.
 
 **Purpose.** Prevent the specific failure of submitting text nobody read.
 
@@ -740,8 +752,8 @@ written.
 - Override requires an affirmative action and records a Ledger entry.
 - Reviewing all spans clears the block without an override.
 
-**Surfaces.** Workbench (full). Console (block enforced; review possible;
-override requires the Workbench, because the review interaction is not adequate
+**Surfaces.** Desk (full). Pocket (block enforced; review possible;
+override requires the Desk, because the review interaction is not adequate
 on a small screen and an uninformed override is worse than a deferred one).
 
 ---
@@ -787,7 +799,7 @@ on a small screen and an uninformed override is worse than a deferred one).
 | Font unavailable | Substitute with a documented fallback; warn |
 | Output fails structural validation | Do not deliver a broken file; report and retain diagnostics |
 
-**Surfaces.** Workbench (full). Console (export of synced projects, cloud-rendered
+**Surfaces.** Desk (full). Pocket (export of synced projects, cloud-rendered
 only for users who have enabled sync; the Warden treats this as `user_content`
 egress and requires explicit consent).
 

@@ -1,6 +1,7 @@
 # Testing Strategy
 
 > **Doc ID:** 52 · **Status:** Design · **Depends on:** `13`, `51`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 What we test, how, and the specific tests that hold the product's guarantees.
 
@@ -47,7 +48,7 @@ Per `13` §6:
 |---|---|---|
 | `domain/provenance` | **100%** | The failure would be invisible and most damaging |
 | `domain/*` (other) | 95% | Pure logic, no mocks needed |
-| `kernel/*` | 90% | Integration against a temp store |
+| `services/*` | 90% | Integration against a temp store |
 | `platform/*` | 85% | Recorded provider fixtures |
 | `app/*` | 80% | Real kernel, fake providers |
 | `surface/*` | Component + journey | Coverage percentage is a poor proxy here |
@@ -177,10 +178,10 @@ build.
 
 | Target | Tested |
 |---|---|
-| Workbench | Windows 10/11, macOS 12+, Ubuntu 22.04+ |
+| Desk | Windows 10/11, macOS 12+, Ubuntu 22.04+ |
 | Baseline hardware | 8 GB RAM, 4 cores, no GPU — a real machine in CI, not a throttled container |
-| Console desktop | Last two versions of Chrome, Firefox, Safari, Edge |
-| Console mobile | 2019 mid-tier Android, recent iOS Safari, 360 px viewport |
+| Pocket desktop | Last two versions of Chrome, Firefox, Safari, Edge |
+| Pocket mobile | 2019 mid-tier Android, recent iOS Safari, 360 px viewport |
 | Approval queue | The one flow tested against the oldest supported baseline |
 
 ---
@@ -197,7 +198,7 @@ Per `46` §17.
 | `no-write-draft-capability` | Every build | No agent or plugin holds `write:draft` |
 | `plane-isolation` | Every build | No admin-plane import reaches user-plane code |
 | `no-key-material-leaks` | Every build | Keys absent from logs, IPC payloads, crash dumps, diagnostics |
-| `relay-ciphertext-only` | Every build | The Relay receives no plaintext |
+| `relay-ciphertext-only` | Every build | The sync service receives no plaintext |
 | `sandbox-escape` | Every release | Plugin sandbox holds against escape attempts |
 | Dependency and secret scanning | Every commit | — |
 | Penetration test | Annually and pre-major-release | — |
@@ -212,8 +213,8 @@ would quietly invalidate the whole security model.
 | Rule | Enforced |
 |---|---|
 | L2 imports nothing from L3 or L4 | ✓ |
-| No filesystem I/O outside `kernel/fs` | ✓ |
-| No key handling outside `kernel/crypto` | ✓ |
+| No filesystem I/O outside `services/storage` | ✓ |
+| No key handling outside `services/crypto` | ✓ |
 | `surface/*` imports only IPC, shared UI, generated types | ✓ |
 | `app/vault` is not a transitive requirement of anything | ✓ |
 | No `admin/*` import in user-plane code | ✓ |
@@ -235,12 +236,12 @@ Budgets from `10` §5, verified on baseline hardware.
 | Test | Budget |
 |---|---|
 | Editor latency at 150k words | < 50 ms |
-| Workbench cold start | < 4 s |
+| Desk cold start | < 4 s |
 | Vault semantic search, 5k docs | < 800 ms |
 | Compliance re-evaluation | < 300 ms |
 | Local model first token, 7B | < 3 s |
 | Export, 20k words | < 8 s |
-| Console FCP on 2019 Android, 4G | < 2.0 s |
+| Pocket FCP on 2019 Android, 4G | < 2.0 s |
 | Memory after an 8-hour session | No growth beyond a defined envelope |
 
 Regressions fail the build. The 8-hour memory test runs nightly, not per-commit.
@@ -255,7 +256,7 @@ Regressions fail the build. The 8-hour memory test runs nightly, not per-commit.
 | Keyboard-only traversal | Every journey |
 | Screen reader | NVDA, VoiceOver, TalkBack — every release |
 | Provenance a11y (`21` §6.1) | Origin announced; text-mode provenance view |
-| Approval card reading order (`24` §9.1) | Every release |
+| Approval card reading order (`23` §10.1) | Every release |
 | 200% zoom | Every release |
 | Reduced motion, high contrast | Every release |
 

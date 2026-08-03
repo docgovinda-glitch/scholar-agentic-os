@@ -1,6 +1,7 @@
 # Output Type Catalog — Atlas
 
 > **Doc ID:** 14 · **Status:** Design · **Depends on:** `02`, `10`, `30`, `31`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 Atlas is the subsystem that knows what academic artefacts are. This document is
 its content specification: 24 output types, each with the structure, intake

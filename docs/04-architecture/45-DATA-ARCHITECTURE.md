@@ -1,6 +1,7 @@
 # Data Architecture
 
 > **Doc ID:** 45 · **Status:** Design · **Depends on:** `40`, `44`, `32`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 Entities, schemas, the event log, migration, and retention.
 
@@ -10,10 +11,10 @@ Entities, schemas, the event log, migration, and retention.
 
 | # | Principle |
 |---|---|
-| D1 | **Events are the source of truth.** State is a projection of the event log |
+| D1 | **Postgres is the source of truth.** An audit log records consequential state transitions |
 | D2 | **Derived data is disposable.** Indexes, embeddings, and caches rebuild from blobs |
 | D3 | **Content is addressed by hash.** Immutable, deduplicated, verifiable |
-| D4 | **The Ledger is append-only.** Never edited; corrections are new entries |
+| D4 | **The audit log is append-only.** Never edited; corrections are new entries |
 | D5 | **Schemas are versioned.** A five-year project outlives many releases |
 | D6 | **Everything is exportable.** In documented open formats (`P9`) |
 | D7 | **Deletion is real.** Content, derivatives, and sync copies (`REQ-SEC-6`) |
@@ -309,7 +310,7 @@ remains attributable to 2.1 after 2.4 ships.
 | Impact preview | Before hard delete: what depends on this |
 | Hard delete | Removed from store and index |
 | Key destruction | The object's CEK is destroyed, which renders any residual ciphertext unrecoverable |
-| Sync propagation | Deletion propagates; the Relay drops the envelope |
+| Sync propagation | Deletion propagates; the sync service drops the envelope |
 | Verification | A report confirming what was removed |
 
 CEK destruction is what makes deletion meaningful on media where secure erasure

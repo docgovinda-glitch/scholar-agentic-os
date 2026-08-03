@@ -1,6 +1,7 @@
 # API Architecture
 
 > **Doc ID:** 48 · **Status:** Design · **Depends on:** `40`, `46`, `47`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 Four API surfaces, their contracts, and the versioning discipline that keeps a
 five-year project working across releases.
@@ -11,8 +12,8 @@ five-year project working across releases.
 
 | Surface | Between | Transport | Trust |
 |---|---|---|---|
-| **IPC API** | Renderer ↔ Kernel | Typed local channel | Renderer untrusted |
-| **Host API** | Kernel ↔ plugin sandbox | WASM host functions | Plugin untrusted |
+| **IPC API** | Renderer ↔ service tier | Typed local channel | Renderer untrusted |
+| **Host API** | service tier ↔ plugin sandbox | WASM host functions | Plugin untrusted |
 | **Cloud API** | Client ↔ cloud plane | HTTPS/JSON | Mutually authenticated |
 | **Provider API** | Gateway ↔ AI providers | HTTPS, per-provider | External |
 
@@ -83,7 +84,7 @@ event agent.complete { runId, result }
 | Control | Statement |
 |---|---|
 | No handles cross | The renderer never receives a store handle, a key, or a file descriptor |
-| Validation | Every payload validated against its schema at the Kernel |
+| Validation | Every payload validated against its schema at the service tier |
 | Rate limiting | Per channel, to contain a compromised renderer |
 | Capability | Privileged channels require the session's capability set |
 | No path arguments | The renderer names objects by ID, never by filesystem path |

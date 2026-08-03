@@ -1,6 +1,7 @@
 # Submission Compliance Architecture — The Rubric
 
 > **Doc ID:** 31 · **Status:** Design · **Depends on:** `14`, `30`, `42`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 How institutional and publisher requirements become checks that run while the
 user writes.

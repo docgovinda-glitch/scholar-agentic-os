@@ -1,6 +1,7 @@
 # Security Architecture
 
 > **Doc ID:** 46 · **Status:** Design · **Depends on:** `40`, `44`, `45`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 Threat model, key custody, encryption, sandboxing, authentication, audit, and
 deletion.
@@ -9,13 +10,19 @@ deletion.
 
 ## 1. Security posture
 
-**The operator is not a trusted party for user content.**
+**Revision 2 changes this posture materially and the change is stated plainly.**
 
-This is the organising principle. Most application security models protect users
-from outsiders while the operator retains full access. Scholar OS's model
-excludes the operator by construction — we hold no key capable of decrypting user
-content (`REQ-SEC-11`), which means a compromise of our infrastructure does not
-compromise anyone's dissertation.
+Revision 1 excluded the operator by construction — content was encrypted with
+client-held keys and we could not decrypt it. A web application cannot do that
+while processing documents server-side.
+
+Revision 2's posture: **the operator holds the keys, and access is constrained by
+controls rather than by mathematics.** Encryption at rest via managed KMS, no
+routine staff access path, break-glass only with two-person approval, and
+mandatory notification of the affected user (`44` §4).
+
+This is weaker than revision 1 and stronger than the category norm. `44` §11
+records the trade-off.
 
 | Property | How |
 |---|---|
@@ -78,10 +85,10 @@ Per `40` §3. Controls at each:
 
 | Boundary | Control |
 |---|---|
-| B1 Renderer ↔ Kernel | Typed IPC; input validation at the Kernel; no key or store handles cross |
-| B2 Kernel ↔ plugin | WASM sandbox; capability tokens; resource limits; no ambient authority |
+| B1 Renderer ↔ service tier | Typed IPC; input validation at the service tier; no key or store handles cross |
+| B2 service tier ↔ plugin | WASM sandbox; capability tokens; resource limits; no ambient authority |
 | B3 Device ↔ provider | Warden classification and policy; per-provider-per-class consent; TLS |
-| B4 Device ↔ cloud | E2E encryption; the Relay is ciphertext-only; TLS |
+| B4 Device ↔ cloud | E2E encryption; the sync service is ciphertext-only; TLS |
 | B5 User plane ↔ admin plane | Physical separation; no shared credentials, network path, or data view |
 
 ---
@@ -108,7 +115,7 @@ under our release cadence, and pinning would break users).
 
 ### 4.3 In use
 
-Decrypted only in Kernel process memory, for the minimum duration. Keys are
+Decrypted only in service tier memory, for the minimum duration. Keys are
 zeroed after use where the runtime permits. The index is decrypted in memory
 during search, which is the documented trade-off in `43` §9.1.
 
@@ -224,14 +231,14 @@ The enforcement mechanism for both agents and plugins.
 ### 8.1 Model
 
 ```
-Manifest declares  →  User/system approves  →  Kernel issues token
+Manifest declares  →  User/system approves  →  service tier issues token
                                                       │
                           every guarded call verifies ─┘
 ```
 
 | Property | Statement |
 |---|---|
-| Unforgeable | Issued and verified only by `kernel/capabilities` |
+| Unforgeable | Issued and verified only by `services/capabilities` |
 | Narrow | One capability per grant; no wildcards |
 | Revocable | Immediately, at runtime |
 | Non-transferable | An agent cannot pass its token to a plugin |
@@ -271,7 +278,7 @@ Detail in `47`. Security summary:
 
 ### 10.1 Local
 
-The Workbench requires no account (`25` §1.2). Where a Vault passphrase is set,
+The Desk requires no account (`25` §1.2). Where a Vault passphrase is set,
 it is required at launch unless the Master Key is sealed to the platform keystore
 and the OS session is authenticated.
 
@@ -380,7 +387,7 @@ Written for a team of two to four (`REQ-ADM-7`).
 
 ### 15.1 The scenario that shapes the architecture
 
-**"The Relay is breached."** An attacker obtains every sync envelope.
+**"The sync service is breached."** An attacker obtains every sync envelope.
 
 They get ciphertext and opaque object IDs. No titles, no content, no project
 names. The impact is a traffic-analysis disclosure — that a user has *N* objects
@@ -432,7 +439,7 @@ prevent the two failures that would quietly invalidate the whole model.
 | Server holds and decrypts user API keys | Keys in the OS keystore; never transmitted |
 | Server-side user data | Local, encrypted, operator-inaccessible |
 | No E2E encryption | E2E for all synced content |
-| No capability system | Kernel-enforced capability tokens |
+| No capability system | service tier-enforced capability tokens |
 | No plugin sandbox | WASM sandbox |
 | No egress control | The Warden |
 | Supabase RLS in place | **Carries forward** — correct approach for the cloud plane |

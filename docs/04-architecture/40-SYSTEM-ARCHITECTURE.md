@@ -1,306 +1,285 @@
 # System Architecture
 
-> **Doc ID:** 40 · **Status:** Design · **Depends on:** `11`, `13`
+> **Doc ID:** 40 · **Status:** Design · **Revision:** 2 (website-only)
 
-The whole-system view: processes, planes, trust boundaries, and deployment.
+The whole-system view for a web application: services, trust boundaries, and
+deployment.
 
 ---
 
 ## 1. Shape
 
-Scholar OS is a **local-first desktop application with a minimal cloud plane**.
-The inversion from conventional SaaS is the defining decision: the user's device
-is where the system lives, and the server is a small, deliberately incapable
-supporting service.
+Scholar OS is a **server-rendered web application with a rich client editor, a
+service tier that does the work, and a strict egress boundary in front of model
+providers.**
 
 ```
-╔════════════════════ USER'S DEVICE ════════════════════════════════╗
-║                                                                    ║
-║  ┌── RENDERER PROCESS (untrusted) ──────────────────────────────┐  ║
-║  │  Workbench UI · panels · editor view · plugin UI host        │  ║
-║  │  No keys · no store access · no network                      │  ║
-║  └────────────────────────┬─────────────────────────────────────┘  ║
-║                    typed IPC (platform/ipc)                        ║
-║  ┌────────────────────────▼─────────────────────────────────────┐  ║
-║  │  KERNEL PROCESS (trusted)                                     │  ║
-║  │  ┌────────┬────────┬────────┬───────────┬─────────────────┐  │  ║
-║  │  │ store  │ index  │ events │ scheduler │ capabilities    │  │  ║
-║  │  └────────┴────────┴────────┴───────────┴─────────────────┘  │  ║
-║  │  ┌──────────────────────────────────────────────────────┐    │  ║
-║  │  │ crypto — keys never leave this process               │    │  ║
-║  │  └──────────────────────────────────────────────────────┘    │  ║
-║  │  Application: conductor · atlas · rubric · mesh · vault ·    │  ║
-║  │               ledger · ingestion · discovery · export        │  ║
-║  └───────────┬──────────────────────────────┬──────────────────┘  ║
-║              │                              │                     ║
-║  ┌───────────▼──────────┐      ┌────────────▼─────────────────┐   ║
-║  │ WARDEN               │      │ PLUGIN SANDBOXES (n)         │   ║
-║  │ the only egress path │      │ WASM · capability-gated      │   ║
-║  └───────────┬──────────┘      └──────────────────────────────┘   ║
-║              │                                                     ║
-║  ┌───────────▼──────────┐                                          ║
-║  │ GATEWAY              │──────► local runtimes (Ollama/LM Studio) ║
-║  └───────────┬──────────┘                                          ║
-╚══════════════│═════════════════════════════════════════════════════╝
-               │  TRUST BOUNDARY
-    ┌──────────┴──────────┬─────────────────────┐
-    ▼                     ▼                     ▼
-┌─────────────┐   ┌──────────────┐   ┌────────────────────┐
-│ AI PROVIDERS│   │ ACADEMIC APIs│   │  CLOUD PLANE       │
-│ (cloud)     │   │ Crossref etc │   │  identity · relay  │
-└─────────────┘   └──────────────┘   │  registry · admin  │
-                                     └─────────┬──────────┘
-                                               │
-                                     ┌─────────▼──────────┐
-                                     │ CONSOLE (web)      │
-                                     └────────────────────┘
+┌──────────────── BROWSER ──────────────────────────────────────┐
+│  Desk (≥1024px)              │  Pocket (<1024px)              │
+│  regions · editor · palette  │  views · queue · reader        │
+│  ── shared: design system, domain types, API client ──        │
+│  IndexedDB edit buffer · service worker cache                 │
+└───────────────────────────┬───────────────────────────────────┘
+                            │  HTTPS · SSE for streams
+┌───────────────────────────▼───────────────────────────────────┐
+│  EDGE / APP TIER                                               │
+│  SSR shell · REST+RPC API · auth · rate limiting · sessions    │
+└───────────────────────────┬───────────────────────────────────┘
+                            │
+┌───────────────────────────▼───────────────────────────────────┐
+│  SERVICE TIER                                                  │
+│  ┌──────────┬──────────┬──────────┬──────────┬─────────────┐  │
+│  │ Conductor│  Atlas   │  Rubric  │  Studio  │   Mesh      │  │
+│  │  gates   │ catalog  │compliance│ language │  agents     │  │
+│  └──────────┴──────────┴──────────┴──────────┴─────────────┘  │
+│  ┌──────────┬──────────┬──────────┬──────────────────────┐    │
+│  │Ingestion │Discovery │  Export  │       Vault          │    │
+│  └──────────┴──────────┴──────────┴──────────────────────┘    │
+└──────┬───────────────────────────────────┬────────────────────┘
+       │                                   │
+┌──────▼──────────┐               ┌────────▼─────────┐
+│  DATA TIER      │               │  WARDEN          │
+│  Postgres       │               │  classify·policy │
+│  Object storage │               │  ↓ only path out │
+│  Vector index   │               └────────┬─────────┘
+│  Job queue      │                        │
+│  Cache          │               ┌────────▼─────────┐
+└─────────────────┘               │  GATEWAY         │
+                                  └────────┬─────────┘
+                                           │
+                              ┌────────────▼────────────┐
+                              │  AI PROVIDERS · ACADEMIC │
+                              │  APIs                    │
+                              └──────────────────────────┘
 ```
+
+Two properties constrain everything downstream:
+
+1. **The browser holds no secrets and does no heavy work.** Parsing, indexing,
+   embedding, agent execution, compliance evaluation, and export all run
+   server-side. The client is an editor and a view layer.
+2. **The Warden is the only egress path to model providers.** No service calls a
+   provider directly. This is what makes privacy policy enforceable rather than
+   aspirational, and it is enforced architecturally (`13` §4).
 
 ---
 
-## 2. Processes
+## 2. Client
 
-### 2.1 Renderer (untrusted)
+### 2.1 One codebase, two applications
 
-Runs the Workbench UI. Holds no keys, no store handle, and no network capability.
-Every operation goes through typed IPC to the Kernel.
+Desk and Pocket share the design system, domain types, API client, and business
+logic. They share no layout shell, no routing tree, and no page components.
 
-**Why untrusted:** it hosts plugin UI and renders untrusted content (source PDFs,
-web pages, model output). Treating it as compromised is the only safe posture.
+Selection is by viewport at the layout-shell level, server-side on first render
+and client-side on resize. A user who drags a window across the 1024 px boundary
+gets a genuine application switch with state preserved.
 
-### 2.2 Kernel (trusted)
+### 2.2 Client responsibilities
 
-Owns storage, keys, index, scheduling, capability enforcement, and all
-application logic. Never renders untrusted content. This is where the security
-model lives.
+| Does | Does not |
+|---|---|
+| Render, and manage layout | Hold API keys |
+| Editor interaction and local buffering | Parse documents |
+| Optimistic updates | Run agents |
+| Cache for offline reading | Evaluate compliance |
+| Stream consumption (SSE) | Call model providers |
 
-### 2.3 Plugin sandboxes
+### 2.3 The edit buffer
 
-One per running plugin. WASM, no ambient authority, all I/O through a
-capability-gated host API (`47`).
-
-### 2.4 Local model runtimes
-
-Ollama or LM Studio as separate OS processes, reached over localhost. Scholar OS
-does not embed an inference engine in v1 — it integrates with runtimes users
-already manage.
+Every keystroke goes to IndexedDB immediately; the server is flushed on a debounce
+(`22` §5.4). This is what makes a browser tab safe for a thesis: a crash, a
+refresh, or a closed lid loses at most a couple of seconds.
 
 ---
 
-## 3. Trust boundaries
+## 3. Service tier
 
-Five, each with a defined control.
+| Service | Owns |
+|---|---|
+| **Conductor** | Gate state, sign-off, agent run scheduling, workflow variants |
+| **Atlas** | Output type catalog, intake schemas, proposal generation |
+| **Rubric** | Requirement ingestion, rule compilation, continuous evaluation |
+| **Studio** | Language & Voice: levels, voice profiles, diffs (`32`) |
+| **Mesh** | Agent registry, execution, capability enforcement, versioning |
+| **Ingestion** | Parsing to CDM, OCR, transcription, metadata extraction |
+| **Discovery** | Academic source adapters, ranking, candidate queue |
+| **Vault** | Corpus storage, indexing, retrieval |
+| **Export** | Rendering, template application, packaging |
+
+All stateless behind the API tier; state lives in the data tier. Long-running
+work goes to the job queue and reports progress over SSE.
+
+---
+
+## 4. Data tier
+
+| Store | Holds |
+|---|---|
+| **Postgres** | Projects, drafts, sources, rules, findings, structure, accounts, history |
+| **Object storage** | Source files, uploaded media, exports, snapshots |
+| **Vector index** | Embeddings for corpus and Vault semantic search |
+| **Job queue** | Background work: ingestion, indexing, agent runs, export |
+| **Cache** | Parsed content, resolved metadata, model responses, rendered fragments |
+
+### 4.1 Encryption
+
+| Data | Approach |
+|---|---|
+| Draft and document content | Encrypted at rest, per-project CEK |
+| Uploaded source files | Encrypted at rest in object storage |
+| User API keys | Encrypted with a key held in a managed KMS, never logged, never returned to the client |
+| Everything else | Encrypted at rest by default |
+
+Revision 1's client-held-key model is withdrawn: it is incompatible with
+server-side processing. `44-DATA-RESIDENCY-AND-PRIVACY.md` states plainly what
+this means and what we do instead.
+
+---
+
+## 5. Trust boundaries
 
 | # | Boundary | Control |
 |---|---|---|
-| B1 | Renderer ↔ Kernel | Typed IPC; no raw handles; input validated at the Kernel |
-| B2 | Kernel ↔ plugin | Capability tokens; WASM sandbox; resource limits |
-| B3 | Device ↔ AI provider | Warden classification and policy; user consent per provider per class |
-| B4 | Device ↔ cloud plane | E2E encryption; the Relay stores ciphertext only |
-| B5 | User plane ↔ admin plane | Physical separation; no shared credentials or data path |
+| B1 | Browser ↔ API | Session auth, CSRF protection, input validation, rate limiting. The client is untrusted |
+| B2 | API ↔ services | Internal auth; services never exposed publicly |
+| B3 | Services ↔ providers | **Warden** classification and policy; per-user egress consent |
+| B4 | Services ↔ plugins | Sandbox and capability tokens |
+| B5 | User plane ↔ admin plane | Separate deployment, separate credentials, no data path |
 
-**B3 and B5 are the ones that make the product's promises true.** B3 is why "your
-documents stay on your device" is enforceable rather than aspirational; B5 is why
-"we cannot read your work" holds even against our own operators.
-
----
-
-## 4. The cloud plane
-
-Deliberately minimal. Everything here is something that *cannot* work locally.
-
-| Service | Purpose | Sees user content |
-|---|---|---|
-| **Identity** | Accounts, verification, sessions, MFA | No |
-| **Licensing** | Subscription state, entitlements | No |
-| **Relay** | Encrypted sync storage | Ciphertext only |
-| **Registry** | Model registry, venue profiles, agent versions, feature flags | No |
-| **Plugin registry** | Plugin distribution and signatures | No |
-| **Telemetry** | Aggregate, privacy-preserving metrics | No |
-| **Admin plane** | Operator tooling | No — B5 |
-
-### 4.1 What the cloud plane deliberately cannot do
-
-- Decrypt user content. It holds no key (`REQ-SEC-11`).
-- Run inference on user documents. Inference is device-side or provider-direct.
-- Index or search user content.
-- Recover a lost Vault passphrase.
-- Read a project even with full database access.
-
-This is a capability statement, not a policy statement. The distinction is the
-point: policies change, capabilities require re-architecture.
-
-### 4.2 Cost posture
-
-The cloud plane must run at near-zero cost per free user (`NFR-COST-1`), which is
-achievable precisely because it stores ciphertext blobs and account rows rather
-than documents and indexes. A conventional architecture for this product would
-carry per-user storage and inference costs that make a genuinely useful free tier
-impossible — and a free tier that cannot complete a project would undermine
-`P4` and the local-first positioning entirely.
+B3 and B5 carry the product's privacy promises and are verified by build-time
+architectural tests (`52` §6).
 
 ---
 
-## 5. Data flow: drafting a section
+## 6. Data flow: refining a passage
 
-Traced end to end, because it exercises every boundary.
+Traced because it exercises the new primary feature end to end.
 
 ```
-1.  User invokes drafting                          [renderer]
-2.  IPC → Conductor                                [B1]
-3.  Conductor checks gates G1,G2,G3                [kernel]
-4.  Conductor schedules the pipeline               [kernel]
-5.  AG-04 retrieves evidence
-      → index query (local)                        [kernel]
-      → embeddings: local model or Warden-gated    [B3 if cloud]
-6.  AG-07 plans the section
-      → Warden classifies the payload
-      → policy check for the bound provider        [B3]
-      → user consent if first egress of this class
-      → Gateway calls the provider
-7.  AG-09 drafts                                   [same path]
-8.  AG-13 binds claims to evidence                 [local + model]
-9.  AG-14 validates citations                      [local, deterministic]
-10. AG-16 style pass                               [model]
-11. Ledger commits spans as unreviewed             [kernel]
-12. Store writes; events appended                  [kernel]
-13. IPC → renderer renders for review              [B1]
-14. Sync (if enabled): encrypt → Relay             [B4]
+1.  User selects text, presses ⌘I, picks level 3      [browser]
+2.  POST /projects/:id/refine {span, level}           [B1]
+3.  API validates, authorises, rate-limits
+4.  Studio: analyse — structure, register, L1 patterns [service]
+5.  Studio: plan — load Voice Profile, set constraints
+6.  Warden: classify payload → user_content
+      → policy check for the bound provider           [B3]
+      → consent check if first egress of this class
+7.  Gateway → provider → candidate text
+8.  AG-20: meaning verification; split content edits   [service]
+9.  Studio: voice check against profile; revise outliers
+10. Studio: build per-change diff with reasons
+11. SSE stream → client renders diff progressively     [B1]
+12. User accepts or rejects each change                [browser]
+13. Accepted changes → draft; Writing History if enabled
 ```
 
-**Step 6 is the important one.** Every model call passes the Warden. There is no
-path from an agent to a provider that skips it, and this is enforced
-architecturally (`13` §4: no HTTP client may be constructed outside `gateway`
-and `relay-client`).
+**Step 6 has no bypass.** Every model call in the system passes it.
 
 ---
 
-## 6. Concurrency and resources
+## 7. Concurrency and background work
 
 | Concern | Approach |
 |---|---|
-| Agent runs | Scheduler-managed queue; configurable concurrency; default 2 |
-| Indexing | Background, low priority, yields to interaction |
-| Local inference | Serialised — one model at a time; VRAM does not permit more |
-| UI responsiveness | Kernel work never blocks the renderer; all IPC async |
-| Resource limits | User-configurable ceilings on CPU, RAM, and disk; enforced by the scheduler |
+| Agent runs | Job queue, per-user concurrency limits, cancellable |
+| Ingestion | Queued, chunked, progress over SSE |
+| Indexing | Background, low priority |
+| Compliance | Deterministic rules synchronous (< 300 ms); model-assisted queued |
+| Studio | Levels 1–2 synchronous; 3–5 streamed |
+| Fairness | Per-user quotas prevent one large project starving others |
 | Backpressure | Queues bounded; work rejected with a clear reason rather than accumulating |
-
-**The 8 GB baseline (`NFR-HW-1`) drives this.** On Amara's laptop, a local model
-holding 5 GB plus an index rebuild plus an editor is a machine that stops
-responding. The Resource Monitor is not a diagnostic nicety; it is how the
-product stays usable on the hardware most of its users have.
 
 ---
 
-## 7. Failure and degradation
+## 8. Failure and degradation
 
 | Failure | Behaviour |
 |---|---|
-| Renderer crash | Kernel survives; renderer restarts; state intact |
-| Kernel crash | Renderer shows a recovery state; kernel restarts; replay from the event log |
-| Plugin crash | Contained to its sandbox; plugin disabled; core unaffected |
-| Local runtime unavailable | Detected; failover per policy; user informed |
-| Provider unavailable | Failover chain; disclosed |
-| Cloud plane unavailable | Local operation continues fully; sync queues |
-| Disk full | Writes stop cleanly before corruption |
-| Index corrupt | Detected by checksum; rebuilt from blobs (the index is derived) |
-| Store corrupt | Recover from the last snapshot; report what was lost exactly |
-
-**The system never loses data to a crash.** Every mutation is an event appended
-before it is applied (`45` §6).
+| Provider unavailable | Failover per policy; substitution disclosed |
+| All providers unavailable | Deterministic features continue; model features queue with an explanation |
+| Service unavailable | Editor stays usable against the local buffer; affected features labelled |
+| Job queue backed up | Position and estimate shown; work is not silently dropped |
+| Database unavailable | Read-only from cache where possible; writes buffered client-side |
+| Browser offline | Editing continues locally; queued and flushed on reconnect |
+| Tab crash | Recovery from IndexedDB with the user told what was recovered |
+| Concurrent edit from two tabs | Detected and surfaced for resolution; nothing silently discarded |
 
 ---
 
-## 8. Deployment
+## 9. Deployment
 
-### 8.1 Desktop
-
-| Aspect | Approach |
+| Component | Approach |
 |---|---|
-| Distribution | Signed installers: Windows (MSI/MSIX), macOS (DMG, notarised), Linux (AppImage, deb, rpm, Flatpak) |
-| Updates | Background download, applied on restart, user-controllable, rollback available |
-| Channels | `stable`, `beta`, `nightly` |
-| Migration | Automatic on launch with a snapshot taken first (`45` §8) |
-| Footprint | Target under 150 MB installed, excluding models |
+| Edge / app tier | Managed platform, autoscaled, multi-region for latency |
+| Services | Containerised, horizontally scalable |
+| Postgres | Managed, with point-in-time recovery |
+| Object storage | Managed, versioned, lifecycle-managed |
+| Vector index | Managed or Postgres-native, depending on scale (`OQ-03`) |
+| Job queue | Managed |
+| Admin plane | **Separate deployment, separate network, separate credentials** (B5) |
 
-### 8.2 Cloud plane
+Chosen so two to four people can operate it: managed services throughout, no
+self-hosted databases, no 24/7 on-call surface.
 
-| Aspect | Approach |
+### 9.1 Cost posture
+
+Server-side compute is now the main cost line — the significant change from
+revision 1, which pushed compute onto user devices. Controls:
+
+| Control | Mechanism |
 |---|---|
-| Identity and licensing | Managed auth service with row-level security |
-| Relay | Object storage for ciphertext + a metadata database |
-| Registry | Static, CDN-delivered, signed manifests |
-| Console | Static site plus a thin API |
-| Admin | Separate deployment, separate credentials, network-isolated from the user plane (B5) |
-
-Chosen so a two-to-four-person team can operate it (`REQ-ADM-7`): managed
-services, no self-hosted databases holding sensitive data, no 24/7 on-call
-surface. The Relay holding only ciphertext means a Relay incident is a
-availability problem, not a confidentiality one.
-
-### 8.3 Registry-driven updates
-
-Model availability, venue profiles, and agent versions update **without a client
-release**. The registry is signed, versioned, and cached locally; clients verify
-signatures before applying. This is what keeps a fast-moving provider landscape
-from forcing monthly desktop releases (`10` §6).
+| Deterministic-first | ~80% of compliance rules and Studio levels 1–2 need no model |
+| Caching | Parsed content, resolved metadata, and repeated model calls |
+| Budgets | Per user, project, and tier (`41` §7) |
+| Bring-your-own-key | Users on their own keys cost us nothing for inference |
+| Tiering | Free tier capped on model-backed operations, not on the product |
 
 ---
 
-## 9. Observability
+## 10. Observability
 
-| Plane | What is collected |
+| Collected | Not collected |
 |---|---|
-| Local | Full diagnostic event log on the device; user-viewable and exportable |
-| Cloud | Aggregate counts only: feature usage, error classes, performance percentiles |
-| **Never** | Document content, titles, prompts, model outputs, source metadata, per-user paths |
+| Request rates, latencies, error classes | Document content |
+| Job queue depth and duration | Prompts or model outputs |
+| Agent run counts and outcomes | Source metadata |
+| Aggregate feature usage | Per-user behavioural paths |
+| Client performance percentiles | Anything identifying a user's work |
 
-Support flows work from a **user-exported, user-reviewed** diagnostic bundle
-which redacts content by default and shows the user exactly what it contains
-before they send it. There is no path by which support reads a user's project
-(`REQ-ADM-3`).
+Support works from user-reported context and reproduction against golden sets,
+never by reading a user's project (`49` §7).
 
 ---
 
-## 10. Technology direction
+## 11. Technology direction
 
-Binding decisions are `OQ-02`. Direction and its reasoning:
-
-| Layer | Direction | Why |
-|---|---|---|
-| Desktop shell | Tauri | Memory footprint against the 8 GB baseline; Electron's overhead is material when a local model wants 5 GB |
-| Kernel | Rust or TypeScript on a Node runtime | Rust for memory safety in the trusted process and better resource behaviour; TypeScript for shared domain logic with the surfaces. `OQ-02` |
-| Domain logic | TypeScript | Shared between Kernel and Console; the citation and document logic already exists in it |
-| Store | Embedded transactional KV plus content-addressed blobs | No server dependency; snapshot support |
-| Index | Embedded full-text plus a local vector store | Offline semantic search is a hard requirement |
-| Editor | Custom document model over a proven text engine | Span-level provenance rules out off-the-shelf rich-text editors |
-| Plugin sandbox | WASM with a capability-gated host API | Language-agnostic, genuinely sandboxed |
-| Console | Server-rendered framework with route splitting | The performance budget in `23` §8 |
-| Cloud | Managed auth + object storage + edge functions | Operable by a small team |
-
-### 10.1 The highest-risk choice
-
-The editor (`53` `RISK-01`). Span-level provenance that survives arbitrary
-editing is not available off the shelf, cannot be retrofitted, and is the
-foundation of the product's differentiation. It is scheduled first in
-`51-IMPLEMENTATION-PHASES.md` for exactly that reason.
-
----
-
-## 11. Migration from the current architecture
-
-| Today | Target |
+| Layer | Direction |
 |---|---|
-| React SPA + Express server; server proxies AI | Desktop app with a local kernel; no server in the inference path |
-| Server holds keys and user records | Keys in the platform keystore; identity is the only server-side user data |
-| Server-side document parsing | Local parsing (`REQ-LOC-1`) |
-| Supabase as application database | Supabase for identity and licensing only; content is local |
-| Render web service as the product | Cloud plane shrinks to identity, Relay, registry, and Console |
-| Gemini-centric with key failover | Provider-agnostic Gateway with local-first defaults |
-| No egress control | Warden as the mandatory chokepoint |
-| No sandbox | WASM plugin sandbox |
+| Client | React 19, server-rendered shell, route-level code splitting |
+| Editor | Custom document model over a proven text engine |
+| API | Typed RPC over HTTP with generated clients; SSE for streams |
+| Services | TypeScript, sharing `domain/*` with the client |
+| Database | Postgres |
+| Vector | pgvector initially; dedicated store if scale requires (`OQ-03`) |
+| Queue | Managed queue with a typed job contract |
+| Object storage | S3-compatible |
 
-The web app does not disappear — it becomes the Console (`23`), with a
-deliberately reduced scope. That reduction is what makes the desktop-primary
-architecture coherent rather than a second frontend to maintain at parity.
+### 11.1 What this reuses from the current repository
+
+Revision 2 makes the existing codebase an asset rather than a migration target:
+
+| Existing | Status |
+|---|---|
+| React 19 + Vite + Tailwind client | **Carries forward** |
+| Express server | Carries forward, restructured into the API and service tiers |
+| Supabase auth and Postgres | **Carries forward** |
+| Citation formatters | Carries forward into `domain/reference` |
+| Document parsing pipeline | Carries forward into Ingestion |
+| Agent and skill registries | Carry forward into Mesh |
+| Provider failover with classified errors | Carries forward into Gateway |
+| Export via `docx` | Carries forward into Export |
+| `humanizeSkill` | **Carries forward and expands** into Studio (`32` §13) |
+
+The withdrawn desktop architecture would have discarded most of this. Revision 2
+does not.

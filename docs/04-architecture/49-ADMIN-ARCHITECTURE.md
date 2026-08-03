@@ -1,6 +1,7 @@
 # Admin Architecture — The Foundry and the Operator Console
 
 > **Doc ID:** 49 · **Status:** Design · **Depends on:** `42`, `46`, `48`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 Operator tooling designed for a team of two to four people who are not platform
 specialists — and the isolation that keeps administrative AI away from user
@@ -313,7 +314,7 @@ Written for someone with no context at 2am.
 | Provider outage | Detect, verify, adjust default routing, announce |
 | Agent regression | Identify, evaluate, roll back, communicate |
 | Auth incident | Revoke, force reset, notify |
-| Relay unavailable | Confirm clients degrade correctly, communicate, restore |
+| sync service unavailable | Confirm clients degrade correctly, communicate, restore |
 | Bad release | Halt rollout, roll back, post-mortem |
 | Plugin incident | Revoke signature, disable remotely, notify affected users |
 | Billing failure | Identify affected accounts, apply grace, communicate |

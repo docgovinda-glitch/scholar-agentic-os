@@ -1,6 +1,7 @@
 # Multi-Agent Architecture — The Mesh
 
 > **Doc ID:** 42 · **Status:** Design · **Depends on:** `30`, `41`, `46`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 Twenty-four agents, their contracts, their permissions, how they communicate,
 and how they improve.
@@ -85,7 +86,7 @@ eval_thresholds:
 
 **Permissions are the important field.** AG-13 verifies claims and cannot write
 to the draft. It cannot reach the network. It cannot read the Vault. If a model
-returns something that would require those, the Kernel refuses
+returns something that would require those, the service tier refuses
 (`REQ-AI-5`).
 
 ---
@@ -214,12 +215,18 @@ defect (`14` OT-20). **Mode:** hybrid. **Permissions:** `read:draft`,
 **QA:** suggestions preserve meaning; meaning-altering changes flagged separately.
 
 #### AG-17 · Language Editor
-Grammar, clarity, and fluency at three intervention levels (`12` F-EDT-2).
-**Mode:** hybrid. **Permissions:** `read:draft`, `write:suggestions`.
+The Language & Voice Studio's engine: five intervention levels, voice matching,
+L1-aware second-language support, discipline register (`32`).
+**Mode:** hybrid — levels 1–2 largely deterministic, 3–5 model-driven.
+**Permissions:** `read:draft`, `read:voice_profile`, `write:suggestions`.
 **Memory:** project.
-**QA:** **refuses to operate on `ai_generated_unreviewed` spans** (`32` §6.2);
-minimal mode changes only errors; every change carries a reason; preserves
-underlying provenance.
+**QA:** level 1 changes only errors; every change carries a reason; quotations
+protected; meaning changes handed to AG-20 and surfaced separately; voice
+matching never reintroduces an error.
+
+**Revision 2:** the constraint forbidding operation on unreviewed AI text is
+removed along with the mandatory provenance tracking it depended on. AG-17 is
+now the most heavily specified agent in the Mesh.
 
 #### AG-18 · Readability Analyst
 Reading level, sentence-length distribution, jargon density, passive-voice ratio
@@ -304,7 +311,7 @@ schedules runs, detects stalls. **Mode:** deterministic + AI (proposals).
 | `read:vault` | Vault content |
 | `read:evidence` | The claim–evidence graph |
 | `read:rubric` | Compiled rules |
-| `read:ledger` | Provenance records |
+| `read:voice_profile` | The user's Voice Profile statistics |
 | `read:index` | Search |
 | `write:draft_proposal` | Propose text into a review surface |
 | `write:draft` | **Modify the accepted draft directly** |
@@ -324,8 +331,9 @@ schedules runs, detects stalls. **Mode:** deterministic + AI (proposals).
 | **No agent holds `write:draft`** | Only the user writes the accepted draft. Agents propose |
 | **`net:outbound` never bypasses the Warden** | It grants the *ability* to request egress, not permission to egress |
 | **`read:vault` is granted narrowly** | Four agents hold it: AG-04, AG-07, AG-19, AG-17 |
+| **`read:voice_profile` is AG-17 only** | The profile models how one person writes |
 | **Permissions are declared, not requested at runtime** | The manifest is the whole grant |
-| **Kernel-enforced** | Not honour-system; `kernel/capabilities` is the enforcement point |
+| **service tier-enforced** | Not honour-system; `services/capabilities` is the enforcement point |
 | **Escalation is impossible** | An agent cannot obtain a capability it did not declare |
 
 The first rule is the one that matters. It is the mechanism by which
@@ -466,7 +474,7 @@ delivered through the signed registry:
 | Model preferences and task class | Capability enforcement |
 | Output schemas | Schema validation |
 | QA checkpoint definitions | Checkpoint evaluation |
-| Thresholds and parameters | Kernel integration |
+| Thresholds and parameters | service tier integration |
 | Tool grants (within what the code permits) | The capability system itself |
 
 **The boundary:** configuration can never grant a capability the code does not
@@ -497,7 +505,7 @@ right instinct.
 | Current | Target |
 |---|---|
 | 9 agents | 26 agents in 7 groups |
-| No permission system | Declared, Kernel-enforced capability grants |
+| No permission system | Declared, service tier-enforced capability grants |
 | No versioning or channels | Full lifecycle with evaluation-gated promotion |
 | No memory tiers | Three tiers with opt-in workspace memory |
 | Agents in code | Behaviour in signed, versioned configuration |

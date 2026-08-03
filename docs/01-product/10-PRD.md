@@ -1,6 +1,7 @@
 # Product Requirements Document — Scholar OS
 
 > **Doc ID:** 10 · **Status:** Design · **Depends on:** `01`, `02`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 ---
 
@@ -81,6 +82,7 @@ change design decisions.
   Nothing that requires the supervisor to install anything.
 
 ### P6 — Yusuf, non-native English writer, international master's student
+*(revision 2: promoted to primary persona — `01` §4.1)*
 
 - **Context:** strong research, weaker English fluency. Has been wrongly flagged by
   an AI detector before.
@@ -127,7 +129,7 @@ Drives every requirement in `REQ-ADM-*` and the design of the Foundry (`49`).
 | ID | Requirement | Priority |
 |---|---|---|
 | REQ-ONB-1 | The system MUST implement the nine-stage onboarding sequence: account creation → email verification → login → password reset (conditional) → AI Setup Wizard → optional Vault setup → Workshop → workspace creation → project start | P0 |
-| REQ-ONB-2 | Email verification MUST be required before a cloud account is usable, and MUST NOT block local-only use of the Workbench | P0 |
+| REQ-ONB-2 | Email verification MUST be required before a cloud account is usable, and MUST NOT block local-only use of the Desk | P0 |
 | REQ-ONB-3 | The AI Setup Wizard MUST present every supported provider with: purpose, strengths, weaknesses, pricing model, privacy implications, recommended use cases, setup instructions, key validation, and model recommendations | P0 |
 | REQ-ONB-4 | The Wizard MUST validate a supplied API key by a live, minimal-cost call before accepting it, and MUST report the specific failure on rejection | P0 |
 | REQ-ONB-5 | The Wizard MUST detect local runtimes (Ollama, LM Studio) and MUST profile device hardware to recommend only models the device can actually run | P0 |
@@ -207,7 +209,14 @@ Drives every requirement in `REQ-ADM-*` and the design of the Foundry (`49`).
 | REQ-EDT-6 | The editor MUST support collaborative review readiness: exportable comment threads and change sets a supervisor can open in Word | P1 |
 | REQ-EDT-7 | Real-time multi-user co-editing is out of scope for v1 (see `55`) | — |
 
-### 4.7 Authorship and integrity — `REQ-INT`
+### 4.7 Authorship and integrity — `REQ-INT` *(largely withdrawn in revision 2)*
+
+> **Revision 2.** `REQ-INT-1` to `-4` and `-7` are **withdrawn**: the product no
+> longer tracks provenance, computes an authorship ratio, or blocks export on
+> authorship grounds (`32` §8.2). `REQ-INT-5`, `-6`, `-8`, and `-9` survive in
+> modified form — declaration stays optional and accurate, the authorship report
+> becomes the Writing History export, and refinement stays reviewable per change.
+> The table below is retained for traceability.
 
 | ID | Requirement | Priority |
 |---|---|---|
@@ -251,23 +260,29 @@ Drives every requirement in `REQ-ADM-*` and the design of the Foundry (`49`).
 |---|---|---|
 | REQ-AI-1 | The system MUST support multiple providers concurrently, with per-task model binding | P0 |
 | REQ-AI-2 | Adding a provider MUST NOT require changes to agent code | P0 |
-| REQ-AI-3 | The system MUST support fully local inference via Ollama and LM Studio | P0 |
+| ~~REQ-AI-3~~ | **Withdrawn in revision 2.** Local inference is not available in a browser |
 | REQ-AI-4 | Every agent MUST declare responsibility, inputs, outputs, permissions, memory tier, and QA checkpoints | P0 |
-| REQ-AI-5 | Agents MUST NOT access data outside their granted capabilities; the Kernel MUST enforce this | P0 |
+| REQ-AI-5 | Agents MUST NOT access data outside their granted capabilities; the service tier MUST enforce this | P0 |
 | REQ-AI-6 | The user MUST be able to see, at any time, which agents are running, on what, using which model, at what cost | P0 |
 | REQ-AI-7 | Agent versions MUST be releasable through channels with evaluation gates before promotion | P1 |
 | REQ-AI-8 | Agent improvement from user feedback MUST be opt-in, privacy-preserving, and administrator-reviewed; user content MUST NOT be used for training | P0 |
 | REQ-AI-9 | Provider failure MUST degrade gracefully via failover, with the substitution disclosed to the user | P0 |
 | REQ-AI-10 | Token spend MUST be tracked and budgetable per project and per workspace | P1 |
 
-### 4.11 Local-first and sync — `REQ-LOC`
+### 4.11 Local-first and sync — `REQ-LOC` *(withdrawn in revision 2)*
+
+> **Revision 2.** This entire group is **withdrawn**. Scholar OS is a web
+> application; content is processed and stored server-side. The replacement
+> commitments — minimisation, egress control, break-glass access with user
+> notification, retention, and deletion — are in
+> `44-DATA-RESIDENCY-AND-PRIVACY.md`. The table is retained for traceability.
 
 | ID | Requirement | Priority |
 |---|---|---|
 | REQ-LOC-1 | Documents, indexes, embeddings, caches, and Vault content MUST reside on the user's device by default | P0 |
 | REQ-LOC-2 | Cloud transmission MUST be limited to authentication, licensing, account management, and user-enabled sync | P0 |
 | REQ-LOC-3 | Sync MUST be opt-in and MUST use end-to-end encryption with client-held keys | P0 |
-| REQ-LOC-4 | The Workbench MUST be fully functional offline except for external discovery and cloud inference | P0 |
+| REQ-LOC-4 | The Desk MUST be fully functional offline except for external discovery and cloud inference | P0 |
 | REQ-LOC-5 | The system MUST warn clearly about local storage responsibility, backup necessity, device-failure risk, sync limitations, and offline behaviour | P0 |
 | REQ-LOC-6 | The system MUST prompt for backup at defined project milestones and MUST make backup a one-action operation | P0 |
 | REQ-LOC-7 | Documentation and UI MUST state that the operator cannot recover locally stored research | P0 |
@@ -278,7 +293,7 @@ Drives every requirement in `REQ-ADM-*` and the design of the Foundry (`49`).
 | ID | Requirement | Priority |
 |---|---|---|
 | REQ-SEC-1 | Local storage MUST be encrypted at rest | P0 |
-| REQ-SEC-2 | Sync payloads MUST be end-to-end encrypted; the Relay MUST NOT be able to decrypt | P0 |
+| REQ-SEC-2 | Sync payloads MUST be end-to-end encrypted; the sync service MUST NOT be able to decrypt | P0 |
 | REQ-SEC-3 | User API keys MUST be stored in platform secure storage, MUST NOT be transmitted to the operator, and MUST NOT appear in logs | P0 |
 | REQ-SEC-4 | Plugins MUST execute sandboxed with no ambient authority | P0 |
 | REQ-SEC-5 | The system MUST maintain a local audit log of security-relevant events | P0 |
@@ -287,7 +302,7 @@ Drives every requirement in `REQ-ADM-*` and the design of the Foundry (`49`).
 | REQ-SEC-8 | MFA MUST be supported (TOTP minimum) and MUST be enforceable by institutional policy | P0 |
 | REQ-SEC-9 | The Warden MUST classify content and enforce per-provider egress policy before any outbound call | P0 |
 | REQ-SEC-10 | The user MUST be able to preview exactly what would be transmitted to a provider | P1 |
-| REQ-SEC-11 | The operator MUST NOT possess any key capable of decrypting user content | P0 |
+| ~~REQ-SEC-11~~ | **Withdrawn in revision 2.** Not achievable with server-side processing. Replaced by the break-glass controls in `44` §4 |
 
 ### 4.13 Administration — `REQ-ADM`
 
@@ -306,13 +321,13 @@ Drives every requirement in `REQ-ADM-*` and the design of the Foundry (`49`).
 
 | ID | Requirement | Priority |
 |---|---|---|
-| REQ-SUR-1 | The Workbench MUST provide dockable panels, split editors, and multiple simultaneously open documents | P0 |
-| REQ-SUR-2 | The Workbench MUST provide: AI side panels, Knowledge Explorer, Citation Explorer, Workflow Monitor, Agent Monitor, Local Processing Dashboard, Plugin Manager, and Resource Monitor | P0 |
-| REQ-SUR-3 | The Workbench MUST be offline-first and MUST sustain multi-hour sessions without degradation | P0 |
-| REQ-SUR-4 | The Console MUST be optimised for quick tasks, mobile responsiveness, project overview, light editing, AI chat, draft review, sync, dashboard, notifications, and account management | P0 |
-| REQ-SUR-5 | The Console MUST NOT replicate the Workbench's panel-based interface | P0 |
+| REQ-SUR-1 | Desk MUST provide a configurable four-region layout, a splittable editor, and multiple simultaneously open documents (`22` §2) | P0 |
+| REQ-SUR-2 | The Desk MUST provide: AI side panels, Knowledge Explorer, Citation Explorer, Workflow Monitor, Agent Monitor, Local Processing Dashboard, Plugin Manager, and Resource Monitor | P0 |
+| REQ-SUR-3 | Desk MUST sustain multi-hour sessions without degradation, and MUST lose no work on refresh, crash, or disconnection (`22` §5.4) | P0 |
+| REQ-SUR-4 | The Pocket MUST be optimised for quick tasks, mobile responsiveness, project overview, light editing, AI chat, draft review, sync, dashboard, notifications, and account management | P0 |
+| REQ-SUR-5 | The Pocket MUST NOT replicate the Desk's panel-based interface | P0 |
 | REQ-SUR-6 | Capability differences between surfaces MUST be explicit in the UI, never silent failure | P0 |
-| REQ-SUR-7 | The Console MUST be usable on a 360 px viewport | P0 |
+| REQ-SUR-7 | The Pocket MUST be usable on a 360 px viewport | P0 |
 
 ---
 
@@ -321,7 +336,7 @@ Drives every requirement in `REQ-ADM-*` and the design of the Foundry (`49`).
 | ID | Area | Requirement |
 |---|---|---|
 | NFR-PERF-1 | Performance | Editor input latency < 50 ms at 150k words |
-| NFR-PERF-2 | Performance | Workbench cold start < 4 s on baseline hardware |
+| NFR-PERF-2 | Performance | Desk cold start < 4 s on baseline hardware |
 | NFR-PERF-3 | Performance | Vault semantic search < 800 ms at 5,000 documents |
 | NFR-PERF-4 | Performance | Compliance re-evaluation < 300 ms after an edit |
 | NFR-PERF-5 | Performance | Local model first token < 3 s on baseline hardware for a 7B model |
@@ -329,10 +344,10 @@ Drives every requirement in `REQ-ADM-*` and the design of the Foundry (`49`).
 | NFR-REL-1 | Reliability | No data loss on crash; recovery to last consistent state |
 | NFR-REL-2 | Reliability | Snapshot at every gate transition, retained per policy in `45` §7 |
 | NFR-A11Y-1 | Accessibility | WCAG 2.2 AA on all surfaces |
-| NFR-A11Y-2 | Accessibility | Full keyboard operability of the Workbench; screen-reader support for editor and panels |
+| NFR-A11Y-2 | Accessibility | Full keyboard operability of the Desk; screen-reader support for editor and panels |
 | NFR-I18N-1 | Internationalisation | UI localisable; RTL-capable layout; content in any language |
 | NFR-COMPAT-1 | Compatibility | Windows 10+, macOS 12+, Ubuntu 22.04+ |
-| NFR-COMPAT-2 | Compatibility | Console on last two versions of Chrome, Firefox, Safari, Edge |
+| NFR-COMPAT-2 | Compatibility | Pocket on last two versions of Chrome, Firefox, Safari, Edge |
 | NFR-HW-1 | Hardware | Baseline: 8 GB RAM, 4 cores, no GPU. Recommended: 16 GB, 8 cores, 8 GB VRAM |
 | NFR-COST-1 | Cost | Operator cost per free user under USD 0.05/month |
 | NFR-PRIV-1 | Privacy | Zero user content in operator systems by design, verifiable by inspection |
@@ -350,9 +365,9 @@ models, GPU embedding) must degrade to a working alternative and say so.
 | Constraint | Implication |
 |---|---|
 | Operator is a 2–4 person team | Admin tooling must be simple; no feature may require 24/7 operations |
-| Operator infrastructure budget near zero at launch | Cloud plane must run within free/low tiers; local-first is the enabling decision |
-| Cannot hold user content | Rules out server-side indexing, server-side AI orchestration over documents, and content-based support |
-| Cannot recover lost user data | Backup UX is a P0 product surface, not an afterthought |
+| Operator infrastructure budget is constrained | Server-side compute is now the main cost line; deterministic-first routing and caching are the enabling decisions (`RISK-05`) |
+| Holds user content, and must be trustworthy with it | Break-glass access only, with user notification; no routine staff access path (`44` §4) |
+| Responsible for user data | Managed backups, point-in-time recovery, and real deletion are operator obligations (`44` §6–7) |
 | Academic conventions vary and change | Rules must be data, editable by users |
 | AI providers change monthly | Model registry must be updatable without a client release |
 | Institutional AI policy is unsettled | Disclosure must be optional and configurable, never hardcoded to one policy |
@@ -366,16 +381,16 @@ models, GPU embedding) must degrade to a working alternative and say so.
 Onboarding, output-driven project creation, intake generation, source upload and
 discovery with approval, requirement compilation and continuous compliance,
 agent-assisted section drafting, the editor with tracked changes and citation
-management, the Provenance Ledger and authorship reporting, DOCX/ODT export, the
-optional Vault, multi-provider AI including local, the Workbench and Console, the
+management, the Language & Voice Studio, DOCX/ODT export, the
+optional Vault, multi-provider AI including local, the Desk and Pocket, the
 admin panel and Foundry, plugin runtime.
 
 ### Out of scope for v1.0
 
 | Excluded | Rationale | Revisit |
 |---|---|---|
-| Real-time collaborative editing | Conflicts with local-first E2E encryption; large investment | `55` §2 |
-| Mobile native apps | Console responsive covers the jobs; native adds cost without new capability | `55` §3 |
+| Real-time collaborative editing | Large investment; asynchronous review already serves the supervisor pattern | `55` §2 |
+| Mobile native apps | Pocket responsive covers the jobs; native adds cost without new capability | `55` §3 |
 | LaTeX as a primary authoring surface | Import/export only in v1; full LaTeX authoring is a distinct product | `55` §4 |
 | Institutional SSO / LMS integration | Requires institutional customers first | `50` Year 2 |
 | Peer-review marketplace | Different business | `55` §8 |
@@ -400,25 +415,23 @@ admin panel and Foundry, plugin runtime.
 
 | Metric | Definition | Target |
 |---|---|---|
-| Authorship ratio | Median human-origin span ratio at export | ≥ 70% |
+| Studio satisfaction, second-language users | Survey, post-project | ≥ 4.5/5 |
 | Fabricated citations | Citations in exports not resolvable to an approved source | 0, absolutely |
 | Unsupported claim rate | Claims without binding at `G6` | ≤ 5% |
-| Export override rate | Exports overriding the unreviewed-AI block | ≤ 8% |
+| Voice-match acceptance | Accepted / offered, users with a profile | ≥ 75% |
 | Source approval rate | Approved / presented candidates | 40–75% |
 | Suggestion acceptance | Accepted / offered inline suggestions | 45–85% (outside band = investigate) |
 
 An acceptance rate above 85% is treated as a risk signal, not a success signal:
 it usually means the user has stopped reading. See `53` `RISK-12`.
 
-### 8.3 Privacy and local-first health
+### 8.3 Privacy health
 
 | Metric | Definition | Target |
 |---|---|---|
-| Local-only projects | Projects with zero cloud inference calls | ≥ 15% |
-| Local model usage | Runs served by a local provider | ≥ 30% |
 | Warden interventions | Egress blocked or modified by policy | Tracked; no target |
-| Sync adoption | Users enabling sync | 40–60% (informational) |
-| Backup completion | Users completing a backup within 7 days of first prompt | ≥ 60% |
+| Restricted-mode projects | Projects marked never-egress | Tracked; no target |
+| Break-glass accesses | Staff content accesses | Tracked; every one notified |
 
 ### 8.4 Operational health
 

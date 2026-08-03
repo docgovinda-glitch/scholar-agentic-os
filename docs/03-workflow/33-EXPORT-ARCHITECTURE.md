@@ -1,6 +1,7 @@
 # Export Architecture
 
 > **Doc ID:** 33 · **Status:** Design · **Depends on:** `30`, `31`, `32`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 Producing the file the user submits. DOCX and ODT are first-class; everything
 else is derived.
@@ -16,7 +17,7 @@ else is derived.
 | E3 | **Formatting comes from the Rubric.** Export applies compiled rules, not app defaults |
 | E4 | **Pre-flight before production.** Never emit a file that fails a blocking check |
 | E5 | **Verify the output.** Structural validation before delivery; a file that fails is not delivered |
-| E6 | **Export works offline.** Entirely local |
+| E6 | **Export is server-side.** Rendering, layout measurement, and validation run in the service tier |
 | E7 | **Export is never tier-gated.** The user's own content, on every plan including free |
 
 ---
@@ -63,7 +64,7 @@ else is derived.
 | Check | Severity | Behaviour |
 |---|---|---|
 | Blocking Rubric findings | Blocking | Listed with locations; export refused |
-| `ai_generated_unreviewed` spans | Blocking, overridable | `32`; override recorded (`REQ-INT-4`) |
+
 | Unresolved cross-references | Blocking | Listed |
 | Missing figure or table assets | Blocking | Listed by filename |
 | Citations without bibliography entries | Blocking | Structurally impossible, but verified |

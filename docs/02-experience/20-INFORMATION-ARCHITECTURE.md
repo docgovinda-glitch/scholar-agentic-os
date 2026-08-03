@@ -1,32 +1,31 @@
-# Information Architecture — Scholar OS
+# Information Architecture
 
-> **Doc ID:** 20 · **Status:** Design · **Depends on:** `02`, `11`
+> **Doc ID:** 20 · **Status:** Design · **Revision:** 2 · **Depends on:** `02`, `11`
 
-How the system's objects are organised, named, and navigated — and the normative
-capability matrix that keeps the Workbench and the Console from collapsing into
-each other.
+How the system's objects are organised and navigated, and the normative
+capability matrix that keeps Desk and Pocket from collapsing into one mediocre
+layout.
 
 ---
 
 ## 1. The user's mental model
 
-The user does not think in terms of the Kernel or the Mesh. They think:
+The user thinks:
 
-> *"I'm writing my thesis. I have my sources. The AI is helping. I need it in
-> Harvard style by March."*
+> *"I'm writing my thesis. I have my sources. The AI is helping. It needs to be
+> in Harvard style by March."*
 
-The IA's job is to make the system's structure match that sentence. Four nouns
-carry the whole model:
+Four nouns carry the whole model:
 
-| User says | System object | Never call it |
+| User says | Object | Never call it |
 |---|---|---|
 | "my thesis" | Project | Document, file, workspace |
 | "my sources" | Corpus | Library, database, references |
 | "my writing" | Draft | Content, output |
 | "my library" | Vault | Archive, storage, knowledge base |
 
-Everything else — gates, agents, rules, spans — is *machinery the user
-encounters*, not a place they navigate to.
+Everything else — gates, agents, rules, refinement levels — is machinery the user
+encounters, not a place they navigate to.
 
 ---
 
@@ -36,335 +35,273 @@ encounters*, not a place they navigate to.
 Account
 │
 ├── Profile, credentials, MFA, sessions, subscription
+├── Voice Profile ?                          (32 §5)
 │
-└── Workspace *                                   (e.g. "Doctorate", "Teaching")
+└── Workspace *
+    ├── Settings         providers, bindings, privacy, defaults
+    ├── Vault ?          optional, shared across the workspace's projects
     │
-    ├── Settings         providers, model bindings, privacy posture, defaults
-    ├── Vault ?          optional, shared by every Project in the Workspace
-    ├── Plugins          installed and enabled per workspace
-    │
-    └── Project *                                 (one primary output each)
-        │
+    └── Project *
         ├── Brief        output type, intake answers, deadline, venue
         ├── Rubric       compiled rules, waivers, requirement sources
         ├── Corpus       approved sources only
-        │   └── Candidates    pending queue — not part of the Corpus
-        ├── Structure    outline, sections, budgets, order
-        ├── Draft        per-section content, spans, comments, changes
+        │   └── Candidates    pending queue — not corpus
+        ├── Structure    outline, sections, budgets
+        ├── Draft        per-section content, comments, changes
         ├── Evidence     claim–evidence graph
-        ├── Ledger       provenance and decisions
-        ├── History      snapshots, timeline
-        └── Outputs      exports, reports, submission packages
+        ├── History ?    optional Writing History (32 §8)
+        ├── Snapshots
+        └── Outputs      exports, reports, packages
 ```
 
-`*` = many · `?` = optional
+`*` many · `?` optional
 
 ### 2.1 Boundary rules
 
 - **A Project owns its Corpus.** Sources are copied in from the Vault, not
-  referenced. A Project must remain intact if the Vault is deleted.
-- **The Vault belongs to the Workspace.** Multiple Projects draw from it.
-- **Candidates are not Corpus.** They live adjacent to it and have no citation
-  identity. This separation is the structural basis of `REQ-SRC-8`.
-- **The Ledger is append-only and per-Project.** It is never edited, only
-  extended.
-- **Workspaces do not share Projects.** Moving a Project between Workspaces is a
-  copy with a recorded provenance note.
+  referenced, so a Project survives the Vault being deleted.
+- **The Vault belongs to the Workspace.**
+- **Candidates are not Corpus.** They have no citation identity. This separation
+  is the structural basis of the citation guarantee.
+- **The Voice Profile is account-level**, not per project — the user's voice
+  does not change between assignments.
+- **Writing History is per project and optional.**
 
 ---
 
-## 3. Naming rules
+## 3. Naming
 
 | Rule | Example |
 |---|---|
-| User-facing names use plain English, not subsystem names | "Knowledge Vault", not "Vault"; "Privacy Guard", not "Warden" |
-| Verbs describe the user's action, not the system's | "Approve source", not "Commit to corpus" |
-| No invented jargon where an academic term exists | "Bibliography", not "reference collection" |
-| Status words are unambiguous | "Not reviewed" beats "Pending" |
-| Counts are absolute, not relative | "3 blocking issues", not "Some issues" |
+| Plain English, not subsystem names | "Knowledge Vault" not "Vault" |
+| Verbs describe the user's action | "Approve source" not "Commit to corpus" |
+| Use the academic term where one exists | "Bibliography" not "reference collection" |
+| Unambiguous status words | "Not reviewed" beats "Pending" |
+| Absolute counts | "3 blocking issues" not "some issues" |
 
 ### 3.1 Subsystem names in the UI
 
-| Internal | User-facing | Shown where |
-|---|---|---|
-| Atlas | (invisible) | Users see output types, not the catalog |
-| Conductor | "Workflow" | Workflow Monitor |
-| Ledger | "Authorship" | Status bar, Authorship panel |
-| Rubric | "Requirements" | Compliance panel |
-| Mesh | "Agents" | Agent Monitor |
-| Gateway | "AI providers" | Settings |
-| Warden | "Privacy Guard" | Settings, egress prompts |
-| Vault | "Knowledge Vault" | Everywhere |
-| Relay | "Sync" | Settings, status bar |
-| Foundry | (admin only) | Admin console |
+| Internal | User-facing |
+|---|---|
+| Atlas | (invisible — users see output types) |
+| Conductor | "Workflow" |
+| Rubric | "Requirements" |
+| Mesh | "Agents" |
+| Gateway | "AI providers" |
+| Warden | "Privacy" |
+| Studio | **"Language & Voice"** |
+| Vault | "Knowledge Vault" |
+| Desk / Pocket | (invisible — one product) |
 
-The user learns three names: Knowledge Vault, Privacy Guard, and Workflow.
-Everything else is described by what it does.
+The user learns three names: Knowledge Vault, Language & Voice, and Workflow.
 
 ---
 
-## 4. Navigation architecture
+## 4. Navigation
 
-The two surfaces navigate differently by design.
+### 4.1 Desk — spatial
 
-### 4.1 Workbench — spatial
+No pages. A persistent workspace whose regions change content. Navigation is
+**spatial and additive**: opening something adds a tab or changes a region rather
+than replacing the view.
 
-The Workbench does not have "pages". It has a persistent workspace whose regions
-change content. Navigation is **spatial and additive**: opening something adds a
-panel or a tab rather than replacing the view.
+Primitives: command palette (⌘K), region panel switching, document tabs,
+go-to-location from any finding.
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│ Title bar · Project switcher · Gate indicator · Command palette   │
-├─────────┬───────────────────────────────────────┬────────────────┤
-│         │                                       │                │
-│ LEFT    │           EDITOR DOCK                 │  RIGHT DOCK    │
-│ DOCK    │        (tabs, splittable)             │                │
-│         │                                       │  AI Chat       │
-│ Outline │                                       │  Compliance    │
-│ Sources │                                       │  Citations     │
-│ Vault   │                                       │  Authorship    │
-│ Files   │                                       │                │
-│         ├───────────────────────────────────────┤                │
-│         │        BOTTOM DOCK                    │                │
-│         │  Agents · Workflow · Processing ·     │                │
-│         │  Resources · Findings · Log           │                │
-├─────────┴───────────────────────────────────────┴────────────────┤
-│ Status: gate · authorship % · runs · sync · budget · resources    │
-└──────────────────────────────────────────────────────────────────┘
-```
+### 4.2 Pocket — hierarchical
 
-**Navigation primitives:** command palette (primary), panel toggles, editor
-tabs, breadcrumbs within panels, go-to-location from any finding.
-
-### 4.2 Console — hierarchical
-
-The Console has pages, a back button, and one focus at a time. Navigation is
-**hierarchical and replacing**.
+Pages, a back gesture, one focus at a time. Navigation is **hierarchical and
+replacing**.
 
 ```
-Home (dashboard)
-├── Projects
-│   └── Project
-│       ├── Overview        status, gate, next action
-│       ├── Review          read and comment on drafts
-│       ├── Sources         approval queue  ← the flagship quick task
-│       ├── Compliance      findings summary
-│       ├── Chat            AI assistant
-│       └── Activity        runs, timeline
-├── Vault                   search and read
-├── Notifications
-└── Account                 profile, security, subscription, devices
+Home
+├── Projects → Project → { Overview · Read · Sources · Requirements · Ask · Activity }
+├── Search
+└── Me
 ```
 
-**Navigation primitives:** bottom tab bar on mobile, top nav on desktop web,
-breadcrumbs, back.
+Primitives: bottom tab bar, push navigation, back.
 
-### 4.3 Why these differ
+### 4.3 Why they differ
 
-| | Workbench | Console |
+| | Desk | Pocket |
 |---|---|---|
 | Session | Hours | Minutes |
 | Task | Deep, multi-object | Single, bounded |
-| Context needed | Many objects visible at once | One thing at a time |
-| Input | Keyboard-primary | Touch-primary |
-| Consequence | Spatial persistence wins | Hierarchical clarity wins |
-
-A tabbed panel layout on a phone is worse than useless. A page-at-a-time
-hierarchy in a four-hour writing session is worse than useless. This is why
-`REQ-SUR-5` forbids replication.
+| Context needed | Several objects visible at once | One thing |
+| Input | Keyboard-primary | Thumb-primary |
+| Winner | Spatial persistence | Hierarchical clarity |
 
 ---
 
-## 5. Content organisation within key areas
+## 5. Content organisation
 
 ### 5.1 Corpus
-
-**Default view:** grouped by approval state, then by relevance.
 
 | Grouping | Options |
 |---|---|
 | Primary | Approval state · Type · Year · Author · Theme · Section used in |
-| Filters | Has full text · Cited in draft · Uncited · From Vault · Discovered · Uploaded · Retracted |
+| Filters | Has full text · Cited · **Uncited** · From Vault · Discovered · Uploaded · Retracted |
 | Sort | Relevance · Date added · Publication year · Citation count in draft |
 
-**The "uncited" filter earns its place:** a source approved but never cited is
-either a gap in the draft or a source that should not have been approved. Both
-are worth surfacing before `G6`.
+**"Uncited" earns its place:** an approved but never-cited source is either a gap
+in the draft or a source that should not have been approved. Both are worth
+surfacing before `G6`.
 
 ### 5.2 Draft
 
-Organised by the Structure tree. Each section carries: word count against budget,
-gate state, unresolved findings, unreviewed spans, and last-modified.
+Organised by the Structure tree. Per section: word count against budget, gate
+state, unresolved findings, last modified.
 
 ### 5.3 Vault
 
 | Grouping | Options |
 |---|---|
 | Primary | Collection · Type · Date added · Source · Tag |
-| Search | Keyword, semantic, or both; scoped to a collection or global |
-| Views | List · Grid (for visual material) · Timeline · Graph (relationships) |
-
-Collections are user-defined and may nest. A document may belong to several.
+| Search | Keyword, semantic, or both |
+| Views | List · Grid · Timeline · Graph |
 
 ### 5.4 Findings
 
 Compliance findings, quality gate results, unsupported claims, and attribution
-findings share one presentation model:
+findings share one model:
 
 ```
 [severity] [what] [where] → [action]
 ```
 
-Grouped by severity, then by location. Every finding is navigable and either
-resolvable or waivable. A finding with neither is a specification defect.
+Every finding is navigable and either resolvable or waivable. A finding with
+neither is a specification defect.
 
 ---
 
 ## 6. Surface capability matrix — normative
 
-This table is the contract. A feature request that contradicts it must amend
-this table first, with a rationale.
+The contract. A feature request contradicting this must amend the table first,
+with a rationale.
 
-Legend: **●** full · **◐** limited · **○** view only · **—** absent
+**●** full · **◐** limited · **○** view only · **—** absent
 
-| Capability | Workbench | Console | Mobile | Rationale for limits |
-|---|---|---|---|---|
-| **Account & setup** |
-| Create account, verify email | ● | ● | ● | |
-| Login, password reset, MFA | ● | ● | ● | |
-| AI Setup Wizard | ● | ◐ | ○ | Local provider detection needs the desktop |
-| Configure local models | ● | — | — | No local runtime in a browser |
-| Configure cloud providers | ● | ● | ◐ | Key entry on mobile is error-prone but permitted |
-| Workshop | ● | ◐ | ○ | Full interactivity needs space |
+| Capability | Desk | Pocket | Rationale for limits |
+|---|---|---|---|
+| **Account** |
+| Register, verify, login, MFA | ● | ● | |
+| Provider configuration | ● | ○ | Key entry is error-prone on a phone |
+| Onboarding | ● | ◐ | Long forms; partial save with Desk handoff |
+| Workshop | ● | ◐ | |
 | **Projects** |
-| Create project, select output type | ● | ● | ◐ | |
-| Complete intake form | ● | ● | ◐ | Long forms are poor on phones but not blocked |
-| View project overview | ● | ● | ● | |
-| Archive, delete, restore | ● | ● | ○ | |
+| Create, select output type | ● | ◐ | |
+| Intake form | ● | ◐ | Partial save, finish on Desk |
+| Overview | ● | ● | |
+| Archive, delete | ● | ○ | |
 | **Sources** |
-| Upload files | ● | ◐ | ◐ | Console upload queues for desktop processing |
-| Parse and index | ● | — | — | Local compute (`REQ-LOC-1`) |
-| Run discovery | ● | ● | ◐ | |
-| **Approve or reject candidates** | ● | ● | ● | Deliberately first-class on every surface |
-| Manage corpus | ● | ◐ | ○ | |
+| Upload | ● | ◐ | Share target and camera on Pocket |
+| Run discovery | ● | ● | |
+| **Approve / reject candidates** | ● | ● | Deliberately first-class on both |
+| Manage corpus | ● | ○ | |
 | **Requirements** |
-| Upload requirement sources | ● | ◐ | — | |
-| Review compiled rules | ● | ● | ○ | |
-| Edit and waive rules | ● | ◐ | — | Consequential; needs context |
+| Upload requirement sources | ● | — | |
+| Review compiled rules | ● | ○ | |
+| Edit, waive rules | ● | — | Consequential; needs the source clause alongside |
 | **Structure** |
-| Build and edit outline | ● | ◐ | ○ | Reordering is a desktop interaction |
-| Approve structure (`G3`) | ● | ● | ○ | |
+| Build and edit outline | ● | — | Reordering is a pointer interaction |
+| Approve structure | ● | ● | |
 | **Drafting** |
-| Run section drafting | ● | — | — | Long-running, resource-heavy |
-| Full editing | ● | ◐ | — | |
-| Light editing (text, comments) | ● | ● | ◐ | Mobile: comment only |
-| Accept or reject suggestions | ● | ● | ◐ | |
-| Tracked changes | ● | ○ | ○ | |
-| Version history and restore | ● | ○ | — | Restoring from a phone is a footgun |
+| Run section drafting | ● | — | Long-running; needs supervision |
+| Full editing | ● | ◐ | Pocket: text edits and comments |
+| Tracked changes | ● | ○ | |
+| Version restore | ● | — | Destructive; poor preview on a phone |
+| **Language & Voice** |
+| Invoke refinement | ● | — | Choosing a level needs the passage in view |
+| **Review a refinement diff** | ● | ● | One change at a time suits a phone well |
+| Voice Profile setup | ● | ○ | |
+| Explanatory mode | ● | ● | |
 | **AI** |
-| AI chat | ● | ● | ● | |
-| Inline suggestions | ● | ◐ | — | |
-| Agent monitoring | ● | ○ | ○ | |
-| Interrupt a run | ● | ● | ● | Always available, everywhere |
+| Chat | ● | ● | |
+| Agent monitoring | ● | ○ | |
+| Interrupt a run | ● | ● | Always available everywhere |
 | **Compliance** |
-| View findings | ● | ● | ● | |
-| Resolve findings | ● | ◐ | — | |
-| Compliance report | ● | ○ | ○ | |
-| **Integrity** |
-| Authorship ratio | ● | ● | ● | |
-| Authorship report | ● | ○ | ○ | |
-| AI disclosure statement | ● | ◐ | — | |
-| **Override export block** | ● | — | — | See §6.1 |
+| View findings | ● | ● | |
+| Resolve findings | ● | ◐ | |
+| Compliance report | ● | ○ | |
+| **Writing History** |
+| Enable, view, export, delete | ● | ○ | |
 | **Export** |
-| Export DOCX/ODT | ● | ◐ | — | Console requires sync + consent |
-| Export other formats | ● | — | — | |
-| Submission package | ● | — | — | |
+| Export any format | ● | — | Format and option choices belong on Desk |
+| Submission package | ● | — | |
 | **Vault** |
-| Create, configure | ● | — | — | Key material is device-held |
-| Ingest | ● | — | — | Local compute |
-| Search and read | ● | ◐ | ◐ | Console requires sync |
-| Curate | ● | — | — | |
+| Ingest, curate | ● | — | Bulk operations |
+| Search and read | ● | ● | |
 | **Platform** |
-| Plugins | ● | — | — | Sandbox is a desktop capability |
-| Resource monitor | ● | — | — | |
-| Local processing dashboard | ● | — | — | |
-| Sync control | ● | ● | ● | |
-| Notifications | ● | ● | ● | |
+| Plugins | ● | — | |
+| Notifications | ● | ● | |
 
 ### 6.1 The three deliberate asymmetries
 
-Most limits above are technical. Three are **product decisions** and are worth
-defending explicitly:
+Most limits are practical. Three are product decisions worth defending:
 
-1. **Export integrity override is Workbench-only.** The override exists because
-   the user owns their work (`REQ-INT-4`). But overriding requires seeing what
-   you are overriding — the unreviewed spans in context. A phone cannot show
-   that. Making the override easy on a small screen would convert a deliberate
-   decision into a dismissed dialog.
+1. **Source approval is first-class on both surfaces.** The only consequential
+   decision deliberately made easy on a phone. Approval is a per-item yes/no with
+   all evidence on one card, it is the workflow's most common bottleneck, and
+   batching it until the user is at a desk produces rubber-stamping — a worse
+   outcome than thoughtful approval on a bus.
 
-2. **Source approval is first-class on every surface.** It is the only
-   consequential decision we deliberately make *easy* on a phone. The reasoning:
-   approval is a per-item yes/no with all the evidence visible in one card, it is
-   the workflow's most common bottleneck, and the alternative — batching a
-   hundred decisions until the user is at their desk — produces rubber-stamping,
-   which is a worse integrity outcome than thoughtful approval on a train.
+2. **Refinement is invoked on Desk, reviewed on both.** Choosing how far to
+   intervene needs the passage in view. Working through the resulting diff one
+   change at a time is well suited to a phone, and it is a genuinely good use of
+   ten spare minutes.
 
-3. **Version restore is not on mobile.** Restoring a snapshot is destructive to
-   in-flight work and hard to preview on a small screen.
+3. **Export is Desk-only.** Format, template, and packaging choices are
+   consequential and multi-part. A mis-exported submission at 2am is the failure
+   we most want to avoid.
 
-### 6.2 How limits are communicated
+### 6.2 Communicating limits
 
-`REQ-SUR-6` requires that capability differences are explicit. The pattern:
+Never a greyed control with no explanation. Never a silent no-op.
 
-> **Not available here**
-> Drafting runs use your computer's processing power, so they run in the
-> Workbench.
-> `[Open in Workbench]` `[Remind me]`
-
-Never a greyed-out control with no explanation. Never a silent no-op.
+> **Not available on your phone**
+> Choosing how much to change in a passage works better with the passage in
+> front of you.
+> `[Open on desktop]` `[Remind me]`
 
 ---
 
-## 7. Search architecture
+## 7. Search
 
-| Scope | Searches | Available on |
+| Scope | Searches | Surface |
 |---|---|---|
-| **Command palette** | Commands, panels, settings, navigation | Workbench |
-| **Project search** | Draft text, sources, notes, findings, comments | All |
-| **Corpus search** | Approved source full text and metadata | All |
-| **Vault search** | Whole Vault, keyword and semantic | Workbench full; Console if synced |
-| **Global search** | Across all projects and the Vault | Workbench |
+| Command palette | Commands, panels, settings, navigation | Desk |
+| Project search | Draft, sources, notes, findings, comments | Both |
+| Corpus search | Approved source full text and metadata | Both |
+| Vault search | Whole Vault, keyword and semantic | Both |
+| Global search | Across all projects and the Vault | Both |
 
-Search results are typed and grouped by kind, never a flat list. Semantic and
-keyword results are labelled so the user knows why something matched.
+Results are typed and grouped by kind, never a flat list. Semantic and keyword
+results are labelled so the user knows why something matched.
 
 ---
 
 ## 8. State visibility
 
-The user must be able to answer these at a glance, without navigation:
+Answerable at a glance without navigation:
 
-| Question | Where answered |
-|---|---|
-| What gate am I at? | Title bar (Workbench), project card (Console) |
-| What is my next action? | Gate indicator, dashboard |
-| How much of this is mine? | Status bar authorship % |
-| Is anything running? | Status bar run indicator |
-| Is anything blocking me? | Status bar finding count |
-| Is my work saved and backed up? | Status bar sync and backup state |
-| What am I spending? | Status bar budget indicator |
-| Am I online? | Status bar connectivity |
+| Question | Desk | Pocket |
+|---|---|---|
+| What gate am I at? | Header | Project card |
+| What is my next action? | Gate indicator | Home |
+| Is anything running? | Status bar | Home badge |
+| Is anything blocking me? | Status bar | Home |
+| Is my work saved? | Status bar | Implicit; explicit on failure |
+| What am I spending? | Status bar | Me → Usage |
+| Am I online? | Status bar | Banner when not |
 
-Eight indicators is the ceiling for the status bar. Adding a ninth requires
-removing one.
+Six status indicators is the Desk ceiling. A seventh requires removing one.
 
 ---
 
 ## 9. Empty states
 
-Every empty state must say what the thing is, why it is empty, and what to do.
-The high-traffic ones:
+Each says what the thing is, why it is empty, and what to do.
 
 | Empty | Message shape |
 |---|---|
@@ -373,23 +310,22 @@ The high-traffic ones:
 | No candidates | "Nothing waiting for review. Run discovery when you want more evidence." → Discover |
 | Vault skipped | "You don't have a Knowledge Vault. It's a long-term library of everything you read — optional, and you can add one any time." → Learn more / Create / Not now |
 | No findings | "Nothing blocking you. Requirements are checked as you write." |
-| Console, no sync | "Your work is on your computer, which is where we keep it by default. Turn on sync to see it here." → About sync / Enable |
-
-The Console-no-sync state matters: without care it reads as breakage. It must
-read as *the privacy promise being kept*.
+| No voice profile | "We can learn how you write, so language suggestions sound like you rather than like a textbook." → Set up / Not now |
 
 ---
 
-## 10. Responsive breakpoints
+## 10. Breakpoints
 
-| Breakpoint | Width | Applies to | Layout |
-|---|---|---|---|
-| Compact | 360–599 px | Console | Single column, bottom tabs |
-| Medium | 600–1023 px | Console | Single column, wider, top nav |
-| Expanded | 1024–1439 px | Console, small Workbench | Two columns; Workbench: two docks max |
-| Large | 1440–1919 px | Workbench | Three docks |
-| Extra large | 1920 px+ | Workbench | Three docks + split editor |
+| Range | Serves | Layout |
+|---|---|---|
+| 320–413 | Pocket | Single column, bottom tabs |
+| 414–599 | Pocket | Single column, comfortable |
+| 600–839 | Pocket | Two-column lists |
+| 840–1023 | Pocket | Master-detail |
+| 1024–1279 | **Desk** | Rail collapsed, aside overlays |
+| 1280–1599 | Desk | Three regions |
+| 1600+ | Desk | Four regions, split primary |
 
-**Workbench minimum:** 1280 × 800. Below this the panel system degrades to a
-single-dock mode with a warning; the product is honest that it is not designed
-for smaller displays.
+**1024 px is the handover**, and it is a genuine application switch, not a media
+query cascade. Both are served from one codebase and one URL space; the layout
+shell differs.

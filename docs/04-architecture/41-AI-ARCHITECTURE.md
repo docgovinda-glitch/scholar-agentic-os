@@ -1,8 +1,9 @@
 # AI Architecture — Gateway and Warden
 
 > **Doc ID:** 41 · **Status:** Design · **Depends on:** `25`, `40`, `46`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
-Multi-provider inference with local-first defaults, and the egress control that
+Multi-provider inference with minimised payloads, and the egress control that
 makes the privacy promise enforceable.
 
 ---
@@ -11,13 +12,13 @@ makes the privacy promise enforceable.
 
 | # | Principle |
 |---|---|
-| A1 | **Local first.** If a task can run locally at acceptable quality, it defaults to local |
+| A1 | **Minimise what leaves.** The Warden sends the least payload that will do the job (`44` §5.1) |
 | A2 | **Provider-agnostic.** No agent knows which provider serves it |
 | A3 | **Egress is controlled.** Every outbound call passes the Warden. No exceptions, no bypass |
 | A4 | **The user chooses.** Task-level model binding, visible and changeable |
 | A5 | **Costs are visible.** Before an expensive action, and recorded after |
 | A6 | **Failures degrade honestly.** Failover is disclosed; substitution is never silent |
-| A7 | **Keys stay with the user.** Never transmitted to the operator, never logged |
+| A7 | **Keys are write-only.** Encrypted via managed KMS, never returned to the client, never logged (`44` §3.1) |
 | A8 | **No training on user content.** Not a setting. A property |
 
 ---

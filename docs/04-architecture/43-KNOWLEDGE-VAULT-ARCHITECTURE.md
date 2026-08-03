@@ -1,6 +1,7 @@
 # Knowledge Vault Architecture
 
 > **Doc ID:** 43 · **Status:** Design · **Depends on:** `44`, `45`, `46`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 The user's optional, encrypted, local, long-term knowledge corpus.
 
@@ -12,8 +13,11 @@ The user's optional, encrypted, local, long-term knowledge corpus.
 for years.**
 
 Not a reference manager (it holds full content, not just metadata). Not a note
-app (it holds source material, not just notes). Not cloud storage (it lives on
-the device, encrypted).
+app (it holds source material, not just notes). Not a file store (it is parsed,
+indexed, and semantically searchable).
+
+**Revision 2:** the Vault is server-side, encrypted at rest, with the data
+handling in `44`.
 
 For a PhD candidate in year four, the Vault is the answer to *"what did I read
 about this in 2023?"* — a question that is otherwise unanswerable and that
@@ -296,7 +300,7 @@ This is an honest trade-off, documented rather than hidden:
 - **Gained:** fast hybrid search over 5,000 documents on baseline hardware, which
   is the feature's entire value.
 - **Given up:** protection against an attacker with live memory access to the
-  running Kernel process on an unlocked machine.
+  running service tier on an unlocked machine.
 - **Retained:** protection at rest, which is the realistic threat (stolen laptop,
   backup exposure, cloud sync compromise).
 

@@ -1,6 +1,7 @@
 # Onboarding Architecture
 
 > **Doc ID:** 25 · **Status:** Design · **Depends on:** `10`, `12`, `21`
+> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
 
 The nine-stage path from stranger to first project, with the AI Setup Wizard and
 the Workshop specified in full.
@@ -39,7 +40,7 @@ the Workshop specified in full.
 
 ### 1.2 The local-only path
 
-A user who downloads the Workbench and wants nothing to do with our servers:
+A user who downloads the Desk and wants nothing to do with our servers:
 
 ```
   Launch → AI Setup Wizard (local models) → Vault (optional)
@@ -49,7 +50,7 @@ A user who downloads the Workbench and wants nothing to do with our servers:
 No account, no email, no network. This path must be **visible on first launch**,
 not hidden — it is the strongest possible demonstration of `P3` and `P4`. The
 first screen offers "Sign in or create an account" and "Use without an account"
-as peers, with a one-line explanation of what an account adds (sync, the Console,
+as peers, with a one-line explanation of what an account adds (sync, Pocket,
 managed model credits).
 
 ---
@@ -80,8 +81,8 @@ managed model credits).
 - Verification link plus a 6-digit code (the code matters for users checking mail
   on a different device).
 - Link valid 24 hours; resend rate-limited.
-- Verification is required before cloud features (sync, Console, credits) and
-  **not** required for local Workbench use (`REQ-ONB-2`).
+- Verification is required before cloud features (sync, Pocket, credits) and
+  **not** required for local Desk use (`REQ-ONB-2`).
 - Unverified users may proceed through the rest of onboarding; a persistent,
   non-modal banner offers resend.
 
@@ -427,7 +428,7 @@ workspace:    { created, backup: configured | declined | deferred }
 first_project:{ started, output_type }
 ```
 
-Stored locally (Workbench config) and, for account-scoped fields, server-side so
+Stored locally (Desk config) and, for account-scoped fields, server-side so
 a second device resumes correctly (`REQ-ONB-10`).
 
 ### 10.2 Re-offering skipped stages
