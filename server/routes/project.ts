@@ -29,6 +29,7 @@ import { catalog } from "../../src/app/atlas/atlas.ts";
 import {
   computeG0ExitCriteria,
   computeG6ExitCriteria,
+  intakeCompleteness,
   updateExitCriteria,
   signOff,
   invalidateGate,
@@ -40,7 +41,7 @@ import type { GateId } from "../../src/app/conductor/conductor.ts";
 import { createProject, getProject, saveProject } from "../../src/app/conductor/projectStore.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
-import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, ClaimGraphError } from "../../src/domain/claim/graph.ts";
+import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, ClaimGraphError } from "../../src/domain/claim/graph.ts";
 import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
@@ -120,10 +121,13 @@ function recomputeG6(record: NonNullable<ReturnType<typeof getProject>>, documen
 
 function projectView(record: ReturnType<typeof getProject>) {
   if (!record) return undefined;
+  const spec = catalog.getOrThrow(record.outputTypeId);
   return {
     projectId: record.projectId,
     outputTypeId: record.outputTypeId,
     answers: record.answers,
+    /** Fraction (0-1) of every intake field (required, recommended, and optional) that has an answer — informational, not gating (only required fields block G0). */
+    intakeCompleteness: intakeCompleteness(spec, record.answers),
     hasDocument: record.document !== undefined,
     gates: summarize(record.gates),
   };
@@ -422,6 +426,20 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
     res.json({ conflicts: findConflicts(record.claimGraph) });
+  });
+
+  /**
+   * Every claim with at least one evidence binding citing `sourceId` —
+   * domain/claim's claimsDependingOnSource(), "which claims depend on
+   * source X" (docs 13). Useful before retracting a source: this is what
+   * `DELETE .../sources/:sourceId` is about to affect.
+   */
+  app.get("/api/projects/:id/sources/:sourceId/claims", projectLimit, (req, res) => {
+    const record = getProject(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    res.json({ claims: claimsDependingOnSource(record.claimGraph, req.params.sourceId) });
   });
 
   /**

@@ -71,6 +71,11 @@ describe("POST /api/projects", () => {
     expect(res.body.gates[0]).toMatchObject({ gate: "G0", status: "in_progress" });
     expect(res.body.gates[1]).toMatchObject({ gate: "G1", status: "not_started" });
   });
+
+  it("starts at intakeCompleteness 0", async () => {
+    const res = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    expect(res.body.intakeCompleteness).toBe(0);
+  });
 });
 
 describe("GET /api/projects/:id", () => {
@@ -130,6 +135,23 @@ describe("PATCH /api/projects/:id/intake", () => {
     expect(full.status).toBe(200);
     const g0Full = full.body.gates.find((g: { gate: string }) => g.gate === "G0");
     expect(g0Full.status).toBe("ready");
+  });
+
+  it("intakeCompleteness spans all tiers, not just required — answering only required fields doesn't reach 1.0", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    const specRes = await request(app).get("/api/atlas/output-types/OT-01");
+    const requiredFields: IntakeFieldLike[] = specRes.body.intakeSchema.required;
+    const totalFields =
+      specRes.body.intakeSchema.required.length +
+      specRes.body.intakeSchema.recommended.length +
+      specRes.body.intakeSchema.optional.length;
+
+    const res = await request(app)
+      .patch(`/api/projects/${projectId}/intake`)
+      .send({ answers: answerAllRequired(requiredFields) });
+    expect(res.body.intakeCompleteness).toBeCloseTo(requiredFields.length / totalFields);
+    expect(res.body.intakeCompleteness).toBeLessThan(1);
   });
 });
 
@@ -494,6 +516,42 @@ describe("GET /api/projects/:id/claims/unsupported and /conflicts", () => {
     expect(res.status).toBe(200);
     expect(res.body.conflicts).toHaveLength(1);
     expect(res.body.conflicts[0].claimId).toBe("c1");
+  });
+});
+
+describe("GET /api/projects/:id/sources/:sourceId/claims", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("404s for an unknown project", async () => {
+    const res = await request(app).get("/api/projects/proj-nope/sources/src-1/claims");
+    expect(res.status).toBe(404);
+  });
+
+  it("lists only claims with a binding citing the given source", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "From source A." } });
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c2", text: "From source B." } });
+    await request(app)
+      .post(`/api/projects/${projectId}/claims/c1/evidence`)
+      .send({ binding: { id: "b1", claimId: "c1", evidence: [evidenceSpan({ sourceId: "src-a" })], strength: "strong", rationale: "x" } });
+    await request(app)
+      .post(`/api/projects/${projectId}/claims/c2/evidence`)
+      .send({ binding: { id: "b2", claimId: "c2", evidence: [evidenceSpan({ sourceId: "src-b" })], strength: "strong", rationale: "y" } });
+
+    const res = await request(app).get(`/api/projects/${projectId}/sources/src-a/claims`);
+    expect(res.status).toBe(200);
+    expect(res.body.claims.map((c: { id: string }) => c.id)).toEqual(["c1"]);
+  });
+
+  it("returns an empty list for a source no claim depends on", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const res = await request(app).get(`/api/projects/${created.body.projectId}/sources/src-nope/claims`);
+    expect(res.status).toBe(200);
+    expect(res.body.claims).toEqual([]);
   });
 });
 
