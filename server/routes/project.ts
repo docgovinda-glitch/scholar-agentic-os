@@ -20,8 +20,10 @@
  * G0 can reach that today. Computing G6 correctly now, ahead of G1-G5
  * existing, means nothing changes here when they do.
  *
- * See src/app/conductor/projectStore.ts for the scope note on project
- * persistence.
+ * Persistence goes through src/services/store/projectStore.ts's
+ * getProjectStore() — an in-memory Map when DATABASE_URL is unset (tests,
+ * un-configured dev), Postgres (src/services/store/pgProjectStore.ts) once
+ * it's set. Every handler below is async and awaits the store accordingly.
  */
 
 import express from "express";
@@ -38,7 +40,8 @@ import {
   GateTransitionError,
 } from "../../src/app/conductor/conductor.ts";
 import type { GateId } from "../../src/app/conductor/conductor.ts";
-import { createProject, getProject, saveProject } from "../../src/app/conductor/projectStore.ts";
+import { getProjectStore } from "../../src/services/store/projectStore.ts";
+import type { ProjectRecord } from "../../src/services/store/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
 import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, ClaimGraphError } from "../../src/domain/claim/graph.ts";
@@ -110,7 +113,7 @@ function isValidBinding(value: unknown): value is ClaimEvidenceBinding {
  * GateTransitionError (via updateExitCriteria) if G6 is already signed
  * off, same as every other gate-touching endpoint.
  */
-function recomputeG6(record: NonNullable<ReturnType<typeof getProject>>, document: CanonicalDocument) {
+function recomputeG6(record: ProjectRecord, document: CanonicalDocument) {
   const spec = catalog.getOrThrow(record.outputTypeId);
   const rules = applyWaivers(compileRubricFromOutputType(spec), record.waivers);
   const rubricReport = buildReport(rules, document, record.claimGraph);
@@ -119,7 +122,7 @@ function recomputeG6(record: NonNullable<ReturnType<typeof getProject>>, documen
   return { rubricReport, gates };
 }
 
-function projectView(record: ReturnType<typeof getProject>) {
+function projectView(record: ProjectRecord | undefined) {
   if (!record) return undefined;
   const spec = catalog.getOrThrow(record.outputTypeId);
   return {
@@ -134,6 +137,8 @@ function projectView(record: ReturnType<typeof getProject>) {
 }
 
 export function registerProjectRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
+  const store = getProjectStore();
+
   /** Summaries of every catalog entry — the "choose an output type" list (docs 12 F-PRJ-1). */
   app.get("/api/atlas/output-types", projectLimit, (_req, res) => {
     const items = catalog.list().map((s) => ({
@@ -157,7 +162,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   });
 
   /** Create a project bound to an output type. Body: { outputTypeId }. */
-  app.post("/api/projects", projectLimit, (req, res) => {
+  app.post("/api/projects", projectLimit, async (req, res) => {
     const { outputTypeId } = req.body ?? {};
     if (typeof outputTypeId !== "string" || outputTypeId.length === 0) {
       return res.status(400).json({ error: "Missing required field: outputTypeId" });
@@ -166,19 +171,19 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     if (!spec) {
       return res.status(404).json({ error: `No output type "${outputTypeId}" in the catalog.` });
     }
-    const created = createProject(outputTypeId);
+    const created = await store.create(outputTypeId);
     // Compute G0's real exit criteria immediately from the (still empty)
     // answers, rather than leaving domain/project/gates.ts's default empty
     // exitCriteria in place — an empty criteria list is vacuously "ready"
     // (isReadyToSignOff's `.every()` over zero items), which would let a
     // caller sign off G0 before intake was ever computed once.
     const gates = updateExitCriteria(created.gates, "G0", computeG0ExitCriteria(spec, created.answers));
-    const record = saveProject({ ...created, gates });
+    const record = await store.save({ ...created, gates });
     res.status(201).json(projectView(record));
   });
 
-  app.get("/api/projects/:id", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.get("/api/projects/:id", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -193,8 +198,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * rather than silently overwritten (domain/project/gates.ts's guarantee).
    * Body: { answers: Record<string, string> }
    */
-  app.patch("/api/projects/:id/intake", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.patch("/api/projects/:id/intake", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -214,7 +219,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
     try {
       const gates = updateExitCriteria(record.gates, "G0", criteria);
-      const updated = saveProject({ ...record, answers: nextAnswers, gates });
+      const updated = await store.save({ ...record, answers: nextAnswers, gates });
       res.json(projectView(updated));
     } catch (err) {
       if (err instanceof GateTransitionError) {
@@ -233,8 +238,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * and any previously recorded waivers are reapplied (applyWaivers) so a
    * waiver survives a document resubmission rather than silently resetting.
    */
-  app.put("/api/projects/:id/document", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.put("/api/projects/:id/document", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -245,7 +250,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
     try {
       const { rubricReport, gates } = recomputeG6(record, document);
-      const updated = saveProject({ ...record, document, rubricReport, gates });
+      const updated = await store.save({ ...record, document, rubricReport, gates });
       res.json({ ...projectView(updated), rubric: rubricReport });
     } catch (err) {
       if (err instanceof GateTransitionError) {
@@ -256,8 +261,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   });
 
   /** The most recent Rubric evaluation of the project's document. 404s if no document has been submitted yet. */
-  app.get("/api/projects/:id/rubric", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.get("/api/projects/:id/rubric", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -277,8 +282,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * empty. Recomputes G6's exit criteria from the waived report, same as
    * the document endpoint.
    */
-  app.post("/api/projects/:id/rubric/waive", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.post("/api/projects/:id/rubric/waive", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -306,7 +311,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       const rubricReport = buildReport(waivedRules, record.document, record.claimGraph);
       const criteria = computeG6ExitCriteria(rubricReport);
       const gates = updateExitCriteria(record.gates, "G6", criteria);
-      const updated = saveProject({ ...record, waivers, rubricReport, gates });
+      const updated = await store.save({ ...record, waivers, rubricReport, gates });
       res.json({ ...projectView(updated), rubric: rubricReport });
     } catch (err) {
       if (err instanceof RuleNotWaivableError) {
@@ -327,12 +332,12 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * off, same "invalidate first" guarantee as every other Rubric-relevant
    * change.
    */
-  function saveClaimGraphChange(record: NonNullable<ReturnType<typeof getProject>>, claimGraph: ClaimEvidenceGraph) {
+  function saveClaimGraphChange(record: ProjectRecord, claimGraph: ClaimEvidenceGraph) {
     if (!record.document) {
-      return saveProject({ ...record, claimGraph });
+      return store.save({ ...record, claimGraph });
     }
     const { rubricReport, gates } = recomputeG6({ ...record, claimGraph }, record.document);
-    return saveProject({ ...record, claimGraph, rubricReport, gates });
+    return store.save({ ...record, claimGraph, rubricReport, gates });
   }
 
   /**
@@ -342,8 +347,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * claim graph, not the document — see fromAtlas.ts's
    * compileClaimSupportGateRules) — 409s if G6 is already signed off.
    */
-  app.post("/api/projects/:id/claims", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.post("/api/projects/:id/claims", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -353,7 +358,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
     try {
       const claimGraph = addClaim(record.claimGraph, claim);
-      const updated = saveClaimGraphChange(record, claimGraph);
+      const updated = await saveClaimGraphChange(record, claimGraph);
       res.status(201).json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
     } catch (err) {
       if (err instanceof ClaimGraphError) {
@@ -375,8 +380,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * document already exists — this is exactly the action that turns a
    * failing claim_support finding into a passing one.
    */
-  app.post("/api/projects/:id/claims/:claimId/evidence", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.post("/api/projects/:id/claims/:claimId/evidence", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -388,7 +393,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
     try {
       const claimGraph = bindEvidence(record.claimGraph, binding);
-      const updated = saveClaimGraphChange(record, claimGraph);
+      const updated = await saveClaimGraphChange(record, claimGraph);
       res.status(201).json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
     } catch (err) {
       if (err instanceof ClaimGraphError) {
@@ -402,8 +407,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   });
 
   /** The project's full Claim–Evidence Graph. */
-  app.get("/api/projects/:id/claims", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.get("/api/projects/:id/claims", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -411,8 +416,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   });
 
   /** Claims with zero evidence bindings — domain/claim's unsupportedClaims(), AG-13's "unsupported" output. */
-  app.get("/api/projects/:id/claims/unsupported", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.get("/api/projects/:id/claims/unsupported", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -420,8 +425,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   });
 
   /** Claims with both a supporting and a contradicting binding, surfaced for a human to resolve (never auto-resolved). */
-  app.get("/api/projects/:id/claims/conflicts", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.get("/api/projects/:id/claims/conflicts", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -434,8 +439,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * source X" (docs 13). Useful before retracting a source: this is what
    * `DELETE .../sources/:sourceId` is about to affect.
    */
-  app.get("/api/projects/:id/sources/:sourceId/claims", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.get("/api/projects/:id/sources/:sourceId/claims", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -450,14 +455,14 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * Recomputes G6 if a document already exists — a retracted source can
    * turn a passing claim_support finding into a failing one.
    */
-  app.delete("/api/projects/:id/sources/:sourceId", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.delete("/api/projects/:id/sources/:sourceId", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
     const claimGraph = removeSource(record.claimGraph, req.params.sourceId);
     try {
-      const updated = saveClaimGraphChange(record, claimGraph);
+      const updated = await saveClaimGraphChange(record, claimGraph);
       res.json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
     } catch (err) {
       if (err instanceof GateTransitionError) {
@@ -477,7 +482,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * currently become ready to sign off through this API.
    */
   app.post("/api/projects/:id/gates/:gate/signoff", projectLimit, async (req, res) => {
-    const record = getProject(req.params.id);
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -498,7 +503,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
     try {
       const gates = await signOff(record.gates, req.params.gate, actor, approvedSnapshot);
-      const updated = saveProject({ ...record, gates });
+      const updated = await store.save({ ...record, gates });
       res.json(projectView(updated));
     } catch (err) {
       if (err instanceof GateTransitionError) {
@@ -512,8 +517,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * Invalidate a gate, cascading forward to every gate that depended on it
    * (domain/project/gates.ts's downstream cascade). Body: { reason }.
    */
-  app.post("/api/projects/:id/gates/:gate/invalidate", projectLimit, (req, res) => {
-    const record = getProject(req.params.id);
+  app.post("/api/projects/:id/gates/:gate/invalidate", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
@@ -526,7 +531,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
 
     const gates = invalidateGate(record.gates, req.params.gate, reason);
-    const updated = saveProject({ ...record, gates });
+    const updated = await store.save({ ...record, gates });
     res.json(projectView(updated));
   });
 }
