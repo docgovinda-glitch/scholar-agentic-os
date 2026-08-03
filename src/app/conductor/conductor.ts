@@ -3,13 +3,16 @@
  *
  * Spec: docs/03-workflow/30-ACADEMIC-WORKFLOW-ARCHITECTURE.md.
  *
- * Binds the pure gate state machine (domain/project/gates.ts) to the two
+ * Binds the pure gate state machine (domain/project/gates.ts) to the
  * modules already built that a gate's exit criteria can be computed from
  * today: Atlas for G0 (has every required intake field been answered, or
- * explicitly deferred), and the Rubric for G6 (are there any unresolved
- * blocking or required compliance findings). G1-G5 and G7 exit criteria are
- * not wired to anything yet — there is no requirement-extraction pipeline,
- * drafting pipeline, review pipeline, or export pipeline built (see
+ * explicitly deferred), Atlas + the document for G3 (every required section
+ * exists, every deferred G0 field resolved — see computeG3ExitCriteria's
+ * own comment for what's deliberately not modeled), and the Rubric for G6
+ * (are there any unresolved blocking or required compliance findings).
+ * G1, G2, G4, G5, and G7 exit criteria are not wired to anything yet —
+ * there is no requirement-extraction pipeline, sourcing pipeline, drafting
+ * pipeline, review pipeline, or export pipeline built (see
  * docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3) — but the gate state
  * machine itself supports them identically once those modules exist:
  * `updateExitCriteria()` takes any `ExitCriterion[]`, computed however the
@@ -41,9 +44,10 @@ import {
   type ProjectGateState,
 } from "../../domain/project/gates";
 import { computeStateHash } from "./hash";
-import type { OutputTypeSpec } from "../atlas/types";
+import type { OutputTypeSpec, SectionSpec } from "../atlas/types";
 import { allIntakeFields } from "../atlas/proposals";
 import type { RubricReport } from "../rubric/rubric";
+import type { CanonicalDocument } from "../../domain/document/model";
 
 export {
   GATE_ORDER,
@@ -82,6 +86,68 @@ export function intakeCompleteness(spec: OutputTypeSpec, answers: Record<string,
   if (fields.length === 0) return 1;
   const answered = fields.filter((f) => answers[f.key] !== undefined).length;
   return answered / fields.length;
+}
+
+function flattenSections(sections: SectionSpec[]): SectionSpec[] {
+  return sections.flatMap((s) => [s, ...(s.children ?? [])]);
+}
+
+/**
+ * Compute G3's exit criteria from an Atlas output type, the project's
+ * document (however far structure has progressed — a required section can
+ * exist as an empty stub at G3 time; G4 is what later requires it be
+ * non-empty), and the intake answers G0 collected (docs 30 §3 G3 "Exit":
+ * "Every required section present · budgets assigned and summing within
+ * tolerance of the total · every deferred G0 field resolved").
+ *
+ * Two of those three are modeled here:
+ *   - "Every required section present" checks existence only (a block
+ *     whose id matches the section's key), deliberately lighter than
+ *     app/rubric's structural_presence Rubric rule, which additionally
+ *     requires non-empty content — that stricter check belongs to G4/G6,
+ *     not G3.
+ *   - "Every deferred G0 field resolved" generates one criterion per
+ *     required intake field that allows a provisional answer (only those
+ *     fields could have been deferred in the first place), satisfied once
+ *     the answer is no longer literally "provisional".
+ *
+ * NOT modeled, stated honestly rather than faked: "budgets assigned and
+ * summing within tolerance of the total". There is no per-project
+ * budget-assignment data model yet (ProjectRecord has no field for a user
+ * overriding a section's word budget) — the only budget data that exists
+ * is the catalog's own `spec.budget.distribution`, which Atlas's own
+ * validator (`app/atlas/validate.ts`) already rejects at catalog-load time
+ * if it doesn't sum close to 1.0. Fabricating a per-project criterion that
+ * can only ever trivially pass would be worse than omitting it — this is
+ * the same "leave it uncompiled rather than force a false mapping"
+ * discipline `app/rubric/fromAtlas.ts`'s module comment describes for
+ * `metadataKey`. A real per-project budget-override feature is future
+ * work, not a redesign, when it exists.
+ */
+export function computeG3ExitCriteria(
+  spec: OutputTypeSpec,
+  document: CanonicalDocument,
+  answers: Record<string, string | "provisional">
+): ExitCriterion[] {
+  const sectionCriteria: ExitCriterion[] = flattenSections(spec.structure.sections)
+    .filter((s) => s.required)
+    .map((section) => ({
+      id: `section-${section.key}`,
+      description: `"${section.title}" exists in the structure`,
+      satisfied: document.blocks.some((b) => b.id === section.key),
+      blocking: true,
+    }));
+
+  const deferredFieldCriteria: ExitCriterion[] = spec.intakeSchema.required
+    .filter((field) => field.allowsProvisional)
+    .map((field) => ({
+      id: `deferred-${field.key}`,
+      description: `"${field.label}" resolved from provisional to a real value`,
+      satisfied: answers[field.key] !== "provisional",
+      blocking: true,
+    }));
+
+  return [...sectionCriteria, ...deferredFieldCriteria];
 }
 
 /**

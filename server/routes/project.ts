@@ -7,18 +7,23 @@
  * The second route built on the new architecture (after
  * server/routes/studio.ts). Exposes the Atlas catalog for intake-form
  * rendering, and the Conductor's gate state machine for a project bound to
- * one output type. G0 (from Atlas intake answers) and G6 (from the Rubric,
- * once a document has been submitted via PUT .../document) have real,
- * computable exit-criteria sources through this surface. G1-G5 and G7 have
- * no requirement-extraction/sourcing/drafting/review/export pipeline to
- * compute criteria from yet (docs 30 §10). The sign-off and invalidate
- * endpoints below are gate-agnostic — they will work for any gate the
- * moment something else in the system starts calling updateExitCriteria
- * for it — but since G6's entry prerequisites (G1-G5 signed off) can't be
- * satisfied without those pipelines, G6 can be computed and inspected
- * through this API today but not yet actually signed off end-to-end; only
- * G0 can reach that today. Computing G6 correctly now, ahead of G1-G5
- * existing, means nothing changes here when they do.
+ * one output type. G0 (from Atlas intake answers), G3 (from the Atlas
+ * structure plus the document and intake answers — see
+ * computeG3ExitCriteria's own comment for what's deliberately not modeled),
+ * and G6 (from the Rubric, once a document has been submitted via
+ * PUT .../document) have real, computable exit-criteria sources through
+ * this surface. G1, G2, G4, G5, and G7 have no requirement-extraction/
+ * sourcing/drafting/review/export pipeline to compute criteria from yet
+ * (docs 30 §10). The sign-off and invalidate endpoints below are
+ * gate-agnostic — they will work for any gate the moment something else in
+ * the system starts calling updateExitCriteria for it — but since G3's
+ * entry prerequisites (G0, G2) and G6's (G1-G5) can't all be satisfied
+ * without the missing pipelines, only G0 can reach an actual sign-off
+ * end-to-end through this API today (G2 and G3 can if a caller manually
+ * signs off G2 with an empty criteria list, same as this file's own tests
+ * do — G2 has no compute function of its own yet). Computing G3 and G6
+ * correctly now, ahead of the gates upstream of them existing, means
+ * nothing changes here when those do.
  *
  * Persistence goes through src/services/store/projectStore.ts's
  * getProjectStore() — an in-memory Map when DATABASE_URL is unset (tests,
@@ -30,6 +35,7 @@ import express from "express";
 import { catalog } from "../../src/app/atlas/atlas.ts";
 import {
   computeG0ExitCriteria,
+  computeG3ExitCriteria,
   computeG6ExitCriteria,
   intakeCompleteness,
   updateExitCriteria,
@@ -43,6 +49,7 @@ import type { GateId } from "../../src/app/conductor/conductor.ts";
 import { getProjectStore } from "../../src/services/store/projectStore.ts";
 import type { ProjectRecord } from "../../src/services/store/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
+import { emptyDocument } from "../../src/domain/document/model.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
 import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, ClaimGraphError } from "../../src/domain/claim/graph.ts";
 import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
@@ -113,6 +120,25 @@ function isValidBinding(value: unknown): value is ClaimEvidenceBinding {
  * GateTransitionError (via updateExitCriteria) if G6 is already signed
  * off, same as every other gate-touching endpoint.
  */
+/**
+ * Recompute G3's exit criteria (docs 30 §3 G3 "Exit") from the project's
+ * output type, its document as it stands right now, and its intake
+ * answers as they stand right now — called from both the intake and
+ * document endpoints below, since a G3 criterion can change from either
+ * side (a deferred field getting resolved, or a section being added).
+ * Falls back to an empty placeholder document when the project has none
+ * yet, so `PATCH .../intake` can recompute G3 before any document exists —
+ * every section-presence criterion is correctly unsatisfied against it.
+ * Throws GateTransitionError (via updateExitCriteria) if G3 is already
+ * signed off, same "invalidate first" discipline as every other
+ * gate-touching endpoint.
+ */
+function recomputeG3(record: ProjectRecord, document: CanonicalDocument | undefined, answers: Record<string, string>) {
+  const spec = catalog.getOrThrow(record.outputTypeId);
+  const criteria = computeG3ExitCriteria(spec, document ?? emptyDocument(record.projectId, spec.label), answers);
+  return updateExitCriteria(record.gates, "G3", criteria);
+}
+
 function recomputeG6(record: ProjectRecord, document: CanonicalDocument) {
   const spec = catalog.getOrThrow(record.outputTypeId);
   const rules = applyWaivers(compileRubricFromOutputType(spec), record.waivers);
@@ -172,12 +198,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(404).json({ error: `No output type "${outputTypeId}" in the catalog.` });
     }
     const created = await store.create(outputTypeId);
-    // Compute G0's real exit criteria immediately from the (still empty)
-    // answers, rather than leaving domain/project/gates.ts's default empty
-    // exitCriteria in place — an empty criteria list is vacuously "ready"
-    // (isReadyToSignOff's `.every()` over zero items), which would let a
-    // caller sign off G0 before intake was ever computed once.
-    const gates = updateExitCriteria(created.gates, "G0", computeG0ExitCriteria(spec, created.answers));
+    // Compute G0's and G3's real exit criteria immediately from the (still
+    // empty) answers/document, rather than leaving domain/project/gates.ts's
+    // default empty exitCriteria in place — an empty criteria list is
+    // vacuously "ready" (isReadyToSignOff's `.every()` over zero items),
+    // which would let a caller sign off before anything was ever computed.
+    let gates = updateExitCriteria(created.gates, "G0", computeG0ExitCriteria(spec, created.answers));
+    gates = recomputeG3({ ...created, gates }, undefined, created.answers);
     const record = await store.save({ ...created, gates });
     res.status(201).json(projectView(record));
   });
@@ -218,7 +245,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const criteria = computeG0ExitCriteria(spec, nextAnswers);
 
     try {
-      const gates = updateExitCriteria(record.gates, "G0", criteria);
+      let gates = updateExitCriteria(record.gates, "G0", criteria);
+      gates = recomputeG3({ ...record, gates }, record.document, nextAnswers);
       const updated = await store.save({ ...record, answers: nextAnswers, gates });
       res.json(projectView(updated));
     } catch (err) {
@@ -249,7 +277,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
 
     try {
-      const { rubricReport, gates } = recomputeG6(record, document);
+      const { rubricReport, gates: gatesAfterG6 } = recomputeG6(record, document);
+      const gates = recomputeG3({ ...record, gates: gatesAfterG6 }, document, record.answers);
       const updated = await store.save({ ...record, document, rubricReport, gates });
       res.json({ ...projectView(updated), rubric: rubricReport });
     } catch (err) {
@@ -476,10 +505,10 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * Sign off a gate. Body: { actor }. 409s if the gate is not ready (a
    * blocking exit criterion is unsatisfied, or entry prerequisites are
    * unmet). The approved snapshot is what a later content change is
-   * detected against (docs 30 §2.2) — G0's is the intake answers, G6's is
-   * the Rubric report; every other gate has no computed content yet (see
-   * this file's module comment) so its snapshot is empty and it cannot
-   * currently become ready to sign off through this API.
+   * detected against (docs 30 §2.2) — G0's is the intake answers, G3's is
+   * the document's block ids plus the intake answers, G6's is the Rubric
+   * report; every other gate has no computed content yet (see this file's
+   * module comment) so its snapshot is empty.
    */
   app.post("/api/projects/:id/gates/:gate/signoff", projectLimit, async (req, res) => {
     const record = await store.get(req.params.id);
@@ -497,9 +526,11 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const approvedSnapshot: unknown =
       req.params.gate === "G0"
         ? { answers: record.answers }
-        : req.params.gate === "G6"
-          ? { rubricReport: record.rubricReport }
-          : {};
+        : req.params.gate === "G3"
+          ? { blockIds: record.document?.blocks.map((b) => b.id) ?? [], answers: record.answers }
+          : req.params.gate === "G6"
+            ? { rubricReport: record.rubricReport }
+            : {};
 
     try {
       const gates = await signOff(record.gates, req.params.gate, actor, approvedSnapshot);

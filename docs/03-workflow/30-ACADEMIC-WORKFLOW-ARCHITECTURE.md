@@ -476,14 +476,15 @@ Aggregate only. No content, no per-user paths.
 `domain/project/gates.ts` (pure — types, entry-prerequisite checks,
 `updateExitCriteria`, `signOffGate`, `invalidateGate` with forward-only
 cascade, `isProjectComplete`, `nextOutstandingGate`) with `app/conductor/`
-as its public entry point. The Conductor binds the gate machine to the two
+as its public entry point. The Conductor binds the gate machine to the
 modules that can compute real exit criteria today:
 
 | Gate | Bound to | How |
 |---|---|---|
 | G0 (Intake) | Atlas (`app/atlas`) | `computeG0ExitCriteria` — one blocking criterion per required intake field; a provisional answer satisfies it only if the field's `allowsProvisional` is true (§14 §9's per-field contract, not a blanket rule) |
+| G3 (Structure) | Atlas + the document (`domain/document`) | `computeG3ExitCriteria` — one blocking criterion per required section (existence only — a block whose id matches the section key, not non-empty content, which is G4/G6's job), plus one per required intake field that allows a provisional answer (satisfied once no longer literally `"provisional"`). "Budgets assigned and summing within tolerance of the total" is deliberately NOT modeled — there is no per-project budget-override data model yet, and the catalog's own default distribution is already validated at load time by `app/atlas`'s validator, so a per-project criterion here could only ever trivially pass. See the function's own comment |
 | G6 (Compliance) | Rubric (`app/rubric`, `domain/compliance`) | `computeG6ExitCriteria` — every non-advisory finding becomes a blocking criterion; `not_applicable` findings (an evaluator that doesn't exist yet) are surfaced as non-blocking but never as a silent pass |
-| G1-G5, G7 | Nothing yet | No requirement-extraction, sourcing, structure-proposal, drafting, review, or export pipeline exists (`13` §8.3). `updateExitCriteria` accepts any `ExitCriterion[]` from any source, so wiring a real gate in later is additive, not a redesign. |
+| G1, G2, G4, G5, G7 | Nothing yet | No requirement-extraction, sourcing, drafting, review, or export pipeline exists (`13` §8.3). `updateExitCriteria` accepts any `ExitCriterion[]` from any source, so wiring a real gate in later is additive, not a redesign. |
 
 Sign-off is `state_hash`-bound as designed: `app/conductor/hash.ts` hashes a
 caller-supplied "what was approved" snapshot via Web Crypto SHA-256 over a
@@ -495,23 +496,25 @@ recompute criteria on an already-signed-off gate — the caller must
 always recorded with a reason, never silently overwritten.
 
 Tests: `domain/project/__tests__/gates.test.ts` and
-`app/conductor/__tests__/conductor.test.ts`, 29 tests — initial state,
+`app/conductor/__tests__/conductor.test.ts`, 34 tests — initial state,
 entry-prerequisite combinations (including G4's three-way AND and G3's
 G0+G2 without G1), sign-off readiness and its blocking/advisory distinction,
 invalidation cascade (forward-only, leaf gates don't affect ancestors), the
-Atlas and Rubric bindings, hash staleness, and a re-target scenario
+Atlas, document, and Rubric bindings (including G3's section-existence and
+deferred-field criteria), hash staleness, and a re-target scenario
 (`26` Journey 3, in miniature) exercising a full sign-off → invalidate →
 recompute cycle.
 
-**Also exposed over HTTP** (`server/routes/project.ts`, 53 supertest
+**Also exposed over HTTP** (`server/routes/project.ts`, 56 supertest
 integration tests): `GET /api/atlas/output-types[/:id]` for choosing and
 rendering an output type, `POST /api/projects` to bind a project to one,
-`PATCH /api/projects/:id/intake` to submit answers and recompute G0 (the
-response's `intakeCompleteness` — `app/conductor`'s `intakeCompleteness()`
-— reports the fraction of *every* intake field answered, across all three
-tiers, distinct from G0 readiness, which only requires the required
-tier), `PUT /api/projects/:id/document` to submit or replace the project's
-document body and recompute G6 from a live Rubric evaluation of it,
+`PATCH /api/projects/:id/intake` to submit answers and recompute both G0
+and G3 (the response's `intakeCompleteness` — `app/conductor`'s
+`intakeCompleteness()` — reports the fraction of *every* intake field
+answered, across all three tiers, distinct from G0 readiness, which only
+requires the required tier), `PUT /api/projects/:id/document` to submit or
+replace the project's document body and recompute both G6 (from a live
+Rubric evaluation) and G3 (section existence) from it,
 `GET /api/projects/:id/rubric` to re-fetch the most recent evaluation,
 `POST /api/projects/:id/rubric/waive` to waive a non-blocking finding with
 a mandatory reason (docs 31 §7) and recompute G6 accordingly — the waiver
@@ -520,8 +523,10 @@ document resubmission, since compiling from Atlas always produces
 unwaived rules — `POST /api/projects/:id/gates/:gate/signoff` and
 `.../invalidate` for the gate-agnostic sign-off/invalidate actions —
 signoff's approved snapshot is now gate-aware (the intake answers for G0,
-the Rubric report for G6, empty for every other gate, which correctly
-keeps them from ever reaching "ready" through this API) — and every
+the document's block ids plus intake answers for G3, the Rubric report for
+G6, empty for every other gate, which correctly keeps them from ever
+reaching "ready" through this API without a manually-supplied empty
+criteria list, as this file's own tests do for G2) — and every
 project now also carries a Claim–Evidence Graph (`domain/claim`),
 reachable via `POST .../claims`, `POST .../claims/:claimId/evidence`,
 `GET .../claims`, `GET .../claims/unsupported`, `GET .../claims/conflicts`,
@@ -536,12 +541,12 @@ project already has a document, since four Atlas quality gates (`31` §12's
 `usesClaimGraph`) check the claim graph, not the document — adding an
 unsupported claim can turn a passing G6 into a failing one, and binding
 evidence can turn it back, both live through this API. A project's exit
-criteria for G0 are computed immediately at creation
+criteria for G0 and G3 are both computed immediately at creation
 (not left at `domain/project/gates.ts`'s default empty list, which is
 vacuously "ready" with zero blocking criteria) so a caller can't sign off
-before intake was ever evaluated. Persistence is the same
-explicitly-interim in-memory pattern as the Studio's session-policy store
-— see `src/app/conductor/projectStore.ts` and `13` §8.3. G6 can be
+before either was ever evaluated. Persistence goes through
+`src/services/store/projectStore.ts` — an in-memory Map when `DATABASE_URL`
+is unset, Postgres once it's set (`45` §13, `13` §8.3). G6 can be
 computed and inspected through this API today, but not yet actually
 signed off end-to-end: its entry prerequisites (G1-G5 signed off) can't
 be satisfied until those gates have a computation source of their own.
