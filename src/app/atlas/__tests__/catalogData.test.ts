@@ -15,9 +15,9 @@ describe("app/atlas: catalog data validity", () => {
     );
   });
 
-  it("has a representative entry for every compliance profile except (deliberately) professional", () => {
+  it("has a representative entry for every compliance profile", () => {
     const profiles = new Set(OUTPUT_TYPES.map((s) => s.complianceProfile));
-    expect(profiles).toEqual(new Set(["coursework", "institutional", "venue", "funder"]));
+    expect(profiles).toEqual(new Set(["coursework", "institutional", "venue", "funder", "professional"]));
   });
 
   it("every entry has a unique id following the OT-NN convention", () => {
@@ -26,17 +26,19 @@ describe("app/atlas: catalog data validity", () => {
     for (const id of ids) expect(id).toMatch(/^OT-\d{2}$/);
   });
 
-  it("has 16 entries, including the additions beyond the original per-family representative", () => {
+  it("has all 24 output types from docs 14 §9, OT-01 through OT-24", () => {
     const ids = OUTPUT_TYPES.map((s) => s.id).sort();
-    expect(ids).toEqual([
-      "OT-01", "OT-02", "OT-03", "OT-04", "OT-06", "OT-07", "OT-08", "OT-09",
-      "OT-10", "OT-11", "OT-13", "OT-15", "OT-16", "OT-18", "OT-19", "OT-22",
-    ]);
+    const expected = Array.from({ length: 24 }, (_, i) => `OT-${String(i + 1).padStart(2, "0")}`);
+    expect(ids).toEqual(expected);
   });
 
-  it("the short_form additions each exercise a structure variant the original 6 entries didn't", () => {
+  it("exercises every structure variant domain/project/types.ts defines", () => {
     const variants = new Set(OUTPUT_TYPES.map((s) => s.structure.variant));
-    expect(variants.has("argumentative")).toBe(true); // OT-02
-    expect(variants.has("thematic")).toBe(true); // OT-13
+    expect(variants).toEqual(
+      new Set([
+        "linear", "imrad", "chapter_based", "thematic",
+        "argumentative", "slide_deck", "poster_grid", "funder_prescribed",
+      ])
+    );
   });
 });

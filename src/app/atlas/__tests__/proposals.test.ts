@@ -251,3 +251,90 @@ describe("app/atlas: OT-15, OT-19", () => {
     expect(result.canProceed).toBe(true);
   });
 });
+
+describe("app/atlas: the final 8 entries (OT-05, OT-12, OT-14, OT-17, OT-20, OT-21, OT-23, OT-24)", () => {
+  it("proposes the typical total word budget for each", () => {
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-05"))).toBe(5000);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-12"))).toBe(9000);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-14"))).toBe(8000);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-17"))).toBe(3000);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-20"))).toBe(1800);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-21"))).toBe(6000);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-23"))).toBe(550);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-24"))).toBe(3000);
+  });
+
+  it("each entry's field with no safe default blocks progress until answered", () => {
+    expect(canProceedFromIntake(catalog.getOrThrow("OT-05"), {}).missing).toContain("seminar_topic_and_framing");
+    expect(canProceedFromIntake(catalog.getOrThrow("OT-12"), { date_range: "2015-2025" }).missing).toContain("review_type");
+    expect(canProceedFromIntake(catalog.getOrThrow("OT-14"), {}).missing).toContain("house_style");
+    expect(
+      canProceedFromIntake(catalog.getOrThrow("OT-17"), {
+        review_body: "provisional",
+        application_form_upload: "provisional",
+        retention_period: "10 years",
+      }).missing
+    ).toEqual(["participant_type", "data_types_collected"]);
+    expect(
+      canProceedFromIntake(catalog.getOrThrow("OT-20"), { length_limit: "two pages" }).missing
+    ).toEqual(["target_audience", "decision_being_influenced"]);
+    expect(canProceedFromIntake(catalog.getOrThrow("OT-21"), {}).missing).toContain("document_purpose");
+    expect(canProceedFromIntake(catalog.getOrThrow("OT-23"), {}).missing).toContain("physical_dimensions_orientation");
+    expect(canProceedFromIntake(catalog.getOrThrow("OT-24"), {}).missing).toEqual(["title", "purpose"]);
+  });
+
+  it("OT-23 is the only entry using poster_grid", () => {
+    const poster = catalog.getOrThrow("OT-23");
+    expect(poster.structure.variant).toBe("poster_grid");
+  });
+
+  it("OT-24's structure is genuinely minimal — one required content section", () => {
+    const generic = catalog.getOrThrow("OT-24");
+    const requiredSections = generic.structure.sections.filter((s) => s.required && s.countsTowardWordcount);
+    expect(requiredSections.map((s) => s.key)).toEqual(["body"]);
+  });
+
+  it("every one of the final 8 can proceed once all required fields are answered", () => {
+    expect(
+      canProceedFromIntake(catalog.getOrThrow("OT-05"), { seminar_topic_and_framing: "x" }).canProceed
+    ).toBe(true);
+    expect(
+      canProceedFromIntake(catalog.getOrThrow("OT-12"), { review_type: "narrative", date_range: "2015-2025" })
+        .canProceed
+    ).toBe(true);
+    expect(canProceedFromIntake(catalog.getOrThrow("OT-14"), { house_style: "chicago-notes-bibliography" }).canProceed).toBe(
+      true
+    );
+    expect(
+      canProceedFromIntake(catalog.getOrThrow("OT-17"), {
+        review_body: "provisional",
+        application_form_upload: "provisional",
+        participant_type: "Adults, no vulnerable groups",
+        data_types_collected: "Anonymised survey responses",
+        retention_period: "10 years",
+      }).canProceed
+    ).toBe(true);
+    expect(
+      canProceedFromIntake(catalog.getOrThrow("OT-20"), {
+        target_audience: "civil servant",
+        decision_being_influenced: "budget allocation",
+        length_limit: "two pages",
+      }).canProceed
+    ).toBe(true);
+    expect(
+      canProceedFromIntake(catalog.getOrThrow("OT-21"), {
+        document_purpose: "technical",
+        audience_technical_level: "expert",
+      }).canProceed
+    ).toBe(true);
+    expect(
+      canProceedFromIntake(catalog.getOrThrow("OT-23"), {
+        physical_dimensions_orientation: "A0 portrait",
+        print_resolution: "300 DPI",
+      }).canProceed
+    ).toBe(true);
+    expect(
+      canProceedFromIntake(catalog.getOrThrow("OT-24"), { title: "x", purpose: "y" }).canProceed
+    ).toBe(true);
+  });
+});
