@@ -19,6 +19,7 @@ import { APA7Formatter } from "./src/citation_compliance/formatters/apa7.ts";
 import { IEEEFormatter } from "./src/citation_compliance/formatters/ieee.ts";
 import { MLA9Formatter } from "./src/citation_compliance/formatters/mla9.ts";
 import { ChicagoFormatter } from "./src/citation_compliance/formatters/chicago.ts";
+import { ChicagoNotesFormatter } from "./src/citation_compliance/formatters/chicagoNotes.ts";
 import { HarvardFormatter } from "./src/citation_compliance/formatters/harvard.ts";
 import { VancouverFormatter } from "./src/citation_compliance/formatters/vancouver.ts";
 import { importBibTex } from "./src/citation_compliance/importers/bibtexImporter.ts";
@@ -459,6 +460,7 @@ citationStyleRegistry.register(new APA7Formatter());
 citationStyleRegistry.register(new IEEEFormatter());
 citationStyleRegistry.register(new MLA9Formatter());
 citationStyleRegistry.register(new ChicagoFormatter());
+citationStyleRegistry.register(new ChicagoNotesFormatter());
 citationStyleRegistry.register(new HarvardFormatter());
 citationStyleRegistry.register(new VancouverFormatter());
 

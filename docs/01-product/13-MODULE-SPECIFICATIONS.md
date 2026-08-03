@@ -351,7 +351,7 @@ exists; everything else remains the intended target.
 | React 19 + Vite + Tailwind client | `client/*` | Not started — the client still predates the Desk/Pocket split |
 | Express server | `platform/api` + `app/*` | **In progress.** `server/routes/studio.ts` and `server/routes/project.ts` are built on the new architecture; the rest of `server/routes/` (ai.ts, parse.ts, admin.ts) is unchanged |
 | Supabase auth + Postgres | `platform/auth`, `services/store` | Not started |
-| `src/citation_compliance/` | `domain/reference` | Not started (still needs Chicago notes + purity pass) |
+| `src/citation_compliance/` | `domain/reference` | **Chicago notes done; the module move + purity pass is still open.** `formatters/chicagoNotes.ts` adds Chicago 17 Notes-Bibliography (footnote/short-note/bibliography, distinct from the existing Author-Date `chicago.ts`), registered in `server.ts` alongside the other six styles. The `CitationStyle` interface gained two *optional* methods (`formatNote`, `formatShortNote`) for this — backward compatible, no other formatter implements them. The directory itself has not moved to `domain/reference` yet (it already has no I/O — see the formatter's module comment — so the pending work is the rename/relocation, not removing side effects) |
 | `src/document_intelligence/` | `app/ingestion` + `domain/document` | **Partially done.** A new, independent `domain/document` (blocks/ranges/ops, 13 tests) is built at `src/domain/document/` — see §8.1a. It does not yet ingest from `src/document_intelligence/`'s parsers; that integration is still open |
 | `src/agents/`, `src/skills/` | `app/mesh` | Not started |
 | `src/services/providerFailover.ts`, `aiErrors.ts` | `platform/gateway` | **Partially done, and not yet reused.** `src/platform/gateway/` exists and is Warden-gated, but currently has its own (simpler) error handling rather than the existing classified-error/failover logic — see `41` §12.2 |
@@ -379,8 +379,9 @@ exists; everything else remains the intended target.
 | `app/conductor` (binds gates to Atlas/Rubric) | `src/app/conductor/` | 14 |
 | API routes | `server/routes/project.ts` | 16 (integration, via supertest against the live app) |
 | `domain/claim` (Claim–Evidence Graph) | `src/domain/claim/` | 19 |
+| Chicago Notes-Bibliography formatter | `src/citation_compliance/formatters/chicagoNotes.ts` | 18 |
 
-241 new tests. Full repository suite: 130 files, 1,378 tests, `tsc --noEmit`
+259 new tests. Full repository suite: 131 files, 1,396 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 
