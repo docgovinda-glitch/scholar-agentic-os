@@ -389,8 +389,9 @@ server.ts` boot as well as the test suite.
 
 | Current | Reason | Status |
 |---|---|---|
-| Server-side API key decryption (`resolveApiKey`, `decryptServerKey`, `ENCRYPTION_KEY`) | Replaced by managed KMS (`44` §3.1) | Not yet retired — still in `server/routes/ai.ts`, unchanged. The new Gateway takes a per-request API key (BYOK) rather than server-held keys, but a KMS-backed custody path is not built |
-| `users.json`, `database_schema.sql` | Already unused | Unchanged |
+| Server-side API key decryption (`resolveApiKey`/`decryptServerKey`/`ENCRYPTION_KEY`/`readUsersDb`/`findUserByUsername` — the live implementation was actually in `server.ts`, not `server/routes/ai.ts`; the latter only had a same-named stub that never called it) | Replaced by managed KMS (`44` §3.1) | **Retired (Phase 4 of the ai.ts migration).** Confirmed genuinely dead — never called from any route this app actually serves — before removal, not merely unused-looking. `server/routes/ai.ts`'s `resolveApiKey()` is now an explicit no-op passthrough (BYOK only); its stale comment referencing the deleted code is fixed. A KMS-backed custody path is still not built — this removed dead code, it did not replace it with anything |
+| `server/services/` (`aiService.ts`, `userDb.ts`, `types.ts`, `index.ts`) and `server/utils/apiKeyCrypto.ts`/`parseUtils.ts` | An earlier, superseded parallel implementation attempt — `server.ts` and `server/routes/*.ts` have their own inline equivalents (e.g. `parse.ts`'s own `extractPrintableStrings`) | **Retired (Phase 4).** Confirmed zero imports anywhere in the app or its tests before deletion; full suite (148 files, 1,661 tests) and a live `npx tsx server.ts` boot both unaffected |
+| `users.json`, `database_schema.sql` | Already unused | Unchanged. `users.json` itself (the data file, not the dead reader/writer code above) is left in place — deleting a data file is a different, more consequential decision than deleting dead code, and out of scope here |
 | Monolithic workspace components in `src/components/` | Replaced by the region and panel model | Unchanged — no client restructure yet |
 
 ### 8.3 New construction

@@ -513,6 +513,45 @@ for anything unrecognized or absent — closer classification than a blanket
 on the legacy path) are unaffected and keep working — both flags default
 off, so nothing in production calls `platform/gateway` from `ai.ts` yet.
 New features — starting with the Studio — are built exclusively on the
-Warden-gated path. Phase 4 (retiring `ai.ts`'s dead code once Phases 1–3
-have proven stable in production) is tracked separately and has not been
-attempted yet.
+Warden-gated path.
+
+**Phase 4 — retiring dead code — is partially done, and honestly scoped.**
+The full retirement this phase's name implies (deleting `ai.ts`'s legacy
+branches themselves) is NOT done and could not responsibly be done yet:
+those branches are still what production actually runs (both flags default
+off), and proving Phases 1–3 stable enough to delete their fallback needs
+real production traffic over time — something this session has no way to
+observe. What Phase 4 actually did, matching what was safe to claim:
+searched for code that was dead *regardless* of either flag's state, found
+two genuinely orphaned clusters, and removed them after confirming zero
+call sites anywhere in the app or its tests:
+
+- **`server.ts`'s own `resolveApiKey`/`decryptServerKey`/`readUsersDb`/
+  `findUserByUsername`/`UserRecord`/`ENCRYPTION_KEY`/`USERS_DB_PATH`** — a
+  complete, working AES-256-CBC implementation that decrypted server-stored
+  per-user API keys from `users.json`, but was never called from anywhere.
+  (`server/routes/ai.ts` has a same-named `resolveApiKey()` stub, referenced
+  by a comment that pointed at this code — but that stub is a different
+  function in a different file, and the real implementation it gestured at
+  was unreachable the whole time. The stub itself is NOT dead — it's called
+  by every phase and general-proxy handler — so it stays, now as an
+  explicit no-op passthrough with its comment corrected.)
+- **`server/services/`** (`aiService.ts`, `userDb.ts`, `types.ts`,
+  `index.ts`) **and `server/utils/apiKeyCrypto.ts`/`parseUtils.ts`** — an
+  earlier, superseded parallel implementation of pieces of `ai.ts` and
+  `parse.ts` (e.g. its own `selectGeminiKey()`, its own
+  `extractPrintableStrings()`) that both files have their own inline
+  copies of. Zero imports anywhere in the app or its tests confirmed this
+  before deletion.
+
+Both removals were verified with `tsc --noEmit`, the full test suite (148
+files, 1,661 tests, unchanged count — confirming these files had no test
+coverage referencing them either), and a live `npx tsx server.ts` boot.
+`users.json` and `database_schema.sql` (data/schema files, not code) are
+deliberately left in place — deleting a data file is a different, more
+consequential decision than deleting dead code, and out of scope here (see
+`13` §8.2).
+
+Retiring the still-live legacy branches in `ai.ts` themselves remains
+future work, gated on the flags being proven stable in real production
+traffic.
