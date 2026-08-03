@@ -503,27 +503,34 @@ Atlas and Rubric bindings, hash staleness, and a re-target scenario
 (`26` Journey 3, in miniature) exercising a full sign-off → invalidate →
 recompute cycle.
 
-**Also exposed over HTTP** (`server/routes/project.ts`, 24 supertest
+**Also exposed over HTTP** (`server/routes/project.ts`, 36 supertest
 integration tests): `GET /api/atlas/output-types[/:id]` for choosing and
 rendering an output type, `POST /api/projects` to bind a project to one,
 `PATCH /api/projects/:id/intake` to submit answers and recompute G0,
 `PUT /api/projects/:id/document` to submit or replace the project's
 document body and recompute G6 from a live Rubric evaluation of it,
 `GET /api/projects/:id/rubric` to re-fetch the most recent evaluation,
-and `POST /api/projects/:id/gates/:gate/signoff` and `.../invalidate` for
+`POST /api/projects/:id/gates/:gate/signoff` and `.../invalidate` for
 the gate-agnostic sign-off/invalidate actions — signoff's approved
 snapshot is now gate-aware (the intake answers for G0, the Rubric report
 for G6, empty for every other gate, which correctly keeps them from ever
-reaching "ready" through this API). A project's exit criteria for G0 are
-computed immediately at creation (not left at
-`domain/project/gates.ts`'s default empty list, which is vacuously "ready"
-with zero blocking criteria) so a caller can't sign off before intake was
-ever evaluated. Persistence is the same explicitly-interim in-memory
-pattern as the Studio's session-policy store — see
-`src/app/conductor/projectStore.ts` and `13` §8.3. G6 can be computed and
-inspected through this API today, but not yet actually signed off
-end-to-end: its entry prerequisites (G1-G5 signed off) can't be satisfied
-until those gates have a computation source of their own.
+reaching "ready" through this API) — and every project now also carries a
+Claim–Evidence Graph (`domain/claim`), reachable via `POST .../claims`,
+`POST .../claims/:claimId/evidence`, `GET .../claims`,
+`GET .../claims/unsupported`, `GET .../claims/conflicts`, and
+`DELETE .../sources/:sourceId`. Claim entry through this surface is
+manual — there is still no extraction agent (AG-13, needs `app/mesh`) —
+but every query domain/claim offers (unsupported claims, conflicts, a
+source's cascading removal) is now something a caller can actually reach.
+A project's exit criteria for G0 are computed immediately at creation
+(not left at `domain/project/gates.ts`'s default empty list, which is
+vacuously "ready" with zero blocking criteria) so a caller can't sign off
+before intake was ever evaluated. Persistence is the same
+explicitly-interim in-memory pattern as the Studio's session-policy store
+— see `src/app/conductor/projectStore.ts` and `13` §8.3. G6 can be
+computed and inspected through this API today, but not yet actually
+signed off end-to-end: its entry prerequisites (G1-G5 signed off) can't
+be satisfied until those gates have a computation source of their own.
 
 **Tracked gap.** Per-chapter independent gating for `long_form_chaptered`
 (§3's "G3 runs per chapter") is not implemented — the module tracks one
