@@ -356,7 +356,7 @@ exists; everything else remains the intended target.
 | `src/agents/`, `src/skills/` | `app/mesh` | Not started |
 | `src/services/providerFailover.ts`, `aiErrors.ts` | `platform/gateway` | **Partially done, and not yet reused.** `src/platform/gateway/` exists and is Warden-gated, but currently has its own (simpler) error handling rather than the existing classified-error/failover logic — see `41` §12.2 |
 | `src/core/project/` | `domain/project` | Not started |
-| `src/types/documentTypes.ts` | `app/atlas` | Not started |
+| `src/types/documentTypes.ts` | `app/atlas` | **Built** at `src/app/atlas/` (schema, registry, validation, proposal engine) with 6 of 24 output types populated — see `14` §12 |
 | `src/services/knowledgeVaultService.ts` | `app/vault` | Not started |
 | `src/services/documentExportService.ts` | `app/export` | Not started |
 | **`src/skills/humanizeSkill.ts`** | **`app/studio` + `domain/language`** | **Built.** `src/domain/language/` (6 modules, 35 tests) and `src/app/studio/` (3 modules, 21 tests) implement the full six-stage pipeline per `32` §13. `humanizeSkill.ts` itself is untouched and still referenced by the legacy agent pipeline — retiring it is the next step once a client calls `/api/studio/refine` instead of the skill |
@@ -372,8 +372,9 @@ exists; everything else remains the intended target.
 | `domain/language` | `src/domain/language/` | 35 |
 | `app/studio` | `src/app/studio/` | 21 |
 | API route | `server/routes/studio.ts` | 10 (integration, via supertest against the live app) |
+| `app/atlas` | `src/app/atlas/` | 36 |
 
-115 new tests. Full repository suite: 119 files, 1,252 tests, `tsc --noEmit`
+151 new tests. Full repository suite: 123 files, 1,288 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 
@@ -392,6 +393,7 @@ suite.
 | `platform/warden` | **Built** |
 | `platform/gateway` (OpenAI-compatible + Anthropic adapters) | **Built**, narrower provider coverage than the legacy path — see `41` §12.2 |
 | `domain/language` and `app/studio` | **Built** |
+| `app/atlas` | **Built** (engine complete; 6/24 output types populated) |
 | `services/*` | Not started. This is the largest near-term gap: the Studio's session-policy store (`src/app/studio/sessionPolicyStore.ts`) is an explicitly-labelled in-memory stand-in for what `services/store` should provide, and does not survive a restart or scale past one process |
 | `app/rubric` and `domain/compliance` | Not started |
 | `app/conductor` | Not started |

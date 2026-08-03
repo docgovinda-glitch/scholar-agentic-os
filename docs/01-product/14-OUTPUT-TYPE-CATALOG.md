@@ -992,21 +992,46 @@ variant → catalog default.
 
 ## 12. Current state
 
-The repository today defines 10 document types in
-`src/types/documentTypes.ts` with sections, word targets, quality gates, and
-format specs — a real foundation that maps onto this schema. The gaps against
-this specification:
+**The Atlas engine is implemented, with 6 of 24 output types populated.**
 
-| Current | Target |
+| Module | Path | Covers |
+|---|---|---|
+| Schema | `src/app/atlas/types.ts` | §2's OutputTypeSpec shape, in full — structure, budget, sources, citation, three-tier intake schema, quality gates, workflow variant, compliance profile, export defaults |
+| Catalog registry | `src/app/atlas/catalog.ts` | Get-by-id, list, filter by family, search by label/alias — validates every entry at construction, so a malformed spec fails at startup rather than reaching a user |
+| Validation | `src/app/atlas/validate.ts` | The four-part guidance contract (§5.2) enforced per field; structural completeness; budget-distribution sanity |
+| Proposal engine | `src/app/atlas/proposals.ts` | §2.1's budget-from-distribution calculation, intake value defaults, citation style resolution, and the `G0`→`G1` provisional-answer gating from `30` §3 |
+| Data | `src/app/atlas/catalogData.ts` | **6 entries** — OT-01, OT-07, OT-10, OT-16, OT-18, OT-22 — one per family, proving all 6 workflow variants and both funder/venue/institutional/coursework compliance profiles |
+
+36 tests: catalog data validity, the query API, validation rules (including
+what "never an empty required field" actually means — see §12.1), and the
+proposal engine's arithmetic.
+
+### 12.1 A correction made during implementation
+
+Building the validator against real data caught a genuine ambiguity in §5.2's
+wording. "Never an empty required field" was initially implemented as "every
+required field must have either a `defaultValue` or `allowsProvisional`" —
+but OT-16's `funder_and_scheme` and `call_document` fields are correctly
+specified in §9 as required with neither, because a grant proposal
+genuinely has no safe default for its funder and blocking until it's
+answered is the right behaviour, not a data-entry gap. The rule is
+implemented as written here: every field's `defaultWithRationale` guidance
+must be non-empty — including, and especially, when the rationale is "there
+is no safe default." That is what makes the field non-empty in the sense
+the spec actually cares about (unguided), not whether it has a pre-fillable
+value.
+
+### 12.2 What remains
+
+| Gap | Status |
 |---|---|
-| 10 types | 24 types |
-| Types as a TypeScript const | Types as versioned data, plugin-extensible |
-| `QualityGate.check` is a `(content: string) => boolean` | Typed rule objects with scope, severity, and location |
-| No intake schema | Full three-tier intake schema with per-field guidance |
-| No workflow variant binding | Six workflow variants |
-| No compliance profile | Five compliance profiles |
-| No discipline or institution overrides | Four-level precedence chain |
+| 18 of 24 output types | Not yet entered. The engine is proven against all 6 families; remaining types are data entry, each needing a real submission example and structure source per §11.1 |
+| Override precedence (`user template → institution profile → discipline variant → catalog default`) | Not implemented — only the catalog-default layer exists. `atlas.ts`'s module comment notes where the other three layers plug in |
+| Type versioning / migration on catalog update | The `version` field exists on every spec but nothing yet reads it to diff or migrate an in-flight project |
+| Any client UI (intake form rendering) | Not built — no editor exists yet (`13` §8.1) |
 
-The existing 10 map to OT-07/08 (thesis-dissertation, which should split),
-OT-10, OT-15, OT-18, OT-19, OT-13, OT-11, OT-21, OT-14, OT-16. Carrying the
-section definitions forward is worthwhile; the `check` function signature is not.
+The former `src/types/documentTypes.ts` (10 document types, a TypeScript
+const with a `QualityGate.check: (content: string) => boolean` signature) is
+unchanged and not yet retired; its section definitions were a reasonable
+starting reference for OT-07/08/10/18 above, but the new schema does not
+reuse its code, only ideas from its structure.
