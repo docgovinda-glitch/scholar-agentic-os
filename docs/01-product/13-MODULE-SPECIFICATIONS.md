@@ -373,8 +373,10 @@ exists; everything else remains the intended target.
 | `app/studio` | `src/app/studio/` | 21 |
 | API route | `server/routes/studio.ts` | 10 (integration, via supertest against the live app) |
 | `app/atlas` | `src/app/atlas/` | 36 |
+| `domain/compliance` | `src/domain/compliance/` | 13 |
+| `app/rubric` | `src/app/rubric/` | 13 |
 
-151 new tests. Full repository suite: 123 files, 1,288 tests, `tsc --noEmit`
+177 new tests. Full repository suite: 126 files, 1,314 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 
@@ -394,8 +396,8 @@ suite.
 | `platform/gateway` (OpenAI-compatible + Anthropic adapters) | **Built**, narrower provider coverage than the legacy path — see `41` §12.2 |
 | `domain/language` and `app/studio` | **Built** |
 | `app/atlas` | **Built** (engine complete; 6/24 output types populated) |
+| `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, two deterministic evaluators (`word_count`, `structural_presence`), and compilation from Atlas specs. Requirement-source extraction (needs `app/mesh`) and template extraction (needs `app/ingestion`) are not built — see `31` §12.2 |
 | `services/*` | Not started. This is the largest near-term gap: the Studio's session-policy store (`src/app/studio/sessionPolicyStore.ts`) is an explicitly-labelled in-memory stand-in for what `services/store` should provide, and does not survive a restart or scale past one process |
-| `app/rubric` and `domain/compliance` | Not started |
 | `app/conductor` | Not started |
 | `domain/claim` | Not started |
 | `app/plugins` | Not started |
