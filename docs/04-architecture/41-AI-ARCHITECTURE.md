@@ -408,7 +408,7 @@ exclusively.
 | Module | Path | Covers |
 |---|---|---|
 | Warden | `src/platform/warden/` | §5 in full: classification (`classify.ts`), policy (`policy.ts`), `evaluate()`/consent/restricted-scope/audit (`warden.ts`). 23 tests |
-| Gateway | `src/platform/gateway/` | §2–§3: `complete()` as the sole sanctioned entry point, OpenAI-compatible and Anthropic adapters built on the existing `providerCatalog.ts`. 9 tests |
+| Gateway | `src/platform/gateway/` | §2–§3: `complete()`/`stream()` as the sole sanctioned entry points, plus `completeWithFailover()`. OpenAI-compatible, Anthropic, Gemini, and Cohere adapters built on the existing `providerCatalog.ts`. 19 tests |
 | Architectural enforcement | `src/platform/__tests__/architecture.test.ts` | The "no bypass" rule: no `fetch()` to a provider outside `gateway/adapters.ts`, and no `src/app/*` file reaching a provider except through `platform/gateway` |
 | First consumer | `src/app/studio/`, `server/routes/studio.ts` | The Studio's model-backed levels (2–5) are the first real traffic through this path, end-to-end tested including a live server boot |
 
@@ -416,24 +416,27 @@ exclusively.
 
 `src/services/aiGateway.ts` (browser, posts to `/api/generate`) and
 `server/routes/ai.ts` (the pre-existing Express proxy with 30+ providers
-already wired, including Gemini/Cohere/local-runner support the new Gateway
-does not implement yet) **continue to run exactly as before**. They are not
-routed through the Warden. This is the documented next migration step
-(`13` §8.1), not a silent gap:
+already wired) **continue to run exactly as before**. They are not routed
+through the Warden. Migrating them is a phased, in-progress effort
+(`13` §8.1), not a silent gap. Phase 1 — closing the new Gateway's provider
+and capability gap so migrating the endpoints in later phases doesn't also
+mean losing functionality — is done:
 
-| Current (legacy path, unchanged) | Target (new path, built for new features) |
+| Current (legacy path, unchanged) | Target (new path) |
 |---|---|
-| 30+ providers via `providerCatalog.ts` | 2 providers (OpenAI-compatible, Anthropic) via `platform/gateway/adapters.ts` — the same catalog, a narrower adapter set so far |
+| 30+ providers via `providerCatalog.ts` | 4 provider calling conventions (OpenAI-compatible, Anthropic, Gemini, Cohere) via `platform/gateway/adapters.ts` — the same catalog. Any further OpenAI-compatible provider needs zero new adapter code, only a catalog entry; a genuinely new calling convention still needs one |
 | No egress control | The Warden, mandatory, architecturally enforced |
 | No task-level classification | Nine task classes, each with default Egress Class behaviour |
 | Client-side encrypted key vault (`apiVault.ts`) | Keys passed per-request to the server Gateway (BYOK, matching the existing model); a managed-KMS custody path per `44` §3.1 is not yet built |
-| Classified errors with failover (`providerFailover.ts`, `aiErrors.ts`) | Not yet reused by `platform/gateway` — it currently surfaces raw adapter errors. Reusing the existing, working classification is the next gateway improvement, not a rewrite |
-| — | Local model support (Ollama/LM Studio) is withdrawn in revision 2 (`01` §12.2); not applicable to either path |
+| Classified errors with failover (`providerFailover.ts`, `aiErrors.ts`) | Reused directly: `completeWithFailover()` calls `executeWithFailover()` and classifies adapter HTTP failures with `classifyHttpError()` — not a reimplementation. Each candidate provider still passes through the Warden individually, since per-provider consent (an `ask` decision) genuinely differs by provider while a hard `deny` does not — see `completeWithFailover()`'s doc comment in `gateway.ts` |
+| SSE streaming | `stream()` is Warden-gated identically to `complete()`. Native SSE parsing for OpenAI-compatible, Anthropic, and Gemini; Cohere has no verified streaming wire format available to this codebase, so its adapter deliberately omits `stream()` and `gateway.stream()` falls back to `complete()` plus a single synthetic chunk rather than ship a guessed parser |
+| — | Local model support (Ollama/LM Studio) is withdrawn in revision 2 (`01` §12.2); not applicable to either path, and not implemented by the new Gateway either |
 
 **Practical effect today:** existing AI features (drafting, chat, etc. built
-on the legacy path) are unaffected and keep working. New features — starting
-with the Studio — are built exclusively on the Warden-gated path. Migrating
-`ai.ts` onto `platform/gateway` retires the duplication; it has not been
-attempted yet because it is a larger, riskier change than building new
-functionality correctly from the start, and is better done as its own
-reviewed unit of work.
+on the legacy path) are unaffected and keep working — nothing in
+`server/routes/ai.ts` calls `platform/gateway` yet. New features — starting
+with the Studio — are built exclusively on the Warden-gated path. The
+remaining migration phases (endpoint-by-endpoint cutover behind a flag, then
+the general `/api/generate` proxy, then retiring `ai.ts`) are tracked
+separately and have not been attempted yet, since each touches live traffic
+and is deliberately scoped as its own reviewed unit of work.
