@@ -137,22 +137,44 @@ export interface CompleteWithFailoverOptions
 }
 
 /**
+ * Turns whatever a single-candidate call (complete()/stream()) threw into
+ * the failover orchestrator's vocabulary. Shared by completeWithFailover()
+ * and streamWithFailover() so the two never drift on this translation.
+ *
+ * A GatewayDenied is translated rather than thrown directly: never worth
+ * retrying the SAME provider (consent/policy does not change between two
+ * calls a second apart), but whether it's worth trying the NEXT provider
+ * depends on which kind of denial it was. A hard "deny" (e.g. restricted
+ * content) is provider-independent — every provider will refuse it
+ * identically — so failover would just burn attempts. An "ask" is
+ * per-provider consent, so a different provider that already has consent
+ * recorded genuinely might succeed where this one didn't.
+ */
+function toProviderCallError(providerId: string, err: unknown): ProviderCallError {
+  if (err instanceof GatewayDenied) {
+    return new ProviderCallError(providerId, {
+      kind: "bad_request",
+      label: err.requiresConsent ? "Consent required" : "Denied by policy",
+      message: err.message,
+      remedy: err.requiresConsent
+        ? "Record consent for this provider via warden.recordConsent(), then retry."
+        : null,
+      retryable: false,
+      failoverWorthwhile: err.requiresConsent,
+    });
+  }
+  if (err instanceof AdapterHttpError) {
+    return new ProviderCallError(providerId, classifyHttpError(err.status, err.detail));
+  }
+  return new ProviderCallError(providerId, classifyThrownError(err));
+}
+
+/**
  * Complete against the first candidate provider that succeeds, in order,
  * with retry/backoff/cooldown handled by services/providerFailover.ts. Each
- * candidate still goes through the full Warden gate individually — a "deny"
- * or "ask" for one provider does not skip evaluation for the next, since
- * policy (in particular per-provider consent, see warden/policy.ts's
- * `consentedProviders`) is genuinely provider-specific.
- *
- * A GatewayDenied is translated into the failover orchestrator's vocabulary
- * rather than thrown directly: never worth retrying the SAME provider
- * (consent/policy does not change between two calls a second apart), but
- * whether it's worth trying the NEXT provider depends on which kind of
- * denial it was. A hard "deny" (e.g. restricted content) is provider-
- * independent — every provider will refuse it identically — so failover
- * would just burn attempts. An "ask" is per-provider consent, so a
- * different provider that already has consent recorded genuinely might
- * succeed where this one didn't.
+ * candidate still goes through the full Warden gate individually — see
+ * toProviderCallError()'s doc comment for why a deny/ask is handled
+ * differently.
  */
 export async function completeWithFailover(
   req: Omit<CompletionRequest, "provider" | "apiKey" | "model">,
@@ -173,22 +195,54 @@ export async function completeWithFailover(
           policy
         );
       } catch (err) {
-        if (err instanceof GatewayDenied) {
-          throw new ProviderCallError(providerId, {
-            kind: "bad_request",
-            label: err.requiresConsent ? "Consent required" : "Denied by policy",
-            message: err.message,
-            remedy: err.requiresConsent
-              ? "Record consent for this provider via warden.recordConsent(), then retry."
-              : null,
-            retryable: false,
-            failoverWorthwhile: err.requiresConsent,
-          });
-        }
-        if (err instanceof AdapterHttpError) {
-          throw new ProviderCallError(providerId, classifyHttpError(err.status, err.detail));
-        }
-        throw new ProviderCallError(providerId, classifyThrownError(err));
+        throw toProviderCallError(providerId, err);
+      }
+    },
+    {
+      ...options,
+      candidates: options.candidates.map((c) => c.provider),
+    }
+  );
+}
+
+/**
+ * Stream against the first candidate provider that succeeds. Same
+ * failover/backoff/cooldown machinery as completeWithFailover(), but only
+ * ever retries or switches provider BEFORE any chunk has been delivered to
+ * `onChunk` — every adapter's stream() validates the HTTP response before
+ * it starts parsing SSE lines, so a failure that lands here always means
+ * nothing was written yet. A failure genuinely mid-stream (the connection
+ * drops after chunks were already delivered) is not retried transparently:
+ * doing so would either duplicate already-delivered text or require the
+ * continuation-prompt machinery in services/providerFailover.ts's
+ * buildContinuationRequest(), which is designed for a client visibly
+ * resuming a stream, not a server-side retry-from-scratch. That failure
+ * simply propagates as this call's failure, same as the legacy proxy this
+ * migrates (server/routes/ai.ts's /api/stream-generate never retried once
+ * response chunks had started flowing either).
+ */
+export async function streamWithFailover(
+  req: Omit<CompletionRequest, "provider" | "apiKey" | "model">,
+  onChunk: (delta: string) => void,
+  options: CompleteWithFailoverOptions,
+  policy: EgressPolicy = defaultPolicy()
+): Promise<FailoverResult<CompletionResult>> {
+  const byProvider = new Map(options.candidates.map((c) => [c.provider, c]));
+
+  return executeWithFailover(
+    async (providerId) => {
+      const candidate = byProvider.get(providerId);
+      if (!candidate) {
+        throw new Error(`streamWithFailover: no candidate configured for provider "${providerId}".`);
+      }
+      try {
+        return await stream(
+          { ...req, provider: providerId, apiKey: candidate.apiKey, model: candidate.model },
+          onChunk,
+          policy
+        );
+      } catch (err) {
+        throw toProviderCallError(providerId, err);
       }
     },
     {

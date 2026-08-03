@@ -462,12 +462,57 @@ something a caller can actually mark restricted is follow-up work, not
 claimed as done by this phase. See `server/routes/ai.ts`'s own comment above
 `generateViaGatewayOrLegacy()` for the same reasoning in code.
 
+**Phase 3 — the general proxy, behind its own flag — is also done.**
+`/api/generate` and `/api/stream-generate` are the general-purpose proxy
+`src/services/aiGateway.ts` calls, and through it the whole legacy
+agent/skill pipeline (`src/agents/`, `src/skills/`) — highest blast radius
+of the four phases, since unlike the 8 fixed-shape phase endpoints this
+proxy accepts an arbitrary provider, model, and prompt per call. Gated by
+its own flag, `AI_GATEWAY_GENERAL_PROXY`, independently toggleable from
+Phase 2's:
+
+| Condition | What happens |
+|---|---|
+| `AI_GATEWAY_GENERAL_PROXY` env var unset/not `"true"` (the default) | Legacy path, byte-for-byte unchanged |
+| Flag on, request supplies a custom `baseUrl` override | Legacy path unconditionally — `CompletionRequest` has no baseUrl-override field, so `platform/gateway` cannot target a caller-supplied endpoint. Used by "custom" local OpenAI-compatible servers; not carried over by this migration |
+| Flag on, provider is Gemini/`server`, or any catalog provider with `apiStyle` `openai-compatible`/`anthropic`/`cohere`, and a usable key is available | Routed through `platform/gateway.completeWithFailover()` (`/api/generate`) or `.streamWithFailover()` (`/api/stream-generate`), each with a single candidate for the requested provider, against a **pre-consented** policy for that provider (`getGeneralProxyPolicy()`, same mechanism as Phase 2, generalized per-provider and cached) |
+| Flag on, but no usable key resolves for the request (e.g. no client key and no `GEMINI_API_KEY` fallback) | Falls through to the legacy branches, which independently produce the identical "\<Provider\> API key is required" error/SSE frame this always gave |
+
+**New capability this phase needed and added to `platform/gateway`:**
+`streamWithFailover()` — `stream()` had no failover-with-retry counterpart
+(`completeWithFailover()` only wraps non-streaming `complete()`). It mirrors
+`completeWithFailover()`'s retry/backoff/cooldown/Warden-per-candidate
+behavior; see `gateway.ts`'s doc comment on why it does not attempt to
+retry or switch providers once chunks have already reached `onChunk` —
+the legacy streaming proxy this replaces had the same limitation (its own
+retry loop only wrapped stream *initiation*, never resumed a partially
+delivered response either).
+
+**A genuine, documented loss:** the legacy `/api/stream-generate`'s Gemini
+branch retries not just the same model, but a whole fallback *chain* of
+model names (`gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-1.5-flash` →
+`gemini-1.5-pro`) if one is unavailable. `completeWithFailover()`/
+`streamWithFailover()`'s `CandidateProvider[]` is keyed one-per-provider-id
+(a `Map`, so two candidates both named `"gemini"` collapse to the last one)
+— it cannot represent "same provider, ordered list of models" today. Under
+the flag, Gemini calls get same-model retry (429/503/504, via
+`services/aiErrors.ts`'s classification) but not the multi-model fallback
+chain. This is a real capability gap, not an oversight papered over —
+extending `CandidateProvider` to support an ordered model list per provider
+is follow-up work if this is needed in practice.
+
+**taskType reuse:** callers already send a free-form `taskType` string
+(`src/types.ts`'s `AIRequest.taskType`) purely for client-side usage
+logging (`aiService.ts`'s `logAIUsage`) — the legacy proxy never read it.
+`taskTypeToTaskClass()` maps the known values (`"drafting"`, `"qc"`,
+`"requirements"`, etc.) onto a Warden `TaskClass`, falling back to `"chat"`
+for anything unrecognized or absent — closer classification than a blanket
+`"chat"` default, at no cost to callers.
+
 **Practical effect today:** existing AI features (drafting, chat, etc. built
-on the legacy path) are unaffected and keep working — the flag defaults off,
-so nothing in production calls `platform/gateway` from `ai.ts` yet. New
-features — starting with the Studio — are built exclusively on the
-Warden-gated path. The remaining migration phases (migrating the general
-`/api/generate`/`/api/stream-generate` proxy that the legacy agent/skill
-pipeline depends on, then retiring `ai.ts`'s dead code) are tracked
-separately and have not been attempted yet, since each touches live traffic
-and is deliberately scoped as its own reviewed unit of work.
+on the legacy path) are unaffected and keep working — both flags default
+off, so nothing in production calls `platform/gateway` from `ai.ts` yet.
+New features — starting with the Studio — are built exclusively on the
+Warden-gated path. Phase 4 (retiring `ai.ts`'s dead code once Phases 1–3
+have proven stable in production) is tracked separately and has not been
+attempted yet.

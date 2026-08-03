@@ -4,7 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "../../src/citation_compliance/model/reference.ts";
 import { CitationStyleRegistry, CitationFormatterFactory } from "../../src/citation_compliance/formattingEngine.ts";
 import { getCloudProvider, chatUrl, buildAuthHeaders, type CloudProviderSpec } from "../../src/config/providerCatalog.ts";
-import { completeWithFailover as gatewayCompleteWithFailover } from "../../src/platform/gateway/gateway.ts";
+import { completeWithFailover as gatewayCompleteWithFailover, streamWithFailover as gatewayStreamWithFailover } from "../../src/platform/gateway/gateway.ts";
 import { defaultPolicy, recordConsent } from "../../src/platform/warden/warden.ts";
 import { isFailoverFailure } from "../../src/services/providerFailover.ts";
 import type { EgressPolicy, EgressSegment, TaskClass } from "../../src/platform/warden/types.ts";
@@ -391,6 +391,91 @@ const sendCachedJson = (res: any, cacheKey: string, payload: any) => {
   return res.json(payload);
 };
 
+// ==========================================
+// GENERAL PROXY GATEWAY MIGRATION (Phase 3)
+// ==========================================
+// docs/01-product/13-MODULE-SPECIFICATIONS.md §8.1,
+// docs/04-architecture/41-AI-ARCHITECTURE.md §12.2.
+//
+// /api/generate and /api/stream-generate are the general-purpose proxy the
+// legacy client-side aiGateway.ts, and through it the whole agent/skill
+// pipeline (src/agents/, src/skills/), depend on. Separate flag from Phase
+// 2's — this is meaningfully higher blast radius (arbitrary providers and
+// prompts, not 8 fixed shapes) and should be independently toggleable.
+const AI_GATEWAY_GENERAL_PROXY_FLAG = "AI_GATEWAY_GENERAL_PROXY";
+function gatewayEnabledForGeneralProxy(): boolean {
+  return process.env[AI_GATEWAY_GENERAL_PROXY_FLAG] === "true";
+}
+
+// Callers already send a free-form `taskType` string (src/types.ts's
+// AIRequest.taskType) purely for client-side usage logging
+// (aiService.ts's logAIUsage) — the legacy proxy has never read it. Reusing
+// it to pick a Warden TaskClass is strictly better than guessing "chat" for
+// everything: it costs nothing new from callers and the classification is
+// closer to reality (a "requirements" call becomes rule_extraction, not
+// user_content). Unrecognized or missing values fail toward "chat" — the
+// same content-bearing default classify.ts itself falls back to.
+const TASK_TYPE_TO_TASK_CLASS: Record<string, TaskClass> = {
+  drafting: "drafting",
+  grounding: "drafting",
+  methodology: "drafting",
+  blueprint: "drafting",
+  "submission-pack": "drafting",
+  qc: "refinement",
+  humanize: "refinement",
+  "title-improve": "refinement",
+  requirements: "rule_extraction",
+  "fields-suggest": "discovery",
+  "topic-suggest": "discovery",
+  "rq-check": "verification",
+  "vault-overview": "summarisation",
+  chat: "chat",
+};
+function taskTypeToTaskClass(taskType: unknown): TaskClass {
+  if (typeof taskType === "string" && TASK_TYPE_TO_TASK_CLASS[taskType]) {
+    return TASK_TYPE_TO_TASK_CLASS[taskType];
+  }
+  return "chat";
+}
+
+// One pre-consented policy per provider, built lazily and cached — mirrors
+// getPhaseEndpointPolicy() above, generalized across whichever provider a
+// given /api/generate or /api/stream-generate call actually names. Same
+// reasoning as Phase 2: this proxy has no client consent UI, and has always
+// succeeded before, so the default policy OUTCOME stays unchanged; the
+// audit log is what's newly real. See that function's comment for the full
+// reasoning, which applies unchanged here.
+const generalProxyPolicies = new Map<string, EgressPolicy>();
+function getGeneralProxyPolicy(provider: string): EgressPolicy {
+  let policy = generalProxyPolicies.get(provider);
+  if (!policy) {
+    policy = recordConsent(defaultPolicy(), provider);
+    generalProxyPolicies.set(provider, policy);
+  }
+  return policy;
+}
+
+/** "server" is a legacy alias for Gemini using this app's own configured key. */
+function normalizeGeneralProxyProvider(aiProvider: string): string {
+  return aiProvider === "server" ? "gemini" : aiProvider;
+}
+
+/**
+ * True when platform/gateway can actually serve this request: a known
+ * provider AND no custom baseUrl override. The gateway's adapters have no
+ * way to target a caller-supplied endpoint (CompletionRequest has no baseUrl
+ * field) — that capability, used by "custom" local OpenAI-compatible
+ * servers, is a genuine gap, not carried over by this migration. Requests
+ * that need it always use the legacy path, regardless of the flag.
+ */
+function generalProxyGatewayCanServe(aiProvider: string, baseUrl?: string): boolean {
+  if (baseUrl) return false;
+  const provider = normalizeGeneralProxyProvider(aiProvider);
+  if (provider === "gemini") return true;
+  const spec = getCloudProvider(provider);
+  return !!spec && (spec.apiStyle === "openai-compatible" || spec.apiStyle === "anthropic" || spec.apiStyle === "cohere");
+}
+
 function resolveCitationStyleId(desiredStyle: string | undefined): string {
   const normalized = (desiredStyle || "").toLowerCase();
   if (normalized.includes("apa")) return "apa-7";
@@ -468,6 +553,37 @@ export function registerAIRoutes(app: express.Express, aiAbuseLimit: any, citati
 
       const aiProvider = provider || "gemini";
       const activeApiKey = resolveApiKey(aiProvider, apiKey, username);
+
+      if (gatewayEnabledForGeneralProxy() && generalProxyGatewayCanServe(aiProvider, baseUrl)) {
+        const gatewayProvider = normalizeGeneralProxyProvider(aiProvider);
+        const gatewayApiKey = gatewayProvider === "gemini" ? selectGeminiKey(activeApiKey) : activeApiKey;
+
+        if (gatewayApiKey) {
+          const result = await gatewayStreamWithFailover(
+            {
+              taskClass: taskTypeToTaskClass(req.body.taskType),
+              systemPrompt: systemInstruction,
+              userPrompt: prompt,
+              temperature,
+              responseFormat: responseMimeType === "application/json" ? "json" : undefined,
+              segments: [{ label: "Prompt", text: prompt }],
+            },
+            (delta) => res.write(`data: ${JSON.stringify({ text: delta })}\n\n`),
+            { candidates: [{ provider: gatewayProvider, apiKey: gatewayApiKey, model: model || undefined }] },
+            getGeneralProxyPolicy(gatewayProvider)
+          );
+
+          if (isFailoverFailure(result)) {
+            res.write(
+              `data: ${JSON.stringify({ error: result.error.message, status: result.error.status ?? 500 })}\n\n`
+            );
+          }
+          return res.end();
+        }
+        // No usable key for this provider — fall through to the legacy
+        // branches below, which independently produce the same
+        // "<Provider> API Key is required." SSE error frame this always gave.
+      }
 
       if (aiProvider === "gemini" || aiProvider === "server") {
         const finalApiKey = selectGeminiKey(activeApiKey);
@@ -744,6 +860,34 @@ export function registerAIRoutes(app: express.Express, aiAbuseLimit: any, citati
 
       const aiProvider = provider || "gemini";
       const activeApiKey = resolveApiKey(aiProvider, apiKey, username);
+
+      if (gatewayEnabledForGeneralProxy() && generalProxyGatewayCanServe(aiProvider, baseUrl)) {
+        const gatewayProvider = normalizeGeneralProxyProvider(aiProvider);
+        const gatewayApiKey = gatewayProvider === "gemini" ? selectGeminiKey(activeApiKey) : activeApiKey;
+
+        if (gatewayApiKey) {
+          const result = await gatewayCompleteWithFailover(
+            {
+              taskClass: taskTypeToTaskClass(req.body.taskType),
+              systemPrompt: systemInstruction,
+              userPrompt: prompt,
+              temperature,
+              responseFormat: responseMimeType === "application/json" ? "json" : undefined,
+              segments: [{ label: "Prompt", text: prompt }],
+            },
+            { candidates: [{ provider: gatewayProvider, apiKey: gatewayApiKey, model: model || undefined }] },
+            getGeneralProxyPolicy(gatewayProvider)
+          );
+
+          if (isFailoverFailure(result)) {
+            return res.status(result.error.status ?? 500).json({ error: result.error.message });
+          }
+          return sendCachedJson(res, cacheKey, { text: result.value.text });
+        }
+        // No usable key for this provider — fall through to the legacy
+        // branches below, which independently produce the same
+        // "<Provider> API key is required." error this always gave.
+      }
 
       if (aiProvider === "gemini" || aiProvider === "server") {
         const finalApiKey = selectGeminiKey(activeApiKey);
