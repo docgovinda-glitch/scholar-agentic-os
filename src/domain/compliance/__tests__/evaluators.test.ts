@@ -60,6 +60,22 @@ function docWithWords(n: number): CanonicalDocument {
   return d;
 }
 
+function readabilityRule(overrides: Partial<Rule> = {}, params: { sectionKey?: string; maxGradeLevel: number } = { maxGradeLevel: 8 }): Rule {
+  return {
+    id: "r-readability",
+    source: { document: "test", locator: "x", quote: "x", extractedAt: "now", confidence: 1 },
+    type: "stylistic",
+    scope: params.sectionKey ? "section" : "document",
+    severity: "required",
+    evaluator: { kind: "readability", params },
+    message: "reading level check",
+    remedy: "simplify",
+    autoFixable: false,
+    userModified: false,
+    ...overrides,
+  };
+}
+
 function claimSupportRule(overrides: Partial<Rule> = {}): Rule {
   return {
     id: "r-claims",
@@ -238,6 +254,67 @@ describe("domain/compliance: claim_support evaluator", () => {
     const graph = addClaim(emptyGraph(), { id: "c1", text: "Unsupported." });
     const rule = claimSupportRule({ severity: "required", waived: { reason: "supervisor approved", at: "now" } });
     const finding = evaluateRule(rule, docWithWords(1), graph);
+    expect(finding.status).toBe("warn");
+  });
+});
+
+describe("domain/compliance: readability evaluator", () => {
+  it("passes simple, short-sentence text against a lenient threshold", () => {
+    const doc = emptyDocument("d1", "Test");
+    const withText = appendBlock(doc, "b1", "paragraph", "The cat sat on the mat. The dog ran. It was a good day.");
+    const finding = evaluateRule(readabilityRule({}, { maxGradeLevel: 12 }), withText);
+    expect(finding.status).toBe("pass");
+  });
+
+  it("fails dense, long-sentence text against a strict threshold", () => {
+    const doc = emptyDocument("d1", "Test");
+    const withText = appendBlock(
+      doc,
+      "b1",
+      "paragraph",
+      "The multidisciplinary epistemological ramifications of postmodern deconstructionist methodology necessitate an extraordinarily comprehensive reconceptualization of institutionalized pedagogical frameworks."
+    );
+    const finding = evaluateRule(readabilityRule({}, { maxGradeLevel: 8 }), withText);
+    expect(finding.status).toBe("fail");
+    expect(finding.remedy).toBeDefined();
+  });
+
+  it("scopes to one section by sectionKey, ignoring other blocks", () => {
+    let doc = emptyDocument("d1", "Test");
+    doc = appendBlock(doc, "intro", "paragraph", "Short and simple text here for the intro.");
+    doc = appendBlock(
+      doc,
+      "appendices",
+      "paragraph",
+      "The multidisciplinary epistemological ramifications of postmodern deconstructionist methodology necessitate comprehensive institutional reconceptualization."
+    );
+    const finding = evaluateRule(readabilityRule({}, { sectionKey: "appendices", maxGradeLevel: 8 }), doc);
+    expect(finding.status).toBe("fail");
+    expect(finding.location).toEqual({ sectionKey: "appendices" });
+  });
+
+  it("returns not_applicable for a missing scoped section rather than a false pass", () => {
+    const doc = emptyDocument("d1", "Test");
+    const finding = evaluateRule(readabilityRule({}, { sectionKey: "appendices", maxGradeLevel: 8 }), doc);
+    expect(finding.status).toBe("not_applicable");
+  });
+
+  it("returns not_applicable for an empty whole document", () => {
+    const doc = emptyDocument("d1", "Test");
+    const finding = evaluateRule(readabilityRule({}, { maxGradeLevel: 8 }), doc);
+    expect(finding.status).toBe("not_applicable");
+  });
+
+  it("downgrades to warn when waived and not blocking severity", () => {
+    const doc = emptyDocument("d1", "Test");
+    const withText = appendBlock(
+      doc,
+      "b1",
+      "paragraph",
+      "The multidisciplinary epistemological ramifications of postmodern deconstructionist methodology necessitate comprehensive institutional reconceptualization."
+    );
+    const rule = readabilityRule({ severity: "required", waived: { reason: "supervisor approved", at: "now" } }, { maxGradeLevel: 8 });
+    const finding = evaluateRule(rule, withText);
     expect(finding.status).toBe("warn");
   });
 });

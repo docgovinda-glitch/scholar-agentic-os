@@ -26,6 +26,10 @@
  * for unsupported claims rather than checking document content at all —
  * OT-08's contribution-claims gate, OT-20's every-claim-sourced gate, and
  * OT-22's claims-traceable gate all compile through this path.
+ *
+ * `compileReadabilityGateRules` compiles gates that set `readabilityGate`
+ * into `readability` rules, checking Flesch-Kincaid grade level —
+ * OT-17's participant-information-sheet gate is the first real example.
  */
 
 import type { OutputTypeSpec } from "../atlas/types";
@@ -150,6 +154,36 @@ export function compileClaimSupportGateRules(spec: OutputTypeSpec): Rule[] {
     }));
 }
 
+/**
+ * Compile one readability rule per quality gate that sets `readabilityGate`
+ * (`QualityGateSpec.readabilityGate`'s own doc comment).
+ */
+export function compileReadabilityGateRules(spec: OutputTypeSpec): Rule[] {
+  return spec.qualityGates
+    .filter((gate) => gate.readabilityGate !== undefined)
+    .map((gate) => ({
+      id: `${spec.id}-readability-${gate.id}`,
+      source: {
+        document: `Atlas catalog entry ${spec.id} v${spec.version}`,
+        locator: `qualityGates[id=${gate.id}]`,
+        quote: gate.description,
+        extractedAt: NOW(),
+        confidence: 1.0,
+      },
+      type: "stylistic" as const,
+      scope: gate.readabilityGate!.sectionKey ? ("section" as const) : ("document" as const),
+      severity: gate.severity,
+      evaluator: {
+        kind: "readability" as const,
+        params: { maxGradeLevel: gate.readabilityGate!.maxGradeLevel, sectionKey: gate.readabilityGate!.sectionKey },
+      },
+      message: gate.description,
+      remedy: "Shorten sentences and prefer shorter, more common words to lower the reading level.",
+      autoFixable: false,
+      userModified: false,
+    }));
+}
+
 /** Compile every deterministic rule this module knows how to derive from an Atlas spec. */
 export function compileRubricFromOutputType(spec: OutputTypeSpec): Rule[] {
   return [
@@ -157,5 +191,6 @@ export function compileRubricFromOutputType(spec: OutputTypeSpec): Rule[] {
     ...compileStructuralRules(spec),
     ...compileMetadataGateRules(spec),
     ...compileClaimSupportGateRules(spec),
+    ...compileReadabilityGateRules(spec),
   ];
 }

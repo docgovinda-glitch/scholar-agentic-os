@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compileClaimSupportGateRules, compileMetadataGateRules, compileRubricFromOutputType, compileStructuralRules, compileWordLimitRule } from "../fromAtlas";
+import { compileClaimSupportGateRules, compileMetadataGateRules, compileReadabilityGateRules, compileRubricFromOutputType, compileStructuralRules, compileWordLimitRule } from "../fromAtlas";
 import { buildReport } from "../rubric";
 import { catalog } from "../../atlas/atlas";
 import type { OutputTypeSpec } from "../../atlas/types";
@@ -199,5 +199,34 @@ describe("app/rubric: compileClaimSupportGateRules against real usesClaimGraph g
     const report = buildReport(rules, doc);
     const finding = report.findings.find((f) => f.ruleId === "OT-08-claims-contribution_claims_supported");
     expect(finding!.status).toBe("not_applicable");
+  });
+});
+
+describe("app/rubric: compileReadabilityGateRules against OT-17's real readabilityGate gate", () => {
+  it("compiles a readability rule for OT-17's information_sheet_readability gate", () => {
+    const rules = compileReadabilityGateRules(catalog.getOrThrow("OT-17"));
+    expect(rules).toHaveLength(1);
+    expect(rules[0].id).toBe("OT-17-readability-information_sheet_readability");
+    expect(rules[0].evaluator).toEqual({ kind: "readability", params: { maxGradeLevel: 8, sectionKey: "appendices" } });
+  });
+
+  it("carries the gate's own severity onto the compiled rule", () => {
+    const rule = compileReadabilityGateRules(catalog.getOrThrow("OT-17"))[0];
+    expect(rule.severity).toBe("required");
+  });
+
+  it("scopes to section when readabilityGate.sectionKey is set", () => {
+    const rule = compileReadabilityGateRules(catalog.getOrThrow("OT-17"))[0];
+    expect(rule.scope).toBe("section");
+  });
+
+  it("compiles no rules for a gate that doesn't set readabilityGate", () => {
+    const assignment = catalog.getOrThrow("OT-01"); // has no readabilityGate gates
+    expect(compileReadabilityGateRules(assignment)).toHaveLength(0);
+  });
+
+  it("is included in compileRubricFromOutputType's full compilation for OT-17", () => {
+    const rules = compileRubricFromOutputType(catalog.getOrThrow("OT-17"));
+    expect(rules.some((r) => r.id === "OT-17-readability-information_sheet_readability")).toBe(true);
   });
 });
