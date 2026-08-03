@@ -14,6 +14,7 @@
  */
 
 import type { CanonicalDocument } from "../../domain/document/model";
+import type { ClaimEvidenceGraph } from "../../domain/claim/types";
 import { evaluateRules } from "../../domain/compliance/evaluators";
 import type { Finding, Rule, RuleSeverity } from "../../domain/compliance/types";
 import type { OutputTypeSpec } from "../atlas/types";
@@ -77,15 +78,23 @@ function bySeverity(findings: Finding[], severity: RuleSeverity, statuses: Findi
 /**
  * Compile rules from an Atlas output type spec and evaluate them against a
  * document in one call — the common case for a first compliance pass at G1.
+ * `claimGraph` is optional and only consulted by `claim_support` rules
+ * (e.g. OT-08's contribution-claims gate, OT-20's every-claim-sourced
+ * gate); omitting it reports those as `not_applicable`, never a false pass.
  */
-export function evaluateAgainstOutputType(spec: OutputTypeSpec, doc: CanonicalDocument, extraRules: Rule[] = []): RubricReport {
+export function evaluateAgainstOutputType(
+  spec: OutputTypeSpec,
+  doc: CanonicalDocument,
+  extraRules: Rule[] = [],
+  claimGraph?: ClaimEvidenceGraph
+): RubricReport {
   const rules = [...compileRubricFromOutputType(spec), ...extraRules];
-  return buildReport(rules, doc);
+  return buildReport(rules, doc, claimGraph);
 }
 
 /** Evaluate an explicit rule set (e.g. after edits, waivers, or a venue re-target) and build the report. */
-export function buildReport(rules: Rule[], doc: CanonicalDocument): RubricReport {
-  const findings = evaluateRules(rules, doc);
+export function buildReport(rules: Rule[], doc: CanonicalDocument, claimGraph?: ClaimEvidenceGraph): RubricReport {
+  const findings = evaluateRules(rules, doc, claimGraph);
   const blockingFailures = bySeverity(findings, "blocking", ["fail"]);
   const requiredFailures = bySeverity(findings, "required", ["fail"]);
   const advisoryFindings = findings.filter((f) => f.severity === "advisory");

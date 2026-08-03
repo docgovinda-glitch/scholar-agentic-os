@@ -1007,24 +1007,30 @@ every one of the 8 structure variants `domain/project/types.ts` defines is
 exercised — the query API, validation rules (including what "never an empty
 required field" actually means — see §12.1), and the proposal engine's
 arithmetic across every entry's own blocking-with-no-default fields and
-budget calculations. A further 3 tests in
-`app/rubric/__tests__/fromAtlas.test.ts` exercise OT-06's `metadataKey` end
-to end: compiled, evaluated `fail` against a document with no
-`ethics_approval_status` metadata, evaluated `pass` once it's set.
+budget calculations.
 
-A handful of quality gates across the final 8 entries are recorded but not
-compiled into Rubric rules, stated honestly rather than silently skipped:
-OT-12's PRISMA screening-workflow gates (need a Source Approval Queue that
-doesn't exist yet), OT-17's agent-assessed readability gate (needs a model
-call), OT-23's layout-measurement gates (print font size, contrast — same
-gap as OT-11's page limit), and OT-20's two gates that are genuinely
-deterministic in principle but need capability this session didn't build:
-"recommendation in the first 200 words" needs a position-in-text rule type
-domain/compliance doesn't implement, and "every claim sourced" is exactly
-what the Claim–Evidence Graph verifies but wiring it into Rubric evaluation
-is its own design decision (evaluateRule/evaluateRules would need a second
-input alongside the CanonicalDocument) — noted in `catalogData.ts`'s own
-comment on OT-20 as real, tractable future work.
+Two `QualityGateSpec` flags reach into Rubric compilation, both proven
+against real catalog data now, not just synthetic specs: `metadataKey`
+(OT-06's ethics approval status — orthogonal metadata, not document
+content) and `usesClaimGraph` (OT-04's claims-traceable-to-source, OT-08's
+contribution-claims, OT-20's every-claim-sourced, and OT-22's
+claims-traceable gates — all "no unsupported claims" checks compiled into
+real `claim_support` rules against the project's Claim–Evidence Graph, `31`
+§12). A further 10 tests across `app/rubric/__tests__/fromAtlas.test.ts`
+exercise both end to end: OT-06's `metadataKey` (compiled, `fail` without
+the metadata, `pass` once set) and the four `usesClaimGraph` gates
+(compiled with the right id and severity, an empty graph passes
+vacuously — a project that hasn't used claims yet is never penalised — an
+unsupported claim fails, evidence flips it back to pass, and no graph at
+all is `not_applicable`, never a silent pass).
+
+A handful of quality gates across the final 8 entries are still recorded
+but not compiled, stated honestly rather than silently skipped: OT-12's
+PRISMA screening-workflow gates (need a Source Approval Queue that doesn't
+exist yet), OT-17's agent-assessed readability gate (needs a model call),
+OT-23's layout-measurement gates (print font size, contrast — same gap as
+OT-11's page limit), and OT-20's remaining recommendation-position-in-text
+gate, which needs a rule type domain/compliance doesn't implement.
 
 The catalog is also reachable over HTTP: `GET /api/atlas/output-types`
 (summaries, for a "choose an output type" list) and
@@ -1055,7 +1061,7 @@ value.
 | Layout-measurement quality gates (OT-11's page limit, OT-23's print font size and contrast) | Descriptive only, not compiled — needs a layout-measurement pass (`33` §5) to check rendered output against a template or physical print size, not a word count, which doesn't exist yet |
 | OT-12's PRISMA screening-workflow gates | Descriptive only — needs a Source Approval Queue mapped onto PRISMA screening stages, which needs a client to drive it (`13` §8.1) |
 | OT-17's agent-assessed readability gate | Descriptive only — needs a model call to judge reading level, which is `app/mesh` territory, not deterministic Rubric evaluation |
-| OT-20's two deterministic-in-principle gates | "Recommendation in the first 200 words" needs a position-in-text rule type `domain/compliance` doesn't implement; "every claim sourced" needs the Claim–Evidence Graph wired into Rubric evaluation, which needs `evaluateRule`/`evaluateRules` to accept a second input beyond the `CanonicalDocument` — a real design decision, not a mechanical follow-on |
+| OT-20's recommendation-position-in-text gate | "Recommendation in the first 200 words" needs a position-in-text rule type `domain/compliance` doesn't implement. (Its sibling gate, "every claim sourced," is resolved — see `31` §12: `usesClaimGraph` compiles it into a real `claim_support` rule.) |
 | Override precedence (`user template → institution profile → discipline variant → catalog default`) | Not implemented — only the catalog-default layer exists. `atlas.ts`'s module comment notes where the other three layers plug in |
 | Type versioning / migration on catalog update | The `version` field exists on every spec but nothing yet reads it to diff or migrate an in-flight project |
 | Any client UI (intake form rendering) | Not built — no editor exists yet (`13` §8.1). The data it would render from (`GET /api/atlas/output-types/:id`) and submit to (`PATCH /api/projects/:id/intake`) are both live |

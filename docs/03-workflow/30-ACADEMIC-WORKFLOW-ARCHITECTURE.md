@@ -503,7 +503,7 @@ Atlas and Rubric bindings, hash staleness, and a re-target scenario
 (`26` Journey 3, in miniature) exercising a full sign-off → invalidate →
 recompute cycle.
 
-**Also exposed over HTTP** (`server/routes/project.ts`, 43 supertest
+**Also exposed over HTTP** (`server/routes/project.ts`, 48 supertest
 integration tests): `GET /api/atlas/output-types[/:id]` for choosing and
 rendering an output type, `POST /api/projects` to bind a project to one,
 `PATCH /api/projects/:id/intake` to submit answers and recompute G0,
@@ -526,7 +526,12 @@ and `DELETE .../sources/:sourceId`. Claim entry through this surface is
 manual — there is still no extraction agent (AG-13, needs `app/mesh`) —
 but every query domain/claim offers (unsupported claims, conflicts, a
 source's cascading removal) is now something a caller can actually reach.
-A project's exit criteria for G0 are computed immediately at creation
+The three claim-graph endpoints also recompute G6 whenever the project
+already has a document, since four Atlas quality gates (`31` §12's
+`usesClaimGraph`) check the claim graph, not the document — adding an
+unsupported claim can turn a passing G6 into a failing one, and binding
+evidence can turn it back, both live through this API. A project's exit
+criteria for G0 are computed immediately at creation
 (not left at `domain/project/gates.ts`'s default empty list, which is
 vacuously "ready" with zero blocking criteria) so a caller can't sign off
 before intake was ever evaluated. Persistence is the same

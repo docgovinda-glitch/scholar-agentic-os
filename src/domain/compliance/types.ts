@@ -15,7 +15,7 @@ export type RuleType =
   | "content";
 
 export type RuleSeverity = "blocking" | "required" | "advisory";
-export type RuleScope = "document" | "section" | "element" | "metadata";
+export type RuleScope = "document" | "section" | "element" | "metadata" | "claims";
 
 export interface RuleSource {
   document: string;
@@ -26,7 +26,7 @@ export interface RuleSource {
 }
 
 /** The deterministic evaluator kinds implemented so far (docs 31 §5.1's "immediate/fast" tier). */
-export type EvaluatorKind = "word_count" | "structural_presence" | "metadata_presence";
+export type EvaluatorKind = "word_count" | "structural_presence" | "metadata_presence" | "claim_support";
 
 export interface WordCountParams {
   max?: number;
@@ -48,6 +48,16 @@ export interface MetadataPresenceParams {
   minLength?: number;
 }
 
+/**
+ * Checks a `domain/claim` `ClaimEvidenceGraph` (not the `CanonicalDocument`)
+ * for unsupported claims — AG-13's "no unsupported claims" guarantee,
+ * reachable as a Rubric rule for the first time via this evaluator kind.
+ */
+export interface ClaimSupportParams {
+  /** Reserved for future claim-subset scoping (e.g. only claims within a given section). V1 checks the whole graph, unscoped. */
+  scope?: "all";
+}
+
 export interface Rule {
   id: string;
   source: RuleSource;
@@ -57,7 +67,8 @@ export interface Rule {
   evaluator:
     | { kind: "word_count"; params: WordCountParams }
     | { kind: "structural_presence"; params: StructuralPresenceParams }
-    | { kind: "metadata_presence"; params: MetadataPresenceParams };
+    | { kind: "metadata_presence"; params: MetadataPresenceParams }
+    | { kind: "claim_support"; params: ClaimSupportParams };
   message: string;
   remedy: string;
   autoFixable: boolean;
