@@ -269,6 +269,51 @@ describe("PUT /api/projects/:id/document", () => {
   });
 });
 
+describe("G3 (Structure gate), recomputed from both intake and document endpoints", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("right after project creation, G3 has one outstanding blocking criterion per required section (no document yet)", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const g3 = created.body.gates.find((g: { gate: string }) => g.gate === "G3");
+    // OT-01 has 5 required sections; no deferred-field criterion yet since
+    // no intake answers have been submitted.
+    expect(g3.outstandingBlocking.length).toBe(5);
+  });
+
+  it("submitting a document with every required section clears the section-presence criteria", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const res = await request(app)
+      .put(`/api/projects/${created.body.projectId}/document`)
+      .send({ document: compliantOT01Document() });
+    const g3 = res.body.gates.find((g: { gate: string }) => g.gate === "G3");
+    expect(g3.outstandingBlocking.length).toBe(0);
+  });
+
+  it("a deferred (provisional) intake field is an outstanding G3 criterion, resolved once answered for real", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+
+    await request(app)
+      .put(`/api/projects/${projectId}/document`)
+      .send({ document: compliantOT01Document() });
+
+    const provisional = await request(app)
+      .patch(`/api/projects/${projectId}/intake`)
+      .send({ answers: { assignment_brief: "provisional", word_limit: "1500" } });
+    let g3 = provisional.body.gates.find((g: { gate: string }) => g.gate === "G3");
+    expect(g3.outstandingBlocking.length).toBe(1); // sections are all present now; only the deferred field remains
+
+    const resolved = await request(app)
+      .patch(`/api/projects/${projectId}/intake`)
+      .send({ answers: { assignment_brief: "Write 1500 words on X." } });
+    g3 = resolved.body.gates.find((g: { gate: string }) => g.gate === "G3");
+    expect(g3.outstandingBlocking.length).toBe(0);
+  });
+});
+
 function overLengthOT01Document() {
   const doc = compliantOT01Document();
   doc.blocks = doc.blocks.map((b) => (b.id === "body" ? { ...b, text: words(4000) } : b));

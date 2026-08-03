@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeG0ExitCriteria,
+  computeG3ExitCriteria,
   computeG6ExitCriteria,
   intakeCompleteness,
   isSignoffStale,
@@ -65,6 +66,73 @@ describe("app/conductor: G0 bound to Atlas", () => {
     const total = assignment.intakeSchema.required.length + assignment.intakeSchema.recommended.length + assignment.intakeSchema.optional.length;
     const completeness = intakeCompleteness(assignment, { word_limit: "1500" });
     expect(completeness).toBeCloseTo(1 / total, 5);
+  });
+});
+
+describe("app/conductor: G3 bound to Atlas + the document", () => {
+  it("computes one blocking criterion per required section, unsatisfied against an empty document", () => {
+    const thesis = catalog.getOrThrow("OT-07");
+    const doc = emptyDocument("d1", "Thesis");
+    const criteria = computeG3ExitCriteria(thesis, doc, {});
+    const sectionCriteria = criteria.filter((c) => c.id.startsWith("section-"));
+    const requiredSectionCount = thesis.structure.sections.filter((s) => s.required).length;
+    expect(sectionCriteria).toHaveLength(requiredSectionCount);
+    expect(sectionCriteria.every((c) => c.blocking && !c.satisfied)).toBe(true);
+  });
+
+  it("a section is satisfied once a block with its key exists, regardless of content", () => {
+    const thesis = catalog.getOrThrow("OT-07");
+    let doc = emptyDocument("d1", "Thesis");
+    doc = appendBlock(doc, "introduction", "heading1", ""); // empty stub — existence is enough for G3
+    const criteria = computeG3ExitCriteria(thesis, doc, {});
+    const introCriterion = criteria.find((c) => c.id === "section-introduction")!;
+    expect(introCriterion.satisfied).toBe(true);
+  });
+
+  it("only generates a deferred-field criterion for fields that allow a provisional answer", () => {
+    const thesis = catalog.getOrThrow("OT-07"); // research_question allows provisional, methodology_type does not
+    const doc = emptyDocument("d1", "Thesis");
+    const criteria = computeG3ExitCriteria(thesis, doc, {});
+    const deferredCriteria = criteria.filter((c) => c.id.startsWith("deferred-"));
+    expect(deferredCriteria).toHaveLength(1);
+    expect(deferredCriteria[0].id).toBe("deferred-research_question");
+  });
+
+  it("a deferred field is unsatisfied while still literally 'provisional', satisfied once resolved", () => {
+    const thesis = catalog.getOrThrow("OT-07");
+    const doc = emptyDocument("d1", "Thesis");
+
+    const stillDeferred = computeG3ExitCriteria(thesis, doc, { research_question: "provisional" });
+    expect(stillDeferred.find((c) => c.id === "deferred-research_question")!.satisfied).toBe(false);
+
+    const resolved = computeG3ExitCriteria(thesis, doc, { research_question: "How did municipal water policy change?" });
+    expect(resolved.find((c) => c.id === "deferred-research_question")!.satisfied).toBe(true);
+  });
+
+  it("end-to-end: G3 becomes ready once its entry prerequisites (G0, G2) are signed off, every required section exists, and no field is still deferred", async () => {
+    const thesis = catalog.getOrThrow("OT-07");
+    let project = initialProjectGateState("p1");
+    const answers = { research_question: "provisional", methodology_type: "theoretical" };
+
+    let doc = emptyDocument("d1", "Thesis");
+    let criteria = computeG3ExitCriteria(thesis, doc, answers);
+    project = updateExitCriteria(project, "G3", criteria);
+    expect(project.gates.G3.status).not.toBe("ready"); // entry prerequisites unmet yet
+
+    // Sign off G0 (its own real exit criteria) and G2 (no compute function
+    // exists yet — see this module's comment — so an empty, vacuously-
+    // satisfied criteria list is what makes it reachable for this test).
+    project = updateExitCriteria(project, "G0", computeG0ExitCriteria(thesis, answers));
+    project = await signOff(project, "G0", "amara", { answers });
+    project = updateExitCriteria(project, "G2", []);
+    project = await signOff(project, "G2", "amara", {});
+
+    for (const section of thesis.structure.sections.filter((s) => s.required)) {
+      doc = appendBlock(doc, section.key, "paragraph", "x");
+    }
+    criteria = computeG3ExitCriteria(thesis, doc, { research_question: "A real question.", methodology_type: "theoretical" });
+    project = updateExitCriteria(project, "G3", criteria);
+    expect(project.gates.G3.status).toBe("ready");
   });
 });
 
