@@ -26,11 +26,11 @@ describe("app/atlas: catalog data validity", () => {
     for (const id of ids) expect(id).toMatch(/^OT-\d{2}$/);
   });
 
-  it("has 14 entries, including the additions beyond the original per-family representative", () => {
+  it("has 16 entries, including the additions beyond the original per-family representative", () => {
     const ids = OUTPUT_TYPES.map((s) => s.id).sort();
     expect(ids).toEqual([
       "OT-01", "OT-02", "OT-03", "OT-04", "OT-06", "OT-07", "OT-08", "OT-09",
-      "OT-10", "OT-11", "OT-13", "OT-16", "OT-18", "OT-22",
+      "OT-10", "OT-11", "OT-13", "OT-15", "OT-16", "OT-18", "OT-19", "OT-22",
     ]);
   });
 
