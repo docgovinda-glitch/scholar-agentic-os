@@ -2231,10 +2231,19 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
       ],
     },
     qualityGates: [
-      { id: "reading_level_appropriate", description: "Written at a reading level appropriate to the target audience", severity: "required" },
-      { id: "recommendation_in_first_200_words", description: "The recommendation is stated within the first 200 words", severity: "blocking" },
+      // maxGradeLevel: 10 — a policy brief's audience spans legislators,
+      // civil servants, and the public (intake's target_audience is free
+      // text, not a fixed enum the catalog can branch on), so this targets
+      // the "informed non-specialist decision-maker" the_problem/evidence
+      // sections' own guidance already names, one notch more lenient than
+      // OT-17's lay-consent-form grade-8 target.
+      { id: "reading_level_appropriate", description: "Written at a reading level appropriate to the target audience", severity: "required", readabilityGate: { maxGradeLevel: 10 } },
+      { id: "recommendation_in_first_200_words", description: "The recommendation is stated within the first 200 words", severity: "blocking", positionInTextGate: { keywords: ["recommend", "recommendation", "we propose", "our proposal"], withinWords: 200 } },
       { id: "every_claim_sourced", description: "Every factual claim is sourced", severity: "blocking", usesClaimGraph: true },
-      { id: "jargon_density_below_threshold", description: "Academic jargon density is below the threshold for this audience", severity: "required" },
+      // maxJargonDensity: 0.15 — policy audiences are non-specialists;
+      // academic prose commonly runs 20-25% complex (3+ syllable) words,
+      // this targets meaningfully below that.
+      { id: "jargon_density_below_threshold", description: "Academic jargon density is below the threshold for this audience", severity: "required", readabilityGate: { maxJargonDensity: 0.15 } },
     ],
     workflowVariant: "applied",
     complianceProfile: "professional",

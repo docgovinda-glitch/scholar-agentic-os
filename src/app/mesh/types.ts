@@ -13,7 +13,15 @@
 import type { Capability } from "../../services/capabilities/types";
 
 export type ExecutionMode = "ai" | "deterministic" | "web" | "hybrid";
-export type MemoryTier = "ephemeral" | "project" | "workspace";
+/**
+ * docs 42 §6 defines three tiers (ephemeral/project/workspace). `"none"` is
+ * a fourth value that only §3's AG-25 entry uses ("Memory: none — stateless
+ * by design") — distinct from `"ephemeral"`, which still implies per-run
+ * working state that gets discarded; `"none"` means the agent never holds
+ * any state at all, not even during a single run (a pure function of its
+ * input, same as platform/warden's evaluate() itself).
+ */
+export type MemoryTier = "ephemeral" | "project" | "workspace" | "none";
 export type AgentChannel = "dev" | "beta" | "stable";
 
 export interface QaCheckpoint<TOutput> {

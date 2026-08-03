@@ -28,8 +28,13 @@
  * OT-22's claims-traceable gate all compile through this path.
  *
  * `compileReadabilityGateRules` compiles gates that set `readabilityGate`
- * into `readability` rules, checking Flesch-Kincaid grade level —
- * OT-17's participant-information-sheet gate is the first real example.
+ * into `readability` rules, checking Flesch-Kincaid grade level and/or
+ * jargon density — OT-17's participant-information-sheet gate and OT-20's
+ * two readability gates are the first real examples.
+ *
+ * `compilePositionInTextGateRules` compiles gates that set
+ * `positionInTextGate` into `position_in_text` rules — OT-20's
+ * recommendation-in-first-200-words gate is the first real example.
  */
 
 import type { OutputTypeSpec } from "../atlas/types";
@@ -175,10 +180,49 @@ export function compileReadabilityGateRules(spec: OutputTypeSpec): Rule[] {
       severity: gate.severity,
       evaluator: {
         kind: "readability" as const,
-        params: { maxGradeLevel: gate.readabilityGate!.maxGradeLevel, sectionKey: gate.readabilityGate!.sectionKey },
+        params: {
+          maxGradeLevel: gate.readabilityGate!.maxGradeLevel,
+          maxJargonDensity: gate.readabilityGate!.maxJargonDensity,
+          sectionKey: gate.readabilityGate!.sectionKey,
+        },
       },
       message: gate.description,
       remedy: "Shorten sentences and prefer shorter, more common words to lower the reading level.",
+      autoFixable: false,
+      userModified: false,
+    }));
+}
+
+/**
+ * Compile one position-in-text rule per quality gate that sets
+ * `positionInTextGate` (`QualityGateSpec.positionInTextGate`'s own doc
+ * comment).
+ */
+export function compilePositionInTextGateRules(spec: OutputTypeSpec): Rule[] {
+  return spec.qualityGates
+    .filter((gate) => gate.positionInTextGate !== undefined)
+    .map((gate) => ({
+      id: `${spec.id}-position-${gate.id}`,
+      source: {
+        document: `Atlas catalog entry ${spec.id} v${spec.version}`,
+        locator: `qualityGates[id=${gate.id}]`,
+        quote: gate.description,
+        extractedAt: NOW(),
+        confidence: 1.0,
+      },
+      type: "structural" as const,
+      scope: gate.positionInTextGate!.sectionKey ? ("section" as const) : ("document" as const),
+      severity: gate.severity,
+      evaluator: {
+        kind: "position_in_text" as const,
+        params: {
+          keywords: gate.positionInTextGate!.keywords,
+          withinWords: gate.positionInTextGate!.withinWords,
+          sectionKey: gate.positionInTextGate!.sectionKey,
+        },
+      },
+      message: gate.description,
+      remedy: `Move the key point earlier — it should appear within the first ${gate.positionInTextGate!.withinWords} words.`,
       autoFixable: false,
       userModified: false,
     }));
@@ -192,5 +236,6 @@ export function compileRubricFromOutputType(spec: OutputTypeSpec): Rule[] {
     ...compileMetadataGateRules(spec),
     ...compileClaimSupportGateRules(spec),
     ...compileReadabilityGateRules(spec),
+    ...compilePositionInTextGateRules(spec),
   ];
 }

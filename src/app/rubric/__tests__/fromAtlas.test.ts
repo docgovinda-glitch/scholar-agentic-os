@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compileClaimSupportGateRules, compileMetadataGateRules, compileReadabilityGateRules, compileRubricFromOutputType, compileStructuralRules, compileWordLimitRule } from "../fromAtlas";
+import { compileClaimSupportGateRules, compileMetadataGateRules, compilePositionInTextGateRules, compileReadabilityGateRules, compileRubricFromOutputType, compileStructuralRules, compileWordLimitRule } from "../fromAtlas";
 import { buildReport } from "../rubric";
 import { catalog } from "../../atlas/atlas";
 import type { OutputTypeSpec } from "../../atlas/types";
@@ -228,5 +228,42 @@ describe("app/rubric: compileReadabilityGateRules against OT-17's real readabili
   it("is included in compileRubricFromOutputType's full compilation for OT-17", () => {
     const rules = compileRubricFromOutputType(catalog.getOrThrow("OT-17"));
     expect(rules.some((r) => r.id === "OT-17-readability-information_sheet_readability")).toBe(true);
+  });
+
+  it("compiles both of OT-20's readability gates — grade level unscoped, jargon density unscoped", () => {
+    const rules = compileReadabilityGateRules(catalog.getOrThrow("OT-20"));
+    expect(rules).toHaveLength(2);
+
+    const gradeLevel = rules.find((r) => r.id === "OT-20-readability-reading_level_appropriate")!;
+    expect(gradeLevel.evaluator).toEqual({ kind: "readability", params: { maxGradeLevel: 10, sectionKey: undefined } });
+    expect(gradeLevel.scope).toBe("document");
+
+    const jargon = rules.find((r) => r.id === "OT-20-readability-jargon_density_below_threshold")!;
+    expect(jargon.evaluator).toEqual({ kind: "readability", params: { maxJargonDensity: 0.15, sectionKey: undefined } });
+  });
+});
+
+describe("app/rubric: compilePositionInTextGateRules against OT-20's real positionInTextGate gate", () => {
+  it("compiles a position_in_text rule for OT-20's recommendation_in_first_200_words gate", () => {
+    const rules = compilePositionInTextGateRules(catalog.getOrThrow("OT-20"));
+    expect(rules).toHaveLength(1);
+    expect(rules[0].id).toBe("OT-20-position-recommendation_in_first_200_words");
+    expect(rules[0].evaluator.kind).toBe("position_in_text");
+  });
+
+  it("carries the gate's own severity onto the compiled rule", () => {
+    const rule = compilePositionInTextGateRules(catalog.getOrThrow("OT-20"))[0];
+    expect(rule.severity).toBe("blocking");
+  });
+
+  it("compiles no rules for a gate that doesn't set positionInTextGate", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    expect(compilePositionInTextGateRules(assignment)).toHaveLength(0);
+  });
+
+  it("is included in compileRubricFromOutputType's full compilation for OT-20", () => {
+    const rules = compileRubricFromOutputType(catalog.getOrThrow("OT-20"));
+    expect(rules.some((r) => r.id === "OT-20-position-recommendation_in_first_200_words")).toBe(true);
+    expect(rules.filter((r) => r.evaluator.kind === "readability")).toHaveLength(2);
   });
 });
