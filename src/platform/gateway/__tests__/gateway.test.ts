@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { complete, stream, completeWithFailover, GatewayDenied } from "../gateway";
+import { complete, stream, completeWithFailover, streamWithFailover, GatewayDenied } from "../gateway";
 import { defaultPolicy, recordConsent, markRestricted } from "../../warden/warden";
 import { __resetAuditLogForTests, getAuditLog } from "../../warden/warden";
 import { isFailoverSuccess, isFailoverFailure, clearAllCooldowns } from "../../../services/providerFailover";
@@ -291,6 +291,89 @@ describe("platform/gateway: completeWithFailover()", () => {
     expect(isFailoverFailure(result)).toBe(true);
     if (isFailoverFailure(result)) {
       expect(result.attempts.map((a) => a.providerId)).toEqual(["openai", "claude"]);
+    }
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("platform/gateway: streamWithFailover()", () => {
+  beforeEach(() => {
+    __resetAuditLogForTests();
+    clearAllCooldowns();
+  });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("delivers deltas via onChunk from the first candidate that succeeds", async () => {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: "Hi" } }] })}\n\n`));
+        controller.close();
+      },
+    });
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, body });
+
+    const chunks: string[] = [];
+    const result = await streamWithFailover(
+      { taskClass: "rule_extraction", userPrompt: "hi", segments: [{ label: "public guideline", text: "x" }] },
+      (delta) => chunks.push(delta),
+      { candidates: [{ provider: "openai", apiKey: "k" }] }
+    );
+
+    expect(isFailoverSuccess(result)).toBe(true);
+    expect(chunks).toEqual(["Hi"]);
+  });
+
+  it("falls to the second candidate before any chunk is delivered, on a retryable/failover-worthy error", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 500, text: async () => "server error" })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ text: "from cohere" }),
+      });
+
+    const chunks: string[] = [];
+    const result = await streamWithFailover(
+      { taskClass: "rule_extraction", userPrompt: "hi", segments: [{ label: "public guideline", text: "x" }] },
+      (delta) => chunks.push(delta),
+      {
+        candidates: [
+          { provider: "openai", apiKey: "k1" },
+          { provider: "cohere", apiKey: "k2" },
+        ],
+        maxRetriesPerProvider: 0,
+      }
+    );
+
+    expect(isFailoverSuccess(result)).toBe(true);
+    if (isFailoverSuccess(result)) {
+      expect(result.providerId).toBe("cohere");
+      // Cohere has no stream() (see adapters.ts) — gateway.stream() falls back
+      // to complete() plus a single synthetic onChunk call.
+      expect(chunks).toEqual(["from cohere"]);
+    }
+  });
+
+  it("does not try a second candidate when the Warden hard-denies", async () => {
+    global.fetch = vi.fn();
+
+    const result = await streamWithFailover(
+      { taskClass: "drafting", userPrompt: "x", segments: [{ label: "restricted participant data", text: "..." }] },
+      () => {},
+      {
+        candidates: [
+          { provider: "openai", apiKey: "k1" },
+          { provider: "claude", apiKey: "k2" },
+        ],
+      }
+    );
+
+    expect(isFailoverFailure(result)).toBe(true);
+    if (isFailoverFailure(result)) {
+      expect(result.attempts).toHaveLength(1);
     }
     expect(global.fetch).not.toHaveBeenCalled();
   });

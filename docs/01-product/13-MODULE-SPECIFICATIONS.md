@@ -366,7 +366,7 @@ exists; everything else remains the intended target.
 | Module | Path | Tests |
 |---|---|---|
 | `platform/warden` | `src/platform/warden/` | 23 |
-| `platform/gateway` | `src/platform/gateway/` | 19 |
+| `platform/gateway` | `src/platform/gateway/` | 24 |
 | Architectural enforcement | `src/platform/__tests__/architecture.test.ts` | 4 |
 | `domain/document` (CDM, incl. the metadata bag) | `src/domain/document/` | 18 |
 | `domain/language` | `src/domain/language/` | 35 |
@@ -381,8 +381,8 @@ exists; everything else remains the intended target.
 | `domain/claim` (Claim–Evidence Graph) | `src/domain/claim/` | 19 |
 | Chicago Notes-Bibliography formatter | `src/citation_compliance/formatters/chicagoNotes.ts` | 18 |
 
-363 new tests. Full repository suite (as of the latest sync): 146 files,
-1,645 tests, `tsc --noEmit` clean, verified against a live `npx tsx
+363 new tests. Full repository suite (as of the latest sync): 148 files,
+1,661 tests, `tsc --noEmit` clean, verified against a live `npx tsx
 server.ts` boot as well as the test suite.
 
 ### 8.2 Retired
@@ -398,7 +398,7 @@ server.ts` boot as well as the test suite.
 | Module | Status |
 |---|---|
 | `platform/warden` | **Built** |
-| `platform/gateway` (OpenAI-compatible, Anthropic, Gemini, Cohere adapters; `stream()`; `completeWithFailover()`) | **Built**. Streaming is native (SSE) for all four adapters except Cohere, whose `complete()`-only fallback is a documented, deliberate gap (see `adapters.ts`'s module comment) rather than a guessed wire format; `completeWithFailover()` reuses `services/providerFailover.ts`'s retry/backoff/cooldown orchestrator and `services/aiErrors.ts`'s HTTP-status classification, gating each candidate provider through the Warden individually since per-provider consent (`ask`) genuinely differs by provider while a hard `deny` does not. `server/routes/ai.ts`'s 8 phase endpoints now call it behind the `AI_GATEWAY_PHASE_ENDPOINTS` flag (default off) — see `41` §12.2 for what's actually live under that flag |
+| `platform/gateway` (OpenAI-compatible, Anthropic, Gemini, Cohere adapters; `stream()`; `completeWithFailover()`; `streamWithFailover()`) | **Built**. Streaming is native (SSE) for all four adapters except Cohere, whose `complete()`-only fallback is a documented, deliberate gap (see `adapters.ts`'s module comment) rather than a guessed wire format; `completeWithFailover()`/`streamWithFailover()` reuse `services/providerFailover.ts`'s retry/backoff/cooldown orchestrator and `services/aiErrors.ts`'s HTTP-status classification, gating each candidate provider through the Warden individually since per-provider consent (`ask`) genuinely differs by provider while a hard `deny` does not. `server/routes/ai.ts`'s 8 phase endpoints call it behind `AI_GATEWAY_PHASE_ENDPOINTS`, and `/api/generate`/`/api/stream-generate` (the general proxy the legacy agent/skill pipeline depends on) call it behind the separate `AI_GATEWAY_GENERAL_PROXY` — both default off — see `41` §12.2 for what's actually live under each flag, including the documented gaps (no baseUrl-override capability, no multi-model fallback chain for Gemini streaming) |
 | `domain/language` and `app/studio` | **Built** |
 | `app/atlas` | **Built** (engine complete; 24/24 output types populated) |
 | `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, six deterministic evaluators (`word_count`, `structural_presence`, `metadata_presence`, `claim_support` — checks a `domain/claim` `ClaimEvidenceGraph` for unsupported claims, via `evaluateRule`/`evaluateRules`' optional third argument — `readability`, which checks Flesch-Kincaid grade level and/or jargon density via `domain/language/readability.ts`, the same pure logic `app/mesh`'s AG-18 wraps, called directly rather than through the agent runtime since there's no untrusted caller here — and `position_in_text`, a heuristic keyword-within-a-word-window check), and compilation from Atlas specs for all six (`compileMetadataGateRules` for `metadataKey`, `compileClaimSupportGateRules` for `usesClaimGraph`, `compileReadabilityGateRules` for `readabilityGate`, `compilePositionInTextGateRules` for `positionInTextGate`), proven against real catalog entries (OT-06; OT-04/OT-08/OT-20/OT-22; OT-17's and OT-20's readability gates; OT-20's recommendation-position gate). Requirement-source extraction (needs `app/mesh`'s remaining 22 agents) and template extraction (needs `app/ingestion`) are still not built — see `31` §12.2 |
