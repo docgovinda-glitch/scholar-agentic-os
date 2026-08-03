@@ -24,6 +24,8 @@ export interface CompletionRequest {
   userPrompt: string;
   temperature?: number;
   maxTokens?: number;
+  /** Forces JSON-mode output where the provider supports it (Gemini, OpenAI-compatible). */
+  responseFormat?: "json";
   /**
    * Egress classification inputs — what the Warden sees before this call is
    * allowed to leave. Callers MUST break their payload into labelled

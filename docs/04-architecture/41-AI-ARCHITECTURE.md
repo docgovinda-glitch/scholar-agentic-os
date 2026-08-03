@@ -432,11 +432,42 @@ mean losing functionality — is done:
 | SSE streaming | `stream()` is Warden-gated identically to `complete()`. Native SSE parsing for OpenAI-compatible, Anthropic, and Gemini; Cohere has no verified streaming wire format available to this codebase, so its adapter deliberately omits `stream()` and `gateway.stream()` falls back to `complete()` plus a single synthetic chunk rather than ship a guessed parser |
 | — | Local model support (Ollama/LM Studio) is withdrawn in revision 2 (`01` §12.2); not applicable to either path, and not implemented by the new Gateway either |
 
+**Phase 2 — the 8 phase endpoints, behind a flag — is also done.**
+`server/routes/ai.ts`'s `generateWithSettings()` (the function all 8
+`/api/generate/<phase>` endpoints call — dissertation-grounding,
+data-discovery, journal-discovery, extract-requirements, draft-section,
+quality-control, submission-pack, citation-engine) is wrapped by a new
+`generateViaGatewayOrLegacy()`. Behavior:
+
+| Condition | What happens |
+|---|---|
+| `AI_GATEWAY_PHASE_ENDPOINTS` env var unset/not `"true"` (the default) | Legacy path, byte-for-byte unchanged. This is what production runs today |
+| Flag on, request targets a non-Gemini provider (`ollama`, `custom`) | Legacy path unconditionally — `platform/gateway` has no adapter for either, and Phase 2 does not add one (see the Phase 1 table above) |
+| Flag on, request targets Gemini | Routed through `platform/gateway.completeWithFailover()` with a single Gemini candidate (preserves `generateContentWithRetry()`'s existing 429/503/504 retry behavior) and a **pre-consented** policy — `recordConsent(defaultPolicy(), "gemini")` |
+
+**Why pre-consented, not a live consent prompt:** these endpoints have never
+asked a user for AI-provider consent — there is no client UI for it — and
+have always succeeded against Gemini. Surfacing a Warden `ask` here for the
+first time, with nothing able to answer it, would look like the feature
+broke. Pre-consenting Gemini keeps the outcome identical to today (still
+succeeds) while adding the one piece of value that doesn't require new UI:
+**every phase-endpoint call now writes a real Warden egress-audit entry**
+(`warden.getAuditLog()`) — visibility that did not exist before. Restricted-
+content denial is NOT exercised by these 8 endpoints yet: `classifySegment()`
+only inspects a segment's label, none of the labels used here are
+`"restricted"`, and no `scopeId` is threaded through from a project, so
+scope-based restriction (`markRestricted()`) is inert too. Both mechanisms
+are real and enforced elsewhere (the Studio); wiring these endpoints to
+something a caller can actually mark restricted is follow-up work, not
+claimed as done by this phase. See `server/routes/ai.ts`'s own comment above
+`generateViaGatewayOrLegacy()` for the same reasoning in code.
+
 **Practical effect today:** existing AI features (drafting, chat, etc. built
-on the legacy path) are unaffected and keep working — nothing in
-`server/routes/ai.ts` calls `platform/gateway` yet. New features — starting
-with the Studio — are built exclusively on the Warden-gated path. The
-remaining migration phases (endpoint-by-endpoint cutover behind a flag, then
-the general `/api/generate` proxy, then retiring `ai.ts`) are tracked
+on the legacy path) are unaffected and keep working — the flag defaults off,
+so nothing in production calls `platform/gateway` from `ai.ts` yet. New
+features — starting with the Studio — are built exclusively on the
+Warden-gated path. The remaining migration phases (migrating the general
+`/api/generate`/`/api/stream-generate` proxy that the legacy agent/skill
+pipeline depends on, then retiring `ai.ts`'s dead code) are tracked
 separately and have not been attempted yet, since each touches live traffic
 and is deliberately scoped as its own reviewed unit of work.

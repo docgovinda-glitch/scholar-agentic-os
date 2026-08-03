@@ -4,6 +4,10 @@ import { GoogleGenAI } from "@google/genai";
 import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "../../src/citation_compliance/model/reference.ts";
 import { CitationStyleRegistry, CitationFormatterFactory } from "../../src/citation_compliance/formattingEngine.ts";
 import { getCloudProvider, chatUrl, buildAuthHeaders, type CloudProviderSpec } from "../../src/config/providerCatalog.ts";
+import { completeWithFailover as gatewayCompleteWithFailover } from "../../src/platform/gateway/gateway.ts";
+import { defaultPolicy, recordConsent } from "../../src/platform/warden/warden.ts";
+import { isFailoverFailure } from "../../src/services/providerFailover.ts";
+import type { EgressPolicy, EgressSegment, TaskClass } from "../../src/platform/warden/types.ts";
 
 // ==========================================
 // GLOBAL STATE
@@ -271,6 +275,103 @@ async function generateWithSettings(params: {
   }
 
   throw new Error(`Unsupported AI provider: ${provider}`);
+}
+
+// ==========================================
+// PHASE-ENDPOINT GATEWAY MIGRATION (Phase 2)
+// ==========================================
+// docs/01-product/13-MODULE-SPECIFICATIONS.md §8.1,
+// docs/04-architecture/41-AI-ARCHITECTURE.md §12.2.
+//
+// Off by default so merging this changes no live behavior. When enabled,
+// Gemini calls from the 8 phase endpoints below route through the
+// Warden-gated platform/gateway instead of calling the Gemini SDK directly.
+// Ollama and "custom" (local OpenAI-compatible server) calls are NOT
+// affected by this flag — platform/gateway has no adapter for either (see
+// 41 §12.2's local-model scope note) — and keep using generateWithSettings()
+// unconditionally, regardless of the flag.
+const AI_GATEWAY_PHASE_ENDPOINTS_FLAG = "AI_GATEWAY_PHASE_ENDPOINTS";
+function gatewayEnabledForPhaseEndpoints(): boolean {
+  return process.env[AI_GATEWAY_PHASE_ENDPOINTS_FLAG] === "true";
+}
+
+// These 8 endpoints have never asked a user for AI-provider consent — there
+// is no client UI for it — and every one of them has always succeeded
+// against Gemini before today. Routing them through the Warden for the
+// first time without pre-consenting would turn "user_content" segments
+// (manuscript drafts, dissertation details) into a consent prompt nobody
+// can answer, which would look like the feature broke. Gemini is therefore
+// pre-consented here, same as a user clicking "allow" once: the default
+// policy OUTCOME for these endpoints is unchanged (still succeeds).
+//
+// What's actually new: every call now writes a real egress audit log entry
+// (warden.getAuditLog()) — that's the concrete, verified improvement this
+// migration adds today. Restricted-content denial is NOT exercised by these
+// endpoints yet: classifySegment() only inspects a segment's *label*, and
+// none of the labels below are "restricted"; nor is a `scopeId` threaded
+// through from a project, so scope-based restriction (markRestricted()) is
+// also inert here. Both mechanisms exist and are enforced elsewhere (the
+// Studio); wiring these endpoints' segments/scopes to something a caller can
+// actually mark restricted is follow-up work, not claimed as done here.
+let phaseEndpointPolicy: EgressPolicy | null = null;
+function getPhaseEndpointPolicy(): EgressPolicy {
+  if (!phaseEndpointPolicy) phaseEndpointPolicy = recordConsent(defaultPolicy(), "gemini");
+  return phaseEndpointPolicy;
+}
+
+/**
+ * Drop-in replacement for a `generateWithSettings()` call from one of the 8
+ * phase endpoints. Falls back to the legacy path unchanged when the flag is
+ * off or the request isn't targeting Gemini (see module comment above).
+ *
+ * Uses `completeWithFailover()` with a single Gemini candidate, not plain
+ * `complete()`, specifically to preserve `generateContentWithRetry()`'s
+ * existing transient-error retry behavior (429/503/504) rather than losing
+ * it in the migration — see `services/providerFailover.ts`.
+ */
+async function generateViaGatewayOrLegacy(params: {
+  taskClass: TaskClass;
+  segments: EgressSegment[];
+  systemInstruction: string;
+  prompt: string;
+  temperature: number;
+  responseMimeType?: string;
+  aiSettings?: any;
+}): Promise<string> {
+  const provider = params.aiSettings?.provider || "gemini";
+
+  if (!gatewayEnabledForPhaseEndpoints() || provider !== "gemini") {
+    return generateWithSettings({
+      systemInstruction: params.systemInstruction,
+      prompt: params.prompt,
+      temperature: params.temperature,
+      responseMimeType: params.responseMimeType,
+      aiSettings: params.aiSettings,
+    });
+  }
+
+  const apiKey = selectGeminiKey();
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY environment variable is not defined pin the Secrets panel.");
+  }
+
+  const result = await gatewayCompleteWithFailover(
+    {
+      taskClass: params.taskClass,
+      systemPrompt: params.systemInstruction,
+      userPrompt: params.prompt,
+      temperature: params.temperature,
+      responseFormat: params.responseMimeType === "application/json" ? "json" : undefined,
+      segments: params.segments,
+    },
+    { candidates: [{ provider: "gemini", apiKey }] },
+    getPhaseEndpointPolicy()
+  );
+
+  if (isFailoverFailure(result)) {
+    throw new Error(`${result.error.label}: ${result.error.message}`);
+  }
+  return result.value.text;
 }
 
 function getCacheKey(body: any): string {
@@ -798,7 +899,9 @@ Generate a comprehensive "Dissertation Grounding Map" in JSON format. Return str
   "academicVoiceAdjustment": "Analyzes the requested style or material, providing instructions for maintaining consistency"
 }`;
 
-      const responseText = await generateWithSettings({
+      const responseText = await generateViaGatewayOrLegacy({
+        taskClass: "drafting",
+        segments: [{ label: "Your dissertation and research details", text: prompt }],
         systemInstruction,
         prompt,
         temperature: 0.2,
@@ -843,7 +946,9 @@ Generate 3 to 4 high-quality public data source recommendations. Return strictly
   ]
 }`;
 
-      const responseText = await generateWithSettings({
+      const responseText = await generateViaGatewayOrLegacy({
+        taskClass: "discovery",
+        segments: [{ label: "Research parameters", text: prompt }],
         systemInstruction,
         prompt,
         temperature: 0.3,
@@ -891,7 +996,9 @@ Generate a shortlist of exactly 3 to 4 reputable journals. Return strictly valid
   ]
 }`;
 
-      const responseText = await generateWithSettings({
+      const responseText = await generateViaGatewayOrLegacy({
+        taskClass: "discovery",
+        segments: [{ label: "Research parameters", text: prompt }],
         systemInstruction,
         prompt,
         temperature: 0.3,
@@ -929,7 +1036,9 @@ Produce a high-fidelity checklists and internal compliance guidelines in JSON fo
   "coverLetterNecessity": "Whether a cover letter is mandatory and what key points are typically required"
 }`;
 
-      const responseText = await generateWithSettings({
+      const responseText = await generateViaGatewayOrLegacy({
+        taskClass: "rule_extraction",
+        segments: [{ label: "Published journal guidelines", text: prompt }],
         systemInstruction,
         prompt,
         temperature: 0.2,
@@ -1003,7 +1112,9 @@ Drafting Rules:
 
 Write the draft section in full, ready-to-publish academic prose. Do not leave placeholder text or summarized notes.`;
 
-      const responseText = await generateWithSettings({
+      const responseText = await generateViaGatewayOrLegacy({
+        taskClass: "drafting",
+        segments: [{ label: "Your manuscript section", text: prompt }],
         systemInstruction,
         prompt,
         temperature: 0.4,
@@ -1057,7 +1168,9 @@ Compile a comprehensive evaluation in JSON. Return strictly valid JSON:
   "ethicalVerification": "Confirm whether the required disclosures, conflict of interest, and funding details are clean"
 }`;
 
-      const responseText = await generateWithSettings({
+      const responseText = await generateViaGatewayOrLegacy({
+        taskClass: "refinement",
+        segments: [{ label: "Your manuscript draft under review", text: prompt }],
         systemInstruction,
         prompt,
         temperature: 0.2,
@@ -1095,7 +1208,9 @@ Generate a comprehensive "Submission Package" in JSON. Return strictly valid JSO
   "responseToReviewersDraft": "A template/framework for a response letter to reviewers for if revisions are requested later"
 }`;
 
-      const responseText = await generateWithSettings({
+      const responseText = await generateViaGatewayOrLegacy({
+        taskClass: "drafting",
+        segments: [{ label: "Your submission details", text: prompt }],
         systemInstruction,
         prompt,
         temperature: 0.3,
@@ -1170,7 +1285,14 @@ Return strictly valid JSON in this exact structure:
         });
       }
 
-      const responseText = await generateWithSettings({ prompt, systemInstruction, temperature: 0.2, aiSettings });
+      const responseText = await generateViaGatewayOrLegacy({
+        taskClass: "rule_extraction",
+        segments: [{ label: "Citation source input", text: prompt }],
+        prompt,
+        systemInstruction,
+        temperature: 0.2,
+        aiSettings
+      });
       let parsed: any;
       try {
         const cleanJson = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
