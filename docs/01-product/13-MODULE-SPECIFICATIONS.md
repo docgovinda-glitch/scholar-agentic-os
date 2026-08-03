@@ -371,7 +371,7 @@ exists; everything else remains the intended target.
 | `domain/document` (CDM, incl. the metadata bag) | `src/domain/document/` | 18 |
 | `domain/language` | `src/domain/language/` | 35 |
 | `app/studio` | `src/app/studio/` | 21 |
-| API route | `server/routes/studio.ts` | 10 (integration, via supertest against the live app) |
+| API route | `server/routes/studio.ts` | 17 (integration, via supertest against the live app) |
 | `app/atlas` | `src/app/atlas/` | 59 |
 | `domain/compliance` (incl. `metadata_presence`, `claim_support`) | `src/domain/compliance/` | 26 |
 | `app/rubric` (incl. `compileMetadataGateRules`, `compileClaimSupportGateRules`, `applyWaivers`) | `src/app/rubric/` | 32 |
@@ -381,7 +381,7 @@ exists; everything else remains the intended target.
 | `domain/claim` (Claim–Evidence Graph) | `src/domain/claim/` | 19 |
 | Chicago Notes-Bibliography formatter | `src/citation_compliance/formatters/chicagoNotes.ts` | 18 |
 
-351 new tests. Full repository suite: 131 files, 1,488 tests, `tsc --noEmit`
+358 new tests. Full repository suite: 131 files, 1,495 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 

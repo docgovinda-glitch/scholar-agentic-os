@@ -508,13 +508,13 @@ not just specified. Location and what each piece covers:
 | Level definitions, deterministic mechanics engine | `src/domain/language/mechanics.ts` | §4 Level 1 — a real, curated, tested rule set (double spaces, repeated words, missing space after a full stop, sentence-start capitalisation, a/an agreement, plural-subject/singular-verb agreement). Runs with no model call |
 | Diff construction | `src/domain/language/diff.ts` | §7 — LCS-based word-level diffing with exact per-hunk accept/reject round-trip |
 | Meaning verification | `src/domain/language/meaningGuard.ts` | §3 stage 4 — deterministically catches claim-strength shifts (the "suggest"→"demonstrate" example is a passing test, verbatim), added/removed negation, and changed numbers; reclassifies them as `content` and sorts them first |
-| Voice Profile | `src/domain/language/voiceProfile.ts` | §5 — statistics from writing samples, disabled below 1,000 words, drift reporting that never vetoes a change |
+| Voice Profile | `src/domain/language/voiceProfile.ts` | §5 — statistics from writing samples, disabled below 1,000 words, drift reporting that never vetoes a change. Reachable over HTTP via `POST /api/studio/voice-profile` (builds one from samples; nothing is persisted server-side) and threaded through `POST /api/studio/refine`'s `voiceProfile` field, which activates `voiceDrift` in the response |
 | L1 pattern catalogue | `src/domain/language/l1Patterns.ts` | §6.1 — all 20 declared-L1 languages from this spec |
 | Quotation protection | `src/domain/language/quotations.ts` | §12 — applied to every refinement path, deterministic and model-backed alike |
 | Discipline register | `src/domain/language/register.ts` | §4 Level 4 |
 | Orchestration | `src/app/studio/studio.ts` | The six-stage pipeline. Levels 2–5 call `platform/gateway`, which enforces the Warden exactly as any other model call |
 | Structured per-change reasons | `src/app/studio/structuredDiff.ts` | Asks the model for JSON with a reason per change rather than one generic label; falls back to a heuristic whole-passage diff if a model doesn't comply |
-| API | `server/routes/studio.ts` | `POST /api/studio/refine`, `/consent`, `/restrict`, `GET /egress-audit` |
+| API | `server/routes/studio.ts` | `POST /api/studio/refine`, `/consent`, `/restrict`, `/voice-profile`, `GET /egress-audit` |
 
 **What is not yet built**, tracked rather than hidden:
 
