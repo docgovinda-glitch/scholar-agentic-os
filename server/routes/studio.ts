@@ -14,21 +14,63 @@ import express from "express";
 import { refine, GatewayDenied } from "../../src/app/studio/studio.ts";
 import { getPolicyForSession, grantConsent, restrictScope } from "../../src/app/studio/sessionPolicyStore.ts";
 import { getAuditLog } from "../../src/platform/warden/warden.ts";
-import { INTERVENTION_LEVELS } from "../../src/domain/language/types.ts";
+import { INTERVENTION_LEVELS, MIN_VOICE_PROFILE_WORDS } from "../../src/domain/language/types.ts";
 import { ALL_L1_PROFILES } from "../../src/domain/language/l1Patterns.ts";
-import type { InterventionLevel } from "../../src/domain/language/types.ts";
+import { buildVoiceProfile } from "../../src/domain/language/voiceProfile.ts";
+import type { InterventionLevel, VoiceProfile } from "../../src/domain/language/types.ts";
 
 function isValidLevel(level: unknown): level is InterventionLevel {
   return typeof level === "string" && (INTERVENTION_LEVELS as string[]).includes(level);
 }
 
+const VOICE_PROFILE_NUMERIC_FIELDS = [
+  "sampleWordCount",
+  "meanSentenceLength",
+  "sentenceLengthStdDev",
+  "passiveVoiceRatio",
+  "semicolonRate",
+  "firstPersonRate",
+  "averageWordLength",
+] as const;
+
+function isValidVoiceProfile(value: unknown): value is VoiceProfile {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return VOICE_PROFILE_NUMERIC_FIELDS.every((key) => typeof v[key] === "number");
+}
+
 export function registerStudioRoutes(app: express.Express, studioLimit: express.RequestHandler): void {
   /**
+   * Build a Voice Profile from the user's own writing samples (docs
+   * 32-LANGUAGE-AND-VOICE-ARCHITECTURE.md §5: "derived statistics, not
+   * stored text... deletable at any time" — this endpoint computes and
+   * returns the profile; nothing is persisted server-side). Body:
+   * { samples: string[] }. 400s if the combined samples fall below
+   * MIN_VOICE_PROFILE_WORDS — voice matching must not be fitted to noise.
+   */
+  app.post("/api/studio/voice-profile", studioLimit, (req, res) => {
+    const { samples } = req.body ?? {};
+    if (!Array.isArray(samples) || samples.length === 0 || !samples.every((s) => typeof s === "string")) {
+      return res.status(400).json({ error: "Missing required field: samples (non-empty string[])" });
+    }
+    const profile = buildVoiceProfile(samples);
+    if (!profile) {
+      return res.status(400).json({
+        error: `Combined samples are too short to build a reliable Voice Profile (need at least ${MIN_VOICE_PROFILE_WORDS} words).`,
+      });
+    }
+    res.json(profile);
+  });
+
+  /**
    * Run the Studio pipeline on a passage.
-   * Body: { sessionId, passageId, text, level, discipline?, l1?, provider?, apiKey?, scopeId? }
+   * Body: { sessionId, passageId, text, level, discipline?, l1?, voiceProfile?, provider?, apiKey?, scopeId? }
+   * `voiceProfile` (from POST .../voice-profile) enables post-refinement
+   * drift detection — the result's `voiceDrift` field is only ever present
+   * when one was supplied.
    */
   app.post("/api/studio/refine", studioLimit, async (req, res) => {
-    const { sessionId, passageId, text, level, discipline, l1, provider, apiKey, scopeId } = req.body ?? {};
+    const { sessionId, passageId, text, level, discipline, l1, voiceProfile, provider, apiKey, scopeId } = req.body ?? {};
 
     if (typeof sessionId !== "string" || sessionId.length === 0) {
       return res.status(400).json({ error: "Missing required field: sessionId" });
@@ -47,6 +89,9 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
     if (l1 !== undefined && !(ALL_L1_PROFILES as string[]).includes(l1)) {
       return res.status(400).json({ error: `Unknown L1 profile: ${l1}` });
     }
+    if (voiceProfile !== undefined && !isValidVoiceProfile(voiceProfile)) {
+      return res.status(400).json({ error: "Malformed voiceProfile — use the object returned by POST /api/studio/voice-profile." });
+    }
 
     const policy = getPolicyForSession(sessionId);
 
@@ -57,6 +102,7 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
         level,
         discipline: typeof discipline === "string" ? discipline : undefined,
         l1,
+        voiceProfile,
         provider: typeof provider === "string" ? provider : undefined,
         apiKey: typeof apiKey === "string" ? apiKey : undefined,
         scopeId: typeof scopeId === "string" ? scopeId : undefined,
