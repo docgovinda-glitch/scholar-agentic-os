@@ -503,11 +503,14 @@ Atlas and Rubric bindings, hash staleness, and a re-target scenario
 (`26` Journey 3, in miniature) exercising a full sign-off → invalidate →
 recompute cycle.
 
-**Also exposed over HTTP** (`server/routes/project.ts`, 48 supertest
+**Also exposed over HTTP** (`server/routes/project.ts`, 53 supertest
 integration tests): `GET /api/atlas/output-types[/:id]` for choosing and
 rendering an output type, `POST /api/projects` to bind a project to one,
-`PATCH /api/projects/:id/intake` to submit answers and recompute G0,
-`PUT /api/projects/:id/document` to submit or replace the project's
+`PATCH /api/projects/:id/intake` to submit answers and recompute G0 (the
+response's `intakeCompleteness` — `app/conductor`'s `intakeCompleteness()`
+— reports the fraction of *every* intake field answered, across all three
+tiers, distinct from G0 readiness, which only requires the required
+tier), `PUT /api/projects/:id/document` to submit or replace the project's
 document body and recompute G6 from a live Rubric evaluation of it,
 `GET /api/projects/:id/rubric` to re-fetch the most recent evaluation,
 `POST /api/projects/:id/rubric/waive` to waive a non-blocking finding with
@@ -522,12 +525,14 @@ keeps them from ever reaching "ready" through this API) — and every
 project now also carries a Claim–Evidence Graph (`domain/claim`),
 reachable via `POST .../claims`, `POST .../claims/:claimId/evidence`,
 `GET .../claims`, `GET .../claims/unsupported`, `GET .../claims/conflicts`,
-and `DELETE .../sources/:sourceId`. Claim entry through this surface is
-manual — there is still no extraction agent (AG-13, needs `app/mesh`) —
-but every query domain/claim offers (unsupported claims, conflicts, a
-source's cascading removal) is now something a caller can actually reach.
-The three claim-graph endpoints also recompute G6 whenever the project
-already has a document, since four Atlas quality gates (`31` §12's
+`GET .../sources/:sourceId/claims` (which claims depend on a given source
+— useful before retracting it), and `DELETE .../sources/:sourceId`. Claim
+entry through this surface is manual — there is still no extraction agent
+(AG-13, needs `app/mesh`) — but every query domain/claim offers
+(unsupported claims, conflicts, a source's dependents, a source's
+cascading removal) is now something a caller can actually reach. The
+three claim-graph-mutating endpoints also recompute G6 whenever the
+project already has a document, since four Atlas quality gates (`31` §12's
 `usesClaimGraph`) check the claim graph, not the document — adding an
 unsupported claim can turn a passing G6 into a failing one, and binding
 evidence can turn it back, both live through this API. A project's exit
