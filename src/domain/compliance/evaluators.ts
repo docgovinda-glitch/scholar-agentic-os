@@ -4,15 +4,17 @@
  * Spec: docs/03-workflow/31-SUBMISSION-COMPLIANCE-ARCHITECTURE.md §5.1:
  * "Roughly 80% of rules are deterministic, which is what makes continuous
  * evaluation feasible offline and within NFR-PERF-4's 300ms budget."
- * These two evaluators (word_count, structural_presence) are that 80% case
- * for the two rule types Atlas's specs can compile directly (§9 fromAtlas.ts).
+ * word_count, structural_presence, metadata_presence, claim_support, and
+ * readability are that 80% case for the rule types app/rubric/fromAtlas.ts
+ * can compile directly from an Atlas spec.
  */
 
 import type { CanonicalDocument } from "../document/model";
 import { wordCount } from "../document/ops";
 import type { ClaimEvidenceGraph } from "../claim/types";
 import { unsupportedClaims } from "../claim/graph";
-import type { Finding, Rule, WordCountParams, StructuralPresenceParams, MetadataPresenceParams, ClaimSupportParams } from "./types";
+import { analyzeReadability } from "../language/readability";
+import type { Finding, Rule, WordCountParams, StructuralPresenceParams, MetadataPresenceParams, ClaimSupportParams, ReadabilityParams } from "./types";
 import { isEffectivelyWaived } from "./types";
 
 function excludingSections(doc: CanonicalDocument, exclude: string[]): CanonicalDocument {
@@ -160,6 +162,46 @@ function evaluateClaimSupport(rule: Rule, _params: ClaimSupportParams, claimGrap
 }
 
 /**
+ * Checks Flesch-Kincaid grade level against `params.maxGradeLevel`.
+ * `not_applicable` for missing/empty text (a section that doesn't exist yet
+ * has no reading level to assess — `structural_presence` is what reports a
+ * missing required section as a failure, this evaluator doesn't duplicate
+ * that job).
+ */
+function evaluateReadability(rule: Rule, params: ReadabilityParams, doc: CanonicalDocument): Finding {
+  const text = params.sectionKey
+    ? (doc.blocks.find((b) => b.id === params.sectionKey)?.text ?? "")
+    : doc.blocks.map((b) => b.text).join("\n\n");
+
+  if (text.trim().length === 0) {
+    return {
+      ruleId: rule.id,
+      status: "not_applicable",
+      severity: rule.severity,
+      message: params.sectionKey
+        ? `Section "${params.sectionKey}" is missing or empty — nothing to assess for readability.`
+        : "The document has no text yet — nothing to assess for readability.",
+    };
+  }
+
+  const { metrics } = analyzeReadability(text);
+  const withinThreshold = metrics.fleschKincaidGradeLevel <= params.maxGradeLevel;
+
+  return {
+    ruleId: rule.id,
+    status: withinThreshold ? "pass" : isEffectivelyWaived(rule) ? "warn" : "fail",
+    severity: rule.severity,
+    location: params.sectionKey ? { sectionKey: params.sectionKey } : undefined,
+    actual: `grade ${metrics.fleschKincaidGradeLevel}`,
+    expected: `≤ grade ${params.maxGradeLevel}`,
+    message: withinThreshold
+      ? `Reading level (grade ${metrics.fleschKincaidGradeLevel}) is at or below the target of grade ${params.maxGradeLevel}.`
+      : `Reading level (grade ${metrics.fleschKincaidGradeLevel}) exceeds the target of grade ${params.maxGradeLevel}.`,
+    remedy: withinThreshold ? undefined : "Shorten sentences and prefer shorter, more common words to lower the reading level.",
+  };
+}
+
+/**
  * Evaluate a single rule against a document. Every rule type this function
  * doesn't yet implement returns "not_applicable" rather than throwing or
  * silently passing — docs 31 §6.1: "the report is a single screen: what
@@ -180,6 +222,8 @@ export function evaluateRule(rule: Rule, doc: CanonicalDocument, claimGraph?: Cl
       return evaluateMetadataPresence(rule, rule.evaluator.params, doc);
     case "claim_support":
       return evaluateClaimSupport(rule, rule.evaluator.params, claimGraph);
+    case "readability":
+      return evaluateReadability(rule, rule.evaluator.params, doc);
     default:
       return {
         ruleId: rule.id,

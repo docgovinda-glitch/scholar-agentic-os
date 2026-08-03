@@ -1027,10 +1027,14 @@ all is `not_applicable`, never a silent pass).
 A handful of quality gates across the final 8 entries are still recorded
 but not compiled, stated honestly rather than silently skipped: OT-12's
 PRISMA screening-workflow gates (need a Source Approval Queue that doesn't
-exist yet), OT-17's agent-assessed readability gate (needs a model call),
-OT-23's layout-measurement gates (print font size, contrast — same gap as
-OT-11's page limit), and OT-20's remaining recommendation-position-in-text
-gate, which needs a rule type domain/compliance doesn't implement.
+exist yet), OT-23's layout-measurement gates (print font size, contrast —
+same gap as OT-11's page limit), and OT-20's remaining
+recommendation-position-in-text gate, which needs a rule type
+domain/compliance doesn't implement. OT-17's readability gate, previously
+in this list, is now compiled and evaluated — `readabilityGate` on the
+gate spec compiles into a `readability` Rule (`31` §12), checking Flesch-
+Kincaid grade level deterministically rather than needing the model call
+this note originally assumed.
 
 The catalog is also reachable over HTTP: `GET /api/atlas/output-types`
 (summaries, for a "choose an output type" list) and
@@ -1060,7 +1064,6 @@ value.
 | OT-08's by-publication structural variant | Not modeled — only the monograph baseline is. Materially different (chapters are standalone published papers with a connecting narrative), stated honestly in `catalogData.ts`'s own comment on that entry |
 | Layout-measurement quality gates (OT-11's page limit, OT-23's print font size and contrast) | Descriptive only, not compiled — needs a layout-measurement pass (`33` §5) to check rendered output against a template or physical print size, not a word count, which doesn't exist yet |
 | OT-12's PRISMA screening-workflow gates | Descriptive only — needs a Source Approval Queue mapped onto PRISMA screening stages, which needs a client to drive it (`13` §8.1) |
-| OT-17's agent-assessed readability gate | Descriptive only — needs a model call to judge reading level, which is `app/mesh` territory, not deterministic Rubric evaluation |
 | OT-20's recommendation-position-in-text gate | "Recommendation in the first 200 words" needs a position-in-text rule type `domain/compliance` doesn't implement. (Its sibling gate, "every claim sourced," is resolved — see `31` §12: `usesClaimGraph` compiles it into a real `claim_support` rule.) |
 | Override precedence (`user template → institution profile → discipline variant → catalog default`) | Not implemented — only the catalog-default layer exists. `atlas.ts`'s module comment notes where the other three layers plug in |
 | Type versioning / migration on catalog update | The `version` field exists on every spec but nothing yet reads it to diff or migrate an in-flight project |

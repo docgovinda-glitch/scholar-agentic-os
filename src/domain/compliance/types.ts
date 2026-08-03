@@ -26,7 +26,7 @@ export interface RuleSource {
 }
 
 /** The deterministic evaluator kinds implemented so far (docs 31 §5.1's "immediate/fast" tier). */
-export type EvaluatorKind = "word_count" | "structural_presence" | "metadata_presence" | "claim_support";
+export type EvaluatorKind = "word_count" | "structural_presence" | "metadata_presence" | "claim_support" | "readability";
 
 export interface WordCountParams {
   max?: number;
@@ -58,6 +58,23 @@ export interface ClaimSupportParams {
   scope?: "all";
 }
 
+/**
+ * Checks the Flesch-Kincaid grade level of a document (or one of its
+ * sections) against `maxGradeLevel`, via `domain/language/readability.ts`'s
+ * `analyzeReadability()` — the pure logic AG-18 (the Readability Analyst,
+ * `app/mesh/agents/ag18ReadabilityAnalyst.ts`) also wraps. This evaluator
+ * calls that pure function directly rather than through `app/mesh`'s
+ * capability-gated executor: there is no untrusted caller here, just the
+ * Rubric's own trusted evaluation of a document it already has in hand,
+ * which is the same reason every other evaluator in this file calls
+ * `domain/*` logic directly instead of routing through an agent.
+ */
+export interface ReadabilityParams {
+  /** If set, evaluates only the block whose id matches this key (same convention as StructuralPresenceParams.sectionKey). Unset evaluates the whole document. */
+  sectionKey?: string;
+  maxGradeLevel: number;
+}
+
 export interface Rule {
   id: string;
   source: RuleSource;
@@ -68,7 +85,8 @@ export interface Rule {
     | { kind: "word_count"; params: WordCountParams }
     | { kind: "structural_presence"; params: StructuralPresenceParams }
     | { kind: "metadata_presence"; params: MetadataPresenceParams }
-    | { kind: "claim_support"; params: ClaimSupportParams };
+    | { kind: "claim_support"; params: ClaimSupportParams }
+    | { kind: "readability"; params: ReadabilityParams };
   message: string;
   remedy: string;
   autoFixable: boolean;

@@ -105,6 +105,17 @@ export interface QualityGateSpec {
    * `domain/claim` `ClaimEvidenceGraph` rather than document content.
    */
   usesClaimGraph?: boolean;
+  /**
+   * Set when this gate is a target-reading-level check (e.g. OT-17's
+   * participant information sheet, which must be plain-language for a lay
+   * reviewer). When set, `app/rubric/fromAtlas.ts`'s
+   * `compileReadabilityGateRules` compiles this into a `readability` Rule
+   * at the gate's own severity, checking Flesch-Kincaid grade level via
+   * `domain/language/readability.ts`. `sectionKey` scopes the check to one
+   * document section (matched the same way `structural_presence` does);
+   * omitted, it checks the whole document.
+   */
+  readabilityGate?: { maxGradeLevel: number; sectionKey?: string };
 }
 
 export interface ExportDefaults {

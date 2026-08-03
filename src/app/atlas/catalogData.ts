@@ -1894,7 +1894,14 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
       { id: "data_protection_addressed", description: "Data protection is addressed", severity: "blocking" },
       { id: "withdrawal_procedure_stated", description: "The withdrawal procedure is stated", severity: "blocking" },
       { id: "vulnerable_participant_safeguards_present", description: "Safeguards for vulnerable participants are present", severity: "blocking", appliesWhen: "participant_type indicates a vulnerable group" },
-      { id: "information_sheet_readability", description: "The participant information sheet is written at or below the target reading level", severity: "required" },
+      // maxGradeLevel: 8 is the commonly-cited plain-language benchmark for
+      // participant-facing research materials (widely used in REC/IRB
+      // guidance). sectionKey: "appendices" is a stated approximation — the
+      // CDM's V1 flat block model (domain/document/model.ts) has no
+      // sub-block nesting, so the "appendices" block bundles the
+      // information sheet with the consent form; a true per-document split
+      // needs a richer structure this model doesn't have yet.
+      { id: "information_sheet_readability", description: "The participant information sheet is written at or below the target reading level", severity: "required", readabilityGate: { maxGradeLevel: 8, sectionKey: "appendices" } },
     ],
     workflowVariant: "proposal",
     complianceProfile: "institutional",
