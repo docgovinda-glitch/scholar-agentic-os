@@ -2,27 +2,34 @@
  * The catalog data — real output type entries.
  *
  * Spec: docs/01-product/14-OUTPUT-TYPE-CATALOG.md §9. That document
- * specifies 24 output types across 6 families. This file implements 16 of
- * them: the original one representative entry per family (one per
- * workflow variant and structure variant class), proving the engine
- * against every shape the full catalog needs to support; three more
- * within the short_form family (OT-02 Essay, OT-03 Report, OT-13
- * Literature Review) that each exercise a structure variant the first
- * pass didn't (`argumentative`, plain `linear` with numbered sections,
- * `thematic`); OT-08 Doctoral Dissertation and OT-11 Conference Paper,
- * deepening long_form_chaptered and venue_targeted; OT-04 Abstract, OT-06
- * Undergraduate Dissertation, and OT-09 Book/Monograph — OT-06 gives
- * `QualityGateSpec.metadataKey` (see app/rubric/fromAtlas.ts) its first
- * real, non-synthetic use, and OT-09 is the first entry defaulting to
+ * specifies 24 output types across 6 families. All 24 are implemented
+ * here now. Built in phases: the original one representative entry per
+ * family, proving the engine against every shape the catalog needs to
+ * support; then successive rounds deepening each family and exercising
+ * every structure variant, ending with OT-23 Poster, the only entry using
+ * `poster_grid` — the eighth and last structure variant proven. Along the
+ * way, OT-06 gave `QualityGateSpec.metadataKey` its first real,
+ * non-synthetic use, and OT-09 became the first entry defaulting to
  * `chicago-notes-bibliography`, exercising this session's
- * ChicagoNotesFormatter for real; and OT-15 Research Proposal and OT-19
- * Case Study, deepening proposal_funding and applied_professional beyond
- * one entry each. Adding the remaining 8 is data entry against an engine
- * already proven correct — see docs/01-product/13-MODULE-SPECIFICATIONS.md
- * §8.3 for the tracked gap.
+ * ChicagoNotesFormatter for real.
+ *
+ * A handful of quality gates across these entries are recorded but not
+ * compiled into Rubric rules, honestly, because what they need doesn't
+ * exist yet: OT-11/OT-23's layout-measurement gates (page limits, print
+ * font sizes, WCAG contrast), OT-12's PRISMA screening-workflow gates,
+ * OT-17's agent-assessed readability gate, and OT-20's two genuinely
+ * deterministic-in-principle gates (recommendation-position-in-text,
+ * every-claim-sourced) that need either a new rule type or the
+ * claim-evidence graph wired into Rubric evaluation, respectively —
+ * neither of which domain/compliance implements yet. See
+ * docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3 for the tracked gaps.
  *
  * Word budgets, source counts, and structure are drawn directly from the
- * spec document's per-type tables, not invented here.
+ * spec document's per-type tables, not invented here. Two exceptions,
+ * both stated in their own entry's comment: OT-14's section list (the
+ * source doc doesn't itemize one) and OT-24's word range (the type is
+ * explicitly user-defined, so the range here is a generic fallback, not
+ * a real target).
  */
 
 import type { OutputTypeSpec } from "./types";
@@ -519,6 +526,88 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     ],
     workflowVariant: "short_form",
     complianceProfile: "venue",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
+  // ── OT-05 Seminar Paper — short_form / linear / institutional ───────────
+  {
+    id: "OT-05",
+    version: 1,
+    label: "Seminar Paper",
+    aliases: ["Hausarbeit", "graduate seminar paper"],
+    family: "short_form",
+    academicLevels: ["masters", "doctoral"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "linear",
+      sections: [
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, wordBudget: { min: 200, max: 600, typical: 350 }, guidance: "States the seminar topic and the paper's specific angle on it." },
+        { key: "theoretical_framework", title: "Theoretical Framework", required: true, countsTowardWordcount: true, guidance: "The theoretical tradition or lens the analysis applies." },
+        { key: "analysis", title: "Analysis", required: true, countsTowardWordcount: true, wordBudget: { min: 1500, max: 4500, typical: 3000 }, guidance: "The core analytical work, applying the framework to the topic." },
+        { key: "discussion", title: "Discussion", required: true, countsTowardWordcount: true, guidance: "Interprets the analysis and situates it against the seminar's broader themes." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, wordBudget: { min: 150, max: 500, typical: 300 }, guidance: "Summarises the argument. No new evidence." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the required style." },
+      ],
+      frontMatter: [],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 3000, max: 8000, typical: 5000 },
+      distribution: { introduction: 0.08, theoretical_framework: 0.17, analysis: 0.45, discussion: 0.2, conclusion: 0.06 },
+    },
+    sources: { targetCount: { min: 20, typical: 30 }, recencyExpectation: "majority within 10 years", typeMix: { peer_reviewed: 0.75, other: 0.25 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7", "chicago-author-date"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "seminar_topic_and_framing",
+          label: "Seminar topic and convenor's framing",
+          tier: "required",
+          guidance: {
+            whatItIs: "The seminar's overall topic and how the convenor has framed the assignment.",
+            whyItMatters: "Seminar papers are graded against how well they engage the convenor's specific framing, not the topic in the abstract.",
+            example: "Seminar: 'Contested Sovereignty.' Convenor's framing: apply one contested-sovereignty case to a theoretical debate covered in class.",
+            defaultWithRationale: "There is no safe default for this — it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+      ],
+      recommended: [
+        {
+          key: "presentation_accompanies",
+          label: "Does a presentation accompany this paper?",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Whether you will also present this work in the seminar.",
+            whyItMatters: "Common in European graduate programmes — when yes, the system offers to create a linked Presentation project sharing the same corpus rather than starting from scratch.",
+            example: "Yes, a 20-minute seminar presentation the week before submission.",
+            defaultWithRationale: "Defaults to no linked presentation unless requested.",
+          },
+          defaultValue: "no",
+          allowsProvisional: true,
+        },
+        {
+          key: "theoretical_tradition",
+          label: "Theoretical tradition",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The specific theoretical tradition or school the framework draws on.",
+            whyItMatters: "Shapes vocabulary and citation expectations from the start rather than discovering a mismatch during literature search.",
+            example: "Constructivist international relations theory.",
+            defaultWithRationale: "If unspecified, the framework is drawn from whatever the literature search surfaces as most relevant.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "structural_completeness", description: "Every required section present and non-empty", severity: "blocking" },
+      { id: "budget_adherence", description: "Within ±20% of the word limit", severity: "required" },
+      { id: "framework_applied_consistently", description: "The stated theoretical framework is actually used in the analysis, not just named in the introduction", severity: "advisory" },
+    ],
+    workflowVariant: "short_form",
+    complianceProfile: "institutional",
     exportDefaults: { format: "docx", includeToc: false },
   },
 
@@ -1234,6 +1323,233 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     exportDefaults: { format: "docx", includeToc: false },
   },
 
+  // ── OT-12 Review Article — publication / thematic / venue_targeted ─────
+  // The systematic variant's PRISMA obligations (search strategy,
+  // databases searched, inclusion/exclusion criteria, the flow diagram)
+  // are real per docs 14 §9's notes — "the best showcase for the
+  // claim-evidence graph" — but mapping the Source Approval Queue onto
+  // PRISMA screening stages needs a queue and screening workflow that
+  // doesn't exist yet (no client, docs 13 §8.1). The systematic-only
+  // intake fields and quality gates are recorded here, honestly marked as
+  // conditional, not compiled into anything PRISMA-specific yet.
+  {
+    id: "OT-12",
+    version: 1,
+    label: "Review Article",
+    aliases: ["systematic review", "narrative review", "scoping review"],
+    family: "publication",
+    academicLevels: ["doctoral", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "thematic",
+      sections: [
+        { key: "abstract", title: "Abstract", required: true, countsTowardWordcount: false, wordBudget: { min: 200, max: 350, typical: 300 }, guidance: "States the review's scope, method, and key conclusions." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, guidance: "Motivates why this review is needed now." },
+        { key: "scope_search_strategy", title: "Scope and Search Strategy", required: true, countsTowardWordcount: true, guidance: "What is in and out of scope, and how the literature was found — for a systematic review, this must be reproducible." },
+        { key: "thematic_sections", title: "Thematic Sections", required: true, countsTowardWordcount: true, wordBudget: { min: 2500, max: 8000, typical: 4500 }, guidance: "The review's substantive body, organised by theme. Modeled here as one aggregate section; the drafting pipeline splits it at G3." },
+        { key: "synthesis", title: "Synthesis", required: true, countsTowardWordcount: true, guidance: "Connects the themes into an overall picture of the field." },
+        { key: "gaps_future_directions", title: "Gaps and Future Directions", required: true, countsTowardWordcount: true, guidance: "What the literature has not yet addressed." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, guidance: "Summarises the state of the field." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the required style." },
+      ],
+      frontMatter: ["abstract"],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 5000, max: 15000, typical: 9000 },
+      distribution: { introduction: 0.08, scope_search_strategy: 0.07, thematic_sections: 0.5, synthesis: 0.2, gaps_future_directions: 0.08, conclusion: 0.04 },
+    },
+    sources: { targetCount: { min: 80, typical: 150 }, recencyExpectation: "majority within 10 years, with foundational older work included deliberately", typeMix: { peer_reviewed: 0.9, other: 0.1 } },
+    citation: { defaultStyle: "vancouver", commonStyles: ["vancouver", "apa7", "ieee"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "review_type",
+          label: "Review type",
+          tier: "required",
+          guidance: {
+            whatItIs: "Narrative, systematic, scoping, or umbrella review.",
+            whyItMatters: "A systematic review triggers PRISMA obligations — a reproducible search strategy, a flow diagram, documented inclusion/exclusion criteria — that a narrative review does not carry.",
+            example: "Systematic review, PRISMA 2020-compliant.",
+            defaultWithRationale: "There is no safe default for this — it changes what compliance actually requires, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "date_range",
+          label: "Date range",
+          tier: "required",
+          guidance: {
+            whatItIs: "The publication date range the review covers.",
+            whyItMatters: "Defines the search's temporal scope and is reported explicitly in a systematic review's methods.",
+            example: "January 2010 to December 2025.",
+            defaultWithRationale: "Defaults to the last 10 years pending a more specific range.",
+          },
+          defaultValue: "last 10 years",
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "search_strategy",
+          label: "Search strategy",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The exact search terms, Boolean logic, and databases used — mandatory and blocking for a systematic review, not required for a narrative one.",
+            whyItMatters: "A systematic review's search must be reproducible by another researcher; without a documented strategy, the review can't claim to be systematic.",
+            example: "(\"remote work\" OR \"telework\") AND (\"productivity\") searched across PubMed, Scopus, and Web of Science.",
+            defaultWithRationale: "Not applicable, and left blank, for narrative, scoping, or umbrella reviews.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "databases_searched",
+          label: "Databases searched",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The specific databases the search strategy was run against.",
+            whyItMatters: "Part of the reproducibility requirement for a systematic review.",
+            example: "PubMed, Scopus, Web of Science, PsycINFO.",
+            defaultWithRationale: "Not applicable, and left blank, for non-systematic reviews.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "inclusion_exclusion_criteria",
+          label: "Inclusion/exclusion criteria",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The explicit criteria used to include or exclude studies found by the search.",
+            whyItMatters: "Required for a systematic review's PRISMA flow diagram — every excluded study needs a stated reason.",
+            example: "Include: peer-reviewed, empirical, English-language. Exclude: conference abstracts, non-human studies.",
+            defaultWithRationale: "Not applicable, and left blank, for non-systematic reviews.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "search_strategy_reproducible", description: "The search strategy is documented precisely enough for another researcher to reproduce it", severity: "blocking", appliesWhen: "review_type = systematic" },
+      { id: "prisma_flow_diagram_present", description: "A PRISMA flow diagram accounts for every study found, screened, and excluded with reasons", severity: "blocking", appliesWhen: "review_type = systematic" },
+      { id: "every_included_study_in_corpus", description: "Every study cited as included is present in the approved source corpus", severity: "blocking" },
+      { id: "thematic_coverage_balanced", description: "Thematic sections are proportionate to the literature rather than skewed toward the author's own prior work", severity: "advisory" },
+    ],
+    workflowVariant: "venue_targeted",
+    complianceProfile: "venue",
+    exportDefaults: { format: "docx", includeToc: true },
+  },
+
+  // ── OT-14 Book Chapter — publication / linear / venue (editor/publisher) ─
+  // docs 14 §9 doesn't itemize OT-14's sections the way it does for most
+  // entries (only intake and notes) — the section list below is inferred
+  // as the standard chapter shape (introduction / body / conclusion /
+  // references) consistent with the `linear` structure the doc does
+  // specify, not invented content beyond that.
+  {
+    id: "OT-14",
+    version: 1,
+    label: "Book Chapter",
+    aliases: ["edited volume chapter", "contributed chapter"],
+    family: "publication",
+    academicLevels: ["doctoral", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "linear",
+      sections: [
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, guidance: "Introduces the chapter's argument and its place in the volume." },
+        { key: "body", title: "Body", required: true, countsTowardWordcount: true, wordBudget: { min: 4000, max: 10000, typical: 6500 }, guidance: "The chapter's substantive content." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, guidance: "Draws the chapter's argument together and connects back to the volume's overall theme." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the volume's house style." },
+      ],
+      frontMatter: [],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 5000, max: 12000, typical: 8000 },
+      distribution: { introduction: 0.1, body: 0.75, conclusion: 0.08 },
+    },
+    sources: { targetCount: { min: 30, typical: 50 }, recencyExpectation: "majority within 10 years", typeMix: { peer_reviewed: 0.7, other: 0.3 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "chicago-notes-bibliography", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "house_style",
+          label: "House style",
+          tier: "required",
+          guidance: {
+            whatItIs: "The volume's required citation and formatting style, as set by the editor or publisher.",
+            whyItMatters: "Edited volumes enforce a single consistent style across every contributed chapter — using your own discipline's default instead of the volume's is a common, avoidable rejection reason.",
+            example: "Chicago notes-bibliography, per the volume's style sheet.",
+            defaultWithRationale: "There is no safe default for this — it is volume-specific and blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+      ],
+      recommended: [
+        {
+          key: "volume_title_and_editors",
+          label: "Volume title and editors",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The edited volume's title and its editors.",
+            whyItMatters: "Establishes what the chapter needs to fit into, thematically and stylistically.",
+            example: "\"Sovereignty Reconsidered\", eds. J. Okafor and M. Lindqvist.",
+            defaultWithRationale: "Left blank until supplied.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "editors_brief_upload",
+          label: "Editor's brief",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The brief the editors circulated to contributors — scope, length, deadlines, and how the chapter should relate to the volume's argument.",
+            whyItMatters: "The single highest-value input for this output type — the editor's brief is effectively the requirement source, the same role a target journal's guidelines play for OT-10.",
+            example: "A PDF or emailed brief from the volume editors.",
+            defaultWithRationale: "Without one, generic contributed-chapter conventions are used, editable once the real brief is available.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "abstract_required",
+          label: "Is an abstract required?",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Whether the volume requires a short abstract preceding each chapter.",
+            whyItMatters: "Some edited volumes require one for indexing purposes; others don't use them at all.",
+            example: "Yes, 150 words, per the editor's brief.",
+            defaultWithRationale: "Defaults to no abstract required unless the brief specifies one.",
+          },
+          defaultValue: "no",
+          allowsProvisional: true,
+        },
+      ],
+      optional: [
+        {
+          key: "position_in_volume",
+          label: "Position in volume",
+          tier: "optional",
+          guidance: {
+            whatItIs: "Where the chapter falls in the volume's running order, if known.",
+            whyItMatters: "Affects how much context the chapter needs to assume — an opening chapter sets up terms later chapters can take for granted.",
+            example: "Chapter 4 of 9, in the volume's second part.",
+            defaultWithRationale: "If unknown, the chapter is written to stand reasonably alone.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+    },
+    qualityGates: [
+      { id: "structural_completeness", description: "Every required section present and non-empty", severity: "blocking" },
+      { id: "budget_adherence", description: "Within ±20% of the word limit", severity: "required" },
+      { id: "relationship_to_volume_stated", description: "The chapter states how it relates to the volume's overall argument", severity: "advisory" },
+    ],
+    workflowVariant: "venue_targeted",
+    complianceProfile: "venue",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
   // ── OT-15 Research Proposal — proposal_funding / linear / institutional ─
   // Distinct from OT-16 by not being funder-prescribed: a degree-admission
   // or upgrade proposal follows a fixed linear shape the institution sets,
@@ -1455,6 +1771,130 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     exportDefaults: { format: "docx", includeToc: false },
   },
 
+  // ── OT-17 Ethics Application — proposal_funding / funder_prescribed / institutional ──
+  // Included per docs 14 §9's own note because it blocks OT-06 through
+  // OT-08 in practice. Its readability quality gate is agent-assessed
+  // (needs a model call to judge whether an information sheet is written
+  // at the target reading level) rather than deterministic, so — same
+  // honest-gap discipline as OT-12's PRISMA gates and OT-11/OT-19's scan
+  // gates — it's recorded but not compiled into a Rubric rule here.
+  {
+    id: "OT-17",
+    version: 1,
+    label: "Ethics Application",
+    aliases: ["IRB application", "REC application", "ethics review submission"],
+    family: "proposal_funding",
+    academicLevels: ["undergraduate", "masters", "doctoral", "postdoc", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "funder_prescribed",
+      sections: [
+        { key: "study_summary", title: "Study Summary", required: true, countsTowardWordcount: true, wordBudget: { min: 150, max: 400, typical: 250 }, guidance: "A plain-language summary of the study for the review committee." },
+        { key: "participants_recruitment", title: "Participants and Recruitment", required: true, countsTowardWordcount: true, guidance: "Who will participate, how many, and how they will be recruited." },
+        { key: "procedures", title: "Procedures", required: true, countsTowardWordcount: true, guidance: "Exactly what participants will be asked to do." },
+        { key: "risks_mitigation", title: "Risks and Mitigation", required: true, countsTowardWordcount: true, guidance: "Foreseeable risks to participants and how each will be mitigated." },
+        { key: "consent_process", title: "Consent Process", required: true, countsTowardWordcount: true, guidance: "How informed consent will be obtained, recorded, and — where relevant — re-confirmed." },
+        { key: "data_protection", title: "Data Protection", required: true, countsTowardWordcount: true, guidance: "How participant data will be stored, secured, and who will have access." },
+        { key: "withdrawal", title: "Withdrawal", required: true, countsTowardWordcount: true, guidance: "How and until when a participant may withdraw, and what happens to their data if they do." },
+        { key: "dissemination", title: "Dissemination", required: true, countsTowardWordcount: false, guidance: "How and where results will be shared." },
+        { key: "appendices", title: "Appendices", required: true, countsTowardWordcount: false, guidance: "The participant information sheet and consent form, attached in full." },
+      ],
+      frontMatter: ["study_summary"],
+      backMatter: ["appendices"],
+    },
+    budget: {
+      totalWords: { min: 1500, max: 6000, typical: 3000 },
+      distribution: {
+        study_summary: 0.08,
+        participants_recruitment: 0.15,
+        procedures: 0.2,
+        risks_mitigation: 0.17,
+        consent_process: 0.15,
+        data_protection: 0.13,
+        withdrawal: 0.07,
+      },
+    },
+    sources: { targetCount: { min: 5, typical: 12 }, recencyExpectation: "majority within 10 years", typeMix: { peer_reviewed: 0.6, other: 0.4 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "review_body",
+          label: "Review body",
+          tier: "required",
+          guidance: {
+            whatItIs: "The specific ethics committee or institutional review board this application goes to.",
+            whyItMatters: "Different bodies use different forms and have different section requirements — the form itself is often what the Rubric compiles from.",
+            example: "University Research Ethics Committee, Panel B (Health Sciences).",
+            defaultWithRationale: "If not yet confirmed, mark this provisional and proceed with generic institutional conventions.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "application_form_upload",
+          label: "Application form",
+          tier: "required",
+          guidance: {
+            whatItIs: "The review body's own application form or template, if one exists.",
+            whyItMatters: "This is the actual requirement source — most committees have their own exact section headings and question wording.",
+            example: "A PDF or Word template downloaded from the committee's website.",
+            defaultWithRationale: "Without one, we use generic ethics-application conventions, editable once you have the real form.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "participant_type",
+          label: "Participant type",
+          tier: "required",
+          guidance: {
+            whatItIs: "Who will participate, and whether any belong to a vulnerable group (children, people who lack capacity to consent, prisoners, or others requiring extra safeguards).",
+            whyItMatters: "Determines which safeguards are mandatory — getting this wrong is a research-conduct issue, not a paperwork gap, so it is not guessed.",
+            example: "Adults aged 18-65 with full capacity to consent — no vulnerable groups involved.",
+            defaultWithRationale: "There is no safe default for this — assuming no vulnerable participants when there are some is exactly the failure this field exists to catch, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "data_types_collected",
+          label: "Data types collected",
+          tier: "required",
+          guidance: {
+            whatItIs: "What data will be collected, and whether any of it is special-category data (health, ethnicity, sexual orientation, criminal history, and similar).",
+            whyItMatters: "Special-category data triggers stricter data-protection obligations — assuming 'no' when there is some is a compliance issue, not a style choice.",
+            example: "Anonymised survey responses; no special-category data.",
+            defaultWithRationale: "There is no safe default for this — it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "retention_period",
+          label: "Retention period",
+          tier: "required",
+          guidance: {
+            whatItIs: "How long participant data will be retained before deletion.",
+            whyItMatters: "Most institutions have a default retention policy, but the application must still state it explicitly.",
+            example: "10 years, per the university's standard research data retention policy.",
+            defaultWithRationale: "Defaults to the institution's standard retention period (typically 5-10 years) pending confirmation.",
+          },
+          defaultValue: "per institutional policy",
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "consent_process_described", description: "The consent process is fully described", severity: "blocking" },
+      { id: "data_protection_addressed", description: "Data protection is addressed", severity: "blocking" },
+      { id: "withdrawal_procedure_stated", description: "The withdrawal procedure is stated", severity: "blocking" },
+      { id: "vulnerable_participant_safeguards_present", description: "Safeguards for vulnerable participants are present", severity: "blocking", appliesWhen: "participant_type indicates a vulnerable group" },
+      { id: "information_sheet_readability", description: "The participant information sheet is written at or below the target reading level", severity: "required" },
+    ],
+    workflowVariant: "proposal",
+    complianceProfile: "institutional",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
   // ── OT-18 Lab Report — applied_professional / imrad / applied ──────────
   {
     id: "OT-18",
@@ -1672,6 +2112,239 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     exportDefaults: { format: "docx", includeToc: false },
   },
 
+  // ── OT-20 Policy Brief — applied_professional / argumentative / professional ──
+  // The register inversion docs 14 §9 flags is real: academic hedging is a
+  // defect here, not a virtue. Two of the four quality gates below are
+  // genuinely deterministic and checkable in principle — "recommendation
+  // in the first 200 words" is a position-in-text check, "every claim
+  // sourced" is exactly what the claim-evidence graph verifies — but
+  // neither has a compiled evaluator yet: position-within-word-count isn't
+  // a rule type domain/compliance implements, and wiring the claim graph
+  // into Rubric evaluation is its own, larger design decision (a document
+  // needs both a CanonicalDocument and a ClaimEvidenceGraph passed to one
+  // evaluation, which the current evaluateRule/evaluateRules signature
+  // doesn't support). Recorded as real, tractable future work rather than
+  // silently left out.
+  {
+    id: "OT-20",
+    version: 1,
+    label: "Policy Brief",
+    aliases: ["briefing paper", "policy memo"],
+    family: "applied_professional",
+    academicLevels: ["masters", "doctoral", "faculty", "professional"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "argumentative",
+      sections: [
+        { key: "title", title: "Title", required: true, countsTowardWordcount: false, guidance: "States the issue and, ideally, the recommendation's direction." },
+        { key: "executive_summary", title: "Executive Summary", required: true, countsTowardWordcount: false, wordBudget: { min: 80, max: 200, typical: 150 }, guidance: "The problem and recommendation, in brief — many readers stop here." },
+        { key: "the_problem", title: "The Problem", required: true, countsTowardWordcount: true, guidance: "What the problem is and why it demands a decision now." },
+        { key: "evidence", title: "Evidence", required: true, countsTowardWordcount: true, guidance: "The evidence base, presented for a non-specialist decision-maker, not a peer reviewer." },
+        { key: "policy_options", title: "Policy Options", required: true, countsTowardWordcount: true, guidance: "The realistic options, including the status quo, weighed fairly before the recommendation." },
+        { key: "recommendation", title: "Recommendation", required: true, countsTowardWordcount: true, guidance: "The recommended option, stated directly and early — this is not the place for academic hedging." },
+        { key: "implementation", title: "Implementation", required: true, countsTowardWordcount: true, guidance: "What would need to happen to act on the recommendation." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the required style." },
+      ],
+      frontMatter: ["title", "executive_summary"],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 1000, max: 3000, typical: 1800 },
+      distribution: { the_problem: 0.2, evidence: 0.3, policy_options: 0.2, recommendation: 0.15, implementation: 0.1 },
+    },
+    sources: { targetCount: { min: 10, typical: 18 }, recencyExpectation: "majority within 5 years — policy briefs favour current evidence over historical depth", typeMix: { peer_reviewed: 0.5, other: 0.5 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "target_audience",
+          label: "Target audience",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the brief is written for a legislator, a civil servant, an NGO, or the general public.",
+            whyItMatters: "Changes register, length tolerance, and how much institutional context can be assumed.",
+            example: "A civil servant in a policy team, already familiar with the broad issue area.",
+            defaultWithRationale: "There is no safe default for this — it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "decision_being_influenced",
+          label: "Decision being influenced",
+          tier: "required",
+          guidance: {
+            whatItIs: "The specific decision this brief is meant to inform.",
+            whyItMatters: "A policy brief exists to move a specific decision, not to inform generally — without a named decision, the brief has no target to be persuasive toward.",
+            example: "Whether to fund a pilot of the proposed intervention in the next budget cycle.",
+            defaultWithRationale: "There is no safe default for this — it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "length_limit",
+          label: "Length limit",
+          tier: "required",
+          guidance: {
+            whatItIs: "The brief's maximum length, often expressed in pages rather than words.",
+            whyItMatters: "Policy audiences are famously unforgiving of length — briefs routinely fail by being too long before anyone reads the content.",
+            example: "Two pages, per the department's standard brief template.",
+            defaultWithRationale: "Defaults to two pages (roughly 1,000-1,200 words), the most common policy-brief length, until corrected.",
+          },
+          defaultValue: "two pages",
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "visual_requirements",
+          label: "Visual requirements",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Whether charts, infographics, or a specific visual template are expected.",
+            whyItMatters: "Policy audiences often expect a scannable visual alongside the prose.",
+            example: "One summary chart showing the trend the brief is responding to.",
+            defaultWithRationale: "Defaults to prose only unless a visual is specifically requested.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [
+        {
+          key: "political_constraints",
+          label: "Political constraints",
+          tier: "optional",
+          guidance: {
+            whatItIs: "Any political sensitivities or constraints the recommendation needs to work within.",
+            whyItMatters: "A technically optimal recommendation that ignores political feasibility often goes nowhere.",
+            example: "The recommendation should avoid implying criticism of the previous administration's policy.",
+            defaultWithRationale: "If none is given, the recommendation is drafted on technical merit alone.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+    },
+    qualityGates: [
+      { id: "reading_level_appropriate", description: "Written at a reading level appropriate to the target audience", severity: "required" },
+      { id: "recommendation_in_first_200_words", description: "The recommendation is stated within the first 200 words", severity: "blocking" },
+      { id: "every_claim_sourced", description: "Every factual claim is sourced", severity: "blocking" },
+      { id: "jargon_density_below_threshold", description: "Academic jargon density is below the threshold for this audience", severity: "required" },
+    ],
+    workflowVariant: "applied",
+    complianceProfile: "professional",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
+  // ── OT-21 White Paper / Technical Documentation — applied_professional / linear / professional ──
+  {
+    id: "OT-21",
+    version: 1,
+    label: "White Paper / Technical Documentation",
+    aliases: ["technical white paper", "technical report (industry)"],
+    family: "applied_professional",
+    academicLevels: ["masters", "doctoral", "faculty", "professional"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "linear",
+      sections: [
+        { key: "executive_summary", title: "Executive Summary", required: true, countsTowardWordcount: false, wordBudget: { min: 150, max: 400, typical: 250 }, guidance: "A summary for a reader who will only read this section." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, guidance: "Frames the problem domain for the stated audience technical level." },
+        { key: "problem", title: "Problem", required: true, countsTowardWordcount: true, guidance: "The specific problem this document addresses." },
+        { key: "approach_architecture", title: "Approach or Architecture", required: true, countsTowardWordcount: true, wordBudget: { min: 700, max: 4000, typical: 2000 }, guidance: "The proposed approach, system architecture, or specification — may include code or specification blocks." },
+        { key: "evaluation", title: "Evaluation", required: true, countsTowardWordcount: true, guidance: "How the approach was validated or benchmarked." },
+        { key: "deployment_considerations", title: "Deployment Considerations", required: true, countsTowardWordcount: true, guidance: "Practical considerations for adopting or deploying the approach." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, guidance: "Summarises the contribution and its practical implications." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the required style." },
+        { key: "appendices", title: "Appendices", required: false, countsTowardWordcount: false, guidance: "Supplementary technical detail — full code listings, extended benchmarks, configuration references." },
+      ],
+      frontMatter: ["executive_summary"],
+      backMatter: ["references", "appendices"],
+    },
+    budget: {
+      totalWords: { min: 2000, max: 12000, typical: 6000 },
+      distribution: { introduction: 0.1, problem: 0.15, approach_architecture: 0.35, evaluation: 0.2, deployment_considerations: 0.12, conclusion: 0.05 },
+    },
+    sources: { targetCount: { min: 10, typical: 22 }, recencyExpectation: "majority within 5 years — technical material dates quickly", typeMix: { peer_reviewed: 0.4, other: 0.6 } },
+    citation: { defaultStyle: "ieee", commonStyles: ["ieee", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "document_purpose",
+          label: "Document purpose",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the document is purely technical, marketing-technical (technical content with a promotional angle), or a standards submission.",
+            whyItMatters: "Changes tone and what claims are appropriate — a standards submission can't include marketing language, and a marketing-technical piece reads differently from a pure technical report.",
+            example: "Purely technical — an internal architecture document being shared with a standards body for comment.",
+            defaultWithRationale: "There is no safe default for this — it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "audience_technical_level",
+          label: "Audience technical level",
+          tier: "required",
+          guidance: {
+            whatItIs: "How much technical background the intended readers already have.",
+            whyItMatters: "Determines whether jargon and unexplained acronyms are appropriate or need to be defined.",
+            example: "Practising engineers in the same subfield — deep familiarity assumed.",
+            defaultWithRationale: "Defaults to 'informed generalist in the field' when unspecified.",
+          },
+          defaultValue: "informed generalist in the field",
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "code_blocks_present",
+          label: "Do code or specification blocks appear?",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Whether the document includes code listings, API specifications, or similar formatted technical blocks.",
+            whyItMatters: "Affects formatting handling on export — code blocks need monospace formatting preserved, not reflowed like prose.",
+            example: "Yes, several Python code listings and one JSON schema.",
+            defaultWithRationale: "Defaults to no code blocks unless the content requires them.",
+          },
+          defaultValue: "no",
+          allowsProvisional: true,
+        },
+        {
+          key: "organisational_template",
+          label: "Organisational template",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Your organisation's white paper template or house style, if one exists.",
+            whyItMatters: "Industry white papers often have branding and formatting conventions distinct from academic templates.",
+            example: "A .docx template from the organisation's technical publications team.",
+            defaultWithRationale: "Without one, a generic technical-document layout is used.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [
+        {
+          key: "versioning_scheme",
+          label: "Versioning scheme",
+          tier: "optional",
+          guidance: {
+            whatItIs: "Whether the document follows a version-numbering convention (useful for living technical documents that get revised).",
+            whyItMatters: "Standards and technical documentation are often version-controlled artifacts rather than one-off submissions.",
+            example: "Semantic versioning — this is v1.2 of the specification.",
+            defaultWithRationale: "If unspecified, the document is treated as a single unversioned artifact.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+    },
+    qualityGates: [
+      { id: "structural_completeness", description: "Every required section present and non-empty", severity: "blocking" },
+      { id: "budget_adherence", description: "Within ±20% of the length range", severity: "required" },
+      { id: "technical_accuracy_reviewed", description: "Technical claims have been reviewed for accuracy, not just plausibility", severity: "advisory" },
+    ],
+    workflowVariant: "applied",
+    complianceProfile: "professional",
+    exportDefaults: { format: "docx", includeToc: true },
+  },
+
   // ── OT-22 Presentation — presentation / slide_deck / visual ────────────
   {
     id: "OT-22",
@@ -1769,6 +2442,218 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     workflowVariant: "visual",
     complianceProfile: "coursework",
     exportDefaults: { format: "pdf", includeToc: false },
+  },
+
+  // ── OT-23 Poster — presentation / poster_grid / venue ───────────────────
+  // The only entry using `poster_grid` — the eighth and last structure
+  // variant `domain/project/types.ts` defines, now proven by real catalog
+  // data alongside `linear`, `imrad`, `chapter_based`, `thematic`,
+  // `argumentative`, `slide_deck`, and `funder_prescribed`. Compliance here
+  // is physical (millimetres, DPI, viewing-distance-driven font size), and
+  // every gate that requires layout measurement is recorded honestly
+  // rather than faked — same discipline as OT-11's page-limit gate.
+  {
+    id: "OT-23",
+    version: 1,
+    label: "Poster",
+    aliases: ["conference poster", "research poster"],
+    family: "presentation",
+    academicLevels: ["undergraduate", "masters", "doctoral", "postdoc", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "poster_grid",
+      sections: [
+        { key: "title_authors", title: "Title and Authors", required: true, countsTowardWordcount: false, guidance: "Title, authors, and affiliations, sized to be readable from several metres away." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, wordBudget: { min: 40, max: 120, typical: 80 }, guidance: "The motivation and question, compressed to a few sentences." },
+        { key: "methods", title: "Methods", required: true, countsTowardWordcount: true, wordBudget: { min: 30, max: 100, typical: 60 }, guidance: "Enough to establish rigor, no more — detail belongs in the paper, not the poster." },
+        { key: "results", title: "Results", required: true, countsTowardWordcount: true, wordBudget: { min: 60, max: 250, typical: 150 }, guidance: "Figure-dominant — this region is mostly figures and captions, with minimal running text." },
+        { key: "conclusions", title: "Conclusions", required: true, countsTowardWordcount: true, wordBudget: { min: 30, max: 100, typical: 60 }, guidance: "The key takeaway, stated for a viewer who only reads this region." },
+        { key: "references", title: "References", required: false, countsTowardWordcount: false, guidance: "A short reference list, often abbreviated given space constraints." },
+        { key: "acknowledgements", title: "Acknowledgements", required: false, countsTowardWordcount: false, guidance: "Funding and collaborator acknowledgements, if space allows." },
+        { key: "contact", title: "QR / Contact", required: false, countsTowardWordcount: false, guidance: "Contact details or a QR code linking to the full paper or dataset." },
+      ],
+      frontMatter: ["title_authors"],
+      backMatter: ["references", "acknowledgements", "contact"],
+    },
+    budget: {
+      totalWords: { min: 300, max: 800, typical: 550 },
+      distribution: { introduction: 0.15, methods: 0.11, results: 0.5, conclusions: 0.11 },
+    },
+    sources: { targetCount: { min: 5, typical: 10 }, recencyExpectation: "majority within 10 years", typeMix: { peer_reviewed: 0.7, other: 0.3 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7", "vancouver"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "physical_dimensions_orientation",
+          label: "Physical dimensions and orientation",
+          tier: "required",
+          guidance: {
+            whatItIs: "The poster's exact print dimensions and whether it's portrait or landscape.",
+            whyItMatters: "Every layout decision — font sizes, figure placement, region proportions — is computed against these dimensions; there is no generic poster size.",
+            example: "A0, portrait, 841mm x 1189mm.",
+            defaultWithRationale: "There is no safe default for this — it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "print_resolution",
+          label: "Print resolution",
+          tier: "required",
+          guidance: {
+            whatItIs: "The minimum resolution (DPI) figures need for print quality at the poster's physical size.",
+            whyItMatters: "A figure that looks fine on screen can be visibly pixelated at A0 print size — this is checked before, not after, printing.",
+            example: "300 DPI at full poster size.",
+            defaultWithRationale: "Defaults to 300 DPI, the standard for print-quality output, until corrected.",
+          },
+          defaultValue: "300 DPI",
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "conference_template",
+          label: "Conference template",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The conference or institution's poster template, if one is provided.",
+            whyItMatters: "Many venues provide a required template with fixed regions and branding.",
+            example: "A PowerPoint or InDesign template from the conference organisers.",
+            defaultWithRationale: "Without one, a generic academic poster layout is used.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "figure_files",
+          label: "Figure files",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The actual figure files (charts, diagrams, photos) to be placed in the Results region.",
+            whyItMatters: "The poster is figure-dominant — without real figures, the layout can't be finalised.",
+            example: "High-resolution PNG or vector figures exported from your analysis.",
+            defaultWithRationale: "Without figures, placeholder regions are reserved pending upload.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "viewing_distance",
+          label: "Viewing distance",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The typical distance viewers will stand from the poster.",
+            whyItMatters: "Directly drives the minimum font size — a poster read from 1 metre needs much larger text than one read from 2-3 metres.",
+            example: "1.5 metres, typical for a conference poster session.",
+            defaultWithRationale: "Defaults to 1.5 metres, the typical conference poster-session viewing distance.",
+          },
+          defaultValue: "1.5 metres",
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "word_count_below_threshold", description: "Total word count is below the venue's threshold", severity: "blocking" },
+      { id: "minimum_font_size_met", description: "Font size meets the minimum for the stated viewing distance", severity: "blocking" },
+      { id: "figure_resolution_adequate", description: "Figure resolution is adequate for the print size", severity: "blocking" },
+      { id: "region_balance", description: "No region is visually overcrowded relative to the others", severity: "advisory" },
+      { id: "contrast_aa", description: "Text-background contrast meets WCAG AA", severity: "blocking" },
+    ],
+    workflowVariant: "visual",
+    complianceProfile: "venue",
+    exportDefaults: { format: "pdf", includeToc: false },
+  },
+
+  // ── OT-24 Generic Document (escape hatch) — short_form / linear / minimal ──
+  // Deliberately minimal, per docs 14 §9: "so that 'my document is not in
+  // your list' is never a dead end." Structure and budget are genuinely
+  // user-defined rather than type-specific, so the section list and word
+  // range below are the widest reasonable default, not a real target —
+  // the actual constraint comes from the approximate_length intake field.
+  {
+    id: "OT-24",
+    version: 1,
+    label: "Generic Document",
+    aliases: ["something else", "other", "custom document"],
+    family: "short_form",
+    academicLevels: ["undergraduate", "masters", "doctoral", "postdoc", "faculty", "professional"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "linear",
+      sections: [
+        { key: "title", title: "Title", required: true, countsTowardWordcount: false, guidance: "A working title for the document." },
+        { key: "body", title: "Body", required: true, countsTowardWordcount: true, guidance: "The document's content — structure is entirely up to you." },
+        { key: "references", title: "References", required: false, countsTowardWordcount: false, guidance: "Sources cited, if any, in your chosen style." },
+      ],
+      frontMatter: ["title"],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 500, max: 15000, typical: 3000 },
+      distribution: { body: 0.9 },
+    },
+    sources: { targetCount: { min: 0, typical: 5 }, recencyExpectation: "no fixed expectation — user-defined", typeMix: { peer_reviewed: 0.5, other: 0.5 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7", "mla9", "chicago-author-date", "ieee", "vancouver"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "title",
+          label: "Title",
+          tier: "required",
+          guidance: {
+            whatItIs: "A working title for whatever this document is.",
+            whyItMatters: "Every project needs a name to be findable later, even a provisional one.",
+            example: "Notes on municipal water policy — untitled draft.",
+            defaultWithRationale: "There is no safe default for this — it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "purpose",
+          label: "Purpose",
+          tier: "required",
+          guidance: {
+            whatItIs: "In a sentence or two, free text: what this document is for.",
+            whyItMatters: "Since nothing else about this type is fixed, this is the only thing grounding what 'good' means for this specific document. It's also logged — recurring patterns here are a catalog roadmap input, per docs 14 §9's own note.",
+            example: "A briefing note for my supervisor summarising three possible thesis directions.",
+            defaultWithRationale: "There is no safe default for this — it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+      ],
+      recommended: [
+        {
+          key: "approximate_length",
+          label: "Approximate length",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "A rough target word count, if you have one in mind.",
+            whyItMatters: "Without a type-specific budget to fall back on, this is the only length signal available.",
+            example: "About 1,500 words.",
+            defaultWithRationale: "Without one, the generic 500-15,000 word range above applies with no meaningful target.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [
+        {
+          key: "citation_style",
+          label: "Citation style, if any",
+          tier: "optional",
+          guidance: {
+            whatItIs: "Your preferred citation style, if the document cites sources at all.",
+            whyItMatters: "Not every generic document needs citations — this is opt-in, not assumed.",
+            example: "APA 7th edition.",
+            defaultWithRationale: "Defaults to no citation style enforced unless one is specified.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+    },
+    qualityGates: [
+      { id: "structural_completeness", description: "The document has a title and non-empty content", severity: "blocking" },
+    ],
+    workflowVariant: "short_form",
+    complianceProfile: "coursework",
+    exportDefaults: { format: "docx", includeToc: false },
   },
 ];
 
