@@ -385,19 +385,37 @@ nothing else about them.
 
 `src/core/project/` has a project model, serializer, validator, and version
 manager — the right instincts. `src/services/storageService.ts` uses browser
-storage. `supabase/schema.sql` defines server-side tables.
+storage. `supabase/schema.sql` defines server-side tables for the older app's
+Auth/users, reached via Supabase's REST API and RLS.
+
+`services/store` (§1's L1 layer) has started: `src/services/store/` provides
+a `ProjectStore` interface (`types.ts`) with two implementations selected by
+`DATABASE_URL` (`projectStore.ts`) — the pre-existing in-memory Map
+(`src/app/conductor/projectStore.ts`, used whenever `DATABASE_URL` is unset)
+and a Postgres-backed one (`pgProjectStore.ts`) over a direct `pg` connection
+to `supabase/schema_store.sql`'s `projects` table. `server/routes/project.ts`
+depends only on the interface. This is a pragmatic increment, not §2-§10's
+full target — one `projects` row per project, jsonb columns for
+answers/gates/document/rubric_report/claim_graph/waivers, no event log, no
+content addressing, no Ledger, no client-side encryption. It makes the
+server-authoritative API's state durable; it does not implement the
+local-first desktop architecture §2-§10 describes, which needs a client that
+doesn't exist yet.
 
 | Current | Target |
 |---|---|
 | Browser storage | Encrypted local store with an event log |
-| Server-side project data | Local; cloud holds ciphertext only |
+| Server-side project data, optionally Postgres-durable (`services/store`) | Local; cloud holds ciphertext only |
 | Project versioning exists | Full schema migration with snapshots and CI fixtures |
 | No event sourcing | Event log as the source of truth |
 | No content addressing | Content-addressed, deduplicated blobs |
 | No snapshots | Gate-triggered permanent snapshots |
 | No provenance storage | Hash-chained append-only Ledger |
 | No deletion guarantees | Real deletion including derivatives and key destruction |
-| Rich server schema | Deliberately thin cloud schema with opaque sync objects |
+| Rich server schema (two independent ones: legacy auth, new project data) | Deliberately thin cloud schema with opaque sync objects |
 
 `projectVersionManager.ts` is the closest existing analogue to §8 and is worth
-studying before rewriting.
+studying before rewriting. `src/app/studio/sessionPolicyStore.ts` (per-session
+Warden consent) is still in-memory only — deliberately out of this
+increment's scope, since it's request-scoped consent state tied to an
+auth/session system that doesn't exist yet, not durable project data.

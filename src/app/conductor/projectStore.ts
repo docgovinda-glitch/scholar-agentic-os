@@ -36,7 +36,8 @@ export interface ProjectRecord {
 const projects = new Map<string, ProjectRecord>();
 let counter = 0;
 
-function generateProjectId(): string {
+/** Exported for src/services/store/pgProjectStore.ts, which needs the same id shape. */
+export function generateProjectId(): string {
   counter += 1;
   return `proj-${Date.now().toString(36)}-${counter}`;
 }

@@ -1,0 +1,130 @@
+/**
+ * Postgres-backed implementation of ProjectStore (services/store's "owns the
+ * Postgres schema" per docs/01-product/13-MODULE-SPECIFICATIONS.md).
+ *
+ * Schema: supabase/schema_store.sql's `projects` table — one row per
+ * ProjectRecord, with answers/gates/document/rubric_report/claim_graph/
+ * waivers stored as jsonb. This is a pragmatic increment, not
+ * docs/04-architecture/45-DATA-ARCHITECTURE.md §2-§10's full target (event
+ * sourcing, content-addressed blobs, a hash-chained Ledger, client-side
+ * encryption with the cloud holding ciphertext only) — that target is for
+ * the eventual local-first desktop client, which doesn't exist yet. What
+ * exists today is a server-authoritative Express API
+ * (server/routes/project.ts), so this store makes that API's state durable
+ * without pretending to be the full local-first architecture. Upgrading to
+ * §2-§10 is real future work, not silently abandoned — see this module's
+ * "Current state" note in docs 45 §13.
+ *
+ * Takes a minimal query interface (`PgQueryable`) rather than depending on
+ * `pg.Pool` directly, so tests can inject a fake and verify SQL/param
+ * shape and row-mapping without a live database. `createPool()` below is
+ * the one place that constructs a real `pg.Pool` from DATABASE_URL.
+ */
+
+import { Pool } from "pg";
+import { initialProjectGateState } from "../../domain/project/gates";
+import { emptyGraph } from "../../domain/claim/graph";
+import { generateProjectId } from "../../app/conductor/projectStore";
+import type { ProjectRecord, ProjectStore } from "./types";
+
+export interface PgQueryable {
+  query(text: string, params?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
+}
+
+/**
+ * Builds the real `pg.Pool` used at runtime. Reads DATABASE_URL directly
+ * (rather than accepting it as a parameter) so every call site gets the
+ * same pool — node-postgres pools are meant to be long-lived and shared,
+ * not created per request.
+ */
+export function createPool(): Pool {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      "DATABASE_URL is not set. Postgres-backed persistence requires it — see " +
+        ".env.example and docs/04-architecture/45-DATA-ARCHITECTURE.md §13. " +
+        "Without it, the server falls back to the in-memory store."
+    );
+  }
+  return new Pool({
+    connectionString,
+    ssl: connectionString.includes("localhost") ? undefined : { rejectUnauthorized: true },
+  });
+}
+
+function rowToRecord(row: Record<string, unknown>): ProjectRecord {
+  return {
+    projectId: row.project_id as string,
+    outputTypeId: row.output_type_id as string,
+    answers: row.answers as ProjectRecord["answers"],
+    gates: row.gates as ProjectRecord["gates"],
+    document: (row.document as ProjectRecord["document"] | null) ?? undefined,
+    rubricReport: (row.rubric_report as ProjectRecord["rubricReport"] | null) ?? undefined,
+    claimGraph: row.claim_graph as ProjectRecord["claimGraph"],
+    waivers: row.waivers as ProjectRecord["waivers"],
+  };
+}
+
+export function createPgProjectStore(db: PgQueryable): ProjectStore {
+  return {
+    async create(outputTypeId: string): Promise<ProjectRecord> {
+      const projectId = generateProjectId();
+      const record: ProjectRecord = {
+        projectId,
+        outputTypeId,
+        answers: {},
+        gates: initialProjectGateState(projectId),
+        claimGraph: emptyGraph(),
+        waivers: {},
+      };
+      await db.query(
+        `insert into public.projects
+           (project_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers)
+         values ($1, $2, $3, $4, null, null, $5, $6)`,
+        [
+          record.projectId,
+          record.outputTypeId,
+          JSON.stringify(record.answers),
+          JSON.stringify(record.gates),
+          JSON.stringify(record.claimGraph),
+          JSON.stringify(record.waivers),
+        ]
+      );
+      return record;
+    },
+
+    async get(projectId: string): Promise<ProjectRecord | undefined> {
+      const result = await db.query(`select * from public.projects where project_id = $1`, [projectId]);
+      const row = result.rows[0];
+      return row ? rowToRecord(row) : undefined;
+    },
+
+    async save(record: ProjectRecord): Promise<ProjectRecord> {
+      await db.query(
+        `insert into public.projects
+           (project_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, now())
+         on conflict (project_id) do update set
+           output_type_id = excluded.output_type_id,
+           answers = excluded.answers,
+           gates = excluded.gates,
+           document = excluded.document,
+           rubric_report = excluded.rubric_report,
+           claim_graph = excluded.claim_graph,
+           waivers = excluded.waivers,
+           updated_at = now()`,
+        [
+          record.projectId,
+          record.outputTypeId,
+          JSON.stringify(record.answers),
+          JSON.stringify(record.gates),
+          record.document ? JSON.stringify(record.document) : null,
+          record.rubricReport ? JSON.stringify(record.rubricReport) : null,
+          JSON.stringify(record.claimGraph),
+          JSON.stringify(record.waivers),
+        ]
+      );
+      return record;
+    },
+  };
+}
