@@ -275,6 +275,163 @@ describe("GET /api/projects/:id/rubric", () => {
   });
 });
 
+function evidenceSpan(overrides: Partial<{ sourceId: string; quote: string }> = {}) {
+  return {
+    sourceId: overrides.sourceId ?? "src-1",
+    locator: { page: 12 },
+    quote: overrides.quote ?? "The observed effect was statistically significant.",
+  };
+}
+
+describe("POST /api/projects/:id/claims", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("404s for an unknown project", async () => {
+    const res = await request(app)
+      .post("/api/projects/proj-nope/claims")
+      .send({ claim: { id: "c1", text: "Claim text." } });
+    expect(res.status).toBe(404);
+  });
+
+  it("400s when claim is missing or malformed", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const res = await request(app).post(`/api/projects/${created.body.projectId}/claims`).send({});
+    expect(res.status).toBe(400);
+  });
+
+  it("adds a claim and returns the updated graph", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const res = await request(app)
+      .post(`/api/projects/${created.body.projectId}/claims`)
+      .send({ claim: { id: "c1", text: "Claim text." } });
+    expect(res.status).toBe(201);
+    expect(res.body.claimGraph.claims).toEqual([{ id: "c1", text: "Claim text." }]);
+  });
+
+  it("409s on a duplicate claim id", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "First." } });
+    const res = await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "Second." } });
+    expect(res.status).toBe(409);
+  });
+});
+
+describe("POST /api/projects/:id/claims/:claimId/evidence", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("400s when the claim doesn't exist", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const res = await request(app)
+      .post(`/api/projects/${created.body.projectId}/claims/nope/evidence`)
+      .send({ binding: { id: "b1", claimId: "nope", evidence: [evidenceSpan()], strength: "strong", rationale: "Direct measurement." } });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s when binding.claimId doesn't match the URL", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "Claim text." } });
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/claims/c1/evidence`)
+      .send({ binding: { id: "b1", claimId: "other-claim", evidence: [evidenceSpan()], strength: "strong", rationale: "x" } });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s when evidence is an empty array", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "Claim text." } });
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/claims/c1/evidence`)
+      .send({ binding: { id: "b1", claimId: "c1", evidence: [], strength: "strong", rationale: "x" } });
+    expect(res.status).toBe(400);
+  });
+
+  it("binds evidence to an existing claim", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "Claim text." } });
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/claims/c1/evidence`)
+      .send({ binding: { id: "b1", claimId: "c1", evidence: [evidenceSpan()], strength: "strong", rationale: "Direct measurement." } });
+    expect(res.status).toBe(201);
+    expect(res.body.claimGraph.bindings).toHaveLength(1);
+  });
+});
+
+describe("GET /api/projects/:id/claims/unsupported and /conflicts", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("lists claims with zero bindings as unsupported", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "Supported." } });
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c2", text: "Unsupported." } });
+    await request(app)
+      .post(`/api/projects/${projectId}/claims/c1/evidence`)
+      .send({ binding: { id: "b1", claimId: "c1", evidence: [evidenceSpan()], strength: "strong", rationale: "x" } });
+
+    const res = await request(app).get(`/api/projects/${projectId}/claims/unsupported`);
+    expect(res.status).toBe(200);
+    expect(res.body.claims.map((c: { id: string }) => c.id)).toEqual(["c2"]);
+  });
+
+  it("surfaces a claim with both supporting and contradicting evidence as a conflict", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "Contested." } });
+    await request(app)
+      .post(`/api/projects/${projectId}/claims/c1/evidence`)
+      .send({ binding: { id: "b1", claimId: "c1", evidence: [evidenceSpan({ sourceId: "src-a" })], strength: "strong", rationale: "x" } });
+    await request(app)
+      .post(`/api/projects/${projectId}/claims/c1/evidence`)
+      .send({ binding: { id: "b2", claimId: "c1", evidence: [evidenceSpan({ sourceId: "src-b" })], strength: "contradicts", rationale: "y" } });
+
+    const res = await request(app).get(`/api/projects/${projectId}/claims/conflicts`);
+    expect(res.status).toBe(200);
+    expect(res.body.conflicts).toHaveLength(1);
+    expect(res.body.conflicts[0].claimId).toBe("c1");
+  });
+});
+
+describe("DELETE /api/projects/:id/sources/:sourceId", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("404s for an unknown project", async () => {
+    const res = await request(app).delete("/api/projects/proj-nope/sources/src-1");
+    expect(res.status).toBe(404);
+  });
+
+  it("removes a binding entirely once its only evidence source is removed, making the claim unsupported again", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "Claim text." } });
+    await request(app)
+      .post(`/api/projects/${projectId}/claims/c1/evidence`)
+      .send({ binding: { id: "b1", claimId: "c1", evidence: [evidenceSpan({ sourceId: "src-1" })], strength: "strong", rationale: "x" } });
+
+    const res = await request(app).delete(`/api/projects/${projectId}/sources/src-1`);
+    expect(res.status).toBe(200);
+    expect(res.body.claimGraph.bindings).toEqual([]);
+
+    const unsupported = await request(app).get(`/api/projects/${projectId}/claims/unsupported`);
+    expect(unsupported.body.claims.map((c: { id: string }) => c.id)).toEqual(["c1"]);
+  });
+});
+
 describe("POST /api/projects/:id/gates/:gate/invalidate", () => {
   beforeEach(() => {
     __resetProjectStoreForTests();

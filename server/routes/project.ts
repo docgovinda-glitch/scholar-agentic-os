@@ -40,6 +40,8 @@ import type { GateId } from "../../src/app/conductor/conductor.ts";
 import { createProject, getProject, saveProject } from "../../src/app/conductor/projectStore.ts";
 import { evaluateAgainstOutputType } from "../../src/app/rubric/rubric.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
+import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, ClaimGraphError } from "../../src/domain/claim/graph.ts";
+import type { Claim, ClaimEvidenceBinding, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
 
@@ -63,6 +65,37 @@ function isValidDocument(value: unknown): value is CanonicalDocument {
 
 function isGateId(value: unknown): value is GateId {
   return typeof value === "string" && (GATE_ORDER as string[]).includes(value);
+}
+
+function isValidClaim(value: unknown): value is Claim {
+  if (typeof value !== "object" || value === null) return false;
+  const c = value as Record<string, unknown>;
+  if (typeof c.id !== "string" || typeof c.text !== "string") return false;
+  if (c.draftSpanId !== undefined && typeof c.draftSpanId !== "string") return false;
+  return true;
+}
+
+const SUPPORT_STRENGTHS = new Set(["strong", "moderate", "weak", "contradicts"]);
+
+function isValidEvidenceSpan(value: unknown): value is EvidenceSpan {
+  if (typeof value !== "object" || value === null) return false;
+  const e = value as Record<string, unknown>;
+  if (typeof e.sourceId !== "string" || typeof e.quote !== "string") return false;
+  if (typeof e.locator !== "object" || e.locator === null) return false;
+  const l = e.locator as Record<string, unknown>;
+  for (const key of ["page", "paragraph", "startOffset", "endOffset"]) {
+    if (l[key] !== undefined && typeof l[key] !== "number") return false;
+  }
+  return true;
+}
+
+function isValidBinding(value: unknown): value is ClaimEvidenceBinding {
+  if (typeof value !== "object" || value === null) return false;
+  const b = value as Record<string, unknown>;
+  if (typeof b.id !== "string" || typeof b.claimId !== "string" || typeof b.rationale !== "string") return false;
+  if (typeof b.strength !== "string" || !SUPPORT_STRENGTHS.has(b.strength as SupportStrength)) return false;
+  if (!Array.isArray(b.evidence) || !b.evidence.every(isValidEvidenceSpan)) return false;
+  return true;
 }
 
 function projectView(record: ReturnType<typeof getProject>) {
@@ -210,6 +243,101 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(404).json({ error: `Project "${req.params.id}" has no document submitted yet.` });
     }
     res.json(record.rubricReport);
+  });
+
+  /** Add a claim to the project's Claim–Evidence Graph. Body: { claim: Claim }. 409s if the claim id is already used. */
+  app.post("/api/projects/:id/claims", projectLimit, (req, res) => {
+    const record = getProject(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    const { claim } = req.body ?? {};
+    if (!isValidClaim(claim)) {
+      return res.status(400).json({ error: "Missing or malformed required field: claim ({id, text, draftSpanId?})." });
+    }
+    try {
+      const claimGraph = addClaim(record.claimGraph, claim);
+      const updated = saveProject({ ...record, claimGraph });
+      res.status(201).json({ ...projectView(updated), claimGraph });
+    } catch (err) {
+      if (err instanceof ClaimGraphError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  /**
+   * Bind evidence to a claim. Body: { binding: ClaimEvidenceBinding }.
+   * 400s if the claim doesn't exist, the binding id is already used, or the
+   * binding has no evidence spans — a binding asserting support without a
+   * real located quote is exactly what domain/claim's bindEvidence refuses
+   * (AG-13's "never invents a locator" QA checkpoint).
+   */
+  app.post("/api/projects/:id/claims/:claimId/evidence", projectLimit, (req, res) => {
+    const record = getProject(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    const { binding } = req.body ?? {};
+    if (!isValidBinding(binding) || binding.claimId !== req.params.claimId) {
+      return res.status(400).json({
+        error: "Missing or malformed required field: binding ({id, claimId, evidence[]: {sourceId, locator, quote}, strength, rationale}); binding.claimId must match the URL.",
+      });
+    }
+    try {
+      const claimGraph = bindEvidence(record.claimGraph, binding);
+      const updated = saveProject({ ...record, claimGraph });
+      res.status(201).json({ ...projectView(updated), claimGraph });
+    } catch (err) {
+      if (err instanceof ClaimGraphError) {
+        return res.status(400).json({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  /** The project's full Claim–Evidence Graph. */
+  app.get("/api/projects/:id/claims", projectLimit, (req, res) => {
+    const record = getProject(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    res.json(record.claimGraph);
+  });
+
+  /** Claims with zero evidence bindings — domain/claim's unsupportedClaims(), AG-13's "unsupported" output. */
+  app.get("/api/projects/:id/claims/unsupported", projectLimit, (req, res) => {
+    const record = getProject(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    res.json({ claims: unsupportedClaims(record.claimGraph) });
+  });
+
+  /** Claims with both a supporting and a contradicting binding, surfaced for a human to resolve (never auto-resolved). */
+  app.get("/api/projects/:id/claims/conflicts", projectLimit, (req, res) => {
+    const record = getProject(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    res.json({ conflicts: findConflicts(record.claimGraph) });
+  });
+
+  /**
+   * Remove a source from the Claim–Evidence Graph: every binding loses any
+   * evidence spans pointing at it, and any binding left with zero evidence
+   * is dropped entirely (domain/claim's removeSource — mirrors a source
+   * being un-approved or retracted after claims were already bound to it).
+   */
+  app.delete("/api/projects/:id/sources/:sourceId", projectLimit, (req, res) => {
+    const record = getProject(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    const claimGraph = removeSource(record.claimGraph, req.params.sourceId);
+    const updated = saveProject({ ...record, claimGraph });
+    res.json({ ...projectView(updated), claimGraph });
   });
 
   /**

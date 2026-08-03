@@ -14,6 +14,8 @@ import { initialProjectGateState } from "../../domain/project/gates";
 import type { ProjectGateState } from "../../domain/project/gates";
 import type { CanonicalDocument } from "../../domain/document/model";
 import type { RubricReport } from "../rubric/rubric";
+import { emptyGraph } from "../../domain/claim/graph";
+import type { ClaimEvidenceGraph } from "../../domain/claim/types";
 
 export interface ProjectRecord {
   projectId: string;
@@ -25,6 +27,8 @@ export interface ProjectRecord {
   document?: CanonicalDocument;
   /** The most recent Rubric evaluation of `document` against the project's output type — recomputed every time `document` changes. Reused as G6's sign-off snapshot. */
   rubricReport?: RubricReport;
+  /** The project's Claim–Evidence Graph (domain/claim). Starts empty at creation, same as an empty gate state — there is always a graph to query, just possibly with nothing in it yet. */
+  claimGraph: ClaimEvidenceGraph;
 }
 
 const projects = new Map<string, ProjectRecord>();
@@ -42,6 +46,7 @@ export function createProject(outputTypeId: string): ProjectRecord {
     outputTypeId,
     answers: {},
     gates: initialProjectGateState(projectId),
+    claimGraph: emptyGraph(),
   };
   projects.set(projectId, record);
   return record;
