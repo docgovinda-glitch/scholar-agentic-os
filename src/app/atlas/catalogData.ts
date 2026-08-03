@@ -2,14 +2,20 @@
  * The catalog data — real output type entries.
  *
  * Spec: docs/01-product/14-OUTPUT-TYPE-CATALOG.md §9. That document
- * specifies 24 output types across 6 families. This file implements 9 of
+ * specifies 24 output types across 6 families. This file implements 11 of
  * them: the original one representative entry per family (one per
  * workflow variant and structure variant class), proving the engine
- * against every shape the full catalog needs to support, plus three more
+ * against every shape the full catalog needs to support; three more
  * within the short_form family (OT-02 Essay, OT-03 Report, OT-13
  * Literature Review) that each exercise a structure variant the first
  * pass didn't (`argumentative`, plain `linear` with numbered sections,
- * `thematic`). Adding the remaining 15 is data entry against an engine
+ * `thematic`); and two more deepening families that only had one entry —
+ * OT-08 Doctoral Dissertation (long_form_chaptered, modeled as the
+ * monograph baseline; the by-publication structural variant is not
+ * modeled, stated honestly in that entry's own comment) and OT-11
+ * Conference Paper (venue_targeted, with a page-limit quality gate that is
+ * deliberately left uncompiled since it needs layout measurement, not a
+ * word count). Adding the remaining 13 is data entry against an engine
  * already proven correct — see docs/01-product/13-MODULE-SPECIFICATIONS.md
  * §8.3 for the tracked gap.
  *
@@ -508,6 +514,138 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     exportDefaults: { format: "docx", includeToc: true },
   },
 
+  // ── OT-08 Doctoral Dissertation — long_form / chapter_based / institutional ──
+  // Modeled as the monograph format (the baseline every field defaults to
+  // when thesis_format is unanswered). The by-publication variant — where
+  // empirical chapters are published papers with a connecting narrative —
+  // is a materially different structure template per docs 14 §9's own
+  // note and is not modeled here; the by-publication-specific intake
+  // fields and quality gate below are marked as applying only to that
+  // variant, honestly, rather than pretending this one structure covers both.
+  {
+    id: "OT-08",
+    version: 1,
+    label: "Doctoral Dissertation",
+    aliases: ["phd thesis", "doctoral thesis", "dissertation"],
+    family: "long_form",
+    academicLevels: ["doctoral"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "chapter_based",
+      sections: [
+        { key: "title_page", title: "Title Page", required: true, countsTowardWordcount: false, guidance: "Title, your name, degree, institution, submission date, per your department's template." },
+        { key: "declaration", title: "Declaration of Originality", required: true, countsTowardWordcount: false, guidance: "The standard statement that this is your own work, using your institution's exact wording." },
+        { key: "abstract", title: "Abstract", required: true, countsTowardWordcount: false, wordBudget: { min: 250, max: 400, typical: 300 }, guidance: "A single paragraph summarising the question, method, key findings, and contribution." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, guidance: "Motivates the research question and previews the dissertation's structure." },
+        { key: "literature_review", title: "Literature Review", required: true, countsTowardWordcount: true, guidance: "Situates the work against existing research; identifies the gap it addresses." },
+        { key: "methodology", title: "Methodology", required: true, countsTowardWordcount: true, guidance: "Names the research design, data collection method, and analysis approach precisely enough to be reproducible." },
+        { key: "empirical_chapters", title: "Empirical / Substantive Chapters", required: true, countsTowardWordcount: true, guidance: "The dissertation's core chapters reporting original work — typically several, one per study or major result. Modeled here as one aggregate section; the drafting pipeline splits it into per-chapter units at G3." },
+        { key: "discussion", title: "Discussion", required: true, countsTowardWordcount: true, guidance: "Interprets the results across all empirical chapters against the literature." },
+        { key: "contribution_statement", title: "Contribution to Knowledge", required: true, countsTowardWordcount: true, wordBudget: { min: 300, max: 1500, typical: 800 }, guidance: "States explicitly what the dissertation contributes that did not exist before it. Every claim here must be traceable to the empirical chapters — this is the one place examiners look first." },
+        { key: "limitations", title: "Limitations", required: true, countsTowardWordcount: true, wordBudget: { min: 200, max: 1000, typical: 500 }, guidance: "States the boundaries of the work honestly — scope, method, and generalisability limits." },
+        { key: "future_work", title: "Future Work", required: false, countsTowardWordcount: true, guidance: "Directions the contribution opens up, distinct from limitations." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, guidance: "Draws the dissertation together; does not introduce new evidence." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Full bibliography in the required citation style." },
+      ],
+      frontMatter: ["title_page", "declaration", "abstract"],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 40000, max: 100000, typical: 70000 },
+      distribution: {
+        introduction: 0.06,
+        literature_review: 0.18,
+        methodology: 0.12,
+        empirical_chapters: 0.35,
+        discussion: 0.15,
+        contribution_statement: 0.02,
+        limitations: 0.01,
+        conclusion: 0.03,
+      },
+    },
+    sources: { targetCount: { min: 150, typical: 250 }, recencyExpectation: "majority within 10 years, with foundational older work expected", typeMix: { peer_reviewed: 0.75, other: 0.25 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7", "chicago-author-date"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "thesis_format",
+          label: "Thesis format",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the dissertation is a monograph, by publication (chapters are published or publication-ready papers), or hybrid.",
+            whyItMatters: "Restructures everything — chapter boundaries, the connecting narrative, and which quality gates apply.",
+            example: "By publication: three journal articles (two published, one under review) with a connecting introduction and discussion.",
+            defaultWithRationale: "There is no safe default for this — it changes the entire structure, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "contribution_claim",
+          label: "Contribution claim",
+          tier: "required",
+          guidance: {
+            whatItIs: "In one or two sentences, what the dissertation contributes that is new.",
+            whyItMatters: "Everything else in the dissertation exists to support this claim — it is the first thing examiners assess.",
+            example: "The first empirical account of how municipal water policy diffusion follows political rather than hydrological boundaries.",
+            defaultWithRationale: "If not yet crystallised, mark this provisional and describe your research question instead — we'll propose candidate contribution statements once the empirical chapters exist.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "viva_jurisdiction",
+          label: "Viva / defence jurisdiction",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The country or institutional system your viva or defence follows (affects declaration wording and formatting conventions).",
+            whyItMatters: "UK vivas, US defences, and European systems have different regulatory expectations.",
+            example: "UK, under a Russell Group university's standard regulations.",
+            defaultWithRationale: "Defaults to generic institutional conventions when unspecified.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "publication_status_of_chapters",
+          label: "Publication status of chapters",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "For each empirical chapter, whether it is published, under review, or unpublished — relevant only for the by-publication format.",
+            whyItMatters: "Published chapters carry citation and copyright obligations that unpublished ones don't.",
+            example: "Chapter 3 published in Water Research (2025); Chapter 4 under review.",
+            defaultWithRationale: "Not applicable, and left blank, for the monograph format.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [
+        {
+          key: "embargo_requirements",
+          label: "Embargo requirements",
+          tier: "optional",
+          guidance: {
+            whatItIs: "Whether the dissertation (or parts of it) must be embargoed from public access after submission.",
+            whyItMatters: "Common for industry-sponsored or pre-publication work; affects the export and repository deposit step.",
+            example: "12-month embargo on Chapter 4 pending a pending patent application.",
+            defaultWithRationale: "Defaults to no embargo unless stated.",
+          },
+          defaultValue: "no embargo",
+          allowsProvisional: true,
+        },
+      ],
+    },
+    qualityGates: [
+      { id: "contribution_stated", description: "Contribution to knowledge is stated explicitly", severity: "blocking" },
+      { id: "limitations_present", description: "Limitations section present", severity: "required" },
+      { id: "chapter_self_contained", description: "Each empirical chapter is self-contained", severity: "required", appliesWhen: "thesis_format = by_publication" },
+      { id: "terminology_consistency", description: "Consistent terminology used across chapters", severity: "advisory" },
+      { id: "contribution_claims_supported", description: "No unsupported claims in the contribution statement", severity: "blocking" },
+    ],
+    workflowVariant: "long_form_chaptered",
+    complianceProfile: "institutional",
+    exportDefaults: { format: "docx", includeToc: true },
+  },
+
   // ── OT-10 Journal Article — publication / imrad / venue_targeted ───────
   {
     id: "OT-10",
@@ -600,6 +738,120 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
       { id: "abstract_limit", description: "Abstract within the venue's word limit", severity: "blocking" },
       { id: "declarations_present", description: "All required declarations present", severity: "blocking" },
       { id: "citation_style_exact", description: "Reference style matches the venue exactly", severity: "blocking" },
+    ],
+    workflowVariant: "venue_targeted",
+    complianceProfile: "venue",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
+  // ── OT-11 Conference Paper — publication / imrad / venue_targeted ──────
+  // The page-limit gate below is descriptive only, per docs 14 §9's own
+  // note: "genuinely different from a word count — requires rendering to
+  // the template and measuring," which needs a layout-measurement pass
+  // (docs 33 §5) that doesn't exist. budget.totalWords is a word-count
+  // proxy for the stated word range, not the binding constraint for venues
+  // that only publish a page limit — stated honestly rather than modeled
+  // as equivalent.
+  {
+    id: "OT-11",
+    version: 1,
+    label: "Conference Paper",
+    aliases: ["conference submission", "workshop paper", "proceedings paper"],
+    family: "publication",
+    academicLevels: ["masters", "doctoral", "postdoc", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "imrad",
+      sections: [
+        { key: "title", title: "Title", required: true, countsTowardWordcount: false, guidance: "Concise and specific, within the template's title-length convention if one exists." },
+        { key: "abstract", title: "Abstract", required: true, countsTowardWordcount: false, wordBudget: { min: 100, max: 250, typical: 200 }, guidance: "States objective, method, key result, and conclusion within the venue's abstract limit." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, guidance: "Establishes the gap this paper fills, compressed for a shorter venue than a journal article." },
+        { key: "methods", title: "Methods", required: true, countsTowardWordcount: true, guidance: "Detailed enough for replication, within the page budget." },
+        { key: "results", title: "Results", required: true, countsTowardWordcount: true, guidance: "Findings only, no interpretation." },
+        { key: "discussion", title: "Discussion", required: true, countsTowardWordcount: true, guidance: "Interprets results and situates against prior work, compressed relative to a journal article." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "In the conference's exact required style and format." },
+      ],
+      frontMatter: ["title", "abstract"],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 2000, max: 8000, typical: 4500 },
+      distribution: { introduction: 0.15, methods: 0.25, results: 0.25, discussion: 0.25 },
+    },
+    sources: { targetCount: { min: 15, typical: 25 }, recencyExpectation: "majority within 5 years — conference venues favour recency", typeMix: { peer_reviewed: 0.8, other: 0.2 } },
+    citation: { defaultStyle: "ieee", commonStyles: ["ieee", "vancouver", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "conference_and_track",
+          label: "Conference and track",
+          tier: "required",
+          guidance: {
+            whatItIs: "The specific conference and, if applicable, its track or workshop.",
+            whyItMatters: "Drives the template, page limit, and citation style — all fixed by the venue, not negotiable.",
+            example: "ACM CHI 2027, Papers track.",
+            defaultWithRationale: "Without one, we use generic conference conventions and flag every venue-specific check as not yet applicable.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "page_limit_and_references_count",
+          label: "Page limit, and whether references count toward it",
+          tier: "required",
+          guidance: {
+            whatItIs: "The venue's hard page limit, and whether the reference list counts against it.",
+            whyItMatters: "Conference limits are strict and enforced at submission — going over by even a line can mean desk rejection.",
+            example: "8 pages including references, ACM double-column format.",
+            defaultWithRationale: "There is no safe default for this — it is venue-specific and blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "template",
+          label: "Template",
+          tier: "required",
+          guidance: {
+            whatItIs: "The required formatting template — ACM, IEEE, Springer LNCS, or a custom one supplied by the venue.",
+            whyItMatters: "Page count is measured against this template, not a generic word count — the wrong template invalidates any budget estimate.",
+            example: "ACM sigconf template, double column.",
+            defaultWithRationale: "Defaults to a generic single-column template pending the real one.",
+          },
+          defaultValue: "generic",
+          allowsProvisional: true,
+        },
+        {
+          key: "anonymous_submission",
+          label: "Anonymous submission required",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the venue requires double-blind anonymisation — no author names, institutions, or identifying self-citation.",
+            whyItMatters: "Has a blocking implication for author fields and how prior work is cited; getting this wrong risks desk rejection independent of paper quality.",
+            example: "Yes, double-blind — remove all author-identifying information including acknowledgements.",
+            defaultWithRationale: "There is no safe default for this — assuming the wrong answer either leaks identity or wrongly blanks required author fields, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+      ],
+      recommended: [
+        {
+          key: "deadline",
+          label: "Submission deadline",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The hard submission deadline, including timezone.",
+            whyItMatters: "Conference deadlines are fixed and unextendable, unlike journal submission which has no clock.",
+            example: "March 15, 2027, 23:59 AoE.",
+            defaultWithRationale: "If not given, no deadline-based prioritisation is applied.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "page_limit_satisfied", description: "Page limit satisfied in rendered output, not estimated word count", severity: "blocking" },
+      { id: "anonymisation_complete", description: "Submission is fully anonymised", severity: "blocking", appliesWhen: "anonymous_submission = yes" },
+      { id: "template_applied", description: "The venue's required template is applied", severity: "blocking" },
     ],
     workflowVariant: "venue_targeted",
     complianceProfile: "venue",

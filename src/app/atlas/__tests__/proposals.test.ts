@@ -126,6 +126,35 @@ describe("app/atlas: the new short_form entries (OT-02, OT-03, OT-13)", () => {
   });
 });
 
+describe("app/atlas: the deepened long_form and venue_targeted entries (OT-08, OT-11)", () => {
+  it("proposes the typical total word budget for OT-08 and OT-11", () => {
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-08"))).toBe(70000);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-11"))).toBe(4500);
+  });
+
+  it("OT-08's thesis_format and OT-11's anonymous_submission have no safe default and block progress until answered", () => {
+    const dissertation = catalog.getOrThrow("OT-08");
+    const missingFormat = canProceedFromIntake(dissertation, { contribution_claim: "provisional" });
+    expect(missingFormat.missing).toContain("thesis_format");
+
+    const paper = catalog.getOrThrow("OT-11");
+    const missingAnon = canProceedFromIntake(paper, {
+      conference_and_track: "ACM CHI",
+      page_limit_and_references_count: "8 pages",
+      template: "acm",
+    });
+    expect(missingAnon.missing).toContain("anonymous_submission");
+  });
+
+  it("OT-08's empirical_chapters section carries the largest share of the budget", () => {
+    const dissertation = catalog.getOrThrow("OT-08");
+    const proposal = proposeStructure(dissertation);
+    const empirical = proposal.find((p) => p.sectionKey === "empirical_chapters")!;
+    const litReview = proposal.find((p) => p.sectionKey === "literature_review")!;
+    expect(empirical.wordBudget).toBeGreaterThan(litReview.wordBudget);
+  });
+});
+
 describe("app/atlas: G0 -> G1 gating (canProceedFromIntake)", () => {
   it("cannot proceed while a required field with no allowed provisional is unanswered", () => {
     const grant = catalog.getOrThrow("OT-16"); // funder_and_scheme disallows provisional

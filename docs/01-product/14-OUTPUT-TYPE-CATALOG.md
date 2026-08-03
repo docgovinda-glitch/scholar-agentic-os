@@ -992,21 +992,22 @@ variant → catalog default.
 
 ## 12. Current state
 
-**The Atlas engine is implemented, with 9 of 24 output types populated.**
+**The Atlas engine is implemented, with 11 of 24 output types populated.**
 
 | Module | Path | Covers |
 |---|---|---|
-| Schema | `src/app/atlas/types.ts` | §2's OutputTypeSpec shape, in full — structure, budget, sources, citation, three-tier intake schema, quality gates, workflow variant, compliance profile, export defaults |
+| Schema | `src/app/atlas/types.ts` | §2's OutputTypeSpec shape, in full — structure, budget, sources, citation, three-tier intake schema, quality gates (including the optional `metadataKey` a gate can set — see `31` §12), workflow variant, compliance profile, export defaults |
 | Catalog registry | `src/app/atlas/catalog.ts` | Get-by-id, list, filter by family, search by label/alias — validates every entry at construction, so a malformed spec fails at startup rather than reaching a user |
 | Validation | `src/app/atlas/validate.ts` | The four-part guidance contract (§5.2) enforced per field; structural completeness; budget-distribution sanity |
 | Proposal engine | `src/app/atlas/proposals.ts` | §2.1's budget-from-distribution calculation, intake value defaults, citation style resolution, and the `G0`→`G1` provisional-answer gating from `30` §3 |
-| Data | `src/app/atlas/catalogData.ts` | **9 entries** — the original 6 (OT-01, OT-07, OT-10, OT-16, OT-18, OT-22, one per family, proving all 6 workflow variants and both funder/venue/institutional/coursework compliance profiles), plus OT-02 Essay, OT-03 Report, and OT-13 Literature Review, three more `short_form` entries transcribed directly from this document's own §9 tables (already the source-of-truth spec, not invented for the transcription), each exercising a structure variant (`argumentative`, `linear` with numbered sections, `thematic`) the first 6 didn't |
+| Data | `src/app/atlas/catalogData.ts` | **11 entries** — the original 6 (OT-01, OT-07, OT-10, OT-16, OT-18, OT-22, one per family, proving all 6 workflow variants and both funder/venue/institutional/coursework compliance profiles); OT-02 Essay, OT-03 Report, and OT-13 Literature Review, three more `short_form` entries each exercising a structure variant (`argumentative`, `linear` with numbered sections, `thematic`) the first 6 didn't; and OT-08 Doctoral Dissertation and OT-11 Conference Paper, deepening `long_form_chaptered` and `venue_targeted` beyond one entry each. All transcribed directly from this document's own §9 tables (already the source-of-truth spec, not invented for the transcription) |
 
-44 tests: catalog data validity, the query API, validation rules (including
+47 tests: catalog data validity, the query API, validation rules (including
 what "never an empty required field" actually means — see §12.1), and the
-proposal engine's arithmetic, including per-entry checks for OT-02/OT-03/OT-13's
-own blocking-with-no-default fields (`report_purpose`, `scope_boundaries`) and
-budget arithmetic.
+proposal engine's arithmetic, including per-entry checks for the newer
+entries' own blocking-with-no-default fields (`report_purpose`,
+`scope_boundaries`, `thesis_format`, `anonymous_submission`) and budget
+arithmetic.
 
 The catalog is also reachable over HTTP: `GET /api/atlas/output-types`
 (summaries, for a "choose an output type" list) and
@@ -1033,7 +1034,9 @@ value.
 
 | Gap | Status |
 |---|---|
-| 15 of 24 output types | Not yet entered. The engine is proven against all 6 families and, within `short_form`, against 3 of that family's 4 structure variants; remaining types are data entry, each needing a real submission example and structure source per §11.1 |
+| 13 of 24 output types | Not yet entered. The engine is proven against all 6 families, within `short_form` against 3 of that family's 4 structure variants, and `long_form_chaptered`/`venue_targeted` each have a second entry; remaining types are data entry, each needing a real submission example and structure source per §11.1 |
+| OT-08's by-publication structural variant | Not modeled — only the monograph baseline is. Materially different (chapters are standalone published papers with a connecting narrative), stated honestly in `catalogData.ts`'s own comment on that entry |
+| OT-11's page-limit quality gate | Descriptive only, not compiled — needs a layout-measurement pass (`33` §5) to check a rendered page count against a template, not a word count, which doesn't exist yet |
 | Override precedence (`user template → institution profile → discipline variant → catalog default`) | Not implemented — only the catalog-default layer exists. `atlas.ts`'s module comment notes where the other three layers plug in |
 | Type versioning / migration on catalog update | The `version` field exists on every spec but nothing yet reads it to diff or migrate an in-flight project |
 | Any client UI (intake form rendering) | Not built — no editor exists yet (`13` §8.1). The data it would render from (`GET /api/atlas/output-types/:id`) and submit to (`PATCH /api/projects/:id/intake`) are both live |

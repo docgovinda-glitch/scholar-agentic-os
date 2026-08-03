@@ -26,9 +26,11 @@ describe("app/atlas: catalog data validity", () => {
     for (const id of ids) expect(id).toMatch(/^OT-\d{2}$/);
   });
 
-  it("has 9 entries, including the three short_form additions beyond the original per-family representative", () => {
+  it("has 11 entries, including the additions beyond the original per-family representative", () => {
     const ids = OUTPUT_TYPES.map((s) => s.id).sort();
-    expect(ids).toEqual(["OT-01", "OT-02", "OT-03", "OT-07", "OT-10", "OT-13", "OT-16", "OT-18", "OT-22"]);
+    expect(ids).toEqual([
+      "OT-01", "OT-02", "OT-03", "OT-07", "OT-08", "OT-10", "OT-11", "OT-13", "OT-16", "OT-18", "OT-22",
+    ]);
   });
 
   it("the short_form additions each exercise a structure variant the original 6 entries didn't", () => {
