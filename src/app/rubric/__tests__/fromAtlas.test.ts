@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { compileMetadataGateRules, compileRubricFromOutputType, compileStructuralRules, compileWordLimitRule } from "../fromAtlas";
+import { buildReport } from "../rubric";
 import { catalog } from "../../atlas/atlas";
 import type { OutputTypeSpec } from "../../atlas/types";
+import { emptyDocument } from "../../../domain/document/model";
+import { setMetadata } from "../../../domain/document/ops";
 
 describe("app/rubric: compiling rules from Atlas", () => {
   it("compiles a word-limit rule matching the type's budget", () => {
@@ -58,10 +61,37 @@ describe("app/rubric: compiling rules from Atlas", () => {
   });
 });
 
-describe("app/rubric: compileMetadataGateRules", () => {
-  // No current catalog entry sets metadataKey (see fromAtlas.ts's module
-  // comment for why) — this exercises the mechanism against a synthetic
-  // spec so it's proven correct ahead of the first real use.
+describe("app/rubric: compileMetadataGateRules against OT-06's real ethics_approval_recorded gate", () => {
+  it("compiles OT-06's ethics_approval_recorded gate into a metadata_presence rule", () => {
+    const dissertation = catalog.getOrThrow("OT-06");
+    const rules = compileMetadataGateRules(dissertation);
+    const rule = rules.find((r) => r.id === "OT-06-metadata-ethics_approval_status");
+    expect(rule).toBeDefined();
+    expect(rule!.evaluator).toEqual({ kind: "metadata_presence", params: { key: "ethics_approval_status" } });
+    expect(rule!.severity).toBe("blocking");
+  });
+
+  it("fails the compiled rule when the document has no ethics_approval_status metadata", () => {
+    const dissertation = catalog.getOrThrow("OT-06");
+    const rules = compileRubricFromOutputType(dissertation);
+    const doc = emptyDocument("d1", "Capstone");
+    const report = buildReport(rules, doc);
+    const finding = report.findings.find((f) => f.ruleId === "OT-06-metadata-ethics_approval_status");
+    expect(finding!.status).toBe("fail");
+    expect(report.blockingFailures.some((f) => f.ruleId === "OT-06-metadata-ethics_approval_status")).toBe(true);
+  });
+
+  it("passes the compiled rule once ethics_approval_status metadata is set", () => {
+    const dissertation = catalog.getOrThrow("OT-06");
+    const rules = compileRubricFromOutputType(dissertation);
+    const doc = setMetadata(emptyDocument("d1", "Capstone"), "ethics_approval_status", "Approved, reference REC-2026-0142.");
+    const report = buildReport(rules, doc);
+    const finding = report.findings.find((f) => f.ruleId === "OT-06-metadata-ethics_approval_status");
+    expect(finding!.status).toBe("pass");
+  });
+});
+
+describe("app/rubric: compileMetadataGateRules against a synthetic gate (severity and source-citation behavior)", () => {
   function withMetadataGate(overrides: Partial<OutputTypeSpec["qualityGates"][number]> = {}): OutputTypeSpec {
     const base = catalog.getOrThrow("OT-16"); // has no metadataKey gates itself
     return {

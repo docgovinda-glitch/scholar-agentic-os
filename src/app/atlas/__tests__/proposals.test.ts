@@ -192,3 +192,35 @@ describe("app/atlas: G0 -> G1 gating (canProceedFromIntake)", () => {
     expect(result.missing).toContain("funder_and_scheme");
   });
 });
+
+describe("app/atlas: OT-04, OT-06, OT-09", () => {
+  it("proposes the typical total word budget for each", () => {
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-04"))).toBe(250);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-06"))).toBe(8000);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-09"))).toBe(90000);
+  });
+
+  it("OT-04's word_limit and OT-06's empirical_or_theoretical have no safe default and block progress until answered", () => {
+    const abstract = catalog.getOrThrow("OT-04");
+    const missingLimit = canProceedFromIntake(abstract, { abstract_type: "structured", citations_permitted: "no" });
+    expect(missingLimit.missing).toContain("word_limit");
+
+    const dissertation = catalog.getOrThrow("OT-06");
+    const missingType = canProceedFromIntake(dissertation, {
+      research_question: "provisional",
+      ethics_approval_status: "provisional",
+    });
+    expect(missingType.missing).toContain("empirical_or_theoretical");
+  });
+
+  it("OT-09 defaults to chicago-notes-bibliography, unlike every other entry", () => {
+    const book = catalog.getOrThrow("OT-09");
+    expect(proposeCitationStyle(book)).toBe("chicago-notes-bibliography");
+  });
+
+  it("OT-06's declaration section is excluded from its word count, same convention as OT-07", () => {
+    const dissertation = catalog.getOrThrow("OT-06");
+    const rule = proposeStructure(dissertation).find((p) => p.sectionKey === "declaration")!;
+    expect(rule.wordBudget).toBe(0);
+  });
+});

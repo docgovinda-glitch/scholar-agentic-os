@@ -2,22 +2,24 @@
  * The catalog data — real output type entries.
  *
  * Spec: docs/01-product/14-OUTPUT-TYPE-CATALOG.md §9. That document
- * specifies 24 output types across 6 families. This file implements 11 of
+ * specifies 24 output types across 6 families. This file implements 14 of
  * them: the original one representative entry per family (one per
  * workflow variant and structure variant class), proving the engine
  * against every shape the full catalog needs to support; three more
  * within the short_form family (OT-02 Essay, OT-03 Report, OT-13
  * Literature Review) that each exercise a structure variant the first
  * pass didn't (`argumentative`, plain `linear` with numbered sections,
- * `thematic`); and two more deepening families that only had one entry —
- * OT-08 Doctoral Dissertation (long_form_chaptered, modeled as the
- * monograph baseline; the by-publication structural variant is not
- * modeled, stated honestly in that entry's own comment) and OT-11
- * Conference Paper (venue_targeted, with a page-limit quality gate that is
- * deliberately left uncompiled since it needs layout measurement, not a
- * word count). Adding the remaining 13 is data entry against an engine
- * already proven correct — see docs/01-product/13-MODULE-SPECIFICATIONS.md
- * §8.3 for the tracked gap.
+ * `thematic`); OT-08 Doctoral Dissertation and OT-11 Conference Paper,
+ * deepening long_form_chaptered and venue_targeted beyond one entry each;
+ * and OT-04 Abstract, OT-06 Undergraduate Dissertation, and OT-09
+ * Book/Monograph. OT-06 gives `QualityGateSpec.metadataKey` (see
+ * app/rubric/fromAtlas.ts) its first real, non-synthetic use — "ethics
+ * approval status" is genuinely orthogonal metadata, not a document
+ * section, unlike every "declaration" this catalog had modeled until now.
+ * OT-09 is the first entry defaulting to `chicago-notes-bibliography`,
+ * exercising this session's ChicagoNotesFormatter for real. Adding the
+ * remaining 10 is data entry against an engine already proven correct —
+ * see docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3 for the tracked gap.
  *
  * Word budgets, source counts, and structure are drawn directly from the
  * spec document's per-type tables, not invented here.
@@ -407,6 +409,246 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     exportDefaults: { format: "docx", includeToc: false },
   },
 
+  // ── OT-04 Abstract (standalone) — short_form / linear / venue ───────────
+  // Modeled as the structured variant (Background/Objective/Methods/
+  // Results/Conclusion) — docs 14 §9 also describes an unstructured
+  // single-paragraph variant for venues that don't require headed
+  // sub-sections; not modeled separately here since it's a strict subset
+  // (one block instead of five) of what the structured variant already
+  // supports, not a different shape the engine needs to prove.
+  {
+    id: "OT-04",
+    version: 1,
+    label: "Abstract",
+    aliases: ["conference abstract", "standalone abstract", "extended abstract"],
+    family: "short_form",
+    academicLevels: ["undergraduate", "masters", "doctoral", "postdoc", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "linear",
+      sections: [
+        { key: "background", title: "Background", required: true, countsTowardWordcount: true, wordBudget: { min: 20, max: 80, typical: 50 }, guidance: "The gap or problem motivating the work, in one or two sentences." },
+        { key: "objective", title: "Objective", required: true, countsTowardWordcount: true, wordBudget: { min: 15, max: 60, typical: 30 }, guidance: "What the work set out to do." },
+        { key: "methods", title: "Methods", required: true, countsTowardWordcount: true, wordBudget: { min: 20, max: 80, typical: 50 }, guidance: "How it was done — enough to judge rigor, not enough to replicate." },
+        { key: "results", title: "Results", required: true, countsTowardWordcount: true, wordBudget: { min: 30, max: 120, typical: 70 }, guidance: "The key finding, stated as a result, not a promise ('we found X', not 'we will discuss X')." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, wordBudget: { min: 15, max: 60, typical: 30 }, guidance: "What the result means, in one sentence." },
+      ],
+      frontMatter: [],
+      backMatter: [],
+    },
+    budget: {
+      totalWords: { min: 150, max: 500, typical: 250 },
+      distribution: { background: 0.2, objective: 0.12, methods: 0.2, results: 0.28, conclusion: 0.12 },
+    },
+    sources: { targetCount: { min: 0, typical: 0 }, recencyExpectation: "not applicable — abstracts of this length rarely cite directly", typeMix: { peer_reviewed: 0, other: 0 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7", "vancouver"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "abstract_type",
+          label: "Abstract type",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the venue wants a structured abstract (headed sub-sections) or a single unstructured paragraph.",
+            whyItMatters: "Determines whether the five sections below render as headed sub-sections or are merged into one flowing paragraph on export.",
+            example: "Structured, per the conference's submission template.",
+            defaultWithRationale: "Defaults to structured, since it's strictly more informative and easy to flatten to unstructured on export if the venue turns out to want that.",
+          },
+          defaultValue: "structured",
+          allowsProvisional: true,
+        },
+        {
+          key: "word_limit",
+          label: "Word limit",
+          tier: "required",
+          guidance: {
+            whatItIs: "The venue's exact word (or character) limit for the abstract.",
+            whyItMatters: "Venues are absolute about this — an over-limit abstract is often rejected by a submission system before a human ever reads it.",
+            example: "250 words, per the conference submission portal.",
+            defaultWithRationale: "There is no safe default for this — it is venue-specific and blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "citations_permitted",
+          label: "Are citations permitted?",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the abstract may include citations at all.",
+            whyItMatters: "Most venues forbid citations in an abstract; including one where forbidden is an easy, avoidable rejection reason.",
+            example: "No — the submission system strips anything that looks like a citation.",
+            defaultWithRationale: "Defaults to no citations permitted, the more common and safer restriction when unspecified.",
+          },
+          defaultValue: "no",
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "source_document",
+          label: "Source document",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The full paper, thesis, or report this abstract summarises, if it already exists.",
+            whyItMatters: "When supplied, every claim in the abstract must bind to a span in your own document — a derivation workflow that is a strong guarantee against overstatement, rather than the abstract being drafted independently.",
+            example: "The completed manuscript this abstract will accompany.",
+            defaultWithRationale: "Without one, the abstract is drafted directly from your intake answers instead of derived from an existing text.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "keywords_required",
+          label: "Keywords required",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Whether the venue requires a keyword list alongside the abstract.",
+            whyItMatters: "A separate, easy-to-miss submission-form field distinct from the abstract text itself.",
+            example: "Yes, 3-5 keywords.",
+            defaultWithRationale: "Defaults to no keyword list unless the venue is known to require one.",
+          },
+          defaultValue: "no",
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "word_limit_satisfied", description: "Within the venue's exact word limit", severity: "blocking" },
+      { id: "no_forbidden_citations", description: "Contains no citations where the venue forbids them", severity: "blocking", appliesWhen: "citations_permitted = no" },
+      { id: "claims_traceable_to_source", description: "Every claim binds to a span in the source document", severity: "required", appliesWhen: "source_document provided" },
+    ],
+    workflowVariant: "short_form",
+    complianceProfile: "venue",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
+  // ── OT-06 Undergraduate Dissertation / Capstone — long_form / chapter_based / institutional ──
+  // The one entry in this catalog where "ethics approval status" is
+  // genuinely orthogonal metadata, not document content: unlike OT-07's
+  // "declaration of originality" (a structural section — a page of prose
+  // the author writes), an ethics approval status is a fact *about* the
+  // project, not a chapter of it, and docs 14 §9 lists it as intake, never
+  // as a chapter. That is exactly the "structured fact that isn't also
+  // rendered as content" fromAtlas.ts's module comment described as the
+  // genuine fit for QualityGateSpec.metadataKey — the first real one.
+  {
+    id: "OT-06",
+    version: 1,
+    label: "Undergraduate Dissertation / Capstone",
+    aliases: ["capstone project", "final year project", "undergraduate thesis"],
+    family: "long_form",
+    academicLevels: ["undergraduate"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "chapter_based",
+      sections: [
+        { key: "title_page", title: "Title Page", required: true, countsTowardWordcount: false, guidance: "Title, your name, degree, institution, submission date, per your department's template." },
+        { key: "declaration", title: "Declaration of Originality", required: true, countsTowardWordcount: false, guidance: "The standard statement that this is your own work, using your institution's exact wording." },
+        { key: "acknowledgements", title: "Acknowledgements", required: false, countsTowardWordcount: false, guidance: "Optional thanks to supervisors, participants, or funders." },
+        { key: "abstract", title: "Abstract", required: true, countsTowardWordcount: false, wordBudget: { min: 150, max: 300, typical: 200 }, guidance: "A single paragraph summarising the question, method, key findings, and contribution." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, guidance: "Motivates the research question and previews the dissertation's structure." },
+        { key: "literature_review", title: "Literature Review", required: true, countsTowardWordcount: true, guidance: "Situates the work against existing research; identifies the gap it addresses." },
+        { key: "methodology", title: "Methodology", required: false, countsTowardWordcount: true, guidance: "Present only for empirical projects: research design, data collection, and analysis approach." },
+        { key: "results", title: "Results / Findings", required: false, countsTowardWordcount: true, guidance: "Present only for empirical projects: findings reported without interpretation." },
+        { key: "discussion", title: "Discussion", required: true, countsTowardWordcount: true, guidance: "Interprets the work — findings for an empirical project, the argument's implications for a theoretical one." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, guidance: "Restates the contribution, states limitations, and suggests future work." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Full bibliography in your required citation style." },
+      ],
+      frontMatter: ["title_page", "declaration", "acknowledgements", "abstract"],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 6000, max: 12000, typical: 8000 },
+      distribution: {
+        introduction: 0.12,
+        literature_review: 0.28,
+        methodology: 0.13,
+        results: 0.17,
+        discussion: 0.2,
+        conclusion: 0.08,
+      },
+    },
+    sources: { targetCount: { min: 30, typical: 45 }, recencyExpectation: "majority within 10 years", typeMix: { peer_reviewed: 0.65, other: 0.35 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "research_question",
+          label: "Research question",
+          tier: "required",
+          guidance: {
+            whatItIs: "The single question your project answers.",
+            whyItMatters: "For most users this is their first long-form project — a vague question here is the single biggest cause of a directionless first draft.",
+            example: "What factors most influenced student engagement with online seminars during 2020-2022?",
+            defaultWithRationale: "Not sure yet? That's normal — start with your topic and the word 'how' or 'why'; we'll help sharpen it at the structure stage.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "empirical_or_theoretical",
+          label: "Empirical or theoretical",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the project involves original data collection (empirical) or is argument/analysis only (theoretical).",
+            whyItMatters: "Determines whether the Methodology and Results chapters appear at all, and whether ethics approval is required.",
+            example: "Empirical: a survey of 120 students plus five follow-up interviews.",
+            defaultWithRationale: "Defaults to theoretical, the option requiring no ethics approval or data collection apparatus.",
+          },
+          defaultValue: "theoretical",
+          allowsProvisional: false,
+        },
+        {
+          key: "ethics_approval_status",
+          label: "Ethics approval status",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether ethics approval has been sought and its outcome, for empirical projects involving human participants or sensitive data.",
+            whyItMatters: "Blocking for empirical projects — writing up unapproved data collection is a research-conduct issue, not just a paperwork gap, and needs to be caught before drafting proceeds, not at submission.",
+            example: "Approved, reference REC-2026-0142.",
+            defaultWithRationale: "Not applicable, and left blank, for theoretical projects.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "supervisor_name",
+          label: "Supervisor",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Your supervisor's name, for the title page and acknowledgements.",
+            whyItMatters: "Many templates require it on the title page.",
+            example: "Dr. Amara Chen",
+            defaultWithRationale: "Left blank until supplied; the title page renders without a supervisor line.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "department_handbook",
+          label: "Department handbook",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Your department's dissertation or capstone handbook, if one exists.",
+            whyItMatters: "The single highest-value upload for this output type — it usually fixes chapter structure, word limits, and formatting exactly.",
+            example: "A PDF handbook from your department's student portal.",
+            defaultWithRationale: "Without one, we apply common conventions for your discipline, editable once you have the real handbook.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "declaration_present", description: "Declaration of originality present", severity: "blocking" },
+      { id: "ethics_approval_recorded", description: "Ethics approval status is on file for an empirical project", severity: "blocking", appliesWhen: "empirical_or_theoretical = empirical", metadataKey: "ethics_approval_status" },
+      { id: "research_question_answered", description: "Research question answered explicitly in the conclusion", severity: "required" },
+      { id: "budget_adherence", description: "Each chapter within ±20% of its budget", severity: "advisory" },
+    ],
+    workflowVariant: "long_form_chaptered",
+    complianceProfile: "institutional",
+    exportDefaults: { format: "docx", includeToc: true },
+  },
+
   // ── OT-07 Master's Thesis — long_form / chapter_based / institutional ───
   {
     id: "OT-07",
@@ -643,6 +885,140 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     ],
     workflowVariant: "long_form_chaptered",
     complianceProfile: "institutional",
+    exportDefaults: { format: "docx", includeToc: true },
+  },
+
+  // ── OT-09 Book / Monograph — long_form / chapter_based / venue (publisher) ──
+  // The first entry whose default citation style is
+  // chicago-notes-bibliography (this session's own ChicagoNotesFormatter,
+  // src/citation_compliance/formatters/chicagoNotes.ts) rather than an
+  // author-date style — docs 14 §9's own note: "Chicago notes-bibliography
+  // is the common style and the citation layer must support the notes
+  // variant, not only author-date," which is exactly the gap that
+  // formatter closed. Index generation is an export-stage concern (docs
+  // 33 §6) and is not modeled as a structural section here.
+  {
+    id: "OT-09",
+    version: 1,
+    label: "Book / Monograph",
+    aliases: ["academic monograph", "scholarly book"],
+    family: "long_form",
+    academicLevels: ["doctoral", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "chapter_based",
+      sections: [
+        { key: "title_page", title: "Title Page", required: true, countsTowardWordcount: false, guidance: "Half title, full title, subtitle, author, and publisher imprint, per the publisher's design template." },
+        { key: "preface", title: "Preface", required: false, countsTowardWordcount: true, guidance: "Why this book, why now, and the author's relationship to the subject — distinct from the Introduction's argument." },
+        { key: "acknowledgements", title: "Acknowledgements", required: false, countsTowardWordcount: false, guidance: "Thanks to colleagues, institutions, and funders." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, guidance: "States the book's central argument and previews how the chapters build it." },
+        { key: "chapters", title: "Chapters", required: true, countsTowardWordcount: true, guidance: "The book's substantive chapters, optionally grouped into parts. Modeled here as one aggregate section; the drafting pipeline splits it into per-chapter units at G3." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, guidance: "Draws the argument together and states its wider implications." },
+        { key: "notes", title: "Notes", required: true, countsTowardWordcount: false, guidance: "Compiled endnotes (or footnotes, per notes_style) in Chicago notes-bibliography form — full note on first citation, shortened note thereafter." },
+        { key: "bibliography", title: "Bibliography", required: true, countsTowardWordcount: false, guidance: "Full bibliography, alphabetical by author, in the required citation style." },
+      ],
+      frontMatter: ["title_page", "preface", "acknowledgements"],
+      backMatter: ["notes", "bibliography"],
+    },
+    budget: {
+      totalWords: { min: 60000, max: 150000, typical: 90000 },
+      distribution: {
+        introduction: 0.06,
+        chapters: 0.82,
+        conclusion: 0.05,
+      },
+    },
+    sources: { targetCount: { min: 100, typical: 200 }, recencyExpectation: "majority within 15 years, with foundational older work expected", typeMix: { peer_reviewed: 0.6, other: 0.4 } },
+    citation: { defaultStyle: "chicago-notes-bibliography", commonStyles: ["chicago-notes-bibliography", "chicago-author-date", "harvard"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "publisher_and_series",
+          label: "Publisher and series",
+          tier: "required",
+          guidance: {
+            whatItIs: "The press you're contracted with (or targeting), and the series if one applies.",
+            whyItMatters: "Drives the entire compliance Rubric the same way a target journal does for OT-10 — word limit, notes style, and manuscript delivery format all come from the publisher's own guidelines.",
+            example: "Cambridge University Press, Cambridge Studies in Comparative Politics.",
+            defaultWithRationale: "Without one, we use generic scholarly monograph conventions and flag every publisher-specific check as not yet applicable.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "notes_style",
+          label: "Notes style",
+          tier: "required",
+          guidance: {
+            whatItIs: "Footnotes (per page) or endnotes (compiled at the back), independent of the notes-bibliography citation format itself.",
+            whyItMatters: "Chicago-dominant fields disagree on this by convention as much as by publisher rule — worth confirming rather than assuming.",
+            example: "Endnotes, compiled by chapter.",
+            defaultWithRationale: "Defaults to endnotes, the more common choice for a full-length monograph.",
+          },
+          defaultValue: "endnotes",
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "publisher_style_guide",
+          label: "Publisher style guide",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The press's own style guide or author instructions, if published.",
+            whyItMatters: "The single highest-value input for compliance here — word limits, notes conventions, and manuscript delivery requirements usually live in this one document.",
+            example: "A downloaded PDF of the press's 'Notes for Authors.'",
+            defaultWithRationale: "If unavailable, we use Chicago Manual of Style's own conventions as the fallback.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "index_required",
+          label: "Index required",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Whether the press requires an index, and if so, author-prepared or professionally indexed.",
+            whyItMatters: "Index generation happens at export time, not during drafting, but affects manuscript delivery scheduling.",
+            example: "Yes, author-prepared, per the contract.",
+            defaultWithRationale: "Defaults to no index requirement unless the contract specifies one.",
+          },
+          defaultValue: "no",
+          allowsProvisional: true,
+        },
+        {
+          key: "part_level_grouping",
+          label: "Part-level grouping",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Whether chapters are grouped into named or numbered Parts.",
+            whyItMatters: "Changes the table of contents structure and chapter numbering convention.",
+            example: "Yes — Part I: Foundations (Ch. 1-3), Part II: Applications (Ch. 4-6).",
+            defaultWithRationale: "Defaults to no part-level grouping — a flat chapter list — unless specified.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [
+        {
+          key: "manuscript_delivery_format",
+          label: "Manuscript delivery format",
+          tier: "optional",
+          guidance: {
+            whatItIs: "The file format and formatting conventions the press requires for final delivery.",
+            whyItMatters: "Presses vary widely here — some want minimally formatted Word files, others a specific LaTeX class.",
+            example: "Word .docx, double-spaced, Times New Roman 12pt, per the contract's manuscript specifications.",
+            defaultWithRationale: "Defaults to a standard double-spaced Word manuscript pending the press's actual requirements.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+    },
+    qualityGates: [
+      { id: "structural_completeness", description: "Every required section present and non-empty", severity: "blocking" },
+      { id: "notes_style_consistent", description: "Notes are consistently footnotes or consistently endnotes, matching notes_style", severity: "required" },
+      { id: "bibliography_matches_notes", description: "Every source cited in the notes appears in the bibliography", severity: "blocking" },
+    ],
+    workflowVariant: "long_form_chaptered",
+    complianceProfile: "venue",
     exportDefaults: { format: "docx", includeToc: true },
   },
 
