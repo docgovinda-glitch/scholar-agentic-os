@@ -355,7 +355,7 @@ exists; everything else remains the intended target.
 | `src/document_intelligence/` | `app/ingestion` + `domain/document` | **Partially done.** A new, independent `domain/document` (blocks/ranges/ops, 13 tests) is built at `src/domain/document/` — see §8.1a. It does not yet ingest from `src/document_intelligence/`'s parsers; that integration is still open |
 | `src/agents/`, `src/skills/` | `app/mesh` | Not started |
 | `src/services/providerFailover.ts`, `aiErrors.ts` | `platform/gateway` | **Partially done, and not yet reused.** `src/platform/gateway/` exists and is Warden-gated, but currently has its own (simpler) error handling rather than the existing classified-error/failover logic — see `41` §12.2 |
-| `src/core/project/` | `domain/project` | Not started |
+| `src/core/project/` | `domain/project` | **Partially built.** The gate state machine (`domain/project/gates.ts`, G0-G7) is built and bound to Atlas/Rubric via `app/conductor` — see §8.1a and `30` §10. `src/core/project/`'s phase-string model is untouched; migrating it onto the gate model is still open |
 | `src/types/documentTypes.ts` | `app/atlas` | **Built** at `src/app/atlas/` (schema, registry, validation, proposal engine) with 6 of 24 output types populated — see `14` §12 |
 | `src/services/knowledgeVaultService.ts` | `app/vault` | Not started |
 | `src/services/documentExportService.ts` | `app/export` | Not started |
@@ -375,8 +375,10 @@ exists; everything else remains the intended target.
 | `app/atlas` | `src/app/atlas/` | 36 |
 | `domain/compliance` | `src/domain/compliance/` | 13 |
 | `app/rubric` | `src/app/rubric/` | 13 |
+| `domain/project` (gate state machine, G0-G7) | `src/domain/project/` | 15 |
+| `app/conductor` (binds gates to Atlas/Rubric) | `src/app/conductor/` | 14 |
 
-177 new tests. Full repository suite: 126 files, 1,314 tests, `tsc --noEmit`
+206 new tests. Full repository suite: 128 files, 1,343 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 
@@ -397,8 +399,8 @@ suite.
 | `domain/language` and `app/studio` | **Built** |
 | `app/atlas` | **Built** (engine complete; 6/24 output types populated) |
 | `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, two deterministic evaluators (`word_count`, `structural_presence`), and compilation from Atlas specs. Requirement-source extraction (needs `app/mesh`) and template extraction (needs `app/ingestion`) are not built — see `31` §12.2 |
-| `services/*` | Not started. This is the largest near-term gap: the Studio's session-policy store (`src/app/studio/sessionPolicyStore.ts`) is an explicitly-labelled in-memory stand-in for what `services/store` should provide, and does not survive a restart or scale past one process |
-| `app/conductor` | Not started |
+| `services/*` | Not started. This is the largest near-term gap: the Studio's session-policy store (`src/app/studio/sessionPolicyStore.ts`) and the Conductor's `ProjectGateState` are both explicitly-labelled in-memory stand-ins for what `services/store` should provide, and do not survive a restart or scale past one process |
+| `app/conductor` | **Built** — gate state machine (`domain/project/gates.ts`) bound to Atlas (G0) and the Rubric (G6); G1-G5/G7 have no computation source yet and per-chapter gating is a tracked gap — see `30` §10 |
 | `domain/claim` | Not started |
 | `app/plugins` | Not started |
 | `client/pocket-shell` | Not started |

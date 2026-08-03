@@ -472,20 +472,55 @@ Aggregate only. No content, no per-user paths.
 
 ## 10. Current state
 
-The repository has a project phase field
-(`planning | literature | design | execution | analysis | writing | review | submission`)
-in `src/core/project/projectTypes.ts`, and an agent pipeline in
-`src/agents/pipeline.ts`. Both are the right instinct; neither is a gate model.
+**Built.** The gate state machine (§2-3, G0-G7) is implemented as
+`domain/project/gates.ts` (pure — types, entry-prerequisite checks,
+`updateExitCriteria`, `signOffGate`, `invalidateGate` with forward-only
+cascade, `isProjectComplete`, `nextOutstandingGate`) with `app/conductor/`
+as its public entry point. The Conductor binds the gate machine to the two
+modules that can compute real exit criteria today:
 
-| Current | Target |
+| Gate | Bound to | How |
+|---|---|---|
+| G0 (Intake) | Atlas (`app/atlas`) | `computeG0ExitCriteria` — one blocking criterion per required intake field; a provisional answer satisfies it only if the field's `allowsProvisional` is true (§14 §9's per-field contract, not a blanket rule) |
+| G6 (Compliance) | Rubric (`app/rubric`, `domain/compliance`) | `computeG6ExitCriteria` — every non-advisory finding becomes a blocking criterion; `not_applicable` findings (an evaluator that doesn't exist yet) are surfaced as non-blocking but never as a silent pass |
+| G1-G5, G7 | Nothing yet | No requirement-extraction, sourcing, structure-proposal, drafting, review, or export pipeline exists (`13` §8.3). `updateExitCriteria` accepts any `ExitCriterion[]` from any source, so wiring a real gate in later is additive, not a redesign. |
+
+Sign-off is `state_hash`-bound as designed: `app/conductor/hash.ts` hashes a
+caller-supplied "what was approved" snapshot via Web Crypto SHA-256 over a
+key-order-independent JSON serialization (chosen over Node's `crypto`
+module to stay isomorphic per `13` §2). `isSignoffStale` compares a new
+snapshot's hash against the recorded one. `updateExitCriteria` refuses to
+recompute criteria on an already-signed-off gate — the caller must
+`invalidateGate` first, so the "this used to be approved" transition is
+always recorded with a reason, never silently overwritten.
+
+Tests: `domain/project/__tests__/gates.test.ts` and
+`app/conductor/__tests__/conductor.test.ts`, 29 tests — initial state,
+entry-prerequisite combinations (including G4's three-way AND and G3's
+G0+G2 without G1), sign-off readiness and its blocking/advisory distinction,
+invalidation cascade (forward-only, leaf gates don't affect ancestors), the
+Atlas and Rubric bindings, hash staleness, and a re-target scenario
+(`26` Journey 3, in miniature) exercising a full sign-off → invalidate →
+recompute cycle.
+
+**Tracked gap.** Per-chapter independent gating for `long_form_chaptered`
+(§3's "G3 runs per chapter") is not implemented — the module tracks one
+gate state per project, not per chapter. Extending to per-chapter state is
+additive (a `Record<chapterId, ProjectGateState>` for G3-G5, with G6/G7
+remaining project-level), not a redesign of what exists.
+
+| Remaining | Target |
 |---|---|
-| A phase string on the project | A gate state machine with entry/exit criteria and recorded sign-off |
-| No sign-off record | `state_hash`-bound sign-off with actor and timestamp |
-| No invalidation | Downstream invalidation on upstream change |
-| Linear pipeline | Seven-stage drafting pipeline with refusal conditions and per-stage observability |
-| No precondition enforcement | Stage 0 refuses when gates are unsatisfied |
+| No requirement-extraction pipeline | G1 exit criteria computed from extracted requirements |
+| No sourcing pipeline | G2 exit criteria computed from discovered/vetted sources |
+| No structure-proposal pipeline | G3 exit criteria computed from an agreed outline |
+| No drafting pipeline | Seven-stage drafting pipeline with refusal conditions (§6) driving G4 |
+| No review pipeline | G5 exit criteria from review completion |
+| No export pipeline | G7 exit criteria from export readiness |
 | No per-chapter state | Independent chapter gating for `long_form_chaptered` |
-| No workflow variants | Six variants |
+| No workflow-variant branching | Six variants (§5) selecting which gates apply and how |
+| No persistence | `ProjectGateState` is an in-memory value type; no store yet (`13` §8.3's "largest near-term gap") |
 
-The existing `executor.ts` and `registry.ts` are a reasonable base for the run
-mechanics; the gate model is new construction.
+The existing `executor.ts` and `registry.ts` (legacy pipeline, pre-dating
+this session's work) are a reasonable base for the eventual G4 drafting
+pipeline; they are not yet wired to the gate model.
