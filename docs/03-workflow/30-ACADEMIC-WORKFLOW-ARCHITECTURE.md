@@ -503,6 +503,19 @@ Atlas and Rubric bindings, hash staleness, and a re-target scenario
 (`26` Journey 3, in miniature) exercising a full sign-off → invalidate →
 recompute cycle.
 
+**Also exposed over HTTP** (`server/routes/project.ts`, 16 supertest
+integration tests): `GET /api/atlas/output-types[/:id]` for choosing and
+rendering an output type, `POST /api/projects` to bind a project to one,
+`PATCH /api/projects/:id/intake` to submit answers and recompute G0,
+`POST /api/projects/:id/gates/:gate/signoff` and `.../invalidate` for the
+gate-agnostic sign-off/invalidate actions. A project's exit criteria for G0
+are computed immediately at creation (not left at
+`domain/project/gates.ts`'s default empty list, which is vacuously "ready"
+with zero blocking criteria) so a caller can't sign off before intake was
+ever evaluated. Persistence is the same explicitly-interim in-memory
+pattern as the Studio's session-policy store — see
+`src/app/conductor/projectStore.ts` and `13` §8.3.
+
 **Tracked gap.** Per-chapter independent gating for `long_form_chaptered`
 (§3's "G3 runs per chapter") is not implemented — the module tracks one
 gate state per project, not per chapter. Extending to per-chapter state is

@@ -30,7 +30,7 @@ import {
   type CloudProviderSpec,
 } from "./src/config/providerCatalog.ts";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
-import { registerHealthRoutes, registerAdminRoutes, registerParseRoutes, registerAIRoutes, registerStudioRoutes } from "./server/routes/index.ts";
+import { registerHealthRoutes, registerAdminRoutes, registerParseRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes } from "./server/routes/index.ts";
 
 dotenv.config();
 
@@ -443,6 +443,12 @@ const studioLimit = rateLimit({
   limitBy: "ip",
 });
 
+const projectLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  limitBy: "ip",
+});
+
 // ==========================================
 // ROUTE REGISTRATION
 // ==========================================
@@ -462,6 +468,7 @@ registerAdminRoutes(app);
 registerParseRoutes(app, parseFileLimit, parseExternalLinkLimit, lookupDoiLimit);
 registerAIRoutes(app, aiAbuseLimit, citationStyleRegistry);
 registerStudioRoutes(app, studioLimit);
+registerProjectRoutes(app, projectLimit);
 
 
 // ==========================================

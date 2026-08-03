@@ -1006,6 +1006,12 @@ variant → catalog default.
 what "never an empty required field" actually means — see §12.1), and the
 proposal engine's arithmetic.
 
+The catalog is also reachable over HTTP: `GET /api/atlas/output-types`
+(summaries, for a "choose an output type" list) and
+`GET /api/atlas/output-types/:id` (the full spec, for intake-form
+rendering), in `server/routes/project.ts`, alongside the Conductor's
+project/intake/sign-off endpoints — see `30` §10 and `13` §8.3.
+
 ### 12.1 A correction made during implementation
 
 Building the validator against real data caught a genuine ambiguity in §5.2's
@@ -1028,7 +1034,7 @@ value.
 | 18 of 24 output types | Not yet entered. The engine is proven against all 6 families; remaining types are data entry, each needing a real submission example and structure source per §11.1 |
 | Override precedence (`user template → institution profile → discipline variant → catalog default`) | Not implemented — only the catalog-default layer exists. `atlas.ts`'s module comment notes where the other three layers plug in |
 | Type versioning / migration on catalog update | The `version` field exists on every spec but nothing yet reads it to diff or migrate an in-flight project |
-| Any client UI (intake form rendering) | Not built — no editor exists yet (`13` §8.1) |
+| Any client UI (intake form rendering) | Not built — no editor exists yet (`13` §8.1). The data it would render from (`GET /api/atlas/output-types/:id`) and submit to (`PATCH /api/projects/:id/intake`) are both live |
 
 The former `src/types/documentTypes.ts` (10 document types, a TypeScript
 const with a `QualityGate.check: (content: string) => boolean` signature) is
