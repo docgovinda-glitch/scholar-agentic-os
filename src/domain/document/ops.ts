@@ -123,6 +123,11 @@ export function removeBlock(doc: CanonicalDocument, blockId: string): CanonicalD
   return { ...doc, blocks: nextBlocks };
 }
 
+/** Set a document-level metadata declaration. Creates the metadata bag if this is the first one set. */
+export function setMetadata(doc: CanonicalDocument, key: string, value: string): CanonicalDocument {
+  return { ...doc, metadata: { ...doc.metadata, [key]: value } };
+}
+
 /** Total plain-text word count across every block — the basis for Rubric word-limit checks. */
 export function wordCount(doc: CanonicalDocument): number {
   const text = doc.blocks.map((b) => b.text).join(" ").trim();

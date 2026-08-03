@@ -10,7 +10,7 @@
 
 import type { CanonicalDocument } from "../document/model";
 import { wordCount } from "../document/ops";
-import type { Finding, Rule, WordCountParams, StructuralPresenceParams } from "./types";
+import type { Finding, Rule, WordCountParams, StructuralPresenceParams, MetadataPresenceParams } from "./types";
 import { isEffectivelyWaived } from "./types";
 
 function excludingSections(doc: CanonicalDocument, exclude: string[]): CanonicalDocument {
@@ -97,6 +97,28 @@ function evaluateStructuralPresence(rule: Rule, params: StructuralPresenceParams
   };
 }
 
+function evaluateMetadataPresence(rule: Rule, params: MetadataPresenceParams, doc: CanonicalDocument): Finding {
+  const value = doc.metadata?.[params.key];
+  const minLength = params.minLength ?? 1;
+
+  if (value === undefined || value.trim().length < minLength) {
+    return {
+      ruleId: rule.id,
+      status: isEffectivelyWaived(rule) ? "warn" : "fail",
+      severity: rule.severity,
+      message: value === undefined ? `Required declaration "${params.key}" is missing.` : `Declaration "${params.key}" is present but too short.`,
+      remedy: `Provide "${params.key}".`,
+    };
+  }
+
+  return {
+    ruleId: rule.id,
+    status: "pass",
+    severity: rule.severity,
+    message: `Declaration "${params.key}" is present.`,
+  };
+}
+
 /**
  * Evaluate a single rule against a document. Every rule type this function
  * doesn't yet implement returns "not_applicable" rather than throwing or
@@ -111,6 +133,8 @@ export function evaluateRule(rule: Rule, doc: CanonicalDocument): Finding {
       return evaluateWordCount(rule, rule.evaluator.params, doc);
     case "structural_presence":
       return evaluateStructuralPresence(rule, rule.evaluator.params, doc);
+    case "metadata_presence":
+      return evaluateMetadataPresence(rule, rule.evaluator.params, doc);
     default:
       return {
         ruleId: rule.id,

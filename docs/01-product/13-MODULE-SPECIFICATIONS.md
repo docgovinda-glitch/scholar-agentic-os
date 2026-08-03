@@ -352,7 +352,7 @@ exists; everything else remains the intended target.
 | Express server | `platform/api` + `app/*` | **In progress.** `server/routes/studio.ts` and `server/routes/project.ts` are built on the new architecture; the rest of `server/routes/` (ai.ts, parse.ts, admin.ts) is unchanged |
 | Supabase auth + Postgres | `platform/auth`, `services/store` | Not started |
 | `src/citation_compliance/` | `domain/reference` | **Chicago notes done; the module move + purity pass is still open.** `formatters/chicagoNotes.ts` adds Chicago 17 Notes-Bibliography (footnote/short-note/bibliography, distinct from the existing Author-Date `chicago.ts`), registered in `server.ts` alongside the other six styles. The `CitationStyle` interface gained two *optional* methods (`formatNote`, `formatShortNote`) for this — backward compatible, no other formatter implements them. The directory itself has not moved to `domain/reference` yet (it already has no I/O — see the formatter's module comment — so the pending work is the rename/relocation, not removing side effects) |
-| `src/document_intelligence/` | `app/ingestion` + `domain/document` | **Partially done.** A new, independent `domain/document` (blocks/ranges/ops, 13 tests) is built at `src/domain/document/` — see §8.1a. It does not yet ingest from `src/document_intelligence/`'s parsers; that integration is still open |
+| `src/document_intelligence/` | `app/ingestion` + `domain/document` | **Partially done.** A new, independent `domain/document` (blocks/ranges/ops, a document-level metadata bag for declarations, 18 tests) is built at `src/domain/document/` — see §8.1a. It does not yet ingest from `src/document_intelligence/`'s parsers; that integration is still open |
 | `src/agents/`, `src/skills/` | `app/mesh` | Not started |
 | `src/services/providerFailover.ts`, `aiErrors.ts` | `platform/gateway` | **Partially done, and not yet reused.** `src/platform/gateway/` exists and is Warden-gated, but currently has its own (simpler) error handling rather than the existing classified-error/failover logic — see `41` §12.2 |
 | `src/core/project/` | `domain/project` | **Partially built.** The gate state machine (`domain/project/gates.ts`, G0-G7) is built and bound to Atlas/Rubric via `app/conductor` — see §8.1a and `30` §10. `src/core/project/`'s phase-string model is untouched; migrating it onto the gate model is still open |
@@ -368,12 +368,12 @@ exists; everything else remains the intended target.
 | `platform/warden` | `src/platform/warden/` | 23 |
 | `platform/gateway` | `src/platform/gateway/` | 9 |
 | Architectural enforcement | `src/platform/__tests__/architecture.test.ts` | 4 |
-| `domain/document` (CDM) | `src/domain/document/` | 13 |
+| `domain/document` (CDM, incl. the metadata bag) | `src/domain/document/` | 18 |
 | `domain/language` | `src/domain/language/` | 35 |
 | `app/studio` | `src/app/studio/` | 21 |
 | API route | `server/routes/studio.ts` | 10 (integration, via supertest against the live app) |
 | `app/atlas` | `src/app/atlas/` | 36 |
-| `domain/compliance` | `src/domain/compliance/` | 13 |
+| `domain/compliance` (incl. `metadata_presence`) | `src/domain/compliance/` | 19 |
 | `app/rubric` | `src/app/rubric/` | 13 |
 | `domain/project` (gate state machine, G0-G7) | `src/domain/project/` | 15 |
 | `app/conductor` (binds gates to Atlas/Rubric) | `src/app/conductor/` | 14 |
@@ -381,7 +381,7 @@ exists; everything else remains the intended target.
 | `domain/claim` (Claim–Evidence Graph) | `src/domain/claim/` | 19 |
 | Chicago Notes-Bibliography formatter | `src/citation_compliance/formatters/chicagoNotes.ts` | 18 |
 
-259 new tests. Full repository suite: 131 files, 1,396 tests, `tsc --noEmit`
+271 new tests. Full repository suite: 131 files, 1,408 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 
@@ -401,7 +401,7 @@ suite.
 | `platform/gateway` (OpenAI-compatible + Anthropic adapters) | **Built**, narrower provider coverage than the legacy path — see `41` §12.2 |
 | `domain/language` and `app/studio` | **Built** |
 | `app/atlas` | **Built** (engine complete; 6/24 output types populated) |
-| `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, two deterministic evaluators (`word_count`, `structural_presence`), and compilation from Atlas specs. Requirement-source extraction (needs `app/mesh`) and template extraction (needs `app/ingestion`) are not built — see `31` §12.2 |
+| `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, three deterministic evaluators (`word_count`, `structural_presence`, `metadata_presence` — the last checks a new `CanonicalDocument.metadata` bag in `domain/document`, closing the `metadata` Rule type's "always not_applicable" gap), and compilation from Atlas specs. Only `word_count`/`structural_presence` are wired to Atlas compilation (`fromAtlas.ts`) — `metadata_presence` has no Atlas-side compiler yet, since the catalog's `qualityGates` entries (e.g. "declaration_present") don't specify which metadata key they check. Requirement-source extraction (needs `app/mesh`) and template extraction (needs `app/ingestion`) are also not built — see `31` §12.2 |
 | `services/*` | Not started. This is the largest near-term gap: the Studio's session-policy store (`src/app/studio/sessionPolicyStore.ts`) and the Conductor's project store (`src/app/conductor/projectStore.ts`) are both explicitly-labelled in-memory stand-ins for what `services/store` should provide, and do not survive a restart or scale past one process |
 | `app/conductor` | **Built**, with an API surface. Gate state machine (`domain/project/gates.ts`) bound to Atlas (G0) and the Rubric (G6); exposed via `server/routes/project.ts` (`GET /api/atlas/output-types[/:id]`, `POST /api/projects`, `GET /api/projects/:id`, `PATCH /api/projects/:id/intake`, `POST /api/projects/:id/gates/:gate/signoff`, `POST /api/projects/:id/gates/:gate/invalidate`). Only G0 can reach "ready" through this API today — G1-G5/G7 have no computation source and G6 needs a stored CanonicalDocument, which has no storage/editor surface yet. Per-chapter gating is a tracked gap — see `30` §10 |
 | `domain/claim` | **Partially built.** The pure Claim–Evidence Graph (`src/domain/claim/`) — Claim, EvidenceSpan, ClaimEvidenceBinding with support strength, EvidenceConflict, and queries (`unsupportedClaims`, `claimsDependingOnSource`, `findConflicts`, `removeSource`'s cascade). Claim *extraction* from draft text (AG-13, `42` §2) is not built — it needs `app/mesh` (agent runtime), which doesn't exist yet, and a real draft/document pipeline to extract from |
