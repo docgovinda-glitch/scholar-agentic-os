@@ -525,6 +525,95 @@ describe("DELETE /api/projects/:id/sources/:sourceId", () => {
   });
 });
 
+function compliantOT04Document() {
+  return {
+    id: "doc-abstract",
+    title: "Test Abstract",
+    blocks: [
+      { id: "background", kind: "paragraph", text: words(40) },
+      { id: "objective", kind: "paragraph", text: words(25) },
+      { id: "methods", kind: "paragraph", text: words(40) },
+      { id: "results", kind: "paragraph", text: words(60) },
+      { id: "conclusion", kind: "paragraph", text: words(25) },
+    ],
+  };
+}
+
+describe("claim graph changes recompute G6 when a document already exists (OT-04's usesClaimGraph gate)", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("an empty claim graph passes vacuously right after a compliant document is submitted", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-04" });
+    const res = await request(app)
+      .put(`/api/projects/${created.body.projectId}/document`)
+      .send({ document: compliantOT04Document() });
+    const finding = res.body.rubric.findings.find(
+      (f: { ruleId: string }) => f.ruleId === "OT-04-claims-claims_traceable_to_source"
+    );
+    expect(finding.status).toBe("pass");
+  });
+
+  it("adding an unsupported claim after the document exists recomputes G6 and flips the gate to fail", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-04" });
+    const projectId = created.body.projectId;
+    await request(app).put(`/api/projects/${projectId}/document`).send({ document: compliantOT04Document() });
+
+    const res = await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "Effect X was observed." } });
+    expect(res.status).toBe(201);
+    const finding = res.body.rubric.findings.find(
+      (f: { ruleId: string }) => f.ruleId === "OT-04-claims-claims_traceable_to_source"
+    );
+    expect(finding.status).toBe("fail");
+    expect(res.body.rubric.readyForG6).toBe(false);
+  });
+
+  it("binding evidence to the claim recomputes G6 back to passing", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-04" });
+    const projectId = created.body.projectId;
+    await request(app).put(`/api/projects/${projectId}/document`).send({ document: compliantOT04Document() });
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "Effect X was observed." } });
+
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/claims/c1/evidence`)
+      .send({ binding: { id: "b1", claimId: "c1", evidence: [evidenceSpan()], strength: "strong", rationale: "Direct measurement." } });
+    expect(res.status).toBe(201);
+    const finding = res.body.rubric.findings.find(
+      (f: { ruleId: string }) => f.ruleId === "OT-04-claims-claims_traceable_to_source"
+    );
+    expect(finding.status).toBe("pass");
+    expect(res.body.rubric.readyForG6).toBe(true);
+  });
+
+  it("removing the claim's only evidence source recomputes G6 back to failing", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-04" });
+    const projectId = created.body.projectId;
+    await request(app).put(`/api/projects/${projectId}/document`).send({ document: compliantOT04Document() });
+    await request(app).post(`/api/projects/${projectId}/claims`).send({ claim: { id: "c1", text: "Effect X was observed." } });
+    await request(app)
+      .post(`/api/projects/${projectId}/claims/c1/evidence`)
+      .send({ binding: { id: "b1", claimId: "c1", evidence: [evidenceSpan({ sourceId: "src-1" })], strength: "strong", rationale: "x" } });
+
+    const res = await request(app).delete(`/api/projects/${projectId}/sources/src-1`);
+    expect(res.status).toBe(200);
+    const finding = res.body.rubric.findings.find(
+      (f: { ruleId: string }) => f.ruleId === "OT-04-claims-claims_traceable_to_source"
+    );
+    expect(finding.status).toBe("fail");
+  });
+
+  it("claim mutations before any document exists don't attempt a recompute (no rubric key on the response)", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-04" });
+    const res = await request(app)
+      .post(`/api/projects/${created.body.projectId}/claims`)
+      .send({ claim: { id: "c1", text: "Effect X was observed." } });
+    expect(res.status).toBe(201);
+    expect(res.body.rubric).toBeUndefined();
+  });
+});
+
 describe("POST /api/projects/:id/gates/:gate/invalidate", () => {
   beforeEach(() => {
     __resetProjectStoreForTests();

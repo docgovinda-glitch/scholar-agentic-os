@@ -10,7 +10,9 @@
 
 import type { CanonicalDocument } from "../document/model";
 import { wordCount } from "../document/ops";
-import type { Finding, Rule, WordCountParams, StructuralPresenceParams, MetadataPresenceParams } from "./types";
+import type { ClaimEvidenceGraph } from "../claim/types";
+import { unsupportedClaims } from "../claim/graph";
+import type { Finding, Rule, WordCountParams, StructuralPresenceParams, MetadataPresenceParams, ClaimSupportParams } from "./types";
 import { isEffectivelyWaived } from "./types";
 
 function excludingSections(doc: CanonicalDocument, exclude: string[]): CanonicalDocument {
@@ -120,14 +122,55 @@ function evaluateMetadataPresence(rule: Rule, params: MetadataPresenceParams, do
 }
 
 /**
+ * Checks a `ClaimEvidenceGraph`, not the document — `claimGraph` is
+ * undefined for any caller that doesn't have one to offer (every existing
+ * caller before this evaluator kind existed), which correctly reports
+ * `not_applicable` rather than a false pass, same discipline as an
+ * unimplemented evaluator kind.
+ */
+function evaluateClaimSupport(rule: Rule, _params: ClaimSupportParams, claimGraph: ClaimEvidenceGraph | undefined): Finding {
+  if (!claimGraph) {
+    return {
+      ruleId: rule.id,
+      status: "not_applicable",
+      severity: rule.severity,
+      message: "No claim graph was supplied for this evaluation.",
+    };
+  }
+
+  const unsupported = unsupportedClaims(claimGraph);
+  if (unsupported.length > 0) {
+    return {
+      ruleId: rule.id,
+      status: isEffectivelyWaived(rule) ? "warn" : "fail",
+      severity: rule.severity,
+      actual: String(unsupported.length),
+      expected: "0",
+      message: `${unsupported.length} claim(s) have no supporting evidence: ${unsupported.map((c) => c.id).join(", ")}.`,
+      remedy: "Bind evidence to every claim, or remove claims that can't be supported.",
+    };
+  }
+
+  return {
+    ruleId: rule.id,
+    status: "pass",
+    severity: rule.severity,
+    message: "Every claim is supported by at least one evidence binding.",
+  };
+}
+
+/**
  * Evaluate a single rule against a document. Every rule type this function
  * doesn't yet implement returns "not_applicable" rather than throwing or
  * silently passing — docs 31 §6.1: "the report is a single screen: what
  * blocks, what is advisory, what to do," and a not-yet-implemented check
  * must never be reported as a pass (docs 31 §10, AG-22's QA: "never reports
- * a pass for a rule that did not run").
+ * a pass for a rule that did not run"). `claimGraph` is optional and only
+ * consulted by `claim_support` rules — every other evaluator kind ignores
+ * it, so existing callers that only ever evaluated against a document are
+ * unaffected by its addition.
  */
-export function evaluateRule(rule: Rule, doc: CanonicalDocument): Finding {
+export function evaluateRule(rule: Rule, doc: CanonicalDocument, claimGraph?: ClaimEvidenceGraph): Finding {
   switch (rule.evaluator.kind) {
     case "word_count":
       return evaluateWordCount(rule, rule.evaluator.params, doc);
@@ -135,6 +178,8 @@ export function evaluateRule(rule: Rule, doc: CanonicalDocument): Finding {
       return evaluateStructuralPresence(rule, rule.evaluator.params, doc);
     case "metadata_presence":
       return evaluateMetadataPresence(rule, rule.evaluator.params, doc);
+    case "claim_support":
+      return evaluateClaimSupport(rule, rule.evaluator.params, claimGraph);
     default:
       return {
         ruleId: rule.id,
@@ -145,6 +190,6 @@ export function evaluateRule(rule: Rule, doc: CanonicalDocument): Finding {
   }
 }
 
-export function evaluateRules(rules: Rule[], doc: CanonicalDocument): Finding[] {
-  return rules.map((rule) => evaluateRule(rule, doc));
+export function evaluateRules(rules: Rule[], doc: CanonicalDocument, claimGraph?: ClaimEvidenceGraph): Finding[] {
+  return rules.map((rule) => evaluateRule(rule, doc, claimGraph));
 }

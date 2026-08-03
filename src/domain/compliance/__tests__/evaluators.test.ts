@@ -3,6 +3,8 @@ import { evaluateRule, evaluateRules } from "../evaluators";
 import type { Rule } from "../types";
 import { emptyDocument, type CanonicalDocument } from "../../document/model";
 import { appendBlock, setMetadata } from "../../document/ops";
+import { emptyGraph, addClaim, bindEvidence } from "../../claim/graph";
+import type { ClaimEvidenceGraph } from "../../claim/types";
 
 function wordCountRule(overrides: Partial<Rule> = {}): Rule {
   return {
@@ -56,6 +58,22 @@ function docWithWords(n: number): CanonicalDocument {
   let d = emptyDocument("d1", "Test");
   d = appendBlock(d, "b1", "paragraph", Array.from({ length: n }, () => "word").join(" "));
   return d;
+}
+
+function claimSupportRule(overrides: Partial<Rule> = {}): Rule {
+  return {
+    id: "r-claims",
+    source: { document: "test", locator: "x", quote: "x", extractedAt: "now", confidence: 1 },
+    type: "content",
+    scope: "claims",
+    severity: "blocking",
+    evaluator: { kind: "claim_support", params: {} },
+    message: "no unsupported claims",
+    remedy: "bind evidence",
+    autoFixable: false,
+    userModified: false,
+    ...overrides,
+  };
 }
 
 describe("domain/compliance: word_count evaluator", () => {
@@ -178,6 +196,52 @@ describe("domain/compliance: metadata_presence evaluator", () => {
   });
 });
 
+describe("domain/compliance: claim_support evaluator", () => {
+  it("returns not_applicable when no claim graph is supplied — never a false pass", () => {
+    const finding = evaluateRule(claimSupportRule(), docWithWords(1));
+    expect(finding.status).toBe("not_applicable");
+  });
+
+  it("passes vacuously against an empty claim graph", () => {
+    const finding = evaluateRule(claimSupportRule(), docWithWords(1), emptyGraph());
+    expect(finding.status).toBe("pass");
+  });
+
+  it("fails when a claim has zero evidence bindings", () => {
+    const graph = addClaim(emptyGraph(), { id: "c1", text: "Effect X was observed." });
+    const finding = evaluateRule(claimSupportRule(), docWithWords(1), graph);
+    expect(finding.status).toBe("fail");
+    expect(finding.message).toContain("c1");
+  });
+
+  it("passes once every claim has at least one evidence binding", () => {
+    let graph: ClaimEvidenceGraph = addClaim(emptyGraph(), { id: "c1", text: "Effect X was observed." });
+    graph = bindEvidence(graph, {
+      id: "b1",
+      claimId: "c1",
+      evidence: [{ sourceId: "src-1", locator: { page: 4 }, quote: "Effect X was measured at p<0.01." }],
+      strength: "strong",
+      rationale: "Direct measurement.",
+    });
+    const finding = evaluateRule(claimSupportRule(), docWithWords(1), graph);
+    expect(finding.status).toBe("pass");
+  });
+
+  it("does NOT downgrade a blocking-severity rule even if somehow marked waived", () => {
+    const graph = addClaim(emptyGraph(), { id: "c1", text: "Unsupported." });
+    const rule = claimSupportRule({ severity: "blocking", waived: { reason: "x", at: "now" } });
+    const finding = evaluateRule(rule, docWithWords(1), graph);
+    expect(finding.status).toBe("fail");
+  });
+
+  it("downgrades to warn when waived and NOT blocking severity", () => {
+    const graph = addClaim(emptyGraph(), { id: "c1", text: "Unsupported." });
+    const rule = claimSupportRule({ severity: "required", waived: { reason: "supervisor approved", at: "now" } });
+    const finding = evaluateRule(rule, docWithWords(1), graph);
+    expect(finding.status).toBe("warn");
+  });
+});
+
 describe("domain/compliance: unimplemented rule types", () => {
   it("returns not_applicable rather than a false pass for an unimplemented evaluator kind", () => {
     const rule = { ...wordCountRule(), evaluator: { kind: "bibliographic_style" as any, params: {} } };
@@ -193,5 +257,12 @@ describe("domain/compliance: evaluateRules", () => {
     expect(findings).toHaveLength(2);
     expect(findings[0].ruleId).toBe("r1");
     expect(findings[1].ruleId).toBe("r-intro");
+  });
+
+  it("threads an optional claim graph through to claim_support rules while leaving other kinds unaffected", () => {
+    const graph = addClaim(emptyGraph(), { id: "c1", text: "Unsupported." });
+    const findings = evaluateRules([wordCountRule({ evaluator: { kind: "word_count", params: { max: 10 } } }), claimSupportRule()], docWithWords(5), graph);
+    expect(findings[0].status).toBe("pass"); // word_count, unaffected by claimGraph
+    expect(findings[1].status).toBe("fail"); // claim_support, sees the unsupported claim
   });
 });

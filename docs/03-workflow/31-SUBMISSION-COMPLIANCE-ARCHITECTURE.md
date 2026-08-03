@@ -381,11 +381,11 @@ is not yet built.
 | Module | Path | Covers |
 |---|---|---|
 | Rule/Finding model | `src/domain/compliance/types.ts` | §3 in full: source traceability (`document`, `locator`, `quote`, `confidence`), type, scope, severity, waiver |
-| Evaluators | `src/domain/compliance/evaluators.ts` | `word_count`, `structural_presence`, and `metadata_presence` (checks a document-level declaration in `CanonicalDocument.metadata` — `domain/document`'s new metadata bag — for the `metadata` rule type's own example, "must include a data availability statement"). A rule type with no evaluator returns `not_applicable`, never a false pass (§10, AG-22's QA rule) |
-| Compilation from Atlas | `src/app/rubric/fromAtlas.ts` | The word-limit rule from `budget.totalWords` (excluding sections marked `countsTowardWordcount: false`), one blocking structural rule per required section, and one `metadata_presence` rule per quality gate that sets `metadataKey` — OT-06's `ethics_approval_recorded` gate is the first real (non-synthetic) use, since an ethics approval status is genuinely orthogonal metadata rather than document content |
+| Evaluators | `src/domain/compliance/evaluators.ts` | `word_count`, `structural_presence`, `metadata_presence` (checks `CanonicalDocument.metadata`, for the `metadata` rule type's own example, "must include a data availability statement"), and `claim_support` (checks a `domain/claim` `ClaimEvidenceGraph` for unsupported claims — `evaluateRule`/`evaluateRules` take it as an optional third argument, extending `RuleScope` with a `claims` value; every pre-existing evaluator kind ignores it, so this was backward-compatible). A rule type with no evaluator returns `not_applicable`, never a false pass (§10, AG-22's QA rule) |
+| Compilation from Atlas | `src/app/rubric/fromAtlas.ts` | The word-limit rule from `budget.totalWords` (excluding sections marked `countsTowardWordcount: false`), one blocking structural rule per required section, one `metadata_presence` rule per quality gate that sets `metadataKey` (OT-06's `ethics_approval_recorded` gate — orthogonal metadata, not document content), and one `claim_support` rule per quality gate that sets `usesClaimGraph` — OT-04, OT-08, OT-20, and OT-22 all compile one, checking the project's Claim–Evidence Graph for unsupported claims |
 | Report / waivers | `src/app/rubric/rubric.ts` | `evaluateAgainstOutputType()`, `readyForG6`, `waiveRule()`, and `applyWaivers()` (reapplies previously-recorded waivers onto a freshly compiled rule set — `fromAtlas.ts` always compiles unwaived rules, so this is what lets a waiver survive a document resubmission rather than silently resetting). Reachable over HTTP via `PUT /api/projects/:id/document` (evaluates and recomputes G6), `GET /api/projects/:id/rubric` (re-fetches the last report), and `POST /api/projects/:id/rubric/waive` (records a waiver by rule id and reason, 400s on a blocking rule) — see `30` §10 |
 
-44 tests, including the re-targeting case from `26` Journey 3 in miniature:
+58 tests, including the re-targeting case from `26` Journey 3 in miniature:
 the same document evaluated against two different output types produces
 different findings without the document itself changing.
 
@@ -407,7 +407,7 @@ already set.
 |---|---|
 | Requirement-source PDF/URL extraction (§4) | Not built — needs a model call through `app/mesh`'s Requirement Analyzer, which doesn't exist yet |
 | DOCX/ODT template style extraction (§4.1) | Not built — needs `app/ingestion`, which doesn't exist yet |
-| Remaining rule types (`bibliographic`, `formatting`, `stylistic`, `ethical`, `content`) | Evaluator not implemented; correctly reported as `not_applicable` rather than skipped silently |
+| Remaining rule types (`bibliographic`, `formatting`, `stylistic`, `ethical`) | Evaluator not implemented; correctly reported as `not_applicable` rather than skipped silently. `content` is now partially covered — `claim_support` rules use it — but a `content`-typed rule with a different `evaluator.kind` still has no evaluator |
 | Continuous re-evaluation on edit, tiering, and the 300ms budget (§5) | Not wired to anything — there is no live editor yet to trigger it |
 | Venue profiles (§8) | Not built |
 | Conflict detection across sources | Not applicable yet — only one source (Atlas) is implemented |

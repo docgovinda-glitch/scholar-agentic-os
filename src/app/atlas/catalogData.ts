@@ -13,15 +13,21 @@
  * `chicago-notes-bibliography`, exercising this session's
  * ChicagoNotesFormatter for real.
  *
- * A handful of quality gates across these entries are recorded but not
- * compiled into Rubric rules, honestly, because what they need doesn't
- * exist yet: OT-11/OT-23's layout-measurement gates (page limits, print
- * font sizes, WCAG contrast), OT-12's PRISMA screening-workflow gates,
- * OT-17's agent-assessed readability gate, and OT-20's two genuinely
- * deterministic-in-principle gates (recommendation-position-in-text,
- * every-claim-sourced) that need either a new rule type or the
- * claim-evidence graph wired into Rubric evaluation, respectively —
- * neither of which domain/compliance implements yet. See
+ * Four "no unsupported claims" gates — OT-04's claims_traceable_to_source,
+ * OT-08's contribution_claims_supported, OT-20's every_claim_sourced, and
+ * OT-22's claims_traceable — all set `usesClaimGraph` and compile into
+ * real `claim_support` rules checking the project's Claim-Evidence Graph
+ * (see app/rubric/fromAtlas.ts). Unscoped: an empty graph passes
+ * vacuously, so this never penalises a project that hasn't started using
+ * claims — it only fires once a claim with no evidence binding exists.
+ *
+ * A handful of other quality gates across these entries are still recorded
+ * but not compiled, honestly, because what they need doesn't exist yet:
+ * OT-11/OT-23's layout-measurement gates (page limits, print font sizes,
+ * WCAG contrast), OT-12's PRISMA screening-workflow gates, OT-17's
+ * agent-assessed readability gate, and OT-20's remaining
+ * recommendation-position-in-text gate, which needs a rule type
+ * domain/compliance doesn't implement. See
  * docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3 for the tracked gaps.
  *
  * Word budgets, source counts, and structure are drawn directly from the
@@ -522,7 +528,7 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     qualityGates: [
       { id: "word_limit_satisfied", description: "Within the venue's exact word limit", severity: "blocking" },
       { id: "no_forbidden_citations", description: "Contains no citations where the venue forbids them", severity: "blocking", appliesWhen: "citations_permitted = no" },
-      { id: "claims_traceable_to_source", description: "Every claim binds to a span in the source document", severity: "required", appliesWhen: "source_document provided" },
+      { id: "claims_traceable_to_source", description: "Every claim binds to a span in the source document", severity: "required", appliesWhen: "source_document provided", usesClaimGraph: true },
     ],
     workflowVariant: "short_form",
     complianceProfile: "venue",
@@ -970,7 +976,7 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
       { id: "limitations_present", description: "Limitations section present", severity: "required" },
       { id: "chapter_self_contained", description: "Each empirical chapter is self-contained", severity: "required", appliesWhen: "thesis_format = by_publication" },
       { id: "terminology_consistency", description: "Consistent terminology used across chapters", severity: "advisory" },
-      { id: "contribution_claims_supported", description: "No unsupported claims in the contribution statement", severity: "blocking" },
+      { id: "contribution_claims_supported", description: "No unsupported claims in the contribution statement", severity: "blocking", usesClaimGraph: true },
     ],
     workflowVariant: "long_form_chaptered",
     complianceProfile: "institutional",
@@ -2114,17 +2120,11 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
 
   // ── OT-20 Policy Brief — applied_professional / argumentative / professional ──
   // The register inversion docs 14 §9 flags is real: academic hedging is a
-  // defect here, not a virtue. Two of the four quality gates below are
-  // genuinely deterministic and checkable in principle — "recommendation
-  // in the first 200 words" is a position-in-text check, "every claim
-  // sourced" is exactly what the claim-evidence graph verifies — but
-  // neither has a compiled evaluator yet: position-within-word-count isn't
-  // a rule type domain/compliance implements, and wiring the claim graph
-  // into Rubric evaluation is its own, larger design decision (a document
-  // needs both a CanonicalDocument and a ClaimEvidenceGraph passed to one
-  // evaluation, which the current evaluateRule/evaluateRules signature
-  // doesn't support). Recorded as real, tractable future work rather than
-  // silently left out.
+  // defect here, not a virtue. "Every claim sourced" (usesClaimGraph)
+  // compiles into a real claim_support rule against the project's
+  // Claim-Evidence Graph. "Recommendation in the first 200 words" is still
+  // uncompiled — it's a position-in-text check, and domain/compliance has
+  // no rule type for that yet.
   {
     id: "OT-20",
     version: 1,
@@ -2226,7 +2226,7 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     qualityGates: [
       { id: "reading_level_appropriate", description: "Written at a reading level appropriate to the target audience", severity: "required" },
       { id: "recommendation_in_first_200_words", description: "The recommendation is stated within the first 200 words", severity: "blocking" },
-      { id: "every_claim_sourced", description: "Every factual claim is sourced", severity: "blocking" },
+      { id: "every_claim_sourced", description: "Every factual claim is sourced", severity: "blocking", usesClaimGraph: true },
       { id: "jargon_density_below_threshold", description: "Academic jargon density is below the threshold for this audience", severity: "required" },
     ],
     workflowVariant: "applied",
@@ -2437,7 +2437,7 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     qualityGates: [
       { id: "slide_count_matches_duration", description: "Slide count matches the stated duration at a sustainable pace", severity: "required" },
       { id: "word_density", description: "Word density per slide below threshold", severity: "blocking" },
-      { id: "claims_traceable", description: "Every claim traceable to the source document or corpus", severity: "required" },
+      { id: "claims_traceable", description: "Every claim traceable to the source document or corpus", severity: "required", usesClaimGraph: true },
     ],
     workflowVariant: "visual",
     complianceProfile: "coursework",

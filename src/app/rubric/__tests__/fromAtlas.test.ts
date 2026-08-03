@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { compileMetadataGateRules, compileRubricFromOutputType, compileStructuralRules, compileWordLimitRule } from "../fromAtlas";
+import { compileClaimSupportGateRules, compileMetadataGateRules, compileRubricFromOutputType, compileStructuralRules, compileWordLimitRule } from "../fromAtlas";
 import { buildReport } from "../rubric";
 import { catalog } from "../../atlas/atlas";
 import type { OutputTypeSpec } from "../../atlas/types";
 import { emptyDocument } from "../../../domain/document/model";
 import { setMetadata } from "../../../domain/document/ops";
+import { emptyGraph, addClaim, bindEvidence } from "../../../domain/claim/graph";
+import type { ClaimEvidenceGraph } from "../../../domain/claim/types";
 
 describe("app/rubric: compiling rules from Atlas", () => {
   it("compiles a word-limit rule matching the type's budget", () => {
@@ -132,5 +134,70 @@ describe("app/rubric: compileMetadataGateRules against a synthetic gate (severit
     const spec = withMetadataGate();
     const rules = compileRubricFromOutputType(spec);
     expect(rules.some((r) => r.evaluator.kind === "metadata_presence")).toBe(true);
+  });
+});
+
+describe("app/rubric: compileClaimSupportGateRules against real usesClaimGraph gates", () => {
+  it("compiles a claim_support rule for each of OT-04, OT-08, OT-20, and OT-22's usesClaimGraph gates", () => {
+    expect(compileClaimSupportGateRules(catalog.getOrThrow("OT-04"))[0].id).toBe("OT-04-claims-claims_traceable_to_source");
+    expect(compileClaimSupportGateRules(catalog.getOrThrow("OT-08"))[0].id).toBe("OT-08-claims-contribution_claims_supported");
+    expect(compileClaimSupportGateRules(catalog.getOrThrow("OT-20"))[0].id).toBe("OT-20-claims-every_claim_sourced");
+    expect(compileClaimSupportGateRules(catalog.getOrThrow("OT-22"))[0].id).toBe("OT-22-claims-claims_traceable");
+  });
+
+  it("carries the gate's own severity onto the compiled rule", () => {
+    const rule = compileClaimSupportGateRules(catalog.getOrThrow("OT-08"))[0];
+    expect(rule.severity).toBe("blocking");
+  });
+
+  it("compiles no rules for a gate that doesn't set usesClaimGraph", () => {
+    const assignment = catalog.getOrThrow("OT-01"); // has no usesClaimGraph gates
+    expect(compileClaimSupportGateRules(assignment)).toHaveLength(0);
+  });
+
+  it("an empty claim graph passes vacuously — a project that hasn't used claims yet isn't penalised", () => {
+    const dissertation = catalog.getOrThrow("OT-08");
+    const rules = compileRubricFromOutputType(dissertation);
+    const doc = emptyDocument("d1", "Thesis");
+    const report = buildReport(rules, doc, emptyGraph());
+    const finding = report.findings.find((f) => f.ruleId === "OT-08-claims-contribution_claims_supported");
+    expect(finding!.status).toBe("pass");
+  });
+
+  it("fails once an unsupported claim exists in the graph", () => {
+    const dissertation = catalog.getOrThrow("OT-08");
+    const rules = compileRubricFromOutputType(dissertation);
+    const doc = emptyDocument("d1", "Thesis");
+    const graph = addClaim(emptyGraph(), { id: "c1", text: "This is the first empirical account of X." });
+    const report = buildReport(rules, doc, graph);
+    const finding = report.findings.find((f) => f.ruleId === "OT-08-claims-contribution_claims_supported");
+    expect(finding!.status).toBe("fail");
+    expect(report.blockingFailures.some((f) => f.ruleId === "OT-08-claims-contribution_claims_supported")).toBe(true);
+  });
+
+  it("passes once the claim is bound to evidence", () => {
+    const dissertation = catalog.getOrThrow("OT-08");
+    const rules = compileRubricFromOutputType(dissertation);
+    const doc = emptyDocument("d1", "Thesis");
+    let graph: ClaimEvidenceGraph = addClaim(emptyGraph(), { id: "c1", text: "This is the first empirical account of X." });
+    graph = bindEvidence(graph, {
+      id: "b1",
+      claimId: "c1",
+      evidence: [{ sourceId: "src-1", locator: { page: 12 }, quote: "No prior empirical account of X exists." }],
+      strength: "strong",
+      rationale: "Systematic literature search found no prior account.",
+    });
+    const report = buildReport(rules, doc, graph);
+    const finding = report.findings.find((f) => f.ruleId === "OT-08-claims-contribution_claims_supported");
+    expect(finding!.status).toBe("pass");
+  });
+
+  it("without a claim graph at all, the rule is not_applicable, never a silent pass", () => {
+    const dissertation = catalog.getOrThrow("OT-08");
+    const rules = compileRubricFromOutputType(dissertation);
+    const doc = emptyDocument("d1", "Thesis");
+    const report = buildReport(rules, doc);
+    const finding = report.findings.find((f) => f.ruleId === "OT-08-claims-contribution_claims_supported");
+    expect(finding!.status).toBe("not_applicable");
   });
 });

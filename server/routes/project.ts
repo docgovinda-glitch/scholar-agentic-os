@@ -41,7 +41,7 @@ import { createProject, getProject, saveProject } from "../../src/app/conductor/
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
 import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, ClaimGraphError } from "../../src/domain/claim/graph.ts";
-import type { Claim, ClaimEvidenceBinding, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
+import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
 
@@ -96,6 +96,26 @@ function isValidBinding(value: unknown): value is ClaimEvidenceBinding {
   if (typeof b.strength !== "string" || !SUPPORT_STRENGTHS.has(b.strength as SupportStrength)) return false;
   if (!Array.isArray(b.evidence) || !b.evidence.every(isValidEvidenceSpan)) return false;
   return true;
+}
+
+/**
+ * Recompute the Rubric report and G6 exit criteria from a project's
+ * waivers and claim graph, against an explicit document — the single
+ * place that combines all three so document edits, waiver changes, and
+ * claim-graph changes all reach the same evaluation. The caller supplies
+ * the document explicitly (rather than reading `record.document`) so it
+ * works both for a document being submitted for the first time and for
+ * re-evaluating against the document already on record. Throws
+ * GateTransitionError (via updateExitCriteria) if G6 is already signed
+ * off, same as every other gate-touching endpoint.
+ */
+function recomputeG6(record: NonNullable<ReturnType<typeof getProject>>, document: CanonicalDocument) {
+  const spec = catalog.getOrThrow(record.outputTypeId);
+  const rules = applyWaivers(compileRubricFromOutputType(spec), record.waivers);
+  const rubricReport = buildReport(rules, document, record.claimGraph);
+  const criteria = computeG6ExitCriteria(rubricReport);
+  const gates = updateExitCriteria(record.gates, "G6", criteria);
+  return { rubricReport, gates };
 }
 
 function projectView(record: ReturnType<typeof getProject>) {
@@ -219,13 +239,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(400).json({ error: "Missing or malformed required field: document (CanonicalDocument — id, title, blocks[]: {id, kind, text})." });
     }
 
-    const spec = catalog.getOrThrow(record.outputTypeId);
-    const rules = applyWaivers(compileRubricFromOutputType(spec), record.waivers);
-    const rubricReport = buildReport(rules, document);
-    const criteria = computeG6ExitCriteria(rubricReport);
-
     try {
-      const gates = updateExitCriteria(record.gates, "G6", criteria);
+      const { rubricReport, gates } = recomputeG6(record, document);
       const updated = saveProject({ ...record, document, rubricReport, gates });
       res.json({ ...projectView(updated), rubric: rubricReport });
     } catch (err) {
@@ -284,7 +299,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       const waivedRules = waiveRule(rules, ruleId, reason);
       const newWaiver = waivedRules.find((r) => r.id === ruleId)!.waived!;
       const waivers = { ...record.waivers, [ruleId]: newWaiver };
-      const rubricReport = buildReport(waivedRules, record.document);
+      const rubricReport = buildReport(waivedRules, record.document, record.claimGraph);
       const criteria = computeG6ExitCriteria(rubricReport);
       const gates = updateExitCriteria(record.gates, "G6", criteria);
       const updated = saveProject({ ...record, waivers, rubricReport, gates });
@@ -300,7 +315,29 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
   });
 
-  /** Add a claim to the project's Claim–Evidence Graph. Body: { claim: Claim }. 409s if the claim id is already used. */
+  /**
+   * Save a claim-graph change, then — if the project already has a
+   * document — recompute G6 against it, since four catalog gates
+   * (`usesClaimGraph`) depend on the graph, not just the document. Returns
+   * the saved record. Throws GateTransitionError if G6 is already signed
+   * off, same "invalidate first" guarantee as every other Rubric-relevant
+   * change.
+   */
+  function saveClaimGraphChange(record: NonNullable<ReturnType<typeof getProject>>, claimGraph: ClaimEvidenceGraph) {
+    if (!record.document) {
+      return saveProject({ ...record, claimGraph });
+    }
+    const { rubricReport, gates } = recomputeG6({ ...record, claimGraph }, record.document);
+    return saveProject({ ...record, claimGraph, rubricReport, gates });
+  }
+
+  /**
+   * Add a claim to the project's Claim–Evidence Graph. Body:
+   * { claim: Claim }. 409s if the claim id is already used. If the project
+   * already has a document, recomputes G6 (four catalog gates check the
+   * claim graph, not the document — see fromAtlas.ts's
+   * compileClaimSupportGateRules) — 409s if G6 is already signed off.
+   */
   app.post("/api/projects/:id/claims", projectLimit, (req, res) => {
     const record = getProject(req.params.id);
     if (!record) {
@@ -312,10 +349,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
     try {
       const claimGraph = addClaim(record.claimGraph, claim);
-      const updated = saveProject({ ...record, claimGraph });
-      res.status(201).json({ ...projectView(updated), claimGraph });
+      const updated = saveClaimGraphChange(record, claimGraph);
+      res.status(201).json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
     } catch (err) {
       if (err instanceof ClaimGraphError) {
+        return res.status(409).json({ error: err.message });
+      }
+      if (err instanceof GateTransitionError) {
         return res.status(409).json({ error: err.message });
       }
       throw err;
@@ -327,7 +367,9 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * 400s if the claim doesn't exist, the binding id is already used, or the
    * binding has no evidence spans — a binding asserting support without a
    * real located quote is exactly what domain/claim's bindEvidence refuses
-   * (AG-13's "never invents a locator" QA checkpoint).
+   * (AG-13's "never invents a locator" QA checkpoint). Recomputes G6 if a
+   * document already exists — this is exactly the action that turns a
+   * failing claim_support finding into a passing one.
    */
   app.post("/api/projects/:id/claims/:claimId/evidence", projectLimit, (req, res) => {
     const record = getProject(req.params.id);
@@ -342,11 +384,14 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
     try {
       const claimGraph = bindEvidence(record.claimGraph, binding);
-      const updated = saveProject({ ...record, claimGraph });
-      res.status(201).json({ ...projectView(updated), claimGraph });
+      const updated = saveClaimGraphChange(record, claimGraph);
+      res.status(201).json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
     } catch (err) {
       if (err instanceof ClaimGraphError) {
         return res.status(400).json({ error: err.message });
+      }
+      if (err instanceof GateTransitionError) {
+        return res.status(409).json({ error: err.message });
       }
       throw err;
     }
@@ -384,6 +429,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * evidence spans pointing at it, and any binding left with zero evidence
    * is dropped entirely (domain/claim's removeSource — mirrors a source
    * being un-approved or retracted after claims were already bound to it).
+   * Recomputes G6 if a document already exists — a retracted source can
+   * turn a passing claim_support finding into a failing one.
    */
   app.delete("/api/projects/:id/sources/:sourceId", projectLimit, (req, res) => {
     const record = getProject(req.params.id);
@@ -391,8 +438,15 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(404).json({ error: `No project "${req.params.id}".` });
     }
     const claimGraph = removeSource(record.claimGraph, req.params.sourceId);
-    const updated = saveProject({ ...record, claimGraph });
-    res.json({ ...projectView(updated), claimGraph });
+    try {
+      const updated = saveClaimGraphChange(record, claimGraph);
+      res.json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
+    } catch (err) {
+      if (err instanceof GateTransitionError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
   });
 
   /**

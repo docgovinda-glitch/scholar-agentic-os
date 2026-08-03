@@ -10,18 +10,22 @@
  * PDF extraction (docs 31 §4, not yet built — that needs a model call),
  * this compilation is deterministic and total.
  *
- * A third rule source lives here too: `compileMetadataGateRules` compiles
- * quality gates that name a `metadataKey` into `metadata_presence` rules.
- * No entry in the current catalog data uses it — every "declaration" this
- * catalog specifies so far (declaration of originality, funding/COI/ethics/
- * data-availability declarations) is modeled as a document *section*
- * (prose the author writes), not orthogonal metadata, so it's already
- * covered by `compileStructuralRules` and forcing a second, redundant
- * `metadataKey` mapping onto the same requirement would be worse than
- * leaving it uncompiled. A genuine fit is a structured fact that isn't
- * also rendered as document content — an ethics-approval reference number,
- * an ORCID, a funder's legal name — which the current 9 populated output
- * types don't yet call for as a quality gate.
+ * Two more rule sources live here too, both compiling `QualityGateSpec`
+ * flags rather than structure or budget:
+ *
+ * `compileMetadataGateRules` compiles gates that name a `metadataKey` into
+ * `metadata_presence` rules — a structured fact that isn't rendered as
+ * document content (OT-06's ethics approval status is the first real
+ * example; most "declarations" this catalog specifies are document
+ * *sections* instead, already covered by `compileStructuralRules`, and
+ * forcing a redundant `metadataKey` mapping onto the same requirement
+ * would be worse than leaving it uncompiled).
+ *
+ * `compileClaimSupportGateRules` compiles gates that set `usesClaimGraph`
+ * into `claim_support` rules, checking a `domain/claim` `ClaimEvidenceGraph`
+ * for unsupported claims rather than checking document content at all —
+ * OT-08's contribution-claims gate, OT-20's every-claim-sourced gate, and
+ * OT-22's claims-traceable gate all compile through this path.
  */
 
 import type { OutputTypeSpec } from "../atlas/types";
@@ -90,10 +94,7 @@ export function compileStructuralRules(spec: OutputTypeSpec): Rule[] {
  * Compile one metadata-presence rule per quality gate that names a
  * `metadataKey` (docs/01-product/14-OUTPUT-TYPE-CATALOG.md §6 quality
  * gates; `QualityGateSpec.metadataKey`'s own doc comment explains why most
- * gates don't set it). No current catalog entry does yet — see this
- * module's own file comment — but the compilation is real and tested
- * against a synthetic spec so it's proven correct for the day a gate like
- * "ethics approval reference present" or "ORCID provided" is added.
+ * gates don't set it).
  */
 export function compileMetadataGateRules(spec: OutputTypeSpec): Rule[] {
   return spec.qualityGates
@@ -118,7 +119,43 @@ export function compileMetadataGateRules(spec: OutputTypeSpec): Rule[] {
     }));
 }
 
+/**
+ * Compile one claim-support rule per quality gate that sets
+ * `usesClaimGraph` (`QualityGateSpec.usesClaimGraph`'s own doc comment).
+ * Unscoped: checks the project's whole `ClaimEvidenceGraph` for any claim
+ * with zero evidence bindings, same as `domain/claim`'s own
+ * `unsupportedClaims()`. Scoping to a claim subset (e.g. only claims within
+ * a specific section) is a real future refinement, not modeled here.
+ */
+export function compileClaimSupportGateRules(spec: OutputTypeSpec): Rule[] {
+  return spec.qualityGates
+    .filter((gate) => gate.usesClaimGraph === true)
+    .map((gate) => ({
+      id: `${spec.id}-claims-${gate.id}`,
+      source: {
+        document: `Atlas catalog entry ${spec.id} v${spec.version}`,
+        locator: `qualityGates[id=${gate.id}]`,
+        quote: gate.description,
+        extractedAt: NOW(),
+        confidence: 1.0,
+      },
+      type: "content" as const,
+      scope: "claims" as const,
+      severity: gate.severity,
+      evaluator: { kind: "claim_support" as const, params: {} },
+      message: gate.description,
+      remedy: "Bind evidence to every claim, or remove claims that can't be supported.",
+      autoFixable: false,
+      userModified: false,
+    }));
+}
+
 /** Compile every deterministic rule this module knows how to derive from an Atlas spec. */
 export function compileRubricFromOutputType(spec: OutputTypeSpec): Rule[] {
-  return [compileWordLimitRule(spec), ...compileStructuralRules(spec), ...compileMetadataGateRules(spec)];
+  return [
+    compileWordLimitRule(spec),
+    ...compileStructuralRules(spec),
+    ...compileMetadataGateRules(spec),
+    ...compileClaimSupportGateRules(spec),
+  ];
 }

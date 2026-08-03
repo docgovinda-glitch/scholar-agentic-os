@@ -96,6 +96,15 @@ export interface QualityGateSpec {
    * severity.
    */
   metadataKey?: string;
+  /**
+   * True when this gate is a "no unsupported claims" check — e.g. OT-08's
+   * contribution-claims gate, OT-20's every-claim-sourced gate, OT-22's
+   * claims-traceable gate. When set, `app/rubric/fromAtlas.ts`'s
+   * `compileClaimSupportGateRules` compiles this into a `claim_support`
+   * Rule at the gate's own severity, checking the project's
+   * `domain/claim` `ClaimEvidenceGraph` rather than document content.
+   */
+  usesClaimGraph?: boolean;
 }
 
 export interface ExportDefaults {

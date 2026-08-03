@@ -373,15 +373,15 @@ exists; everything else remains the intended target.
 | `app/studio` | `src/app/studio/` | 21 |
 | API route | `server/routes/studio.ts` | 10 (integration, via supertest against the live app) |
 | `app/atlas` | `src/app/atlas/` | 59 |
-| `domain/compliance` (incl. `metadata_presence`) | `src/domain/compliance/` | 19 |
-| `app/rubric` (incl. `compileMetadataGateRules`, `applyWaivers`) | `src/app/rubric/` | 25 |
+| `domain/compliance` (incl. `metadata_presence`, `claim_support`) | `src/domain/compliance/` | 26 |
+| `app/rubric` (incl. `compileMetadataGateRules`, `compileClaimSupportGateRules`, `applyWaivers`) | `src/app/rubric/` | 32 |
 | `domain/project` (gate state machine, G0-G7) | `src/domain/project/` | 15 |
 | `app/conductor` (binds gates to Atlas/Rubric) | `src/app/conductor/` | 14 |
-| API routes | `server/routes/project.ts` | 43 (integration, via supertest against the live app) |
+| API routes | `server/routes/project.ts` | 48 (integration, via supertest against the live app) |
 | `domain/claim` (Claim–Evidence Graph) | `src/domain/claim/` | 19 |
 | Chicago Notes-Bibliography formatter | `src/citation_compliance/formatters/chicagoNotes.ts` | 18 |
 
-332 new tests. Full repository suite: 131 files, 1,469 tests, `tsc --noEmit`
+351 new tests. Full repository suite: 131 files, 1,488 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 
@@ -401,10 +401,10 @@ suite.
 | `platform/gateway` (OpenAI-compatible + Anthropic adapters) | **Built**, narrower provider coverage than the legacy path — see `41` §12.2 |
 | `domain/language` and `app/studio` | **Built** |
 | `app/atlas` | **Built** (engine complete; 24/24 output types populated) |
-| `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, three deterministic evaluators (`word_count`, `structural_presence`, `metadata_presence` — the last checks a new `CanonicalDocument.metadata` bag in `domain/document`, closing the `metadata` Rule type's "always not_applicable" gap), and compilation from Atlas specs for all three (`compileMetadataGateRules` compiles any quality gate that sets `QualityGateSpec.metadataKey`). No current catalog entry sets `metadataKey` yet — every "declaration" the catalog specifies is modeled as a document section, not orthogonal metadata, so the compiler is tested against a synthetic spec pending a real fit (an ethics-approval reference number, an ORCID). Requirement-source extraction (needs `app/mesh`) and template extraction (needs `app/ingestion`) are also not built — see `31` §12.2 |
+| `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, four deterministic evaluators (`word_count`, `structural_presence`, `metadata_presence`, and `claim_support` — the last checks a `domain/claim` `ClaimEvidenceGraph` for unsupported claims, via `evaluateRule`/`evaluateRules`' optional third argument), and compilation from Atlas specs for all four (`compileMetadataGateRules` for `metadataKey`, `compileClaimSupportGateRules` for `usesClaimGraph`), both proven against real catalog entries (OT-06; OT-04/OT-08/OT-20/OT-22). Requirement-source extraction (needs `app/mesh`) and template extraction (needs `app/ingestion`) are still not built — see `31` §12.2 |
 | `services/*` | Not started. This is the largest near-term gap: the Studio's session-policy store (`src/app/studio/sessionPolicyStore.ts`) and the Conductor's project store (`src/app/conductor/projectStore.ts`) are both explicitly-labelled in-memory stand-ins for what `services/store` should provide, and do not survive a restart or scale past one process |
 | `app/conductor` | **Built**, with an API surface. Gate state machine (`domain/project/gates.ts`) bound to Atlas (G0) and the Rubric (G6); exposed via `server/routes/project.ts` (`GET /api/atlas/output-types[/:id]`, `POST /api/projects`, `GET /api/projects/:id`, `PATCH /api/projects/:id/intake`, `PUT /api/projects/:id/document`, `GET /api/projects/:id/rubric`, `POST /api/projects/:id/gates/:gate/signoff`, `POST /api/projects/:id/gates/:gate/invalidate`). G0 and G6 both have real, computable exit criteria through this API now — submitting a document via `PUT .../document` recomputes G6 from a live Rubric evaluation. Only G0 can reach an actual sign-off today, though: G6's entry prerequisites (G1-G5 signed off) can't be satisfied since those gates have no computation source yet. Per-chapter gating is a tracked gap — see `30` §10 |
-| `domain/claim` | **Partially built.** The pure Claim–Evidence Graph (`src/domain/claim/`) — Claim, EvidenceSpan, ClaimEvidenceBinding with support strength, EvidenceConflict, and queries (`unsupportedClaims`, `claimsDependingOnSource`, `findConflicts`, `removeSource`'s cascade). Reachable over HTTP now too: each project carries a graph (`server/routes/project.ts`'s `POST .../claims`, `POST .../claims/:claimId/evidence`, `GET .../claims`, `GET .../claims/unsupported`, `GET .../claims/conflicts`, `DELETE .../sources/:sourceId`) — manual entry, since there is no extraction agent yet. Claim *extraction* from draft text (AG-13, `42` §2) is still not built — it needs `app/mesh` (agent runtime), which doesn't exist yet, and a real draft/document pipeline to extract from |
+| `domain/claim` | **Partially built.** The pure Claim–Evidence Graph (`src/domain/claim/`) — Claim, EvidenceSpan, ClaimEvidenceBinding with support strength, EvidenceConflict, and queries (`unsupportedClaims`, `claimsDependingOnSource`, `findConflicts`, `removeSource`'s cascade). Reachable over HTTP (each project carries a graph — `server/routes/project.ts`'s `POST .../claims`, `POST .../claims/:claimId/evidence`, `GET .../claims`, `GET .../claims/unsupported`, `GET .../claims/conflicts`, `DELETE .../sources/:sourceId`) and, as of `app/rubric`'s `claim_support` evaluator, consumed by compliance evaluation too — `unsupportedClaims()` is what that evaluator calls. Claim entry through either path is manual; there is no extraction agent yet. Claim *extraction* from draft text (AG-13, `42` §2) is still not built — it needs `app/mesh` (agent runtime), which doesn't exist yet, and a real draft/document pipeline to extract from |
 | `app/plugins` | Not started |
 | `client/pocket-shell` | Not started |
 | `admin/foundry` | Not started |
