@@ -378,8 +378,9 @@ exists; everything else remains the intended target.
 | `domain/project` (gate state machine, G0-G7) | `src/domain/project/` | 15 |
 | `app/conductor` (binds gates to Atlas/Rubric) | `src/app/conductor/` | 14 |
 | API routes | `server/routes/project.ts` | 16 (integration, via supertest against the live app) |
+| `domain/claim` (Claim–Evidence Graph) | `src/domain/claim/` | 19 |
 
-222 new tests. Full repository suite: 129 files, 1,359 tests, `tsc --noEmit`
+241 new tests. Full repository suite: 130 files, 1,378 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 
@@ -402,7 +403,7 @@ suite.
 | `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, two deterministic evaluators (`word_count`, `structural_presence`), and compilation from Atlas specs. Requirement-source extraction (needs `app/mesh`) and template extraction (needs `app/ingestion`) are not built — see `31` §12.2 |
 | `services/*` | Not started. This is the largest near-term gap: the Studio's session-policy store (`src/app/studio/sessionPolicyStore.ts`) and the Conductor's project store (`src/app/conductor/projectStore.ts`) are both explicitly-labelled in-memory stand-ins for what `services/store` should provide, and do not survive a restart or scale past one process |
 | `app/conductor` | **Built**, with an API surface. Gate state machine (`domain/project/gates.ts`) bound to Atlas (G0) and the Rubric (G6); exposed via `server/routes/project.ts` (`GET /api/atlas/output-types[/:id]`, `POST /api/projects`, `GET /api/projects/:id`, `PATCH /api/projects/:id/intake`, `POST /api/projects/:id/gates/:gate/signoff`, `POST /api/projects/:id/gates/:gate/invalidate`). Only G0 can reach "ready" through this API today — G1-G5/G7 have no computation source and G6 needs a stored CanonicalDocument, which has no storage/editor surface yet. Per-chapter gating is a tracked gap — see `30` §10 |
-| `domain/claim` | Not started |
+| `domain/claim` | **Partially built.** The pure Claim–Evidence Graph (`src/domain/claim/`) — Claim, EvidenceSpan, ClaimEvidenceBinding with support strength, EvidenceConflict, and queries (`unsupportedClaims`, `claimsDependingOnSource`, `findConflicts`, `removeSource`'s cascade). Claim *extraction* from draft text (AG-13, `42` §2) is not built — it needs `app/mesh` (agent runtime), which doesn't exist yet, and a real draft/document pipeline to extract from |
 | `app/plugins` | Not started |
 | `client/pocket-shell` | Not started |
 | `admin/foundry` | Not started |
