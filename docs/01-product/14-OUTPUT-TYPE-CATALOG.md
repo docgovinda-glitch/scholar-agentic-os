@@ -992,7 +992,7 @@ variant → catalog default.
 
 ## 12. Current state
 
-**The Atlas engine is implemented, with 14 of 24 output types populated.**
+**The Atlas engine is implemented, with 16 of 24 output types populated.**
 
 | Module | Path | Covers |
 |---|---|---|
@@ -1000,14 +1000,15 @@ variant → catalog default.
 | Catalog registry | `src/app/atlas/catalog.ts` | Get-by-id, list, filter by family, search by label/alias — validates every entry at construction, so a malformed spec fails at startup rather than reaching a user |
 | Validation | `src/app/atlas/validate.ts` | The four-part guidance contract (§5.2) enforced per field; structural completeness; budget-distribution sanity |
 | Proposal engine | `src/app/atlas/proposals.ts` | §2.1's budget-from-distribution calculation, intake value defaults, citation style resolution, and the `G0`→`G1` provisional-answer gating from `30` §3 |
-| Data | `src/app/atlas/catalogData.ts` | **14 entries** — the original 6 (OT-01, OT-07, OT-10, OT-16, OT-18, OT-22, one per family, proving all 6 workflow variants and both funder/venue/institutional/coursework compliance profiles); OT-02 Essay, OT-03 Report, and OT-13 Literature Review, exercising `argumentative`, `linear` with numbered sections, and `thematic`; OT-08 Doctoral Dissertation and OT-11 Conference Paper, deepening `long_form_chaptered` and `venue_targeted`; and OT-04 Abstract, OT-06 Undergraduate Dissertation, and OT-09 Book/Monograph. OT-06's "ethics approval status" gives `metadataKey` its first real use — genuinely orthogonal metadata, not a document section, unlike every other "declaration" this catalog had modeled. OT-09 is the first entry defaulting to `chicago-notes-bibliography`, exercising this session's `ChicagoNotesFormatter` for real. All transcribed directly from this document's own §9 tables (already the source-of-truth spec, not invented for the transcription) |
+| Data | `src/app/atlas/catalogData.ts` | **16 entries** — the original 6 (OT-01, OT-07, OT-10, OT-16, OT-18, OT-22, one per family, proving all 6 workflow variants and both funder/venue/institutional/coursework compliance profiles); OT-02 Essay, OT-03 Report, and OT-13 Literature Review, exercising `argumentative`, `linear` with numbered sections, and `thematic`; OT-08 Doctoral Dissertation and OT-11 Conference Paper, deepening `long_form_chaptered` and `venue_targeted`; OT-04 Abstract, OT-06 Undergraduate Dissertation, and OT-09 Book/Monograph — OT-06's "ethics approval status" gives `metadataKey` its first real use, and OT-09 is the first entry defaulting to `chicago-notes-bibliography`, exercising this session's `ChicagoNotesFormatter` for real; and OT-15 Research Proposal and OT-19 Case Study, deepening `proposal_funding` and `applied_professional` beyond one entry each. All transcribed directly from this document's own §9 tables (already the source-of-truth spec, not invented for the transcription) |
 
-51 tests: catalog data validity, the query API, validation rules (including
+54 tests: catalog data validity, the query API, validation rules (including
 what "never an empty required field" actually means — see §12.1), and the
 proposal engine's arithmetic, including per-entry checks for the newer
 entries' own blocking-with-no-default fields (`report_purpose`,
 `scope_boundaries`, `thesis_format`, `anonymous_submission`,
-`word_limit`, `empirical_or_theoretical`) and budget arithmetic. A
+`word_limit`, `empirical_or_theoretical`, `proposal_purpose`,
+`case_subject`, `anonymisation_required`) and budget arithmetic. A
 further 3 tests in `app/rubric/__tests__/fromAtlas.test.ts` exercise
 OT-06's `metadataKey` end to end: compiled, evaluated `fail` against a
 document with no `ethics_approval_status` metadata, evaluated `pass`
@@ -1038,7 +1039,7 @@ value.
 
 | Gap | Status |
 |---|---|
-| 10 of 24 output types | Not yet entered. The engine is proven against all 6 families, within `short_form` against 3 of that family's 4 structure variants, `long_form_chaptered` has 3 entries (a master's thesis, a doctoral dissertation, an undergraduate capstone) and `venue_targeted` has 2; remaining types are data entry, each needing a real submission example and structure source per §11.1 |
+| 8 of 24 output types | Not yet entered. The engine is proven against all 6 families, within `short_form` against 3 of that family's 4 structure variants, `long_form_chaptered` has 3 entries, and `venue_targeted`/`proposal_funding`/`applied_professional` each have 2; remaining types are data entry, each needing a real submission example and structure source per §11.1 |
 | OT-08's by-publication structural variant | Not modeled — only the monograph baseline is. Materially different (chapters are standalone published papers with a connecting narrative), stated honestly in `catalogData.ts`'s own comment on that entry |
 | OT-11's page-limit quality gate | Descriptive only, not compiled — needs a layout-measurement pass (`33` §5) to check a rendered page count against a template, not a word count, which doesn't exist yet |
 | Override precedence (`user template → institution profile → discipline variant → catalog default`) | Not implemented — only the catalog-default layer exists. `atlas.ts`'s module comment notes where the other three layers plug in |

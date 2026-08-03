@@ -224,3 +224,30 @@ describe("app/atlas: OT-04, OT-06, OT-09", () => {
     expect(rule.wordBudget).toBe(0);
   });
 });
+
+describe("app/atlas: OT-15, OT-19", () => {
+  it("proposes the typical total word budget for each", () => {
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-15"))).toBe(5000);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-19"))).toBe(4000);
+  });
+
+  it("OT-15's proposal_purpose and OT-19's case_subject have no safe default and block progress until answered", () => {
+    const proposal = catalog.getOrThrow("OT-15");
+    const missingPurpose = canProceedFromIntake(proposal, { duration: "3 years full-time" });
+    expect(missingPurpose.missing).toContain("proposal_purpose");
+
+    const caseStudy = catalog.getOrThrow("OT-19");
+    const missingSubject = canProceedFromIntake(caseStudy, { case_type: "business", anonymisation_required: "no" });
+    expect(missingSubject.missing).toContain("case_subject");
+  });
+
+  it("OT-19 can proceed once case_subject, case_type, and anonymisation_required are all answered", () => {
+    const caseStudy = catalog.getOrThrow("OT-19");
+    const result = canProceedFromIntake(caseStudy, {
+      case_subject: "A retailer's ERP rollout",
+      case_type: "business",
+      anonymisation_required: "no",
+    });
+    expect(result.canProceed).toBe(true);
+  });
+});

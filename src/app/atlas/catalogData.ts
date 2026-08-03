@@ -2,7 +2,7 @@
  * The catalog data — real output type entries.
  *
  * Spec: docs/01-product/14-OUTPUT-TYPE-CATALOG.md §9. That document
- * specifies 24 output types across 6 families. This file implements 14 of
+ * specifies 24 output types across 6 families. This file implements 16 of
  * them: the original one representative entry per family (one per
  * workflow variant and structure variant class), proving the engine
  * against every shape the full catalog needs to support; three more
@@ -10,16 +10,16 @@
  * Literature Review) that each exercise a structure variant the first
  * pass didn't (`argumentative`, plain `linear` with numbered sections,
  * `thematic`); OT-08 Doctoral Dissertation and OT-11 Conference Paper,
- * deepening long_form_chaptered and venue_targeted beyond one entry each;
- * and OT-04 Abstract, OT-06 Undergraduate Dissertation, and OT-09
- * Book/Monograph. OT-06 gives `QualityGateSpec.metadataKey` (see
- * app/rubric/fromAtlas.ts) its first real, non-synthetic use — "ethics
- * approval status" is genuinely orthogonal metadata, not a document
- * section, unlike every "declaration" this catalog had modeled until now.
- * OT-09 is the first entry defaulting to `chicago-notes-bibliography`,
- * exercising this session's ChicagoNotesFormatter for real. Adding the
- * remaining 10 is data entry against an engine already proven correct —
- * see docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3 for the tracked gap.
+ * deepening long_form_chaptered and venue_targeted; OT-04 Abstract, OT-06
+ * Undergraduate Dissertation, and OT-09 Book/Monograph — OT-06 gives
+ * `QualityGateSpec.metadataKey` (see app/rubric/fromAtlas.ts) its first
+ * real, non-synthetic use, and OT-09 is the first entry defaulting to
+ * `chicago-notes-bibliography`, exercising this session's
+ * ChicagoNotesFormatter for real; and OT-15 Research Proposal and OT-19
+ * Case Study, deepening proposal_funding and applied_professional beyond
+ * one entry each. Adding the remaining 8 is data entry against an engine
+ * already proven correct — see docs/01-product/13-MODULE-SPECIFICATIONS.md
+ * §8.3 for the tracked gap.
  *
  * Word budgets, source counts, and structure are drawn directly from the
  * spec document's per-type tables, not invented here.
@@ -1234,6 +1234,131 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     exportDefaults: { format: "docx", includeToc: false },
   },
 
+  // ── OT-15 Research Proposal — proposal_funding / linear / institutional ─
+  // Distinct from OT-16 by not being funder-prescribed: a degree-admission
+  // or upgrade proposal follows a fixed linear shape the institution sets,
+  // not a call document. Ethical considerations is already a required
+  // structural section here (compiled by compileStructuralRules), so it
+  // needs no metadataKey — a real second example, after OT-06, of the
+  // same judgment call: model a requirement where the catalog already
+  // models it best, don't force a second mechanism onto it.
+  {
+    id: "OT-15",
+    version: 1,
+    label: "Research Proposal",
+    aliases: ["PhD proposal", "upgrade proposal", "admission proposal"],
+    family: "proposal_funding",
+    academicLevels: ["masters", "doctoral", "postdoc", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "linear",
+      sections: [
+        { key: "title", title: "Title", required: true, countsTowardWordcount: false, guidance: "Working title of the proposed research." },
+        { key: "abstract", title: "Abstract", required: true, countsTowardWordcount: false, wordBudget: { min: 150, max: 300, typical: 200 }, guidance: "Summarises the question, approach, and expected contribution." },
+        { key: "background_rationale", title: "Background and Rationale", required: true, countsTowardWordcount: true, guidance: "Why this research matters and what motivates it." },
+        { key: "research_questions", title: "Research Questions", required: true, countsTowardWordcount: true, guidance: "The specific questions the research will answer, stated precisely." },
+        { key: "literature_review", title: "Literature Review", required: true, countsTowardWordcount: true, guidance: "Situates the proposal against existing work; identifies the gap." },
+        { key: "methodology", title: "Methodology", required: true, countsTowardWordcount: true, guidance: "The proposed research design, data collection, and analysis approach." },
+        { key: "timeline", title: "Timeline", required: true, countsTowardWordcount: false, guidance: "A realistic schedule of milestones against the stated duration." },
+        { key: "ethical_considerations", title: "Ethical Considerations", required: true, countsTowardWordcount: true, guidance: "Anticipated ethical issues and how they will be addressed, even if formal approval is a later step." },
+        { key: "expected_outcomes", title: "Expected Outcomes", required: true, countsTowardWordcount: true, guidance: "What the research is expected to contribute or produce." },
+        { key: "resources", title: "Resources", required: true, countsTowardWordcount: false, guidance: "Facilities, equipment, or access required beyond normal supervision." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the required style." },
+      ],
+      frontMatter: ["title", "abstract"],
+      backMatter: ["resources", "references"],
+    },
+    budget: {
+      totalWords: { min: 1500, max: 10000, typical: 5000 },
+      distribution: {
+        background_rationale: 0.15,
+        research_questions: 0.08,
+        literature_review: 0.3,
+        methodology: 0.25,
+        ethical_considerations: 0.07,
+        expected_outcomes: 0.1,
+      },
+    },
+    sources: { targetCount: { min: 20, typical: 35 }, recencyExpectation: "majority within 10 years", typeMix: { peer_reviewed: 0.7, other: 0.3 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "proposal_purpose",
+          label: "Proposal purpose",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether this proposal is for degree admission, a PhD upgrade/confirmation, a funding application, or an ethics submission.",
+            whyItMatters: "These are materially different documents in expectation and length even when the underlying research is the same — an admission proposal sells feasibility, an upgrade proposal proves progress.",
+            example: "PhD upgrade/confirmation, first-year to second-year transfer.",
+            defaultWithRationale: "There is no safe default for this — the document's entire register depends on it, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "duration",
+          label: "Duration",
+          tier: "required",
+          guidance: {
+            whatItIs: "The proposed research's total duration.",
+            whyItMatters: "The Timeline section and feasibility assessment are both computed against this.",
+            example: "3 years, full-time, starting October 2026.",
+            defaultWithRationale: "Defaults to 3 years full-time, the most common doctoral duration, until corrected.",
+          },
+          defaultValue: "3 years full-time",
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "supervisor_or_pi",
+          label: "Supervisor or Principal Investigator",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The named supervisor or PI for this proposal.",
+            whyItMatters: "Required on most institutional proposal cover sheets.",
+            example: "Prof. Amara Chen",
+            defaultWithRationale: "Left blank until supplied.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "resource_requirements",
+          label: "Resource requirements",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Any facilities, equipment, datasets, or specialist access the research needs beyond normal supervision.",
+            whyItMatters: "Flags feasibility concerns early — a proposal requiring unavailable equipment needs to know that before submission, not after.",
+            example: "Access to a mass spectrometer; a licensed clinical dataset.",
+            defaultWithRationale: "Defaults to no resources beyond normal supervision.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "ethics_review_body",
+          label: "Ethics review body",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The committee or body that will eventually review this research's ethics, if known.",
+            whyItMatters: "Different bodies have different expectations for how much ethical detail a proposal (as opposed to a full application) needs to anticipate.",
+            example: "University Research Ethics Committee, Panel B (Health Sciences).",
+            defaultWithRationale: "Defaults to the institution's general research ethics committee when unspecified.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "feasibility_within_timeline", description: "The proposed work is feasible within the stated timeline", severity: "advisory" },
+      { id: "methodology_matches_questions", description: "The proposed methodology can actually answer the stated research questions", severity: "required" },
+      { id: "ethical_considerations_present", description: "Ethical considerations are addressed", severity: "blocking", appliesWhen: "human subjects indicated" },
+    ],
+    workflowVariant: "proposal",
+    complianceProfile: "institutional",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
   // ── OT-16 Grant Proposal — proposal_funding / funder_prescribed ────────
   {
     id: "OT-16",
@@ -1420,6 +1545,127 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
       { id: "results_no_interpretation", description: "Results section contains no interpretation", severity: "required" },
       { id: "hypothesis_addressed", description: "Discussion addresses the hypothesis explicitly", severity: "blocking" },
       { id: "figures_referenced", description: "Every figure and table referenced in the text", severity: "blocking" },
+    ],
+    workflowVariant: "applied",
+    complianceProfile: "coursework",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
+  // ── OT-19 Case Study — applied_professional / linear / coursework ──────
+  // Anonymisation is a real scan (docs 14 §9's own note: "the same
+  // machinery as OT-11's double-blind check, differently configured"), but
+  // that scanner isn't built — the quality gate is descriptive only, same
+  // honest gap as OT-11's page-limit gate.
+  {
+    id: "OT-19",
+    version: 1,
+    label: "Case Study",
+    aliases: ["business case study", "clinical case report", "case report"],
+    family: "applied_professional",
+    academicLevels: ["undergraduate", "masters", "doctoral", "professional"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "linear",
+      sections: [
+        { key: "executive_summary", title: "Executive Summary", required: true, countsTowardWordcount: false, wordBudget: { min: 100, max: 300, typical: 200 }, guidance: "A summary of the case, the problem, and the recommendation — written last." },
+        { key: "background_context", title: "Background and Context", required: true, countsTowardWordcount: true, guidance: "The setting and circumstances the case sits within." },
+        { key: "problem_statement", title: "Problem Statement", required: true, countsTowardWordcount: true, guidance: "What specifically needs to be resolved or explained." },
+        { key: "analysis", title: "Analysis", required: true, countsTowardWordcount: true, guidance: "The core analytical work — applying a framework, examining evidence, or working through the clinical presentation." },
+        { key: "alternatives_considered", title: "Alternatives Considered", required: true, countsTowardWordcount: true, guidance: "Other options genuinely weighed, not a token mention before the preferred answer." },
+        { key: "recommendation", title: "Recommendation", required: true, countsTowardWordcount: true, guidance: "The recommended course of action, following directly from the analysis." },
+        { key: "implementation", title: "Implementation", required: true, countsTowardWordcount: true, guidance: "How the recommendation would actually be carried out." },
+        { key: "limitations", title: "Limitations", required: true, countsTowardWordcount: true, guidance: "What the analysis couldn't account for." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the required style." },
+      ],
+      frontMatter: ["executive_summary"],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 1500, max: 8000, typical: 4000 },
+      distribution: {
+        background_context: 0.12,
+        problem_statement: 0.08,
+        analysis: 0.35,
+        alternatives_considered: 0.15,
+        recommendation: 0.12,
+        implementation: 0.1,
+        limitations: 0.05,
+      },
+    },
+    sources: { targetCount: { min: 10, typical: 20 }, recencyExpectation: "majority within 10 years", typeMix: { peer_reviewed: 0.5, other: 0.5 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7", "vancouver"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "case_subject",
+          label: "Case subject",
+          tier: "required",
+          guidance: {
+            whatItIs: "What or who the case study is about.",
+            whyItMatters: "There is no generic case study — everything downstream is specific to this subject.",
+            example: "A mid-sized retailer's failed ERP system rollout in 2024.",
+            defaultWithRationale: "There is no safe default for this — it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "case_type",
+          label: "Case type",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the case is exploratory, explanatory, descriptive, clinical, or business.",
+            whyItMatters: "Clinical cases carry consent and anonymisation obligations the other types don't.",
+            example: "Business — a strategic decision case for a management course.",
+            defaultWithRationale: "Defaults to business, the most common type in coursework contexts.",
+          },
+          defaultValue: "business",
+          allowsProvisional: false,
+        },
+        {
+          key: "anonymisation_required",
+          label: "Is anonymisation required?",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether names, dates, locations, or other identifiers must be removed or altered — always required for clinical cases.",
+            whyItMatters: "Blocking for clinical cases: publishing identifiable patient details without proper anonymisation is a research-conduct issue, not a style preference.",
+            example: "Yes — patient identifiers must be altered per the clinical case report's ethics requirements.",
+            defaultWithRationale: "There is no safe default for this — assuming 'no' when anonymisation was required is exactly the failure mode this field exists to catch, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+      ],
+      recommended: [
+        {
+          key: "framework_applied",
+          label: "Framework applied",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The analytical framework or model structuring the Analysis section, if one is expected.",
+            whyItMatters: "Business cases in particular are often expected to apply a named framework (SWOT, Porter's Five Forces, a specific clinical protocol) rather than freeform analysis.",
+            example: "Porter's Five Forces.",
+            defaultWithRationale: "If none is given, the analysis proceeds without a named framework.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "consent_for_case_details",
+          label: "Consent for case details",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Confirmation that consent was obtained to write about the case — required and blocking specifically for clinical cases, not universally required.",
+            whyItMatters: "A clinical case report without documented consent should not proceed to drafting.",
+            example: "Written consent obtained from the patient, on file with the department.",
+            defaultWithRationale: "Not applicable, and left blank, for non-clinical case types.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "anonymisation_complete", description: "Anonymisation is complete where required — scans for names, dates, locations, identifiers", severity: "blocking", appliesWhen: "anonymisation_required = yes" },
+      { id: "recommendation_follows_analysis", description: "The recommendation follows from the analysis rather than introducing new claims", severity: "required" },
+      { id: "alternatives_genuinely_considered", description: "Alternatives are genuinely weighed, not a token mention", severity: "advisory" },
     ],
     workflowVariant: "applied",
     complianceProfile: "coursework",
