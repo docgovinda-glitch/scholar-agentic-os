@@ -58,8 +58,22 @@ export class GatewayDenied extends Error {
   }
 }
 
-/** One provider's calling convention. Adding a provider = one adapter + a registry entry. */
+/**
+ * One provider's calling convention. Adding a provider = one adapter + a
+ * registry entry. `stream` is optional: a provider without a streaming
+ * implementation falls back to `complete()` at the gateway.stream() call
+ * site, which delivers the whole result as a single chunk rather than
+ * failing — see gateway.ts's `stream()`.
+ */
 export interface ProviderAdapter {
   id: string;
   complete(req: CompletionRequest): Promise<{ text: string; model: string }>;
+  stream?(req: CompletionRequest, onChunk: (delta: string) => void): Promise<{ text: string; model: string }>;
+}
+
+/** One entry in a failover candidate list — completeWithFailover() tries these in order. */
+export interface CandidateProvider {
+  provider: string;
+  apiKey: string;
+  model?: string;
 }

@@ -354,7 +354,7 @@ exists; everything else remains the intended target.
 | `src/citation_compliance/` | `domain/reference` | **Chicago notes done; the module move + purity pass is still open.** `formatters/chicagoNotes.ts` adds Chicago 17 Notes-Bibliography (footnote/short-note/bibliography, distinct from the existing Author-Date `chicago.ts`), registered in `server.ts` alongside the other six styles. The `CitationStyle` interface gained two *optional* methods (`formatNote`, `formatShortNote`) for this — backward compatible, no other formatter implements them. The directory itself has not moved to `domain/reference` yet (it already has no I/O — see the formatter's module comment — so the pending work is the rename/relocation, not removing side effects) |
 | `src/document_intelligence/` | `app/ingestion` + `domain/document` | **Partially done.** A new, independent `domain/document` (blocks/ranges/ops, a document-level metadata bag for declarations, 18 tests) is built at `src/domain/document/` — see §8.1a. It does not yet ingest from `src/document_intelligence/`'s parsers; that integration is still open |
 | `src/agents/`, `src/skills/` | `app/mesh` | **Started.** `src/app/mesh/` — see §8.3 |
-| `src/services/providerFailover.ts`, `aiErrors.ts` | `platform/gateway` | **Partially done, and not yet reused.** `src/platform/gateway/` exists and is Warden-gated, but currently has its own (simpler) error handling rather than the existing classified-error/failover logic — see `41` §12.2 |
+| `src/services/providerFailover.ts`, `aiErrors.ts` | `platform/gateway` | **Reused, not reimplemented.** `platform/gateway`'s `completeWithFailover()` calls `services/providerFailover.ts`'s `executeWithFailover()` directly, and classifies adapter HTTP failures via `services/aiErrors.ts`'s `classifyHttpError()` — the same logic the legacy path uses, not a parallel simpler version. `stream()` and `complete()` still have their own minimal error surface (they throw rather than classify) since failover, not classification, was the missing piece — see `41` §12.2 |
 | `src/core/project/` | `domain/project` | **Partially built.** The gate state machine (`domain/project/gates.ts`, G0-G7) is built and bound to Atlas/Rubric via `app/conductor` — see §8.1a and `30` §10. `src/core/project/`'s phase-string model is untouched; migrating it onto the gate model is still open |
 | `src/types/documentTypes.ts` | `app/atlas` | **Built** at `src/app/atlas/` (schema, registry, validation, proposal engine) with all 24 of 24 output types populated — see `14` §12 |
 | `src/services/knowledgeVaultService.ts` | `app/vault` | Not started |
@@ -366,7 +366,7 @@ exists; everything else remains the intended target.
 | Module | Path | Tests |
 |---|---|---|
 | `platform/warden` | `src/platform/warden/` | 23 |
-| `platform/gateway` | `src/platform/gateway/` | 9 |
+| `platform/gateway` | `src/platform/gateway/` | 19 |
 | Architectural enforcement | `src/platform/__tests__/architecture.test.ts` | 4 |
 | `domain/document` (CDM, incl. the metadata bag) | `src/domain/document/` | 18 |
 | `domain/language` | `src/domain/language/` | 35 |
@@ -381,9 +381,9 @@ exists; everything else remains the intended target.
 | `domain/claim` (Claim–Evidence Graph) | `src/domain/claim/` | 19 |
 | Chicago Notes-Bibliography formatter | `src/citation_compliance/formatters/chicagoNotes.ts` | 18 |
 
-363 new tests. Full repository suite: 131 files, 1,500 tests, `tsc --noEmit`
-clean, verified against a live `npx tsx server.ts` boot as well as the test
-suite.
+363 new tests. Full repository suite (as of the latest sync): 146 files,
+1,645 tests, `tsc --noEmit` clean, verified against a live `npx tsx
+server.ts` boot as well as the test suite.
 
 ### 8.2 Retired
 
@@ -398,7 +398,7 @@ suite.
 | Module | Status |
 |---|---|
 | `platform/warden` | **Built** |
-| `platform/gateway` (OpenAI-compatible + Anthropic adapters) | **Built**, narrower provider coverage than the legacy path — see `41` §12.2 |
+| `platform/gateway` (OpenAI-compatible, Anthropic, Gemini, Cohere adapters; `stream()`; `completeWithFailover()`) | **Built**. Streaming is native (SSE) for all four adapters except Cohere, whose `complete()`-only fallback is a documented, deliberate gap (see `adapters.ts`'s module comment) rather than a guessed wire format; `completeWithFailover()` reuses `services/providerFailover.ts`'s retry/backoff/cooldown orchestrator and `services/aiErrors.ts`'s HTTP-status classification, gating each candidate provider through the Warden individually since per-provider consent (`ask`) genuinely differs by provider while a hard `deny` does not. Nothing in `server/routes/ai.ts` calls any of this yet — see `41` §12.2 |
 | `domain/language` and `app/studio` | **Built** |
 | `app/atlas` | **Built** (engine complete; 24/24 output types populated) |
 | `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, six deterministic evaluators (`word_count`, `structural_presence`, `metadata_presence`, `claim_support` — checks a `domain/claim` `ClaimEvidenceGraph` for unsupported claims, via `evaluateRule`/`evaluateRules`' optional third argument — `readability`, which checks Flesch-Kincaid grade level and/or jargon density via `domain/language/readability.ts`, the same pure logic `app/mesh`'s AG-18 wraps, called directly rather than through the agent runtime since there's no untrusted caller here — and `position_in_text`, a heuristic keyword-within-a-word-window check), and compilation from Atlas specs for all six (`compileMetadataGateRules` for `metadataKey`, `compileClaimSupportGateRules` for `usesClaimGraph`, `compileReadabilityGateRules` for `readabilityGate`, `compilePositionInTextGateRules` for `positionInTextGate`), proven against real catalog entries (OT-06; OT-04/OT-08/OT-20/OT-22; OT-17's and OT-20's readability gates; OT-20's recommendation-position gate). Requirement-source extraction (needs `app/mesh`'s remaining 22 agents) and template extraction (needs `app/ingestion`) are still not built — see `31` §12.2 |
