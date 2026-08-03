@@ -370,7 +370,7 @@ The final section is not boilerplate. It reads:
 
 ## 12. Current state
 
-**The deterministic core is implemented**: the rule/finding model, two rule
+**The deterministic core is implemented**: the rule/finding model, three rule
 evaluators covering the tier that matters most for continuous evaluation
 (§5.1's "roughly 80% of rules are deterministic"), and compilation of rules
 directly from an Atlas output type — the machine-readable-template path
@@ -381,11 +381,11 @@ is not yet built.
 | Module | Path | Covers |
 |---|---|---|
 | Rule/Finding model | `src/domain/compliance/types.ts` | §3 in full: source traceability (`document`, `locator`, `quote`, `confidence`), type, scope, severity, waiver |
-| Evaluators | `src/domain/compliance/evaluators.ts` | `word_count` and `structural_presence` — the two rule types Atlas can compile deterministically. A rule type with no evaluator returns `not_applicable`, never a false pass (§10, AG-22's QA rule) |
-| Compilation from Atlas | `src/app/rubric/fromAtlas.ts` | The word-limit rule from `budget.totalWords` (excluding sections marked `countsTowardWordcount: false`) and one blocking structural rule per required section |
+| Evaluators | `src/domain/compliance/evaluators.ts` | `word_count`, `structural_presence`, and `metadata_presence` (checks a document-level declaration in `CanonicalDocument.metadata` — `domain/document`'s new metadata bag — for the `metadata` rule type's own example, "must include a data availability statement"). A rule type with no evaluator returns `not_applicable`, never a false pass (§10, AG-22's QA rule) |
+| Compilation from Atlas | `src/app/rubric/fromAtlas.ts` | The word-limit rule from `budget.totalWords` (excluding sections marked `countsTowardWordcount: false`), one blocking structural rule per required section, and one `metadata_presence` rule per quality gate that sets `metadataKey` (none currently do — see §12.2) |
 | Report / waivers | `src/app/rubric/rubric.ts` | `evaluateAgainstOutputType()`, `readyForG6`, and `waiveRule()` |
 
-26 tests, including the re-targeting case from `26` Journey 3 in miniature:
+38 tests, including the re-targeting case from `26` Journey 3 in miniature:
 the same document evaluated against two different output types produces
 different findings without the document itself changing.
 
@@ -408,6 +408,7 @@ already set.
 | Requirement-source PDF/URL extraction (§4) | Not built — needs a model call through `app/mesh`'s Requirement Analyzer, which doesn't exist yet |
 | DOCX/ODT template style extraction (§4.1) | Not built — needs `app/ingestion`, which doesn't exist yet |
 | Remaining rule types (`bibliographic`, `formatting`, `stylistic`, `ethical`, `content`) | Evaluator not implemented; correctly reported as `not_applicable` rather than skipped silently |
+| Populating `metadataKey` on a real catalog entry | `fromAtlas.ts`'s `compileMetadataGateRules` and `QualityGateSpec.metadataKey` are built and tested, but no entry in the current 9-type catalog data sets `metadataKey` — every "declaration" the catalog specifies so far (declaration of originality, funding/COI/ethics/data-availability declarations) is modeled as a document *section* the author writes, already covered by `compileStructuralRules`, and forcing a redundant `metadataKey` onto the same requirement would be worse than leaving it unset. A genuine fit is a structured fact that isn't also rendered as document content — an ethics-approval reference number, an ORCID, a funder's legal name — which none of the 9 populated types currently call for as a quality gate |
 | Continuous re-evaluation on edit, tiering, and the 300ms budget (§5) | Not wired to anything — there is no live editor yet to trigger it |
 | Venue profiles (§8) | Not built |
 | Conflict detection across sources | Not applicable yet — only one source (Atlas) is implemented |

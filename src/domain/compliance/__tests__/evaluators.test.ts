@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { evaluateRule, evaluateRules } from "../evaluators";
 import type { Rule } from "../types";
 import { emptyDocument, type CanonicalDocument } from "../../document/model";
-import { appendBlock } from "../../document/ops";
+import { appendBlock, setMetadata } from "../../document/ops";
 
 function wordCountRule(overrides: Partial<Rule> = {}): Rule {
   return {
@@ -30,6 +30,22 @@ function structuralRule(sectionKey: string, overrides: Partial<Rule> = {}): Rule
     evaluator: { kind: "structural_presence", params: { sectionKey } },
     message: `${sectionKey} required`,
     remedy: `add ${sectionKey}`,
+    autoFixable: false,
+    userModified: false,
+    ...overrides,
+  };
+}
+
+function metadataRule(key: string, overrides: Partial<Rule> = {}): Rule {
+  return {
+    id: `r-${key}`,
+    source: { document: "test", locator: "x", quote: "x", extractedAt: "now", confidence: 1 },
+    type: "metadata",
+    scope: "metadata",
+    severity: "blocking",
+    evaluator: { kind: "metadata_presence", params: { key } },
+    message: `${key} required`,
+    remedy: `add ${key}`,
     autoFixable: false,
     userModified: false,
     ...overrides,
@@ -111,6 +127,54 @@ describe("domain/compliance: structural_presence evaluator", () => {
     const rule = structuralRule("abstract", { evaluator: { kind: "structural_presence", params: { sectionKey: "abstract", minWords: 50 } } });
     const finding = evaluateRule(rule, doc);
     expect(finding.status).toBe("fail");
+  });
+});
+
+describe("domain/compliance: metadata_presence evaluator", () => {
+  it("fails when the declaration is entirely missing", () => {
+    const doc = emptyDocument("d1", "Test");
+    const finding = evaluateRule(metadataRule("data_availability_statement"), doc);
+    expect(finding.status).toBe("fail");
+    expect(finding.message).toContain("missing");
+  });
+
+  it("fails when the declaration is present but blank", () => {
+    const doc = setMetadata(emptyDocument("d1", "Test"), "ethics_approval", "   ");
+    const finding = evaluateRule(metadataRule("ethics_approval"), doc);
+    expect(finding.status).toBe("fail");
+  });
+
+  it("passes when the declaration has content", () => {
+    const doc = setMetadata(emptyDocument("d1", "Test"), "ethics_approval", "IRB-2026-014");
+    const finding = evaluateRule(metadataRule("ethics_approval"), doc);
+    expect(finding.status).toBe("pass");
+  });
+
+  it("respects a minLength threshold beyond mere non-emptiness", () => {
+    const doc = setMetadata(emptyDocument("d1", "Test"), "funder_statement", "N/A");
+    const rule = metadataRule("funder_statement", {
+      evaluator: { kind: "metadata_presence", params: { key: "funder_statement", minLength: 10 } },
+    });
+    const finding = evaluateRule(rule, doc);
+    expect(finding.status).toBe("fail");
+  });
+
+  it("is unaffected by an unrelated metadata key being present", () => {
+    const doc = setMetadata(emptyDocument("d1", "Test"), "other_key", "something");
+    const finding = evaluateRule(metadataRule("ethics_approval"), doc);
+    expect(finding.status).toBe("fail");
+  });
+
+  it("does NOT downgrade a blocking-severity rule even if somehow marked waived", () => {
+    const rule = metadataRule("ethics_approval", { severity: "blocking", waived: { reason: "x", at: "now" } });
+    const finding = evaluateRule(rule, emptyDocument("d1", "Test"));
+    expect(finding.status).toBe("fail");
+  });
+
+  it("downgrades to warn when waived and NOT blocking severity", () => {
+    const rule = metadataRule("ethics_approval", { severity: "required", waived: { reason: "supervisor approved", at: "now" } });
+    const finding = evaluateRule(rule, emptyDocument("d1", "Test"));
+    expect(finding.status).toBe("warn");
   });
 });
 

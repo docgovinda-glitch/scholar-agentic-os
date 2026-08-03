@@ -25,4 +25,17 @@ describe("app/atlas: catalog data validity", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(id).toMatch(/^OT-\d{2}$/);
   });
+
+  it("has 11 entries, including the additions beyond the original per-family representative", () => {
+    const ids = OUTPUT_TYPES.map((s) => s.id).sort();
+    expect(ids).toEqual([
+      "OT-01", "OT-02", "OT-03", "OT-07", "OT-08", "OT-10", "OT-11", "OT-13", "OT-16", "OT-18", "OT-22",
+    ]);
+  });
+
+  it("the short_form additions each exercise a structure variant the original 6 entries didn't", () => {
+    const variants = new Set(OUTPUT_TYPES.map((s) => s.structure.variant));
+    expect(variants.has("argumentative")).toBe(true); // OT-02
+    expect(variants.has("thematic")).toBe(true); // OT-13
+  });
 });

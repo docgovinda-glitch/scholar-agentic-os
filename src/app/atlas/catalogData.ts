@@ -2,12 +2,21 @@
  * The catalog data — real output type entries.
  *
  * Spec: docs/01-product/14-OUTPUT-TYPE-CATALOG.md §9. That document
- * specifies 24 output types across 6 families. This file implements one
- * representative entry per family (one per workflow variant and structure
- * variant class), proving the engine against every shape the full catalog
- * needs to support, rather than 24 entries of comparatively low incremental
- * value entered in one pass. Adding the remaining 18 is data entry against
- * an engine already proven correct — see docs/01-product/13-MODULE-SPECIFICATIONS.md
+ * specifies 24 output types across 6 families. This file implements 11 of
+ * them: the original one representative entry per family (one per
+ * workflow variant and structure variant class), proving the engine
+ * against every shape the full catalog needs to support; three more
+ * within the short_form family (OT-02 Essay, OT-03 Report, OT-13
+ * Literature Review) that each exercise a structure variant the first
+ * pass didn't (`argumentative`, plain `linear` with numbered sections,
+ * `thematic`); and two more deepening families that only had one entry —
+ * OT-08 Doctoral Dissertation (long_form_chaptered, modeled as the
+ * monograph baseline; the by-publication structural variant is not
+ * modeled, stated honestly in that entry's own comment) and OT-11
+ * Conference Paper (venue_targeted, with a page-limit quality gate that is
+ * deliberately left uncompiled since it needs layout measurement, not a
+ * word count). Adding the remaining 13 is data entry against an engine
+ * already proven correct — see docs/01-product/13-MODULE-SPECIFICATIONS.md
  * §8.3 for the tracked gap.
  *
  * Word budgets, source counts, and structure are drawn directly from the
@@ -105,6 +114,293 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
       { id: "structural_completeness", description: "Every required section present and non-empty", severity: "blocking" },
       { id: "budget_adherence", description: "Within ±20% of the word limit", severity: "required" },
       { id: "style_consistency", description: "One citation style used throughout", severity: "blocking" },
+    ],
+    workflowVariant: "short_form",
+    complianceProfile: "coursework",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
+  // ── OT-02 Essay — short_form / argumentative / coursework ───────────────
+  {
+    id: "OT-02",
+    version: 1,
+    label: "Essay",
+    aliases: ["argumentative essay", "position paper", "critical essay"],
+    family: "short_form",
+    academicLevels: ["undergraduate", "masters"],
+    typicalDisciplines: ["humanities", "social science", "all"],
+    structure: {
+      variant: "argumentative",
+      sections: [
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, wordBudget: { min: 100, max: 350, typical: 250 }, guidance: "States the essay question and the thesis — the single position the essay will argue for." },
+        { key: "argument", title: "Argument", required: true, countsTowardWordcount: true, wordBudget: { min: 600, max: 3500, typical: 1500 }, guidance: "One claim at a time, each with its own evidence. At G3 this becomes a claim tree rather than a flat section list — the sections here represent that body in aggregate." },
+        { key: "counter_argument", title: "Counter-argument", required: true, countsTowardWordcount: true, wordBudget: { min: 150, max: 600, typical: 300 }, guidance: "The strongest opposing position, addressed directly rather than dismissed." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, wordBudget: { min: 100, max: 300, typical: 200 }, guidance: "Restates the thesis in light of the argument and counter-argument. No new evidence." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited in the argument and counter-argument, in the required style." },
+      ],
+      frontMatter: [],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 1000, max: 5000, typical: 2500 },
+      distribution: { introduction: 0.1, argument: 0.6, counter_argument: 0.15, conclusion: 0.08 },
+    },
+    sources: { targetCount: { min: 8, typical: 15 }, recencyExpectation: "majority within 10 years unless historical", typeMix: { peer_reviewed: 0.6, other: 0.4 } },
+    citation: { defaultStyle: "mla9", commonStyles: ["mla9", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "essay_question",
+          label: "Essay question",
+          tier: "required",
+          guidance: {
+            whatItIs: "The exact question or prompt set for the essay.",
+            whyItMatters: "The thesis has to answer this precisely — essays that drift from the set question lose marks regardless of writing quality.",
+            example: "\"To what extent was the Treaty of Versailles responsible for the outbreak of the Second World War?\"",
+            defaultWithRationale: "If you don't have the exact wording, paraphrase it as closely as you can — we'll flag if the thesis seems to be answering something else.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "thesis_statement",
+          label: "Position or thesis statement",
+          tier: "required",
+          guidance: {
+            whatItIs: "The single claim your essay will argue for, in one or two sentences.",
+            whyItMatters: "This is where most undergraduates struggle: a thesis that is too broad, too obvious, or actually a topic rather than a claim produces an essay with nothing to prove. Getting this right first saves a rewrite later.",
+            example: "\"The Treaty of Versailles was a necessary but not sufficient cause of the Second World War, secondary to the failure of collective security in the 1930s.\"",
+            defaultWithRationale: "If you're not sure yet, mark this provisional and describe your topic instead — we'll propose candidate thesis statements from your reading for you to choose from.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "argument_type",
+          label: "Argument type",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the essay is analytical, persuasive, comparative, or evaluative.",
+            whyItMatters: "Changes what 'good' looks like at G5 — a persuasive essay needs a strong counter-argument response; a comparative one needs balanced treatment of both sides being compared.",
+            example: "Evaluative — weighing the relative importance of several causes.",
+            defaultWithRationale: "Defaults to analytical, the most common type when unspecified.",
+          },
+          defaultValue: "analytical",
+          allowsProvisional: false,
+        },
+      ],
+      recommended: [
+        {
+          key: "required_texts",
+          label: "Required or suggested reading",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Texts your module explicitly wants you to engage with.",
+            whyItMatters: "Markers often look for engagement with set readings specifically.",
+            example: "A reading list from your module handbook.",
+            defaultWithRationale: "If none is given, we treat this as unconstrained and search broadly instead.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "thesis_statement_present", description: "A single, specific thesis statement appears in the introduction", severity: "blocking" },
+      { id: "claims_advance_thesis", description: "Each argument section advances the thesis rather than merely being related to the topic", severity: "advisory" },
+      { id: "counter_argument_addressed", description: "The strongest opposing position is stated and directly answered, not ignored", severity: "required", appliesWhen: "persuasive or evaluative argument type" },
+    ],
+    workflowVariant: "short_form",
+    complianceProfile: "coursework",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
+  // ── OT-03 Report — short_form / linear / coursework ─────────────────────
+  {
+    id: "OT-03",
+    version: 1,
+    label: "Report",
+    aliases: ["business report", "technical report", "coursework report"],
+    family: "short_form",
+    academicLevels: ["undergraduate", "masters", "professional"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "linear",
+      sections: [
+        { key: "title_page", title: "Title Page", required: true, countsTowardWordcount: false, guidance: "Report title, author, audience, and date." },
+        { key: "executive_summary", title: "Executive Summary", required: true, countsTowardWordcount: false, wordBudget: { min: 150, max: 400, typical: 250 }, guidance: "Written last. A summary of your own findings and recommendations, not a restatement of sources — the one place the system drafts from your text rather than from cited material." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, wordBudget: { min: 150, max: 500, typical: 300 }, guidance: "States the report's purpose, scope, and intended audience." },
+        { key: "methodology", title: "Methodology", required: false, countsTowardWordcount: true, guidance: "How data or evidence was gathered, if the report involves original data collection or a defined method." },
+        { key: "findings", title: "Findings", required: true, countsTowardWordcount: true, wordBudget: { min: 400, max: 2500, typical: 1200 }, guidance: "What was found. Facts and data only, no interpretation — that belongs in Discussion." },
+        { key: "discussion", title: "Discussion", required: true, countsTowardWordcount: true, wordBudget: { min: 200, max: 1500, typical: 700 }, guidance: "Interprets the findings and situates them against the report's purpose." },
+        { key: "conclusions", title: "Conclusions", required: true, countsTowardWordcount: true, wordBudget: { min: 100, max: 400, typical: 250 }, guidance: "What the findings and discussion establish, stated plainly." },
+        { key: "recommendations", title: "Recommendations", required: false, countsTowardWordcount: true, guidance: "Specific, actionable recommendations, present only when the report's purpose calls for them." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the required style." },
+        { key: "appendices", title: "Appendices", required: false, countsTowardWordcount: false, guidance: "Supporting material too detailed for the main body — raw data, full survey instruments, extended calculations." },
+      ],
+      frontMatter: ["title_page", "executive_summary"],
+      backMatter: ["references", "appendices"],
+    },
+    budget: {
+      totalWords: { min: 1500, max: 8000, typical: 3500 },
+      distribution: { introduction: 0.1, methodology: 0.15, findings: 0.3, discussion: 0.2, conclusions: 0.1, recommendations: 0.1 },
+    },
+    sources: { targetCount: { min: 10, typical: 20 }, recencyExpectation: "majority within 10 years", typeMix: { peer_reviewed: 0.5, other: 0.5 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "report_purpose",
+          label: "Report purpose",
+          tier: "required",
+          guidance: {
+            whatItIs: "What the report is for — inform, evaluate, recommend, or record.",
+            whyItMatters: "Determines whether Recommendations and Methodology are needed at all, and shapes the Executive Summary.",
+            example: "Evaluate three vendor proposals and recommend one.",
+            defaultWithRationale: "There is no safe default for this — the report's structure genuinely depends on it, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "audience",
+          label: "Audience",
+          tier: "required",
+          guidance: {
+            whatItIs: "Who the report is written for.",
+            whyItMatters: "Changes register substantially — a report for a board reads very differently from one for a technical peer, even with identical findings.",
+            example: "Senior management with no technical background in the subject.",
+            defaultWithRationale: "Defaults to 'an informed but non-specialist reader' when unspecified.",
+          },
+          defaultValue: "an informed but non-specialist reader",
+          allowsProvisional: true,
+        },
+        {
+          key: "recommendations_expected",
+          label: "Are recommendations expected?",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the brief calls for actionable recommendations or a findings-only record.",
+            whyItMatters: "Determines whether the Recommendations section is compiled at all — including one when it isn't wanted reads as padding.",
+            example: "Yes — the brief asks for a recommended course of action.",
+            defaultWithRationale: "Defaults to yes, since most report briefs expect a recommendation even when not stated explicitly.",
+          },
+          defaultValue: "yes",
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "data_sources",
+          label: "Data sources",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Any datasets, interviews, or records the report draws on beyond published literature.",
+            whyItMatters: "Reports frequently rely on primary or organisational data that a literature search alone would never find.",
+            example: "Q3 sales figures spreadsheet; three stakeholder interview transcripts.",
+            defaultWithRationale: "If none is supplied, the report is written from published sources only.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "numbered_heading_convention",
+          label: "Numbered-heading convention",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Whether sections should be numbered (1, 1.1, 1.2...) per your institution's or organisation's house style.",
+            whyItMatters: "Numbered headings are a common, easy-to-miss formatting requirement in professional and some academic reports.",
+            example: "Yes, decimal numbering to two levels.",
+            defaultWithRationale: "Defaults to unnumbered headings unless a house style is specified.",
+          },
+          defaultValue: "no",
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "structural_completeness", description: "Every required section present and non-empty", severity: "blocking" },
+      { id: "budget_adherence", description: "Within ±20% of the word limit", severity: "required" },
+      { id: "recommendations_alignment", description: "Recommendations follow from the findings and discussion rather than introducing new claims", severity: "required", appliesWhen: "recommendations_expected" },
+    ],
+    workflowVariant: "short_form",
+    complianceProfile: "coursework",
+    exportDefaults: { format: "docx", includeToc: true },
+  },
+
+  // ── OT-13 Literature Review (standalone) — short_form / thematic ────────
+  {
+    id: "OT-13",
+    version: 1,
+    label: "Literature Review",
+    aliases: ["lit review", "review of the literature", "standalone literature review"],
+    family: "short_form",
+    academicLevels: ["undergraduate", "masters", "doctoral", "postdoc", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "thematic",
+      sections: [
+        { key: "introduction", title: "Introduction and Scope", required: true, countsTowardWordcount: true, wordBudget: { min: 150, max: 500, typical: 300 }, guidance: "States the review's scope boundaries and organising principle." },
+        { key: "body", title: "Body", required: true, countsTowardWordcount: true, wordBudget: { min: 1000, max: 7000, typical: 3000 }, guidance: "Organised by theme, chronology, methodology, or theory per the chosen organising principle — not source-by-source summary." },
+        { key: "synthesis_critique", title: "Synthesis and Critique", required: true, countsTowardWordcount: true, wordBudget: { min: 300, max: 1500, typical: 700 }, guidance: "Connects the themes and evaluates the literature's strengths, weaknesses, and disagreements — present only when critique, not summary, was required." },
+        { key: "gaps", title: "Gaps", required: true, countsTowardWordcount: true, wordBudget: { min: 100, max: 500, typical: 250 }, guidance: "What the literature has not yet addressed." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, wordBudget: { min: 100, max: 350, typical: 200 }, guidance: "Summarises the state of the field per the review's scope." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the required style." },
+      ],
+      frontMatter: [],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 2000, max: 10000, typical: 5000 },
+      distribution: { introduction: 0.08, body: 0.55, synthesis_critique: 0.2, gaps: 0.07, conclusion: 0.05 },
+    },
+    sources: { targetCount: { min: 25, typical: 50 }, recencyExpectation: "majority within 10 years, with broader historical context where the field warrants it", typeMix: { peer_reviewed: 0.8, other: 0.2 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "organising_principle",
+          label: "Organising principle",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the body is organised thematically, chronologically, methodologically, or theoretically.",
+            whyItMatters: "Drives the entire structure of the body section — a chronological review and a thematic one covering the same literature read completely differently.",
+            example: "Thematic, organised around three competing theoretical frameworks.",
+            defaultWithRationale: "Defaults to thematic, the most common organising principle when unspecified.",
+          },
+          defaultValue: "thematic",
+          allowsProvisional: false,
+        },
+        {
+          key: "scope_boundaries",
+          label: "Scope boundaries",
+          tier: "required",
+          guidance: {
+            whatItIs: "What is in scope and out of scope — discipline, date range, geography, methodology, or population.",
+            whyItMatters: "Without explicit boundaries, source discovery either misses relevant work or returns an unmanageable volume.",
+            example: "Peer-reviewed empirical studies on remote work productivity, English-language, published 2015 onward.",
+            defaultWithRationale: "There is no safe default for this — an unscoped review cannot be meaningfully searched, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "critique_or_summary",
+          label: "Is critique expected, or does summary suffice?",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the review must evaluate and critique the literature, or whether accurately summarising it is sufficient.",
+            whyItMatters: "The single most common misunderstanding at undergraduate level: students routinely submit a summary when critique was required. Asked explicitly here so it's never assumed.",
+            example: "Critique required — the brief asks for an evaluation of methodological strengths and weaknesses, not just a description.",
+            defaultWithRationale: "Defaults to critique expected, since most academic literature review briefs require it even when not stated in those exact words.",
+          },
+          defaultValue: "critique",
+          allowsProvisional: false,
+        },
+      ],
+      recommended: [],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "critique_present", description: "The review evaluates the literature rather than only summarising it", severity: "blocking", appliesWhen: "critique_or_summary = critique" },
+      { id: "thematic_coherence", description: "Sources within each theme are meaningfully connected rather than merely listed", severity: "advisory" },
+      { id: "gap_identification", description: "At least one genuine gap in the literature is identified", severity: "required" },
     ],
     workflowVariant: "short_form",
     complianceProfile: "coursework",
@@ -218,6 +514,138 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     exportDefaults: { format: "docx", includeToc: true },
   },
 
+  // ── OT-08 Doctoral Dissertation — long_form / chapter_based / institutional ──
+  // Modeled as the monograph format (the baseline every field defaults to
+  // when thesis_format is unanswered). The by-publication variant — where
+  // empirical chapters are published papers with a connecting narrative —
+  // is a materially different structure template per docs 14 §9's own
+  // note and is not modeled here; the by-publication-specific intake
+  // fields and quality gate below are marked as applying only to that
+  // variant, honestly, rather than pretending this one structure covers both.
+  {
+    id: "OT-08",
+    version: 1,
+    label: "Doctoral Dissertation",
+    aliases: ["phd thesis", "doctoral thesis", "dissertation"],
+    family: "long_form",
+    academicLevels: ["doctoral"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "chapter_based",
+      sections: [
+        { key: "title_page", title: "Title Page", required: true, countsTowardWordcount: false, guidance: "Title, your name, degree, institution, submission date, per your department's template." },
+        { key: "declaration", title: "Declaration of Originality", required: true, countsTowardWordcount: false, guidance: "The standard statement that this is your own work, using your institution's exact wording." },
+        { key: "abstract", title: "Abstract", required: true, countsTowardWordcount: false, wordBudget: { min: 250, max: 400, typical: 300 }, guidance: "A single paragraph summarising the question, method, key findings, and contribution." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, guidance: "Motivates the research question and previews the dissertation's structure." },
+        { key: "literature_review", title: "Literature Review", required: true, countsTowardWordcount: true, guidance: "Situates the work against existing research; identifies the gap it addresses." },
+        { key: "methodology", title: "Methodology", required: true, countsTowardWordcount: true, guidance: "Names the research design, data collection method, and analysis approach precisely enough to be reproducible." },
+        { key: "empirical_chapters", title: "Empirical / Substantive Chapters", required: true, countsTowardWordcount: true, guidance: "The dissertation's core chapters reporting original work — typically several, one per study or major result. Modeled here as one aggregate section; the drafting pipeline splits it into per-chapter units at G3." },
+        { key: "discussion", title: "Discussion", required: true, countsTowardWordcount: true, guidance: "Interprets the results across all empirical chapters against the literature." },
+        { key: "contribution_statement", title: "Contribution to Knowledge", required: true, countsTowardWordcount: true, wordBudget: { min: 300, max: 1500, typical: 800 }, guidance: "States explicitly what the dissertation contributes that did not exist before it. Every claim here must be traceable to the empirical chapters — this is the one place examiners look first." },
+        { key: "limitations", title: "Limitations", required: true, countsTowardWordcount: true, wordBudget: { min: 200, max: 1000, typical: 500 }, guidance: "States the boundaries of the work honestly — scope, method, and generalisability limits." },
+        { key: "future_work", title: "Future Work", required: false, countsTowardWordcount: true, guidance: "Directions the contribution opens up, distinct from limitations." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, guidance: "Draws the dissertation together; does not introduce new evidence." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Full bibliography in the required citation style." },
+      ],
+      frontMatter: ["title_page", "declaration", "abstract"],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 40000, max: 100000, typical: 70000 },
+      distribution: {
+        introduction: 0.06,
+        literature_review: 0.18,
+        methodology: 0.12,
+        empirical_chapters: 0.35,
+        discussion: 0.15,
+        contribution_statement: 0.02,
+        limitations: 0.01,
+        conclusion: 0.03,
+      },
+    },
+    sources: { targetCount: { min: 150, typical: 250 }, recencyExpectation: "majority within 10 years, with foundational older work expected", typeMix: { peer_reviewed: 0.75, other: 0.25 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7", "chicago-author-date"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "thesis_format",
+          label: "Thesis format",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the dissertation is a monograph, by publication (chapters are published or publication-ready papers), or hybrid.",
+            whyItMatters: "Restructures everything — chapter boundaries, the connecting narrative, and which quality gates apply.",
+            example: "By publication: three journal articles (two published, one under review) with a connecting introduction and discussion.",
+            defaultWithRationale: "There is no safe default for this — it changes the entire structure, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "contribution_claim",
+          label: "Contribution claim",
+          tier: "required",
+          guidance: {
+            whatItIs: "In one or two sentences, what the dissertation contributes that is new.",
+            whyItMatters: "Everything else in the dissertation exists to support this claim — it is the first thing examiners assess.",
+            example: "The first empirical account of how municipal water policy diffusion follows political rather than hydrological boundaries.",
+            defaultWithRationale: "If not yet crystallised, mark this provisional and describe your research question instead — we'll propose candidate contribution statements once the empirical chapters exist.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "viva_jurisdiction",
+          label: "Viva / defence jurisdiction",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The country or institutional system your viva or defence follows (affects declaration wording and formatting conventions).",
+            whyItMatters: "UK vivas, US defences, and European systems have different regulatory expectations.",
+            example: "UK, under a Russell Group university's standard regulations.",
+            defaultWithRationale: "Defaults to generic institutional conventions when unspecified.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "publication_status_of_chapters",
+          label: "Publication status of chapters",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "For each empirical chapter, whether it is published, under review, or unpublished — relevant only for the by-publication format.",
+            whyItMatters: "Published chapters carry citation and copyright obligations that unpublished ones don't.",
+            example: "Chapter 3 published in Water Research (2025); Chapter 4 under review.",
+            defaultWithRationale: "Not applicable, and left blank, for the monograph format.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [
+        {
+          key: "embargo_requirements",
+          label: "Embargo requirements",
+          tier: "optional",
+          guidance: {
+            whatItIs: "Whether the dissertation (or parts of it) must be embargoed from public access after submission.",
+            whyItMatters: "Common for industry-sponsored or pre-publication work; affects the export and repository deposit step.",
+            example: "12-month embargo on Chapter 4 pending a pending patent application.",
+            defaultWithRationale: "Defaults to no embargo unless stated.",
+          },
+          defaultValue: "no embargo",
+          allowsProvisional: true,
+        },
+      ],
+    },
+    qualityGates: [
+      { id: "contribution_stated", description: "Contribution to knowledge is stated explicitly", severity: "blocking" },
+      { id: "limitations_present", description: "Limitations section present", severity: "required" },
+      { id: "chapter_self_contained", description: "Each empirical chapter is self-contained", severity: "required", appliesWhen: "thesis_format = by_publication" },
+      { id: "terminology_consistency", description: "Consistent terminology used across chapters", severity: "advisory" },
+      { id: "contribution_claims_supported", description: "No unsupported claims in the contribution statement", severity: "blocking" },
+    ],
+    workflowVariant: "long_form_chaptered",
+    complianceProfile: "institutional",
+    exportDefaults: { format: "docx", includeToc: true },
+  },
+
   // ── OT-10 Journal Article — publication / imrad / venue_targeted ───────
   {
     id: "OT-10",
@@ -310,6 +738,120 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
       { id: "abstract_limit", description: "Abstract within the venue's word limit", severity: "blocking" },
       { id: "declarations_present", description: "All required declarations present", severity: "blocking" },
       { id: "citation_style_exact", description: "Reference style matches the venue exactly", severity: "blocking" },
+    ],
+    workflowVariant: "venue_targeted",
+    complianceProfile: "venue",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
+  // ── OT-11 Conference Paper — publication / imrad / venue_targeted ──────
+  // The page-limit gate below is descriptive only, per docs 14 §9's own
+  // note: "genuinely different from a word count — requires rendering to
+  // the template and measuring," which needs a layout-measurement pass
+  // (docs 33 §5) that doesn't exist. budget.totalWords is a word-count
+  // proxy for the stated word range, not the binding constraint for venues
+  // that only publish a page limit — stated honestly rather than modeled
+  // as equivalent.
+  {
+    id: "OT-11",
+    version: 1,
+    label: "Conference Paper",
+    aliases: ["conference submission", "workshop paper", "proceedings paper"],
+    family: "publication",
+    academicLevels: ["masters", "doctoral", "postdoc", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "imrad",
+      sections: [
+        { key: "title", title: "Title", required: true, countsTowardWordcount: false, guidance: "Concise and specific, within the template's title-length convention if one exists." },
+        { key: "abstract", title: "Abstract", required: true, countsTowardWordcount: false, wordBudget: { min: 100, max: 250, typical: 200 }, guidance: "States objective, method, key result, and conclusion within the venue's abstract limit." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, guidance: "Establishes the gap this paper fills, compressed for a shorter venue than a journal article." },
+        { key: "methods", title: "Methods", required: true, countsTowardWordcount: true, guidance: "Detailed enough for replication, within the page budget." },
+        { key: "results", title: "Results", required: true, countsTowardWordcount: true, guidance: "Findings only, no interpretation." },
+        { key: "discussion", title: "Discussion", required: true, countsTowardWordcount: true, guidance: "Interprets results and situates against prior work, compressed relative to a journal article." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "In the conference's exact required style and format." },
+      ],
+      frontMatter: ["title", "abstract"],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 2000, max: 8000, typical: 4500 },
+      distribution: { introduction: 0.15, methods: 0.25, results: 0.25, discussion: 0.25 },
+    },
+    sources: { targetCount: { min: 15, typical: 25 }, recencyExpectation: "majority within 5 years — conference venues favour recency", typeMix: { peer_reviewed: 0.8, other: 0.2 } },
+    citation: { defaultStyle: "ieee", commonStyles: ["ieee", "vancouver", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "conference_and_track",
+          label: "Conference and track",
+          tier: "required",
+          guidance: {
+            whatItIs: "The specific conference and, if applicable, its track or workshop.",
+            whyItMatters: "Drives the template, page limit, and citation style — all fixed by the venue, not negotiable.",
+            example: "ACM CHI 2027, Papers track.",
+            defaultWithRationale: "Without one, we use generic conference conventions and flag every venue-specific check as not yet applicable.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "page_limit_and_references_count",
+          label: "Page limit, and whether references count toward it",
+          tier: "required",
+          guidance: {
+            whatItIs: "The venue's hard page limit, and whether the reference list counts against it.",
+            whyItMatters: "Conference limits are strict and enforced at submission — going over by even a line can mean desk rejection.",
+            example: "8 pages including references, ACM double-column format.",
+            defaultWithRationale: "There is no safe default for this — it is venue-specific and blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "template",
+          label: "Template",
+          tier: "required",
+          guidance: {
+            whatItIs: "The required formatting template — ACM, IEEE, Springer LNCS, or a custom one supplied by the venue.",
+            whyItMatters: "Page count is measured against this template, not a generic word count — the wrong template invalidates any budget estimate.",
+            example: "ACM sigconf template, double column.",
+            defaultWithRationale: "Defaults to a generic single-column template pending the real one.",
+          },
+          defaultValue: "generic",
+          allowsProvisional: true,
+        },
+        {
+          key: "anonymous_submission",
+          label: "Anonymous submission required",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the venue requires double-blind anonymisation — no author names, institutions, or identifying self-citation.",
+            whyItMatters: "Has a blocking implication for author fields and how prior work is cited; getting this wrong risks desk rejection independent of paper quality.",
+            example: "Yes, double-blind — remove all author-identifying information including acknowledgements.",
+            defaultWithRationale: "There is no safe default for this — assuming the wrong answer either leaks identity or wrongly blanks required author fields, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+      ],
+      recommended: [
+        {
+          key: "deadline",
+          label: "Submission deadline",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "The hard submission deadline, including timezone.",
+            whyItMatters: "Conference deadlines are fixed and unextendable, unlike journal submission which has no clock.",
+            example: "March 15, 2027, 23:59 AoE.",
+            defaultWithRationale: "If not given, no deadline-based prioritisation is applied.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "page_limit_satisfied", description: "Page limit satisfied in rendered output, not estimated word count", severity: "blocking" },
+      { id: "anonymisation_complete", description: "Submission is fully anonymised", severity: "blocking", appliesWhen: "anonymous_submission = yes" },
+      { id: "template_applied", description: "The venue's required template is applied", severity: "blocking" },
     ],
     workflowVariant: "venue_targeted",
     complianceProfile: "venue",

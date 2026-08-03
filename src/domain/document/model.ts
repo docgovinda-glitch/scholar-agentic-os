@@ -40,6 +40,8 @@ export interface CanonicalDocument {
   id: string;
   title: string;
   blocks: Block[];
+  /** Document-level declarations (e.g. "data availability statement", "ethics approval reference") — the `metadata` Rule type (docs 31 §3.1) checks presence here, not in a block. Optional so every existing caller that predates this field keeps working unchanged. */
+  metadata?: Record<string, string>;
 }
 
 /** A position within a document, addressed by block + character offset. */

@@ -9,6 +9,7 @@ import {
   moveBlock,
   removeBlock,
   replaceRange,
+  setMetadata,
   splitBlock,
   wordCount,
 } from "../ops";
@@ -112,5 +113,34 @@ describe("domain/document: derived views", () => {
       { blockId: "b1", level: 1, text: "Methods" },
       { blockId: "b4", level: 2, text: "Data Collection" },
     ]);
+  });
+});
+
+describe("domain/document: metadata", () => {
+  it("a fresh document has no metadata bag", () => {
+    expect(emptyDocument("d1", "Untitled").metadata).toBeUndefined();
+  });
+
+  it("setMetadata creates the bag on first use", () => {
+    const d = setMetadata(emptyDocument("d1", "Untitled"), "data_availability_statement", "Data available on request.");
+    expect(d.metadata).toEqual({ data_availability_statement: "Data available on request." });
+  });
+
+  it("setMetadata does not mutate the input document", () => {
+    const original = emptyDocument("d1", "Untitled");
+    setMetadata(original, "ethics_approval", "IRB-2026-014");
+    expect(original.metadata).toBeUndefined();
+  });
+
+  it("setMetadata adds to existing keys without dropping others", () => {
+    let d = setMetadata(emptyDocument("d1", "Untitled"), "a", "1");
+    d = setMetadata(d, "b", "2");
+    expect(d.metadata).toEqual({ a: "1", b: "2" });
+  });
+
+  it("setMetadata overwrites an existing key", () => {
+    let d = setMetadata(emptyDocument("d1", "Untitled"), "a", "1");
+    d = setMetadata(d, "a", "2");
+    expect(d.metadata).toEqual({ a: "2" });
   });
 });

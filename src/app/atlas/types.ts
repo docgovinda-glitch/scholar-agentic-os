@@ -83,6 +83,19 @@ export interface QualityGateSpec {
   severity: QualityGateSeverity;
   /** Which academic levels / empirical status this gate applies to; undefined = all. */
   appliesWhen?: string;
+  /**
+   * The `CanonicalDocument.metadata` key this gate checks for presence, if
+   * it maps to exactly one declaration (e.g. a single "declaration of
+   * originality" statement). Optional: many quality gates describe a
+   * compound or content-level check (e.g. "all required declarations
+   * present" spanning several distinct declarations, or a structural/word-
+   * count check) that a single metadata key can't represent — those are
+   * left unset and remain uncompiled rather than force a false 1:1 mapping.
+   * When set, `app/rubric/fromAtlas.ts`'s `compileMetadataGateRules`
+   * compiles this into a `metadata_presence` Rule at the gate's own
+   * severity.
+   */
+  metadataKey?: string;
 }
 
 export interface ExportDefaults {

@@ -26,7 +26,7 @@ export interface RuleSource {
 }
 
 /** The deterministic evaluator kinds implemented so far (docs 31 §5.1's "immediate/fast" tier). */
-export type EvaluatorKind = "word_count" | "structural_presence";
+export type EvaluatorKind = "word_count" | "structural_presence" | "metadata_presence";
 
 export interface WordCountParams {
   max?: number;
@@ -41,13 +41,23 @@ export interface StructuralPresenceParams {
   minWords?: number;
 }
 
+/** The `metadata` Rule type (docs 31 §3.1: "Must include a data availability statement") — checks `CanonicalDocument.metadata`, not a block. */
+export interface MetadataPresenceParams {
+  key: string;
+  /** A present-but-blank value still fails this check, same guarantee as structural_presence for sections. */
+  minLength?: number;
+}
+
 export interface Rule {
   id: string;
   source: RuleSource;
   type: RuleType;
   scope: RuleScope;
   severity: RuleSeverity;
-  evaluator: { kind: "word_count"; params: WordCountParams } | { kind: "structural_presence"; params: StructuralPresenceParams };
+  evaluator:
+    | { kind: "word_count"; params: WordCountParams }
+    | { kind: "structural_presence"; params: StructuralPresenceParams }
+    | { kind: "metadata_presence"; params: MetadataPresenceParams };
   message: string;
   remedy: string;
   autoFixable: boolean;
