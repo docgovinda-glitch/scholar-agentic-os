@@ -14,25 +14,7 @@
 
 import type { VoiceProfile } from "./types";
 import { MIN_VOICE_PROFILE_WORDS } from "./types";
-
-function splitSentences(text: string): string[] {
-  return text
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function words(text: string): string[] {
-  return text.match(/[A-Za-z']+/g) ?? [];
-}
-
-/** A conservative heuristic for passive voice: a form of "to be" followed by a past participle. */
-const PASSIVE_RE = /\b(is|are|was|were|be|been|being)\s+\w+ed\b/gi;
-
-function countMatches(text: string, re: RegExp): number {
-  const matches = text.match(re);
-  return matches ? matches.length : 0;
-}
+import { splitSentences, words, PASSIVE_RE, countMatches } from "./textStats";
 
 /**
  * Build a Voice Profile from one or more writing samples. Returns undefined

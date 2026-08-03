@@ -502,17 +502,34 @@ user answer "why did it say that?" without asking us.
 type already distinguishes `ai | deterministic | web | hybrid`, which is the
 right instinct.
 
+Alongside that legacy pipeline, a new `app/mesh` has started at
+`src/app/mesh/`: `executor.ts`'s `runAgent()` enforces every
+`AgentManifest.permissions` entry against `services/capabilities.verify()`
+before a run executes, evaluates declared QA checkpoints afterward (§8.1 —
+a failed checkpoint fails the run and withholds output), and enforces a
+`budgetMs` timeout (§8.3). `registry.ts` is an in-process id-to-manifest
+lookup. One real agent is wired through it: **AG-18, the Readability
+Analyst** (`agents/ag18ReadabilityAnalyst.ts`), backed by new pure logic in
+`domain/language/readability.ts` — Flesch Reading Ease, Flesch-Kincaid grade
+level, passive-voice ratio (reusing the same heuristic `voiceProfile.ts`
+uses, now shared via `domain/language/textStats.ts`), and jargon density,
+with an audience-relative grade-level finding. AG-18 was picked specifically
+because it's fully deterministic, so the runtime's capability enforcement
+and QA-checkpoint machinery could be proven end-to-end without also
+standing up a Foundry/prompt/golden-set pipeline.
+
 | Current | Target |
 |---|---|
-| 9 agents | 26 agents in 7 groups |
-| No permission system | Declared, service tier-enforced capability grants |
-| No versioning or channels | Full lifecycle with evaluation-gated promotion |
-| No memory tiers | Three tiers with opt-in workspace memory |
-| Agents in code | Behaviour in signed, versioned configuration |
+| 9 legacy agents; 1 new-architecture agent (AG-18) wired through `app/mesh` | 26 agents in 7 groups |
+| `app/mesh`'s executor enforces declared permissions via `services/capabilities`, but nothing calls it yet — not `app/conductor`, not any HTTP route | Declared, service tier-enforced capability grants, actually driving agent runs in the product |
+| No versioning or channels (an `AgentManifest.channel` field exists but nothing acts on it) | Full lifecycle with evaluation-gated promotion |
+| `AgentManifest.memory` is declared but not implemented — no tier actually persists anything | Three tiers with opt-in workspace memory |
+| Legacy agents in code; AG-18 in a typed in-process object | Behaviour in signed, versioned configuration |
 | No golden sets | Per-agent evaluation suites |
-| No QA checkpoints | Declared checkpoints enforced at runtime |
-| Pipeline exists | Conductor-composed with typed artifacts and no agent-to-agent calls |
+| QA checkpoints declared and enforced at runtime for AG-18 | Declared checkpoints enforced at runtime, for all 26 |
+| Legacy pipeline exists; `app/mesh`'s executor runs one agent at a time, with no composition layer yet | Conductor-composed with typed artifacts and no agent-to-agent calls |
 | `humanizeSkill` | **Retired** (`32` §12) |
 
-The registry/executor/mode design carries forward. Permissions, versioning, and
-the Foundry are new construction.
+The registry/executor/mode design carries forward. Permissions and QA
+checkpoints are now real for one agent; versioning, channels, memory-tier
+persistence, and the Foundry remain new construction.
