@@ -36,6 +36,19 @@ export interface CitationStyle {
    * Format a full reference list.
    */
   formatReferenceList(references: CanonicalReference[]): string;
+
+  /**
+   * Notes-style citation support (Chicago 17 Notes-Bibliography, and any
+   * future footnote/endnote style). Optional: every style that cites
+   * in-text via author-date or a numbered marker (the rest of this
+   * registry) has no use for it, and implementing it does not change how
+   * they're called — `formatInText` still returns the in-text marker,
+   * e.g. the footnote number, via `options.position` (see VancouverFormatter
+   * for the same convention with `[n]` markers).
+   */
+  formatNote?(reference: CanonicalReference, options?: NoteOptions): string;
+  /** The shortened form used for the second and later citations of the same source (CMOS 17 §14.34). */
+  formatShortNote?(reference: CanonicalReference, options?: NoteOptions): string;
 }
 
 /**
@@ -50,6 +63,12 @@ export interface InTextOptions {
   etAl?: boolean;
   /** Include URL/DOI */
   includeUrl?: boolean;
+}
+
+/** Options for a notes-style (footnote/endnote) citation. */
+export interface NoteOptions {
+  /** The specific page/section this citation instance points to — distinct from a bibliography entry's full page range. */
+  locator?: string;
 }
 
 // ============================================================================
