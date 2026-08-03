@@ -374,14 +374,14 @@ exists; everything else remains the intended target.
 | API route | `server/routes/studio.ts` | 10 (integration, via supertest against the live app) |
 | `app/atlas` | `src/app/atlas/` | 47 |
 | `domain/compliance` (incl. `metadata_presence`) | `src/domain/compliance/` | 19 |
-| `app/rubric` (incl. `compileMetadataGateRules`) | `src/app/rubric/` | 19 |
+| `app/rubric` (incl. `compileMetadataGateRules`, `applyWaivers`) | `src/app/rubric/` | 22 |
 | `domain/project` (gate state machine, G0-G7) | `src/domain/project/` | 15 |
 | `app/conductor` (binds gates to Atlas/Rubric) | `src/app/conductor/` | 14 |
-| API routes | `server/routes/project.ts` | 36 (integration, via supertest against the live app) |
+| API routes | `server/routes/project.ts` | 43 (integration, via supertest against the live app) |
 | `domain/claim` (Claim–Evidence Graph) | `src/domain/claim/` | 19 |
 | Chicago Notes-Bibliography formatter | `src/citation_compliance/formatters/chicagoNotes.ts` | 18 |
 
-307 new tests. Full repository suite: 131 files, 1,444 tests, `tsc --noEmit`
+317 new tests. Full repository suite: 131 files, 1,454 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 

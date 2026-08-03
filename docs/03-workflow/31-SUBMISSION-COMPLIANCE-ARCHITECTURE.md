@@ -383,9 +383,9 @@ is not yet built.
 | Rule/Finding model | `src/domain/compliance/types.ts` | §3 in full: source traceability (`document`, `locator`, `quote`, `confidence`), type, scope, severity, waiver |
 | Evaluators | `src/domain/compliance/evaluators.ts` | `word_count`, `structural_presence`, and `metadata_presence` (checks a document-level declaration in `CanonicalDocument.metadata` — `domain/document`'s new metadata bag — for the `metadata` rule type's own example, "must include a data availability statement"). A rule type with no evaluator returns `not_applicable`, never a false pass (§10, AG-22's QA rule) |
 | Compilation from Atlas | `src/app/rubric/fromAtlas.ts` | The word-limit rule from `budget.totalWords` (excluding sections marked `countsTowardWordcount: false`), one blocking structural rule per required section, and one `metadata_presence` rule per quality gate that sets `metadataKey` (none currently do — see §12.2) |
-| Report / waivers | `src/app/rubric/rubric.ts` | `evaluateAgainstOutputType()`, `readyForG6`, and `waiveRule()`. Reachable over HTTP via `PUT /api/projects/:id/document` (evaluates and recomputes G6) and `GET /api/projects/:id/rubric` (re-fetches the last report) — see `30` §10 |
+| Report / waivers | `src/app/rubric/rubric.ts` | `evaluateAgainstOutputType()`, `readyForG6`, `waiveRule()`, and `applyWaivers()` (reapplies previously-recorded waivers onto a freshly compiled rule set — `fromAtlas.ts` always compiles unwaived rules, so this is what lets a waiver survive a document resubmission rather than silently resetting). Reachable over HTTP via `PUT /api/projects/:id/document` (evaluates and recomputes G6), `GET /api/projects/:id/rubric` (re-fetches the last report), and `POST /api/projects/:id/rubric/waive` (records a waiver by rule id and reason, 400s on a blocking rule) — see `30` §10 |
 
-38 tests, including the re-targeting case from `26` Journey 3 in miniature:
+41 tests, including the re-targeting case from `26` Journey 3 in miniature:
 the same document evaluated against two different output types produces
 different findings without the document itself changing.
 

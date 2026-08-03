@@ -29,6 +29,8 @@ export interface ProjectRecord {
   rubricReport?: RubricReport;
   /** The project's Claim–Evidence Graph (domain/claim). Starts empty at creation, same as an empty gate state — there is always a graph to query, just possibly with nothing in it yet. */
   claimGraph: ClaimEvidenceGraph;
+  /** Recorded Rubric waivers, keyed by rule id. Compiling rules from Atlas always produces unwaived rules (fromAtlas.ts has no memory), so this is what lets a waiver survive a document resubmission — see app/rubric/rubric.ts's applyWaivers. */
+  waivers: Record<string, { reason: string; at: string }>;
 }
 
 const projects = new Map<string, ProjectRecord>();
@@ -47,6 +49,7 @@ export function createProject(outputTypeId: string): ProjectRecord {
     answers: {},
     gates: initialProjectGateState(projectId),
     claimGraph: emptyGraph(),
+    waivers: {},
   };
   projects.set(projectId, record);
   return record;

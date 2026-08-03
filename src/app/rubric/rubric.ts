@@ -56,6 +56,20 @@ export function waiveRule(rules: Rule[], ruleId: string, reason: string): Rule[]
   return rules.map((r) => (r.id === ruleId ? { ...r, waived: { reason, at: new Date().toISOString() } } : r));
 }
 
+/**
+ * Reapply previously-recorded waivers (by rule id) onto a freshly compiled
+ * rule set. Needed because `compileRubricFromOutputType` always returns
+ * unwaived rules — a caller re-evaluating after a document edit (or a
+ * venue re-target, `26` Journey 3) would otherwise silently lose every
+ * waiver on each recompile. Safe even if a waiver map somehow contains a
+ * blocking rule's id (which `waiveRule` itself never produces): the
+ * evaluator's `isEffectivelyWaived` still refuses to downgrade blocking
+ * severity regardless of what `Rule.waived` is set to.
+ */
+export function applyWaivers(rules: Rule[], waivers: Record<string, { reason: string; at: string }>): Rule[] {
+  return rules.map((r) => (waivers[r.id] ? { ...r, waived: waivers[r.id] } : r));
+}
+
 function bySeverity(findings: Finding[], severity: RuleSeverity, statuses: Finding["status"][]): Finding[] {
   return findings.filter((f) => f.severity === severity && statuses.includes(f.status));
 }

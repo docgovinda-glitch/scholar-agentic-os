@@ -38,7 +38,7 @@ import {
 } from "../../src/app/conductor/conductor.ts";
 import type { GateId } from "../../src/app/conductor/conductor.ts";
 import { createProject, getProject, saveProject } from "../../src/app/conductor/projectStore.ts";
-import { evaluateAgainstOutputType } from "../../src/app/rubric/rubric.ts";
+import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
 import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, ClaimGraphError } from "../../src/domain/claim/graph.ts";
 import type { Claim, ClaimEvidenceBinding, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
@@ -205,7 +205,9 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * criteria against it (docs 30 §3 G6 "Exit": zero unresolved blocking or
    * required Rubric findings). Body: { document: CanonicalDocument }.
    * 409s if G6 is already signed off — invalidate it first, same guarantee
-   * as the intake endpoint gives G0.
+   * as the intake endpoint gives G0. Rules are recompiled fresh from Atlas
+   * and any previously recorded waivers are reapplied (applyWaivers) so a
+   * waiver survives a document resubmission rather than silently resetting.
    */
   app.put("/api/projects/:id/document", projectLimit, (req, res) => {
     const record = getProject(req.params.id);
@@ -218,7 +220,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
 
     const spec = catalog.getOrThrow(record.outputTypeId);
-    const rubricReport = evaluateAgainstOutputType(spec, document);
+    const rules = applyWaivers(compileRubricFromOutputType(spec), record.waivers);
+    const rubricReport = buildReport(rules, document);
     const criteria = computeG6ExitCriteria(rubricReport);
 
     try {
@@ -243,6 +246,58 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(404).json({ error: `Project "${req.params.id}" has no document submitted yet.` });
     }
     res.json(record.rubricReport);
+  });
+
+  /**
+   * Waive a non-blocking Rubric finding with a reason (docs 31 §7:
+   * "Reason required. Appears in the compliance report"). Body:
+   * { ruleId, reason }. Requires a document to already have been
+   * submitted — there is nothing to re-evaluate otherwise. 404s if
+   * `ruleId` doesn't name a rule this output type compiles. 400s if the
+   * rule is blocking severity (never waivable by design) or the reason is
+   * empty. Recomputes G6's exit criteria from the waived report, same as
+   * the document endpoint.
+   */
+  app.post("/api/projects/:id/rubric/waive", projectLimit, (req, res) => {
+    const record = getProject(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    if (!record.document) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no document submitted yet.` });
+    }
+    const { ruleId, reason } = req.body ?? {};
+    if (typeof ruleId !== "string" || ruleId.length === 0) {
+      return res.status(400).json({ error: "Missing required field: ruleId" });
+    }
+    if (typeof reason !== "string" || reason.trim().length === 0) {
+      return res.status(400).json({ error: "Missing required field: reason" });
+    }
+
+    const spec = catalog.getOrThrow(record.outputTypeId);
+    const rules = applyWaivers(compileRubricFromOutputType(spec), record.waivers);
+    if (!rules.some((r) => r.id === ruleId)) {
+      return res.status(404).json({ error: `No rule "${ruleId}" for this project's output type.` });
+    }
+
+    try {
+      const waivedRules = waiveRule(rules, ruleId, reason);
+      const newWaiver = waivedRules.find((r) => r.id === ruleId)!.waived!;
+      const waivers = { ...record.waivers, [ruleId]: newWaiver };
+      const rubricReport = buildReport(waivedRules, record.document);
+      const criteria = computeG6ExitCriteria(rubricReport);
+      const gates = updateExitCriteria(record.gates, "G6", criteria);
+      const updated = saveProject({ ...record, waivers, rubricReport, gates });
+      res.json({ ...projectView(updated), rubric: rubricReport });
+    } catch (err) {
+      if (err instanceof RuleNotWaivableError) {
+        return res.status(400).json({ error: err.message });
+      }
+      if (err instanceof GateTransitionError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
   });
 
   /** Add a claim to the project's Claim–Evidence Graph. Body: { claim: Claim }. 409s if the claim id is already used. */

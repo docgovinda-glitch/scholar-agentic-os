@@ -247,6 +247,99 @@ describe("PUT /api/projects/:id/document", () => {
   });
 });
 
+function overLengthOT01Document() {
+  const doc = compliantOT01Document();
+  doc.blocks = doc.blocks.map((b) => (b.id === "body" ? { ...b, text: words(4000) } : b));
+  return doc;
+}
+
+describe("POST /api/projects/:id/rubric/waive", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("404s for an unknown project", async () => {
+    const res = await request(app).post("/api/projects/proj-nope/rubric/waive").send({ ruleId: "x", reason: "y" });
+    expect(res.status).toBe(404);
+  });
+
+  it("404s when no document has been submitted yet", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const res = await request(app)
+      .post(`/api/projects/${created.body.projectId}/rubric/waive`)
+      .send({ ruleId: "OT-01-word-limit", reason: "y" });
+    expect(res.status).toBe(404);
+  });
+
+  it("400s when ruleId or reason is missing", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).put(`/api/projects/${projectId}/document`).send({ document: compliantOT01Document() });
+
+    const noRuleId = await request(app).post(`/api/projects/${projectId}/rubric/waive`).send({ reason: "y" });
+    expect(noRuleId.status).toBe(400);
+
+    const noReason = await request(app).post(`/api/projects/${projectId}/rubric/waive`).send({ ruleId: "OT-01-word-limit" });
+    expect(noReason.status).toBe(400);
+  });
+
+  it("404s for a ruleId this output type doesn't compile", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).put(`/api/projects/${projectId}/document`).send({ document: compliantOT01Document() });
+
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/rubric/waive`)
+      .send({ ruleId: "no-such-rule", reason: "y" });
+    expect(res.status).toBe(404);
+  });
+
+  it("400s when the rule is blocking severity (never waivable)", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).put(`/api/projects/${projectId}/document`).send({ document: compliantOT01Document() });
+
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/rubric/waive`)
+      .send({ ruleId: "OT-01-section-references", reason: "I don't feel like it" });
+    expect(res.status).toBe(400);
+  });
+
+  it("waiving the word-limit rule clears it from requiredFailures and G6 becomes ready", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    const overLength = await request(app).put(`/api/projects/${projectId}/document`).send({ document: overLengthOT01Document() });
+    expect(overLength.body.rubric.readyForG6).toBe(false);
+
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/rubric/waive`)
+      .send({ ruleId: "OT-01-word-limit", reason: "Tutor granted an extension on length." });
+    expect(res.status).toBe(200);
+    expect(res.body.rubric.readyForG6).toBe(true);
+    const g6 = res.body.gates.find((g: { gate: string }) => g.gate === "G6");
+    expect(g6.outstandingBlocking).toEqual([]);
+  });
+
+  it("a waiver survives a document resubmission rather than resetting", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    await request(app).put(`/api/projects/${projectId}/document`).send({ document: overLengthOT01Document() });
+    await request(app)
+      .post(`/api/projects/${projectId}/rubric/waive`)
+      .send({ ruleId: "OT-01-word-limit", reason: "Tutor granted an extension on length." });
+
+    // Resubmit the same over-length document — rules are recompiled from
+    // scratch each time; the waiver must be reapplied, not lost.
+    const resubmitted = await request(app)
+      .put(`/api/projects/${projectId}/document`)
+      .send({ document: overLengthOT01Document() });
+    expect(resubmitted.body.rubric.readyForG6).toBe(true);
+    const finding = resubmitted.body.rubric.findings.find((f: { ruleId: string }) => f.ruleId === "OT-01-word-limit");
+    expect(finding.status).toBe("warn");
+  });
+});
+
 describe("GET /api/projects/:id/rubric", () => {
   beforeEach(() => {
     __resetProjectStoreForTests();
