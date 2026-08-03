@@ -2,12 +2,15 @@
  * The catalog data — real output type entries.
  *
  * Spec: docs/01-product/14-OUTPUT-TYPE-CATALOG.md §9. That document
- * specifies 24 output types across 6 families. This file implements one
- * representative entry per family (one per workflow variant and structure
- * variant class), proving the engine against every shape the full catalog
- * needs to support, rather than 24 entries of comparatively low incremental
- * value entered in one pass. Adding the remaining 18 is data entry against
- * an engine already proven correct — see docs/01-product/13-MODULE-SPECIFICATIONS.md
+ * specifies 24 output types across 6 families. This file implements 9 of
+ * them: the original one representative entry per family (one per
+ * workflow variant and structure variant class), proving the engine
+ * against every shape the full catalog needs to support, plus three more
+ * within the short_form family (OT-02 Essay, OT-03 Report, OT-13
+ * Literature Review) that each exercise a structure variant the first
+ * pass didn't (`argumentative`, plain `linear` with numbered sections,
+ * `thematic`). Adding the remaining 15 is data entry against an engine
+ * already proven correct — see docs/01-product/13-MODULE-SPECIFICATIONS.md
  * §8.3 for the tracked gap.
  *
  * Word budgets, source counts, and structure are drawn directly from the
@@ -105,6 +108,293 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
       { id: "structural_completeness", description: "Every required section present and non-empty", severity: "blocking" },
       { id: "budget_adherence", description: "Within ±20% of the word limit", severity: "required" },
       { id: "style_consistency", description: "One citation style used throughout", severity: "blocking" },
+    ],
+    workflowVariant: "short_form",
+    complianceProfile: "coursework",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
+  // ── OT-02 Essay — short_form / argumentative / coursework ───────────────
+  {
+    id: "OT-02",
+    version: 1,
+    label: "Essay",
+    aliases: ["argumentative essay", "position paper", "critical essay"],
+    family: "short_form",
+    academicLevels: ["undergraduate", "masters"],
+    typicalDisciplines: ["humanities", "social science", "all"],
+    structure: {
+      variant: "argumentative",
+      sections: [
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, wordBudget: { min: 100, max: 350, typical: 250 }, guidance: "States the essay question and the thesis — the single position the essay will argue for." },
+        { key: "argument", title: "Argument", required: true, countsTowardWordcount: true, wordBudget: { min: 600, max: 3500, typical: 1500 }, guidance: "One claim at a time, each with its own evidence. At G3 this becomes a claim tree rather than a flat section list — the sections here represent that body in aggregate." },
+        { key: "counter_argument", title: "Counter-argument", required: true, countsTowardWordcount: true, wordBudget: { min: 150, max: 600, typical: 300 }, guidance: "The strongest opposing position, addressed directly rather than dismissed." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, wordBudget: { min: 100, max: 300, typical: 200 }, guidance: "Restates the thesis in light of the argument and counter-argument. No new evidence." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited in the argument and counter-argument, in the required style." },
+      ],
+      frontMatter: [],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 1000, max: 5000, typical: 2500 },
+      distribution: { introduction: 0.1, argument: 0.6, counter_argument: 0.15, conclusion: 0.08 },
+    },
+    sources: { targetCount: { min: 8, typical: 15 }, recencyExpectation: "majority within 10 years unless historical", typeMix: { peer_reviewed: 0.6, other: 0.4 } },
+    citation: { defaultStyle: "mla9", commonStyles: ["mla9", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "essay_question",
+          label: "Essay question",
+          tier: "required",
+          guidance: {
+            whatItIs: "The exact question or prompt set for the essay.",
+            whyItMatters: "The thesis has to answer this precisely — essays that drift from the set question lose marks regardless of writing quality.",
+            example: "\"To what extent was the Treaty of Versailles responsible for the outbreak of the Second World War?\"",
+            defaultWithRationale: "If you don't have the exact wording, paraphrase it as closely as you can — we'll flag if the thesis seems to be answering something else.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "thesis_statement",
+          label: "Position or thesis statement",
+          tier: "required",
+          guidance: {
+            whatItIs: "The single claim your essay will argue for, in one or two sentences.",
+            whyItMatters: "This is where most undergraduates struggle: a thesis that is too broad, too obvious, or actually a topic rather than a claim produces an essay with nothing to prove. Getting this right first saves a rewrite later.",
+            example: "\"The Treaty of Versailles was a necessary but not sufficient cause of the Second World War, secondary to the failure of collective security in the 1930s.\"",
+            defaultWithRationale: "If you're not sure yet, mark this provisional and describe your topic instead — we'll propose candidate thesis statements from your reading for you to choose from.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "argument_type",
+          label: "Argument type",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the essay is analytical, persuasive, comparative, or evaluative.",
+            whyItMatters: "Changes what 'good' looks like at G5 — a persuasive essay needs a strong counter-argument response; a comparative one needs balanced treatment of both sides being compared.",
+            example: "Evaluative — weighing the relative importance of several causes.",
+            defaultWithRationale: "Defaults to analytical, the most common type when unspecified.",
+          },
+          defaultValue: "analytical",
+          allowsProvisional: false,
+        },
+      ],
+      recommended: [
+        {
+          key: "required_texts",
+          label: "Required or suggested reading",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Texts your module explicitly wants you to engage with.",
+            whyItMatters: "Markers often look for engagement with set readings specifically.",
+            example: "A reading list from your module handbook.",
+            defaultWithRationale: "If none is given, we treat this as unconstrained and search broadly instead.",
+          },
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "thesis_statement_present", description: "A single, specific thesis statement appears in the introduction", severity: "blocking" },
+      { id: "claims_advance_thesis", description: "Each argument section advances the thesis rather than merely being related to the topic", severity: "advisory" },
+      { id: "counter_argument_addressed", description: "The strongest opposing position is stated and directly answered, not ignored", severity: "required", appliesWhen: "persuasive or evaluative argument type" },
+    ],
+    workflowVariant: "short_form",
+    complianceProfile: "coursework",
+    exportDefaults: { format: "docx", includeToc: false },
+  },
+
+  // ── OT-03 Report — short_form / linear / coursework ─────────────────────
+  {
+    id: "OT-03",
+    version: 1,
+    label: "Report",
+    aliases: ["business report", "technical report", "coursework report"],
+    family: "short_form",
+    academicLevels: ["undergraduate", "masters", "professional"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "linear",
+      sections: [
+        { key: "title_page", title: "Title Page", required: true, countsTowardWordcount: false, guidance: "Report title, author, audience, and date." },
+        { key: "executive_summary", title: "Executive Summary", required: true, countsTowardWordcount: false, wordBudget: { min: 150, max: 400, typical: 250 }, guidance: "Written last. A summary of your own findings and recommendations, not a restatement of sources — the one place the system drafts from your text rather than from cited material." },
+        { key: "introduction", title: "Introduction", required: true, countsTowardWordcount: true, wordBudget: { min: 150, max: 500, typical: 300 }, guidance: "States the report's purpose, scope, and intended audience." },
+        { key: "methodology", title: "Methodology", required: false, countsTowardWordcount: true, guidance: "How data or evidence was gathered, if the report involves original data collection or a defined method." },
+        { key: "findings", title: "Findings", required: true, countsTowardWordcount: true, wordBudget: { min: 400, max: 2500, typical: 1200 }, guidance: "What was found. Facts and data only, no interpretation — that belongs in Discussion." },
+        { key: "discussion", title: "Discussion", required: true, countsTowardWordcount: true, wordBudget: { min: 200, max: 1500, typical: 700 }, guidance: "Interprets the findings and situates them against the report's purpose." },
+        { key: "conclusions", title: "Conclusions", required: true, countsTowardWordcount: true, wordBudget: { min: 100, max: 400, typical: 250 }, guidance: "What the findings and discussion establish, stated plainly." },
+        { key: "recommendations", title: "Recommendations", required: false, countsTowardWordcount: true, guidance: "Specific, actionable recommendations, present only when the report's purpose calls for them." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the required style." },
+        { key: "appendices", title: "Appendices", required: false, countsTowardWordcount: false, guidance: "Supporting material too detailed for the main body — raw data, full survey instruments, extended calculations." },
+      ],
+      frontMatter: ["title_page", "executive_summary"],
+      backMatter: ["references", "appendices"],
+    },
+    budget: {
+      totalWords: { min: 1500, max: 8000, typical: 3500 },
+      distribution: { introduction: 0.1, methodology: 0.15, findings: 0.3, discussion: 0.2, conclusions: 0.1, recommendations: 0.1 },
+    },
+    sources: { targetCount: { min: 10, typical: 20 }, recencyExpectation: "majority within 10 years", typeMix: { peer_reviewed: 0.5, other: 0.5 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "report_purpose",
+          label: "Report purpose",
+          tier: "required",
+          guidance: {
+            whatItIs: "What the report is for — inform, evaluate, recommend, or record.",
+            whyItMatters: "Determines whether Recommendations and Methodology are needed at all, and shapes the Executive Summary.",
+            example: "Evaluate three vendor proposals and recommend one.",
+            defaultWithRationale: "There is no safe default for this — the report's structure genuinely depends on it, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "audience",
+          label: "Audience",
+          tier: "required",
+          guidance: {
+            whatItIs: "Who the report is written for.",
+            whyItMatters: "Changes register substantially — a report for a board reads very differently from one for a technical peer, even with identical findings.",
+            example: "Senior management with no technical background in the subject.",
+            defaultWithRationale: "Defaults to 'an informed but non-specialist reader' when unspecified.",
+          },
+          defaultValue: "an informed but non-specialist reader",
+          allowsProvisional: true,
+        },
+        {
+          key: "recommendations_expected",
+          label: "Are recommendations expected?",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the brief calls for actionable recommendations or a findings-only record.",
+            whyItMatters: "Determines whether the Recommendations section is compiled at all — including one when it isn't wanted reads as padding.",
+            example: "Yes — the brief asks for a recommended course of action.",
+            defaultWithRationale: "Defaults to yes, since most report briefs expect a recommendation even when not stated explicitly.",
+          },
+          defaultValue: "yes",
+          allowsProvisional: true,
+        },
+      ],
+      recommended: [
+        {
+          key: "data_sources",
+          label: "Data sources",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Any datasets, interviews, or records the report draws on beyond published literature.",
+            whyItMatters: "Reports frequently rely on primary or organisational data that a literature search alone would never find.",
+            example: "Q3 sales figures spreadsheet; three stakeholder interview transcripts.",
+            defaultWithRationale: "If none is supplied, the report is written from published sources only.",
+          },
+          allowsProvisional: true,
+        },
+        {
+          key: "numbered_heading_convention",
+          label: "Numbered-heading convention",
+          tier: "recommended",
+          guidance: {
+            whatItIs: "Whether sections should be numbered (1, 1.1, 1.2...) per your institution's or organisation's house style.",
+            whyItMatters: "Numbered headings are a common, easy-to-miss formatting requirement in professional and some academic reports.",
+            example: "Yes, decimal numbering to two levels.",
+            defaultWithRationale: "Defaults to unnumbered headings unless a house style is specified.",
+          },
+          defaultValue: "no",
+          allowsProvisional: true,
+        },
+      ],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "structural_completeness", description: "Every required section present and non-empty", severity: "blocking" },
+      { id: "budget_adherence", description: "Within ±20% of the word limit", severity: "required" },
+      { id: "recommendations_alignment", description: "Recommendations follow from the findings and discussion rather than introducing new claims", severity: "required", appliesWhen: "recommendations_expected" },
+    ],
+    workflowVariant: "short_form",
+    complianceProfile: "coursework",
+    exportDefaults: { format: "docx", includeToc: true },
+  },
+
+  // ── OT-13 Literature Review (standalone) — short_form / thematic ────────
+  {
+    id: "OT-13",
+    version: 1,
+    label: "Literature Review",
+    aliases: ["lit review", "review of the literature", "standalone literature review"],
+    family: "short_form",
+    academicLevels: ["undergraduate", "masters", "doctoral", "postdoc", "faculty"],
+    typicalDisciplines: ["all"],
+    structure: {
+      variant: "thematic",
+      sections: [
+        { key: "introduction", title: "Introduction and Scope", required: true, countsTowardWordcount: true, wordBudget: { min: 150, max: 500, typical: 300 }, guidance: "States the review's scope boundaries and organising principle." },
+        { key: "body", title: "Body", required: true, countsTowardWordcount: true, wordBudget: { min: 1000, max: 7000, typical: 3000 }, guidance: "Organised by theme, chronology, methodology, or theory per the chosen organising principle — not source-by-source summary." },
+        { key: "synthesis_critique", title: "Synthesis and Critique", required: true, countsTowardWordcount: true, wordBudget: { min: 300, max: 1500, typical: 700 }, guidance: "Connects the themes and evaluates the literature's strengths, weaknesses, and disagreements — present only when critique, not summary, was required." },
+        { key: "gaps", title: "Gaps", required: true, countsTowardWordcount: true, wordBudget: { min: 100, max: 500, typical: 250 }, guidance: "What the literature has not yet addressed." },
+        { key: "conclusion", title: "Conclusion", required: true, countsTowardWordcount: true, wordBudget: { min: 100, max: 350, typical: 200 }, guidance: "Summarises the state of the field per the review's scope." },
+        { key: "references", title: "References", required: true, countsTowardWordcount: false, guidance: "Every source cited, in the required style." },
+      ],
+      frontMatter: [],
+      backMatter: ["references"],
+    },
+    budget: {
+      totalWords: { min: 2000, max: 10000, typical: 5000 },
+      distribution: { introduction: 0.08, body: 0.55, synthesis_critique: 0.2, gaps: 0.07, conclusion: 0.05 },
+    },
+    sources: { targetCount: { min: 25, typical: 50 }, recencyExpectation: "majority within 10 years, with broader historical context where the field warrants it", typeMix: { peer_reviewed: 0.8, other: 0.2 } },
+    citation: { defaultStyle: "harvard", commonStyles: ["harvard", "apa7"] },
+    intakeSchema: {
+      required: [
+        {
+          key: "organising_principle",
+          label: "Organising principle",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the body is organised thematically, chronologically, methodologically, or theoretically.",
+            whyItMatters: "Drives the entire structure of the body section — a chronological review and a thematic one covering the same literature read completely differently.",
+            example: "Thematic, organised around three competing theoretical frameworks.",
+            defaultWithRationale: "Defaults to thematic, the most common organising principle when unspecified.",
+          },
+          defaultValue: "thematic",
+          allowsProvisional: false,
+        },
+        {
+          key: "scope_boundaries",
+          label: "Scope boundaries",
+          tier: "required",
+          guidance: {
+            whatItIs: "What is in scope and out of scope — discipline, date range, geography, methodology, or population.",
+            whyItMatters: "Without explicit boundaries, source discovery either misses relevant work or returns an unmanageable volume.",
+            example: "Peer-reviewed empirical studies on remote work productivity, English-language, published 2015 onward.",
+            defaultWithRationale: "There is no safe default for this — an unscoped review cannot be meaningfully searched, so it blocks progress until answered.",
+          },
+          allowsProvisional: false,
+        },
+        {
+          key: "critique_or_summary",
+          label: "Is critique expected, or does summary suffice?",
+          tier: "required",
+          guidance: {
+            whatItIs: "Whether the review must evaluate and critique the literature, or whether accurately summarising it is sufficient.",
+            whyItMatters: "The single most common misunderstanding at undergraduate level: students routinely submit a summary when critique was required. Asked explicitly here so it's never assumed.",
+            example: "Critique required — the brief asks for an evaluation of methodological strengths and weaknesses, not just a description.",
+            defaultWithRationale: "Defaults to critique expected, since most academic literature review briefs require it even when not stated in those exact words.",
+          },
+          defaultValue: "critique",
+          allowsProvisional: false,
+        },
+      ],
+      recommended: [],
+      optional: [],
+    },
+    qualityGates: [
+      { id: "critique_present", description: "The review evaluates the literature rather than only summarising it", severity: "blocking", appliesWhen: "critique_or_summary = critique" },
+      { id: "thematic_coherence", description: "Sources within each theme are meaningfully connected rather than merely listed", severity: "advisory" },
+      { id: "gap_identification", description: "At least one genuine gap in the literature is identified", severity: "required" },
     ],
     workflowVariant: "short_form",
     complianceProfile: "coursework",

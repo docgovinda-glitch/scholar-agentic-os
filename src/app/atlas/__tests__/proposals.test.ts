@@ -70,6 +70,60 @@ describe("app/atlas: citation and budget helpers", () => {
   it("proposes the typical total word budget", () => {
     expect(proposeTotalWordBudget(catalog.getOrThrow("OT-07"))).toBe(20000);
   });
+
+  it("proposes the typical total word budget for each of the new short_form entries", () => {
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-02"))).toBe(2500);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-03"))).toBe(3500);
+    expect(proposeTotalWordBudget(catalog.getOrThrow("OT-13"))).toBe(5000);
+  });
+});
+
+describe("app/atlas: the new short_form entries (OT-02, OT-03, OT-13)", () => {
+  it("OT-02's argument section proposal sums close to the total typical budget", () => {
+    const essay = catalog.getOrThrow("OT-02");
+    const proposal = proposeStructure(essay);
+    const sum = proposal.reduce((a, p) => a + p.wordBudget, 0);
+    const total = proposeTotalWordBudget(essay);
+    expect(sum).toBeGreaterThan(total * 0.8);
+    expect(sum).toBeLessThanOrEqual(total + 5);
+  });
+
+  it("OT-03's report_purpose has no safe default and blocks progress until answered", () => {
+    const report = catalog.getOrThrow("OT-03");
+    const result = canProceedFromIntake(report, { audience: "board", recommendations_expected: "yes" });
+    expect(result.canProceed).toBe(false);
+    expect(result.missing).toContain("report_purpose");
+  });
+
+  it("OT-03 can proceed once every required field is answered", () => {
+    const report = catalog.getOrThrow("OT-03");
+    const result = canProceedFromIntake(report, {
+      report_purpose: "Evaluate three vendor proposals.",
+      audience: "board",
+      recommendations_expected: "yes",
+    });
+    expect(result.canProceed).toBe(true);
+  });
+
+  it("OT-13's scope_boundaries has no safe default and blocks progress until answered", () => {
+    const litReview = catalog.getOrThrow("OT-13");
+    const result = canProceedFromIntake(litReview, {
+      organising_principle: "thematic",
+      critique_or_summary: "critique",
+    });
+    expect(result.canProceed).toBe(false);
+    expect(result.missing).toContain("scope_boundaries");
+  });
+
+  it("OT-13 can proceed once every required field is answered", () => {
+    const litReview = catalog.getOrThrow("OT-13");
+    const result = canProceedFromIntake(litReview, {
+      organising_principle: "thematic",
+      scope_boundaries: "Peer-reviewed studies 2015 onward.",
+      critique_or_summary: "critique",
+    });
+    expect(result.canProceed).toBe(true);
+  });
 });
 
 describe("app/atlas: G0 -> G1 gating (canProceedFromIntake)", () => {

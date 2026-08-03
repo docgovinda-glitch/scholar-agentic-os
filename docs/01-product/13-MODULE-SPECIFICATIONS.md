@@ -356,7 +356,7 @@ exists; everything else remains the intended target.
 | `src/agents/`, `src/skills/` | `app/mesh` | Not started |
 | `src/services/providerFailover.ts`, `aiErrors.ts` | `platform/gateway` | **Partially done, and not yet reused.** `src/platform/gateway/` exists and is Warden-gated, but currently has its own (simpler) error handling rather than the existing classified-error/failover logic — see `41` §12.2 |
 | `src/core/project/` | `domain/project` | **Partially built.** The gate state machine (`domain/project/gates.ts`, G0-G7) is built and bound to Atlas/Rubric via `app/conductor` — see §8.1a and `30` §10. `src/core/project/`'s phase-string model is untouched; migrating it onto the gate model is still open |
-| `src/types/documentTypes.ts` | `app/atlas` | **Built** at `src/app/atlas/` (schema, registry, validation, proposal engine) with 6 of 24 output types populated — see `14` §12 |
+| `src/types/documentTypes.ts` | `app/atlas` | **Built** at `src/app/atlas/` (schema, registry, validation, proposal engine) with 9 of 24 output types populated — see `14` §12 |
 | `src/services/knowledgeVaultService.ts` | `app/vault` | Not started |
 | `src/services/documentExportService.ts` | `app/export` | Not started |
 | **`src/skills/humanizeSkill.ts`** | **`app/studio` + `domain/language`** | **Built.** `src/domain/language/` (6 modules, 35 tests) and `src/app/studio/` (3 modules, 21 tests) implement the full six-stage pipeline per `32` §13. `humanizeSkill.ts` itself is untouched and still referenced by the legacy agent pipeline — retiring it is the next step once a client calls `/api/studio/refine` instead of the skill |
@@ -372,7 +372,7 @@ exists; everything else remains the intended target.
 | `domain/language` | `src/domain/language/` | 35 |
 | `app/studio` | `src/app/studio/` | 21 |
 | API route | `server/routes/studio.ts` | 10 (integration, via supertest against the live app) |
-| `app/atlas` | `src/app/atlas/` | 36 |
+| `app/atlas` | `src/app/atlas/` | 44 |
 | `domain/compliance` (incl. `metadata_presence`) | `src/domain/compliance/` | 19 |
 | `app/rubric` | `src/app/rubric/` | 13 |
 | `domain/project` (gate state machine, G0-G7) | `src/domain/project/` | 15 |
@@ -381,7 +381,7 @@ exists; everything else remains the intended target.
 | `domain/claim` (Claim–Evidence Graph) | `src/domain/claim/` | 19 |
 | Chicago Notes-Bibliography formatter | `src/citation_compliance/formatters/chicagoNotes.ts` | 18 |
 
-271 new tests. Full repository suite: 131 files, 1,408 tests, `tsc --noEmit`
+279 new tests. Full repository suite: 131 files, 1,416 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 
@@ -400,7 +400,7 @@ suite.
 | `platform/warden` | **Built** |
 | `platform/gateway` (OpenAI-compatible + Anthropic adapters) | **Built**, narrower provider coverage than the legacy path — see `41` §12.2 |
 | `domain/language` and `app/studio` | **Built** |
-| `app/atlas` | **Built** (engine complete; 6/24 output types populated) |
+| `app/atlas` | **Built** (engine complete; 9/24 output types populated) |
 | `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, three deterministic evaluators (`word_count`, `structural_presence`, `metadata_presence` — the last checks a new `CanonicalDocument.metadata` bag in `domain/document`, closing the `metadata` Rule type's "always not_applicable" gap), and compilation from Atlas specs. Only `word_count`/`structural_presence` are wired to Atlas compilation (`fromAtlas.ts`) — `metadata_presence` has no Atlas-side compiler yet, since the catalog's `qualityGates` entries (e.g. "declaration_present") don't specify which metadata key they check. Requirement-source extraction (needs `app/mesh`) and template extraction (needs `app/ingestion`) are also not built — see `31` §12.2 |
 | `services/*` | Not started. This is the largest near-term gap: the Studio's session-policy store (`src/app/studio/sessionPolicyStore.ts`) and the Conductor's project store (`src/app/conductor/projectStore.ts`) are both explicitly-labelled in-memory stand-ins for what `services/store` should provide, and do not survive a restart or scale past one process |
 | `app/conductor` | **Built**, with an API surface. Gate state machine (`domain/project/gates.ts`) bound to Atlas (G0) and the Rubric (G6); exposed via `server/routes/project.ts` (`GET /api/atlas/output-types[/:id]`, `POST /api/projects`, `GET /api/projects/:id`, `PATCH /api/projects/:id/intake`, `POST /api/projects/:id/gates/:gate/signoff`, `POST /api/projects/:id/gates/:gate/invalidate`). Only G0 can reach "ready" through this API today — G1-G5/G7 have no computation source and G6 needs a stored CanonicalDocument, which has no storage/editor surface yet. Per-chapter gating is a tracked gap — see `30` §10 |
