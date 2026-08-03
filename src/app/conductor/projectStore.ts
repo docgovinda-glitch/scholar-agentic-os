@@ -12,6 +12,8 @@
 
 import { initialProjectGateState } from "../../domain/project/gates";
 import type { ProjectGateState } from "../../domain/project/gates";
+import type { CanonicalDocument } from "../../domain/document/model";
+import type { RubricReport } from "../rubric/rubric";
 
 export interface ProjectRecord {
   projectId: string;
@@ -19,6 +21,10 @@ export interface ProjectRecord {
   /** Intake answers so far, keyed by IntakeField.key. "provisional" is a valid value (docs 14 §5.2). */
   answers: Record<string, string>;
   gates: ProjectGateState;
+  /** The project's document body, once one has been submitted (server/routes/project.ts's PUT .../document). Undefined until then — G6 has nothing to evaluate before this exists. */
+  document?: CanonicalDocument;
+  /** The most recent Rubric evaluation of `document` against the project's output type — recomputed every time `document` changes. Reused as G6's sign-off snapshot. */
+  rubricReport?: RubricReport;
 }
 
 const projects = new Map<string, ProjectRecord>();

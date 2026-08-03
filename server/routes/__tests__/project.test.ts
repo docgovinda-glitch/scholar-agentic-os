@@ -173,6 +173,108 @@ describe("POST /api/projects/:id/gates/:gate/signoff", () => {
   });
 });
 
+function words(n: number): string {
+  return Array.from({ length: n }, () => "word").join(" ");
+}
+
+function compliantOT01Document(id = "doc-1") {
+  return {
+    id,
+    title: "Test Assignment",
+    blocks: [
+      { id: "title_page", kind: "heading1", text: "Test Assignment" },
+      { id: "introduction", kind: "paragraph", text: words(150) },
+      { id: "body", kind: "paragraph", text: words(700) },
+      { id: "conclusion", kind: "paragraph", text: words(100) },
+      { id: "references", kind: "paragraph", text: "Reference one." },
+    ],
+  };
+}
+
+describe("PUT /api/projects/:id/document", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("404s for an unknown project", async () => {
+    const res = await request(app).put("/api/projects/proj-nope/document").send({ document: compliantOT01Document() });
+    expect(res.status).toBe(404);
+  });
+
+  it("400s when document is missing or malformed", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const missing = await request(app).put(`/api/projects/${created.body.projectId}/document`).send({});
+    expect(missing.status).toBe(400);
+
+    const malformed = await request(app)
+      .put(`/api/projects/${created.body.projectId}/document`)
+      .send({ document: { id: "d1", title: "x", blocks: [{ id: "b1", kind: "not-a-real-kind", text: "x" }] } });
+    expect(malformed.status).toBe(400);
+  });
+
+  it("a compliant document leaves G6 with no outstanding blocking criteria", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const res = await request(app)
+      .put(`/api/projects/${created.body.projectId}/document`)
+      .send({ document: compliantOT01Document() });
+    expect(res.status).toBe(200);
+    expect(res.body.rubric.readyForG6).toBe(true);
+    const g6 = res.body.gates.find((g: { gate: string }) => g.gate === "G6");
+    expect(g6.outstandingBlocking).toEqual([]);
+  });
+
+  it("a document missing a required section leaves G6 with an outstanding blocking criterion", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const incomplete = compliantOT01Document();
+    incomplete.blocks = incomplete.blocks.filter((b) => b.id !== "conclusion");
+    const res = await request(app)
+      .put(`/api/projects/${created.body.projectId}/document`)
+      .send({ document: incomplete });
+    expect(res.status).toBe(200);
+    expect(res.body.rubric.readyForG6).toBe(false);
+    const g6 = res.body.gates.find((g: { gate: string }) => g.gate === "G6");
+    expect(g6.outstandingBlocking.length).toBeGreaterThan(0);
+  });
+
+  it("hasDocument flips true once a document is submitted", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    expect(created.body.hasDocument).toBe(false);
+    const res = await request(app)
+      .put(`/api/projects/${created.body.projectId}/document`)
+      .send({ document: compliantOT01Document() });
+    expect(res.body.hasDocument).toBe(true);
+  });
+});
+
+describe("GET /api/projects/:id/rubric", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("404s for an unknown project", async () => {
+    const res = await request(app).get("/api/projects/proj-nope/rubric");
+    expect(res.status).toBe(404);
+  });
+
+  it("404s when no document has been submitted yet", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const res = await request(app).get(`/api/projects/${created.body.projectId}/rubric`);
+    expect(res.status).toBe(404);
+  });
+
+  it("returns the same report the document PUT computed", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const put = await request(app)
+      .put(`/api/projects/${created.body.projectId}/document`)
+      .send({ document: compliantOT01Document() });
+    const res = await request(app).get(`/api/projects/${created.body.projectId}/rubric`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(put.body.rubric);
+  });
+});
+
 describe("POST /api/projects/:id/gates/:gate/invalidate", () => {
   beforeEach(() => {
     __resetProjectStoreForTests();

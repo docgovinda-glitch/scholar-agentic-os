@@ -377,11 +377,11 @@ exists; everything else remains the intended target.
 | `app/rubric` (incl. `compileMetadataGateRules`) | `src/app/rubric/` | 19 |
 | `domain/project` (gate state machine, G0-G7) | `src/domain/project/` | 15 |
 | `app/conductor` (binds gates to Atlas/Rubric) | `src/app/conductor/` | 14 |
-| API routes | `server/routes/project.ts` | 16 (integration, via supertest against the live app) |
+| API routes | `server/routes/project.ts` | 24 (integration, via supertest against the live app) |
 | `domain/claim` (Claim–Evidence Graph) | `src/domain/claim/` | 19 |
 | Chicago Notes-Bibliography formatter | `src/citation_compliance/formatters/chicagoNotes.ts` | 18 |
 
-287 new tests. Full repository suite: 131 files, 1,424 tests, `tsc --noEmit`
+295 new tests. Full repository suite: 131 files, 1,432 tests, `tsc --noEmit`
 clean, verified against a live `npx tsx server.ts` boot as well as the test
 suite.
 
@@ -403,7 +403,7 @@ suite.
 | `app/atlas` | **Built** (engine complete; 11/24 output types populated) |
 | `app/rubric` and `domain/compliance` | **Partially built** — rule/finding model, three deterministic evaluators (`word_count`, `structural_presence`, `metadata_presence` — the last checks a new `CanonicalDocument.metadata` bag in `domain/document`, closing the `metadata` Rule type's "always not_applicable" gap), and compilation from Atlas specs for all three (`compileMetadataGateRules` compiles any quality gate that sets `QualityGateSpec.metadataKey`). No current catalog entry sets `metadataKey` yet — every "declaration" the catalog specifies is modeled as a document section, not orthogonal metadata, so the compiler is tested against a synthetic spec pending a real fit (an ethics-approval reference number, an ORCID). Requirement-source extraction (needs `app/mesh`) and template extraction (needs `app/ingestion`) are also not built — see `31` §12.2 |
 | `services/*` | Not started. This is the largest near-term gap: the Studio's session-policy store (`src/app/studio/sessionPolicyStore.ts`) and the Conductor's project store (`src/app/conductor/projectStore.ts`) are both explicitly-labelled in-memory stand-ins for what `services/store` should provide, and do not survive a restart or scale past one process |
-| `app/conductor` | **Built**, with an API surface. Gate state machine (`domain/project/gates.ts`) bound to Atlas (G0) and the Rubric (G6); exposed via `server/routes/project.ts` (`GET /api/atlas/output-types[/:id]`, `POST /api/projects`, `GET /api/projects/:id`, `PATCH /api/projects/:id/intake`, `POST /api/projects/:id/gates/:gate/signoff`, `POST /api/projects/:id/gates/:gate/invalidate`). Only G0 can reach "ready" through this API today — G1-G5/G7 have no computation source and G6 needs a stored CanonicalDocument, which has no storage/editor surface yet. Per-chapter gating is a tracked gap — see `30` §10 |
+| `app/conductor` | **Built**, with an API surface. Gate state machine (`domain/project/gates.ts`) bound to Atlas (G0) and the Rubric (G6); exposed via `server/routes/project.ts` (`GET /api/atlas/output-types[/:id]`, `POST /api/projects`, `GET /api/projects/:id`, `PATCH /api/projects/:id/intake`, `PUT /api/projects/:id/document`, `GET /api/projects/:id/rubric`, `POST /api/projects/:id/gates/:gate/signoff`, `POST /api/projects/:id/gates/:gate/invalidate`). G0 and G6 both have real, computable exit criteria through this API now — submitting a document via `PUT .../document` recomputes G6 from a live Rubric evaluation. Only G0 can reach an actual sign-off today, though: G6's entry prerequisites (G1-G5 signed off) can't be satisfied since those gates have no computation source yet. Per-chapter gating is a tracked gap — see `30` §10 |
 | `domain/claim` | **Partially built.** The pure Claim–Evidence Graph (`src/domain/claim/`) — Claim, EvidenceSpan, ClaimEvidenceBinding with support strength, EvidenceConflict, and queries (`unsupportedClaims`, `claimsDependingOnSource`, `findConflicts`, `removeSource`'s cascade). Claim *extraction* from draft text (AG-13, `42` §2) is not built — it needs `app/mesh` (agent runtime), which doesn't exist yet, and a real draft/document pipeline to extract from |
 | `app/plugins` | Not started |
 | `client/pocket-shell` | Not started |
