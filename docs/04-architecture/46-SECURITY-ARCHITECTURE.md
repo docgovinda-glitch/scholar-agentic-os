@@ -439,7 +439,8 @@ prevent the two failures that would quietly invalidate the whole model.
 | Server holds and decrypts user API keys | Keys in the OS keystore; never transmitted |
 | Server-side user data | Local, encrypted, operator-inaccessible |
 | No E2E encryption | E2E for all synced content |
-| No capability system | service tier-enforced capability tokens |
+| `services/capabilities` issues/verifies/revokes tokens against the real §4.1 capability set (`src/services/capabilities/`); `write:draft` refused at issuance, non-transferable, revocable, scopable | Wired as the actual enforcement point at every agent/plugin call boundary — no caller does that yet, since `app/mesh` (the agent runtime) doesn't exist yet |
+| `services/crypto` (`src/services/crypto/`) provides working AES-256-GCM envelope encryption — generate/wrap/unwrap a CEK, encrypt/decrypt — against a server-held `MASTER_KEY` env var | §5.1's full hierarchy: passphrase-derived, Argon2id, sealed to the OS platform keystore, operator access none |
 | No plugin sandbox | WASM sandbox |
 | No egress control | The Warden |
 | Supabase RLS in place | **Carries forward** — correct approach for the cloud plane |

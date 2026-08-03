@@ -376,6 +376,7 @@ without a verified backup. See `44` §7 for the full backup regime and `RISK-04`
 |---|---|
 | Prototype storage | Encrypted, content-addressed local store |
 | Passphrase concept exists | Full key hierarchy with platform sealing and Recovery Kit |
+| Full-text index built (`services/index`'s `TextIndex` — real BM25 over generic `{id, text}` records, `src/services/index/textIndex.ts`) but not wired to the Vault (no VaultDocument entity exists yet to index) | Embedded inverted index over actual Vault content |
 | No local vector index | Local embeddings with hybrid retrieval |
 | Limited formats | Fourteen content categories including audio, video, handwriting |
 | No reference manager import | Zotero, Mendeley, EndNote, BibTeX, RIS |
