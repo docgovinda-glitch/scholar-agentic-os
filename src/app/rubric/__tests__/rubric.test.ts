@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { catalog } from "../../atlas/atlas";
-import { evaluateAgainstOutputType, buildReport, waiveRule, RuleNotWaivableError, compileRubricFromOutputType } from "../rubric";
+import { evaluateAgainstOutputType, buildReport, waiveRule, applyWaivers, RuleNotWaivableError, compileRubricFromOutputType } from "../rubric";
 import { emptyDocument } from "../../../domain/document/model";
 import { appendBlock } from "../../../domain/document/ops";
 
@@ -90,6 +90,46 @@ describe("app/rubric: waivers", () => {
     const assignment = catalog.getOrThrow("OT-01");
     const rules = compileRubricFromOutputType(assignment);
     expect(() => waiveRule(rules, "no-such-rule", "because")).toThrow(/No rule/);
+  });
+});
+
+describe("app/rubric: applyWaivers", () => {
+  it("reapplies a recorded waiver onto a freshly compiled rule set", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const wordLimitRuleId = `${assignment.id}-word-limit`;
+    const waivers = { [wordLimitRuleId]: { reason: "Extension granted.", at: "2026-01-01T00:00:00.000Z" } };
+
+    const freshRules = compileRubricFromOutputType(assignment);
+    const waived = applyWaivers(freshRules, waivers);
+    const rule = waived.find((r) => r.id === wordLimitRuleId)!;
+    expect(rule.waived).toEqual(waivers[wordLimitRuleId]);
+  });
+
+  it("leaves rules with no recorded waiver untouched", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const freshRules = compileRubricFromOutputType(assignment);
+    const waived = applyWaivers(freshRules, {});
+    expect(waived).toEqual(freshRules);
+  });
+
+  it("a reapplied waiver on a required rule still clears it from requiredFailures after recompiling", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    let doc = emptyDocument("d1", "Test Assignment");
+    doc = appendBlock(doc, "title_page", "paragraph", "Title");
+    doc = appendBlock(doc, "introduction", "paragraph", wordsOf(150));
+    doc = appendBlock(doc, "body", "paragraph", wordsOf(5000));
+    doc = appendBlock(doc, "conclusion", "paragraph", wordsOf(140));
+    doc = appendBlock(doc, "references", "paragraph", "Ref.");
+
+    const wordLimitRuleId = `${assignment.id}-word-limit`;
+    const waivers = { [wordLimitRuleId]: { reason: "Extension granted.", at: "2026-01-01T00:00:00.000Z" } };
+
+    // Simulates a document resubmission: rules are recompiled from scratch
+    // (unwaived) every time, same as fromAtlas.ts always does.
+    const recompiledRules = applyWaivers(compileRubricFromOutputType(assignment), waivers);
+    const report = buildReport(recompiledRules, doc);
+    expect(report.requiredFailures.find((f) => f.ruleId === wordLimitRuleId)).toBeUndefined();
+    expect(report.readyForG6).toBe(true);
   });
 });
 

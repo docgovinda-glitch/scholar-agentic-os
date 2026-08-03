@@ -503,22 +503,26 @@ Atlas and Rubric bindings, hash staleness, and a re-target scenario
 (`26` Journey 3, in miniature) exercising a full sign-off → invalidate →
 recompute cycle.
 
-**Also exposed over HTTP** (`server/routes/project.ts`, 36 supertest
+**Also exposed over HTTP** (`server/routes/project.ts`, 43 supertest
 integration tests): `GET /api/atlas/output-types[/:id]` for choosing and
 rendering an output type, `POST /api/projects` to bind a project to one,
 `PATCH /api/projects/:id/intake` to submit answers and recompute G0,
 `PUT /api/projects/:id/document` to submit or replace the project's
 document body and recompute G6 from a live Rubric evaluation of it,
 `GET /api/projects/:id/rubric` to re-fetch the most recent evaluation,
-`POST /api/projects/:id/gates/:gate/signoff` and `.../invalidate` for
-the gate-agnostic sign-off/invalidate actions — signoff's approved
-snapshot is now gate-aware (the intake answers for G0, the Rubric report
-for G6, empty for every other gate, which correctly keeps them from ever
-reaching "ready" through this API) — and every project now also carries a
-Claim–Evidence Graph (`domain/claim`), reachable via `POST .../claims`,
-`POST .../claims/:claimId/evidence`, `GET .../claims`,
-`GET .../claims/unsupported`, `GET .../claims/conflicts`, and
-`DELETE .../sources/:sourceId`. Claim entry through this surface is
+`POST /api/projects/:id/rubric/waive` to waive a non-blocking finding with
+a mandatory reason (docs 31 §7) and recompute G6 accordingly — the waiver
+is recorded by rule id and reapplied (`applyWaivers`) on every subsequent
+document resubmission, since compiling from Atlas always produces
+unwaived rules — `POST /api/projects/:id/gates/:gate/signoff` and
+`.../invalidate` for the gate-agnostic sign-off/invalidate actions —
+signoff's approved snapshot is now gate-aware (the intake answers for G0,
+the Rubric report for G6, empty for every other gate, which correctly
+keeps them from ever reaching "ready" through this API) — and every
+project now also carries a Claim–Evidence Graph (`domain/claim`),
+reachable via `POST .../claims`, `POST .../claims/:claimId/evidence`,
+`GET .../claims`, `GET .../claims/unsupported`, `GET .../claims/conflicts`,
+and `DELETE .../sources/:sourceId`. Claim entry through this surface is
 manual — there is still no extraction agent (AG-13, needs `app/mesh`) —
 but every query domain/claim offers (unsupported claims, conflicts, a
 source's cascading removal) is now something a caller can actually reach.
