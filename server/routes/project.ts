@@ -7,15 +7,18 @@
  * The second route built on the new architecture (after
  * server/routes/studio.ts). Exposes the Atlas catalog for intake-form
  * rendering, and the Conductor's gate state machine for a project bound to
- * one output type. Only G0 has a real, computable exit-criteria source
- * through this surface today (from Atlas intake answers) — G1-G5 and G7
- * have no requirement-extraction/sourcing/drafting/review/export pipeline
- * to compute criteria from yet (docs 30 §10), and G6 (the Rubric) needs a
- * CanonicalDocument, which has no storage/editor surface yet either
- * (docs 13 §8.1). The sign-off and invalidate endpoints below are
- * gate-agnostic — they will work for any gate the moment something else in
- * the system starts calling updateExitCriteria for it — but in practice
- * only G0 can reach "ready" through this API right now.
+ * one output type. G0 (from Atlas intake answers) and G6 (from the Rubric,
+ * once a document has been submitted via PUT .../document) have real,
+ * computable exit-criteria sources through this surface. G1-G5 and G7 have
+ * no requirement-extraction/sourcing/drafting/review/export pipeline to
+ * compute criteria from yet (docs 30 §10). The sign-off and invalidate
+ * endpoints below are gate-agnostic — they will work for any gate the
+ * moment something else in the system starts calling updateExitCriteria
+ * for it — but since G6's entry prerequisites (G1-G5 signed off) can't be
+ * satisfied without those pipelines, G6 can be computed and inspected
+ * through this API today but not yet actually signed off end-to-end; only
+ * G0 can reach that today. Computing G6 correctly now, ahead of G1-G5
+ * existing, means nothing changes here when they do.
  *
  * See src/app/conductor/projectStore.ts for the scope note on project
  * persistence.
@@ -25,6 +28,7 @@ import express from "express";
 import { catalog } from "../../src/app/atlas/atlas.ts";
 import {
   computeG0ExitCriteria,
+  computeG6ExitCriteria,
   updateExitCriteria,
   signOff,
   invalidateGate,
@@ -34,6 +38,28 @@ import {
 } from "../../src/app/conductor/conductor.ts";
 import type { GateId } from "../../src/app/conductor/conductor.ts";
 import { createProject, getProject, saveProject } from "../../src/app/conductor/projectStore.ts";
+import { evaluateAgainstOutputType } from "../../src/app/rubric/rubric.ts";
+import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
+
+const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
+
+function isValidBlock(value: unknown): value is Block {
+  if (typeof value !== "object" || value === null) return false;
+  const b = value as Record<string, unknown>;
+  return typeof b.id === "string" && typeof b.kind === "string" && BLOCK_KINDS.has(b.kind) && typeof b.text === "string";
+}
+
+function isValidDocument(value: unknown): value is CanonicalDocument {
+  if (typeof value !== "object" || value === null) return false;
+  const d = value as Record<string, unknown>;
+  if (typeof d.id !== "string" || typeof d.title !== "string" || !Array.isArray(d.blocks)) return false;
+  if (!d.blocks.every(isValidBlock)) return false;
+  if (d.metadata !== undefined) {
+    if (typeof d.metadata !== "object" || d.metadata === null) return false;
+    if (!Object.values(d.metadata as Record<string, unknown>).every((v) => typeof v === "string")) return false;
+  }
+  return true;
+}
 
 function isGateId(value: unknown): value is GateId {
   return typeof value === "string" && (GATE_ORDER as string[]).includes(value);
@@ -45,6 +71,7 @@ function projectView(record: ReturnType<typeof getProject>) {
     projectId: record.projectId,
     outputTypeId: record.outputTypeId,
     answers: record.answers,
+    hasDocument: record.document !== undefined,
     gates: summarize(record.gates),
   };
 }
@@ -141,10 +168,58 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   });
 
   /**
+   * Submit or replace the project's document body and recompute G6's exit
+   * criteria against it (docs 30 §3 G6 "Exit": zero unresolved blocking or
+   * required Rubric findings). Body: { document: CanonicalDocument }.
+   * 409s if G6 is already signed off — invalidate it first, same guarantee
+   * as the intake endpoint gives G0.
+   */
+  app.put("/api/projects/:id/document", projectLimit, (req, res) => {
+    const record = getProject(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    const { document } = req.body ?? {};
+    if (!isValidDocument(document)) {
+      return res.status(400).json({ error: "Missing or malformed required field: document (CanonicalDocument — id, title, blocks[]: {id, kind, text})." });
+    }
+
+    const spec = catalog.getOrThrow(record.outputTypeId);
+    const rubricReport = evaluateAgainstOutputType(spec, document);
+    const criteria = computeG6ExitCriteria(rubricReport);
+
+    try {
+      const gates = updateExitCriteria(record.gates, "G6", criteria);
+      const updated = saveProject({ ...record, document, rubricReport, gates });
+      res.json({ ...projectView(updated), rubric: rubricReport });
+    } catch (err) {
+      if (err instanceof GateTransitionError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  /** The most recent Rubric evaluation of the project's document. 404s if no document has been submitted yet. */
+  app.get("/api/projects/:id/rubric", projectLimit, (req, res) => {
+    const record = getProject(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    if (!record.rubricReport) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no document submitted yet.` });
+    }
+    res.json(record.rubricReport);
+  });
+
+  /**
    * Sign off a gate. Body: { actor }. 409s if the gate is not ready (a
    * blocking exit criterion is unsatisfied, or entry prerequisites are
-   * unmet). The approved snapshot is the project's intake answers, which is
-   * only meaningful for G0 today — see this file's module comment.
+   * unmet). The approved snapshot is what a later content change is
+   * detected against (docs 30 §2.2) — G0's is the intake answers, G6's is
+   * the Rubric report; every other gate has no computed content yet (see
+   * this file's module comment) so its snapshot is empty and it cannot
+   * currently become ready to sign off through this API.
    */
   app.post("/api/projects/:id/gates/:gate/signoff", projectLimit, async (req, res) => {
     const record = getProject(req.params.id);
@@ -159,8 +234,15 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(400).json({ error: "Missing required field: actor" });
     }
 
+    const approvedSnapshot: unknown =
+      req.params.gate === "G0"
+        ? { answers: record.answers }
+        : req.params.gate === "G6"
+          ? { rubricReport: record.rubricReport }
+          : {};
+
     try {
-      const gates = await signOff(record.gates, req.params.gate, actor, { answers: record.answers });
+      const gates = await signOff(record.gates, req.params.gate, actor, approvedSnapshot);
       const updated = saveProject({ ...record, gates });
       res.json(projectView(updated));
     } catch (err) {
