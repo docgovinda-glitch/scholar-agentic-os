@@ -122,9 +122,14 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
         throw new Error(`Supabase Data API ${res.status}: ${detail.slice(0, 300)}`);
       }
 
-      // 204 on writes that ask for no representation.
-      if (res.status === 204) return null;
-      return await res.json();
+      // Writes sent with `Prefer: return=minimal` come back with an empty
+      // body — and PostgREST answers 201, not only 204, so keying off the
+      // status alone is not enough: `res.json()` on an empty body throws
+      // "Unexpected end of JSON input", which surfaced as a 500 on a request
+      // that had in fact succeeded. Decide on the body itself.
+      const text = await res.text();
+      if (text.length === 0) return null;
+      return JSON.parse(text);
     } finally {
       clearTimeout(timer);
     }
