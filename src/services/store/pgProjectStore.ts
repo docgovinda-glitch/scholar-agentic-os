@@ -25,6 +25,7 @@ import { Pool } from "pg";
 import { initialProjectGateState } from "../../domain/project/gates";
 import { emptyGraph } from "../../domain/claim/graph";
 import { generateProjectId } from "../../app/conductor/projectStore";
+import { SUPABASE_ROOT_CA } from "./supabaseRootCa";
 import type { ProjectRecord, ProjectStore } from "./types";
 
 export interface PgQueryable {
@@ -46,10 +47,35 @@ export function createPool(): Pool {
         "Without it, the server falls back to the in-memory store."
     );
   }
-  return new Pool({
+  const pool = new Pool({
     connectionString,
-    ssl: connectionString.includes("localhost") ? undefined : { rejectUnauthorized: true },
+    // `rejectUnauthorized: true` alone was not enough and broke production:
+    // Supabase's certificate chains to its own root, which Node does not
+    // trust by default, so every connection failed with
+    // SELF_SIGNED_CERT_IN_CHAIN. Supplying that root keeps verification ON —
+    // the common fix of `rejectUnauthorized: false` would have restored the
+    // connection by no longer checking who answers it, on the link carrying
+    // every user's documents.
+    ssl: connectionString.includes("localhost")
+      ? undefined
+      : { ca: SUPABASE_ROOT_CA, rejectUnauthorized: true },
   });
+
+  // node-postgres emits 'error' on idle clients — a dropped connection, a
+  // failed TLS handshake, a database restart. With no listener, Node treats it
+  // as an unhandled error event and terminates the process: one transient
+  // database problem took the entire web service down, returning 502 for every
+  // route including those that never touch the database.
+  //
+  // Logged and swallowed here. The pool discards the bad client and makes a new
+  // one on the next query; a genuinely unreachable database then surfaces as a
+  // failed request, which the route layer already handles, rather than as a
+  // crash.
+  pool.on("error", (err) => {
+    console.error("pg pool: idle client error (connection discarded, server staying up):", err.message);
+  });
+
+  return pool;
 }
 
 function rowToRecord(row: Record<string, unknown>): ProjectRecord {

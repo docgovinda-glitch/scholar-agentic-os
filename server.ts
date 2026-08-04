@@ -417,6 +417,27 @@ async function startServer() {
     });
   }
 
+  // Last-resort process guards.
+  //
+  // Node terminates on an unhandled promise rejection. Express 4 does not
+  // await async route handlers, so a rejection inside one is unhandled by
+  // definition — which is how a single failed database query killed the whole
+  // service in production and returned 502 for every route, including the
+  // static frontend and /api/health, neither of which touches the database.
+  //
+  // Individual handlers still catch their own errors and answer properly (see
+  // asyncRoute in server/routes/project.ts); this is the net beneath that, so
+  // one missed `await` degrades a request instead of the deployment. Deliberately
+  // last-resort, not routine error handling: anything reaching here is a bug
+  // worth the loud log.
+  process.on("unhandledRejection", (reason) => {
+    console.error("unhandledRejection (server staying up):", reason);
+  });
+
+  process.on("uncaughtException", (err) => {
+    console.error("uncaughtException (server staying up):", err);
+  });
+
   // Start Server
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
