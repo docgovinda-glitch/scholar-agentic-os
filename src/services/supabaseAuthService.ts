@@ -13,7 +13,7 @@
  * never be possible from the anon-key client.
  */
 
-import { getSupabaseClient } from "./supabaseClient";
+import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 
 export interface SignUpInput {
   username: string;
@@ -303,8 +303,21 @@ export async function updatePassword(newPassword: string): Promise<ServiceResult
  * Confirmed working in production 2026-07-31; the temporary
  * [PasswordRecovery]-tagged console logging used to diagnose it has been
  * removed, leaving the fix itself unchanged.
+ *
+ * Bug fix (2026-08-04): UserProfileGate calls this unconditionally from a
+ * mount-time useEffect, with no try/catch around it (unlike a form submit,
+ * which already has its own error handling). getSupabaseClient() throwing
+ * synchronously here — which it always did when Supabase isn't configured —
+ * crashed the entire app before any UI could render, caught only by the
+ * top-level ErrorBoundary as an opaque "WORKSPACE RENDER BOUNDARY BREACH".
+ * Confirmed live: this was reproducible on every page load with no
+ * VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY set — which is this app's actual
+ * out-of-the-box state. A no-op unsubscribe is correct here specifically
+ * because there is nothing to recover into: with no Supabase project,
+ * password-recovery links can't exist yet either.
  */
 export function onPasswordRecovery(callback: () => void): () => void {
+  if (!isSupabaseConfigured()) return () => {};
   const supabase = getSupabaseClient();
   let fired = false;
   // Both paths below can legitimately trigger for the same visit — the URL
@@ -397,10 +410,15 @@ export async function signInWithGoogle() {
  * redirect (or already has an active session established that way, if
  * this listener registered late — see the getSession() call below).
  * Returns an unsubscribe function.
+ *
+ * Same guard, same reason, as onPasswordRecovery above: called
+ * unconditionally on mount, no Google OAuth session is reachable without a
+ * configured Supabase project anyway.
  */
 export function onGoogleSignIn(
   callback: (user: { id: string; email: string; fullName: string }) => void
 ): () => void {
+  if (!isSupabaseConfigured()) return () => {};
   const supabase = getSupabaseClient();
   let fired = false;
   const fireOnce = (session: { user: { id: string; email?: string; user_metadata?: any } } | null | undefined) => {

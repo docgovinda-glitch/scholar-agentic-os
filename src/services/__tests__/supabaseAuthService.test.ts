@@ -27,10 +27,17 @@ const mockAuth = {
   getUser: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   updateUser: vi.fn(),
+  onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+  getSession: vi.fn(() => Promise.resolve({ data: { session: null } })),
 };
 const mockFrom = vi.fn();
 const mockRpc = vi.fn();
 const mockFunctionsInvoke = vi.fn();
+// Every existing test in this file assumes a configured Supabase project —
+// default true so none of them need to know this mock exists. The
+// onPasswordRecovery/onGoogleSignIn regression tests below flip it to
+// false for the specific case they're covering.
+const mockIsSupabaseConfigured = vi.fn(() => true);
 
 vi.mock("../supabaseClient", () => ({
   getSupabaseClient: () => ({
@@ -39,6 +46,7 @@ vi.mock("../supabaseClient", () => ({
     rpc: mockRpc,
     functions: { invoke: mockFunctionsInvoke },
   }),
+  isSupabaseConfigured: () => mockIsSupabaseConfigured(),
 }));
 
 import {
@@ -50,10 +58,13 @@ import {
   sendPasswordResetEmail,
   updatePassword,
   requestProfileUpdate,
+  onPasswordRecovery,
+  onGoogleSignIn,
 } from "../supabaseAuthService";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockIsSupabaseConfigured.mockReturnValue(true);
 });
 
 describe("signUp", () => {
@@ -289,5 +300,41 @@ describe("requestProfileUpdate", () => {
     // Deterministic: hashing the same key again must produce the identical digest.
     const again = await requestProfileUpdate({ username: "jdoe", pendingPhone: "555-0100" });
     expect(again.keyHash).toBe(result.keyHash);
+  });
+});
+
+describe("onPasswordRecovery / onGoogleSignIn — unconfigured Supabase", () => {
+  // Regression test (2026-08-04): both are called unconditionally from
+  // UserProfileGate's mount-time useEffect, with no try/catch around them.
+  // Before this fix, getSupabaseClient() threw synchronously here whenever
+  // Supabase wasn't configured — crashing the ENTIRE app on first render,
+  // caught only by the top-level ErrorBoundary, before any UI (including
+  // the signup form itself) could ever be seen. Confirmed live: this was
+  // this app's actual out-of-the-box behavior with no
+  // VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY set.
+  beforeEach(() => {
+    mockIsSupabaseConfigured.mockReturnValue(false);
+  });
+
+  it("onPasswordRecovery does not throw and returns a working no-op unsubscribe", () => {
+    expect(() => onPasswordRecovery(() => {})).not.toThrow();
+    const unsubscribe = onPasswordRecovery(() => {});
+    expect(() => unsubscribe()).not.toThrow();
+    expect(mockAuth.onAuthStateChange).not.toHaveBeenCalled();
+  });
+
+  it("onGoogleSignIn does not throw and returns a working no-op unsubscribe", () => {
+    expect(() => onGoogleSignIn(() => {})).not.toThrow();
+    const unsubscribe = onGoogleSignIn(() => {});
+    expect(() => unsubscribe()).not.toThrow();
+    expect(mockAuth.getSession).not.toHaveBeenCalled();
+    expect(mockAuth.onAuthStateChange).not.toHaveBeenCalled();
+  });
+
+  it("still subscribes normally once Supabase is configured", () => {
+    mockIsSupabaseConfigured.mockReturnValue(true);
+    onPasswordRecovery(() => {});
+    onGoogleSignIn(() => {});
+    expect(mockAuth.onAuthStateChange).toHaveBeenCalledTimes(2);
   });
 });
