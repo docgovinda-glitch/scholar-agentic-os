@@ -63,3 +63,37 @@ create policy user_ai_settings_all_own
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ============================================================================
+-- user_vaults: the Knowledge Vault's existence and metadata. NO SECRETS.
+-- ============================================================================
+--
+-- Doc 25 §6.3 specifies the Recovery Kit wording verbatim, and it is a promise
+-- this schema has to keep:
+--
+--   "If you forget your passphrase, this code is the only way to open your
+--    Vault again. We do not have a copy. We cannot reset it."
+--
+-- So neither the passphrase nor the recovery code is stored here, in any form
+-- — not encrypted, not hashed. A hash would still be a copy for the purpose
+-- that sentence is making a promise about, and would let a future feature
+-- quietly turn into "reset your Vault", which is exactly what the wording
+-- rules out.
+--
+-- What this table records is that a Vault exists and when it was made, so the
+-- onboarding stage is not re-offered to someone who already has one and so
+-- Desk can show it in the workspace. Everything secret lives on the device.
+create table if not exists public.user_vaults (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  label text not null default 'My Knowledge Vault',
+  created_at timestamptz not null default now()
+);
+
+alter table public.user_vaults enable row level security;
+
+drop policy if exists user_vaults_all_own on public.user_vaults;
+create policy user_vaults_all_own
+  on public.user_vaults
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

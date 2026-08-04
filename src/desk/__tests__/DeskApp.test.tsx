@@ -18,11 +18,15 @@ vi.mock("../useDeskSession", () => ({
   useDeskSession: () => ({ status: "signed-in", userId: "user-1", email: "scholar@example.com" }),
 }));
 
-// AI setup sits between sign-in and the workspace. These tests are about the
-// project list and the shell, so the setup stage is reported already done —
-// its own gating behaviour is covered in AiSetup.test.tsx.
+// AI setup and the Knowledge Vault offer sit between sign-in and the
+// workspace. These tests are about the project list and the shell, so both
+// stages are reported already done — their own gating behaviour is covered in
+// AiSetup.test.tsx and VaultSetup.test.tsx.
 vi.mock("../setup/useAiSetupStatus", () => ({
   useAiSetupStatus: () => ({ status: "ready", skip: vi.fn(), complete: vi.fn(), refresh: vi.fn() }),
+}));
+vi.mock("../setup/useVaultSetupStatus", () => ({
+  useVaultSetupStatus: () => ({ status: "done", skip: vi.fn(), complete: vi.fn() }),
 }));
 
 // api.ts asks the Supabase client for an access token on every request.
