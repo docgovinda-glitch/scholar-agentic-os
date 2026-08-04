@@ -642,6 +642,17 @@ export interface PaperProject {
   preferredJournalScope: string;
   articleType: string;
   outputFormat: OutputFormat | "";
+  /**
+   * Atlas catalog id (OT-01…OT-24) for the chosen deliverable.
+   *
+   * `outputFormat` above is the older, coarser union that still drives export
+   * templates and compliance branching; several Atlas types map onto one of
+   * its values. This id is what carries the real specification — section
+   * structure, word budget, citation styles, source expectations and the
+   * tiered intake schema — and is set alongside it, not instead of it.
+   * Optional so existing saved projects keep loading.
+   */
+  outputTypeId?: string;
   targetReferenceCount?: number; // Soft target (target-workflow.md Stage 5) — warn, never block
   dissertationMaterials: string;
   styleAspiration: string;

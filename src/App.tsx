@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { PaperProject, WORKFLOW_PHASES } from "./types";
-import OutputFormatSelector from "./components/OutputFormatSelector";
+import OutputTypeSelector from "./components/OutputTypeSelector";
 import { AuthProvider, useAuth } from "./auth/authContext";
 import { useProjectPersistence } from "./hooks/useProjectPersistence";
 import { useHashNavigation } from "./hooks/useHashNavigation";
@@ -404,8 +404,10 @@ function App() {
               <ErrorBoundary>
               <Suspense fallback={<PanelLoadingFallback />}>
                 {project.currentPhase === "A" && !project.outputFormat && (
-                  <OutputFormatSelector
-                    onSelect={(format) => updateProject({ outputFormat: format })}
+                  <OutputTypeSelector
+                    onSelect={(format, outputTypeId) =>
+                      updateProject({ outputFormat: format, outputTypeId })
+                    }
                   />
                 )}
                 {project.currentPhase === "A" && project.outputFormat && (
