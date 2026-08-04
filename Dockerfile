@@ -30,7 +30,7 @@ ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 
 # Lockfile-exact install, cached independently of source changes.
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 COPY . .
 # → dist/ (frontend assets, from vite) + dist/server.cjs (from esbuild)
