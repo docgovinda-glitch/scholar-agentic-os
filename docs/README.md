@@ -99,6 +99,18 @@ still carrying revision-1 assumptions are marked in the index below.
 | [`54-OPEN-QUESTIONS.md`](05-delivery/54-OPEN-QUESTIONS.md) | Deferred decisions with deadlines | **2** |
 | [`55-FUTURE-ENHANCEMENTS.md`](05-delivery/55-FUTURE-ENHANCEMENTS.md) | Out of scope now, plausible later | 1† |
 
+### 06 — Decisions
+
+Records of decisions that changed a direction already taken. Unlike the
+documents above, which describe the intended system, these explain why the
+system stopped doing something it used to do — and are written to be read
+years later by someone asking "why is it like this?"
+
+| Doc | Purpose | Rev |
+|---|---|---|
+| [`60-DESIGN-DIRECTION.md`](06-decisions/60-DESIGN-DIRECTION.md) | Retires the sci-fi visual direction; establishes the single warm, light-and-dark token system and the contrast verification that guards it | **2** |
+| [`61-CLIENT-CONSOLIDATION.md`](06-decisions/61-CLIENT-CONSOLIDATION.md) | Desk becomes the product and the legacy client retires; records the authentication and ownership gap this surfaced, and how it was closed | **2** |
+
 **Rev key** — **2**: rewritten for revision 2 · 1†: revision-1 document with
 revision-2 terminology applied; surface and architecture passages still need a
 full pass · 1‡: substantially surface-independent, carries forward intact.

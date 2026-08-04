@@ -31,7 +31,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           <div className="flex items-center gap-3 text-red-400">
             <AlertCircle className="w-6 h-6 text-red-400 shrink-0" />
             <div>
-              <h2 className="text-sm font-mono font-bold uppercase tracking-wider">
+              <h2 className="text-sm font-bold">
                 Workspace Render Boundary Breach
               </h2>
               <p className="text-[11px] text-red-400/90 mt-0.5">
@@ -47,7 +47,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           <div className="flex justify-end pt-2">
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-mono font-bold text-[10px] uppercase tracking-wider rounded-xl cursor-pointer transition-colors shadow-sm"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors shadow-sm"
             >
               Reinitialize Workspace
             </button>

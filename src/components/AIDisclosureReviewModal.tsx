@@ -38,29 +38,29 @@ export default function AIDisclosureReviewModal({
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
             <div>
-              <h2 className="text-lg font-bold text-[#E2E8F0]">AI-Use Disclosure — Review Before Export</h2>
-              <p className="text-sm text-[#94A3B8] mt-1">
+              <h2 className="text-lg font-bold text-[color:var(--text-primary)]">AI-Use Disclosure — Review Before Export</h2>
+              <p className="text-sm text-[color:var(--text-secondary)] mt-1">
                 Most journals now require authors to disclose generative AI use in manuscript preparation. Review and edit the statement below — it will be included in your exported .docx and PDF.
               </p>
             </div>
           </div>
-          <button onClick={onCancel} className="text-[#94A3B8] hover:text-[#E2E8F0]" aria-label="Close">
+          <button onClick={onCancel} className="text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-5 space-y-4">
-          <div className="text-xs text-[#94A3B8]">
+          <div className="text-xs text-[color:var(--text-secondary)]">
             <div>
-              <span className="font-bold text-[#E2E8F0]">Sections included:</span> {sectionsIncluded.length > 0 ? sectionsIncluded.join(", ") : "none drafted yet"}
+              <span className="font-bold text-[color:var(--text-primary)]">Sections included:</span> {sectionsIncluded.length > 0 ? sectionsIncluded.join(", ") : "none drafted yet"}
             </div>
             <div>
-              <span className="font-bold text-[#E2E8F0]">Model(s) used:</span> {modelsUsed.length > 0 ? modelsUsed.join(", ") : "none recorded yet"}
+              <span className="font-bold text-[color:var(--text-primary)]">Model(s) used:</span> {modelsUsed.length > 0 ? modelsUsed.join(", ") : "none recorded yet"}
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1">
+            <label className="block text-xs font-bold text-[color:var(--text-secondary)] mb-1">
               Disclosure Statement (editable)
             </label>
             <div className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] focus-within:border-[color:var(--color-luminous-blue)] rounded-lg px-3 py-2">
@@ -68,7 +68,7 @@ export default function AIDisclosureReviewModal({
                 rows={10}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                className="w-full border-0 bg-transparent text-sm text-[#E2E8F0] focus:outline-none font-sans resize-none"
+                className="w-full border-0 bg-transparent text-sm text-[color:var(--text-primary)] focus:outline-none font-sans resize-none"
               />
             </div>
           </div>
@@ -77,7 +77,7 @@ export default function AIDisclosureReviewModal({
         <div className="flex items-center justify-end gap-3 p-5 border-t border-[color:var(--color-navy-4)]">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-semibold text-[#94A3B8] hover:text-[#E2E8F0]"
+            className="px-4 py-2 text-sm font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
           >
             Cancel
           </button>

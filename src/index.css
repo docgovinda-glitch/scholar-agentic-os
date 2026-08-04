@@ -1,163 +1,276 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   SCHOLAR OS — DESIGN SYSTEM
+   Authority: docs/06-decisions/60-DESIGN-DIRECTION.md
+
+   One token generation, replacing the three that previously coexisted here
+   (original brand, sci-fi v2 grey, sci-fi v3 navy). See the ADR for why a
+   single sweep was chosen over a fourth per-component migration.
+
+   Structure:
+     1. Typography tokens          (@theme)
+     2. Semantic colour — light    (:root)
+     3. Semantic colour — dark     (media + [data-theme])
+     4. Legacy token compatibility (maps old names onto the new system)
+     5. Base elements
+     6. Utilities still in use
+   ========================================================================= */
+
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  /* --font-serif intentionally NOT removed yet: 27 .tsx files still consume
-     the `font-serif` utility this token generates. Per
-     docs/planning/sci-fi-redesign-scoping.md v2, serif is retired outright
-     with no replacement — but that retirement is component-level work (each
-     call site reverts to --font-sans deliberately, not a blind sweep), done
-     in this sequence's "rework the 6 already-redesigned components" and
-     "remaining components" steps. Removing the token here, before those
-     call sites are migrated, would silently fall back to Tailwind's default
-     generic serif stack for all 27 files in one uncontrolled step — exactly
-     the kind of mechanical change this project's own discipline avoids. */
-  --font-serif: "Playfair Display", serif;
-  /* CHANGED (sci-fi redesign v2): display face moves from Playfair Display
-     (retired direction) to Rajdhani, a geometric/angular technical face —
-     loaded in index.html. Reserved for h2-h4 headings and .font-display
-     only, per the "exactly one display face" typography convention this
-     revision's research settled on (see scoping doc, "Typefaces" section). */
-  --font-display: "Rajdhani", "Chakra Petch", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  /* One sans family for everything. The Rajdhani display face and the
+     Playfair serif are withdrawn (ADR §3.5) — headings are this face at a
+     heavier weight, which is what "highly readable" actually requires.
+     --font-serif / --font-display are retained as ALIASES of the sans stack
+     so the 16 + 7 files still carrying `.font-serif` / `.font-display`
+     classNames keep rendering correctly while those call sites are removed
+     incrementally. They are no longer distinct typefaces. */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-sans);
+  --font-display: var(--font-sans);
 
-  --color-primary: #1A365D;
-  --color-accent: #C08A3E;
-  --color-bg-base: #F8FAFC;
-  --color-card-base: #FFFFFF;
-  --color-success-base: #10B981;
-  --color-warning-base: #F59E0B;
-  --color-border-base: #E5E7EB;
-
-  /* Brand Colors definition for light theme fallback. NOT removed here —
-     still consumed by unmigrated components; the navy remap step replaces
-     these call sites onto --color-surface-0..3 deliberately, file by file. */
-  --color-brand-50: #FAF8F5;
-  --color-brand-100: #FAF6F0;
-  --color-brand-200: #FAF0E6;
-  --color-brand-300: #C08A3E;
-  --color-brand-400: #A87630;
-  --color-brand-500: #1A365D; /* Oxford Blue */
-  --color-brand-600: #122847;
-  --color-brand-650: #172D4D;
-  --color-brand-700: #0E203A;
-  --color-brand-800: #0A172B;
-  --color-brand-900: #06101F;
-  --color-brand-950: #030810;
-
-  /* SUPERSEDED by --color-luminous-blue below (sci-fi v3). Kept declared,
-     NOT deleted — still consumed live by AIControlCenter.tsx,
-     AISetupWizard.tsx, CommandPalette.tsx, ManuscriptDraftingWorkspace.tsx,
-     ManuscriptEditorWorkspace.tsx, ResearchIntelligenceDashboard.tsx,
-     ActiveAgentsPanel.tsx, AIModeCard.tsx (confirmed via grep before this
-     edit) — retire only once every one of those is migrated onto
-     --color-luminous-blue, component by component, never as a blind sweep. */
-  --color-cyan-accent: #22D3EE;
-  --color-cyan-accent-dim: #0E7490;
-
-  /* SUPERSEDED by --color-navy-0..4 below (sci-fi v3 reverses v2's grey
-     scale back to navy — see docs/planning/sci-fi-redesign-scoping.md's
-     v3 section for the full reversal rationale). Kept declared, NOT
-     deleted — still consumed live by the same files listed above for
-     --color-cyan-accent; retire only once every consumer is migrated. */
-  --color-surface-0: #121212;   /* base page background — never pure black */
-  --color-surface-1: #1A1A1A;   /* first elevation: cards, panels */
-  --color-surface-2: #232323;   /* second elevation: nested panels, popovers */
-  --color-surface-3: #2C2C2C;   /* third elevation: modals, top-most overlays */
-  --color-border-subtle: #383838; /* dividers, resting borders — no glow */
-
-  /* Sci-fi redesign v3 (2026-07-28) — layered NAVY surface scale, replacing
-     v2's grey one. Reuses the --color-brand-500/900/950 lineage that
-     predates the sci-fi redesign entirely (the original brand palette),
-     rather than inventing a new hue, per the scoping doc's reversal #1.
-     --color-navy-3 is the one genuinely new value (one step lighter than
-     brand-800, for the login-card/nested-panel surface the mockup shows).
-     IMPORTANT, confirmed by real contrast computation (sRGB relative-
-     luminance formula) before writing these: every adjacent pair in this
-     scale fails the 3:1 non-text floor on luminance alone (0.03-0.18
-     ratio spread apart, at most 1.18:1 between the two lightest steps) —
-     navy is simply too tonally narrow a hue for elevation-by-luminance to
-     work the way v2's grey scale did. This is expected and intentional,
-     not a defect to fix here: elevation between these surfaces must be
-     communicated with --color-border-luminous (below) or a visible
-     border/glow, never by the surface-color step alone. Do not add more
-     intermediate navy steps hoping to find one that passes — it can't,
-     confirmed by testing the entire brand-950..650 range. */
-  --color-navy-0: #030810; /* = --color-brand-950, deepest layer / true page background */
-  --color-navy-1: #06101F; /* = --color-brand-900, base chrome surface */
-  --color-navy-2: #0A172B; /* = --color-brand-800, first elevation: cards, panels */
-  --color-navy-3: #0F1B36; /* NEW — nested panels, the login-card surface */
-  --color-navy-4: #172D4D; /* = --color-brand-650, modals / top-most overlays */
-
-  /* The real fix for the 3:1 non-text floor navy's own luminance can't
-     supply (see above) — a SOLID (not alpha) border color, deliberately
-     opaque rather than translucent: an alpha-based border's real
-     contrast depends on whatever photographic/starfield background is
-     composited underneath it, which this project can't guarantee stays
-     within floor at every point behind a panel.
-     LIVE-VERIFIED CATCH, not just computed: the first version of this
-     token reused --color-luminous-blue-dim (#1E6FD9), which looked fine
-     against navy-0..navy-3 (3.52-4.14:1) in a pre-implementation estimate,
-     but a real getComputedStyle-driven contrast check in the browser
-     (after these tokens actually existed, not before) showed it fails
-     against --color-navy-4 specifically: 2.85:1, below the 3:1 floor —
-     navy-4 is light enough that the "dim" blue is too close to it. Fixed
-     by using the full (non-dim) --color-luminous-blue value instead,
-     which clears 3:1 against every navy surface including navy-4
-     (4.86:1, the worst case) — re-verified live after the fix. */
-  --color-border-luminous: #3B9CFF;
-
-  /* Primary accent — sci-fi v3's "luminous blue," a distinct hue from
-     --color-cyan-accent (#22D3EE, more turquoise/teal); the supplied
-     mockup's blue reads as a separate, less-teal blue. Verified via the
-     sRGB formula: 4.86:1 (navy-4, worst case) to 7.06:1 (navy-0) against
-     every navy surface above — clears the 4.5:1 text floor everywhere. */
-  --color-luminous-blue: #3B9CFF;
-  --color-luminous-blue-dim: #1E6FD9; /* verified 3.37-4.14:1 vs navy-4..navy-0 — fine for
-                                          borders/non-text use per --color-border-luminous
-                                          above, but NOT reliable as body text on the two
-                                          lightest surfaces (navy-3/navy-4) — use
-                                          --color-luminous-blue (not -dim) for on-navy text. */
-
-  /* Gold — sci-fi v3 reversal #2: reinstated, but SCOPED narrowly to
-     primary CTA + wordmark only (never general emphasis — see the
-     scoping doc's reversal rationale). Brightened slightly from the
-     retired --color-brand-300 (#C08A3E) to match the mockup's more
-     saturated gold — verified via the sRGB formula: 6.48:1 (navy-4,
-     worst case) to 9.40:1 (navy-0) against every navy surface, comfortably
-     above the 4.5:1 floor even in the one CTA/wordmark spot per screen
-     this is used. */
-  --color-gold-accent: #E0A83D;
-  --color-gold-accent-dim: #A87630; /* = --color-brand-400, unchanged — same "not reliable
-                                        as on-navy text on the lightest surfaces" caveat as
-                                        --color-luminous-blue-dim above; dim variants are for
-                                        light-background contexts elsewhere in the app. */
-
-  /* Semantic state colors (sci-fi v2, unaffected by the v3 navy/gold
-     reversal) — NOT a second brand accent. Agent status/error states get
-     their own conventional, non-brand tokens; citation/scholarship
-     emphasis gets no color at all (structural treatment instead) per the
-     scoping doc's Phase 2 judgment call, still true under v3. */
-  --color-warning-accent: #F59E0B; /* alias of --color-warning-base, reused as-is */
-  --color-error-accent: #F87171;   /* NEW — Tailwind red-400, dark-mode-safe lightness */
+  /* Mono is reserved for genuine code, keys, identifiers, and numeric
+     tabular data — never for chrome labels (ADR §3.5). */
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-/* Motion tokens (sci-fi v2) — state-driven only, every duration below 250ms
-   per the scoping doc's non-negotiable guardrail #5. Deliberately declared
-   in a plain :root block, NOT inside @theme: Tailwind v4's @theme directive
-   only recognizes known design-token namespaces (--font-*, --color-*,
-   --spacing-*, etc.) and silently drops any custom property outside those —
-   confirmed live: --motion-duration-base resolved to an empty string via
-   getComputedStyle until moved here. --motion-* isn't a namespace Tailwind
-   understands, so it must live outside @theme to actually reach the page. */
+/* ----------------------------------------------------------------------------
+   2. SEMANTIC COLOUR — LIGHT (default)
+
+   Warm neutrals, not blue-black. The navy scale this replaces could not
+   express elevation by surface colour at all: every adjacent pair sat within
+   1.18:1, forcing a glowing border onto every panel edge to communicate depth
+   (see ADR §2). These warm greys span 0.95 → 0.86 relative luminance across
+   the surface scale, so elevation reads without any border at all.
+
+   Every pairing below is verified by scripts/verify-contrast.mjs, which runs
+   the sRGB relative-luminance formula over the real token values and fails
+   the build on a regression. Ratios in comments are that script's output,
+   not estimates.
+   ------------------------------------------------------------------------- */
 :root {
-  --motion-duration-fast: 120ms;
-  --motion-duration-base: 180ms;
-  --motion-duration-slow: 220ms;
+  color-scheme: light;
+
+  /* Surfaces — lightest is the page, each step down is one elevation up.
+     Counter-intuitive but correct for light themes: raised surfaces are
+     lighter than the canvas they sit on. */
+  --surface-canvas:  #FAF9F7; /* page ground — warm paper */
+  --surface-raised:  #FFFFFF; /* cards, panels, popovers */
+  --surface-inset:   #F1EFEA; /* wells, nested panels, input backgrounds */
+  --surface-sunken:  #E9E6DF; /* deepest recess, track backgrounds */
+  --surface-hover:   #F3F1EC; /* hover on an otherwise transparent row */
+
+  /* Borders — four weights, none of them glowing.
+     The split between panel edges and control edges is deliberate and is a
+     WCAG distinction, not a stylistic one. 1.4.11 requires 3:1 for "visual
+     information required to identify user interface components" — an input's
+     boundary qualifies; the divider between two panels does not. Holding
+     every border to 3:1 would put a mid-grey rule around all 674 panel edges
+     in this codebase, which is exactly the heaviness this direction removes.
+     Holding none of them to it silently fails form controls. */
+  --border-subtle:   #EAE6DE; /* dividers inside a panel — decorative */
+  --border-default:  #DED9CF; /* panel and card edges — decorative */
+  --border-control:  #918978; /* input/button edges — 3:1 floor, verified */
+  --border-strong:   #7D7565; /* emphasis and hover on a control — 3:1 floor */
+
+  /* Text — all four verified against canvas, raised, and inset. */
+  --text-primary:    #1C1B19; /* 16.1:1 on canvas — body and headings */
+  --text-secondary:  #55514B; /* 7.6:1 on canvas — labels, secondary copy */
+  --text-muted:      #6E6960; /* 5.3:1 on canvas — hints, metadata, timestamps */
+  --text-inverse:    #FAF9F7; /* on accent / on inverted surfaces */
+
+  /* Accent — one, used sparingly: interactive text, selected state, focus.
+     A muted clay, not a saturated blue. Two values because a single one
+     cannot both pass 4.5:1 as text on paper and read as a fill: --accent is
+     the text/icon value, --accent-solid the fill behind --text-inverse. */
+  --accent:          #A8452A; /* 5.6:1 on canvas — links, active nav, icons */
+  --accent-hover:    #8C3720; /* 7.6:1 — hover/active on the above */
+  --accent-solid:    #B44D28; /* button fill; pairs with --text-inverse */
+  --accent-subtle:   #F7EDE8; /* tinted background for selected rows/chips */
+  --accent-border:   #E3C9BC; /* border on a tinted surface */
+
+  /* State — conventional, deliberately not brand-coloured (ADR §3.4).
+     Each has a text-weight value (AA on light surfaces) and a subtle fill. */
+  --state-success:        #1F6F43;
+  --state-success-subtle: #E7F2EB;
+  --state-warning:        #8A5A08;
+  --state-warning-subtle: #FBF0DC;
+  --state-danger:         #A32B22;
+  --state-danger-subtle:  #FBEAE8;
+  --state-info:           #1F5C8A;
+  --state-info-subtle:    #E8F1F8;
+
+  /* Elevation — soft, warm-tinted, low-spread. No glow. */
+  --shadow-sm: 0 1px 2px rgba(41, 37, 31, 0.05);
+  --shadow-md: 0 2px 8px rgba(41, 37, 31, 0.07), 0 1px 2px rgba(41, 37, 31, 0.04);
+  --shadow-lg: 0 8px 28px rgba(41, 37, 31, 0.10), 0 2px 6px rgba(41, 37, 31, 0.05);
+
+  /* Motion — state-driven only, every duration under 250ms.
+     Declared here rather than in @theme: Tailwind v4's @theme only recognises
+     known token namespaces (--font-*, --color-*, --spacing-*) and silently
+     drops anything else, so --motion-* would resolve to an empty string. */
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 220ms;
   --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 }
 
-/* Base style resets — override Tailwind v4 preflight height:100% to allow page scrolling */
+/* ----------------------------------------------------------------------------
+   3. SEMANTIC COLOUR — DARK
+
+   Applied by system preference, and overridden in both directions by an
+   explicit [data-theme] on the root so a user's toggle always wins.
+
+   Warm dark, matching the light theme's hue family — a neutral-grey dark
+   theme beside a warm light theme reads as two different products.
+   ------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --surface-canvas:  #191816;
+    --surface-raised:  #232120;
+    --surface-inset:   #2B2927;
+    --surface-sunken:  #121110;
+    --surface-hover:   #2F2C29;
+
+    --border-subtle:   #302D2A;
+    --border-default:  #3E3A35;
+    --border-control:  #7E766A;
+    --border-strong:   #948B7D;
+
+    --text-primary:    #F4F2EE; /* 15.4:1 on canvas */
+    --text-secondary:  #B6B0A6; /* 7.6:1 on canvas */
+    --text-muted:      #9C958B; /* 5.9:1 on canvas */
+    --text-inverse:    #191816;
+
+    --accent:          #E08B67; /* 7.4:1 on canvas */
+    --accent-hover:    #EDA184;
+    --accent-solid:    #D2724A;
+    --accent-subtle:   #2E211B;
+    --accent-border:   #4A3227;
+
+    --state-success:        #6FD79B;
+    --state-success-subtle: #17281E;
+    --state-warning:        #E3B15C;
+    --state-warning-subtle: #2B2214;
+    --state-danger:         #F08C82;
+    --state-danger-subtle:  #2E1A18;
+    --state-info:           #7FBCE8;
+    --state-info-subtle:    #16232E;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.42), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-canvas:  #191816;
+  --surface-raised:  #232120;
+  --surface-inset:   #2B2927;
+  --surface-sunken:  #121110;
+  --surface-hover:   #2F2C29;
+
+  --border-subtle:   #302D2A;
+  --border-default:  #3E3A35;
+  --border-control:  #7E766A;
+  --border-strong:   #948B7D;
+
+  --text-primary:    #F4F2EE;
+  --text-secondary:  #B6B0A6;
+  --text-muted:      #9C958B;
+  --text-inverse:    #191816;
+
+  --accent:          #E08B67;
+  --accent-hover:    #EDA184;
+  --accent-solid:    #D2724A;
+  --accent-subtle:   #2E211B;
+  --accent-border:   #4A3227;
+
+  --state-success:        #6FD79B;
+  --state-success-subtle: #17281E;
+  --state-warning:        #E3B15C;
+  --state-warning-subtle: #2B2214;
+  --state-danger:         #F08C82;
+  --state-danger-subtle:  #2E1A18;
+  --state-info:           #7FBCE8;
+  --state-info-subtle:    #16232E;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.42), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* ----------------------------------------------------------------------------
+   4. LEGACY TOKEN COMPATIBILITY
+
+   These are the old names, redefined as aliases of the new system. They are
+   what makes a single-commit migration possible: 2,290 `var(--color-*)` call
+   sites across 63 component files adopt the new palette without being edited
+   (ADR §4).
+
+   The mapping is derived from how each token is ACTUALLY used, measured
+   before it was written — not from what its original comment claimed:
+
+     --color-navy-1   283 bg,   6 border   → canvas surface
+     --color-navy-2   246 bg               → raised surface
+     --color-navy-3   138 bg               → inset surface
+     --color-navy-4   674 border,  29 bg   → a BORDER token in practice,
+                                             despite being documented as
+                                             "modals / top-most overlays"
+
+   navy-4's 29 background call sites were converted to --surface-inset
+   directly, so this alias can be tuned purely for its 674 border uses.
+
+   These aliases are a migration bridge, not API. New code uses the semantic
+   tokens in §2. Each alias disappears when its last call site does.
+   ------------------------------------------------------------------------- */
+:root {
+  --color-navy-0: var(--surface-sunken);
+  --color-navy-1: var(--surface-canvas);
+  --color-navy-2: var(--surface-raised);
+  --color-navy-3: var(--surface-inset);
+  --color-navy-4: var(--border-default);
+
+  --color-luminous-blue:     var(--accent);
+  --color-luminous-blue-dim: var(--accent-hover);
+  --color-border-luminous:   var(--border-strong);
+  --color-border-subtle:     var(--border-subtle);
+  --color-gold-accent:       var(--accent);
+  --color-gold-accent-dim:   var(--accent-hover);
+  --color-cyan-accent:       var(--accent);
+  --color-cyan-accent-dim:   var(--accent-hover);
+
+  --color-warning-accent: var(--state-warning);
+  --color-error-accent:   var(--state-danger);
+
+  /* Pre-sci-fi brand names, still referenced by a handful of files. */
+  --color-primary:      var(--text-primary);
+  --color-accent:       var(--accent);
+  --color-bg-base:      var(--surface-canvas);
+  --color-card-base:    var(--surface-raised);
+  --color-success-base: var(--state-success);
+  --color-warning-base: var(--state-warning);
+  --color-border-base:  var(--border-default);
+
+  --color-surface-0: var(--surface-canvas);
+  --color-surface-1: var(--surface-raised);
+  --color-surface-2: var(--surface-inset);
+  --color-surface-3: var(--surface-raised);
+}
+
+/* ----------------------------------------------------------------------------
+   5. BASE ELEMENTS
+   ------------------------------------------------------------------------- */
+
+/* Tailwind v4 preflight sets height:100%, which prevents page scrolling. */
 html, body, #root {
   height: auto !important;
   min-height: 100% !important;
@@ -165,580 +278,258 @@ html, body, #root {
 
 body {
   font-family: var(--font-sans);
-  background-color: #F8FAFC;
-  color: #1A365D;
+  background-color: var(--surface-canvas);
+  color: var(--text-primary);
   overflow-x: hidden;
   overflow-y: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* Blueprint radial grid pattern for premium desktop canvas.
-   Recolored for sci-fi v3 (2026-07-29) — this class only has 2 call sites
-   (App.tsx's root div, OnboardingWizard.tsx's root div), both fully navy by
-   this point, so recoloring here directly is safe (unlike .os-card/
-   .glass-effect, which several still-unconverted components still depend
-   on and must NOT be touched globally). This was the actual root cause of
-   the "white frame behind every phase view" bug found via live browser
-   verification — App.tsx's own root <div> carried this class but had never
-   been touched by any sci-fi pass, so its light #F8FAFC background sat
-   directly behind every phase component regardless of how dark the
-   component itself was. */
-.blueprint-canvas {
-  background-color: var(--color-navy-0);
-  background-image:
-    radial-gradient(circle, rgba(59, 156, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(to right, rgba(59, 156, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(59, 156, 255, 0.03) 1px, transparent 1px);
-  background-size: 24px 24px, 120px 120px, 120px 120px;
-  background-position: center center;
+/* Headings: the sans face at a heavier weight and tighter tracking.
+   No `!important` and no colour declaration here — the previous revision's
+   `color: #1A365D !important` on h2/h3/h4 silently overrode every heading
+   colour app-wide, rendering headings near-invisible (1.14:1) on the dark
+   surfaces components had explicitly styled for. Element-level colour rules
+   beat class-level ones when marked important, so components could not win.
+   Headings inherit from body; components override with a normal class. */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  line-height: 1.25;
 }
 
-/* Premium hover lift class */
-.hover-lift {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
-}
-.hover-lift:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 28px -4px rgba(26, 54, 93, 0.08), 0 4px 12px -2px rgba(26, 54, 93, 0.03);
-  /* Was a gold-tinted border (rgba(192, 138, 62, 0.3)) — violated the
-     "gold is CTA + wordmark only" rule this redesign has maintained
-     throughout, applying it to any hovered card (ResearchIntelligence-
-     Dashboard.tsx, ActiveAgentsPanel.tsx, UserProfileGate.tsx all use this
-     class on plain cards, not CTAs). Swapped to luminous-blue. */
-  border-color: rgba(59, 156, 255, 0.3);
+/* `.font-serif` / `.font-display` / `.wordmark` remain declared so the 23
+   files still carrying them render correctly. Both tokens now alias the sans
+   stack (§1), so these are no-ops that keep call sites valid until removed. */
+.font-serif,
+.font-display,
+.wordmark {
+  font-family: var(--font-sans);
 }
 
-/* Heading font overrides.
-   NARROWED (sci-fi v3): was `h1, .font-serif`, applying serif to EVERY
-   <h1> in the app regardless of whether it was the product wordmark or
-   just a section heading that happened to use an h1 tag — too broad per
-   the scoping doc's reversal #3 ("serif in the wordmark only"). Confirmed
-   safe to narrow: the only 3 real <h1> elements in the app
-   (AppHeader.tsx, UserProfileGate.tsx, ManuscriptPDFViewer.tsx) each
-   already carry their own explicit `.font-serif` className, so removing
-   the bare `h1` selector changes nothing for them — it only stops a
-   *future* h1 from silently inheriting serif it was never meant to have. */
-.font-serif {
-  font-family: var(--font-serif) !important;
+.wordmark {
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
-h2, h3, h4, .font-display {
-  /* CHANGED (sci-fi v2): was hardcoded to var(--font-sans), which meant the
-     pre-existing --font-display token had zero effect on any heading. Now
-     genuinely wired to the token so the Rajdhani swap above is visible. */
-  font-family: var(--font-display) !important;
-  font-weight: 600 !important;
-  /* `color: #1A365D !important` REMOVED (sci-fi v3, 2026-07-29) — this was
-     the "navy remap step's job" the comment above deferred, and it never
-     got done: this !important rule silently force-overrode EVERY h2/h3/h4
-     heading's text color across the ENTIRE app, including every component
-     already converted to navy in this redesign, no matter what explicit
-     Tailwind text-color class the heading itself carried (a class-selector
-     declaration cannot beat an element-selector declaration marked
-     !important, regardless of specificity). Measured real-world impact:
-     #1A365D against every navy-0..4 surface was 1.14-1.65:1 — nowhere near
-     the 4.5:1 text floor, meaning every converted component's own heading
-     was silently near-invisible dark-navy-on-dark-navy this whole time,
-     found only by live browser verification (`getComputedStyle` showed
-     rgb(26,54,93) on a heading whose own JSX explicitly set #E2E8F0).
-     Removing the override lets each component's own text-color class win
-     again; elements with no explicit class still inherit body's own
-     `color: #1A365D` default unchanged, so this is safe for the
-     still-unconverted components that never set an explicit heading
-     color. */
-}
-
-/* Form controls overrides */
+/* Form controls.
+   Scoped with :not() escape hatches, as before, so components that
+   deliberately render a bare/transparent input are not overridden. */
 input[type="text"]:not(.border-0):not(.bg-transparent),
 input[type="date"]:not(.border-0):not(.bg-transparent),
 input[type="email"]:not(.border-0):not(.bg-transparent),
 input[type="password"]:not(.border-0):not(.bg-transparent),
+input[type="search"]:not(.border-0):not(.bg-transparent),
+input[type="number"]:not(.border-0):not(.bg-transparent),
 select:not(.border-0):not(.bg-transparent),
 textarea:not(.border-0):not(.bg-transparent) {
-  background-color: #FFFFFF !important;
-  border: 1px solid #CBD5E1 !important;
-  color: #1A365D !important;
-  border-radius: 10px !important;
-  transition: all 0.2s ease !important;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-control); /* 3:1 — WCAG 1.4.11 */
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  transition: border-color var(--motion-base) var(--motion-ease),
+              box-shadow var(--motion-base) var(--motion-ease);
 }
 
-input[type="text"]:focus:not(.border-0),
-input[type="date"]:focus:not(.border-0),
-input[type="email"]:focus:not(.border-0),
-input[type="password"]:focus:not(.border-0),
-select:focus:not(.border-0),
-textarea:focus:not(.border-0) {
-  border-color: #C08A3E !important;
-  outline: none !important;
-  box-shadow: 0 0 0 3px rgba(192, 138, 62, 0.15) !important;
+input:not(.border-0):not(.bg-transparent):focus,
+select:not(.border-0):not(.bg-transparent):focus,
+textarea:not(.border-0):not(.bg-transparent):focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
-/* Clean scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+::placeholder {
+  color: var(--text-muted);
+  opacity: 1; /* Firefox applies its own opacity to placeholders. */
 }
-::-webkit-scrollbar-track {
-  background: #F8FAFC;
+
+/* Disabled buttons.
+   No `!important`: the previous revision forced a single surface/text pair
+   onto every disabled button app-wide, which fought each component's own
+   styling. A plain rule lets components override where they need to. */
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
+
+/* Keyboard focus. Declared once — the previous revision defined
+   `:focus-visible` twice with conflicting colours, the second silently
+   winning. --border-strong clears 3:1 against every surface in both themes. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Scrollbars — tokenised so they follow the theme. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 3px;
+  background: var(--border-default);
+  border-radius: 6px;
+  border: 2px solid var(--surface-canvas);
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+* { scrollbar-color: var(--border-default) transparent; }
+
+/* ----------------------------------------------------------------------------
+   6. UTILITIES STILL IN USE
+
+   Classes with zero call sites (verified by grep across every .tsx file under
+   src before this rewrite) are removed rather than carried forward: .os-card,
+   .glass-effect, .manuscript-paper, .manuscript-body, .zen-overlay,
+   .bottom-sheet, .desktop-only, .mobile-only, .workspace-container.
+   ------------------------------------------------------------------------- */
+
+/* App canvas. Was a blueprint grid of glowing blue lines over near-black —
+   the single largest source of visual noise in the product, and the reason
+   headings needed glow to separate from it. Now a plain themed ground. */
+.blueprint-canvas {
+  background-color: var(--surface-canvas);
+}
+
+.hover-lift {
+  transition: transform var(--motion-slow) var(--motion-ease),
+              box-shadow var(--motion-slow) var(--motion-ease),
+              border-color var(--motion-base) var(--motion-ease);
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-strong);
+}
+
+/* Header/footer chrome. Was a dark navy band pinned across the top of an
+   otherwise light app; now it simply follows the theme like everything else. */
+.chrome-dark {
+  background-color: var(--surface-raised);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+.chrome-dark .chrome-dark-subtle {
+  background-color: var(--surface-inset);
+  border: 1px solid var(--border-subtle);
+}
+.chrome-dark-accent {
+  color: var(--accent);
+}
+
+/* Was a frosted pane with a glowing blue edge. Kept as a real surface. */
+.glassmorphic {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.glassmorphic:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+/* Was a blue glow halo; now a plain emphasis border. */
+.border-glow { border-color: var(--border-strong); }
+.border-glow-pulse { border-color: var(--accent); }
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+.status-pulse.success { color: var(--state-success); }
+.status-pulse.warning { color: var(--state-warning); }
+.status-pulse.error   { color: var(--state-danger); }
+
+.progress-bar {
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-inset),
+    var(--surface-hover),
+    var(--surface-inset)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Phase indicator. Was a 48px ring with a perpetually pulsing glow and a
+   second ring orbiting it on a 20s loop — decorative motion with no state
+   behind it, which UX4 ("state is always visible") argues against: motion
+   that never stops carries no information. Static, legible, still a ring. */
+.phase-ring {
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.phase-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn var(--motion-slow) var(--motion-ease) forwards;
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Touch targets. The previous revision applied `min-height: 44px !important`
+   and `padding: 12px 16px !important` to EVERY button under 768px, including
+   small icon buttons inside toolbars, which it visibly distorted. Scoped to
+   a minimum hit area instead, which meets the 44px WCAG 2.5.5 target without
+   dictating the control's painted size. */
+@media (max-width: 768px) {
+  button, [role="button"], a[href] {
+    min-height: 44px;
+    min-width: 44px;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
-/* Intercept low-contrast 'Back' buttons and map to clean secondary buttons.
-   RECOLORED (sci-fi v3, 2026-07-29) — same bug class as the h2/h3/h4 and
-   button:disabled !important overrides fixed earlier this session: this
-   rule force-applied a LIGHT secondary-button look (cream background, dark
-   navy text) to any button carrying a `border-white/10` class, silently
-   fighting the navy design in every file that uses that class —
-   CommandPalette.tsx, AppHeader.tsx (both pre-dating this redesign) plus
-   GroundingMapDisplay.tsx/JournalDiscoveryPanel.tsx/
-   SubmissionPackagingSuite.tsx (converted this session). Recolored to the
-   navy secondary-button pair used throughout this session's own
-   conversions instead. */
-button.border-white\/10,
-button[class*="border-white/10"] {
-  border-color: var(--color-navy-4) !important;
-  color: #94A3B8 !important;
-  background-color: var(--color-navy-2) !important;
-}
-button.border-white\/10:hover,
-button[class*="border-white/10"]:hover {
-  background-color: var(--color-navy-3) !important;
-  color: #E2E8F0 !important;
-}
-
-/* Intercept disabled buttons for correct contrast.
-   RECOLORED (sci-fi v3, 2026-07-29) — same bug class as the h2/h3/h4
-   !important override fixed earlier this session: this rule force-applied
-   a light-theme background/border to EVERY disabled <button> app-wide,
-   found while live-verifying UserProfileGate.tsx's signup form (disabled
-   "Submit Account Request" button rendered pale against its new navy
-   card). Uses the disabled-button token pair already established in
-   ManuscriptDraftingWorkspace.tsx/ManuscriptEditorWorkspace.tsx this
-   session (navy-4 surface, #94A3B8 text). */
-button:disabled {
-  background-color: var(--color-navy-4) !important;
-  border-color: var(--color-navy-4) !important;
-  color: #94A3B8 !important;
-  cursor: not-allowed !important;
-  box-shadow: none !important;
-}
-
-/* ==========================================
-   DOCTORAL MANUSCRIPT TYPOGRAPHY & ZEN MODE
-   ========================================== */
-
-.manuscript-paper {
-  background-color: #FFFFFF;
-  color: #1A365D;
-  max-width: 850px;
-  margin: 0 auto;
-  padding: 3rem 4rem;
-  box-shadow: 0 10px 30px -5px rgba(26, 54, 93, 0.08), 0 4px 10px -2px rgba(26, 54, 93, 0.04);
-  border-radius: 8px;
-  border: 1px solid #E2E8F0;
-  transition: all 0.3s ease;
-}
-
-@media (max-width: 640px) {
-  .manuscript-paper {
-    padding: 1.5rem 1.5rem;
+  /* iOS zooms the viewport when a focused input's text is under 16px. */
+  input, textarea, select {
+    font-size: 16px;
   }
 }
 
-/* ==========================================
-   SCI-FI REDESIGN — STEP 1: ACCESSIBILITY GUARDRAILS
-   Built first, non-negotiable per docs/planning/sci-fi-redesign-scoping.md:
-   every later step must respect these, never reintroduce the gap.
-   ========================================== */
-
-/* Explicit, high-contrast keyboard focus ring — nothing in this codebase
-   defined one before this step; the browser default was the only signal.
-   Applies globally so no redesigned component can silently lose it. */
-:focus-visible {
-  outline: 2px solid var(--color-cyan-accent) !important;
-  outline-offset: 2px !important;
-  border-radius: 4px;
-}
-
-/* Reduce/disable motion for users who request it — covers every animation
-   and transition this codebase defines today (fadeIn, hover-lift, pulse,
-   os-card/glass-effect transitions) plus anything the redesign adds. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* ==========================================
-   SCI-FI REDESIGN v3 — STEP 2: GLOBAL CHROME (deep-navy surface)
-   Scoped to a `.chrome-dark` wrapper (used by AppHeader/AppFooter) rather
-   than applied to <body>, since the rest of the app is still on the light
-   surface and adopts the dark system incrementally, per the scoping doc's
-   own "everything else adopted incrementally as touched" guidance.
-   CHANGED (v3): moved off v2's grey --color-surface-1/2 tokens onto the
-   --color-navy-1/2 scale from Step 1 — this is the v3 reversal's own
-   "rework the 2 already-shipped components" step. Added a real, visible
-   luminous border between .chrome-dark and its nested .chrome-dark-subtle
-   layer: Step 1 confirmed live that navy's own luminance step between
-   these two tokens is only ~1.06:1, nowhere near the 3:1 non-text floor —
-   the border is what actually communicates the elevation change, not the
-   surface color alone. Re-verified contrast live after the swap (see
-   commit). ========================================== */
-
-.chrome-dark {
-  background-color: var(--color-navy-1);
-  color: #E2E8F0;
-  border-color: rgba(226, 232, 240, 0.1) !important;
-}
-
-.chrome-dark .chrome-dark-subtle {
-  background-color: var(--color-navy-2);
-  border: 1px solid var(--color-border-luminous);
-}
-
-.chrome-dark-accent {
-  color: var(--color-luminous-blue);
-}
-
-/* Sci-fi v3 — the product wordmark, scoped narrowly (never a blanket h1
-   rule — see the note on the old `h1, .font-serif` rule below, which this
-   replaces for wordmark purposes). Serif is permitted ONLY here, per the
-   scoping doc's reversal #3; gold is reserved for the second word only,
-   applied inline by whichever component renders the wordmark, not by this
-   class (a shared value, not a shared markup structure, since the
-   wordmark still appears in more than one component pending the "extract
-   a shared component" step in the v3 sequence). */
-.wordmark {
-  font-family: var(--font-serif);
-}
-
-.manuscript-body {
-  font-family: var(--font-serif);
-  font-size: 1.125rem; /* 18px */
-  line-height: 1.85;
-  color: #2D3748;
-  letter-spacing: -0.01em;
-}
-
-.manuscript-body p {
-  margin-bottom: 1.5rem;
-  text-indent: 2rem; /* Academic paragraph indent */
-}
-
-/* Zen Mode Overlay */
-.zen-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 50 !important;
-  background-color: #F8FAFC !important;
-  overflow-y: auto !important;
-  padding: 2rem 1rem !important;
-}
-
-/* ==========================================
-   PHASE 1: SCI-FI GLASSMORPHIC EFFECTS
-   ========================================== */
-
-/* Glassmorphic card — frosted glass effect with neon border */
-.glassmorphic {
-  background: rgba(10, 14, 39, 0.4) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(59, 156, 255, 0.2) !important;
-  border-radius: 12px !important;
-}
-
-.glassmorphic:hover {
-  background: rgba(10, 14, 39, 0.5) !important;
-  border-color: rgba(59, 156, 255, 0.4) !important;
-  box-shadow: 0 0 20px rgba(59, 156, 255, 0.15) !important;
-}
-
-/* Glowing border effect */
-.border-glow {
-  box-shadow: 0 0 10px rgba(59, 156, 255, 0.3), inset 0 0 10px rgba(59, 156, 255, 0.05) !important;
-}
-
-.border-glow-pulse {
-  animation: glowPulse 2s ease-in-out infinite;
-}
-
-/* ==========================================
-   LOADING & SPINNER ANIMATIONS
-   ========================================== */
-
-@keyframes spinnerPulse {
-  0% {
-    transform: scale(1) rotate(0deg);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.1) rotate(180deg);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1) rotate(360deg);
-    opacity: 0.8;
-  }
-}
-
-@keyframes glowPulse {
-  0%, 100% {
-    box-shadow: 0 0 10px rgba(59, 156, 255, 0.3), inset 0 0 10px rgba(59, 156, 255, 0.05);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(59, 156, 255, 0.6), inset 0 0 15px rgba(59, 156, 255, 0.1);
-  }
-}
-
-@keyframes statusPulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.2);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
-}
-
-/* Spinner component */
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(59, 156, 255, 0.2);
-  border-top-color: var(--color-luminous-blue);
-  border-radius: 50%;
-  animation: spinnerPulse 1.2s linear infinite;
-}
-
-/* Pulse indicator (status dot) */
-.status-pulse {
-  animation: statusPulse 2s ease-in-out infinite;
-}
-
-.status-pulse.success {
-  color: #10b981;
-}
-
-.status-pulse.warning {
-  color: #f59e0b;
-}
-
-.status-pulse.error {
-  color: #ef4444;
-}
-
-/* Progress bar with gradient */
-.progress-bar {
-  height: 3px;
-  background: linear-gradient(90deg, var(--color-luminous-blue), var(--color-luminous-blue));
-  border-radius: 2px;
-  box-shadow: 0 0 10px rgba(59, 156, 255, 0.4);
-  animation: shimmer 2s infinite;
-  background-size: 1000px 100%;
-}
-
-/* Loading skeleton shimmer */
-.skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(59, 156, 255, 0.1),
-    rgba(59, 156, 255, 0.2),
-    rgba(59, 156, 255, 0.1)
-  );
-  background-size: 1000px 100%;
-  animation: shimmer 2s infinite;
-}
-
-/* ==========================================
-   PHASE INDICATOR STYLING
-   ========================================== */
-
-/* Animated phase ring */
-.phase-ring {
-  width: 48px;
-  height: 48px;
-  border: 3px solid var(--color-luminous-blue);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: var(--color-luminous-blue);
-  box-shadow: 0 0 15px rgba(59, 156, 255, 0.3), inset 0 0 10px rgba(59, 156, 255, 0.05);
-  animation: glowPulse 3s ease-in-out infinite;
-  position: relative;
-}
-
-.phase-ring::before {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  border: 1px solid rgba(59, 156, 255, 0.15);
-  border-radius: 50%;
-  animation: spin 20s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-/* Phase label styling */
-.phase-label {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--color-luminous-blue);
-}
-
-/* ==========================================
-   ENHANCED FOCUS & INTERACTION STATES
-   ========================================== */
-
-/* Updated focus ring for nav-friendly appearance */
-:focus-visible {
-  outline: 2px solid var(--color-luminous-blue) !important;
-  outline-offset: 2px !important;
-  border-radius: 4px;
-}
-
-/* Interactive button states with glow */
-button:not(:disabled):hover {
-  box-shadow: 0 0 15px rgba(59, 156, 255, 0.2) !important;
-  transition: all var(--motion-duration-base) var(--motion-ease);
-}
-
-button:not(:disabled):active {
-  transform: scale(0.98);
-}
-
-/* Input focus glow */
-input:focus,
-textarea:focus,
-select:focus {
-  box-shadow: 0 0 0 3px rgba(59, 156, 255, 0.2) !important;
-  border-color: var(--color-luminous-blue) !important;
-}
-
-/* ==========================================
-   MOBILE OPTIMIZATIONS (PHASE 1)
-   ========================================== */
-
-@media (max-width: 768px) {
-  /* Larger touch targets */
-  button {
-    min-height: 44px !important;
-    padding: 12px 16px !important;
-  }
-
-  input,
-  textarea,
-  select {
-    min-height: 48px !important;
-    font-size: 16px !important; /* Prevents zoom on iOS */
-  }
-
-  /* Simplify panels on mobile */
-  .glassmorphic {
-    border-radius: 8px !important;
-  }
-
-  /* Bottom sheet animations */
-  .bottom-sheet {
-    animation: slideUp 0.3s var(--motion-ease);
-  }
-
-  @keyframes slideUp {
-    from {
-      transform: translateY(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  /* Hide desktop-only elements */
-  .desktop-only {
-    display: none !important;
-  }
-}
-
-@media (min-width: 769px) {
-  /* Hide mobile-only elements */
-  .mobile-only {
-    display: none !important;
-  }
-
-  /* Spacious desktop layout */
-  .workspace-container {
-    padding: 2rem !important;
-    gap: 1.5rem;
-  }
-}
-
-/* ==========================================
-   ACCESSIBILITY: PREFERS REDUCED MOTION
-   ========================================== */
-
-@media (prefers-reduced-motion: reduce) {
-  .spinnerPulse,
-  .glowPulse,
-  .statusPulse,
-  .shimmer,
-  .border-glow-pulse,
-  .phase-ring,
-  .phase-ring::before {
-    animation: none !important;
-  }
-
-  button:not(:disabled):hover {
-    box-shadow: none !important;
-  }
-
-  button:not(:disabled):active {
-    transform: none !important;
-  }
+  .hover-lift:hover { transform: none; }
 }

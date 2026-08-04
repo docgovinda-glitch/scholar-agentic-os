@@ -93,23 +93,19 @@ export default function ProviderKeyManager({
       {/* Search + filter */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="w-3.5 h-3.5 text-[color:var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search providers or models..."
-            className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg pl-9 pr-3 py-2 text-sm text-[#E2E8F0] placeholder:text-[#94A3B8]/60 focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+            className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg pl-9 pr-3 py-2 text-sm text-[color:var(--text-primary)] placeholder:text-[color:var(--text-secondary)]/60 focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
           />
         </div>
         <button
           type="button"
           onClick={() => setOnlyConfigured((v) => !v)}
-          className={`px-3 py-2 text-[10px] font-mono font-semibold uppercase tracking-wider rounded-lg border cursor-pointer whitespace-nowrap transition-colors ${
-            onlyConfigured
-              ? "border-[color:var(--color-luminous-blue)]/50 bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)]"
-              : "border-[color:var(--color-navy-4)] text-[#94A3B8] hover:text-[#E2E8F0]"
-          }`}
+          className={`px-3 py-2 text-xs font-semibold rounded-lg border cursor-pointer whitespace-nowrap transition-colors ${ onlyConfigured ? "border-[color:var(--color-luminous-blue)]/50 bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)]" : "border-[color:var(--color-navy-4)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]" }`}
         >
           My keys only ({configuredIds.size})
         </button>
@@ -118,16 +114,16 @@ export default function ProviderKeyManager({
       {configuredIds.size > 1 && <FailoverOrderEditor onChanged={onVaultChanged} />}
 
       {groups.length === 0 && (
-        <p className="text-xs text-[#94A3B8] p-4 text-center">No provider matches that search.</p>
+        <p className="text-xs text-[color:var(--text-secondary)] p-4 text-center">No provider matches that search.</p>
       )}
 
       {groups.map((group) => (
         <section key={group.kind}>
           <div className="flex items-baseline gap-2 flex-wrap mb-2">
-            <h4 className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+            <h4 className="text-xs font-bold text-[color:var(--text-secondary)]">
               {group.title}
             </h4>
-            <span className="text-[11px] text-[#94A3B8]/70">{group.blurb}</span>
+            <span className="text-[11px] text-[color:var(--text-secondary)]/70">{group.blurb}</span>
           </div>
           <div className="space-y-1.5">
             {group.providers.map((spec) => (
@@ -238,26 +234,26 @@ function ProviderRow({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-[#E2E8F0]">{spec.name}</span>
+            <span className="text-sm font-semibold text-[color:var(--text-primary)]">{spec.name}</span>
             {isActive && (
-              <span className="text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)]">
+              <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)]">
                 Active
               </span>
             )}
             {statusPill && <StatusPill {...statusPill} />}
           </div>
-          <p className="text-[11px] text-[#94A3B8] truncate mt-0.5">{spec.freeTierNote}</p>
+          <p className="text-[11px] text-[color:var(--text-secondary)] truncate mt-0.5">{spec.freeTierNote}</p>
         </div>
-        <ChevronDown className={`w-4 h-4 text-[#94A3B8] shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+        <ChevronDown className={`w-4 h-4 text-[color:var(--text-secondary)] shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
       </button>
 
       {isExpanded && (
         <div className="px-3 pb-3 pt-3 border-t border-[color:var(--color-navy-4)] space-y-3">
-          <p className="text-xs text-[#94A3B8] leading-relaxed">{spec.description}</p>
+          <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">{spec.description}</p>
 
           <div className="space-y-2">
             <label className="block">
-              <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+              <span className="text-xs font-bold text-[color:var(--text-secondary)]">
                 API key
               </span>
               <input
@@ -267,13 +263,13 @@ function ProviderRow({
                 placeholder={isConfigured ? "•••••••• saved — type to replace" : "Paste your key"}
                 autoComplete="off"
                 spellCheck={false}
-                className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] font-mono placeholder:text-[#94A3B8]/50 focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+                className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] font-mono placeholder:text-[color:var(--text-secondary)]/50 focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
               />
             </label>
 
             {spec.requiresCustomBaseUrl && (
               <label className="block">
-                <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+                <span className="text-xs font-bold text-[color:var(--text-secondary)]">
                   API address (required)
                 </span>
                 <input
@@ -282,16 +278,16 @@ function ProviderRow({
                   onChange={(e) => setBaseUrlDraft(e.target.value)}
                   placeholder="https://..."
                   spellCheck={false}
-                  className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] font-mono focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+                  className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] font-mono focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
                 />
-                <span className="text-[11px] text-[#94A3B8] mt-1 block leading-relaxed">
+                <span className="text-[11px] text-[color:var(--text-secondary)] mt-1 block leading-relaxed">
                   {spec.customBaseUrlHint}
                 </span>
               </label>
             )}
 
             <label className="block">
-              <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+              <span className="text-xs font-bold text-[color:var(--text-secondary)]">
                 Model
               </span>
               {/* Free text with suggestions rather than a fixed dropdown:
@@ -303,7 +299,7 @@ function ProviderRow({
                 value={modelDraft}
                 onChange={(e) => setModelDraft(e.target.value)}
                 spellCheck={false}
-                className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] font-mono focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+                className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] font-mono focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
               />
               <datalist id={`models-${spec.id}`}>
                 {(testResult?.models ?? spec.models).map((model) => (
@@ -311,7 +307,7 @@ function ProviderRow({
                 ))}
               </datalist>
               {testResult?.models?.length ? (
-                <span className="text-[11px] text-[#94A3B8] mt-1 block">
+                <span className="text-[11px] text-[color:var(--text-secondary)] mt-1 block">
                   {testResult.models.length} models available to this key.
                 </span>
               ) : null}
@@ -325,7 +321,7 @@ function ProviderRow({
               type="button"
               onClick={handleSave}
               disabled={saving || (!keyDraft && !isConfigured)}
-              className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-[10px] font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer disabled:opacity-40 flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-40 flex items-center gap-1.5"
             >
               {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
               Save
@@ -334,7 +330,7 @@ function ProviderRow({
               type="button"
               onClick={onTest}
               disabled={isTesting || !isConfigured}
-              className="px-3 py-1.5 border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[#E2E8F0] text-[10px] font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer disabled:opacity-40 flex items-center gap-1.5"
+              className="px-3 py-1.5 border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[color:var(--text-primary)] text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-40 flex items-center gap-1.5"
             >
               {isTesting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plug className="w-3 h-3" />}
               Test connection
@@ -343,7 +339,7 @@ function ProviderRow({
               <button
                 type="button"
                 onClick={() => onSelect(spec.id)}
-                className="px-3 py-1.5 border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[#E2E8F0] text-[10px] font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer flex items-center gap-1.5"
+                className="px-3 py-1.5 border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[color:var(--text-primary)] text-xs font-semibold rounded-lg cursor-pointer flex items-center gap-1.5"
               >
                 <Zap className="w-3 h-3" />
                 Use this
@@ -353,7 +349,7 @@ function ProviderRow({
               href={spec.getKeyUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1.5 border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[#E2E8F0] text-[10px] font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[color:var(--text-primary)] text-xs font-semibold rounded-lg cursor-pointer flex items-center gap-1.5"
             >
               <ExternalLink className="w-3 h-3" />
               Get a key
@@ -362,7 +358,7 @@ function ProviderRow({
               <button
                 type="button"
                 onClick={handleRemove}
-                className="px-3 py-1.5 border border-red-500/30 text-red-400 hover:bg-red-500/10 text-[10px] font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer flex items-center gap-1.5 ml-auto"
+                className="px-3 py-1.5 border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-semibold rounded-lg cursor-pointer flex items-center gap-1.5 ml-auto"
               >
                 <Trash2 className="w-3 h-3" />
                 Remove
@@ -383,9 +379,9 @@ function StatusPill({ text, tone }: { text: string; tone: "ok" | "bad" | "warn" 
         ? "bg-red-500/15 text-red-400"
         : tone === "warn"
           ? "bg-amber-500/15 text-amber-400"
-          : "bg-[color:var(--color-navy-3)] text-[#94A3B8]";
+          : "bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)]";
   return (
-    <span className={`text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded ${cls}`}>{text}</span>
+    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${cls}`}>{text}</span>
   );
 }
 
@@ -395,7 +391,7 @@ function DiagnosticBlock({ result }: { result: ConnectionTestResult }) {
     return (
       <div className="flex items-start gap-2 bg-[color:var(--color-luminous-blue)]/10 border border-[color:var(--color-luminous-blue)]/30 rounded-lg p-2.5">
         <Check className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)] shrink-0 mt-0.5" />
-        <p className="text-xs text-[#E2E8F0] leading-relaxed">{summariseResult(result)}</p>
+        <p className="text-xs text-[color:var(--text-primary)] leading-relaxed">{summariseResult(result)}</p>
       </div>
     );
   }
@@ -406,12 +402,12 @@ function DiagnosticBlock({ result }: { result: ConnectionTestResult }) {
       <div className="flex items-start gap-2">
         <X className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
         <div className="min-w-0">
-          <span className="text-[10px] font-mono font-bold text-red-400 uppercase tracking-wider">
+          <span className="text-xs font-bold text-red-400">
             {error?.label}
           </span>
-          <p className="text-xs text-[#E2E8F0] leading-relaxed mt-0.5">{error?.message}</p>
+          <p className="text-xs text-[color:var(--text-primary)] leading-relaxed mt-0.5">{error?.message}</p>
           {error?.remedy && (
-            <p className="text-xs text-[#94A3B8] leading-relaxed mt-1 flex items-start gap-1.5">
+            <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed mt-1 flex items-start gap-1.5">
               <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
               {error.remedy}
             </p>
@@ -420,10 +416,10 @@ function DiagnosticBlock({ result }: { result: ConnectionTestResult }) {
       </div>
       {error?.detail && (
         <details className="ml-5.5">
-          <summary className="text-[10px] font-mono text-[#94A3B8] uppercase tracking-wider cursor-pointer hover:text-[#E2E8F0]">
+          <summary className="text-xs text-[color:var(--text-secondary)] cursor-pointer hover:text-[color:var(--text-primary)]">
             Technical detail
           </summary>
-          <pre className="mt-1 text-[10px] text-[#94A3B8] font-mono whitespace-pre-wrap break-all bg-[color:var(--color-navy-3)]/60 rounded p-2 max-h-32 overflow-y-auto">
+          <pre className="mt-1 text-[10px] text-[color:var(--text-secondary)] font-mono whitespace-pre-wrap break-all bg-[color:var(--color-navy-3)]/60 rounded p-2 max-h-32 overflow-y-auto">
             {error.detail}
           </pre>
         </details>
@@ -452,10 +448,10 @@ function FailoverOrderEditor({ onChanged }: { onChanged: () => void }) {
 
   return (
     <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-3">
-      <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+      <span className="text-xs font-bold text-[color:var(--text-secondary)]">
         Automatic switching order
       </span>
-      <p className="text-[11px] text-[#94A3B8] mt-1 leading-relaxed">
+      <p className="text-[11px] text-[color:var(--text-secondary)] mt-1 leading-relaxed">
         If one provider is rate limited or fails, your work continues on the next one down —
         automatically, without losing what has already been written.
       </p>
@@ -467,14 +463,14 @@ function FailoverOrderEditor({ onChanged }: { onChanged: () => void }) {
               key={id}
               className="flex items-center gap-2 bg-[color:var(--color-navy-3)]/60 rounded-lg px-2.5 py-1.5"
             >
-              <span className="text-[10px] font-mono font-bold text-[#94A3B8] w-4">{index + 1}</span>
-              <span className="text-xs text-[#E2E8F0] flex-1 truncate">{spec?.name ?? id}</span>
+              <span className="text-[10px] font-mono font-bold text-[color:var(--text-secondary)] w-4">{index + 1}</span>
+              <span className="text-xs text-[color:var(--text-primary)] flex-1 truncate">{spec?.name ?? id}</span>
               <button
                 type="button"
                 onClick={() => move(index, -1)}
                 disabled={index === 0}
                 aria-label={`Move ${spec?.name ?? id} earlier`}
-                className="text-[#94A3B8] hover:text-[#E2E8F0] disabled:opacity-30 cursor-pointer disabled:cursor-default"
+                className="text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] disabled:opacity-30 cursor-pointer disabled:cursor-default"
               >
                 <ArrowUp className="w-3.5 h-3.5" />
               </button>
@@ -483,7 +479,7 @@ function FailoverOrderEditor({ onChanged }: { onChanged: () => void }) {
                 onClick={() => move(index, 1)}
                 disabled={index === chain.length - 1}
                 aria-label={`Move ${spec?.name ?? id} later`}
-                className="text-[#94A3B8] hover:text-[#E2E8F0] disabled:opacity-30 cursor-pointer disabled:cursor-default"
+                className="text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] disabled:opacity-30 cursor-pointer disabled:cursor-default"
               >
                 <ArrowDown className="w-3.5 h-3.5" />
               </button>

@@ -213,7 +213,7 @@ function ReviewerResponseManager({
           {!showCommentForm && (
             <button
               onClick={() => setShowCommentForm(true)}
-              className="px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue font-mono text-xs font-bold uppercase transition-all flex items-center gap-2 w-fit"
+              className="px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue text-xs font-bold transition-all flex items-center gap-2 w-fit"
             >
               <Plus className="w-3 h-3" />
               Add Comment
@@ -225,23 +225,23 @@ function ReviewerResponseManager({
       {/* Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <GlassmorphicCard className="p-3">
-          <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Total Comments</p>
+          <p className="text-xs text-slate-400">Total Comments</p>
           <p className="text-2xl font-bold text-slate-100">{stats.totalComments}</p>
         </GlassmorphicCard>
         <GlassmorphicCard className="p-3">
-          <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Major</p>
+          <p className="text-xs text-slate-400">Major</p>
           <p className="text-2xl font-bold text-orange-400">{stats.majorCount}</p>
         </GlassmorphicCard>
         <GlassmorphicCard className="p-3">
-          <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Minor</p>
+          <p className="text-xs text-slate-400">Minor</p>
           <p className="text-2xl font-bold text-yellow-400">{stats.minorCount}</p>
         </GlassmorphicCard>
         <GlassmorphicCard className="p-3">
-          <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Responded</p>
+          <p className="text-xs text-slate-400">Responded</p>
           <p className="text-2xl font-bold text-emerald-400">{stats.respondedCount}</p>
         </GlassmorphicCard>
         <GlassmorphicCard className="p-3">
-          <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Progress</p>
+          <p className="text-xs text-slate-400">Progress</p>
           <p className="text-2xl font-bold text-luminous-blue">{stats.responseRate}%</p>
         </GlassmorphicCard>
       </div>
@@ -252,11 +252,7 @@ function ReviewerResponseManager({
           <button
             key={mode}
             onClick={() => setViewMode(mode as any)}
-            className={`px-4 py-2 rounded-lg font-mono text-xs font-bold uppercase transition-all ${
-              viewMode === mode
-                ? "bg-luminous-blue/30 border border-luminous-blue text-luminous-blue"
-                : "bg-slate-700/30 border border-slate-600 text-slate-400 hover:border-slate-500"
-            }`}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${ viewMode === mode ? "bg-luminous-blue/30 border border-luminous-blue text-luminous-blue" : "bg-slate-700/30 border border-slate-600 text-slate-400 hover:border-slate-500" }`}
           >
             {mode.charAt(0).toUpperCase() + mode.slice(1)}
           </button>
@@ -268,13 +264,13 @@ function ReviewerResponseManager({
         <div className="space-y-4">
           {showCommentForm && (
             <GlassmorphicCard className="p-6 space-y-4">
-              <h4 className="font-mono font-bold text-luminous-blue uppercase text-sm">
+              <h4 className="font-bold text-luminous-blue text-sm">
                 {editingCommentId ? "Edit Comment" : "Add Reviewer Comment"}
               </h4>
 
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+                  <label className="block text-xs text-slate-300 mb-1.5">
                     Reviewer Name *
                   </label>
                   <input
@@ -288,7 +284,7 @@ function ReviewerResponseManager({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+                    <label className="block text-xs text-slate-300 mb-1.5">
                       Date
                     </label>
                     <input
@@ -299,7 +295,7 @@ function ReviewerResponseManager({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+                    <label className="block text-xs text-slate-300 mb-1.5">
                       Severity
                     </label>
                     <select
@@ -314,7 +310,7 @@ function ReviewerResponseManager({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+                  <label className="block text-xs text-slate-300 mb-1.5">
                     Section
                   </label>
                   <input
@@ -327,7 +323,7 @@ function ReviewerResponseManager({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+                  <label className="block text-xs text-slate-300 mb-1.5">
                     Comment *
                   </label>
                   <textarea
@@ -343,7 +339,7 @@ function ReviewerResponseManager({
               <div className="flex gap-3">
                 <button
                   onClick={handleCommentSubmit}
-                  className="flex-1 px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue font-mono text-xs font-bold uppercase transition-all"
+                  className="flex-1 px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue text-xs font-bold transition-all"
                 >
                   {editingCommentId ? "Update" : "Add"} Comment
                 </button>
@@ -359,7 +355,7 @@ function ReviewerResponseManager({
                       severity: "minor"
                     });
                   }}
-                  className="flex-1 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-400 font-mono text-xs font-bold uppercase transition-all"
+                  className="flex-1 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-400 text-xs font-bold transition-all"
                 >
                   Cancel
                 </button>
@@ -428,7 +424,7 @@ function ReviewerResponseManager({
         <div className="space-y-4">
           {/* Overall Response */}
           <GlassmorphicCard className="p-4">
-            <label className="block text-sm font-mono font-bold text-luminous-blue mb-3 uppercase">
+            <label className="block text-sm font-bold text-luminous-blue mb-3">
               Overall Response Letter
             </label>
             <textarea
@@ -494,14 +490,14 @@ function ReviewerResponseManager({
           <div className="flex gap-3 flex-wrap">
             <button
               onClick={handleCopy}
-              className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue font-mono text-xs font-bold uppercase transition-all flex items-center justify-center gap-2"
+              className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue text-xs font-bold transition-all flex items-center justify-center gap-2"
             >
               <Copy className="w-3 h-3" />
               {copied ? "Copied!" : "Copy"}
             </button>
             <button
               onClick={handleDownload}
-              className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-600/40 text-emerald-400 font-mono text-xs font-bold uppercase transition-all flex items-center justify-center gap-2"
+              className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-600/40 text-emerald-400 text-xs font-bold transition-all flex items-center justify-center gap-2"
             >
               <Download className="w-3 h-3" />
               Download

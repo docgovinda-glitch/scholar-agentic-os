@@ -19,6 +19,16 @@ import type { ClaimEvidenceGraph } from "../../domain/claim/types";
 
 export interface ProjectRecord {
   projectId: string;
+  /**
+   * Supabase user id of the project's owner.
+   *
+   * Required, not optional, and deliberately so: a project with no owner
+   * cannot be authorised against, and an optional field would let one be
+   * created by omission — which is exactly how this store previously allowed
+   * every project to be readable and writable by anyone who could name its
+   * id. Every construction path must state an owner.
+   */
+  ownerId: string;
   outputTypeId: string;
   /** Intake answers so far, keyed by IntakeField.key. "provisional" is a valid value (docs 14 §5.2). */
   answers: Record<string, string>;
@@ -34,18 +44,38 @@ export interface ProjectRecord {
 }
 
 const projects = new Map<string, ProjectRecord>();
-let counter = 0;
 
-/** Exported for src/services/store/pgProjectStore.ts, which needs the same id shape. */
+/**
+ * Exported for src/services/store/pgProjectStore.ts, which needs the same id shape.
+ *
+ * Was `proj-${Date.now().toString(36)}-${counter}` with a module-level
+ * counter. Two problems, both real once these ids address authorised data:
+ * the counter made ids sequential, so knowing one id told you its
+ * neighbours', and the timestamp narrowed the rest of the search space to
+ * whatever was created in the same millisecond. Enumeration was arithmetic,
+ * not guessing.
+ *
+ * Ownership checks are the actual access control (see ProjectRecord.ownerId)
+ * — an unguessable id is not authorisation. But ids leak: into URLs, logs,
+ * screenshots, and shared links. Making them opaque means a leaked id
+ * discloses one project rather than a range of them.
+ *
+ * `randomUUID` is available on Node 19+ and in every browser that ships
+ * `crypto.subtle`; the fallback covers non-secure contexts, where
+ * `crypto.randomUUID` is undefined but `getRandomValues` is not.
+ */
 export function generateProjectId(): string {
-  counter += 1;
-  return `proj-${Date.now().toString(36)}-${counter}`;
+  const c = globalThis.crypto;
+  if (typeof c?.randomUUID === "function") return `proj-${c.randomUUID()}`;
+  const bytes = c.getRandomValues(new Uint8Array(16));
+  return `proj-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export function createProject(outputTypeId: string): ProjectRecord {
+export function createProject(outputTypeId: string, ownerId: string): ProjectRecord {
   const projectId = generateProjectId();
   const record: ProjectRecord = {
     projectId,
+    ownerId,
     outputTypeId,
     answers: {},
     gates: initialProjectGateState(projectId),
@@ -65,7 +95,13 @@ export function saveProject(record: ProjectRecord): ProjectRecord {
   return record;
 }
 
+/** Owner-scoped listing. Filtering here rather than at the call site keeps
+ *  "which projects exist for this user" a single question the store answers,
+ *  so no caller can accidentally enumerate the whole map. */
+export function listProjectsByOwner(ownerId: string): ProjectRecord[] {
+  return Array.from(projects.values()).filter((p) => p.ownerId === ownerId);
+}
+
 export function __resetProjectStoreForTests(): void {
   projects.clear();
-  counter = 0;
 }

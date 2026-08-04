@@ -177,7 +177,7 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
     if (fileType.includes("doc")) return <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />;
     if (fileType.includes("xls") || fileType.includes("csv"))
       return <FileSpreadsheet className="w-4 h-4 text-emerald-400" />;
-    return <File className="w-4 h-4 text-[#94A3B8]" />;
+    return <File className="w-4 h-4 text-[color:var(--text-secondary)]" />;
   };
 
   const formatSize = (bytes: number) => {
@@ -281,11 +281,11 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
       {/* Header */}
       <div className="border-b border-[color:var(--color-navy-4)] pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0">
         <div>
-          <h2 className="text-xl font-semibold text-[#E2E8F0] flex items-center gap-2">
+          <h2 className="text-xl font-semibold text-[color:var(--text-primary)] flex items-center gap-2">
             <Database className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
             Knowledge Vault
           </h2>
-          <p className="text-xs text-[#94A3B8] font-mono uppercase tracking-wider mt-1">
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">
             Upload research documents to ground AI-generated content with citations
           </p>
         </div>
@@ -326,14 +326,14 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
         {/* Left: File Registry */}
         <div className="flex flex-col border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-2)] rounded-2xl overflow-hidden lg:col-span-5 min-h-0">
           <div className="bg-[color:var(--color-navy-2)] border-b border-[color:var(--color-navy-4)] px-4 py-3 flex items-center justify-between shrink-0">
-            <span className="text-xs font-mono font-bold text-[#E2E8F0] uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-xs font-bold text-[color:var(--text-primary)] flex items-center gap-1.5">
               <HardDrive className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Data Registry ({vault.files.length})
             </span>
             {vault.files.length > 0 && (
               <button
                 onClick={() => setShowV2Engine(true)}
-                className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-[11px] font-mono uppercase tracking-wider font-semibold cursor-pointer transition-all flex items-center gap-1.5 shadow-sm"
+                className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 shadow-sm"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Source (17 Methods)
@@ -351,18 +351,18 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                   <Sparkles className="w-8 h-8 text-[color:var(--color-luminous-blue)]" />
                 </div>
                 <div className="max-w-xs space-y-2">
-                  <h3 className="text-base font-bold text-[#E2E8F0]">Knowledge Vault v2.0 Empty</h3>
-                  <p className="text-xs text-[#94A3B8] leading-relaxed">
+                  <h3 className="text-base font-bold text-[color:var(--text-primary)]">Knowledge Vault v2.0 Empty</h3>
+                  <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
                     Click anywhere here to launch the Multi-Source Import Wizard. Ingest via PDF, URL, DOI, ISBN, PMID, arXiv, YouTube, Audio, or OCR.
                   </p>
                 </div>
-                <div className="px-5 py-2.5 bg-[color:var(--color-luminous-blue-dim)] group-hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono uppercase tracking-wider font-semibold shadow-md flex items-center gap-2 transition-all">
+                <div className="px-5 py-2.5 bg-[color:var(--color-luminous-blue-dim)] group-hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-semibold shadow-md flex items-center gap-2 transition-all">
                   <Plus className="w-4 h-4" />
                   Launch Multi-Source Intake
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-[color:var(--color-navy-4)]">
+              <div className="divide-y divide-[color:var(--border-default)]">
                 {vault.files.map((file) => (
                   <div
                     key={file.id}
@@ -375,12 +375,12 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                       <div className="mt-0.5 shrink-0">{getFileIcon(file.fileType)}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-xs font-semibold text-[#E2E8F0] truncate">{file.fileName}</p>
+                          <p className="text-xs font-semibold text-[color:var(--text-primary)] truncate">{file.fileName}</p>
                           {file.status === "processing" && <Loader2 className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)] animate-spin shrink-0" />}
                           {file.status === "ready" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
                           {file.status === "error" && <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />}
                         </div>
-                        <p className="text-[10px] text-[#94A3B8] font-mono mt-0.5">
+                        <p className="text-[10px] text-[color:var(--text-secondary)] font-mono mt-0.5">
                           {formatSize(file.fileSize)} · {file.chunks.length} chunks · {new Date(file.uploadedAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -391,12 +391,12 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                             className="cursor-pointer"
                             title={file.isActive ? "Disable citations" : "Enable citations"}
                           >
-                            {file.isActive ? <ToggleRight className="w-6 h-6 text-emerald-400" /> : <ToggleLeft className="w-6 h-6 text-[#94A3B8]" />}
+                            {file.isActive ? <ToggleRight className="w-6 h-6 text-emerald-400" /> : <ToggleLeft className="w-6 h-6 text-[color:var(--text-secondary)]" />}
                           </button>
                         )}
                         <button
                           onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }}
-                          className="p-1 text-[#94A3B8] hover:text-red-400 transition-colors cursor-pointer"
+                          className="p-1 text-[color:var(--text-secondary)] hover:text-red-400 transition-colors cursor-pointer"
                           title="Remove file"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -420,16 +420,16 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
         {/* Right: File Overview / Detail */}
         <div className="flex flex-col border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-2)] rounded-2xl overflow-hidden lg:col-span-7 min-h-0">
           <div className="bg-[color:var(--color-navy-2)] border-b border-[color:var(--color-navy-4)] px-4 py-3 flex items-center justify-between shrink-0">
-            <span className="text-xs font-mono font-bold text-[#E2E8F0] uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-xs font-bold text-[color:var(--text-primary)] flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               {selectedFile ? "Document Overview" : "Source Details"}
             </span>
             {selectedFile?.parsedOverview?.citationTag && (
-              <span className="text-[10px] text-[#94A3B8] font-mono">{selectedFile.parsedOverview.citationTag}</span>
+              <span className="text-[10px] text-[color:var(--text-secondary)] font-mono">{selectedFile.parsedOverview.citationTag}</span>
             )}
           </div>
 
-          <div className="grow overflow-y-auto p-5 space-y-5 text-[#E2E8F0] font-sans">
+          <div className="grow overflow-y-auto p-5 space-y-5 text-[color:var(--text-primary)] font-sans">
             {selectedFile ? (
               selectedFile.status === "processing" ? (
                 <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
@@ -438,7 +438,7 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-sm font-bold">Processing Document...</h3>
-                    <p className="text-xs text-[#94A3B8]">Parsing text, chunking for retrieval, and extracting overview via AI.</p>
+                    <p className="text-xs text-[color:var(--text-secondary)]">Parsing text, chunking for retrieval, and extracting overview via AI.</p>
                   </div>
                 </div>
               ) : selectedFile.status === "error" ? (
@@ -455,10 +455,10 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                 <>
                   <div className="space-y-2 border-b border-[color:var(--color-navy-4)] pb-4">
                     <div className="flex items-center gap-2">
-                      <span className={`text-[9px] font-bold font-mono px-2.5 py-0.5 rounded-md border ${selectedFile.isActive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-[color:var(--color-navy-3)] text-[#94A3B8] border-[color:var(--color-navy-4)]"}`}>
+                      <span className={`text-[9px] font-bold font-mono px-2.5 py-0.5 rounded-md border ${selectedFile.isActive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)] border-[color:var(--color-navy-4)]"}`}>
                         {selectedFile.isActive ? "Active Source" : "Inactive Source"}
                       </span>
-                      <span className="text-[9px] font-mono text-[#94A3B8]">
+                      <span className="text-[9px] font-mono text-[color:var(--text-secondary)]">
                         {selectedFile.chunks.length} chunks · {selectedFile.charCount.toLocaleString()} chars
                       </span>
                     </div>
@@ -466,28 +466,28 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                       {selectedFile.parsedOverview?.title || selectedFile.fileName}
                     </h3>
                     {selectedFile.parsedOverview?.author && selectedFile.parsedOverview.author !== "Unknown" && (
-                      <p className="text-xs italic text-[#94A3B8]">{selectedFile.parsedOverview.author}</p>
+                      <p className="text-xs italic text-[color:var(--text-secondary)]">{selectedFile.parsedOverview.author}</p>
                     )}
                   </div>
 
                   {selectedFile.parsedOverview?.abstract && (
                     <div className="space-y-1.5">
-                      <h4 className="text-[10px] font-mono font-bold uppercase text-[color:var(--color-luminous-blue)]">Abstract / Summary</h4>
-                      <p className="text-xs text-[#94A3B8] leading-relaxed">{selectedFile.parsedOverview.abstract}</p>
+                      <h4 className="text-xs font-bold text-[color:var(--color-luminous-blue)]">Abstract / Summary</h4>
+                      <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">{selectedFile.parsedOverview.abstract}</p>
                     </div>
                   )}
 
                   {selectedFile.parsedOverview?.chapters && selectedFile.parsedOverview.chapters.length > 0 && (
                     <div className="space-y-3">
-                      <h4 className="text-[10px] font-mono font-bold uppercase text-[color:var(--color-luminous-blue)]">Chapters / Sections</h4>
+                      <h4 className="text-xs font-bold text-[color:var(--color-luminous-blue)]">Chapters / Sections</h4>
                       <div className="space-y-2 text-xs">
                         {selectedFile.parsedOverview.chapters.map((ch, i) => (
                           <div key={i} className="space-y-0.5">
-                            <h5 className="font-bold text-[#E2E8F0] font-mono uppercase text-[10px] text-[color:var(--color-luminous-blue)] flex items-center gap-1.5">
+                            <h5 className="font-bold text-[color:var(--text-primary)] text-xs text-[color:var(--color-luminous-blue)] flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-luminous-blue)] shrink-0" />
                               {ch.name}
                             </h5>
-                            <p className="text-[#94A3B8] leading-relaxed pl-3 font-sans">{ch.summary}</p>
+                            <p className="text-[color:var(--text-secondary)] leading-relaxed pl-3 font-sans">{ch.summary}</p>
                           </div>
                         ))}
                       </div>
@@ -496,7 +496,7 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
 
                   {selectedFile.parsedOverview?.keyTerms && selectedFile.parsedOverview.keyTerms.length > 0 && (
                     <div className="space-y-1.5">
-                      <h4 className="text-[10px] font-mono font-bold uppercase text-[color:var(--color-luminous-blue)]">Key Terms</h4>
+                      <h4 className="text-xs font-bold text-[color:var(--color-luminous-blue)]">Key Terms</h4>
                       <div className="flex flex-wrap gap-1.5">
                         {selectedFile.parsedOverview.keyTerms.map((term, i) => (
                           <span key={i} className="text-[10px] font-mono px-2 py-0.5 bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)] border border-[color:var(--color-luminous-blue)]/30 rounded">
@@ -514,20 +514,20 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                         <Sparkles className="w-5 h-5 text-[color:var(--color-luminous-blue)] animate-pulse shrink-0" />
                         <div>
                           <h4 className="text-xs font-bold tracking-wide">Enterprise 16-Section Citation Suite</h4>
-                          <p className="text-[10px] text-[#94A3B8] font-mono">12 formats (APA, MLA, BibTeX, RIS...), AI quotes, & verified lookups</p>
+                          <p className="text-[10px] text-[color:var(--text-secondary)] font-mono">12 formats (APA, MLA, BibTeX, RIS...), AI quotes, & verified lookups</p>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => setShowSuiteModal(true)}
-                        className="px-3.5 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
+                        className="px-3.5 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
                       >
                         <ShieldCheck className="w-3.5 h-3.5" /> Launch Suite
                       </button>
                     </div>
 
                     <div className="flex items-center justify-between border-b border-[color:var(--color-navy-4)] pb-2">
-                      <div className="flex items-center gap-2 text-xs font-bold text-[#E2E8F0] font-mono uppercase">
+                      <div className="flex items-center gap-2 text-xs font-bold text-[color:var(--text-primary)]">
                         <Tag className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                         {isEditingCitation ? "Feed Citation Engine Manually" : "Citation System Tags & Required Fields"}
                       </div>
@@ -543,7 +543,7 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                         <button
                           type="button"
                           onClick={() => setIsEditingCitation(false)}
-                          className="px-2 py-1 text-[#94A3B8] hover:text-[#E2E8F0] text-xs font-mono cursor-pointer"
+                          className="px-2 py-1 text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] text-xs font-mono cursor-pointer"
                         >
                           Cancel
                         </button>
@@ -558,7 +558,7 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                         </div>
                         <button
                           onClick={handleStartEdit}
-                          className="px-2.5 py-1 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded font-mono text-[10px] uppercase font-bold shrink-0 shadow-2xs cursor-pointer transition-all"
+                          className="px-2.5 py-1 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded text-xs font-bold shrink-0 shadow-2xs cursor-pointer transition-all"
                         >
                           Feed Manually
                         </button>
@@ -569,63 +569,63 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                       <div className="space-y-3 pt-1 text-xs animate-fade-in">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="sm:col-span-2">
-                            <label className="block font-mono font-semibold text-[10px] uppercase text-[#94A3B8] mb-1">Document Title</label>
+                            <label className="block font-semibold text-xs text-[color:var(--text-secondary)] mb-1">Document Title</label>
                             <div className="focus-within:border-[color:var(--color-luminous-blue)] border border-[color:var(--color-navy-4)] rounded bg-[color:var(--color-navy-1)]">
                               <input
                                 type="text"
                                 value={editForm.title || ""}
                                 onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                                className="w-full p-2 border-0 bg-transparent focus:outline-none text-xs text-[#E2E8F0]"
+                                className="w-full p-2 border-0 bg-transparent focus:outline-none text-xs text-[color:var(--text-primary)]"
                               />
                             </div>
                           </div>
                           <div>
-                            <label className="block font-mono font-semibold text-[10px] uppercase text-[#94A3B8] mb-1">Primary Author(s)</label>
+                            <label className="block font-semibold text-xs text-[color:var(--text-secondary)] mb-1">Primary Author(s)</label>
                             <div className="focus-within:border-[color:var(--color-luminous-blue)] border border-[color:var(--color-navy-4)] rounded bg-[color:var(--color-navy-1)]">
                               <input
                                 type="text"
                                 value={editForm.author || ""}
                                 onChange={(e) => setEditForm({ ...editForm, author: e.target.value })}
                                 placeholder="e.g. Smith, J. A."
-                                className="w-full p-2 border-0 bg-transparent focus:outline-none text-xs text-[#E2E8F0]"
+                                className="w-full p-2 border-0 bg-transparent focus:outline-none text-xs text-[color:var(--text-primary)]"
                               />
                             </div>
                           </div>
                           <div>
-                            <label className="block font-mono font-semibold text-[10px] uppercase text-[#94A3B8] mb-1">Publication Year</label>
+                            <label className="block font-semibold text-xs text-[color:var(--text-secondary)] mb-1">Publication Year</label>
                             <div className="focus-within:border-[color:var(--color-luminous-blue)] border border-[color:var(--color-navy-4)] rounded bg-[color:var(--color-navy-1)]">
                               <input
                                 type="text"
                                 value={editForm.year || ""}
                                 onChange={(e) => setEditForm({ ...editForm, year: e.target.value })}
-                                className="w-full p-2 border-0 bg-transparent focus:outline-none text-xs text-[#E2E8F0]"
+                                className="w-full p-2 border-0 bg-transparent focus:outline-none text-xs text-[color:var(--text-primary)]"
                               />
                             </div>
                           </div>
                           <div>
-                            <label className="block font-mono font-semibold text-[10px] uppercase text-[#94A3B8] mb-1">Institution / Journal</label>
+                            <label className="block font-semibold text-xs text-[color:var(--text-secondary)] mb-1">Institution / Journal</label>
                             <div className="focus-within:border-[color:var(--color-luminous-blue)] border border-[color:var(--color-navy-4)] rounded bg-[color:var(--color-navy-1)]">
                               <input
                                 type="text"
                                 value={editForm.institutionOrJournal || ""}
                                 onChange={(e) => setEditForm({ ...editForm, institutionOrJournal: e.target.value })}
-                                className="w-full p-2 border-0 bg-transparent focus:outline-none text-xs text-[#E2E8F0]"
+                                className="w-full p-2 border-0 bg-transparent focus:outline-none text-xs text-[color:var(--text-primary)]"
                               />
                             </div>
                           </div>
                           <div>
-                            <label className="block font-mono font-semibold text-[10px] uppercase text-[#94A3B8] mb-1">Volume / Issue / Type</label>
+                            <label className="block font-semibold text-xs text-[color:var(--text-secondary)] mb-1">Volume / Issue / Type</label>
                             <div className="focus-within:border-[color:var(--color-luminous-blue)] border border-[color:var(--color-navy-4)] rounded bg-[color:var(--color-navy-1)]">
                               <input
                                 type="text"
                                 value={editForm.volumeIssue || ""}
                                 onChange={(e) => setEditForm({ ...editForm, volumeIssue: e.target.value })}
-                                className="w-full p-2 border-0 bg-transparent focus:outline-none text-xs text-[#E2E8F0]"
+                                className="w-full p-2 border-0 bg-transparent focus:outline-none text-xs text-[color:var(--text-primary)]"
                               />
                             </div>
                           </div>
                           <div className="sm:col-span-2">
-                            <label className="block font-mono font-semibold text-[10px] uppercase text-[#94A3B8] mb-1">In-Text Citation Tag (e.g. Smith (2026))</label>
+                            <label className="block font-semibold text-xs text-[color:var(--text-secondary)] mb-1">In-Text Citation Tag (e.g. Smith (2026))</label>
                             <div className="focus-within:border-emerald-500 border border-emerald-500/40 rounded bg-emerald-500/5">
                               <input
                                 type="text"
@@ -636,13 +636,13 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                             </div>
                           </div>
                           <div className="sm:col-span-2">
-                            <label className="block font-mono font-semibold text-[10px] uppercase text-[#94A3B8] mb-1">BibTeX Citation Export</label>
+                            <label className="block font-semibold text-xs text-[color:var(--text-secondary)] mb-1">BibTeX Citation Export</label>
                             <div className="focus-within:border-[color:var(--color-luminous-blue)] border border-[color:var(--color-navy-4)] rounded bg-[color:var(--color-navy-1)]">
                               <textarea
                                 rows={3}
                                 value={editForm.bibtex || ""}
                                 onChange={(e) => setEditForm({ ...editForm, bibtex: e.target.value })}
-                                className="w-full p-2 border-0 bg-transparent font-mono text-[11px] focus:outline-none text-[#E2E8F0]"
+                                className="w-full p-2 border-0 bg-transparent font-mono text-[11px] focus:outline-none text-[color:var(--text-primary)]"
                               />
                             </div>
                           </div>
@@ -651,7 +651,7 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                           <button
                             type="button"
                             onClick={() => setIsEditingCitation(false)}
-                            className="px-3 py-1.5 bg-[color:var(--color-navy-3)] hover:bg-[color:var(--color-navy-4)] text-[#E2E8F0] rounded text-xs font-semibold cursor-pointer"
+                            className="px-3 py-1.5 bg-[color:var(--color-navy-3)] hover:bg-[color:var(--surface-inset)] text-[color:var(--text-primary)] rounded text-xs font-semibold cursor-pointer"
                           >
                             Cancel
                           </button>
@@ -668,23 +668,23 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                       <>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5 text-[11px] font-sans">
                           <div>
-                            <span className="text-[#94A3B8] block text-[9px] uppercase font-mono tracking-wider">Primary Author(s)</span>
-                            <span className="font-semibold text-[#E2E8F0]">{selectedFile.parsedOverview?.author || "Academic Researcher"}</span>
+                            <span className="text-[color:var(--text-secondary)] block text-[9px]">Primary Author(s)</span>
+                            <span className="font-semibold text-[color:var(--text-primary)]">{selectedFile.parsedOverview?.author || "Academic Researcher"}</span>
                           </div>
                           <div>
-                            <span className="text-[#94A3B8] block text-[9px] uppercase font-mono tracking-wider">Publication Year</span>
-                            <span className="font-semibold text-[#E2E8F0]">{selectedFile.parsedOverview?.year || new Date().getFullYear()}</span>
+                            <span className="text-[color:var(--text-secondary)] block text-[9px]">Publication Year</span>
+                            <span className="font-semibold text-[color:var(--text-primary)]">{selectedFile.parsedOverview?.year || new Date().getFullYear()}</span>
                           </div>
                           <div>
-                            <span className="text-[#94A3B8] block text-[9px] uppercase font-mono tracking-wider">Institution / Journal</span>
-                            <span className="font-semibold text-[#E2E8F0]">{selectedFile.parsedOverview?.institutionOrJournal || "Research Institution"}</span>
+                            <span className="text-[color:var(--text-secondary)] block text-[9px]">Institution / Journal</span>
+                            <span className="font-semibold text-[color:var(--text-primary)]">{selectedFile.parsedOverview?.institutionOrJournal || "Research Institution"}</span>
                           </div>
                           <div>
-                            <span className="text-[#94A3B8] block text-[9px] uppercase font-mono tracking-wider">Volume / Issue</span>
-                            <span className="font-semibold text-[#E2E8F0]">{selectedFile.parsedOverview?.volumeIssue || "Doctoral Dissertation"}</span>
+                            <span className="text-[color:var(--text-secondary)] block text-[9px]">Volume / Issue</span>
+                            <span className="font-semibold text-[color:var(--text-primary)]">{selectedFile.parsedOverview?.volumeIssue || "Doctoral Dissertation"}</span>
                           </div>
                           <div className="sm:col-span-2">
-                            <span className="text-[#94A3B8] block text-[9px] uppercase font-mono tracking-wider">In-Text Citation Tag (APA/MLA)</span>
+                            <span className="text-[color:var(--text-secondary)] block text-[9px]">In-Text Citation Tag (APA/MLA)</span>
                             <span className="font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded inline-block mt-0.5 border border-emerald-500/30 text-xs">
                               {selectedFile.parsedOverview?.citationTag || selectedFile.fileName}
                             </span>
@@ -694,7 +694,7 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                         {/* Interactive Multi-Format Citation Generator */}
                         <div className="pt-3 border-t border-[color:var(--color-navy-4)] space-y-2.5 animate-fade-in">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <span className="text-[#E2E8F0] font-mono font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="text-[color:var(--text-primary)] font-bold text-xs flex items-center gap-1.5">
                               <Sparkles className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" /> Formatted Citation Engine (12 Formats)
                             </span>
                             <div className="flex items-center gap-1 overflow-x-auto pb-1">
@@ -705,8 +705,8 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                                   onClick={() => setCitationFormat(fmt)}
                                   className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold transition-all shrink-0 cursor-pointer ${
                                     citationFormat === fmt
-                                      ? "bg-[color:var(--color-luminous-blue-dim)] text-white shadow-2xs"
-                                      : "bg-[color:var(--color-navy-3)] text-[#94A3B8] hover:bg-[color:var(--color-navy-4)]"
+                                      ? "bg-[color:var(--color-luminous-blue-dim)] text-[color:var(--text-primary)] shadow-2xs"
+                                      : "bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-inset)]"
                                   }`}
                                 >
                                   {fmt}
@@ -715,15 +715,15 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                             </div>
                           </div>
                           <div className="relative group">
-                            <pre className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg text-[11px] font-mono text-[#E2E8F0] overflow-x-auto whitespace-pre-wrap pr-16 leading-relaxed shadow-inner min-h-[50px]">
+                            <pre className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg text-[11px] font-mono text-[color:var(--text-primary)] overflow-x-auto whitespace-pre-wrap pr-16 leading-relaxed shadow-inner min-h-[50px]">
                               {generateCitation(getInlineMeta(selectedFile), citationFormat)}
                             </pre>
                             <button
                               type="button"
                               onClick={() => handleInlineCopy(generateCitation(getInlineMeta(selectedFile), citationFormat))}
-                              className="absolute top-2 right-2 px-2.5 py-1 bg-[color:var(--color-navy-2)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded text-[10px] font-mono font-bold flex items-center gap-1 shadow-2xs cursor-pointer transition-all text-[#E2E8F0]"
+                              className="absolute top-2 right-2 px-2.5 py-1 bg-[color:var(--color-navy-2)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded text-[10px] font-mono font-bold flex items-center gap-1 shadow-2xs cursor-pointer transition-all text-[color:var(--text-primary)]"
                             >
-                              {copiedFormat ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-[#94A3B8]" />}
+                              {copiedFormat ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-[color:var(--text-secondary)]" />}
                               {copiedFormat ? "Copied!" : "Copy"}
                             </button>
                           </div>
@@ -735,7 +735,7 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                   {!selectedFile.isActive && (
                     <button
                       onClick={() => toggleFileActive(selectedFile.id)}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono uppercase tracking-wider font-semibold transition-all cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2"
                     >
                       <ToggleRight className="w-4 h-4" />
                       Enable as Citation Source
@@ -749,8 +749,8 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
                   <Eye className="w-7 h-7 text-[color:var(--color-luminous-blue)]" />
                 </div>
                 <div className="max-w-sm space-y-2">
-                  <h3 className="text-sm font-bold text-[#E2E8F0]">Select a Source</h3>
-                  <p className="text-xs text-[#94A3B8] leading-relaxed">
+                  <h3 className="text-sm font-bold text-[color:var(--text-primary)]">Select a Source</h3>
+                  <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
                     {vault.files.length > 0
                       ? "Click on a file in the registry to view its extracted overview, chapters, and citation details."
                       : "Upload your doctoral thesis or research documents to get started. The AI will automatically extract an overview and chunk the content for citation-backed drafting."}
@@ -771,8 +771,8 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
             <div className="w-14 h-14 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-sm">
               <CheckCircle2 className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-[#E2E8F0]">File Uploaded & Parsed!</h3>
-            <p className="text-xs text-[#94A3B8] leading-relaxed">
+            <h3 className="text-lg font-bold text-[color:var(--text-primary)]">File Uploaded & Parsed!</h3>
+            <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
               Your research document has been indexed with complete citation tags. Do you want to upload more research files to ground your workbench?
             </p>
             <div className="flex gap-3 pt-2">
@@ -793,7 +793,7 @@ export default function KnowledgeVaultWorkspace({ project, updateProject }: Know
               <button
                 type="button"
                 onClick={() => setShowUploadMoreModal(false)}
-                className="flex-1 py-3 px-4 bg-[color:var(--color-navy-3)] hover:bg-[color:var(--color-navy-4)] text-[#E2E8F0] font-medium text-xs rounded-xl transition-all cursor-pointer"
+                className="flex-1 py-3 px-4 bg-[color:var(--color-navy-3)] hover:bg-[color:var(--surface-inset)] text-[color:var(--text-primary)] font-medium text-xs rounded-xl transition-all cursor-pointer"
               >
                 Skip / Done
               </button>

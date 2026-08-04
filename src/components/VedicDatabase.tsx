@@ -120,16 +120,16 @@ export default function VedicDatabase() {
     <div className="space-y-6">
       <div className="border-b border-[color:var(--color-navy-4)] pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-[#E2E8F0] flex items-center gap-2">
+          <h2 className="text-xl font-bold text-[color:var(--text-primary)] flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-amber-700" />
             Scriptural & Ethical Database (Vedic & Kautilyan Library)
           </h2>
-          <p className="text-xs text-[#94A3B8] font-mono uppercase tracking-wider mt-1">
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">
             Reference directory of authentic, annotated philosophical support verses for your manuscript
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-amber-400 font-mono bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20 font-bold uppercase">
+          <span className="text-xs text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20 font-bold">
             {SCRIPTURES_DATA.length} Verses Authenticated
           </span>
         </div>
@@ -138,10 +138,10 @@ export default function VedicDatabase() {
       {/* Filter and Search Bento */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] p-4 rounded-xl">
         <div className="md:col-span-4 relative bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] focus-within:border-[color:var(--color-luminous-blue)] rounded-lg">
-          <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-3" />
+          <Search className="w-4 h-4 text-[color:var(--text-secondary)] absolute left-3 top-3" />
           <input
             type="text"
-            className="w-full border-0 bg-transparent rounded-lg pl-9 pr-4 py-2 text-xs text-[#E2E8F0] focus:outline-none"
+            className="w-full border-0 bg-transparent rounded-lg pl-9 pr-4 py-2 text-xs text-[color:var(--text-primary)] focus:outline-none"
             placeholder="Search keywords, translations, or references..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -149,7 +149,7 @@ export default function VedicDatabase() {
         </div>
         
         <div className="md:col-span-8 flex flex-wrap gap-1.5 items-center justify-end">
-          <span className="text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider mr-2 flex items-center gap-1">
+          <span className="text-xs font-bold text-[color:var(--text-secondary)] mr-2 flex items-center gap-1">
             <Filter className="w-3 h-3" /> Filter:
           </span>
           {["All", "Vedas", "Upanishads", "Bhagavad Gita", "Arthashastra"].map((cat) => (
@@ -158,8 +158,8 @@ export default function VedicDatabase() {
               onClick={() => setCategory(cat)}
               className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
                 category === cat
-                  ? "bg-amber-800 text-white border border-amber-800 font-semibold"
-                  : "bg-transparent text-[#94A3B8] border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)]"
+                  ? "bg-amber-800 text-[color:var(--text-primary)] border border-amber-800 font-semibold"
+                  : "bg-transparent text-[color:var(--text-secondary)] border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)]"
               }`}
             >
               {cat}
@@ -183,38 +183,38 @@ export default function VedicDatabase() {
                     <span className="text-[9px] font-bold font-mono px-2 py-0.5 bg-amber-800/10 text-amber-900 border border-amber-800/20 rounded-md">
                       {item.category}
                     </span>
-                    <h3 className="text-sm font-bold text-[#E2E8F0] mt-1.5">
+                    <h3 className="text-sm font-bold text-[color:var(--text-primary)] mt-1.5">
                       {item.source} ({item.verseNum})
                     </h3>
                   </div>
-                  <span className="text-[10px] text-[#94A3B8] font-mono">ID: {item.id}</span>
+                  <span className="text-[10px] text-[color:var(--text-secondary)] font-mono">ID: {item.id}</span>
                 </div>
 
                 {/* Sanskrit Box */}
-                <div className="p-3 bg-amber-500/[0.06] border border-amber-500/20 rounded-lg text-center leading-relaxed text-[#E2E8F0] whitespace-pre-line text-sm italic">
+                <div className="p-3 bg-amber-500/[0.06] border border-amber-500/20 rounded-lg text-center leading-relaxed text-[color:var(--text-primary)] whitespace-pre-line text-sm italic">
                   {item.sanskrit}
                 </div>
 
                 {/* Transliteration */}
                 <div>
-                  <span className="text-[9px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider block">Transliteration:</span>
-                  <p className="text-[11px] text-[#94A3B8] font-sans mt-0.5 italic leading-relaxed">
+                  <span className="text-[9px] font-bold text-[color:var(--text-secondary)] block">Transliteration:</span>
+                  <p className="text-[11px] text-[color:var(--text-secondary)] font-sans mt-0.5 italic leading-relaxed">
                     {item.transliteration}
                   </p>
                 </div>
 
                 {/* Translation */}
                 <div>
-                  <span className="text-[9px] font-bold font-mono text-amber-900 uppercase tracking-wider block">English Translation:</span>
-                  <p className="text-xs text-[#E2E8F0] font-medium leading-relaxed mt-1">
+                  <span className="text-[9px] font-bold text-amber-900 block">English Translation:</span>
+                  <p className="text-xs text-[color:var(--text-primary)] font-medium leading-relaxed mt-1">
                     "{item.translation}"
                   </p>
                 </div>
 
                 {/* Academic Context */}
                 <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg">
-                  <span className="text-[9px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider block">Academic Context & CSR Adaptation:</span>
-                  <p className="text-xs text-[#94A3B8] leading-relaxed mt-1">
+                  <span className="text-[9px] font-bold text-[color:var(--text-secondary)] block">Academic Context & CSR Adaptation:</span>
+                  <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed mt-1">
                     {item.context}
                   </p>
                 </div>
@@ -222,14 +222,14 @@ export default function VedicDatabase() {
 
               {/* Card Footer actions */}
               <div className="flex justify-between items-center pt-4 mt-4 border-t border-[color:var(--color-navy-4)] text-xs">
-                <span className="text-[10px] font-mono text-[#94A3B8] italic truncate max-w-[200px]" title={item.citation}>
+                <span className="text-[10px] font-mono text-[color:var(--text-secondary)] italic truncate max-w-[200px]" title={item.citation}>
                   Cite: {item.verseNum}
                 </span>
 
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => handleCopy(item.citation, `${item.id}_cite`)}
-                    className="p-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[#94A3B8] rounded-md transition-all flex items-center gap-1.5 cursor-pointer"
+                    className="p-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)] rounded-md transition-all flex items-center gap-1.5 cursor-pointer"
                     title="Copy APA Citation"
                   >
                     {copiedId === `${item.id}_cite` ? (
@@ -273,9 +273,9 @@ export default function VedicDatabase() {
           ))
         ) : (
           <div className="col-span-2 text-center p-12 bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl">
-            <BookOpen className="w-10 h-10 text-[#94A3B8] mx-auto opacity-40 mb-3" />
-            <p className="text-sm italic text-[#94A3B8]">No matching scriptures found</p>
-            <p className="text-xs text-[#94A3B8] mt-1">Try expanding your filter or search keywords</p>
+            <BookOpen className="w-10 h-10 text-[color:var(--text-secondary)] mx-auto opacity-40 mb-3" />
+            <p className="text-sm italic text-[color:var(--text-secondary)]">No matching scriptures found</p>
+            <p className="text-xs text-[color:var(--text-secondary)] mt-1">Try expanding your filter or search keywords</p>
           </div>
         )}
       </div>

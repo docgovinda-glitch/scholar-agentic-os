@@ -70,10 +70,10 @@ export default function ReadView({
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 text-center px-4">
         <div className="text-2xl">📖</div>
-        <p className="text-[#F1F5F9] text-sm">No document loaded</p>
+        <p className="text-[color:var(--text-primary)] text-sm">No document loaded</p>
         <button
           onClick={onBack}
-          className="mt-4 text-[color:var(--color-luminous-blue)] text-xs font-mono uppercase tracking-wide"
+          className="mt-4 text-[color:var(--color-luminous-blue)] text-xs"
         >
           ← Back
         </button>
@@ -85,12 +85,12 @@ export default function ReadView({
     <div className="h-full flex flex-col gap-4">
       {/* Document Header */}
       <div className="space-y-2 pb-2 border-b border-[color:var(--color-border-subtle)]">
-        <h1 className="text-sm font-serif font-bold text-[#F1F5F9]">{document.title}</h1>
-        <p className="text-xs text-[#94A3B8]">{document.authors.join(", ")}</p>
-        <div className="flex gap-2 text-[10px] text-[#64748B]">
+        <h1 className="text-sm font-serif font-bold text-[color:var(--text-primary)]">{document.title}</h1>
+        <p className="text-xs text-[color:var(--text-secondary)]">{document.authors.join(", ")}</p>
+        <div className="flex gap-2 text-[10px] text-[color:var(--text-muted)]">
           <span>Section {currentBlockIndex + 1} of {document.blocks.length}</span>
           {blockComments.length > 0 && (
-            <span className="text-[#FBBF24]">· {blockComments.length} comment{blockComments.length !== 1 ? "s" : ""}</span>
+            <span className="text-[color:var(--state-warning)]">· {blockComments.length} comment{blockComments.length !== 1 ? "s" : ""}</span>
           )}
         </div>
       </div>
@@ -100,54 +100,54 @@ export default function ReadView({
         {/* Block Content */}
         <div className="rounded-lg border border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] p-4">
           {currentBlock.kind === "heading1" && (
-            <h2 className="text-lg font-serif font-bold text-[#F1F5F9]">{currentBlock.text}</h2>
+            <h2 className="text-lg font-serif font-bold text-[color:var(--text-primary)]">{currentBlock.text}</h2>
           )}
           {currentBlock.kind === "heading2" && (
-            <h3 className="text-base font-serif font-bold text-[#F1F5F9]">{currentBlock.text}</h3>
+            <h3 className="text-base font-serif font-bold text-[color:var(--text-primary)]">{currentBlock.text}</h3>
           )}
           {currentBlock.kind === "heading3" && (
-            <h4 className="text-sm font-serif font-bold text-[#F1F5F9]">{currentBlock.text}</h4>
+            <h4 className="text-sm font-serif font-bold text-[color:var(--text-primary)]">{currentBlock.text}</h4>
           )}
           {currentBlock.kind === "paragraph" && (
-            <p className="text-sm leading-relaxed text-[#E2E8F0]">{currentBlock.text}</p>
+            <p className="text-sm leading-relaxed text-[color:var(--text-primary)]">{currentBlock.text}</p>
           )}
           {currentBlock.kind === "quote" && (
-            <blockquote className="text-sm italic border-l-2 border-[color:var(--color-luminous-blue-dim)] pl-3 text-[#94A3B8]">
+            <blockquote className="text-sm italic border-l-2 border-[color:var(--color-luminous-blue-dim)] pl-3 text-[color:var(--text-secondary)]">
               {currentBlock.text}
             </blockquote>
           )}
           {currentBlock.kind === "list-item" && (
-            <li className="text-sm text-[#E2E8F0]">• {currentBlock.text}</li>
+            <li className="text-sm text-[color:var(--text-primary)]">• {currentBlock.text}</li>
           )}
         </div>
 
         {/* Comments */}
         {showComments && blockComments.length > 0 && (
           <div className="space-y-2">
-            <p className="text-[10px] font-mono uppercase tracking-wide text-[#94A3B8]">Comments</p>
+            <p className="text-xs text-[color:var(--text-secondary)]">Comments</p>
             {blockComments.map((comment) => (
               <div
                 key={comment.id}
                 className={`rounded-lg border p-3 text-xs space-y-2 ${
                   comment.resolved
                     ? "border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)]/50 opacity-60"
-                    : "border-[#FBBF24] bg-[#FBBF24]/5"
+                    : "border-[color:var(--state-warning)] bg-[color:var(--state-warning)]/5"
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[#94A3B8]">{comment.author}</span>
+                  <span className="text-[color:var(--text-secondary)]">{comment.author}</span>
                   {!comment.resolved && (
                     <button
                       onClick={() => onResolveComment?.(comment.id)}
-                      className="text-[#64748B] hover:text-[#86EFAC] text-[10px]"
+                      className="text-[color:var(--text-muted)] hover:text-[color:var(--state-success)] text-[10px]"
                     >
                       Mark resolved
                     </button>
                   )}
                 </div>
-                <p className="text-[#E2E8F0]">{comment.text}</p>
+                <p className="text-[color:var(--text-primary)]">{comment.text}</p>
                 {comment.resolved && (
-                  <p className="text-[#64748B] text-[10px]">✓ Resolved</p>
+                  <p className="text-[color:var(--text-muted)] text-[10px]">✓ Resolved</p>
                 )}
               </div>
             ))}
@@ -162,12 +162,12 @@ export default function ReadView({
           onChange={(e) => setNewComment(e.target.value)}
           placeholder="Add a comment…"
           rows={2}
-          className="w-full px-3 py-2 text-xs rounded-lg bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] text-[#E2E8F0] placeholder-[#64748B] focus:outline-none focus:border-[color:var(--color-luminous-blue-dim)]"
+          className="w-full px-3 py-2 text-xs rounded-lg bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-none focus:border-[color:var(--color-luminous-blue-dim)]"
         />
         {newComment.trim() && (
           <button
             onClick={handleAddComment}
-            className="w-full py-2 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs font-mono uppercase tracking-wide"
+            className="w-full py-2 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs"
           >
             Post Comment
           </button>
@@ -179,20 +179,20 @@ export default function ReadView({
         <button
           onClick={handlePrev}
           disabled={isFirst}
-          className="flex-1 py-2 rounded-lg border border-[color:var(--color-border-subtle)] text-[#94A3B8] text-xs font-mono uppercase tracking-wide disabled:opacity-50"
+          className="flex-1 py-2 rounded-lg border border-[color:var(--color-border-subtle)] text-[color:var(--text-secondary)] text-xs disabled:opacity-50"
         >
           ← Prev
         </button>
         <button
           onClick={onBack}
-          className="flex-1 py-2 rounded-lg border border-[color:var(--color-border-subtle)] text-[color:var(--color-luminous-blue)] text-xs font-mono uppercase tracking-wide"
+          className="flex-1 py-2 rounded-lg border border-[color:var(--color-border-subtle)] text-[color:var(--color-luminous-blue)] text-xs"
         >
           Done
         </button>
         <button
           onClick={handleNext}
           disabled={isLast}
-          className="flex-1 py-2 rounded-lg border border-[color:var(--color-border-subtle)] text-[#94A3B8] text-xs font-mono uppercase tracking-wide disabled:opacity-50"
+          className="flex-1 py-2 rounded-lg border border-[color:var(--color-border-subtle)] text-[color:var(--text-secondary)] text-xs disabled:opacity-50"
         >
           Next →
         </button>

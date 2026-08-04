@@ -17,9 +17,10 @@ describe("services/store: backend selection", () => {
     const { getProjectStore } = await import("../projectStore");
 
     const store = getProjectStore();
-    const created = await store.create("OT-07");
+    const created = await store.create("OT-07", "11111111-1111-4111-8111-111111111111");
     const fetched = await store.get(created.projectId);
     expect(fetched).toEqual(created);
+    expect(created.ownerId).toBe("11111111-1111-4111-8111-111111111111");
   });
 
   it("caches the resolved backend across calls until reset", async () => {

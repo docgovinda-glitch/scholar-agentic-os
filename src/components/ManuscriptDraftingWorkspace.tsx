@@ -510,29 +510,27 @@ export default function ManuscriptDraftingWorkspace({
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-[#E2E8F0] flex items-center gap-2">
+          <h2 className="text-lg font-bold text-[color:var(--text-primary)] flex items-center gap-2">
             <PenTool className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
             Phase F: Manuscript Co-Drafting Laboratory
           </h2>
-          <p className="text-xs text-[#94A3B8] font-mono mt-0.5 uppercase tracking-wider">
+          <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
             Section-by-section co-writer · {totalWordCount.toLocaleString()} total words drafted
           </p>
         </div>
         <div className="flex items-center gap-3 text-xs font-mono">
           <button
             onClick={onToggleFocusMode}
-            className={`px-3 py-1.5 border rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all flex items-center gap-1.5 ${
-              isFocusMode ? "bg-[color:var(--color-luminous-blue-dim)] text-white border-[color:var(--color-luminous-blue-dim)]" : "bg-[color:var(--color-navy-2)] text-[#94A3B8] border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)]"
-            }`}
+            className={`px-3 py-1.5 border rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${ isFocusMode ? "bg-[color:var(--color-luminous-blue-dim)] text-[color:var(--text-primary)] border-[color:var(--color-luminous-blue-dim)]" : "bg-[color:var(--color-navy-2)] text-[color:var(--text-secondary)] border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)]" }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
             {isFocusMode ? "Exit Focus Mode" : "Focus Mode"}
           </button>
           
-          <div className="h-4 w-[1px] bg-[color:var(--color-navy-4)]" />
+          <div className="h-4 w-[1px] bg-[color:var(--surface-inset)]" />
           
-          <span className="text-[#94A3B8]">{sectionsList.filter(s => !!project.sections[s]).length}/{sectionsList.length} sections</span>
-          <div className="w-24 h-1.5 bg-[color:var(--color-navy-4)] rounded-full overflow-hidden">
+          <span className="text-[color:var(--text-secondary)]">{sectionsList.filter(s => !!project.sections[s]).length}/{sectionsList.length} sections</span>
+          <div className="w-24 h-1.5 bg-[color:var(--surface-inset)] rounded-full overflow-hidden">
             <div
               className="bg-[color:var(--color-luminous-blue)] h-full rounded-full transition-all"
               style={{ width: `${(sectionsList.filter(s => !!project.sections[s]).length / sectionsList.length) * 100}%` }}
@@ -552,7 +550,7 @@ export default function ManuscriptDraftingWorkspace({
       {/* Error Panel */}
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm space-y-3">
-          <p className="font-semibold flex items-center gap-2 text-xs font-mono uppercase">
+          <p className="font-semibold flex items-center gap-2 text-xs">
             <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
             Drafting Issue: {error}
           </p>
@@ -577,25 +575,25 @@ export default function ManuscriptDraftingWorkspace({
       {showDiff && diffPrev !== null && (
         <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-luminous-blue)]/30 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className="text-xs font-bold text-[color:var(--color-luminous-blue)] flex items-center gap-1.5">
               <GitCompare className="w-3.5 h-3.5" />
               Revision Comparison — {activeSec}
             </h3>
-            <button onClick={() => setShowDiff(false)} className="text-[10px] text-[#94A3B8] hover:text-[#E2E8F0] font-mono cursor-pointer">
+            <button onClick={() => setShowDiff(false)} className="text-[10px] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] font-mono cursor-pointer">
               Dismiss
             </button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <span className="text-[9px] font-mono font-bold uppercase text-red-500 block mb-1">◀ Previous Version</span>
+              <span className="text-[9px] font-bold text-red-500 block mb-1">◀ Previous Version</span>
               <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-[11px] text-red-300 leading-relaxed max-h-[200px] overflow-y-auto whitespace-pre-wrap font-sans">
-                {diffPrev || <em className="text-[#94A3B8]">Empty</em>}
+                {diffPrev || <em className="text-[color:var(--text-secondary)]">Empty</em>}
               </div>
             </div>
             <div>
-              <span className="text-[9px] font-mono font-bold uppercase text-emerald-600 block mb-1">▶ New Version (Current)</span>
+              <span className="text-[9px] font-bold text-emerald-600 block mb-1">▶ New Version (Current)</span>
               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 text-[11px] text-emerald-300 leading-relaxed max-h-[200px] overflow-y-auto whitespace-pre-wrap font-sans">
-                {currentText || <em className="text-[#94A3B8]">Empty</em>}
+                {currentText || <em className="text-[color:var(--text-secondary)]">Empty</em>}
               </div>
             </div>
           </div>
@@ -612,7 +610,7 @@ export default function ManuscriptDraftingWorkspace({
               <div className="bg-[color:var(--color-navy-3)] border-b border-[color:var(--color-navy-4)] px-4 py-2.5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <Edit3 className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" />
-                  <span className="text-xs font-mono font-bold text-[#E2E8F0] uppercase tracking-wider">Canvas: {activeSec}</span>
+                  <span className="text-xs font-bold text-[color:var(--text-primary)]">Canvas: {activeSec}</span>
                 </div>
                 <select
                   aria-label="Select manuscript section to edit"
@@ -633,7 +631,7 @@ export default function ManuscriptDraftingWorkspace({
               <div className="grow p-5 overflow-y-auto">
                 <textarea
                   aria-label="Manuscript section draft editor"
-                  className="w-full h-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm text-[#E2E8F0] leading-relaxed font-sans resize-none min-h-[350px]"
+                  className="w-full h-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm text-[color:var(--text-primary)] leading-relaxed font-sans resize-none min-h-[350px]"
                   placeholder="Start writing or editing your research draft here... Use the global command palette (Cmd+K) to navigate."
                   value={currentText}
                   onChange={(e) => handleTextChange(e.target.value)}
@@ -646,10 +644,10 @@ export default function ManuscriptDraftingWorkspace({
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   {/* Word Count Progress */}
                   <div className="flex items-center gap-2 grow max-w-xs">
-                    <span className="text-[#94A3B8] font-bold uppercase shrink-0 text-[9px]">
+                    <span className="text-[color:var(--text-secondary)] font-bold uppercase shrink-0 text-[9px]">
                       Length: {wordCount} / {getLengthConstraint(activeSec).max}w
                     </span>
-                    <div className="grow h-1.5 bg-[color:var(--color-navy-4)] rounded-full overflow-hidden">
+                    <div className="grow h-1.5 bg-[color:var(--surface-inset)] rounded-full overflow-hidden">
                       <div 
                         className={`h-full rounded-full transition-all ${
                           wordCount < getLengthConstraint(activeSec).min 
@@ -676,7 +674,7 @@ export default function ManuscriptDraftingWorkspace({
 
                   {/* Originality Index */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[#94A3B8] font-bold uppercase text-[9px]">Originality:</span>
+                    <span className="text-[color:var(--text-secondary)] font-bold uppercase text-[9px]">Originality:</span>
                     <span className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${
                       calculateOriginalityIndex(currentText) >= 90 
                         ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" 
@@ -688,7 +686,7 @@ export default function ManuscriptDraftingWorkspace({
 
                   {/* Style warnings */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[#94A3B8] font-bold uppercase text-[9px]">Style Errors:</span>
+                    <span className="text-[color:var(--text-secondary)] font-bold uppercase text-[9px]">Style Errors:</span>
                     <span className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${
                       checkAcademicTone(currentText).length === 0 
                         ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" 
@@ -702,10 +700,10 @@ export default function ManuscriptDraftingWorkspace({
                 {/* Tone warnings suggestion list */}
                 {checkAcademicTone(currentText).length > 0 && (
                   <div className="mt-1 pt-1.5 border-t border-[color:var(--color-navy-4)]/50 max-h-[50px] overflow-y-auto flex flex-wrap gap-1.5 text-[9px] text-[color:var(--color-luminous-blue)]">
-                    <span className="font-bold text-[#94A3B8] mr-1">Suggestions:</span>
+                    <span className="font-bold text-[color:var(--text-secondary)] mr-1">Suggestions:</span>
                     {checkAcademicTone(currentText).slice(0, 4).map((warn, i) => (
                       <span key={i} className="bg-amber-500/10 border border-amber-500/20 rounded px-1">
-                        "{warn.word}" → <span className="font-bold text-[#E2E8F0]">{warn.replacement}</span>
+                        "{warn.word}" → <span className="font-bold text-[color:var(--text-primary)]">{warn.replacement}</span>
                       </span>
                     ))}
                   </div>
@@ -727,9 +725,7 @@ export default function ManuscriptDraftingWorkspace({
                     <button
                       key={tab.id}
                       onClick={() => setDrawerTab(tab.id as any)}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
-                        isActive ? "bg-[color:var(--color-luminous-blue-dim)] text-white" : "text-[#94A3B8] hover:bg-[color:var(--color-navy-3)]"
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${ isActive ? "bg-[color:var(--color-luminous-blue-dim)] text-[color:var(--text-primary)]" : "text-[color:var(--text-secondary)] hover:bg-[color:var(--color-navy-3)]" }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
                       <span>{tab.name}</span>
@@ -742,11 +738,11 @@ export default function ManuscriptDraftingWorkspace({
                 {drawerTab === "citations" && (
                   <div className="space-y-4">
                     <div className="border border-[color:var(--color-navy-4)] rounded-xl bg-[color:var(--color-navy-2)] p-3 space-y-2">
-                      <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#E2E8F0] flex items-center gap-1">
+                      <h4 className="text-xs font-bold text-[color:var(--text-primary)] flex items-center gap-1">
                         <BookOpenCheck className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" />
                         APA/IEEE Inline Preview
                       </h4>
-                      <p className="text-[10px] text-[#94A3B8] leading-normal">
+                      <p className="text-[10px] text-[color:var(--text-secondary)] leading-normal">
                         Copy inline formats compiled from your private research vault.
                       </p>
                       
@@ -759,21 +755,21 @@ export default function ManuscriptDraftingWorkspace({
                             const tag = file.parsedOverview?.citationTag || file.id;
 
                             return (
-                              <div key={file.id} className="p-2 border border-[color:var(--color-navy-4)] rounded-lg hover:border-[color:var(--color-luminous-blue)]/40 transition-colors text-[10px] bg-[color:var(--color-navy-1)] text-[#E2E8F0]">
-                                <div className="flex items-center justify-between font-mono font-bold text-[#E2E8F0]">
+                              <div key={file.id} className="p-2 border border-[color:var(--color-navy-4)] rounded-lg hover:border-[color:var(--color-luminous-blue)]/40 transition-colors text-[10px] bg-[color:var(--color-navy-1)] text-[color:var(--text-primary)]">
+                                <div className="flex items-center justify-between font-mono font-bold text-[color:var(--text-primary)]">
                                   <span className="line-clamp-1 grow mr-2">{file.fileName}</span>
                                   <span className="text-[color:var(--color-luminous-blue)] shrink-0 font-normal">[{tag}]</span>
                                 </div>
                                 <div className="mt-2 flex gap-1.5">
                                   <button
                                     onClick={() => navigator.clipboard.writeText(`(${authorStr}, ${year})`)}
-                                    className="bg-[color:var(--color-navy-3)] hover:bg-[color:var(--color-navy-4)] text-[#E2E8F0] px-1.5 py-0.5 rounded text-[8px] font-mono cursor-pointer transition-colors"
+                                    className="bg-[color:var(--color-navy-3)] hover:bg-[color:var(--surface-inset)] text-[color:var(--text-primary)] px-1.5 py-0.5 rounded text-[8px] font-mono cursor-pointer transition-colors"
                                   >
                                     APA: ({authorStr}, {year})
                                   </button>
                                   <button
                                     onClick={() => navigator.clipboard.writeText(`[${idx + 1}]`)}
-                                    className="bg-[color:var(--color-navy-3)] hover:bg-[color:var(--color-navy-4)] text-[#E2E8F0] px-1.5 py-0.5 rounded text-[8px] font-mono cursor-pointer transition-colors"
+                                    className="bg-[color:var(--color-navy-3)] hover:bg-[color:var(--surface-inset)] text-[color:var(--text-primary)] px-1.5 py-0.5 rounded text-[8px] font-mono cursor-pointer transition-colors"
                                   >
                                     IEEE: [{idx + 1}]
                                   </button>
@@ -782,7 +778,7 @@ export default function ManuscriptDraftingWorkspace({
                             );
                           })
                         ) : (
-                          <div className="p-8 text-center text-[#94A3B8] text-[10px] font-mono">
+                          <div className="p-8 text-center text-[color:var(--text-secondary)] text-[10px] font-mono">
                             No files loaded in Vault. Use the Knowledge Vault tab.
                           </div>
                         )}
@@ -794,7 +790,7 @@ export default function ManuscriptDraftingWorkspace({
                 {drawerTab === "checker" && (
                   <div className="space-y-4">
                     <div className="border border-[color:var(--color-navy-4)] rounded-xl bg-[color:var(--color-navy-2)] p-4 text-center space-y-3">
-                      <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#E2E8F0] text-left">
+                      <h4 className="text-xs font-bold text-[color:var(--text-primary)] text-left">
                         Framework Resonance Analysis
                       </h4>
                       
@@ -805,18 +801,18 @@ export default function ManuscriptDraftingWorkspace({
                           style={{ transform: `rotate(${Math.min(360, (checkThematicAlignment(currentText).score / 100) * 360 - 90)}deg)` }}
                         />
                         <div className="flex flex-col items-center">
-                          <span className="text-xl font-mono font-bold text-[#E2E8F0]">{checkThematicAlignment(currentText).score}%</span>
+                          <span className="text-xl font-mono font-bold text-[color:var(--text-primary)]">{checkThematicAlignment(currentText).score}%</span>
                           <span className="text-[8px] uppercase tracking-wider font-bold text-[color:var(--color-luminous-blue)]">Ṛta Match</span>
                         </div>
                       </div>
                       
-                      <p className="text-[10px] text-[#94A3B8] leading-relaxed font-sans px-2">
+                      <p className="text-[10px] text-[color:var(--text-secondary)] leading-relaxed font-sans px-2">
                         {checkThematicAlignment(currentText).feedback}
                       </p>
                     </div>
 
                     <div className="border border-[color:var(--color-navy-4)] rounded-xl bg-[color:var(--color-navy-2)] p-3 space-y-2 text-[10px]">
-                      <h4 className="font-mono font-bold uppercase tracking-wider text-[#E2E8F0] flex items-center gap-1">
+                      <h4 className="font-bold text-[color:var(--text-primary)] flex items-center gap-1">
                         <Award className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" />
                         Detected Framework Anchors
                       </h4>
@@ -829,7 +825,7 @@ export default function ManuscriptDraftingWorkspace({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-[#94A3B8] italic text-[9px]">No core framework terms detected in the active segment.</p>
+                        <p className="text-[color:var(--text-secondary)] italic text-[9px]">No core framework terms detected in the active segment.</p>
                       )}
                     </div>
                   </div>
@@ -838,7 +834,7 @@ export default function ManuscriptDraftingWorkspace({
                 {drawerTab === "vault" && (
                   <div className="space-y-4">
                     <div className="border border-[color:var(--color-navy-4)] rounded-xl bg-[color:var(--color-navy-2)] p-3 space-y-2 text-[10px]">
-                      <h4 className="font-mono font-bold uppercase tracking-wider text-[#E2E8F0] flex items-center gap-1">
+                      <h4 className="font-bold text-[color:var(--text-primary)] flex items-center gap-1">
                         <Layers className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" />
                         Chapter Continuity Excerpts
                       </h4>
@@ -847,14 +843,14 @@ export default function ManuscriptDraftingWorkspace({
                           .filter(s => s !== activeSec && project.sections[s]?.trim())
                           .map(s => (
                             <div key={s} className="p-2 bg-[color:var(--color-navy-1)] rounded-lg border border-[color:var(--color-navy-4)]">
-                              <span className="font-mono font-bold text-[#E2E8F0] text-[9px] uppercase tracking-wider block mb-1">{s}</span>
-                              <p className="text-[#94A3B8] text-[9px] leading-relaxed line-clamp-3">
+                              <span className="font-bold text-[color:var(--text-primary)] text-[9px] block mb-1">{s}</span>
+                              <p className="text-[color:var(--text-secondary)] text-[9px] leading-relaxed line-clamp-3">
                                 {project.sections[s]}
                               </p>
                             </div>
                           ))}
                         {sectionsList.filter(s => s !== activeSec && project.sections[s]?.trim()).length === 0 && (
-                          <div className="p-4 text-center text-[#94A3B8] italic text-[9px]">
+                          <div className="p-4 text-center text-[color:var(--text-secondary)] italic text-[9px]">
                             No other sections drafted yet.
                           </div>
                         )}
@@ -864,7 +860,7 @@ export default function ManuscriptDraftingWorkspace({
                 )}
               </div>
 
-              <div className="border-t border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-2)] p-2.5 shrink-0 flex items-center justify-between text-[9px] font-mono text-[#94A3B8]">
+              <div className="border-t border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-2)] p-2.5 shrink-0 flex items-center justify-between text-[9px] font-mono text-[color:var(--text-secondary)]">
                 <span>Focus intelligence Drawer</span>
                 <span>OS V1.0</span>
               </div>
@@ -877,7 +873,7 @@ export default function ManuscriptDraftingWorkspace({
             <div className="lg:col-span-4 space-y-4">
               {/* Section picker */}
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-4 space-y-2">
-                <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                <label className="block text-xs font-bold text-[color:var(--text-secondary)]">
                   1. Select Manuscript Section
                 </label>
                 <div className="flex flex-col gap-1.5 max-h-[220px] overflow-y-auto pr-1">
@@ -895,10 +891,10 @@ export default function ManuscriptDraftingWorkspace({
                         }}
                         className={`px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all text-left flex items-center justify-between gap-2 border cursor-pointer ${
                           isActive
-                            ? "bg-[color:var(--color-luminous-blue-dim)] text-white border-[color:var(--color-luminous-blue-dim)] shadow-sm"
+                            ? "bg-[color:var(--color-luminous-blue-dim)] text-[color:var(--text-primary)] border-[color:var(--color-luminous-blue-dim)] shadow-sm"
                             : isDrafted
                             ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                            : "bg-[color:var(--color-navy-1)] text-[#94A3B8] border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-2)] hover:border-[color:var(--color-luminous-blue)]/30"
+                            : "bg-[color:var(--color-navy-1)] text-[color:var(--text-secondary)] border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-2)] hover:border-[color:var(--color-luminous-blue)]/30"
                         }`}
                       >
                         <span className="truncate flex-1">{sec}</span>
@@ -919,13 +915,13 @@ export default function ManuscriptDraftingWorkspace({
               {/* Style & Writing Controls */}
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-4 space-y-3">
                 <div>
-                  <label htmlFor="writing-style-sample" className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1">
+                  <label htmlFor="writing-style-sample" className="block text-xs font-bold text-[color:var(--text-secondary)] mb-1">
                     2. Writing Style Sample
                   </label>
                   <textarea
                     id="writing-style-sample"
                     rows={2}
-                    className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)] font-sans"
+                    className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-2.5 py-2 text-xs text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)] font-sans"
                     placeholder="Paste a sample of your academic writing for style mimicry..."
                     value={styleSample}
                     onChange={(e) => setStyleSample(e.target.value)}
@@ -934,7 +930,7 @@ export default function ManuscriptDraftingWorkspace({
 
                 <div className="flex items-center justify-between p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                   <label htmlFor="scripture-toggle" className="cursor-pointer">
-                    <span className="text-xs font-bold font-mono text-amber-400 uppercase block">Scriptural & Ethical Support</span>
+                    <span className="text-xs font-bold text-amber-400 block">Scriptural & Ethical Support</span>
                     <p className="text-[10px] text-amber-300/80 leading-normal mt-0.5">
                       Integrate Vedic/classical references when relevant
                     </p>
@@ -950,7 +946,7 @@ export default function ManuscriptDraftingWorkspace({
 
                 <div className="flex items-center justify-between p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                   <label htmlFor="humanize-toggle" className="cursor-pointer">
-                    <span className="text-xs font-bold font-mono text-blue-400 uppercase block">Humanize Prose</span>
+                    <span className="text-xs font-bold text-blue-400 block">Humanize Prose</span>
                     <p className="text-[10px] text-blue-300/80 leading-normal mt-0.5">
                       Post-process the draft to reduce formulaic AI-writing patterns (stock transitions, hollow topic sentences, passive voice, uniform sentence length, hedging)
                     </p>
@@ -965,13 +961,13 @@ export default function ManuscriptDraftingWorkspace({
                 </div>
 
                 <div>
-                  <label htmlFor="section-outline" className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1">
+                  <label htmlFor="section-outline" className="block text-xs font-bold text-[color:var(--text-secondary)] mb-1">
                     3. Section Outline (Optional)
                   </label>
                   <textarea
                     id="section-outline"
                     rows={2}
-                    className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)] placeholder:text-[#94A3B8] font-sans"
+                    className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-2.5 py-2 text-xs text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)] placeholder:text-[color:var(--text-secondary)] font-sans"
                     placeholder="e.g.:&#10;- Definition of trusteeship&#10;- Critique of Milton Friedman..."
                     value={outline}
                     onChange={(e) => setOutline(e.target.value)}
@@ -979,13 +975,13 @@ export default function ManuscriptDraftingWorkspace({
                 </div>
 
                 <div>
-                  <label htmlFor="custom-writing-directives" className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider mb-1">
+                  <label htmlFor="custom-writing-directives" className="block text-xs font-bold text-[color:var(--text-secondary)] mb-1">
                     4. Custom Writing Directives
                   </label>
                   <input
                     id="custom-writing-directives"
                     type="text"
-                    className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-2.5 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)] font-sans"
+                    className="w-full bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg px-2.5 py-2 text-xs text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)] font-sans"
                     placeholder="e.g. 'Synthesize with World Bank data findings...'"
                     value={customInstruction}
                     onChange={(e) => setCustomInstruction(e.target.value)}
@@ -995,7 +991,7 @@ export default function ManuscriptDraftingWorkspace({
                 {/* Continuity Context Hint */}
                 {draftedSections.length > 0 && (
                   <div className="p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                    <span className="text-[9px] font-mono font-bold text-blue-400 uppercase block mb-1">
+                    <span className="text-[9px] font-bold text-blue-400 block mb-1">
                       ✓ Multi-Section Continuity Active
                     </span>
                     <p className="text-[10px] text-blue-300/80 leading-normal">
@@ -1011,12 +1007,12 @@ export default function ManuscriptDraftingWorkspace({
                   onClick={draftSection}
                   disabled={loading || isCurrentLocked}
                   title={isCurrentLocked ? "Section is locked. Unlock to draft." : ""}
-                  className="w-full py-3 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--color-navy-4)] disabled:text-[#94A3B8] disabled:cursor-not-allowed font-bold text-white text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer font-mono uppercase tracking-wider shadow-sm"
+                  className="w-full py-3 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--surface-inset)] disabled:text-[color:var(--text-secondary)] disabled:cursor-not-allowed font-bold text-[color:var(--text-primary)] text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                 >
                   {loading ? (
                     <><RefreshCcw className="w-4 h-4 animate-spin" />Co-Writing Draft...</>
                   ) : isCurrentLocked ? (
-                    <><Lock className="w-4 h-4 text-[#94A3B8]" />Section Locked</>
+                    <><Lock className="w-4 h-4 text-[color:var(--text-secondary)]" />Section Locked</>
                   ) : (
                     <><Sparkles className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />Trigger Drafting Co-Agent</>
                   )}
@@ -1024,7 +1020,7 @@ export default function ManuscriptDraftingWorkspace({
                 <button
                   onClick={loadStandardDraftSegment}
                   disabled={loading || isCurrentLocked}
-                  className="w-full py-2.5 bg-[color:var(--color-navy-2)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] disabled:opacity-50 text-[#E2E8F0] text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer font-mono uppercase tracking-wider"
+                  className="w-full py-2.5 bg-[color:var(--color-navy-2)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] disabled:opacity-50 text-[color:var(--text-primary)] text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" />
                   Skip & Pre-Compile Offline
@@ -1033,7 +1029,7 @@ export default function ManuscriptDraftingWorkspace({
                   onClick={generateFullDraftWithAgent}
                   disabled={agentDraftLoading}
                   title="Generates all sections at once via the Manuscript Writer Agent, filling only sections that are currently empty — never overwrites anything already drafted."
-                  className="w-full py-2.5 bg-[color:var(--color-navy-2)] hover:bg-[color:var(--color-navy-3)] border border-dashed border-[#94A3B8]/40 disabled:opacity-50 text-[#94A3B8] text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer font-mono uppercase tracking-wider"
+                  className="w-full py-2.5 bg-[color:var(--color-navy-2)] hover:bg-[color:var(--color-navy-3)] border border-dashed border-[color:var(--text-secondary)]/40 disabled:opacity-50 text-[color:var(--text-secondary)] text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {agentDraftLoading ? (
                     <><RefreshCcw className="w-3.5 h-3.5 animate-spin" />Generating Full Draft...</>
@@ -1056,7 +1052,7 @@ export default function ManuscriptDraftingWorkspace({
               <div className="border-b border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-3)] px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
-                  <span className="text-xs font-mono font-bold text-[#E2E8F0] truncate max-w-[200px]">
+                  <span className="text-xs font-mono font-bold text-[color:var(--text-primary)] truncate max-w-[200px]">
                     {activeSec}
                   </span>
                 </div>
@@ -1067,40 +1063,34 @@ export default function ManuscriptDraftingWorkspace({
                     <button
                       type="button"
                       onClick={() => setEditorMode("edit")}
-                      className={`px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded-md transition-all cursor-pointer ${
-                        editorMode === "edit" ? "bg-[color:var(--color-navy-2)] text-[#E2E8F0] shadow-sm" : "text-[#94A3B8] hover:text-[#E2E8F0]"
-                      }`}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${ editorMode === "edit" ? "bg-[color:var(--color-navy-2)] text-[color:var(--text-primary)] shadow-sm" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]" }`}
                     >
                       Edit text
                     </button>
                     <button
                       type="button"
                       onClick={() => setEditorMode("preview")}
-                      className={`px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded-md transition-all cursor-pointer ${
-                        editorMode === "preview" ? "bg-[color:var(--color-navy-2)] text-[#E2E8F0] shadow-sm" : "text-[#94A3B8] hover:text-[#E2E8F0]"
-                      }`}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${ editorMode === "preview" ? "bg-[color:var(--color-navy-2)] text-[color:var(--text-primary)] shadow-sm" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]" }`}
                     >
                       Live PDF Preview
                     </button>
                     <button
                       type="button"
                       onClick={() => setEditorMode("chat")}
-                      className={`px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded-md transition-all cursor-pointer ${
-                        editorMode === "chat" ? "bg-[color:var(--color-navy-2)] text-[#E2E8F0] shadow-sm" : "text-[#94A3B8] hover:text-[#E2E8F0]"
-                      }`}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${ editorMode === "chat" ? "bg-[color:var(--color-navy-2)] text-[color:var(--text-primary)] shadow-sm" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]" }`}
                     >
                       AI Chat Refiner
                     </button>
                   </div>
 
-                  <div className="h-4 w-[1px] bg-[color:var(--color-navy-4)]" />
+                  <div className="h-4 w-[1px] bg-[color:var(--surface-inset)]" />
 
-                  <span className="text-[10px] text-[#94A3B8] font-mono">{wordCount.toLocaleString()} words</span>
+                  <span className="text-[10px] text-[color:var(--text-secondary)] font-mono">{wordCount.toLocaleString()} words</span>
 
                   {/* Version History */}
                   <button
                     onClick={() => setShowHistory(!showHistory)}
-                    className="p-1.5 hover:bg-[color:var(--color-navy-3)] rounded-lg transition-all cursor-pointer text-[#94A3B8] hover:text-[#E2E8F0]"
+                    className="p-1.5 hover:bg-[color:var(--color-navy-3)] rounded-lg transition-all cursor-pointer text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                     title="Version History"
                   >
                     <History className="w-3.5 h-3.5" />
@@ -1110,7 +1100,7 @@ export default function ManuscriptDraftingWorkspace({
                   {diffPrev !== null && (
                     <button
                       onClick={() => setShowDiff(!showDiff)}
-                      className={`p-1.5 rounded-lg transition-all cursor-pointer ${showDiff ? "bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)]" : "hover:bg-[color:var(--color-navy-3)] text-[#94A3B8]"}`}
+                      className={`p-1.5 rounded-lg transition-all cursor-pointer ${showDiff ? "bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)]" : "hover:bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)]"}`}
                       title="Show/hide diff"
                     >
                       <GitCompare className="w-3.5 h-3.5" />
@@ -1120,7 +1110,7 @@ export default function ManuscriptDraftingWorkspace({
                   {/* Copy */}
                   <button
                     onClick={handleCopy}
-                    className="p-1.5 hover:bg-[color:var(--color-navy-3)] rounded-lg transition-all cursor-pointer text-[#94A3B8] hover:text-[#E2E8F0]"
+                    className="p-1.5 hover:bg-[color:var(--color-navy-3)] rounded-lg transition-all cursor-pointer text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                     title="Copy text"
                   >
                     {copiedSection === activeSec ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -1129,7 +1119,7 @@ export default function ManuscriptDraftingWorkspace({
                   {/* Manual Save */}
                   <button
                     onClick={() => saveVersion("Manual save checkpoint")}
-                    className="p-1.5 hover:bg-[color:var(--color-navy-3)] rounded-lg transition-all cursor-pointer text-[#94A3B8] hover:text-[#E2E8F0]"
+                    className="p-1.5 hover:bg-[color:var(--color-navy-3)] rounded-lg transition-all cursor-pointer text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                     title="Save version checkpoint"
                   >
                     <Save className="w-3.5 h-3.5" />
@@ -1141,7 +1131,7 @@ export default function ManuscriptDraftingWorkspace({
                     className={`p-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-mono ${
                       isCurrentLocked
                         ? "bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
-                        : "hover:bg-[color:var(--color-navy-3)] text-[#94A3B8] hover:text-[#E2E8F0]"
+                        : "hover:bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                     }`}
                     title={isCurrentLocked ? "Unlock section" : "Lock section to prevent edits"}
                   >
@@ -1152,31 +1142,31 @@ export default function ManuscriptDraftingWorkspace({
 
               {/* Version History Drawer */}
               {showHistory && (
-                <div className="border-b border-[#E2E8F0] bg-[color:var(--color-navy-1)] px-4 py-3 space-y-2">
+                <div className="border-b border-[color:var(--text-primary)] bg-[color:var(--color-navy-1)] px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
                       <Clock className="w-3 h-3" />
                       Revision History — {activeSec}
                     </span>
-                    <button onClick={() => setShowHistory(false)} className="text-[10px] text-[#94A3B8] hover:text-[#E2E8F0] cursor-pointer font-mono">
+                    <button onClick={() => setShowHistory(false)} className="text-[10px] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer font-mono">
                       Close
                     </button>
                   </div>
                   {sectionVersions.length === 0 ? (
-                    <p className="text-[11px] text-[#94A3B8] italic">No saved versions for this section yet.</p>
+                    <p className="text-[11px] text-[color:var(--text-secondary)] italic">No saved versions for this section yet.</p>
                   ) : (
                     <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
                       {sectionVersions.map((v) => (
                         <div key={v.id} className="flex items-center justify-between text-[11px] bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-1.5 gap-4">
                           <div>
-                            <span className="text-[#E2E8F0] font-mono font-semibold">{v.description.replace(`[${activeSec}] `, "")}</span>
-                            <span className="text-[#94A3B8] ml-2 font-mono">
+                            <span className="text-[color:var(--text-primary)] font-mono font-semibold">{v.description.replace(`[${activeSec}] `, "")}</span>
+                            <span className="text-[color:var(--text-secondary)] ml-2 font-mono">
                               {new Date(v.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </span>
                           </div>
                           <button
                             onClick={() => restoreVersion(v)}
-                            className="text-[10px] text-[color:var(--color-luminous-blue)] hover:text-[#E2E8F0] font-mono cursor-pointer uppercase tracking-wider"
+                            className="text-xs text-[color:var(--color-luminous-blue)] hover:text-[color:var(--text-primary)] cursor-pointer"
                           >
                             Restore
                           </button>
@@ -1206,34 +1196,34 @@ export default function ManuscriptDraftingWorkspace({
                 ) : editorMode === "chat" ? (
                   <div className="grow flex flex-col bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl overflow-hidden min-h-[460px]">
                     {/* Chat Header */}
-                    <div className="bg-[color:var(--color-navy-3)] text-white px-4 py-2 flex items-center justify-between text-xs font-mono uppercase tracking-wider shrink-0 border-b border-[color:var(--color-navy-4)]">
+                    <div className="bg-[color:var(--color-navy-3)] text-[color:var(--text-primary)] px-4 py-2 flex items-center justify-between text-xs shrink-0 border-b border-[color:var(--color-navy-4)]">
                       <span>AI Section Refiner Chat</span>
-                      <span className="text-[10px] text-[#94A3B8]/50">Target: {activeSec}</span>
+                      <span className="text-[10px] text-[color:var(--text-secondary)]/50">Target: {activeSec}</span>
                     </div>
                     {/* Chat Messages */}
                     <div className="flex-1 p-4 overflow-y-auto space-y-3 max-h-[340px]">
                       {chatMessages.length === 0 ? (
-                        <div className="text-center text-[#94A3B8] py-8 space-y-2">
-                          <MessageSquare className="w-8 h-8 mx-auto text-[#94A3B8]/50 animate-pulse" />
+                        <div className="text-center text-[color:var(--text-secondary)] py-8 space-y-2">
+                          <MessageSquare className="w-8 h-8 mx-auto text-[color:var(--text-secondary)]/50 animate-pulse" />
                           <p className="text-xs">Ask the AI chat assistant to refine, expand, or adjust the tone of the <strong>{activeSec}</strong> draft.</p>
-                          <p className="text-[10px] text-[#94A3B8]">e.g. "Add a paragraph explaining the methodology" or "Make the language more formal."</p>
+                          <p className="text-[10px] text-[color:var(--text-secondary)]">e.g. "Add a paragraph explaining the methodology" or "Make the language more formal."</p>
                         </div>
                       ) : (
                         chatMessages.map(msg => (
                           <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                             <div className={`max-w-[85%] rounded-xl p-3 text-xs leading-relaxed ${
                               msg.role === 'user'
-                                ? 'bg-[color:var(--color-luminous-blue-dim)] text-white rounded-tr-none'
-                                : 'bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] text-[#E2E8F0] rounded-tl-none shadow-sm'
+                                ? 'bg-[color:var(--color-luminous-blue-dim)] text-[color:var(--text-primary)] rounded-tr-none'
+                                : 'bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] text-[color:var(--text-primary)] rounded-tl-none shadow-sm'
                             }`}>
                               <p className="whitespace-pre-wrap">{msg.content}</p>
                             </div>
-                            <span className="text-[8px] text-[#94A3B8] mt-1 px-1">{new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            <span className="text-[8px] text-[color:var(--text-secondary)] mt-1 px-1">{new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                           </div>
                         ))
                       )}
                       {chatLoading && (
-                        <div className="flex items-center gap-2 text-xs text-[#94A3B8] font-mono animate-pulse">
+                        <div className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)] font-mono animate-pulse">
                           <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-luminous-blue)] animate-bounce" />
                           <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-luminous-blue)] animate-bounce delay-75" />
                           <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-luminous-blue)] animate-bounce delay-150" />
@@ -1251,7 +1241,7 @@ export default function ManuscriptDraftingWorkspace({
                         onKeyDown={(e) => { if (e.key === 'Enter') handleSendChat(); }}
                         placeholder={`Instruct AI to edit "${activeSec}"...`}
                         disabled={chatLoading}
-                        className="flex-1 p-2 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg text-xs placeholder-[#94A3B8] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-luminous-blue)] text-[#E2E8F0]"
+                        className="flex-1 p-2 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg text-xs placeholder-[color:var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-luminous-blue)] text-[color:var(--text-primary)]"
                       />
                       <button
                         onClick={handleSendChat}
@@ -1267,8 +1257,8 @@ export default function ManuscriptDraftingWorkspace({
                   <div className="grow flex flex-col items-center justify-center text-center space-y-4">
                     <div className="w-8 h-8 border-2 border-[color:var(--color-luminous-blue)]/20 border-t-[color:var(--color-luminous-blue)] rounded-full animate-spin" />
                     <div className="max-w-xs space-y-1">
-                      <p className="text-xs text-[#E2E8F0] font-mono animate-pulse">Co-writing academic discourse...</p>
-                      <p className="text-[10px] text-[#94A3B8]">
+                      <p className="text-xs text-[color:var(--text-primary)] font-mono animate-pulse">Co-writing academic discourse...</p>
+                      <p className="text-[10px] text-[color:var(--text-secondary)]">
                         Retrieving dissertation terminology standards and applying cross-section continuity...
                       </p>
                     </div>
@@ -1277,7 +1267,7 @@ export default function ManuscriptDraftingWorkspace({
                   <textarea
                     ref={textareaRef}
                     aria-label="Manuscript section draft editor"
-                    className={`grow w-full bg-transparent border-0 text-[#E2E8F0] text-sm leading-relaxed p-0 focus:ring-0 focus:outline-none font-sans whitespace-pre-line resize-none min-h-[420px] ${
+                    className={`grow w-full bg-transparent border-0 text-[color:var(--text-primary)] text-sm leading-relaxed p-0 focus:ring-0 focus:outline-none font-sans whitespace-pre-line resize-none min-h-[420px] ${
                       isCurrentLocked ? "cursor-not-allowed opacity-60" : ""
                     }`}
                     placeholder={
@@ -1293,7 +1283,7 @@ export default function ManuscriptDraftingWorkspace({
               </div>
 
               {/* Footer Status */}
-              <div className="border-t border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-3)] p-2.5 flex items-center justify-between text-[10px] text-[#94A3B8] font-mono">
+              <div className="border-t border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-3)] p-2.5 flex items-center justify-between text-[10px] text-[color:var(--text-secondary)] font-mono">
                 <span>Auto-saved · {wordCount} words</span>
                 <div className="flex items-center gap-3">
                   {isCurrentLocked && (
@@ -1314,13 +1304,13 @@ export default function ManuscriptDraftingWorkspace({
       <div className="flex justify-between items-center pt-4 border-t border-[color:var(--color-navy-4)]">
         <button
           onClick={onBack}
-          className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[#E2E8F0] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
+          className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[color:var(--text-primary)] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
         >
           ← Back to Requirements
         </button>
         <button
           onClick={onNext}
-          className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-lg transition-all duration-200 shadow-sm cursor-pointer font-mono uppercase tracking-wider"
+          className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-lg transition-all duration-200 shadow-sm cursor-pointer"
         >
           Proceed to Quality Control →
         </button>

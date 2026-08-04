@@ -84,7 +84,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
           ? "border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-3)] opacity-70 cursor-not-allowed"
           : isSelected
           ? "border-[color:var(--color-luminous-blue)] bg-[color:var(--color-luminous-blue)]/10 shadow-lg cursor-pointer"
-          : "border-[#94A3B8]/60 bg-[color:var(--color-navy-2)] hover:border-[color:var(--color-luminous-blue)]/40 hover:shadow-md cursor-pointer"
+          : "border-[color:var(--text-secondary)]/60 bg-[color:var(--color-navy-2)] hover:border-[color:var(--color-luminous-blue)]/40 hover:shadow-md cursor-pointer"
       }`}
     >
       {isSelected && !isComingSoon && (
@@ -98,7 +98,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
         className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
           isSelected && !isComingSoon
             ? "bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)]"
-            : "bg-[color:var(--color-navy-3)] text-[#94A3B8]"
+            : "bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)]"
         }`}
       >
         <Icon className="w-6 h-6" />
@@ -107,18 +107,14 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
       {/* Title + badge */}
       <div>
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 id={titleId} className="text-base font-bold text-[#E2E8F0]">{mode.title}</h3>
+          <h3 id={titleId} className="text-base font-bold text-[color:var(--text-primary)]">{mode.title}</h3>
           <span
-            className={`text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-              isComingSoon
-                ? "bg-[color:var(--color-navy-3)] text-[#94A3B8]"
-                : "bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)]"
-            }`}
+            className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${ isComingSoon ? "bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)]" : "bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)]" }`}
           >
             {mode.badge}
           </span>
         </div>
-        <p className="text-xs text-[#94A3B8] mt-1.5 leading-relaxed">{mode.description}</p>
+        <p className="text-xs text-[color:var(--text-secondary)] mt-1.5 leading-relaxed">{mode.description}</p>
       </div>
 
       <div className="border-t border-[color:var(--color-navy-4)]" />
@@ -127,7 +123,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
       {mode.features.length > 0 && (
         <ul className="space-y-1">
           {mode.features.map((feature) => (
-            <li key={feature} className="text-[11px] text-[#CBD5E1] flex items-start gap-1.5">
+            <li key={feature} className="text-[11px] text-[color:var(--text-secondary)] flex items-start gap-1.5">
               <Check className="w-3 h-3 text-[color:var(--color-luminous-blue)] shrink-0 mt-0.5" />
               <span>{feature}</span>
             </li>
@@ -138,18 +134,18 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
       <div className="border-t border-[color:var(--color-navy-4)]" />
 
       {/* Difficulty / setup time / best-for */}
-      <div className="grid grid-cols-1 gap-1.5 text-[10px] font-mono text-[#94A3B8]">
+      <div className="grid grid-cols-1 gap-1.5 text-[10px] font-mono text-[color:var(--text-secondary)]">
         <div className="flex items-center gap-1.5">
           <Zap className="w-3 h-3 shrink-0" />
-          <span>Difficulty: <strong className="text-[#E2E8F0]">{mode.difficulty}</strong></span>
+          <span>Difficulty: <strong className="text-[color:var(--text-primary)]">{mode.difficulty}</strong></span>
         </div>
         <div className="flex items-center gap-1.5">
           <Clock className="w-3 h-3 shrink-0" />
-          <span>Setup time: <strong className="text-[#E2E8F0]">{mode.setupTime}</strong></span>
+          <span>Setup time: <strong className="text-[color:var(--text-primary)]">{mode.setupTime}</strong></span>
         </div>
         <div className="flex items-start gap-1.5">
           <Target className="w-3 h-3 shrink-0 mt-0.5" />
-          <span>Best for: <strong className="text-[#E2E8F0]">{mode.bestFor}</strong></span>
+          <span>Best for: <strong className="text-[color:var(--text-primary)]">{mode.bestFor}</strong></span>
         </div>
       </div>
 
@@ -162,17 +158,13 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
           e.stopPropagation();
           handleActivate();
         }}
-        className={`w-full py-2.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all ${
-          isComingSoon
-            ? "bg-[color:var(--color-navy-4)] text-[#94A3B8] cursor-not-allowed"
-            : "bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white cursor-pointer"
-        }`}
+        className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${ isComingSoon ? "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] cursor-not-allowed" : "bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-[color:var(--text-primary)] cursor-pointer" }`}
       >
         {mode.ctaLabel}
       </button>
 
       {isComingSoon && mode.comingSoonNote && (
-        <p className="text-[10px] text-[#94A3B8] italic leading-relaxed">{mode.comingSoonNote}</p>
+        <p className="text-[10px] text-[color:var(--text-secondary)] italic leading-relaxed">{mode.comingSoonNote}</p>
       )}
 
       {/* Expandable: How it works */}
@@ -185,7 +177,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
               e.stopPropagation();
               setHowItWorksOpen((v) => !v);
             }}
-            className="w-full flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[#94A3B8] cursor-pointer"
+            className="w-full flex items-center justify-between text-xs font-bold text-[color:var(--text-secondary)] cursor-pointer"
           >
             <span>How it works</span>
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${howItWorksOpen ? "rotate-180" : ""}`} />
@@ -193,7 +185,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
           {howItWorksOpen && (
             <ol className="mt-2 space-y-1.5 list-decimal list-inside">
               {mode.howItWorks.map((step) => (
-                <li key={step} className="text-[11px] text-[#CBD5E1] leading-relaxed">{step}</li>
+                <li key={step} className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">{step}</li>
               ))}
             </ol>
           )}
@@ -210,7 +202,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
               e.stopPropagation();
               setRequirementsOpen((v) => !v);
             }}
-            className="w-full flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[#94A3B8] cursor-pointer"
+            className="w-full flex items-center justify-between text-xs font-bold text-[color:var(--text-secondary)] cursor-pointer"
           >
             <span>Requirements</span>
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${requirementsOpen ? "rotate-180" : ""}`} />
@@ -218,7 +210,7 @@ export default function AIModeCard({ mode, isSelected, onSelect }: AIModeCardPro
           {requirementsOpen && (
             <ul className="mt-2 space-y-1">
               {mode.requirements.map((req) => (
-                <li key={req} className="text-[11px] text-[#CBD5E1] leading-relaxed">• {req}</li>
+                <li key={req} className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">• {req}</li>
               ))}
             </ul>
           )}

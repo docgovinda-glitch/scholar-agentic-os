@@ -1,36 +1,68 @@
-import { useState } from "react";
-import CreateProjectScreen from "./CreateProjectScreen";
+import { useEffect, useState } from "react";
+import DeskAuthGate from "./DeskAuthGate";
 import DeskShell from "./DeskShell";
+import ProjectListScreen from "./ProjectListScreen";
+import { useDeskSession } from "./useDeskSession";
 
 function readProjectIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get("project");
 }
 
 /**
- * Entry point for the new-architecture client (docs 20/21/22 — Desk).
- * Deliberately separate from src/App.tsx (the legacy client, still what
- * production serves) rather than replacing it — see main.tsx for the
- * pathname-based split. Nothing here touches src/components/,
- * src/services/aiGateway.ts, or the legacy /api/generate path; this talks
- * only to server/routes/project.ts's new-architecture endpoints.
+ * Entry point for Desk — the client the product is consolidating onto
+ * (docs 20/21/22).
  *
- * No router library: a single ?project=<id> query param is the only
- * "route" this slice has, in keeping with not adding a dependency for one
- * split. A real router is follow-up work once there's more than one screen
- * to navigate between within Desk itself.
+ * Two things changed when Desk was promoted from an orphaned demo to the
+ * client that will replace src/App.tsx:
+ *
+ *  1. It renders behind DeskAuthGate. It previously mounted outside any auth
+ *     provider, against endpoints that required none.
+ *  2. Its entry surface is the user's own project list, not a bare create
+ *     form. Reaching a project used to mean already knowing its id.
+ *
+ * Still no router library: Desk has two states — list and project — keyed off
+ * one `?project=` param. `popstate` is handled so Back works, which was the
+ * real gap; a router earns its place when there is a third destination.
  */
-export default function DeskApp() {
-  const [projectId, setProjectId] = useState<string | null>(readProjectIdFromUrl());
+function DeskRoutes() {
+  const session = useDeskSession();
+  const [projectId, setProjectId] = useState<string | null>(readProjectIdFromUrl);
 
-  function handleCreated(id: string) {
+  // Keep component state and the URL in step when the user presses Back or
+  // Forward. Without this, going back from a project left the URL on the list
+  // while the shell stayed mounted.
+  useEffect(() => {
+    const onPopState = () => setProjectId(readProjectIdFromUrl());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  function open(id: string) {
     const url = new URL(window.location.href);
     url.searchParams.set("project", id);
     window.history.pushState({}, "", url);
     setProjectId(id);
   }
 
-  if (!projectId) {
-    return <CreateProjectScreen onCreated={handleCreated} />;
+  function close() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("project");
+    window.history.pushState({}, "", url);
+    setProjectId(null);
   }
-  return <DeskShell projectId={projectId} />;
+
+  if (!projectId) {
+    return (
+      <ProjectListScreen onOpen={open} userEmail={session.status === "signed-in" ? session.email : null} />
+    );
+  }
+  return <DeskShell projectId={projectId} onClose={close} />;
+}
+
+export default function DeskApp() {
+  return (
+    <DeskAuthGate>
+      <DeskRoutes />
+    </DeskAuthGate>
+  );
 }

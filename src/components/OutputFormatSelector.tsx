@@ -11,8 +11,8 @@ export default function OutputFormatSelector({ onSelect }: OutputFormatSelectorP
   return (
     <div className="space-y-6">
       <div className="border-b border-[color:var(--color-navy-4)] pb-4">
-        <h2 className="text-lg font-bold text-[#E2E8F0]">What are you producing?</h2>
-        <p className="text-xs text-[#94A3B8] font-sans mt-0.5">
+        <h2 className="text-lg font-bold text-[color:var(--text-primary)]">What are you producing?</h2>
+        <p className="text-xs text-[color:var(--text-secondary)] font-sans mt-0.5">
           Pick an output format first — every research-input field on the next screen adapts to this choice.
         </p>
       </div>
@@ -27,9 +27,9 @@ export default function OutputFormatSelector({ onSelect }: OutputFormatSelectorP
           >
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)] shrink-0" />
-              <span className="text-sm font-bold text-[#E2E8F0]">{option.label}</span>
+              <span className="text-sm font-bold text-[color:var(--text-primary)]">{option.label}</span>
             </div>
-            <p className="text-xs text-[#94A3B8] font-sans leading-relaxed">{option.description}</p>
+            <p className="text-xs text-[color:var(--text-secondary)] font-sans leading-relaxed">{option.description}</p>
           </button>
         ))}
       </div>

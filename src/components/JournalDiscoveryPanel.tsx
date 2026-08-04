@@ -45,7 +45,7 @@ export default function JournalDiscoveryPanel({
 
   return (
     <div id="journal-discovery" className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[color:var(--border-default)] pb-4">
         <div>
           <h2 className="text-xl font-semibold text-white font-display flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-brand-400" />
@@ -103,8 +103,8 @@ export default function JournalDiscoveryPanel({
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-4">
               <div>
-                <h4 className="text-sm font-bold text-[#E2E8F0]">Target Publication Venue</h4>
-                <p className="text-xs text-[#94A3B8]">
+                <h4 className="text-sm font-bold text-[color:var(--text-primary)]">Target Publication Venue</h4>
+                <p className="text-xs text-[color:var(--text-secondary)]">
                   Select a journal to lock-in submission constraints for Phase E compliance translation.
                 </p>
               </div>
@@ -135,7 +135,7 @@ export default function JournalDiscoveryPanel({
                           <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)] rounded border border-[color:var(--color-luminous-blue)]/20">
                             {journal.publisher}
                           </span>
-                          <h3 className="text-base font-bold text-[#E2E8F0] mt-2 group-hover:text-[color:var(--color-luminous-blue)] transition-colors">
+                          <h3 className="text-base font-bold text-[color:var(--text-primary)] mt-2 group-hover:text-[color:var(--color-luminous-blue)] transition-colors">
                             {journal.name}
                           </h3>
                         </div>
@@ -152,34 +152,34 @@ export default function JournalDiscoveryPanel({
 
                       <div className="grid grid-cols-2 gap-3 bg-[color:var(--color-navy-3)] p-3 rounded-lg border border-[color:var(--color-navy-4)]">
                         <div>
-                          <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Fee / APC Status:</span>
-                          <span className="text-xs text-[#E2E8F0] font-semibold mt-1 block font-mono">{journal.feeStatus}</span>
+                          <span className="text-xs font-bold text-[color:var(--text-secondary)] block">Fee / APC Status:</span>
+                          <span className="text-xs text-[color:var(--text-primary)] font-semibold mt-1 block font-mono">{journal.feeStatus}</span>
                         </div>
                         <div>
-                          <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Indexing & Ranking:</span>
-                          <span className="text-xs text-[#E2E8F0] font-semibold mt-1 block font-mono">{journal.ranking}</span>
+                          <span className="text-xs font-bold text-[color:var(--text-secondary)] block">Indexing & Ranking:</span>
+                          <span className="text-xs text-[color:var(--text-primary)] font-semibold mt-1 block font-mono">{journal.ranking}</span>
                         </div>
                       </div>
 
                       <div className="space-y-2.5 text-xs">
                         <div>
-                          <span className="font-bold font-mono text-[color:var(--color-luminous-blue)] uppercase block">Aim & Scope Alignment:</span>
-                          <p className="text-[#94A3B8] mt-0.5 leading-relaxed font-sans">{journal.scopeFit}</p>
+                          <span className="font-bold text-[color:var(--color-luminous-blue)] block">Aim & Scope Alignment:</span>
+                          <p className="text-[color:var(--text-secondary)] mt-0.5 leading-relaxed font-sans">{journal.scopeFit}</p>
                         </div>
                         <div>
-                          <span className="font-bold font-mono text-[color:var(--color-luminous-blue)] uppercase block">Why this is an ideal strategic fit:</span>
-                          <p className="text-[#94A3B8] mt-0.5 leading-relaxed font-sans">{journal.whyFit}</p>
+                          <span className="font-bold text-[color:var(--color-luminous-blue)] block">Why this is an ideal strategic fit:</span>
+                          <p className="text-[color:var(--text-secondary)] mt-0.5 leading-relaxed font-sans">{journal.whyFit}</p>
                         </div>
                         <div>
-                          <span className="font-bold font-mono text-[color:var(--color-luminous-blue)] uppercase block">Reviewing Style:</span>
-                          <p className="text-[#94A3B8] mt-0.5 leading-relaxed italic font-sans">{journal.reviewContext}</p>
+                          <span className="font-bold text-[color:var(--color-luminous-blue)] block">Reviewing Style:</span>
+                          <p className="text-[color:var(--text-secondary)] mt-0.5 leading-relaxed italic font-sans">{journal.reviewContext}</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="flex justify-end pt-4 mt-4 border-t border-[color:var(--color-navy-4)]">
                       <span className={`text-[11px] font-mono flex items-center gap-1 ${
-                        isSelected ? "text-[color:var(--color-luminous-blue)] font-bold" : "text-[#94A3B8] group-hover:text-[#E2E8F0]"
+                        isSelected ? "text-[color:var(--color-luminous-blue)] font-bold" : "text-[color:var(--text-secondary)] group-hover:text-[color:var(--text-primary)]"
                       }`}>
                         {isSelected ? "Selected Target Venue" : "Click to select journal"}
                         <ChevronRight className="w-3 h-3" />
@@ -190,10 +190,10 @@ export default function JournalDiscoveryPanel({
               })}
             </div>
 
-            <div className="flex justify-between items-center pt-4 border-t border-white/10">
+            <div className="flex justify-between items-center pt-4 border-t border-[color:var(--border-default)]">
               <button
                 onClick={onBack}
-                className="px-4 py-2 border border-white/10 hover:bg-white/5 text-gray-300 text-sm rounded-lg transition-all duration-150 cursor-pointer"
+                className="px-4 py-2 border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-gray-300 text-sm rounded-lg transition-all duration-150 cursor-pointer"
               >
                 Back to Empirical Data
               </button>

@@ -18,6 +18,7 @@ import { INTERVENTION_LEVELS, MIN_VOICE_PROFILE_WORDS } from "../../src/domain/l
 import { ALL_L1_PROFILES } from "../../src/domain/language/l1Patterns.ts";
 import { buildVoiceProfile } from "../../src/domain/language/voiceProfile.ts";
 import type { InterventionLevel, VoiceProfile } from "../../src/domain/language/types.ts";
+import { requireAuth } from "../src/middleware/auth.ts";
 
 function isValidLevel(level: unknown): level is InterventionLevel {
   return typeof level === "string" && (INTERVENTION_LEVELS as string[]).includes(level);
@@ -39,7 +40,27 @@ function isValidVoiceProfile(value: unknown): value is VoiceProfile {
   return VOICE_PROFILE_NUMERIC_FIELDS.every((key) => typeof v[key] === "number");
 }
 
+/**
+ * Namespace a client-supplied sessionId to the authenticated user.
+ *
+ * sessionId arrives in the request body and is the key for consent grants
+ * and scope restrictions. Unnamespaced, it is attacker-chosen shared state:
+ * one user could grant provider consent under session "s1" and another could
+ * refine under the same "s1" and inherit that grant, or restrict a scope out
+ * from under someone else. Prefixing with the verified user id keeps every
+ * session key inside exactly one account, whatever the client sends.
+ */
+function scopedSession(req: express.Request, sessionId: string): string {
+  const userId = (req as express.Request & { user?: { id: string } }).user!.id;
+  return `${userId}:${sessionId}`;
+}
+
 export function registerStudioRoutes(app: express.Express, studioLimit: express.RequestHandler): void {
+  // Studio drives model-backed refinement — it spends provider budget and
+  // sends user prose to third parties. It previously required no
+  // authentication at all; every endpoint below now does.
+  app.use("/api/studio", requireAuth);
+
   /**
    * Build a Voice Profile from the user's own writing samples (docs
    * 32-LANGUAGE-AND-VOICE-ARCHITECTURE.md §5: "derived statistics, not
@@ -93,7 +114,7 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
       return res.status(400).json({ error: "Malformed voiceProfile — use the object returned by POST /api/studio/voice-profile." });
     }
 
-    const policy = getPolicyForSession(sessionId);
+    const policy = getPolicyForSession(scopedSession(req, sessionId));
 
     try {
       const result = await refine({
@@ -139,7 +160,7 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
     if (typeof provider !== "string" || provider.length === 0) {
       return res.status(400).json({ error: "Missing required field: provider" });
     }
-    grantConsent(sessionId, provider);
+    grantConsent(scopedSession(req, sessionId), provider);
     return res.json({ ok: true });
   });
 
@@ -159,7 +180,7 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
     if (typeof scopeId !== "string" || scopeId.length === 0) {
       return res.status(400).json({ error: "Missing required field: scopeId" });
     }
-    restrictScope(sessionId, scopeId);
+    restrictScope(scopedSession(req, sessionId), scopeId);
     return res.json({ ok: true });
   });
 

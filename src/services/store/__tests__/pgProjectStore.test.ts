@@ -23,9 +23,10 @@ describe("services/store: pgProjectStore", () => {
   it("create() inserts a row with empty answers/waivers and an empty claim graph, and returns the same shape as the in-memory store", async () => {
     const db = fakeDb();
     const store = createPgProjectStore(db);
-    const record = await store.create("OT-07");
+    const record = await store.create("OT-07", "11111111-1111-4111-8111-111111111111");
 
     expect(record.projectId).toMatch(/^proj-/);
+    expect(record.ownerId).toBe("11111111-1111-4111-8111-111111111111");
     expect(record.outputTypeId).toBe("OT-07");
     expect(record.answers).toEqual({});
     expect(record.waivers).toEqual({});
@@ -36,13 +37,15 @@ describe("services/store: pgProjectStore", () => {
     expect(db.calls).toHaveLength(1);
     expect(db.calls[0].text).toMatch(/insert into public\.projects/i);
     expect(db.calls[0].params?.[0]).toBe(record.projectId);
-    expect(db.calls[0].params?.[1]).toBe("OT-07");
+    expect(db.calls[0].params?.[1]).toBe("11111111-1111-4111-8111-111111111111"); // owner_id
+    expect(db.calls[0].params?.[2]).toBe("OT-07");
   });
 
   it("get() maps a jsonb row back into a ProjectRecord, treating null document/rubric_report as undefined", async () => {
     const db = fakeDb([
       {
         project_id: "proj-abc",
+        owner_id: "11111111-1111-4111-8111-111111111111",
         output_type_id: "OT-07",
         answers: { research_question: "provisional" },
         gates: { G0: { status: "ready" } },
@@ -56,6 +59,7 @@ describe("services/store: pgProjectStore", () => {
     const record = await store.get("proj-abc");
 
     expect(record).toBeDefined();
+    expect(record?.ownerId).toBe("11111111-1111-4111-8111-111111111111");
     expect(record?.document).toBeUndefined();
     expect(record?.rubricReport).toBeUndefined();
     expect(record?.answers).toEqual({ research_question: "provisional" });
@@ -74,6 +78,7 @@ describe("services/store: pgProjectStore", () => {
     const store = createPgProjectStore(db);
     const record: ProjectRecord = {
       projectId: "proj-xyz",
+      ownerId: "11111111-1111-4111-8111-111111111111",
       outputTypeId: "OT-07",
       answers: {},
       gates: {} as ProjectRecord["gates"],
@@ -84,8 +89,20 @@ describe("services/store: pgProjectStore", () => {
     const saved = await store.save(record);
     expect(saved).toBe(record);
     expect(db.calls[0].text).toMatch(/on conflict \(project_id\) do update/i);
-    expect(db.calls[0].params?.[4]).toBeNull(); // document
-    expect(db.calls[0].params?.[5]).toBeNull(); // rubric_report
+    expect(db.calls[0].params?.[5]).toBeNull(); // document
+    expect(db.calls[0].params?.[6]).toBeNull(); // rubric_report
+  });
+
+  it("listByOwner() scopes the query to the owner in SQL, not in memory", async () => {
+    const db = fakeDb([]);
+    const store = createPgProjectStore(db);
+    await store.listByOwner("11111111-1111-4111-8111-111111111111");
+
+    // The owner filter must be in the WHERE clause. Selecting every row and
+    // filtering after the fact would put one bug between a user and everyone
+    // else's projects.
+    expect(db.calls[0].text).toMatch(/where owner_id = \$1/i);
+    expect(db.calls[0].params).toEqual(["11111111-1111-4111-8111-111111111111"]);
   });
 
   it("save() serializes a present document as JSON, not passed through raw", async () => {
@@ -93,6 +110,7 @@ describe("services/store: pgProjectStore", () => {
     const store = createPgProjectStore(db);
     const record: ProjectRecord = {
       projectId: "proj-doc",
+      ownerId: "11111111-1111-4111-8111-111111111111",
       outputTypeId: "OT-07",
       answers: {},
       gates: {} as ProjectRecord["gates"],
@@ -102,7 +120,7 @@ describe("services/store: pgProjectStore", () => {
     };
 
     await store.save(record);
-    const documentParam = db.calls[0].params?.[4];
+    const documentParam = db.calls[0].params?.[5];
     expect(typeof documentParam).toBe("string");
     expect(JSON.parse(documentParam as string)).toEqual(record.document);
   });

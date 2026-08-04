@@ -15,6 +15,7 @@ import {
   Smartphone
 } from "lucide-react";
 import { PaperProject } from "../../types";
+import ThemeToggle from "./ThemeToggle";
 
 // Subcomponent: Application Header (logo, history nav, dashboard/workspace toggle,
 // quick-jump selector, PDF button, reset button, exit/logout button, status bar, tab navigation)
@@ -47,9 +48,9 @@ export default function AppHeader({
 }: AppHeaderProps) {
   return (
     <header className="chrome-dark sticky top-0 z-50 border-b shadow-sm shrink-0">
-      <div className="px-6 py-4 flex items-center justify-between border-b border-white/5 gap-4 flex-wrap">
+      <div className="px-6 py-4 flex items-center justify-between border-b border-[color:var(--border-subtle)] gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="chrome-dark-subtle w-10 h-10 rounded-xl border border-white/10 flex items-center justify-center shrink-0 shadow-sm">
+          <div className="chrome-dark-subtle w-10 h-10 rounded-xl border border-[color:var(--border-default)] flex items-center justify-center shrink-0 shadow-sm">
             <GraduationCap className="w-6 h-6 chrome-dark-accent" />
           </div>
           <div>
@@ -57,10 +58,10 @@ export default function AppHeader({
                 lockup only (.wordmark, index.css), gold reserved for the
                 second word only per the scoping doc's reversal #2/#3 —
                 never general emphasis, never the whole heading. */}
-            <h1 className="wordmark text-xl font-bold text-[#E2E8F0] tracking-tight leading-tight">
+            <h1 className="wordmark text-xl font-bold text-[color:var(--text-primary)] tracking-tight leading-tight">
               🎓 Scholar <span style={{ color: "var(--color-gold-accent)" }}>Agentic OS</span>
             </h1>
-            <p className="text-[10px] uppercase tracking-[0.15em] font-bold font-mono" style={{ color: "var(--color-luminous-blue)" }}>
+            <p className="text-xs tracking-[0.15em] font-bold" style={{ color: "var(--color-luminous-blue)" }}>
               AI Research Operating System
             </p>
           </div>
@@ -73,17 +74,17 @@ export default function AppHeader({
             390px viewport, scrolling the whole page sideways on phones. */}
         <div className="flex items-center gap-2.5 min-w-0">
           {/* Native Browser History Nav mimics */}
-          <div className="chrome-dark-subtle flex items-center gap-1 border border-white/10 rounded-lg p-1 shadow-inner shrink-0">
+          <div className="chrome-dark-subtle flex items-center gap-1 border border-[color:var(--border-default)] rounded-lg p-1 shadow-inner shrink-0">
             <button
               onClick={() => window.history.back()}
-              className="p-1 hover:bg-white/10 rounded text-[#94A3B8] hover:chrome-dark-accent cursor-pointer transition-colors"
+              className="p-1 hover:bg-[color:var(--surface-hover)] rounded text-[color:var(--text-secondary)] hover:chrome-dark-accent cursor-pointer transition-colors"
               title="Go Back"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => window.history.forward()}
-              className="p-1 hover:bg-white/10 rounded text-[#94A3B8] hover:chrome-dark-accent cursor-pointer transition-colors"
+              className="p-1 hover:bg-[color:var(--surface-hover)] rounded text-[color:var(--text-secondary)] hover:chrome-dark-accent cursor-pointer transition-colors"
               title="Go Forward"
             >
               <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
@@ -93,7 +94,7 @@ export default function AppHeader({
           {/* Home Button */}
           <button
             onClick={() => { window.location.hash = "#dashboard"; }}
-            className="chrome-dark-subtle p-1.5 border border-white/10 hover:bg-white/10 rounded-lg text-[#94A3B8] hover:text-[color:var(--color-luminous-blue)] transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center"
+            className="chrome-dark-subtle p-1.5 border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] rounded-lg text-[color:var(--text-secondary)] hover:text-[color:var(--color-luminous-blue)] transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center"
             title="Go to Dashboard Home"
           >
             <LayoutDashboard className="w-4 h-4" />
@@ -104,7 +105,7 @@ export default function AppHeader({
             <select
               value={onboardingStep !== "workshop" ? `#onboarding/${onboardingStep}` : (viewMode === "dashboard" ? "#dashboard" : `#workspace/${activeTab}`)}
               onChange={(e) => { window.location.hash = e.target.value; }}
-              className="chrome-dark-subtle min-w-0 w-full max-w-[14rem] truncate px-3 py-1.5 border border-white/10 rounded-lg text-xs font-mono font-bold text-[#E2E8F0] focus:ring-1 focus:ring-[color:var(--color-luminous-blue)] focus:outline-none cursor-pointer shadow-sm"
+              className="chrome-dark-subtle min-w-0 w-full max-w-[14rem] truncate px-3 py-1.5 border border-[color:var(--border-default)] rounded-lg text-xs font-mono font-bold text-[color:var(--text-primary)] focus:ring-1 focus:ring-[color:var(--color-luminous-blue)] focus:outline-none cursor-pointer shadow-sm"
             >
               <optgroup label="Onboarding Steps">
                 <option value="#onboarding/ai-setup">Step 2: AI Configuration</option>
@@ -131,15 +132,15 @@ export default function AppHeader({
             second line on narrow screens instead of pushing the header wider
             than the viewport. */}
         <div className="flex flex-wrap justify-end items-center gap-2 min-w-0">
+          {/* Available at every stage, including before onboarding completes:
+              the theme is a comfort setting, and someone who needs dark should
+              not have to finish a setup wizard in light to reach it. */}
+          <ThemeToggle />
           {/* Dashboard / Workspace toggle (only if onboarding is complete) */}
           {onboardingStep === "workshop" && (
             <button
               onClick={() => setViewMode(viewMode === "dashboard" ? "workspace" : "dashboard")}
-              className={`px-3.5 py-1.5 border rounded-lg text-xs font-mono tracking-wider flex items-center gap-1.5 cursor-pointer transition-all uppercase font-semibold shadow-sm ${
-                viewMode === "dashboard"
-                  ? "bg-[color:var(--color-luminous-blue)] text-[#06101F] border-[color:var(--color-luminous-blue)]"
-                  : "chrome-dark-subtle text-[#E2E8F0] border-white/10 hover:bg-white/10"
-              }`}
+              className={`px-3.5 py-1.5 border rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all font-semibold shadow-sm ${ viewMode === "dashboard" ? "bg-[color:var(--color-luminous-blue)] text-[color:var(--surface-canvas)] border-[color:var(--color-luminous-blue)]" : "chrome-dark-subtle text-[color:var(--text-primary)] border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)]" }`}
               title={viewMode === "dashboard" ? "Open Active Workspace" : "Back to Dashboard"}
             >
               {viewMode === "dashboard" ? (
@@ -152,7 +153,7 @@ export default function AppHeader({
           {onboardingStep === "workshop" && viewMode === "workspace" && (
             <button
               onClick={() => setIsPdfModalOpen(true)}
-              className="px-3.5 py-1.5 bg-[color:var(--color-luminous-blue)] text-[#06101F] border border-[color:var(--color-luminous-blue)] hover:bg-[#6BB6FF] rounded-lg text-xs font-mono tracking-wider flex items-center gap-1.5 cursor-pointer transition-all uppercase font-semibold shadow-sm"
+              className="px-3.5 py-1.5 bg-[color:var(--color-luminous-blue)] text-[color:var(--surface-canvas)] border border-[color:var(--color-luminous-blue)] hover:bg-[var(--accent-hover)] rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all font-semibold shadow-sm"
               title="View complete compiled manuscript"
             >
               <FileText className="w-3.5 h-3.5" />
@@ -162,7 +163,7 @@ export default function AppHeader({
           {onboardingStep === "workshop" && viewMode === "workspace" && (
             <button
               onClick={resetAllProgress}
-              className="chrome-dark-subtle p-2 border border-white/10 hover:bg-white/10 rounded-lg text-[#94A3B8] hover:text-red-400 transition-all shrink-0 cursor-pointer"
+              className="chrome-dark-subtle p-2 border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] rounded-lg text-[color:var(--text-secondary)] hover:text-red-400 transition-all shrink-0 cursor-pointer"
               title="Reset Sandbox Workspace"
             >
               <Trash2 className="w-4 h-4" />
@@ -173,7 +174,7 @@ export default function AppHeader({
               window.location.hash = "";
               logout();
             }}
-            className="px-3.5 py-1.5 border border-red-200 hover:border-red-300 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-all duration-150 shrink-0 cursor-pointer flex items-center gap-1.5 text-xs font-mono font-bold uppercase shadow-sm"
+            className="px-3.5 py-1.5 border border-red-200 hover:border-red-300 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-all duration-150 shrink-0 cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-sm"
             title="Exit Scholar Workspace"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -184,7 +185,7 @@ export default function AppHeader({
 
       {/* Tab nav — only shown in workspace view */}
       {viewMode === "workspace" && (
-      <div className="chrome-dark-subtle px-6 py-3 border-b border-white/5 flex items-center justify-start gap-3.5 overflow-x-auto scrollbar-none">
+      <div className="chrome-dark-subtle px-6 py-3 border-b border-[color:var(--border-subtle)] flex items-center justify-start gap-3.5 overflow-x-auto scrollbar-none">
         {[
           { id: "workspace", name: "Workspace", icon: GraduationCap },
           { id: "vault", name: "Knowledge Vault", icon: BookOpen },
@@ -201,13 +202,9 @@ export default function AppHeader({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-2 text-xs font-mono font-semibold uppercase tracking-wider rounded-xl transition-all duration-200 cursor-pointer shrink-0 flex items-center gap-2 border ${
-                isActive
-                  ? "bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)] border-[color:var(--color-luminous-blue)]/40"
-                  : "text-[#94A3B8] bg-transparent border-white/10 hover:text-[#E2E8F0] hover:bg-white/5 hover:border-white/20"
-              }`}
+              className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all duration-200 cursor-pointer shrink-0 flex items-center gap-2 border ${ isActive ? "bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)] border-[color:var(--color-luminous-blue)]/40" : "text-[color:var(--text-secondary)] bg-transparent border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] hover:border-[color:var(--border-default)]" }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? "text-[color:var(--color-luminous-blue)]" : "text-[#64748B]"}`} />
+              <Icon className={`w-3.5 h-3.5 ${isActive ? "text-[color:var(--color-luminous-blue)]" : "text-[color:var(--text-muted)]"}`} />
               <span>{tab.name}</span>
               {tab.id === "vault" && project?.knowledgeVault?.files.some((f: any) => f.isActive && f.status === "ready") && (
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
@@ -220,9 +217,9 @@ export default function AppHeader({
 
       {/* Status bar — only in workspace view */}
       {viewMode === "workspace" && project && (
-      <div className="chrome-dark px-6 py-2 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono text-[#94A3B8] gap-2">
+      <div className="chrome-dark px-6 py-2 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono text-[color:var(--text-secondary)] gap-2">
         <div className="flex items-center gap-4 flex-wrap">
-          <span className="flex items-center gap-1 text-[#E2E8F0]">
+          <span className="flex items-center gap-1 text-[color:var(--text-primary)]">
             Active Model:
             <select
               value={project.aiSettings?.provider === "openai" ? (project.aiSettings?.openaiModel || "gpt-4o") : "gemini"}
@@ -245,14 +242,14 @@ export default function AppHeader({
               <option value="o1-mini">o1-Mini</option>
             </select>
           </span>
-          <div className="h-3 w-[1px] bg-white/10"></div>
+          <div className="h-3 w-[1px] bg-[color:var(--surface-inset)]"></div>
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-luminous-blue)] animate-pulse"></div>
             <span className="text-[10px] font-bold text-[color:var(--color-luminous-blue)]">Auto-Fallback ON</span>
           </div>
         </div>
         <div>
-          Active Scholar: <span className="text-[#E2E8F0] font-bold">{user}</span>
+          Active Scholar: <span className="text-[color:var(--text-primary)] font-bold">{user}</span>
         </div>
       </div>
       )}

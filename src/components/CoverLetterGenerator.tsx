@@ -170,7 +170,7 @@ function CoverLetterGenerator({
 
           {(Object.keys(template.structure) as Array<keyof typeof template.structure>).map((section) => (
             <GlassmorphicCard key={section} className="p-4">
-              <label className="block text-sm font-mono font-semibold text-luminous-blue mb-2 uppercase tracking-wide">
+              <label className="block text-sm font-semibold text-luminous-blue mb-2">
                 {section.replace(/_/g, " ")}
               </label>
               <textarea
@@ -209,14 +209,14 @@ function CoverLetterGenerator({
       <div className="flex gap-3 flex-wrap">
         <button
           onClick={handleCopy}
-          className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue font-mono text-xs font-bold uppercase transition-all flex items-center justify-center gap-2"
+          className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue text-xs font-bold transition-all flex items-center justify-center gap-2"
         >
           <Copy className="w-3 h-3" />
           {copied ? "Copied!" : "Copy"}
         </button>
         <button
           onClick={handleDownload}
-          className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-600/40 text-emerald-400 font-mono text-xs font-bold uppercase transition-all flex items-center justify-center gap-2"
+          className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-600/40 text-emerald-400 text-xs font-bold transition-all flex items-center justify-center gap-2"
         >
           <Download className="w-3 h-3" />
           Download
@@ -224,7 +224,7 @@ function CoverLetterGenerator({
         {onSave && (
           <button
             onClick={handleSave}
-            className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-600/40 text-indigo-400 font-mono text-xs font-bold uppercase transition-all"
+            className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-600/40 text-indigo-400 text-xs font-bold transition-all"
           >
             Save Draft
           </button>

@@ -9,7 +9,7 @@ export default function StatusBar({ project }: { project: ProjectView }) {
   const blockingCount = project.gates.reduce((n, g) => n + g.outstandingBlocking.length, 0);
 
   return (
-    <div className="flex items-center gap-4 px-4 py-1.5 text-[11px] font-mono text-[#94A3B8] border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)]">
+    <div className="flex items-center gap-4 px-4 py-1.5 text-[11px] font-mono text-[color:var(--text-secondary)] border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)]">
       <span>
         {current.gate} · {current.name} · {current.status.replace("_", " ")}
       </span>

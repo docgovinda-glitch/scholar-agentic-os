@@ -76,7 +76,7 @@ export default function GroundingMapDisplay({
 
   return (
     <div id="grounding-map" className="space-y-6">
-      <div className="flex items-center justify-between border-b border-white/10 pb-4">
+      <div className="flex items-center justify-between border-b border-[color:var(--border-default)] pb-4">
         <div>
           <h2 className="text-xl font-semibold text-white font-display flex items-center gap-2">
             <BrainCircuit className="w-5 h-5 text-brand-400" />
@@ -129,7 +129,7 @@ export default function GroundingMapDisplay({
             </button>
             <button
               onClick={loadStandardGroundingMap}
-              className="px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 font-medium text-gray-200 text-sm rounded-lg transition-all duration-200 inline-flex items-center gap-2 cursor-pointer text-xs"
+              className="px-5 py-2.5 bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-default)] font-medium text-gray-200 text-sm rounded-lg transition-all duration-200 inline-flex items-center gap-2 cursor-pointer text-xs"
             >
               <Sparkles className="w-4 h-4 text-brand-400" />
               Skip & Load Standard Grounding
@@ -164,7 +164,7 @@ export default function GroundingMapDisplay({
               </div>
               <button
                 onClick={generateGroundingMap}
-                className="p-2 bg-brand-900/30 hover:bg-brand-900/60 border border-white/10 rounded-lg text-gray-400 hover:text-white transition-all duration-150 cursor-pointer"
+                className="p-2 bg-brand-900/30 hover:bg-brand-900/60 border border-[color:var(--border-default)] rounded-lg text-gray-400 hover:text-[color:var(--text-primary)] transition-all duration-150 cursor-pointer"
                 title="Recalibrate anchors"
               >
                 <RefreshCcw className="w-3.5 h-3.5" />
@@ -175,7 +175,7 @@ export default function GroundingMapDisplay({
               {/* Left Column */}
               <div className="space-y-6">
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
-                  <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
+                  <h3 className="text-sm font-medium text-brand-300 flex items-center gap-2 border-b border-[color:var(--border-subtle)] pb-2">
                     Conceptual Framework Alignment
                   </h3>
                   <p className="text-sm text-gray-300 leading-relaxed italic">
@@ -184,7 +184,7 @@ export default function GroundingMapDisplay({
                 </div>
 
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
-                  <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
+                  <h3 className="text-sm font-medium text-brand-300 flex items-center gap-2 border-b border-[color:var(--border-subtle)] pb-2">
                     Key Thesis Constructs
                   </h3>
                   <div className="flex flex-col gap-2">
@@ -200,7 +200,7 @@ export default function GroundingMapDisplay({
                 </div>
 
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
-                  <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
+                  <h3 className="text-sm font-medium text-brand-300 flex items-center gap-2 border-b border-[color:var(--border-subtle)] pb-2">
                     Consistent Terminology Standard
                   </h3>
                   <div className="flex flex-wrap gap-2">
@@ -216,7 +216,7 @@ export default function GroundingMapDisplay({
               {/* Right Column */}
               <div className="space-y-6">
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
-                  <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
+                  <h3 className="text-sm font-medium text-brand-300 flex items-center gap-2 border-b border-[color:var(--border-subtle)] pb-2">
                     Philosophical Anchors
                   </h3>
                   <p className="text-sm text-gray-300 leading-relaxed">
@@ -225,7 +225,7 @@ export default function GroundingMapDisplay({
                 </div>
 
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
-                  <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
+                  <h3 className="text-sm font-medium text-brand-300 flex items-center gap-2 border-b border-[color:var(--border-subtle)] pb-2">
                     Reusable Arguments
                   </h3>
                   <ul className="space-y-2 text-sm text-gray-300 list-disc list-inside">
@@ -236,7 +236,7 @@ export default function GroundingMapDisplay({
                 </div>
 
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
-                  <h3 className="text-sm font-medium text-brand-300 font-mono uppercase tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
+                  <h3 className="text-sm font-medium text-brand-300 flex items-center gap-2 border-b border-[color:var(--border-subtle)] pb-2">
                     Voice & Academic Register
                   </h3>
                   <p className="text-sm text-gray-300 whitespace-pre-line leading-relaxed">
@@ -246,10 +246,10 @@ export default function GroundingMapDisplay({
               </div>
             </div>
 
-            <div className="flex justify-between items-center pt-4 border-t border-white/10">
+            <div className="flex justify-between items-center pt-4 border-t border-[color:var(--border-default)]">
               <button
                 onClick={onBack}
-                className="px-4 py-2 border border-white/10 hover:bg-white/5 text-gray-300 text-sm rounded-lg transition-all duration-150 cursor-pointer"
+                className="px-4 py-2 border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-gray-300 text-sm rounded-lg transition-all duration-150 cursor-pointer"
               >
                 Back to Intake
               </button>

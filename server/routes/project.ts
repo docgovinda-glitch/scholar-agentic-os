@@ -47,6 +47,7 @@ import {
 } from "../../src/app/conductor/conductor.ts";
 import type { GateId } from "../../src/app/conductor/conductor.ts";
 import { getProjectStore } from "../../src/services/store/projectStore.ts";
+import { requireAuth } from "../src/middleware/auth.ts";
 import type { ProjectRecord } from "../../src/services/store/types.ts";
 import { exportDocument } from "../../src/app/export/export.ts";
 import type { ExportFormat } from "../../src/app/export/types.ts";
@@ -164,8 +165,49 @@ function projectView(record: ProjectRecord | undefined) {
   };
 }
 
+/** The authenticated Supabase user attached by requireAuth. */
+function currentUserId(req: express.Request): string {
+  return (req as express.Request & { user?: { id: string } }).user!.id;
+}
+
+/**
+ * Fetch a project and authorise the caller against it in one step.
+ *
+ * Returns the record, or null once it has already sent the response — so
+ * every handler is `const record = await loadOwnedProject(...); if (!record) return;`
+ * and cannot forget the ownership half.
+ *
+ * A project owned by someone else returns 404, not 403. 403 would confirm
+ * that the id names a real project, which turns any id-guessing attempt into
+ * an existence oracle; 404 makes "not yours" and "not there" indistinguishable
+ * from outside. That mattered more than usual here, because these ids used to
+ * be sequential — see generateProjectId.
+ */
+async function loadOwnedProject(
+  store: { get(id: string): Promise<ProjectRecord | undefined> },
+  req: express.Request,
+  res: express.Response
+): Promise<ProjectRecord | null> {
+  const record = await store.get(req.params.id);
+  if (!record || record.ownerId !== currentUserId(req)) {
+    res.status(404).json({ error: `No project "${req.params.id}".` });
+    return null;
+  }
+  return record;
+}
+
 export function registerProjectRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
   const store = getProjectStore();
+
+  // Everything under /api/projects requires a verified Supabase session.
+  //
+  // Previously nothing here did. Combined with projects having no owner and
+  // sequential ids, any unauthenticated caller could create projects, read
+  // and overwrite anyone else's by walking the id space, and drive the
+  // model-backed export path. The Atlas catalog routes below are deliberately
+  // left public: they are a static list of output types with no user data in
+  // them, and the "choose what you are writing" screen reads them.
+  app.use("/api/projects", requireAuth);
 
   /** Summaries of every catalog entry — the "choose an output type" list (docs 12 F-PRJ-1). */
   app.get("/api/atlas/output-types", projectLimit, (_req, res) => {
@@ -199,7 +241,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     if (!spec) {
       return res.status(404).json({ error: `No output type "${outputTypeId}" in the catalog.` });
     }
-    const created = await store.create(outputTypeId);
+    const created = await store.create(outputTypeId, currentUserId(req));
     // Compute G0's and G3's real exit criteria immediately from the (still
     // empty) answers/document, rather than leaving domain/project/gates.ts's
     // default empty exitCriteria in place — an empty criteria list is
@@ -211,11 +253,25 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     res.status(201).json(projectView(record));
   });
 
+  /**
+   * The caller's own projects, most recently updated first — Desk's entry
+   * screen reads this.
+   *
+   * Owner scoping happens in the store (listByOwner), not by filtering a
+   * full listing here: there is no code path that can return every project,
+   * so no future handler can accidentally expose one.
+   *
+   * Registered before "/api/projects/:id" so Express does not match the bare
+   * collection path as an id.
+   */
+  app.get("/api/projects", projectLimit, async (req, res) => {
+    const records = await store.listByOwner(currentUserId(req));
+    res.json({ items: records.map((r) => projectView(r)) });
+  });
+
   app.get("/api/projects/:id", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     res.json(projectView(record));
   });
 
@@ -228,10 +284,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * Body: { answers: Record<string, string> }
    */
   app.patch("/api/projects/:id/intake", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     const { answers } = req.body ?? {};
     if (typeof answers !== "object" || answers === null || Array.isArray(answers)) {
       return res.status(400).json({ error: "Missing required field: answers (object)" });
@@ -269,10 +323,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * waiver survives a document resubmission rather than silently resetting.
    */
   app.put("/api/projects/:id/document", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     const { document } = req.body ?? {};
     if (!isValidDocument(document)) {
       return res.status(400).json({ error: "Missing or malformed required field: document (CanonicalDocument — id, title, blocks[]: {id, kind, text})." });
@@ -293,10 +345,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
   /** The most recent Rubric evaluation of the project's document. 404s if no document has been submitted yet. */
   app.get("/api/projects/:id/rubric", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     if (!record.rubricReport) {
       return res.status(404).json({ error: `Project "${req.params.id}" has no document submitted yet.` });
     }
@@ -314,10 +364,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * the document endpoint.
    */
   app.post("/api/projects/:id/rubric/waive", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     if (!record.document) {
       return res.status(404).json({ error: `Project "${req.params.id}" has no document submitted yet.` });
     }
@@ -379,10 +427,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * compileClaimSupportGateRules) — 409s if G6 is already signed off.
    */
   app.post("/api/projects/:id/claims", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     const { claim } = req.body ?? {};
     if (!isValidClaim(claim)) {
       return res.status(400).json({ error: "Missing or malformed required field: claim ({id, text, draftSpanId?})." });
@@ -412,10 +458,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * failing claim_support finding into a passing one.
    */
   app.post("/api/projects/:id/claims/:claimId/evidence", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     const { binding } = req.body ?? {};
     if (!isValidBinding(binding) || binding.claimId !== req.params.claimId) {
       return res.status(400).json({
@@ -439,28 +483,22 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
   /** The project's full Claim–Evidence Graph. */
   app.get("/api/projects/:id/claims", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     res.json(record.claimGraph);
   });
 
   /** Claims with zero evidence bindings — domain/claim's unsupportedClaims(), AG-13's "unsupported" output. */
   app.get("/api/projects/:id/claims/unsupported", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     res.json({ claims: unsupportedClaims(record.claimGraph) });
   });
 
   /** Claims with both a supporting and a contradicting binding, surfaced for a human to resolve (never auto-resolved). */
   app.get("/api/projects/:id/claims/conflicts", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     res.json({ conflicts: findConflicts(record.claimGraph) });
   });
 
@@ -471,10 +509,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * `DELETE .../sources/:sourceId` is about to affect.
    */
   app.get("/api/projects/:id/sources/:sourceId/claims", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     res.json({ claims: claimsDependingOnSource(record.claimGraph, req.params.sourceId) });
   });
 
@@ -487,10 +523,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * turn a passing claim_support finding into a failing one.
    */
   app.delete("/api/projects/:id/sources/:sourceId", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     const claimGraph = removeSource(record.claimGraph, req.params.sourceId);
     try {
       const updated = await saveClaimGraphChange(record, claimGraph);
@@ -513,10 +547,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * module comment) so its snapshot is empty.
    */
   app.post("/api/projects/:id/gates/:gate/signoff", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     if (!isGateId(req.params.gate)) {
       return res.status(400).json({ error: `Unknown gate "${req.params.gate}". Must be one of: ${GATE_ORDER.join(", ")}` });
     }
@@ -551,10 +583,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * (domain/project/gates.ts's downstream cascade). Body: { reason }.
    */
   app.post("/api/projects/:id/gates/:gate/invalidate", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     if (!isGateId(req.params.gate)) {
       return res.status(400).json({ error: `Unknown gate "${req.params.gate}". Must be one of: ${GATE_ORDER.join(", ")}` });
     }
@@ -577,10 +607,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * Currently supports: DOCX only. ODT and PDF in Phase 3.11–3.12.
    */
   app.post("/api/projects/:id/export", projectLimit, async (req, res) => {
-    const record = await store.get(req.params.id);
-    if (!record) {
-      return res.status(404).json({ error: `No project "${req.params.id}".` });
-    }
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
     if (!record.document) {
       return res.status(400).json({ error: "Cannot export a project with no document submitted yet." });
     }

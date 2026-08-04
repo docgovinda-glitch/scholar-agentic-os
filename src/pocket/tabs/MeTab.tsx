@@ -32,15 +32,15 @@ export default function MeTab({ user, onNotificationsChange }: MeTabProps) {
       {/* Account Info */}
       {user && (
         <div className="space-y-3">
-          <h2 className="text-[10px] font-mono uppercase tracking-wide text-[#94A3B8]">Account</h2>
+          <h2 className="text-xs text-[color:var(--text-secondary)]">Account</h2>
           <div className="rounded-lg border border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] p-3 space-y-2 text-sm">
             <div>
-              <span className="text-[#94A3B8]">Name: </span>
-              <span className="text-[#F1F5F9]">{user.name}</span>
+              <span className="text-[color:var(--text-secondary)]">Name: </span>
+              <span className="text-[color:var(--text-primary)]">{user.name}</span>
             </div>
             <div>
-              <span className="text-[#94A3B8]">Email: </span>
-              <span className="text-[#E2E8F0] text-xs break-all">{user.email}</span>
+              <span className="text-[color:var(--text-secondary)]">Email: </span>
+              <span className="text-[color:var(--text-primary)] text-xs break-all">{user.email}</span>
             </div>
           </div>
         </div>
@@ -48,7 +48,7 @@ export default function MeTab({ user, onNotificationsChange }: MeTabProps) {
 
       {/* Notification Preferences */}
       <div className="space-y-3">
-        <h2 className="text-[10px] font-mono uppercase tracking-wide text-[#94A3B8]">Notifications</h2>
+        <h2 className="text-xs text-[color:var(--text-secondary)]">Notifications</h2>
         <div className="space-y-2">
           {[
             { key: "runComplete", label: "Extraction complete", desc: "When source discovery finishes" },
@@ -68,8 +68,8 @@ export default function MeTab({ user, onNotificationsChange }: MeTabProps) {
                 className="mt-1 w-4 h-4 cursor-pointer accent-[color:var(--color-luminous-blue)]"
               />
               <div className="flex-1">
-                <div className="text-sm text-[#F1F5F9]">{label}</div>
-                <div className="text-xs text-[#64748B]">{desc}</div>
+                <div className="text-sm text-[color:var(--text-primary)]">{label}</div>
+                <div className="text-xs text-[color:var(--text-muted)]">{desc}</div>
               </div>
             </div>
           ))}
@@ -78,23 +78,23 @@ export default function MeTab({ user, onNotificationsChange }: MeTabProps) {
 
       {/* Display Settings */}
       <div className="space-y-3">
-        <h2 className="text-[10px] font-mono uppercase tracking-wide text-[#94A3B8]">Display</h2>
+        <h2 className="text-xs text-[color:var(--text-secondary)]">Display</h2>
         <div className="rounded-lg border border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[#F1F5F9]">Dark Mode</span>
-            <span className="text-xs text-[#94A3B8]">Always on</span>
+            <span className="text-sm text-[color:var(--text-primary)]">Dark Mode</span>
+            <span className="text-xs text-[color:var(--text-secondary)]">Always on</span>
           </div>
-          <div className="text-xs text-[#64748B]">Pocket is optimized for low-light reading and review.</div>
+          <div className="text-xs text-[color:var(--text-muted)]">Pocket is optimized for low-light reading and review.</div>
         </div>
       </div>
 
       {/* About */}
       <div className="space-y-3 pb-4">
-        <h2 className="text-[10px] font-mono uppercase tracking-wide text-[#94A3B8]">About</h2>
-        <div className="text-xs text-[#64748B] space-y-1">
+        <h2 className="text-xs text-[color:var(--text-secondary)]">About</h2>
+        <div className="text-xs text-[color:var(--text-muted)] space-y-1">
           <p>Scholar OS Pocket</p>
           <p>Mobile-first source approval and project review</p>
-          <p className="text-[#475569]">docs 23-MOBILE-WEB-UX-SPECIFICATION.md</p>
+          <p className="text-[color:var(--text-muted)]">docs 23-MOBILE-WEB-UX-SPECIFICATION.md</p>
         </div>
       </div>
     </div>

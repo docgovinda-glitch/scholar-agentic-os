@@ -138,9 +138,9 @@ function OnboardingProgressBar({ currentIndex }: { currentIndex: number }) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <GraduationCap className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
-            <span className="text-sm font-bold text-[#E2E8F0]">Scholar Agentic OS — Setup Wizard</span>
+            <span className="text-sm font-bold text-[color:var(--text-primary)]">Scholar Agentic OS — Setup Wizard</span>
           </div>
-          <span className="text-[10px] font-mono text-[color:var(--color-luminous-blue)] font-bold uppercase tracking-wider">
+          <span className="text-xs text-[color:var(--color-luminous-blue)] font-bold">
             Step {currentIndex + 1} of {STEPS.length}
           </span>
         </div>
@@ -154,21 +154,19 @@ function OnboardingProgressBar({ currentIndex }: { currentIndex: number }) {
                 <div className="flex items-center gap-1.5">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold transition-all duration-350 ${
                     isCurrent
-                      ? "bg-[color:var(--color-luminous-blue-dim)] text-white ring-4 ring-[color:var(--color-luminous-blue)]/10"
+                      ? "bg-[color:var(--color-luminous-blue-dim)] text-[color:var(--text-primary)] ring-4 ring-[color:var(--color-luminous-blue)]/10"
                       : isPast
                       ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                      : "bg-[color:var(--color-navy-3)] text-[#94A3B8] border border-[color:var(--color-navy-4)]"
+                      : "bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)] border border-[color:var(--color-navy-4)]"
                   }`}>
                     {isPast ? <CheckCircle2 className="w-3.5 h-3.5" /> : idx + 1}
                   </div>
-                  <span className={`text-[10px] font-mono font-bold uppercase tracking-wider hidden sm:inline ${
-                    isCurrent ? "text-[color:var(--color-luminous-blue)]" : isPast ? "text-emerald-400" : "text-[#94A3B8]"
-                  }`}>
+                  <span className={`text-xs font-bold hidden sm:inline ${ isCurrent ? "text-[color:var(--color-luminous-blue)]" : isPast ? "text-emerald-400" : "text-[color:var(--text-secondary)]" }`}>
                     {step.label.split(" / ")[0]}
                   </span>
                 </div>
                 {idx < STEPS.length - 1 && (
-                  <div className={`grow h-[2px] rounded transition-colors duration-350 ${isPast ? "bg-emerald-500" : "bg-[color:var(--color-navy-4)]/50"}`} />
+                  <div className={`grow h-[2px] rounded transition-colors duration-350 ${isPast ? "bg-emerald-500" : "bg-[color:var(--surface-inset)]/50"}`} />
                 )}
               </React.Fragment>
             );

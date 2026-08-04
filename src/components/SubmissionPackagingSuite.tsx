@@ -81,7 +81,7 @@ export default function SubmissionPackagingSuite({
 
   return (
     <div id="submission-packaging" className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[color:var(--border-default)] pb-4">
         <div>
           <h2 className="text-xl font-semibold text-white font-display flex items-center gap-2">
             <Landmark className="w-5 h-5 text-brand-400" />
@@ -115,7 +115,7 @@ export default function SubmissionPackagingSuite({
 
       {!pack && !loading ? (
         <div className="p-8 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl shadow-sm space-y-4">
-          <div className="w-12 h-12 bg-white/[0.02] border border-white/10 rounded-full flex items-center justify-center mx-auto">
+          <div className="w-12 h-12 bg-white/[0.02] border border-[color:var(--border-default)] rounded-full flex items-center justify-center mx-auto">
             <FileText className="w-6 h-6 text-brand-400" />
           </div>
           <div className="max-w-md mx-auto space-y-2">
@@ -134,7 +134,7 @@ export default function SubmissionPackagingSuite({
             </button>
             <button
               onClick={loadStandardSubmissionPack}
-              className="px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 font-medium text-gray-200 text-sm rounded-lg transition-all duration-200 inline-flex items-center gap-2 cursor-pointer text-xs"
+              className="px-5 py-2.5 bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-default)] font-medium text-gray-200 text-sm rounded-lg transition-all duration-200 inline-flex items-center gap-2 cursor-pointer text-xs"
             >
               <Sparkles className="w-4 h-4 text-brand-400" />
               Skip & Pre-Compile Package Offline
@@ -154,7 +154,7 @@ export default function SubmissionPackagingSuite({
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
               
               {/* Left Side: Formal Cover Letter (lg:7) — Using CoverLetterGenerator */}
-              <div className="lg:col-span-7 flex flex-col border border-white/5 bg-brand-950/10 rounded-xl overflow-hidden min-h-[400px]">
+              <div className="lg:col-span-7 flex flex-col border border-[color:var(--border-subtle)] bg-brand-950/10 rounded-xl overflow-hidden min-h-[400px]">
                 <Suspense fallback={<div className="p-4 text-gray-400">Loading cover letter editor...</div>}>
                   <CoverLetterGenerator
                     project={project}
@@ -183,15 +183,15 @@ export default function SubmissionPackagingSuite({
 
                 {/* Templates & letters */}
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-4">
-                  <h3 className="text-sm font-semibold text-brand-300 font-mono uppercase tracking-wider border-b border-white/5 pb-2">
+                  <h3 className="text-sm font-semibold text-brand-300 border-b border-[color:var(--border-subtle)] pb-2">
                     Compliance & templates
                   </h3>
                   <p className="text-xs text-gray-400 leading-normal">
                     {pack.complianceSummary}
                   </p>
                   <div>
-                    <span className="text-[10px] font-bold font-mono text-gray-400 block uppercase mb-1">Response-to-reviewers structure template:</span>
-                    <pre className="text-[10px] font-mono text-yellow-300 bg-black/30 p-2.5 rounded border border-white/5 overflow-x-auto whitespace-pre-wrap leading-tight max-h-[140px] overflow-y-auto">
+                    <span className="text-xs font-bold text-gray-400 block mb-1">Response-to-reviewers structure template:</span>
+                    <pre className="text-[10px] font-mono text-yellow-300 bg-black/30 p-2.5 rounded border border-[color:var(--border-subtle)] overflow-x-auto whitespace-pre-wrap leading-tight max-h-[140px] overflow-y-auto">
                       {pack.responseToReviewersDraft}
                     </pre>
                   </div>
@@ -204,7 +204,7 @@ export default function SubmissionPackagingSuite({
             {/* Phase I: Live submission Tracker system */}
             <div className="border border-brand-500/20 bg-brand-950/20 rounded-xl p-5 space-y-6">
               
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 pb-3">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[color:var(--border-subtle)] pb-3">
                 <div>
                   <h3 className="text-sm font-semibold text-white font-display flex items-center gap-1.5">
                     <Clock className="w-4 h-4 text-brand-400 animate-spin-slow" />
@@ -239,8 +239,8 @@ export default function SubmissionPackagingSuite({
               {/* Status details */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-gray-300">
                 <div className="space-y-1.5">
-                  <span className="font-bold font-mono text-brand-300 uppercase block">Submission Date:</span>
-                  <div className="bg-brand-950/70 border border-white/10 rounded focus-within:border-[color:var(--color-luminous-blue)]">
+                  <span className="font-bold text-brand-300 block">Submission Date:</span>
+                  <div className="bg-brand-950/70 border border-[color:var(--border-default)] rounded focus-within:border-[color:var(--color-luminous-blue)]">
                     <input
                       type="date"
                       className="border-0 bg-transparent px-2.5 py-1 text-xs text-white"
@@ -250,21 +250,21 @@ export default function SubmissionPackagingSuite({
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <span className="font-bold font-mono text-brand-300 uppercase block">Active Portal Target:</span>
+                  <span className="font-bold text-brand-300 block">Active Portal Target:</span>
                   <span className="text-white font-medium flex items-center gap-1">
                     {project.targetJournal?.name || "Target Editorial Venue"}
                     <ExternalLink className="w-3.5 h-3.5 text-gray-500" />
                   </span>
                 </div>
                 <div className="space-y-1.5">
-                  <span className="font-bold font-mono text-brand-300 uppercase block">Correspondence Logs:</span>
+                  <span className="font-bold text-brand-300 block">Correspondence Logs:</span>
                   <span className="text-gray-400">No active reviewer email logs recorded.</span>
                 </div>
               </div>
 
               {portalStatus === "Minor Revisions" && (
                 <div className="p-4 bg-brand-900/10 border border-brand-500/20 rounded-lg space-y-3">
-                  <span className="text-xs font-bold font-mono text-yellow-400 uppercase tracking-widest block">
+                  <span className="text-xs font-bold text-yellow-400 block">
                     Peer Reviewer Feedback Logs
                   </span>
                   <div className="space-y-2">
@@ -285,10 +285,10 @@ export default function SubmissionPackagingSuite({
               )}
             </div>
 
-            <div className="flex justify-between items-center pt-4 border-t border-white/10">
+            <div className="flex justify-between items-center pt-4 border-t border-[color:var(--border-default)]">
               <button
                 onClick={onBack}
-                className="px-4 py-2 border border-white/10 hover:bg-white/5 text-gray-300 text-sm rounded-lg transition-all duration-150 cursor-pointer"
+                className="px-4 py-2 border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-gray-300 text-sm rounded-lg transition-all duration-150 cursor-pointer"
               >
                 Back to Quality Control
               </button>

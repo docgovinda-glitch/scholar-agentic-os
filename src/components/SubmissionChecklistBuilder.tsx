@@ -167,13 +167,13 @@ function SubmissionChecklistBuilder({
       <div className="flex gap-3 flex-wrap">
         <button
           onClick={markAllRequiredComplete}
-          className="px-4 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-600/40 text-emerald-400 font-mono text-xs font-bold uppercase transition-all"
+          className="px-4 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-600/40 text-emerald-400 text-xs font-bold transition-all"
         >
           Mark Required Complete
         </button>
         <button
           onClick={downloadChecklist}
-          className="px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue font-mono text-xs font-bold uppercase transition-all flex items-center gap-2"
+          className="px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue text-xs font-bold transition-all flex items-center gap-2"
         >
           <Download className="w-3 h-3" />
           Export
@@ -196,7 +196,7 @@ function SubmissionChecklistBuilder({
                 className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-700/30 transition-colors text-left"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <span className="text-luminous-blue font-mono font-bold uppercase text-sm">
+                  <span className="text-luminous-blue font-bold text-sm">
                     {section}
                   </span>
                   <div className="flex gap-2 text-xs text-slate-400">

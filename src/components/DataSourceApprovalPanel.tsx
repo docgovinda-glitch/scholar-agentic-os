@@ -54,15 +54,15 @@ export function DataSourceApprovalPanel({
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <GlassmorphicCard className="p-4">
-          <div className="text-xs text-slate-400 uppercase tracking-wide font-mono">Total Sources</div>
+          <div className="text-xs text-slate-400">Total Sources</div>
           <div className="text-2xl font-bold text-slate-100 mt-2">{dataSources.length}</div>
         </GlassmorphicCard>
         <GlassmorphicCard className="p-4">
-          <div className="text-xs text-slate-400 uppercase tracking-wide font-mono">Pending Review</div>
+          <div className="text-xs text-slate-400">Pending Review</div>
           <div className="text-2xl font-bold text-amber-400 mt-2">{pendingCount}</div>
         </GlassmorphicCard>
         <GlassmorphicCard className="p-4">
-          <div className="text-xs text-slate-400 uppercase tracking-wide font-mono">Approved</div>
+          <div className="text-xs text-slate-400">Approved</div>
           <div className="text-2xl font-bold text-emerald-400 mt-2">{approvedCount}</div>
         </GlassmorphicCard>
       </div>
@@ -73,11 +73,7 @@ export function DataSourceApprovalPanel({
           <button
             key={status}
             onClick={() => setFilterStatus(status)}
-            className={`px-3 py-2 text-xs font-mono uppercase font-bold transition-colors rounded-lg ${
-              filterStatus === status
-                ? "bg-luminous-blue text-navy-0"
-                : "bg-navy-2 text-slate-400 hover:text-slate-200"
-            }`}
+            className={`px-3 py-2 text-xs font-bold transition-colors rounded-lg ${ filterStatus === status ? "bg-luminous-blue text-navy-0" : "bg-navy-2 text-slate-400 hover:text-slate-200" }`}
           >
             {status === "all" && "All"}
             {status === "pending" && `Pending (${pendingCount})`}
@@ -160,11 +156,11 @@ export function DataSourceApprovalPanel({
                   {isExpanded && (
                     <div className="pt-3 border-t border-slate-700 space-y-2 text-sm">
                       <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wide font-mono">Relevance</p>
+                        <p className="text-xs text-slate-500">Relevance</p>
                         <p className="text-slate-300 text-sm">{source.relevance}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wide font-mono">Limitations</p>
+                        <p className="text-xs text-slate-500">Limitations</p>
                         <p className="text-slate-300 text-sm">{source.limitations}</p>
                       </div>
                       <div className="pt-2 flex items-center gap-2">

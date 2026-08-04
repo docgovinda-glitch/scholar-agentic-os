@@ -279,7 +279,7 @@ export function AgentOrchestrationDashboard({
 
                 {/* Capabilities */}
                 <div className="space-y-1.5">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide font-mono">Capabilities</p>
+                  <p className="text-xs text-slate-500">Capabilities</p>
                   <div className="flex flex-wrap gap-1.5">
                     {agent.capabilities.map((cap) => (
                       <span
@@ -308,13 +308,7 @@ export function AgentOrchestrationDashboard({
                       ? "Running…"
                       : "Run this agent"
                   }
-                  className={`w-full py-2 px-3 rounded-lg font-mono text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 ${
-                    isRunning
-                      ? "bg-blue-500/20 border border-blue-500/40 text-blue-400 cursor-wait"
-                      : isAvailable
-                      ? "bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue cursor-pointer"
-                      : "bg-slate-700 border border-slate-600 text-slate-500 cursor-not-allowed opacity-50"
-                  }`}
+                  className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${ isRunning ? "bg-blue-500/20 border border-blue-500/40 text-blue-400 cursor-wait" : isAvailable ? "bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue cursor-pointer" : "bg-slate-700 border border-slate-600 text-slate-500 cursor-not-allowed opacity-50" }`}
                 >
                   {isRunning && <Clock className="w-3 h-3 animate-spin" />}
                   {isRunning ? "Running" : "Run Agent"}

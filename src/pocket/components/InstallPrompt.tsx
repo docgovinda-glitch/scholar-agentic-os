@@ -35,20 +35,20 @@ export default function InstallPrompt() {
       <div className="flex flex-col gap-3">
         <div>
           <p className="text-sm font-serif font-semibold text-white">Install Pocket</p>
-          <p className="text-xs text-[#E2E8F0] mt-1">
+          <p className="text-xs text-[color:var(--text-primary)] mt-1">
             Quick access to source review and project management
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={handleInstall}
-            className="flex-1 px-3 py-2 rounded-lg bg-white text-[color:var(--color-luminous-blue-dim)] text-xs font-mono uppercase tracking-wide font-semibold hover:bg-[#E2E8F0]"
+            className="flex-1 px-3 py-2 rounded-lg bg-white text-[color:var(--color-luminous-blue-dim)] text-xs font-semibold hover:bg-[color:var(--text-primary)]"
           >
             Install
           </button>
           <button
             onClick={() => setDismissed(true)}
-            className="flex-1 px-3 py-2 rounded-lg border border-white text-white text-xs font-mono uppercase tracking-wide hover:bg-white/10"
+            className="flex-1 px-3 py-2 rounded-lg border border-white text-[color:var(--text-primary)] text-xs hover:bg-[color:var(--surface-hover)]"
           >
             Dismiss
           </button>

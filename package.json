@@ -8,13 +8,14 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --define:import.meta={} --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && node scripts/verify-contrast.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "migrate:users-to-supabase": "tsx scripts/migrate-users-to-supabase.ts",
     "generate:knowledge": "node .claude/scripts/generate-knowledge.js",
     "validate:knowledge": "node .claude/scripts/validate-knowledge.js",
-    "check:knowledge": "node .claude/scripts/check-drift.js"
+    "check:knowledge": "node .claude/scripts/check-drift.js",
+    "verify:contrast": "node scripts/verify-contrast.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

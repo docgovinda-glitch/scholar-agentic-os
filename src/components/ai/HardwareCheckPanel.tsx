@@ -96,7 +96,7 @@ export default function HardwareCheckPanel({ onSelectModel }: HardwareCheckPanel
 
   if (!profile) {
     return (
-      <div className="flex items-center gap-2 text-xs text-[#94A3B8] p-4">
+      <div className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)] p-4">
         <Loader2 className="w-4 h-4 animate-spin" />
         Checking what this computer can run...
       </div>
@@ -121,7 +121,7 @@ export default function HardwareCheckPanel({ onSelectModel }: HardwareCheckPanel
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <MonitorCog className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
-            <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+            <span className="text-xs font-bold text-[color:var(--text-secondary)]">
               This computer
             </span>
           </div>
@@ -129,7 +129,7 @@ export default function HardwareCheckPanel({ onSelectModel }: HardwareCheckPanel
             <button
               type="button"
               onClick={beginEdit}
-              className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[#94A3B8] hover:text-[#E2E8F0] flex items-center gap-1 cursor-pointer"
+              className="text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1 cursor-pointer"
             >
               <Pencil className="w-3 h-3" />
               Correct
@@ -138,7 +138,7 @@ export default function HardwareCheckPanel({ onSelectModel }: HardwareCheckPanel
               type="button"
               onClick={runDetection}
               disabled={detecting}
-              className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[#94A3B8] hover:text-[#E2E8F0] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              className="text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1 cursor-pointer disabled:opacity-50"
             >
               {detecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
               Re-detect
@@ -148,14 +148,14 @@ export default function HardwareCheckPanel({ onSelectModel }: HardwareCheckPanel
 
         {editing ? (
           <div className="mt-3 space-y-3">
-            <p className="text-xs text-[#94A3B8]">
+            <p className="text-xs text-[color:var(--text-secondary)]">
               Your browser hides some of this for privacy. Entering the real figures gives you far
               better recommendations — you can find them in System Information (macOS), Task Manager
-              → Performance (Windows), or with <code className="text-[#E2E8F0]">free -h</code> (Linux).
+              → Performance (Windows), or with <code className="text-[color:var(--text-primary)]">free -h</code> (Linux).
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <label className="block">
-                <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+                <span className="text-xs font-bold text-[color:var(--text-secondary)]">
                   System memory (GB)
                 </span>
                 <input
@@ -164,11 +164,11 @@ export default function HardwareCheckPanel({ onSelectModel }: HardwareCheckPanel
                   value={draftRam}
                   onChange={(e) => setDraftRam(e.target.value)}
                   placeholder="16"
-                  className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+                  className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
                 />
               </label>
               <label className="block">
-                <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+                <span className="text-xs font-bold text-[color:var(--text-secondary)]">
                   Graphics memory (GB)
                 </span>
                 <input
@@ -177,17 +177,17 @@ export default function HardwareCheckPanel({ onSelectModel }: HardwareCheckPanel
                   value={draftVram}
                   onChange={(e) => setDraftVram(e.target.value)}
                   placeholder="0 if none"
-                  className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+                  className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
                 />
               </label>
               <label className="block">
-                <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+                <span className="text-xs font-bold text-[color:var(--text-secondary)]">
                   Processor
                 </span>
                 <select
                   value={draftArch}
                   onChange={(e) => setDraftArch(e.target.value as CpuArchitecture)}
-                  className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+                  className="mt-1 w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
                 >
                   <option value="apple-silicon">Apple Silicon (M1/M2/M3/M4)</option>
                   <option value="x86-64">Intel or AMD (x86-64)</option>
@@ -200,14 +200,14 @@ export default function HardwareCheckPanel({ onSelectModel }: HardwareCheckPanel
               <button
                 type="button"
                 onClick={saveEdit}
-                className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer"
+                className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-semibold rounded-lg cursor-pointer"
               >
                 Save
               </button>
               <button
                 type="button"
                 onClick={() => setEditing(false)}
-                className="px-3 py-1.5 border border-[color:var(--color-navy-4)] text-[#94A3B8] hover:text-[#E2E8F0] text-xs font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer"
+                className="px-3 py-1.5 border border-[color:var(--color-navy-4)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] text-xs font-semibold rounded-lg cursor-pointer"
               >
                 Cancel
               </button>
@@ -242,20 +242,20 @@ export default function HardwareCheckPanel({ onSelectModel }: HardwareCheckPanel
         )}
 
         {profile.gpuName && !editing && (
-          <p className="mt-3 text-[11px] text-[#94A3B8] font-mono truncate">Graphics: {profile.gpuName}</p>
+          <p className="mt-3 text-[11px] text-[color:var(--text-secondary)] font-mono truncate">Graphics: {profile.gpuName}</p>
         )}
       </div>
 
       {/* Verdict */}
       <div className={`border rounded-xl p-4 ${tierColor}`}>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono font-bold uppercase tracking-wider">{assessment.label}</span>
+          <span className="text-xs font-bold">{assessment.label}</span>
         </div>
-        <p className="text-xs mt-1.5 leading-relaxed text-[#E2E8F0]">{assessment.summary}</p>
+        <p className="text-xs mt-1.5 leading-relaxed text-[color:var(--text-primary)]">{assessment.summary}</p>
         {assessment.caveats.length > 0 && (
           <ul className="mt-2.5 space-y-1">
             {assessment.caveats.map((caveat) => (
-              <li key={caveat} className="flex items-start gap-1.5 text-[11px] text-[#94A3B8] leading-relaxed">
+              <li key={caveat} className="flex items-start gap-1.5 text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
                 <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                 <span>{caveat}</span>
               </li>
@@ -267,7 +267,7 @@ export default function HardwareCheckPanel({ onSelectModel }: HardwareCheckPanel
       {/* Recommendations */}
       {recommendations.length > 0 && (
         <div>
-          <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+          <span className="text-xs font-bold text-[color:var(--text-secondary)]">
             Models that fit this computer
           </span>
           <div className="mt-2 space-y-2">
@@ -307,12 +307,12 @@ function SpecTile({
 }) {
   return (
     <div className="bg-[color:var(--color-navy-3)]/60 rounded-lg p-2.5">
-      <dt className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+      <dt className="flex items-center gap-1.5 text-xs font-bold text-[color:var(--text-secondary)]">
         {icon}
         <span className="truncate">{label}</span>
       </dt>
-      <dd className="text-sm font-bold text-[#E2E8F0] mt-1">{value}</dd>
-      {note && <p className="text-[10px] text-[#94A3B8] mt-0.5 leading-tight">{note}</p>}
+      <dd className="text-sm font-bold text-[color:var(--text-primary)] mt-1">{value}</dd>
+      {note && <p className="text-[10px] text-[color:var(--text-secondary)] mt-0.5 leading-tight">{note}</p>}
     </div>
   );
 }
@@ -325,28 +325,24 @@ function ModelRow({ rec, onSelect }: { rec: ModelRecommendation; onSelect?: (tag
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-bold text-[#E2E8F0]">{model.name}</span>
+            <span className="text-sm font-bold text-[color:var(--text-primary)]">{model.name}</span>
             <span
-              className={`text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded ${
-                fit === "comfortable"
-                  ? "bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)]"
-                  : "bg-amber-500/15 text-amber-400"
-              }`}
+              className={`text-xs font-bold px-1.5 py-0.5 rounded ${ fit === "comfortable" ? "bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)]" : "bg-amber-500/15 text-amber-400" }`}
             >
               {fit === "comfortable" ? "Good fit" : "Tight fit"}
             </span>
-            <span className="text-[10px] font-mono text-[#94A3B8]">
+            <span className="text-[10px] font-mono text-[color:var(--text-secondary)]">
               {model.downloadSizeGb} GB · {model.quantization}
             </span>
           </div>
-          <p className="text-xs text-[#94A3B8] mt-1 leading-relaxed">{model.academicFit}</p>
-          <p className="text-[11px] text-[#94A3B8] mt-1 leading-relaxed opacity-80">{rationale}</p>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1 leading-relaxed">{model.academicFit}</p>
+          <p className="text-[11px] text-[color:var(--text-secondary)] mt-1 leading-relaxed opacity-80">{rationale}</p>
         </div>
         {onSelect && (
           <button
             type="button"
             onClick={() => onSelect(model.ollamaTag)}
-            className="px-2.5 py-1.5 border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[#E2E8F0] text-[10px] font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer shrink-0 flex items-center gap-1.5"
+            className="px-2.5 py-1.5 border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[color:var(--text-primary)] text-xs font-semibold rounded-lg cursor-pointer shrink-0 flex items-center gap-1.5"
           >
             <Download className="w-3 h-3" />
             Use

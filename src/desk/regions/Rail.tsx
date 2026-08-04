@@ -29,9 +29,7 @@ export default function Rail({ document, onJumpToBlock }: { document: CanonicalD
             key={t.id}
             onClick={() => setTab(t.id)}
             aria-current={tab === t.id ? "true" : undefined}
-            className={`flex-1 px-2 py-2 text-[10px] font-mono uppercase tracking-wide ${
-              tab === t.id ? "text-[color:var(--color-luminous-blue)] border-b-2 border-[color:var(--color-luminous-blue)]" : "text-[#64748B] hover:text-[#94A3B8]"
-            }`}
+            className={`flex-1 px-2 py-2 text-xs ${ tab === t.id ? "text-[color:var(--color-luminous-blue)] border-b-2 border-[color:var(--color-luminous-blue)]" : "text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]" }`}
           >
             {t.label}
           </button>
@@ -40,7 +38,7 @@ export default function Rail({ document, onJumpToBlock }: { document: CanonicalD
       <div className="flex-1 overflow-y-auto p-2">
         {tab === "outline" ? (
           headings.length === 0 ? (
-            <p className="text-xs text-[#64748B] p-2">
+            <p className="text-xs text-[color:var(--text-muted)] p-2">
               {document ? "No headings in this document yet." : "No document submitted yet."}
             </p>
           ) : (
@@ -49,7 +47,7 @@ export default function Rail({ document, onJumpToBlock }: { document: CanonicalD
                 <li key={h.id}>
                   <button
                     onClick={() => onJumpToBlock(h.id)}
-                    className={`w-full text-left px-2 py-1 rounded text-[#CBD5E1] hover:bg-[color:var(--color-navy-2)] truncate ${
+                    className={`w-full text-left px-2 py-1 rounded text-[color:var(--text-secondary)] hover:bg-[color:var(--color-navy-2)] truncate ${
                       h.kind === "heading1" ? "font-semibold" : h.kind === "heading2" ? "pl-4" : "pl-6 text-xs"
                     }`}
                     title={h.text}
@@ -61,7 +59,7 @@ export default function Rail({ document, onJumpToBlock }: { document: CanonicalD
             </ul>
           )
         ) : (
-          <p className="text-xs text-[#64748B] p-2">
+          <p className="text-xs text-[color:var(--text-muted)] p-2">
             Not yet built — {TABS.find((t) => t.id === tab)?.label} needs {tab === "sources" ? "the Corpus API" : tab === "vault" ? "app/vault" : "project file attachments"}, none of which exist yet.
           </p>
         )}

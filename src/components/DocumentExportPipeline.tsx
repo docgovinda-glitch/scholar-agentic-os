@@ -87,21 +87,21 @@ function DocumentExportPipeline({ project }: DocumentExportPipelineProps) {
       <GlassmorphicCard className="p-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Sections</p>
+            <p className="text-xs text-slate-400">Sections</p>
             <p className="text-2xl font-bold text-luminous-blue">{contentStats.sectionCount}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Words</p>
+            <p className="text-xs text-slate-400">Words</p>
             <p className="text-2xl font-bold text-luminous-blue">{contentStats.wordCount}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Title</p>
+            <p className="text-xs text-slate-400">Title</p>
             <p className="text-sm font-mono text-emerald-400">
               {contentStats.hasTitle ? "✓" : "✗"}
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Author</p>
+            <p className="text-xs text-slate-400">Author</p>
             <p className="text-sm font-mono text-emerald-400">
               {contentStats.hasAuthor ? "✓" : "✗"}
             </p>
@@ -153,11 +153,7 @@ function DocumentExportPipeline({ project }: DocumentExportPipelineProps) {
       <button
         onClick={handleExport}
         disabled={isExporting || contentStats.sectionCount === 0}
-        className={`w-full px-6 py-3 rounded-lg font-mono text-sm font-bold uppercase transition-all flex items-center justify-center gap-2 ${
-          isExporting || contentStats.sectionCount === 0
-            ? "bg-slate-700 border border-slate-600 text-slate-500 cursor-not-allowed opacity-50"
-            : "bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue cursor-pointer"
-        }`}
+        className={`w-full px-6 py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${ isExporting || contentStats.sectionCount === 0 ? "bg-slate-700 border border-slate-600 text-slate-500 cursor-not-allowed opacity-50" : "bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue cursor-pointer" }`}
       >
         <Download className="w-4 h-4" />
         {isExporting ? "Exporting…" : "Export Document"}

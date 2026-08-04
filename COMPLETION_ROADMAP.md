@@ -1,454 +1,190 @@
 # Scholar Agentic OS — Completion Roadmap
 
-## Current Status: 67% Complete (Phases 1-4 UI Foundation Done)
-
-What's built ✅ vs. what remains ⏳ to ship Scholar OS fully.
-
----
-
-## PHASE 1: Foundation & Editor ✅ MOSTLY COMPLETE
-
-**Status:** 95% done (M1 internal alpha ready)
-
-### Completed ✅
-- Express API server with service tier architecture
-- PostgreSQL schema with migrations and encryption
-- Supabase authentication (registration, MFA, password reset)
-- Desk shell with 5-region layout (rail, primary, aside, statusbar)
-- Rich text editor with headings, lists, tables, footnotes
-- Autosave with IndexedDB recovery
-- Comments and threading with resolution
-- Snapshots and version history
-- Warden: egress classification and policy engine
-- Gateway: model routing with provider failover
-- Provider adapters: OpenAI, Anthropic, Google, OpenRouter
-- AI setup flow with live validation
-- Chat panel with inline suggestions
-
-### Still Needed ⏳
-- [ ] Command palette keyboard model (partial)
-- [ ] Full accessibility pass (WCAG 2.1 AA compliance)
-- [ ] Performance optimization (<1.2s first contentful paint)
-- [ ] Complete test coverage (exit criteria validation)
-
-**Effort to complete:** 1-2 weeks
+> **Last verified:** 2026-08-04, against the working tree — not from memory.
+>
+> **How to keep this honest:** every claim below was checked by running the
+> thing or reading the file that implements it. The commands used are recorded
+> next to each section. A status document that is not re-verified becomes a
+> liability faster than it becomes useful — the previous revision of this file
+> listed the Pocket API backend, the ODT writer, and the Pocket database schema
+> as "still needed" when all three were already committed and passing tests. It
+> would have sent the next engineer to rebuild working code.
 
 ---
 
-## PHASE 2: Academic Workflow ✅ 80% COMPLETE
+## Verified baseline
 
-**Status:** Ready for private beta (M2)
-
-### Completed ✅
-- Atlas: 24 academic output types with schemas
-- Intake form engine with dynamic rendering
-- Gate state machine (G0-G7) with sign-off enforcement
-- Conductor: workflow scheduling
-- PDF/DOCX/ODT ingestion to Canonical Document Model
-- Candidate queue with approval interaction
-- Authenticity checks: DOI resolution, publisher verification, retraction detection
-- Citation management with corpus integrity
-- Claim-Evidence graph structure
-- Rubric: rule model, compilation, evaluation
-- Compliance panel with inline findings
-- Mesh: agent runtime with capability enforcement
-- Agents AG-01 to AG-16 (mostly working)
-- Drafting pipeline with refusal conditions
-
-### Still Needed ⏳
-- [ ] OCR for scanned documents (integration)
-- [ ] Complete metadata extraction service
-- [ ] AG-14 Citation Manager full implementation
-- [ ] All 16 agents fully tested and optimized
-- [ ] Beta user feedback loop
-
-**Effort to complete:** 2-3 weeks
-
----
-
-## PHASE 3: Voice & Output ✅ 90% COMPLETE
-
-**Status:** Public 1.0 ready (M3)
-
-### Completed ✅
-- **Studio: 5 intervention levels** (proofread → rewrite)
-- **Voice Profile**: build, apply, drift detection
-- **L1 Support**: 20 first-language profiles
-- **Meaning verification**: content vs. language separation
-- **Diff display**: per-change reasons with warnings
-- Export pipeline: 5-stage (preflight → render → verify)
-- **DOCX writer** with template fidelity
-- Export UI: download handlers for DOCX/ODT/PDF
-- **Writing History**: optional, session-scoped, deletable
-- Quotation protection from refinement
-- Agents AG-17 to AG-24 (partial)
-
-### Still Needed ⏳
-- [ ] ODT writer (stub in place, needs implementation)
-- [ ] PDF writer with proper tagging
-- [ ] TOC, front matter, cross-references, auto-numbering
-- [ ] AI use declaration drafting
-- [ ] Workshop onboarding (partial)
-- [ ] Compliance report generation
-- [ ] Tier enforcement (Free vs. Scholar)
-- [ ] Field-level guidance refinement
-
-**Effort to complete:** 1-2 weeks
-
----
-
-## PHASE 4: Reach (Mobile) ✅ 60% COMPLETE
-
-**Status:** Pocket foundation ready (M4)
-
-### Completed ✅
-- **Pocket shell**: 3-zone mobile layout (Reference/Read/Reach)
-- **4 persistent tabs**: Home (Know), Projects, Search, Me
-- **Approval Queue** card UI (flagship feature)
-- Read view with comment threads
-- Chat/Ask interface
-- Source discovery interface with multi-select
-- **PWA**: manifest, service worker, offline caching
-- **Install prompt** with auto-dismiss
-- **Background sync** for queued actions
-- **Push notifications** integration
-- Tablet responsive layout (master-detail)
-
-### Still Needed ⏳
-- [ ] **API Backend for Pocket** (server-side endpoints)
-  - POST /api/projects/:id/approve (approval submission)
-  - POST /api/documents/:id/comments (comment creation)
-  - GET /api/discovery/search (source discovery)
-  - POST /api/chat/stream (chat streaming)
-  - POST /api/push/subscribe (push notification subscription)
-
-- [ ] **Vault integration on mobile**
-  - Collections browsing
-  - Quick search
-  - Attachment preview
-
-- [ ] **Reference manager imports**
-  - Zotero importer
-  - Mendeley importer
-  - BibTeX parser
-  - RIS parser
-
-- [ ] **AG-05 Discovery agent** (AI-powered source ranking)
-
-- [ ] **AG-07 Vault Curator** (retraction monitoring, collection management)
-
-- [ ] **Complete offline sync** (currently stub)
-
-- [ ] **Share target API** (receive URLs/files from system share menu)
-
-- [ ] **Accessibility audit** (screen reader, keyboard navigation)
-
-- [ ] **Mobile performance** (Lighthouse 90+)
-
-**Effort to complete:** 3-4 weeks (backend-heavy)
-
----
-
-## PHASE 5: Platform ⏳ NOT STARTED
-
-**Status:** 0% done (Admin/enterprise features)
-
-### Work Required
-- [ ] Plugin runtime and sandbox
-- [ ] Capability-gated plugin API
-- [ ] Plugin registry and signing
-- [ ] Admin plane deployment (isolated)
-- [ ] Operator console (13 capability areas)
-- [ ] Foundry: authoring, golden sets, evaluation
-- [ ] Agent release channels
-- [ ] Feature flags with targeting
-- [ ] Telemetry aggregation
-- [ ] Admin audit with justification
-- [ ] Break-glass access controls
-- [ ] Institutional tier: SSO, SCIM, profiles
-
-**Effort to complete:** 4-6 weeks
-
----
-
-## What's Actually Needed to Ship Now
-
-Based on the current state, here's what will **unlock production launch**:
-
-### Tier 1: Critical Path to MVP (3-4 weeks)
-
-1. **Pocket API Backend** — Most urgent
-   - Approval submission endpoint
-   - Comment creation/retrieval
-   - Chat streaming
-   - Push notification handling
-   - Offline action sync
-
-2. **Database schema updates**
-   - Pocket-specific tables (comments, chat messages)
-   - Approval queue state
-   - Offline sync queue
-
-3. **Integration tests**
-   - Pocket → API → Database full flow
-   - Approval workflow end-to-end
-   - Chat persistence and retrieval
-
-4. **Deployment verification**
-   - Schema migrations to Supabase
-   - GitHub Actions CI/CD working
-   - Production deployment tested
-
-**Outcome:** Pocket fully functional on scholar.gkshah.com.np
-
-### Tier 2: Feature Completeness (2-3 weeks)
-
-5. **ODT/PDF export writers** (currently DOCX only)
-6. **Vault on mobile** (collections, search, attachments)
-7. **Reference manager imports** (Zotero, Mendeley)
-8. **Agent optimizations** (AG-05, AG-07)
-9. **Writing History** UI improvements
-10. **Accessibility audit & fixes**
-
-**Outcome:** All Phase 4 features production-ready
-
-### Tier 3: Enterprise/Platform (4-6 weeks)
-
-11. **Plugin system** (Phase 5)
-12. **Admin console** (Phase 5)
-13. **Institutional SSO** (Phase 5)
-
-**Outcome:** Full platform for institutional deployment
-
----
-
-## Detailed Breakdown: What To Build Next
-
-### Immediately (This Week)
-
-**Create Pocket API Endpoints:**
-
-```typescript
-// src/server/routes/pocket.ts — New file
-
-// 1. Approval Queue
-POST /api/pocket/projects/:id/approve-source
-  Body: { sourceId, decision: 'approved'|'rejected'|'deferred' }
-  Response: { success, updatedProjectState }
-
-// 2. Read & Comments  
-POST /api/pocket/documents/:docId/comments
-  Body: { text, sectionId, resolved? }
-  Response: { comment }
-
-GET /api/pocket/documents/:docId/comments
-  Response: { comments: Comment[] }
-
-// 3. Chat
-POST /api/pocket/chat/stream
-  Body: { messages: ChatMessage[], projectId }
-  Response: ReadableStream<ChatDelta>
-
-// 4. Notifications
-POST /api/pocket/push/subscribe
-  Body: { subscription: PushSubscription }
-  Response: { subscribed: true }
-
-// 5. Offline Sync
-POST /api/pocket/sync/actions
-  Body: { actions: QueuedAction[] }
-  Response: { synced: number, failed: number }
+```
+npm run lint    # tsc --noEmit + contrast verification — clean
+npm test        # 160 files, 1783 tests — all passing
+npm run build   # client + server bundles — succeeds
 ```
 
-**Update Database Schema:**
-
-```sql
--- supabase/schema_store.sql additions
-
-CREATE TABLE pocket_approvals (
-  id uuid PRIMARY KEY,
-  project_id uuid NOT NULL REFERENCES projects(id),
-  source_id text NOT NULL,
-  user_decision text NOT NULL,
-  decided_at timestamp,
-  UNIQUE(project_id, source_id)
-);
-
-CREATE TABLE pocket_comments (
-  id uuid PRIMARY KEY,
-  document_id uuid NOT NULL,
-  user_id uuid NOT NULL,
-  text text NOT NULL,
-  section_id text,
-  resolved boolean DEFAULT false,
-  created_at timestamp,
-  updated_at timestamp
-);
-
-CREATE TABLE pocket_chat_messages (
-  id uuid PRIMARY KEY,
-  project_id uuid NOT NULL,
-  role text NOT NULL,
-  content text NOT NULL,
-  created_at timestamp
-);
-
-CREATE TABLE pocket_push_subscriptions (
-  id uuid PRIMARY KEY,
-  user_id uuid NOT NULL,
-  endpoint text NOT NULL,
-  auth_key text NOT NULL,
-  p256dh_key text NOT NULL,
-  UNIQUE(user_id, endpoint)
-);
-```
-
-### Week 2
-
-**Wire Pocket components to API:**
-
-```typescript
-// src/pocket/views/ApprovalQueueView.tsx
-// Change stub fetch calls to real API:
-- POST /api/pocket/projects/:id/approve-source
-
-// src/pocket/views/ReadView.tsx  
-// Wire comment creation and retrieval:
-- POST /api/pocket/documents/:docId/comments
-- GET /api/pocket/documents/:docId/comments
-
-// src/pocket/views/AskView.tsx
-// Connect to chat streaming:
-- POST /api/pocket/chat/stream (with streaming response)
-```
-
-**Add to PocketShell.tsx:**
-
-```typescript
-// Initialization: register service worker, request permissions
-useServiceWorkerRegistration();
-usePushNotifications();
-useInstallPrompt();
-
-// Wire offline sync:
-useEffect(() => {
-  navigator.serviceWorker.ready.then(reg => {
-    reg.sync.register('sync-approvals');
-    reg.sync.register('sync-comments');
-  });
-}, []);
-```
-
-### Week 3-4
-
-**Testing & Integration:**
-
-```typescript
-// src/pocket/__tests__/PocketIntegration.test.tsx
-- Test approval flow end-to-end
-- Test comment persistence
-- Test chat streaming
-- Test offline queue and sync
-- Test push notification delivery
-```
-
-**Performance & Accessibility:**
-
-- Lighthouse audit (target: 90+ performance, 100 accessibility)
-- WCAG 2.1 AA compliance check
-- Screen reader testing
-- Keyboard navigation audit
-
-### Week 5-6 (Optional but Recommended)
-
-**Reference Manager Imports:**
-
-```typescript
-// src/app/import/zoteroImporter.ts
-// Parse Zotero JSON export, map to DiscoverySource
-
-// src/app/import/bibTexParser.ts
-// Parse BibTeX format
-
-// Wire to: POST /api/pocket/import (bulk add sources)
-```
-
-**Vault on Mobile:**
-
-```typescript
-// src/pocket/views/VaultView.tsx
-// Browse collections
-// Quick search
-// Preview attachments
-```
+| Measure | Value |
+|---|---|
+| Source files (`src`, `server`) | 431 |
+| Lines of TypeScript/TSX | ~90,000 |
+| Test files / tests | 160 / 1783 |
+| `TODO` / `FIXME` markers in source | 0 |
 
 ---
 
-## Effort Estimation
+## What is actually built
 
-| Phase | Status | Effort | Timeline |
-|-------|--------|--------|----------|
-| **Phase 1** | 95% done | 1 week | This week |
-| **Phase 2** | 80% done | 2-3 weeks | Week 2-3 |
-| **Phase 3** | 90% done | 1-2 weeks | Week 2 |
-| **Phase 4** | 60% done | **4 weeks** | Weeks 1-4 ← **CRITICAL** |
-| **Phase 5** | 0% done | 4-6 weeks | After 4 |
+### Foundation and editor — substantially complete
 
-**Total to MVP (Phases 1-4):** 6-8 weeks  
-**Total to Full Platform (Phases 1-5):** 10-14 weeks
+Express API with a service tier, Postgres schema with migrations, Supabase auth
+(registration, MFA, password reset), the Desk five-region shell, rich-text
+editing with headings/lists/tables/footnotes, autosave with IndexedDB recovery,
+comment threading, snapshots and version history, Warden egress classification,
+the model gateway with provider failover, adapters for OpenAI/Anthropic/Google/
+OpenRouter, AI setup with live key validation, and the chat panel.
 
----
+### Academic workflow — substantially complete
 
-## Recommended Order (To Ship Fastest)
+24 output types with schemas, the dynamic intake form engine, the G0–G7 gate
+state machine with sign-off enforcement, Conductor scheduling, PDF/DOCX/ODT
+ingestion into the Canonical Document Model, the candidate approval queue,
+authenticity checks (DOI resolution, publisher verification, retraction
+detection), citation management, the Claim–Evidence graph, Rubric compilation
+and evaluation, the compliance panel, and the Mesh agent runtime with
+capability enforcement.
 
-1. **Week 1**: Pocket API endpoints (approval, comments, chat)
-2. **Week 2**: Wire Pocket UI to real API
-3. **Week 3**: Offline sync + testing
-4. **Week 4**: Mobile performance + accessibility
-5. **Week 5-6**: Reference imports + Vault mobile
-6. **Week 7-8**: Phase 5 platform features (optional for initial launch)
+### Voice and output — substantially complete
 
----
+Studio's five intervention levels, voice profile build/apply/drift-detection,
+20 first-language profiles, meaning verification, per-change diff reasons, the
+five-stage export pipeline, the DOCX writer with template fidelity, and
+quotation protection.
 
-## Success Criteria for Ship
+**ODT export is implemented** (`src/services/documentExportService.ts`, covered
+by `src/services/__tests__/documentExportService.odt.test.ts`) — the previous
+revision of this file described it as a stub.
 
-- [ ] ✅ Pocket approval queue fully functional
-- [ ] ✅ All comments persist and sync
-- [ ] ✅ Chat streaming works with context
-- [ ] ✅ Offline actions queue and sync on reconnect
-- [ ] ✅ PWA installs on iOS/Android
-- [ ] ✅ Lighthouse: 90+ performance, 100 accessibility
-- [ ] ✅ All Pocket features work at 360px (mobile)
-- [ ] ✅ Domain scholar.gkshah.com.np resolves
-- [ ] ✅ Supabase schema migrated
-- [ ] ✅ GitHub Actions deployment working
-- [ ] ✅ End-to-end tests passing
-- [ ] ✅ Security audit: no XSS/SQL injection/auth bypass
+### Pocket (mobile) — implemented, needs device verification
 
----
+The three-zone shell, four persistent tabs, the approval queue, read view with
+comment threads, the ask/chat interface, source discovery, PWA manifest and
+service worker, install prompt, background sync, and the tablet master-detail
+layout.
 
-## Next Action
+**The Pocket API backend exists** — `server/routes/pocket.ts`, 458 lines,
+8 endpoints:
 
-**What should we build next?**
+```
+POST   /projects/:projectId/approve-source
+POST   /documents/:docId/comments
+GET    /documents/:docId/comments
+POST   /chat/stream
+GET    /chat/:projectId
+POST   /push/subscribe
+POST   /sync/actions
+GET    /projects/:projectId/approval-queue
+```
 
-**Option A (Recommended):** Start with Pocket API backend
-- Highest impact: unlocks all mobile functionality
-- Blocks everything else
-- 1-2 weeks to core endpoints
+`supabase/schema_pocket.sql` declares the four supporting tables. The previous
+revision listed all of this as the critical unbuilt path.
 
-**Option B:** Complete Phase 3 polish
-- ODT/PDF export writers
-- Writing History UI
-- Less critical for MVP
+### Design system — rebuilt 2026-08-04
 
-**Option C:** Admin console & plugins (Phase 5)
-- Enterprise features
-- Can ship later
-- Not needed for initial launch
-
-**My recommendation:** Go with **Option A** — Build Pocket API backend first.
-This unblocks your mobile experience and lets you deploy a working product.
+One token generation replacing three that had coexisted, light and dark both
+first-class, and `scripts/verify-contrast.mjs` gating 80 contrast pairings in
+`npm run lint`. See `docs/06-decisions/60-DESIGN-DIRECTION.md`.
 
 ---
 
-**What would you like to tackle first?**
+## What genuinely remains
+
+Ordered by what blocks the most.
+
+### 1. Desk feature parity — decided, in progress
+
+**Decided 2026-08-04: Desk becomes the real client; the legacy app retires**
+(`docs/06-decisions/61-CLIENT-CONSOLIDATION.md`).
+
+Promoting Desk surfaced and closed a vulnerability first: `/api/projects` and
+`/api/studio` required no authentication, projects had no owner, and project
+ids were sequential — so any unauthenticated caller could read, overwrite, and
+export anyone's work by walking the id space. Fixed, with 37 authorization
+tests that were verified to fail when the fix is reverted.
+
+Desk now has authentication, project ownership, an owner-scoped project list,
+and working Back/Forward. What remains is feature parity:
+
+- Intake wizards, Knowledge Vault, AI setup, export pipeline UI, submission
+  tracking — all legacy-only, each needs porting onto the gate-based model
+- Onboarding (registration, password recovery, AI setup, optional Vault)
+- Pocket should become Desk's responsive form, not a third client
+- Route flip: `/desk` → `/`, legacy reachable during transition
+- Delete `src/App.tsx` and legacy-only components once nothing routes to them
+
+### 2. Per-screen redesign
+
+The design system landed; the layouts did not change. Information architecture,
+navigation, and screen-level composition are unchanged from the phase-based
+original. Now unblocked — there is one system to build against.
+
+### 3. Test files are not typechecked
+
+`tsconfig.json` excludes `**/__tests__/**`. A `store.create()` call kept
+compiling after the signature gained a required parameter. Enabling the check
+surfaces 199 pre-existing errors, mostly `possibly undefined` after assertions.
+
+### 4. Verification that cannot be done from source
+
+- Lighthouse performance and accessibility on a real deployment
+- PWA install on physical iOS and Android devices
+- Screen-reader passes (VoiceOver, NVDA) on the primary journeys
+- Contrast verification covers *tokens*; it cannot see a component that puts
+  the wrong token on the wrong surface
+
+### 5. Feature gaps
+
+- OCR for scanned documents (integration)
+- Reference-manager import: Zotero, Mendeley, BibTeX, RIS
+- Vault on mobile: collection browsing, quick search, attachment preview
+- Share Target API
+- PDF export writer with proper tagging; TOC, front matter, cross-references
+- AI use declaration drafting
+
+### 6. Platform tier — not started
+
+Plugin runtime and sandbox, plugin registry and signing, the operator console,
+Foundry authoring and golden sets, agent release channels, feature flags with
+targeting, telemetry aggregation, admin audit with justification, break-glass
+controls, and institutional SSO/SCIM.
+
+---
+
+## Recommended order
+
+1. **Port onboarding to Desk** (§1). Registration, password recovery, and AI
+   setup are the only path to a usable account, and they are legacy-only —
+   Desk cannot be the front door until they move.
+2. **Deploy and measure** (§4). Lighthouse and device testing need a running
+   deployment, and the results will reorder §2.
+3. **Port the remaining legacy surfaces** (§1) onto the gate-based model,
+   redesigning each as it moves (§2) rather than porting then restyling.
+4. **Flip the route** (§1) once parity is reached; delete legacy after.
+5. **Close feature gaps** (§5) — largely independent, parallelisable.
+6. **Platform tier** (§6) — not required for launch.
+
+§3 (typechecking tests) is not sequenced here — it is a standalone cleanup that
+can land at any point, and gets more valuable the more porting work is in
+flight.
+
+---
+
+## Success criteria for ship
+
+- [x] Type check, test suite, and production build all green
+- [x] Contrast verified automatically, in CI
+- [x] Single design token system, light and dark
+- [x] Client split decided — Desk, with auth and ownership enforced
+- [ ] Desk at feature parity with the legacy client
+- [ ] Lighthouse ≥ 90 performance, ≥ 95 accessibility on deployment
+- [ ] PWA installs on physical iOS and Android
+- [ ] Screen-reader pass on registration → setup → workspace → export
+- [ ] All Pocket features usable at 360 px
+- [ ] Supabase schema migrated in production
+- [ ] `scholar.gkshah.com.np` resolves and serves the deployment

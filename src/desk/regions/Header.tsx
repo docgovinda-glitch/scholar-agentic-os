@@ -1,32 +1,53 @@
 import type { ProjectView } from "../types";
 
-/** Region A (docs 22 §2). No project switcher yet — GET /api/projects (list)
- * doesn't exist server-side; this first slice works one project at a time,
- * addressed by ?project=<id> in the URL. Search and settings are visibly
- * present but explicitly labelled not-yet-built rather than dead/silent
- * controls (22 §6.2's "never a silent no-op" principle, applied here even
- * though that section is about Desk/Pocket parity messaging specifically). */
-export default function Header({ project, outputTypeLabel }: { project: ProjectView; outputTypeLabel: string }) {
+/**
+ * Region A (docs 22 §2).
+ *
+ * The wordmark is now a real control that returns to the project list —
+ * `GET /api/projects` exists, so the "no project switcher yet; addressed by
+ * ?project=<id> in the URL" note this carried no longer applies. Search and
+ * settings stay visibly present but explicitly labelled not-yet-built, rather
+ * than being dead controls that look live (22 §6.2's "never a silent no-op").
+ */
+export default function Header({
+  project,
+  outputTypeLabel,
+  onClose,
+}: {
+  project: ProjectView;
+  outputTypeLabel: string;
+  onClose?: () => void;
+}) {
   const current = project.gates.find((g) => g.status !== "signed_off") ?? project.gates[project.gates.length - 1];
 
   return (
-    <header className="flex items-center gap-3 px-4 h-12 border-b border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)] text-sm">
-      <span className="font-semibold text-[#E2E8F0]">Scholar OS</span>
-      <span className="text-[#475569]" aria-hidden="true">
+    <header className="flex h-12 items-center gap-3 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 text-sm">
+      {onClose ? (
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-[var(--radius-sm)] px-1.5 py-1 font-semibold text-[color:var(--text-primary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+        >
+          Scholar
+        </button>
+      ) : (
+        <span className="font-semibold text-[color:var(--text-primary)]">Scholar</span>
+      )}
+      <span className="text-[color:var(--text-muted)]" aria-hidden="true">
         /
       </span>
-      <span className="text-[#94A3B8] truncate max-w-xs" title={project.projectId}>
+      <span className="max-w-xs truncate text-[color:var(--text-secondary)]" title={project.projectId}>
         {outputTypeLabel}
       </span>
-      <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wide border border-[color:var(--color-luminous-blue-dim)] text-[color:var(--color-luminous-blue)]">
+      <span className="ml-2 rounded-full border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-2 py-0.5 text-xs text-[color:var(--accent)]">
         {current.gate} {current.name}
       </span>
-      <div className="ml-auto flex items-center gap-3 text-[#64748B]">
-        <span title="Not yet built" className="cursor-not-allowed text-xs font-mono">
-          ⌕ Search
+      <div className="ml-auto flex items-center gap-3 text-xs text-[color:var(--text-muted)]">
+        <span title="Not yet built" className="cursor-not-allowed">
+          Search
         </span>
-        <span title="Not yet built" className="cursor-not-allowed text-xs font-mono">
-          ⚙ Settings
+        <span title="Not yet built" className="cursor-not-allowed">
+          Settings
         </span>
       </div>
     </header>

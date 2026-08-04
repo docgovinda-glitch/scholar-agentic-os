@@ -189,14 +189,14 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
   return (
     <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl shadow-xl overflow-hidden flex flex-col h-[850px]">
       {/* Top Header */}
-      <div className="bg-[color:var(--color-navy-3)] text-white p-5 border-b border-[color:var(--color-navy-4)] flex items-center justify-between shrink-0">
+      <div className="bg-[color:var(--color-navy-3)] text-[color:var(--text-primary)] p-5 border-b border-[color:var(--color-navy-4)] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-[color:var(--color-luminous-blue)]/15 rounded-xl border border-[color:var(--color-luminous-blue)]/30 text-[color:var(--color-luminous-blue)]">
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
             <h2 className="text-lg font-bold tracking-wide">Knowledge Vault Reference Suite</h2>
-            <p className="text-xs text-[#94A3B8] font-mono">
+            <p className="text-xs text-[color:var(--text-secondary)] font-mono">
               Academic citation management, traceability & AI literature synthesis ({files.length} references)
             </p>
           </div>
@@ -204,7 +204,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
         <div className="flex items-center gap-3">
           <button
             onClick={createNewReference}
-            className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-semibold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-md transition-all"
+            className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-md transition-all"
           >
             <Plus className="w-4 h-4" />
             New Reference
@@ -212,7 +212,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
           {onClose && (
             <button
               onClick={onClose}
-              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-mono transition-all cursor-pointer"
+              className="px-3 py-2 bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] rounded-xl text-xs font-mono transition-all cursor-pointer"
             >
               Close
             </button>
@@ -226,14 +226,14 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
         <div className="w-[340px] border-r border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] flex flex-col shrink-0">
           <div className="p-3.5 border-b border-[color:var(--color-navy-4)] space-y-3 bg-[color:var(--color-navy-1)]">
             <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#94A3B8]" />
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-[color:var(--text-secondary)]" />
               <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                 <input
                   type="text"
                   placeholder="Search authors, title..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="border-0 bg-transparent text-[#E2E8F0] w-full pl-9 pr-3 py-1.5 rounded-xl text-xs focus:outline-none font-sans"
+                  className="border-0 bg-transparent text-[color:var(--text-primary)] w-full pl-9 pr-3 py-1.5 rounded-xl text-xs focus:outline-none font-sans"
                 />
               </div>
             </div>
@@ -241,7 +241,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
               <select
                 value={filterType}
                 onChange={e => setFilterType(e.target.value)}
-                className="border-0 bg-transparent w-full px-3 py-1.5 rounded-xl text-xs font-mono text-[#E2E8F0] focus:outline-none"
+                className="border-0 bg-transparent w-full px-3 py-1.5 rounded-xl text-xs font-mono text-[color:var(--text-primary)] focus:outline-none"
               >
                 <option value="All">All Source Types ({files.length})</option>
                 {SOURCE_TYPES.map(t => (
@@ -253,7 +253,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
 
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {filteredFiles.length === 0 ? (
-              <div className="text-center py-10 text-[#94A3B8] text-xs font-mono">
+              <div className="text-center py-10 text-[color:var(--text-secondary)] text-xs font-mono">
                 No references match filter. Click "New Reference" to create one.
               </div>
             ) : (
@@ -272,17 +272,17 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                   >
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)]">
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)]">
                           {m.sourceType}
                         </span>
-                        <span className="text-[10px] font-mono text-[#94A3B8]">
+                        <span className="text-[10px] font-mono text-[color:var(--text-secondary)]">
                           {m.dates.publicationDate || "n.d."}
                         </span>
                       </div>
-                      <h4 className="text-xs font-bold text-[#E2E8F0] leading-snug line-clamp-2 pt-1">
+                      <h4 className="text-xs font-bold text-[color:var(--text-primary)] leading-snug line-clamp-2 pt-1">
                         {m.title}
                       </h4>
-                      <p className="text-[11px] text-[#94A3B8] font-sans line-clamp-1">
+                      <p className="text-[11px] text-[color:var(--text-secondary)] font-sans line-clamp-1">
                         {m.authors.map(a => a.lastName).join(", ")}
                       </p>
                     </div>
@@ -292,7 +292,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                       </span>
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteReference(f.id); }}
-                        className="text-[#94A3B8] hover:text-red-400 transition-colors p-1"
+                        className="text-[color:var(--text-secondary)] hover:text-red-400 transition-colors p-1"
                         title="Delete Reference"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -308,7 +308,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
         {/* Right Pane: 16-Section Detailed Reference Editor */}
         <div className="flex-1 flex flex-col bg-[color:var(--color-navy-2)] overflow-hidden">
           {!meta || !selectedFile ? (
-            <div className="flex-1 flex items-center justify-center text-[#94A3B8] font-mono text-xs">
+            <div className="flex-1 flex items-center justify-center text-[color:var(--text-secondary)] font-mono text-xs">
               Select a reference from the left pane to edit.
             </div>
           ) : (
@@ -317,14 +317,14 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
               <div className="p-5 border-b border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] flex items-center justify-between shrink-0">
                 <div className="space-y-1 flex-1 mr-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-wider">
+                    <span className="text-xs font-bold text-[color:var(--color-luminous-blue)]">
                       Source Type:
                     </span>
                     <div className="rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                       <select
                         value={meta.sourceType}
                         onChange={e => updateSelectedMeta({ ...meta, sourceType: e.target.value as any })}
-                        className="border-0 bg-transparent px-2.5 py-1 rounded-lg text-xs font-mono font-bold text-[#E2E8F0] focus:outline-none"
+                        className="border-0 bg-transparent px-2.5 py-1 rounded-lg text-xs font-mono font-bold text-[color:var(--text-primary)] focus:outline-none"
                       >
                         {SOURCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
@@ -335,7 +335,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                     value={meta.title}
                     onChange={e => updateSelectedMeta({ ...meta, title: e.target.value })}
                     placeholder="Enter source title..."
-                    className="w-full text-base font-bold text-[#E2E8F0] bg-transparent border-b border-transparent hover:border-[color:var(--color-navy-4)] focus:border-[color:var(--color-luminous-blue)] focus:outline-none py-1 transition-all"
+                    className="w-full text-base font-bold text-[color:var(--text-primary)] bg-transparent border-b border-transparent hover:border-[color:var(--color-navy-4)] focus:border-[color:var(--color-luminous-blue)] focus:outline-none py-1 transition-all"
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -367,7 +367,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                     className={`py-3 font-semibold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap cursor-pointer ${
                       activeTab === tab.id
                         ? "border-[color:var(--color-luminous-blue)] text-[color:var(--color-luminous-blue)]"
-                        : "border-transparent text-[#94A3B8] hover:text-[#E2E8F0]"
+                        : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
                     }`}
                   >
                     {tab.label}
@@ -382,40 +382,40 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                   <div className="space-y-6 animate-fade-in">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Subtitle</label>
+                        <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Subtitle</label>
                         <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                           <input
                             type="text"
                             value={meta.subtitle || ""}
                             onChange={e => updateSelectedMeta({ ...meta, subtitle: e.target.value })}
                             placeholder="Optional subtitle..."
-                            className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-sans focus:outline-none"
+                            className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-sans focus:outline-none"
                           />
                         </div>
                       </div>
                       <div>
-                        <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Academic Discipline</label>
+                        <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Academic Discipline</label>
                         <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                           <input
                             type="text"
                             value={meta.discipline || ""}
                             onChange={e => updateSelectedMeta({ ...meta, discipline: e.target.value })}
                             placeholder="e.g. Information Systems, Philosophy..."
-                            className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-sans focus:outline-none"
+                            className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-sans focus:outline-none"
                           />
                         </div>
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Abstract / Executive Summary</label>
+                      <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Abstract / Executive Summary</label>
                       <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                         <textarea
                           rows={4}
                           value={meta.abstract || ""}
                           onChange={e => updateSelectedMeta({ ...meta, abstract: e.target.value })}
                           placeholder="Paste full abstract here..."
-                          className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-sans focus:outline-none leading-relaxed"
+                          className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-sans focus:outline-none leading-relaxed"
                         />
                       </div>
                     </div>
@@ -423,7 +423,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                     {/* Authors Section */}
                     <div className="border border-[color:var(--color-navy-4)] rounded-xl p-4 bg-[color:var(--color-navy-1)] space-y-4">
                       <div className="flex items-center justify-between border-b border-[color:var(--color-navy-4)] pb-2">
-                        <span className="text-xs font-mono font-bold uppercase text-[#E2E8F0] flex items-center gap-2">
+                        <span className="text-xs font-bold text-[color:var(--text-primary)] flex items-center gap-2">
                           Section 2: Authors ({meta.authors.length})
                         </span>
                         <button
@@ -431,7 +431,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                             const newAuth: CitationAuthor = { id: Date.now().toString(), firstName: "New", lastName: "Author", order: meta.authors.length + 1 };
                             updateSelectedMeta({ ...meta, authors: [...meta.authors, newAuth] });
                           }}
-                          className="px-2.5 py-1 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-[10px] font-mono uppercase font-semibold flex items-center gap-1 cursor-pointer transition-all"
+                          className="px-2.5 py-1 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all"
                         >
                           <Plus className="w-3 h-3" /> Add Author
                         </button>
@@ -439,7 +439,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                       <div className="space-y-3">
                         {meta.authors.map((auth, idx) => (
                           <div key={auth.id} className="grid grid-cols-12 gap-2 items-center bg-[color:var(--color-navy-2)] p-3 rounded-xl border border-[color:var(--color-navy-4)] shadow-2xs">
-                            <span className="col-span-1 text-center font-mono font-bold text-xs text-[#94A3B8]">#{idx + 1}</span>
+                            <span className="col-span-1 text-center font-mono font-bold text-xs text-[color:var(--text-secondary)]">#{idx + 1}</span>
                             <div className="rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                               <input
                                 type="text"
@@ -450,7 +450,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                                   updateSelectedMeta({ ...meta, authors: newAuths });
                                 }}
                                 placeholder="First Name"
-                                className="border-0 bg-transparent text-[#E2E8F0] col-span-3 px-2 py-1.5 rounded-lg text-xs font-sans focus:outline-none"
+                                className="border-0 bg-transparent text-[color:var(--text-primary)] col-span-3 px-2 py-1.5 rounded-lg text-xs font-sans focus:outline-none"
                               />
                             </div>
                             <div className="rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
@@ -463,7 +463,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                                   updateSelectedMeta({ ...meta, authors: newAuths });
                                 }}
                                 placeholder="Last Name"
-                                className="border-0 bg-transparent text-[#E2E8F0] col-span-4 px-2 py-1.5 rounded-lg text-xs font-sans focus:outline-none"
+                                className="border-0 bg-transparent text-[color:var(--text-primary)] col-span-4 px-2 py-1.5 rounded-lg text-xs font-sans focus:outline-none"
                               />
                             </div>
                             <div className="rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
@@ -476,12 +476,12 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                                   updateSelectedMeta({ ...meta, authors: newAuths });
                                 }}
                                 placeholder="Affiliation / University"
-                                className="border-0 bg-transparent text-[#E2E8F0] col-span-3 px-2 py-1.5 rounded-lg text-xs font-sans focus:outline-none"
+                                className="border-0 bg-transparent text-[color:var(--text-primary)] col-span-3 px-2 py-1.5 rounded-lg text-xs font-sans focus:outline-none"
                               />
                             </div>
                             <button
                               onClick={() => updateSelectedMeta({ ...meta, authors: meta.authors.filter((_, i) => i !== idx) })}
-                              className="col-span-1 text-[#94A3B8] hover:text-red-400 justify-self-center p-1 cursor-pointer"
+                              className="col-span-1 text-[color:var(--text-secondary)] hover:text-red-400 justify-self-center p-1 cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -496,26 +496,26 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                 {activeTab === "pub" && (
                   <div className="space-y-6 animate-fade-in">
                     <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
-                      <h3 className="text-xs font-mono font-bold uppercase text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-2">
+                      <h3 className="text-xs font-bold text-[color:var(--text-primary)] border-b border-[color:var(--color-navy-4)] pb-2">
                         Section 3: Publication Details (Dynamic for {meta.sourceType})
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {(meta.sourceType === "Journal Article" || meta.sourceType === "Magazine Article") && (
                           <>
                             <div className="md:col-span-2">
-                              <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Journal / Magazine Name</label>
+                              <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Journal / Magazine Name</label>
                               <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                                 <input
                                   type="text"
                                   value={meta.publicationDetails.journalName || ""}
                                   onChange={e => updateSelectedMeta({ ...meta, publicationDetails: { ...meta.publicationDetails, journalName: e.target.value } })}
                                   placeholder="e.g. Journal of Academic Informatics"
-                                  className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
+                                  className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
                                 />
                               </div>
                             </div>
                             <div>
-                              <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Volume & Issue</label>
+                              <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Volume & Issue</label>
                               <div className="flex gap-2">
                                 <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                                   <input
@@ -523,7 +523,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                                     value={meta.publicationDetails.volume || ""}
                                     onChange={e => updateSelectedMeta({ ...meta, publicationDetails: { ...meta.publicationDetails, volume: e.target.value } })}
                                     placeholder="Vol"
-                                    className="border-0 bg-transparent text-[#E2E8F0] w-1/2 px-2 py-2 rounded-xl text-xs focus:outline-none"
+                                    className="border-0 bg-transparent text-[color:var(--text-primary)] w-1/2 px-2 py-2 rounded-xl text-xs focus:outline-none"
                                   />
                                 </div>
                                 <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
@@ -532,7 +532,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                                     value={meta.publicationDetails.issue || ""}
                                     onChange={e => updateSelectedMeta({ ...meta, publicationDetails: { ...meta.publicationDetails, issue: e.target.value } })}
                                     placeholder="Issue"
-                                    className="border-0 bg-transparent text-[#E2E8F0] w-1/2 px-2 py-2 rounded-xl text-xs focus:outline-none"
+                                    className="border-0 bg-transparent text-[color:var(--text-primary)] w-1/2 px-2 py-2 rounded-xl text-xs focus:outline-none"
                                   />
                                 </div>
                               </div>
@@ -543,26 +543,26 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                         {(meta.sourceType === "Book" || meta.sourceType === "Book Chapter") && (
                           <>
                             <div className="md:col-span-2">
-                              <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Book Publisher</label>
+                              <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Book Publisher</label>
                               <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                                 <input
                                   type="text"
                                   value={meta.publicationDetails.publisher || ""}
                                   onChange={e => updateSelectedMeta({ ...meta, publicationDetails: { ...meta.publicationDetails, publisher: e.target.value } })}
                                   placeholder="e.g. Oxford University Press"
-                                  className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
+                                  className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
                                 />
                               </div>
                             </div>
                             <div>
-                              <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Edition / Series</label>
+                              <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Edition / Series</label>
                               <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                                 <input
                                   type="text"
                                   value={meta.publicationDetails.edition || ""}
                                   onChange={e => updateSelectedMeta({ ...meta, publicationDetails: { ...meta.publicationDetails, edition: e.target.value } })}
                                   placeholder="e.g. 2nd Edition"
-                                  className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
+                                  className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
                                 />
                               </div>
                             </div>
@@ -572,26 +572,26 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                         {(meta.sourceType === "Thesis" || meta.sourceType === "Dissertation") && (
                           <>
                             <div className="md:col-span-2">
-                              <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">University / Institution</label>
+                              <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">University / Institution</label>
                               <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                                 <input
                                   type="text"
                                   value={meta.publicationDetails.university || ""}
                                   onChange={e => updateSelectedMeta({ ...meta, publicationDetails: { ...meta.publicationDetails, university: e.target.value } })}
                                   placeholder="e.g. Stanford University"
-                                  className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
+                                  className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
                                 />
                               </div>
                             </div>
                             <div>
-                              <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Degree Type</label>
+                              <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Degree Type</label>
                               <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                                 <input
                                   type="text"
                                   value={meta.publicationDetails.degree || ""}
                                   onChange={e => updateSelectedMeta({ ...meta, publicationDetails: { ...meta.publicationDetails, degree: e.target.value } })}
                                   placeholder="e.g. Ph.D. Dissertation"
-                                  className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
+                                  className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
                                 />
                               </div>
                             </div>
@@ -599,14 +599,14 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                         )}
 
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Page Range</label>
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Page Range</label>
                           <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                             <input
                               type="text"
                               value={meta.publicationDetails.pages || ""}
                               onChange={e => updateSelectedMeta({ ...meta, publicationDetails: { ...meta.publicationDetails, pages: e.target.value } })}
                               placeholder="e.g. 112-128"
-                              className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
+                              className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
                             />
                           </div>
                         </div>
@@ -614,24 +614,24 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                     </div>
 
                     <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
-                      <h3 className="text-xs font-mono font-bold uppercase text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-2">
+                      <h3 className="text-xs font-bold text-[color:var(--text-primary)] border-b border-[color:var(--color-navy-4)] pb-2">
                         Section 4: Dates & Access Timeline
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Publication Year / Date</label>
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Publication Year / Date</label>
                           <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                             <input
                               type="text"
                               value={meta.dates.publicationDate || ""}
                               onChange={e => updateSelectedMeta({ ...meta, dates: { ...meta.dates, publicationDate: e.target.value } })}
                               placeholder="YYYY-MM-DD or YYYY"
-                              className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
+                              className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
                             />
                           </div>
                         </div>
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] flex items-center justify-between mb-1">
                             <span>Access Date</span>
                             <button
                               onClick={() => updateSelectedMeta({ ...meta, dates: { ...meta.dates, accessDate: new Date().toISOString().split("T")[0] } })}
@@ -646,7 +646,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                               value={meta.dates.accessDate || ""}
                               onChange={e => updateSelectedMeta({ ...meta, dates: { ...meta.dates, accessDate: e.target.value } })}
                               placeholder="YYYY-MM-DD"
-                              className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
+                              className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
                             />
                           </div>
                         </div>
@@ -659,31 +659,31 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                 {activeTab === "ident" && (
                   <div className="space-y-6 animate-fade-in">
                     <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
-                      <h3 className="text-xs font-mono font-bold uppercase text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-2">
+                      <h3 className="text-xs font-bold text-[color:var(--text-primary)] border-b border-[color:var(--color-navy-4)] pb-2">
                         Section 5: Persistent Identifiers
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Digital Object Identifier (DOI)</label>
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Digital Object Identifier (DOI)</label>
                           <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                             <input
                               type="text"
                               value={meta.identifiers.doi || ""}
                               onChange={e => updateSelectedMeta({ ...meta, identifiers: { ...meta.identifiers, doi: e.target.value } })}
                               placeholder="e.g. 10.1038/s41586-026-0012-z"
-                              className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
+                              className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
                             />
                           </div>
                         </div>
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Source URL / Web Link</label>
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Source URL / Web Link</label>
                           <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                             <input
                               type="text"
                               value={meta.identifiers.url || ""}
                               onChange={e => updateSelectedMeta({ ...meta, identifiers: { ...meta.identifiers, url: e.target.value } })}
                               placeholder="https://..."
-                              className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
+                              className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
                             />
                           </div>
                         </div>
@@ -691,17 +691,17 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                     </div>
 
                     <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
-                      <h3 className="text-xs font-mono font-bold uppercase text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-2">
+                      <h3 className="text-xs font-bold text-[color:var(--text-primary)] border-b border-[color:var(--color-navy-4)] pb-2">
                         Section 6: Source Reliability & Evidence Assessment
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Peer Reviewed?</label>
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Peer Reviewed?</label>
                           <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                             <select
                               value={meta.reliability.peerReviewed}
                               onChange={e => updateSelectedMeta({ ...meta, reliability: { ...meta.reliability, peerReviewed: e.target.value as any } })}
-                              className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
+                              className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
                             >
                               <option value="Yes">Yes (Verified Peer-Reviewed)</option>
                               <option value="No">No (Working Paper / Report)</option>
@@ -710,12 +710,12 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                           </div>
                         </div>
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Evidence Level</label>
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Evidence Level</label>
                           <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                             <select
                               value={meta.reliability.evidenceLevel}
                               onChange={e => updateSelectedMeta({ ...meta, reliability: { ...meta.reliability, evidenceLevel: e.target.value as any } })}
-                              className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
+                              className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
                             >
                               <option value="High">High (Meta-analysis / RCT / Empirics)</option>
                               <option value="Medium">Medium (Observational / Review)</option>
@@ -724,12 +724,12 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                           </div>
                         </div>
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Publication Type</label>
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Publication Type</label>
                           <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                             <select
                               value={meta.reliability.publicationType}
                               onChange={e => updateSelectedMeta({ ...meta, reliability: { ...meta.reliability, publicationType: e.target.value as any } })}
-                              className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
+                              className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
                             >
                               <option value="Primary">Primary Source Data</option>
                               <option value="Secondary">Secondary Literature Review</option>
@@ -746,39 +746,39 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                 {activeTab === "extract" && (
                   <div className="space-y-6 animate-fade-in">
                     <div>
-                      <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Section 7: Full Text / Extracted Document Content</label>
+                      <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Section 7: Full Text / Extracted Document Content</label>
                       <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                         <textarea
                           rows={6}
                           value={meta.extraction.fullText || ""}
                           onChange={e => updateSelectedMeta({ ...meta, extraction: { ...meta.extraction, fullText: e.target.value } })}
                           placeholder="Full document text or primary analysis excerpt..."
-                          className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none leading-relaxed"
+                          className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none leading-relaxed"
                         />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Section 9: Research Methodology</label>
+                        <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Section 9: Research Methodology</label>
                         <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                           <input
                             type="text"
                             value={meta.classification.methodology || ""}
                             onChange={e => updateSelectedMeta({ ...meta, classification: { ...meta.classification, methodology: e.target.value } })}
                             placeholder="e.g. Mixed Methods / Structural Equation Modeling"
-                            className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-sans focus:outline-none"
+                            className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-sans focus:outline-none"
                           />
                         </div>
                       </div>
                       <div>
-                        <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Theoretical Framework / Theory</label>
+                        <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Theoretical Framework / Theory</label>
                         <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                           <input
                             type="text"
                             value={meta.classification.theory || ""}
                             onChange={e => updateSelectedMeta({ ...meta, classification: { ...meta.classification, theory: e.target.value } })}
                             placeholder="e.g. Vedic Trusteeship / Agency Theory"
-                            className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-sans focus:outline-none"
+                            className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-sans focus:outline-none"
                           />
                         </div>
                       </div>
@@ -791,7 +791,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                   <div className="space-y-6 animate-fade-in">
                     <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 space-y-4">
                       <div className="flex items-center justify-between border-b border-[color:var(--color-navy-4)] pb-3">
-                        <h3 className="text-sm font-mono font-bold uppercase text-[#E2E8F0] flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-2">
                           <Copy className="w-4 h-4 text-[color:var(--color-luminous-blue)]" /> Section 8: Automatic Citation Generator
                         </h3>
                         <div className="flex flex-wrap gap-1.5">
@@ -799,11 +799,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                             <button
                               key={fmt}
                               onClick={() => { setSelectedFormat(fmt); setCopiedFormat(false); }}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase cursor-pointer transition-all ${
-                                selectedFormat === fmt
-                                  ? "bg-[color:var(--color-luminous-blue-dim)] text-white shadow-xs"
-                                  : "bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[#94A3B8] hover:border-[color:var(--color-luminous-blue)]"
-                              }`}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${ selectedFormat === fmt ? "bg-[color:var(--color-luminous-blue-dim)] text-[color:var(--text-primary)] shadow-xs" : "bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[color:var(--text-secondary)] hover:border-[color:var(--color-luminous-blue)]" }`}
                             >
                               {fmt}
                             </button>
@@ -811,7 +807,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                         </div>
                       </div>
 
-                      <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-4 relative font-mono text-xs leading-relaxed text-[#E2E8F0] shadow-inner whitespace-pre-wrap">
+                      <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-4 relative font-mono text-xs leading-relaxed text-[color:var(--text-primary)] shadow-inner whitespace-pre-wrap">
                         {generateCitation(meta, selectedFormat)}
                         <button
                           onClick={() => {
@@ -833,7 +829,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                 {activeTab === "ai" && (
                   <div className="space-y-6 animate-fade-in">
                     <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
-                      <h3 className="text-xs font-mono font-bold uppercase text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-[color:var(--text-primary)] border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-[color:var(--color-luminous-blue)]" /> Section 16: Live AI Knowledge Actions Suite
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -846,7 +842,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                             key={act}
                             onClick={() => executeAiAction(act)}
                             disabled={aiActionLoading}
-                            className="p-2.5 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] rounded-xl text-xs font-mono font-semibold text-[#E2E8F0] flex items-center justify-between cursor-pointer transition-all shadow-2xs"
+                            className="p-2.5 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] rounded-xl text-xs font-mono font-semibold text-[color:var(--text-primary)] flex items-center justify-between cursor-pointer transition-all shadow-2xs"
                           >
                             <span>{act}</span>
                             <ChevronRight className="w-3.5 h-3.5 text-[color:var(--color-luminous-blue)]" />
@@ -861,12 +857,12 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                       )}
 
                       {aiActionResult && (
-                        <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-luminous-blue)]/30 rounded-xl p-4 font-sans text-xs leading-relaxed text-[#E2E8F0] whitespace-pre-wrap shadow-sm">
+                        <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-luminous-blue)]/30 rounded-xl p-4 font-sans text-xs leading-relaxed text-[color:var(--text-primary)] whitespace-pre-wrap shadow-sm">
                           <div className="flex items-center justify-between border-b border-[color:var(--color-navy-4)] pb-2 mb-2">
-                            <span className="font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase text-[10px]">AI Synthesis Output</span>
+                            <span className="font-bold text-[color:var(--color-luminous-blue)] text-xs">AI Synthesis Output</span>
                             <button
                               onClick={() => navigator.clipboard.writeText(aiActionResult)}
-                              className="text-[10px] font-mono text-[#94A3B8] hover:text-[#E2E8F0] flex items-center gap-1 cursor-pointer"
+                              className="text-[10px] font-mono text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1 cursor-pointer"
                             >
                               <Copy className="w-3 h-3" /> Copy
                             </button>
@@ -882,7 +878,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                 {activeTab === "personal" && (
                   <div className="space-y-6 animate-fade-in">
                     <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
-                      <h3 className="text-xs font-mono font-bold uppercase text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-[color:var(--text-primary)] border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-2">
                         <ShieldCheck className="w-4 h-4 text-emerald-400" /> Section 11: Verification Audit Trail
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -903,17 +899,17 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                     </div>
 
                     <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
-                      <h3 className="text-xs font-mono font-bold uppercase text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-2">
+                      <h3 className="text-xs font-bold text-[color:var(--text-primary)] border-b border-[color:var(--color-navy-4)] pb-2">
                         Section 14: Personal Research Metrics & Priority
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Read Status</label>
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Read Status</label>
                           <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                             <select
                               value={meta.personal.readStatus}
                               onChange={e => updateSelectedMeta({ ...meta, personal: { ...meta.personal, readStatus: e.target.value as any } })}
-                              className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
+                              className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
                             >
                               <option value="Unread">Unread</option>
                               <option value="Skimmed">Skimmed</option>
@@ -923,12 +919,12 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                           </div>
                         </div>
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Priority Level</label>
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Priority Level</label>
                           <div className="rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                             <select
                               value={meta.personal.priority}
                               onChange={e => updateSelectedMeta({ ...meta, personal: { ...meta.personal, priority: e.target.value as any } })}
-                              className="border-0 bg-transparent text-[#E2E8F0] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
+                              className="border-0 bg-transparent text-[color:var(--text-primary)] w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none"
                             >
                               <option value="Low">Low Priority</option>
                               <option value="Medium">Medium Priority</option>
@@ -938,7 +934,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                           </div>
                         </div>
                         <div>
-                          <label className="text-[10px] font-mono font-bold uppercase text-[#94A3B8] block mb-1">Importance Rating (1-5 Stars)</label>
+                          <label className="text-xs font-bold text-[color:var(--text-secondary)] block mb-1">Importance Rating (1-5 Stars)</label>
                           <div className="flex items-center gap-1.5 pt-1">
                             {[1, 2, 3, 4, 5].map(star => (
                               <button
@@ -946,7 +942,7 @@ export default function KnowledgeVaultManager({ project, updateProject, onClose 
                                 onClick={() => updateSelectedMeta({ ...meta, personal: { ...meta.personal, importance: star } })}
                                 className="cursor-pointer"
                               >
-                                <Star className={`w-5 h-5 ${star <= meta.personal.importance ? "fill-[color:var(--color-luminous-blue)] text-[color:var(--color-luminous-blue)]" : "text-[#94A3B8]"}`} />
+                                <Star className={`w-5 h-5 ${star <= meta.personal.importance ? "fill-[color:var(--color-luminous-blue)] text-[color:var(--color-luminous-blue)]" : "text-[color:var(--text-secondary)]"}`} />
                               </button>
                             ))}
                           </div>

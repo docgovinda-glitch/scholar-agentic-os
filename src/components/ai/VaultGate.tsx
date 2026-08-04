@@ -113,7 +113,7 @@ export default function VaultGate({ onUnlocked }: VaultGateProps) {
 
   if (mode === "loading") {
     return (
-      <div className="flex items-center gap-2 text-xs text-[#94A3B8] p-4">
+      <div className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)] p-4">
         <Loader2 className="w-4 h-4 animate-spin" />
         Opening your key vault...
       </div>
@@ -127,9 +127,9 @@ export default function VaultGate({ onUnlocked }: VaultGateProps) {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2 text-red-400">
           <AlertTriangle className="w-4 h-4" />
-          <span className="text-[10px] font-mono font-bold uppercase tracking-wider">Vault key missing</span>
+          <span className="text-xs font-bold">Vault key missing</span>
         </div>
-        <p className="text-xs text-[#E2E8F0] leading-relaxed">{error}</p>
+        <p className="text-xs text-[color:var(--text-primary)] leading-relaxed">{error}</p>
         <div className="flex flex-wrap gap-2">
           <RestoreFromBackupButton onRestored={() => { setMode("unlocked"); onUnlocked(); }} />
           <button
@@ -139,7 +139,7 @@ export default function VaultGate({ onUnlocked }: VaultGateProps) {
               setMode("create");
               setError(null);
             }}
-            className="px-3 py-1.5 border border-[color:var(--color-navy-4)] text-[#94A3B8] hover:text-[#E2E8F0] text-xs font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer"
+            className="px-3 py-1.5 border border-[color:var(--color-navy-4)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] text-xs font-semibold rounded-lg cursor-pointer"
           >
             Start a new vault
           </button>
@@ -152,14 +152,14 @@ export default function VaultGate({ onUnlocked }: VaultGateProps) {
     <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4 max-w-lg">
       <div className="flex items-center gap-2">
         <Lock className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
-        <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+        <span className="text-xs font-bold text-[color:var(--text-secondary)]">
           {mode === "create" ? "Set up your key vault" : "Unlock your key vault"}
         </span>
       </div>
 
       {mode === "create" ? (
         <>
-          <p className="text-xs text-[#94A3B8] leading-relaxed">
+          <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
             Your API keys are encrypted before they are saved, and never leave this device.
             Choose how the vault should open:
           </p>
@@ -179,11 +179,11 @@ export default function VaultGate({ onUnlocked }: VaultGateProps) {
                 className="mt-0.5 accent-[color:var(--color-luminous-blue)]"
               />
               <div>
-                <span className="text-sm font-bold text-[#E2E8F0] flex items-center gap-1.5">
+                <span className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-1.5">
                   <Monitor className="w-3.5 h-3.5" />
                   Stay unlocked on this device
                 </span>
-                <p className="text-xs text-[#94A3B8] mt-1 leading-relaxed">
+                <p className="text-xs text-[color:var(--text-secondary)] mt-1 leading-relaxed">
                   Recommended. No prompt, ever. The encryption key is stored so that no website
                   code can read it — but anyone using this browser profile can use your keys.
                 </p>
@@ -204,11 +204,11 @@ export default function VaultGate({ onUnlocked }: VaultGateProps) {
                 className="mt-0.5 accent-[color:var(--color-luminous-blue)]"
               />
               <div>
-                <span className="text-sm font-bold text-[#E2E8F0] flex items-center gap-1.5">
+                <span className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-1.5">
                   <KeyRound className="w-3.5 h-3.5" />
                   Ask for a passphrase each session
                 </span>
-                <p className="text-xs text-[#94A3B8] mt-1 leading-relaxed">
+                <p className="text-xs text-[color:var(--text-secondary)] mt-1 leading-relaxed">
                   Strongest protection on a shared computer. The passphrase is never stored, so
                   losing it means losing every saved key unless you have a backup file.
                 </p>
@@ -224,7 +224,7 @@ export default function VaultGate({ onUnlocked }: VaultGateProps) {
                 onChange={(e) => setPassphrase(e.target.value)}
                 placeholder="Vault passphrase"
                 autoComplete="new-password"
-                className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+                className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
               />
               <input
                 type="password"
@@ -232,14 +232,14 @@ export default function VaultGate({ onUnlocked }: VaultGateProps) {
                 onChange={(e) => setConfirmPassphrase(e.target.value)}
                 placeholder="Confirm passphrase"
                 autoComplete="new-password"
-                className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+                className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
               />
             </div>
           )}
         </>
       ) : (
         <>
-          <p className="text-xs text-[#94A3B8] leading-relaxed">
+          <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
             Enter the passphrase you chose when you set up the vault.
           </p>
           <input
@@ -250,7 +250,7 @@ export default function VaultGate({ onUnlocked }: VaultGateProps) {
             placeholder="Vault passphrase"
             autoComplete="current-password"
             autoFocus
-            className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+            className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
           />
         </>
       )}
@@ -262,7 +262,7 @@ export default function VaultGate({ onUnlocked }: VaultGateProps) {
           type="button"
           onClick={mode === "create" ? handleCreate : handleUnlock}
           disabled={busy}
-          className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+          className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
         >
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />}
           {mode === "create" ? "Create vault" : "Unlock"}
@@ -304,7 +304,7 @@ function VaultManagement() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
-          <span className="text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+          <span className="text-xs font-bold text-[color:var(--text-secondary)]">
             Vault unlocked · {entryCount} {entryCount === 1 ? "key" : "keys"} saved
           </span>
         </div>
@@ -312,7 +312,7 @@ function VaultManagement() {
           <button
             type="button"
             onClick={() => setShowBackup((v) => !v)}
-            className="px-2.5 py-1.5 border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[#E2E8F0] text-[10px] font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer flex items-center gap-1.5"
+            className="px-2.5 py-1.5 border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[color:var(--text-primary)] text-xs font-semibold rounded-lg cursor-pointer flex items-center gap-1.5"
           >
             <Download className="w-3 h-3" />
             Back up
@@ -322,7 +322,7 @@ function VaultManagement() {
       </div>
 
       {entryCount > 0 && !showBackup && (
-        <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+        <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
           If this browser's data is cleared, these keys cannot be recovered. Take a backup now
           while it is easy.
         </p>
@@ -330,7 +330,7 @@ function VaultManagement() {
 
       {showBackup && (
         <div className="space-y-2 border-t border-[color:var(--color-navy-4)] pt-3">
-          <p className="text-xs text-[#94A3B8] leading-relaxed">
+          <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
             Choose a passphrase for the backup file. You will need it to restore, and it is not
             stored anywhere — write it down.
           </p>
@@ -340,12 +340,12 @@ function VaultManagement() {
             onChange={(e) => setBackupPassphrase(e.target.value)}
             placeholder="Recovery passphrase"
             autoComplete="new-password"
-            className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+            className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
           />
           <button
             type="button"
             onClick={handleExport}
-            className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer"
+            className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-semibold rounded-lg cursor-pointer"
           >
             Download backup
           </button>
@@ -416,9 +416,7 @@ function RestoreFromBackupButton({
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
-        className={`border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[#E2E8F0] font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer flex items-center gap-1.5 ${
-          compact ? "px-2.5 py-1.5 text-[10px]" : "px-4 py-2 text-xs"
-        }`}
+        className={`border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-[color:var(--text-primary)] font-semibold rounded-lg cursor-pointer flex items-center gap-1.5 ${ compact ? "px-2.5 py-1.5 text-xs" : "px-4 py-2 text-xs" }`}
       >
         <Upload className="w-3 h-3" />
         Restore backup
@@ -437,7 +435,7 @@ function RestoreFromBackupButton({
 
       {pendingFile !== null && (
         <div className="w-full mt-2 bg-[color:var(--color-navy-3)]/60 border border-[color:var(--color-navy-4)] rounded-xl p-3 space-y-2">
-          <p className="text-xs text-[#94A3B8]">Enter the recovery passphrase for this backup file.</p>
+          <p className="text-xs text-[color:var(--text-secondary)]">Enter the recovery passphrase for this backup file.</p>
           <input
             type="password"
             value={passphrase}
@@ -445,7 +443,7 @@ function RestoreFromBackupButton({
             onKeyDown={(e) => e.key === "Enter" && handleRestore()}
             placeholder="Recovery passphrase"
             autoComplete="off"
-            className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
+            className="w-full bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] rounded-lg px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--color-luminous-blue)]"
           />
           {error && <p className="text-xs text-red-400">{error}</p>}
           <div className="flex gap-2">
@@ -453,14 +451,14 @@ function RestoreFromBackupButton({
               type="button"
               onClick={handleRestore}
               disabled={busy}
-              className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer disabled:opacity-50"
+              className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-50"
             >
               {busy ? "Restoring..." : "Restore"}
             </button>
             <button
               type="button"
               onClick={() => { setPendingFile(null); setError(null); }}
-              className="px-3 py-1.5 border border-[color:var(--color-navy-4)] text-[#94A3B8] hover:text-[#E2E8F0] text-xs font-mono font-semibold uppercase tracking-wider rounded-lg cursor-pointer"
+              className="px-3 py-1.5 border border-[color:var(--color-navy-4)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] text-xs font-semibold rounded-lg cursor-pointer"
             >
               Cancel
             </button>

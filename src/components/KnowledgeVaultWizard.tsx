@@ -661,22 +661,22 @@ Return strictly valid JSON:
             <BookOpen className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0]">Knowledge Vault Setup Wizard</h2>
-            <p className="text-[11px] text-[#94A3B8] font-sans">Ground your AI research assistants with academic articles, theses, files, links, or media.</p>
+            <h2 className="text-sm font-bold text-[color:var(--text-primary)]">Knowledge Vault Setup Wizard</h2>
+            <p className="text-[11px] text-[color:var(--text-secondary)] font-sans">Ground your AI research assistants with academic articles, theses, files, links, or media.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {onBack && (
             <button
               onClick={onBack}
-              className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-all text-[#E2E8F0]"
+              className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-xl text-xs font-bold cursor-pointer transition-all text-[color:var(--text-primary)]"
             >
               &larr; Back
             </button>
           )}
           <button
             onClick={onComplete}
-            className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm transition-all"
+            className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-bold cursor-pointer shadow-sm transition-all"
           >
             Skip / Continue
           </button>
@@ -696,41 +696,33 @@ Return strictly valid JSON:
         {/* COLUMN 1: UPLOAD TABS & FILES LIST */}
         <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-2xs flex flex-col space-y-4">
           <div>
-            <span className="text-[9px] font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-widest block">Column 01</span>
-            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mt-0.5">Primary Ingestion Hub</h3>
+            <span className="text-[9px] font-bold text-[color:var(--color-luminous-blue)] block">Column 01</span>
+            <h3 className="text-xs font-bold text-[color:var(--text-primary)] mt-0.5">Primary Ingestion Hub</h3>
           </div>
 
           {/* Ingestion Tabs */}
           <div className="flex bg-[color:var(--color-navy-1)] p-1 rounded-xl gap-1">
             <button
               onClick={() => setActiveTab("files")}
-              className={`flex-1 py-1.5 text-[9px] font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer ${
-                activeTab === "files" ? "bg-[color:var(--color-navy-3)] text-[#E2E8F0] shadow-2xs" : "text-[#94A3B8] hover:text-[#E2E8F0]"
-              }`}
+              className={`flex-1 py-1.5 text-[9px] font-bold rounded-lg transition-colors cursor-pointer ${ activeTab === "files" ? "bg-[color:var(--color-navy-3)] text-[color:var(--text-primary)] shadow-2xs" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]" }`}
             >
               Files
             </button>
             <button
               onClick={() => setActiveTab("url")}
-              className={`flex-1 py-1.5 text-[9px] font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer ${
-                activeTab === "url" ? "bg-[color:var(--color-navy-3)] text-[#E2E8F0] shadow-2xs" : "text-[#94A3B8] hover:text-[#E2E8F0]"
-              }`}
+              className={`flex-1 py-1.5 text-[9px] font-bold rounded-lg transition-colors cursor-pointer ${ activeTab === "url" ? "bg-[color:var(--color-navy-3)] text-[color:var(--text-primary)] shadow-2xs" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]" }`}
             >
               URL Link
             </button>
             <button
               onClick={() => setActiveTab("doi")}
-              className={`flex-1 py-1.5 text-[9px] font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer ${
-                activeTab === "doi" ? "bg-[color:var(--color-navy-3)] text-[#E2E8F0] shadow-2xs" : "text-[#94A3B8] hover:text-[#E2E8F0]"
-              }`}
+              className={`flex-1 py-1.5 text-[9px] font-bold rounded-lg transition-colors cursor-pointer ${ activeTab === "doi" ? "bg-[color:var(--color-navy-3)] text-[color:var(--text-primary)] shadow-2xs" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]" }`}
             >
               DOI
             </button>
             <button
               onClick={() => setActiveTab("media")}
-              className={`flex-1 py-1.5 text-[9px] font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer ${
-                activeTab === "media" ? "bg-[color:var(--color-navy-3)] text-[#E2E8F0] shadow-2xs" : "text-[#94A3B8] hover:text-[#E2E8F0]"
-              }`}
+              className={`flex-1 py-1.5 text-[9px] font-bold rounded-lg transition-colors cursor-pointer ${ activeTab === "media" ? "bg-[color:var(--color-navy-3)] text-[color:var(--text-primary)] shadow-2xs" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]" }`}
             >
               Media
             </button>
@@ -741,8 +733,8 @@ Return strictly valid JSON:
             <div className="flex flex-col items-center justify-center p-8 bg-[color:var(--color-navy-1)] border border-[color:var(--color-luminous-blue)]/20 rounded-xl space-y-3 text-center min-h-[160px]">
               <Loader2 className="w-8 h-8 text-[color:var(--color-luminous-blue)] animate-spin" />
               <div className="space-y-1">
-                <span className="text-xs font-bold text-[#E2E8F0]">Processing Resource...</span>
-                <p className="text-[10px] text-[#94A3B8] max-w-[200px]">Extracting data streams, structure, and referencing metadata.</p>
+                <span className="text-xs font-bold text-[color:var(--text-primary)]">Processing Resource...</span>
+                <p className="text-[10px] text-[color:var(--text-secondary)] max-w-[200px]">Extracting data streams, structure, and referencing metadata.</p>
               </div>
             </div>
           ) : (
@@ -773,10 +765,10 @@ Return strictly valid JSON:
                     <Upload className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   </div>
                   <div className="space-y-0.5">
-                    <span className="text-[11px] font-mono font-bold text-[#E2E8F0] block">Drag & Drop Document</span>
-                    <span className="text-[8px] text-[#94A3B8] block">PDF, DOCX, CSV, TXT, PNG/JPG, MP3/WAV</span>
+                    <span className="text-[11px] font-mono font-bold text-[color:var(--text-primary)] block">Drag & Drop Document</span>
+                    <span className="text-[8px] text-[color:var(--text-secondary)] block">PDF, DOCX, CSV, TXT, PNG/JPG, MP3/WAV</span>
                   </div>
-                  <div className="px-3 py-1 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-[9px] font-mono uppercase tracking-wider font-bold">
+                  <div className="px-3 py-1 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-lg text-[9px] font-bold">
                     Choose File
                   </div>
                 </div>
@@ -786,22 +778,22 @@ Return strictly valid JSON:
               {activeTab === "url" && (
                 <form onSubmit={handleUrlIngest} className="space-y-3 min-h-[160px] flex flex-col justify-center">
                   <div className="space-y-1">
-                    <label className="text-[8px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Website URL Link</label>
+                    <label className="text-[8px] font-bold text-[color:var(--text-secondary)] block">Website URL Link</label>
                     <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
-                      <LinkIcon className="absolute left-3 top-3 w-4 h-4 text-[#94A3B8] z-10" />
+                      <LinkIcon className="absolute left-3 top-3 w-4 h-4 text-[color:var(--text-secondary)] z-10" />
                       <input
                         type="url"
                         placeholder="https://wikipedia.org/wiki/Tribhuvan_University"
                         value={inputUrl}
                         onChange={(e) => setInputUrl(e.target.value)}
-                        className="w-full text-xs font-mono p-2.5 pl-9 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                        className="w-full text-xs font-mono p-2.5 pl-9 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                         required
                       />
                     </div>
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                    className="w-full py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" /> Ingest Web Page
                   </button>
@@ -812,22 +804,22 @@ Return strictly valid JSON:
               {activeTab === "doi" && (
                 <form onSubmit={handleDoiIngest} className="space-y-3 min-h-[160px] flex flex-col justify-center">
                   <div className="space-y-1">
-                    <label className="text-[8px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">CrossRef DOI Identifier</label>
+                    <label className="text-[8px] font-bold text-[color:var(--text-secondary)] block">CrossRef DOI Identifier</label>
                     <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
-                      <Search className="absolute left-3 top-3 w-4 h-4 text-[#94A3B8] z-10" />
+                      <Search className="absolute left-3 top-3 w-4 h-4 text-[color:var(--text-secondary)] z-10" />
                       <input
                         type="text"
                         placeholder="e.g. 10.1038/s41586-020-2012-7"
                         value={inputDoi}
                         onChange={(e) => setInputDoi(e.target.value)}
-                        className="w-full text-xs font-mono p-2.5 pl-9 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                        className="w-full text-xs font-mono p-2.5 pl-9 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                         required
                       />
                     </div>
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                    className="w-full py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
                   >
                     <Database className="w-3.5 h-3.5" /> Lookup Reference
                   </button>
@@ -838,22 +830,22 @@ Return strictly valid JSON:
               {activeTab === "media" && (
                 <form onSubmit={handleMediaIngest} className="space-y-3 min-h-[160px] flex flex-col justify-center">
                   <div className="space-y-1">
-                    <label className="text-[8px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">YouTube / Podcast Link</label>
+                    <label className="text-[8px] font-bold text-[color:var(--text-secondary)] block">YouTube / Podcast Link</label>
                     <div className="relative rounded-xl border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
-                      <Youtube className="absolute left-3 top-3 w-4 h-4 text-[#94A3B8] z-10" />
+                      <Youtube className="absolute left-3 top-3 w-4 h-4 text-[color:var(--text-secondary)] z-10" />
                       <input
                         type="url"
                         placeholder="https://www.youtube.com/watch?v=..."
                         value={inputMediaUrl}
                         onChange={(e) => setInputMediaUrl(e.target.value)}
-                        className="w-full text-xs font-mono p-2.5 pl-9 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                        className="w-full text-xs font-mono p-2.5 pl-9 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                         required
                       />
                     </div>
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                    className="w-full py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
                   >
                     <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Summarize Media Link
                   </button>
@@ -864,10 +856,10 @@ Return strictly valid JSON:
 
           {/* Uploaded Documents List */}
           <div className="space-y-2.5 pt-2 border-t border-[color:var(--color-navy-4)]">
-            <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Indexed Library ({files.length})</span>
+            <span className="text-[9px] font-bold text-[color:var(--text-secondary)] block">Indexed Library ({files.length})</span>
             {files.length === 0 ? (
               <div className="p-8 text-center bg-[color:var(--color-navy-1)]/50 border border-[color:var(--color-navy-4)] rounded-xl">
-                <span className="text-[10px] font-mono text-[#94A3B8]">No sources indexed yet.</span>
+                <span className="text-[10px] font-mono text-[color:var(--text-secondary)]">No sources indexed yet.</span>
               </div>
             ) : (
               <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
@@ -897,12 +889,12 @@ Return strictly valid JSON:
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <TypeIcon className={`w-4 h-4 shrink-0 ${isSelected ? "text-[color:var(--color-luminous-blue)]" : "text-[#94A3B8]"}`} />
+                        <TypeIcon className={`w-4 h-4 shrink-0 ${isSelected ? "text-[color:var(--color-luminous-blue)]" : "text-[color:var(--text-secondary)]"}`} />
                         <div className="min-w-0 flex-1">
-                          <h4 className="text-[11px] font-mono font-bold text-[#E2E8F0] truncate" title={file.fileName}>
+                          <h4 className="text-[11px] font-mono font-bold text-[color:var(--text-primary)] truncate" title={file.fileName}>
                             {file.fileName}
                           </h4>
-                          <span className="text-[9px] font-mono text-[#94A3B8] block truncate">
+                          <span className="text-[9px] font-mono text-[color:var(--text-secondary)] block truncate">
                             Tag: {file.parsedOverview?.citationTag || file.fileName}
                           </span>
                         </div>
@@ -910,7 +902,7 @@ Return strictly valid JSON:
                       <button
                         type="button"
                         onClick={(e) => handleDeleteFileLocal(file.id, e)}
-                        className="p-1 text-[#94A3B8] hover:text-red-400 hover:bg-[color:var(--color-navy-3)] rounded-lg transition-colors cursor-pointer"
+                        className="p-1 text-[color:var(--text-secondary)] hover:text-red-400 hover:bg-[color:var(--color-navy-3)] rounded-lg transition-colors cursor-pointer"
                         title="Delete Source"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -926,15 +918,15 @@ Return strictly valid JSON:
         {/* COLUMN 2: ABSTRACT & CHAPTER STRUCTURE */}
         <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-2xs flex flex-col space-y-4">
           <div>
-            <span className="text-[9px] font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-widest block">Column 02</span>
-            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mt-0.5">Abstract & Chapters</h3>
+            <span className="text-[9px] font-bold text-[color:var(--color-luminous-blue)] block">Column 02</span>
+            <h3 className="text-xs font-bold text-[color:var(--text-primary)] mt-0.5">Abstract & Chapters</h3>
           </div>
 
           {!selectedFile ? (
             <div className="flex flex-col items-center justify-center p-8 bg-[color:var(--color-navy-1)]/30 border border-dashed border-[color:var(--color-navy-4)] rounded-xl grow text-center min-h-[300px]">
-              <Sparkles className="w-8 h-8 text-[#94A3B8] mb-2" />
-              <span className="text-[11px] font-mono text-[#94A3B8] font-bold">No Source Selected</span>
-              <p className="text-[10px] text-[#94A3B8] max-w-[200px] mt-1 font-sans">Upload or select an indexed document from Column 1 to synthesize findings.</p>
+              <Sparkles className="w-8 h-8 text-[color:var(--text-secondary)] mb-2" />
+              <span className="text-[11px] font-mono text-[color:var(--text-secondary)] font-bold">No Source Selected</span>
+              <p className="text-[10px] text-[color:var(--text-secondary)] max-w-[200px] mt-1 font-sans">Upload or select an indexed document from Column 1 to synthesize findings.</p>
             </div>
           ) : selectedFile.status === "processing" ? (
             <div className="flex flex-col items-center justify-center p-8 bg-[color:var(--color-navy-1)]/30 border border-dashed border-[color:var(--color-navy-4)] rounded-xl grow text-center min-h-[300px] space-y-2">
@@ -947,35 +939,35 @@ Return strictly valid JSON:
               <div className="space-y-3.5">
                 {/* Meta Header */}
                 <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl space-y-1">
-                  <h4 className="text-[11px] font-mono font-bold text-[#E2E8F0] leading-tight break-words">
+                  <h4 className="text-[11px] font-mono font-bold text-[color:var(--text-primary)] leading-tight break-words">
                     {selectedFile.parsedOverview?.title || selectedFile.fileName}
                   </h4>
-                  <span className="text-[9px] font-mono text-[#94A3B8] block truncate">
+                  <span className="text-[9px] font-mono text-[color:var(--text-secondary)] block truncate">
                     Author: {selectedFile.parsedOverview?.author || "Unknown"} ({selectedFile.parsedOverview?.year || "N/A"})
                   </span>
                 </div>
 
                 {/* Abstract Text */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Document Abstract</span>
-                  <div className="p-3.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl text-[11px] text-[#94A3B8] leading-relaxed font-sans max-h-[140px] overflow-y-auto">
+                  <span className="text-[9px] font-bold text-[color:var(--text-secondary)] block">Document Abstract</span>
+                  <div className="p-3.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl text-[11px] text-[color:var(--text-secondary)] leading-relaxed font-sans max-h-[140px] overflow-y-auto">
                     {selectedFile.parsedOverview?.abstract || "No abstract or summary was generated."}
                   </div>
                 </div>
 
                 {/* Chapters / Sections */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Extracted Chapters & Sections</span>
-                  <div className="border border-[color:var(--color-navy-4)] rounded-xl divide-y divide-[color:var(--color-navy-4)] max-h-[150px] overflow-y-auto bg-[color:var(--color-navy-1)]">
+                  <span className="text-[9px] font-bold text-[color:var(--text-secondary)] block">Extracted Chapters & Sections</span>
+                  <div className="border border-[color:var(--color-navy-4)] rounded-xl divide-y divide-[color:var(--border-default)] max-h-[150px] overflow-y-auto bg-[color:var(--color-navy-1)]">
                     {selectedFile.parsedOverview?.chapters && selectedFile.parsedOverview.chapters.length > 0 ? (
                       selectedFile.parsedOverview.chapters.map((ch, idx) => (
                         <div key={idx} className="p-2.5 text-[10px] font-mono hover:bg-[color:var(--color-navy-3)]/50">
-                          <span className="font-bold text-[#E2E8F0] block">{ch.name}</span>
-                          <span className="text-[#94A3B8] text-[9px] mt-0.5 block font-sans">{ch.summary}</span>
+                          <span className="font-bold text-[color:var(--text-primary)] block">{ch.name}</span>
+                          <span className="text-[color:var(--text-secondary)] text-[9px] mt-0.5 block font-sans">{ch.summary}</span>
                         </div>
                       ))
                     ) : (
-                      <div className="p-3 text-center text-[10px] text-[#94A3B8] font-mono">
+                      <div className="p-3 text-center text-[10px] text-[color:var(--text-secondary)] font-mono">
                         No sections detected.
                       </div>
                     )}
@@ -990,15 +982,15 @@ Return strictly valid JSON:
         {/* COLUMN 3: KEY DATA & FINDINGS + CITATION TRIGGER */}
         <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-2xs flex flex-col space-y-4">
           <div>
-            <span className="text-[9px] font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-widest block">Column 03</span>
-            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mt-0.5">Key Findings & Data</h3>
+            <span className="text-[9px] font-bold text-[color:var(--color-luminous-blue)] block">Column 03</span>
+            <h3 className="text-xs font-bold text-[color:var(--text-primary)] mt-0.5">Key Findings & Data</h3>
           </div>
 
           {!selectedFile ? (
             <div className="flex flex-col items-center justify-center p-8 bg-[color:var(--color-navy-1)]/30 border border-dashed border-[color:var(--color-navy-4)] rounded-xl grow text-center min-h-[300px]">
-              <ShieldCheck className="w-8 h-8 text-[#94A3B8] mb-2" />
-              <span className="text-[11px] font-mono text-[#94A3B8] font-bold">Extraction Idle</span>
-              <p className="text-[10px] text-[#94A3B8] max-w-[200px] mt-1 font-sans">Select a document to extract data variables and research findings.</p>
+              <ShieldCheck className="w-8 h-8 text-[color:var(--text-secondary)] mb-2" />
+              <span className="text-[11px] font-mono text-[color:var(--text-secondary)] font-bold">Extraction Idle</span>
+              <p className="text-[10px] text-[color:var(--text-secondary)] max-w-[200px] mt-1 font-sans">Select a document to extract data variables and research findings.</p>
             </div>
           ) : selectedFile.status === "processing" ? (
             <div className="flex flex-col items-center justify-center p-8 bg-[color:var(--color-navy-1)]/30 border border-dashed border-[color:var(--color-navy-4)] rounded-xl grow text-center min-h-[300px] space-y-2">
@@ -1011,7 +1003,7 @@ Return strictly valid JSON:
               <div className="space-y-3.5">
                 {/* Key Findings Card */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Key Research Findings</span>
+                  <span className="text-[9px] font-bold text-[color:var(--text-secondary)] block">Key Research Findings</span>
                   <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1.5 max-h-[140px] overflow-y-auto">
                     {selectedFile.parsedOverview?.keyFindings && selectedFile.parsedOverview.keyFindings.length > 0 ? (
                       selectedFile.parsedOverview.keyFindings.map((finding, idx) => (
@@ -1021,14 +1013,14 @@ Return strictly valid JSON:
                         </div>
                       ))
                     ) : (
-                      <span className="text-[10px] font-mono text-[#94A3B8] block">No primary findings identified.</span>
+                      <span className="text-[10px] font-mono text-[color:var(--text-secondary)] block">No primary findings identified.</span>
                     )}
                   </div>
                 </div>
 
                 {/* Key Data Points Card */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Key Statistical / Experimental Data</span>
+                  <span className="text-[9px] font-bold text-[color:var(--text-secondary)] block">Key Statistical / Experimental Data</span>
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-1.5 max-h-[140px] overflow-y-auto">
                     {selectedFile.parsedOverview?.keyDataPoints && selectedFile.parsedOverview.keyDataPoints.length > 0 ? (
                       selectedFile.parsedOverview.keyDataPoints.map((dataPt, idx) => (
@@ -1038,23 +1030,23 @@ Return strictly valid JSON:
                         </div>
                       ))
                     ) : (
-                      <span className="text-[10px] font-mono text-[#94A3B8] block">No key statistical variables parsed.</span>
+                      <span className="text-[10px] font-mono text-[color:var(--text-secondary)] block">No key statistical variables parsed.</span>
                     )}
                   </div>
                 </div>
 
                 {/* Key Terms Badges */}
                 <div className="space-y-1.5">
-                  <span className="text-[9px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider block">Extracted Key Terms</span>
+                  <span className="text-[9px] font-bold text-[color:var(--text-secondary)] block">Extracted Key Terms</span>
                   <div className="flex flex-wrap gap-1.5 max-h-[60px] overflow-y-auto">
                     {selectedFile.parsedOverview?.keyTerms && selectedFile.parsedOverview.keyTerms.length > 0 ? (
                       selectedFile.parsedOverview.keyTerms.map((term, idx) => (
-                        <span key={idx} className="px-2 py-0.5 bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] text-[#94A3B8] rounded text-[9px] font-mono">
+                        <span key={idx} className="px-2 py-0.5 bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] text-[color:var(--text-secondary)] rounded text-[9px] font-mono">
                           {term}
                         </span>
                       ))
                     ) : (
-                      <span className="text-[10px] font-mono text-[#94A3B8]">None detected.</span>
+                      <span className="text-[10px] font-mono text-[color:var(--text-secondary)]">None detected.</span>
                     )}
                   </div>
                 </div>
@@ -1066,7 +1058,7 @@ Return strictly valid JSON:
                   <button
                     type="button"
                     onClick={handleStartEdit}
-                    className="w-full bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white p-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white p-3 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <Tag className="w-4 h-4" />
                     <span>Manage Citation & Referencing</span>
@@ -1087,14 +1079,14 @@ Return strictly valid JSON:
           <div className="flex items-center justify-between border-b border-[color:var(--color-navy-4)] pb-3">
             <div className="flex items-center gap-2">
               <Tag className="w-4.5 h-4.5 text-[color:var(--color-luminous-blue)]" />
-              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0]">
+              <h3 className="text-sm font-bold text-[color:var(--text-primary)]">
               Academic Reference Citation Editor
               </h3>
             </div>
             <button
               type="button"
               onClick={() => setIsEditingCitation(false)}
-              className="text-[#94A3B8] hover:text-[#E2E8F0] cursor-pointer"
+              className="text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1107,9 +1099,7 @@ Return strictly valid JSON:
                 key={tab}
                 type="button"
                 onClick={() => setEditorTab(tab)}
-                className={`pb-2 px-3 text-xs font-mono font-bold uppercase border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-                  editorTab === tab ? "border-[color:var(--color-luminous-blue)] text-[color:var(--color-luminous-blue)] font-extrabold" : "border-transparent text-[#94A3B8] hover:text-[#E2E8F0]"
-                }`}
+                className={`pb-2 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${ editorTab === tab ? "border-[color:var(--color-luminous-blue)] text-[color:var(--color-luminous-blue)] font-extrabold" : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]" }`}
               >
                 {tab === "basic" ? "Basic Info" : tab === "identifiers" ? "Identifiers & Access" : tab === "details" ? "Publisher Details" : "Citation Previews"}
               </button>
@@ -1121,12 +1111,12 @@ Return strictly valid JSON:
             {editorTab === "basic" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Resource Type (Genre)</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Resource Type (Genre)</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <select
                       value={editForm.genre || "Journal Article"}
                       onChange={(e) => setEditForm({ ...editForm, genre: e.target.value })}
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     >
                       <option value="Journal Article">Journal Article</option>
                       <option value="Book">Book</option>
@@ -1141,46 +1131,46 @@ Return strictly valid JSON:
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Publication Year</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Publication Year</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.year || ""}
                       onChange={(e) => setEditForm({ ...editForm, year: e.target.value })}
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Document Title</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Document Title</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.title || ""}
                       onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Author(s)</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Author(s)</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.author || ""}
                       onChange={(e) => setEditForm({ ...editForm, author: e.target.value })}
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Journal / School / Institution</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Journal / School / Institution</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.institutionOrJournal || ""}
                       onChange={(e) => setEditForm({ ...editForm, institutionOrJournal: e.target.value })}
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
@@ -1191,74 +1181,74 @@ Return strictly valid JSON:
             {editorTab === "identifiers" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Digital Object Identifier (DOI)</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Digital Object Identifier (DOI)</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.doiOrUrl?.startsWith("10.") ? editForm.doiOrUrl : ""}
                       onChange={(e) => setEditForm({ ...editForm, doiOrUrl: e.target.value })}
                       placeholder="e.g. 10.1038/s41586-020-2012-7"
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">URL / Link</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">URL / Link</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.doiOrUrl?.startsWith("http") ? editForm.doiOrUrl : ""}
                       onChange={(e) => setEditForm({ ...editForm, doiOrUrl: e.target.value })}
                       placeholder="https://example.com/article"
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">ISSN / ISBN</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">ISSN / ISBN</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.issnIsbn || ""}
                       onChange={(e) => setEditForm({ ...editForm, issnIsbn: e.target.value })}
                       placeholder="e.g. 0028-0836"
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">arXiv Identifier</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">arXiv Identifier</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.arxivId || ""}
                       onChange={(e) => setEditForm({ ...editForm, arxivId: e.target.value })}
                       placeholder="e.g. arXiv:2103.00020"
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">PubMed ID (PMID)</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">PubMed ID (PMID)</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.pmid || ""}
                       onChange={(e) => setEditForm({ ...editForm, pmid: e.target.value })}
                       placeholder="e.g. 32051586"
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">PubMed Central ID (PMCID)</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">PubMed Central ID (PMCID)</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.pmcid || ""}
                       onChange={(e) => setEditForm({ ...editForm, pmcid: e.target.value })}
                       placeholder="e.g. PMC7098200"
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
@@ -1269,50 +1259,50 @@ Return strictly valid JSON:
             {editorTab === "details" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Publisher</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Publisher</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.publisher || ""}
                       onChange={(e) => setEditForm({ ...editForm, publisher: e.target.value })}
                       placeholder="e.g. Nature Publishing Group"
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Volume & Issue</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Volume & Issue</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.volumeIssue || ""}
                       onChange={(e) => setEditForm({ ...editForm, volumeIssue: e.target.value })}
                       placeholder="e.g. Vol. 578, No. 7795"
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Page Range</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Page Range</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.pages || ""}
                       onChange={(e) => setEditForm({ ...editForm, pages: e.target.value })}
                       placeholder="e.g. 201-215"
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Access / Retrieval Date</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Access / Retrieval Date</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
                       value={editForm.accessDate || ""}
                       onChange={(e) => setEditForm({ ...editForm, accessDate: e.target.value })}
                       placeholder="e.g. 2026-06-30"
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                     />
                   </div>
                 </div>
@@ -1324,7 +1314,7 @@ Return strictly valid JSON:
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">In-Text Citation Tag (APA)</label>
+                    <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">In-Text Citation Tag (APA)</label>
                     <div className="w-full rounded-lg border border-emerald-500/40 bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                       <input
                         type="text"
@@ -1335,7 +1325,7 @@ Return strictly valid JSON:
                     </div>
                   </div>
                   <div>
-                    <span className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">Style Preformatted Previews</span>
+                    <span className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">Style Preformatted Previews</span>
                     <div className="space-y-2 border border-[color:var(--color-navy-4)] rounded-lg p-3 bg-[color:var(--color-navy-1)]/50 max-h-[180px] overflow-y-auto">
                       {(() => {
                         const alt = generateAlternativeCitations(editForm);
@@ -1349,7 +1339,7 @@ Return strictly valid JSON:
                         ].map((item) => (
                           <div key={item.style} className="text-[10px] leading-relaxed">
                             <span className="font-bold text-[color:var(--color-luminous-blue)] uppercase text-[9px] mr-1.5">{item.style}:</span>
-                            <span className="text-[#94A3B8] italic">{item.val}</span>
+                            <span className="text-[color:var(--text-secondary)] italic">{item.val}</span>
                           </div>
                         ));
                       })()}
@@ -1358,13 +1348,13 @@ Return strictly valid JSON:
                 </div>
 
                 <div>
-                  <label className="block text-[10px] text-[#94A3B8] uppercase font-bold mb-1">BibTeX Citation Snippet</label>
+                  <label className="block text-[10px] text-[color:var(--text-secondary)] uppercase font-bold mb-1">BibTeX Citation Snippet</label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <textarea
                       rows={4}
                       value={editForm.bibtex || ""}
                       onChange={(e) => setEditForm({ ...editForm, bibtex: e.target.value })}
-                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[#E2E8F0] font-mono text-[10px] leading-relaxed"
+                      className="w-full p-2.5 border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)] font-mono text-[10px] leading-relaxed"
                     />
                   </div>
                 </div>
@@ -1376,14 +1366,14 @@ Return strictly valid JSON:
             <button
               type="button"
               onClick={() => setIsEditingCitation(false)}
-              className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-lg text-xs font-mono font-bold uppercase cursor-pointer text-[#E2E8F0]"
+              className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-lg text-xs font-bold cursor-pointer text-[color:var(--text-primary)]"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSaveCitation}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
             >
               <Save className="w-3.5 h-3.5" /> Save Citation Details
             </button>
@@ -1399,7 +1389,7 @@ Return strictly valid JSON:
               <CheckCircle2 className="w-6.5 h-6.5" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-mono font-bold uppercase text-emerald-300 flex items-center gap-1.5">
+              <h3 className="text-sm font-bold text-emerald-300 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4" /> Citation Grounding Confirmed
               </h3>
               <p className="text-[11px] text-emerald-400 leading-relaxed font-sans max-w-xl">
@@ -1410,13 +1400,13 @@ Return strictly valid JSON:
           <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
             <button
               onClick={handleAddAnotherSource}
-              className="flex-1 md:flex-none px-4 py-2.5 border border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-all"
+              className="flex-1 md:flex-none px-4 py-2.5 border border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 rounded-xl text-xs font-bold cursor-pointer transition-all"
             >
               Add Another Source
             </button>
             <button
               onClick={onComplete}
-              className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-md transition-all flex items-center justify-center gap-1"
+              className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold cursor-pointer shadow-md transition-all flex items-center justify-center gap-1"
             >
               <span>Continue to Workshop</span>
               <ChevronRight className="w-4 h-4" />
@@ -1433,27 +1423,27 @@ Return strictly valid JSON:
       <div className="w-full flex flex-col space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[color:var(--color-navy-2)]/50 border border-[color:var(--color-navy-4)] rounded-2xl p-4 shadow-sm">
           <div>
-            <h2 className="text-lg font-bold text-[#E2E8F0]">Reference Library Integration</h2>
-            <p className="text-xs text-[#94A3B8]">Configure publications, references, and files for grounding your manuscript drafts.</p>
+            <h2 className="text-lg font-bold text-[color:var(--text-primary)]">Reference Library Integration</h2>
+            <p className="text-xs text-[color:var(--text-secondary)]">Configure publications, references, and files for grounding your manuscript drafts.</p>
           </div>
           <div className="flex items-center gap-2">
             {onBack && (
               <button
                 onClick={onBack}
-                className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-xl text-xs font-mono font-bold uppercase cursor-pointer transition-all text-[#E2E8F0]"
+                className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] rounded-xl text-xs font-bold cursor-pointer transition-all text-[color:var(--text-primary)]"
               >
                 &larr; Back
               </button>
             )}
             <button
               onClick={onComplete}
-              className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm transition-all"
+              className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-bold cursor-pointer shadow-sm transition-all"
             >
               Skip / Complete
             </button>
             <button
               onClick={() => setViewMode("wizard")}
-              className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm transition-all"
+              className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white rounded-xl text-xs font-bold cursor-pointer shadow-sm transition-all"
             >
               Upload Wizard
             </button>
