@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CLOUD_PROVIDERS, type CloudProviderSpec } from "../../config/providerCatalog";
+import { LOCAL_RUNNERS, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
+import { detectRunners } from "../../services/localRunnerProbe";
 import {
   DEFAULT_AI_SETTINGS,
   forgetProviderKey,
@@ -20,11 +22,16 @@ import {
  * free tier actually is, and a real link to that provider's own key page. This
  * screen presents that rather than inventing its own copy.
  *
- * Deliberately narrower than the legacy AISetupWizard (987 lines): that screen
- * also covers local model runners, hardware capability checks, and a vault
- * passphrase. Those are real features and are not being deleted — the legacy
- * client still has them until it retires. What is here is the path a new user
- * needs to reach a working editor: pick a provider, supply a key, continue.
+ * Local runners are offered as PEERS to cloud providers, not behind a
+ * disclosure (docs 63 §4). P3/P4 are about where a user's prose goes, and
+ * prose sent to a model on localhost never leaves the machine — making the
+ * privacy-preserving choice the harder one to find would invert the point.
+ *
+ * Deliberately narrower than the legacy AISetupWizard (987 lines), which also
+ * covers hardware capability checks and a vault passphrase. Those are real
+ * features and are not being deleted — the legacy client keeps them until it
+ * retires. What is here is the path a new user needs to reach a working
+ * editor: pick a provider or a local runner, supply what it needs, continue.
  */
 export default function AiSetupScreen({
   onDone,
@@ -40,6 +47,9 @@ export default function AiSetupScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Local runners that answered a probe on this machine. */
+  const [detected, setDetected] = useState<Array<{ runner: LocalRunnerSpec; models: string[] }>>([]);
+  const [probing, setProbing] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -51,13 +61,27 @@ export default function AiSetupScreen({
       })
       .finally(() => active && setLoading(false));
     setConfigured(providersWithStoredKey());
+
+    // Local runners are offered as PEERS to cloud providers (docs 63): a user
+    // who wants nothing sent to a third party should not have to go looking.
+    // Probing on mount means we can say "Ollama is running" rather than making
+    // them find out by trying.
+    detectRunners()
+      .then((found) => active && setDetected(found))
+      .catch(() => {})
+      .finally(() => active && setProbing(false));
+
     return () => {
       active = false;
     };
   }, []);
 
   const spec = useMemo(() => CLOUD_PROVIDERS.find((p) => p.id === selected), [selected]);
+  const localSpec = useMemo(() => LOCAL_RUNNERS.find((r) => r.id === selected), [selected]);
   const hasKeyOnDevice = configured.includes(selected);
+  // A local runner authenticates with nothing — reachability is the whole
+  // requirement, so the key field does not apply to it.
+  const isLocal = localSpec !== undefined;
 
   async function handleSave() {
     setBusy(true);
@@ -72,7 +96,12 @@ export default function AiSetupScreen({
         provider: selected,
         preferences: {
           ...settings.preferences,
-          ...(spec ? { [`${selected}Model`]: settings.preferences[`${selected}Model`] ?? spec.defaultModel } : {}),
+          ...(spec && !isLocal
+            ? { [`${selected}Model`]: settings.preferences[`${selected}Model`] ?? spec.defaultModel }
+            : {}),
+          // A local runner is addressed by endpoint, not by key. Recorded so
+          // the gateway knows where to reach it.
+          ...(localSpec ? { [`${selected}Endpoint`]: localSpec.defaultEndpoint } : {}),
         },
       };
       const result = await saveUserAiSettings(next);
@@ -129,7 +158,56 @@ export default function AiSetupScreen({
         </ul>
       </fieldset>
 
-      {spec && (
+      <fieldset className="mb-6">
+        <legend className="mb-2 text-sm font-medium text-[color:var(--text-primary)]">
+          Or run a model on your own machine
+        </legend>
+        <p className="mb-2 text-xs text-[color:var(--text-muted)]">
+          Nothing you write leaves your computer. You install the runner yourself; Scholar just talks to it.
+        </p>
+        {probing ? (
+          <p className="text-sm text-[color:var(--text-muted)]">Looking for a runner on this machine…</p>
+        ) : detected.length === 0 ? (
+          <p className="text-sm text-[color:var(--text-muted)]">
+            None detected. {LOCAL_RUNNERS[0].name} is the easiest to start with —{" "}
+            <a
+              href={LOCAL_RUNNERS[0].installUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[color:var(--accent)] hover:text-[color:var(--accent-hover)]"
+            >
+              install it
+            </a>
+            , then reload this page. If it is already running, it may need permission to accept requests from this
+            site.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {detected.map(({ runner, models }) => (
+              <li key={runner.id}>
+                <LocalOption
+                  spec={runner}
+                  models={models}
+                  selected={selected === runner.id}
+                  onSelect={() => setSelected(runner.id)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </fieldset>
+
+      {isLocal && localSpec && (
+        <div className="mb-6 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-4">
+          <p className="text-sm font-medium text-[color:var(--text-primary)]">{localSpec.name}</p>
+          <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+            Running at <code className="font-mono text-xs">{localSpec.defaultEndpoint}</code>. No API key is needed —
+            and nothing you write is sent anywhere.
+          </p>
+        </div>
+      )}
+
+      {spec && !isLocal && (
         <div className="mb-6 flex flex-col gap-4 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-4">
           <div>
             <p className="text-sm font-medium text-[color:var(--text-primary)]">{spec.name}</p>
@@ -193,7 +271,7 @@ export default function AiSetupScreen({
         <button
           type="button"
           onClick={handleSave}
-          disabled={busy || (!apiKey.trim() && !hasKeyOnDevice)}
+          disabled={busy || (!isLocal && !apiKey.trim() && !hasKeyOnDevice)}
           className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
         >
           {busy ? "Saving…" : "Save and continue"}
@@ -255,6 +333,42 @@ function ProviderOption({
           )}
         </span>
         <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">{spec.description}</span>
+      </span>
+    </label>
+  );
+}
+
+function LocalOption({
+  spec,
+  models,
+  selected,
+  onSelect,
+}: {
+  spec: LocalRunnerSpec;
+  models: string[];
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <label
+      className={[
+        "flex cursor-pointer items-start gap-3 rounded-[var(--radius-md)] border px-3.5 py-3 transition-colors duration-[var(--motion-fast)]",
+        selected
+          ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)]"
+          : "border-[color:var(--border-default)] bg-[color:var(--surface-raised)] hover:border-[color:var(--border-strong)]",
+      ].join(" ")}
+    >
+      <input type="radio" name="ai-provider" value={spec.id} checked={selected} onChange={onSelect} className="mt-0.5" />
+      <span className="min-w-0">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-[color:var(--text-primary)]">{spec.name}</span>
+          <span className="rounded-full bg-[color:var(--state-success-subtle)] px-2 py-0.5 text-xs text-[color:var(--state-success)]">
+            Running on this machine
+          </span>
+        </span>
+        <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">
+          {models.length > 0 ? `${models.length} model${models.length === 1 ? "" : "s"} loaded` : spec.description}
+        </span>
       </span>
     </label>
   );
