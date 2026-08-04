@@ -1,0 +1,119 @@
+/**
+ * Export pipeline orchestrator (docs 33-EXPORT-ARCHITECTURE.md §3: five-stage pipeline).
+ * Stages: 1. pre-flight, 2. resolution, 3. layout, 4. render, 5. verify.
+ *
+ * This first slice implements a minimal viable pipeline: pre-flight validation,
+ * direct render (skipping template layout for now), and basic DOCX output.
+ * Future: resolution (citations), template layout, full verification, ODT/PDF.
+ */
+
+import type { CanonicalDocument, Block } from "../../desk/types";
+import { renderDocx } from "./docxWriter";
+import type { ExportFormat, ExportInput, ExportResult, ExportMetadata, PreflightReport } from "./types";
+
+/**
+ * Stage 1: Pre-flight — validate the document is export-ready.
+ * Checks: non-empty content, resolvable citations, no encoding issues.
+ */
+function preflight(document: CanonicalDocument): PreflightReport {
+  const issues: string[] = [];
+  const warnings: string[] = [];
+
+  if (!document.title || document.title.trim().length === 0) {
+    issues.push("Document has no title");
+  }
+
+  if (document.blocks.length === 0) {
+    issues.push("Document is empty");
+  }
+
+  if (document.blocks.every((b: Block) => !b.text || b.text.trim().length === 0)) {
+    issues.push("Document contains only empty blocks");
+  }
+
+  const totalWords = document.blocks.reduce((sum: number, b: Block) => sum + (b.text?.split(/\s+/).length || 0), 0);
+  if (totalWords < 100) {
+    warnings.push(`Document is very short (${totalWords} words)`);
+  }
+
+  return {
+    isReady: issues.length === 0,
+    issues,
+    warnings,
+  };
+}
+
+/**
+ * Stage 2: Resolution — resolve citations and references (minimal for now).
+ * Full implementation needs domain/claim integration and citation metadata.
+ * For this slice: pass through, marking for future enhancement.
+ */
+function resolve(_document: CanonicalDocument): CanonicalDocument {
+  // Stub: in full implementation, this would:
+  // - resolve all citations against the Corpus
+  // - check for missing bibliography entries
+  // - resolve cross-references
+  return _document;
+}
+
+/**
+ * Stage 4: Render — convert to the target format.
+ * Currently: DOCX only. Future: ODT, PDF.
+ */
+async function render(document: CanonicalDocument, format: ExportFormat, metadata: ExportMetadata): Promise<Buffer> {
+  switch (format) {
+    case "docx":
+      return renderDocx(document, metadata);
+    case "odt":
+      throw new Error("ODT export not yet implemented — Phase 3.11");
+    case "pdf":
+      throw new Error("PDF export not yet implemented — Phase 3.12");
+    default:
+      throw new Error(`Unknown export format: ${format}`);
+  }
+}
+
+/**
+ * Stage 5: Verify — check the output is well-formed.
+ * Stub: proper implementation checks DOCX validity, file size, etc.
+ */
+function verify(data: Buffer): boolean {
+  // Minimal check: DOCX files start with PK (ZIP signature)
+  return data.length > 0 && data[0] === 0x50 && data[1] === 0x4b;
+}
+
+/**
+ * Full pipeline: orchestrate the five stages.
+ */
+export async function exportDocument(input: ExportInput): Promise<ExportResult> {
+  const pf = preflight(input.document);
+  if (!pf.isReady) {
+    throw new Error(`Export pre-flight failed: ${pf.issues.join("; ")}`);
+  }
+
+  const resolved = resolve(input.document);
+
+  const metadata: ExportMetadata = {
+    title: input.title,
+    author: input.author,
+    discipline: input.discipline,
+    created: new Date(),
+    modified: new Date(),
+  };
+
+  const data = await render(resolved, input.format, metadata);
+
+  if (!verify(data)) {
+    throw new Error("Export verification failed — output is malformed");
+  }
+
+  const extension = input.format === "odt" ? "odt" : input.format === "pdf" ? "pdf" : "docx";
+  const filename = `${input.title.replace(/[^a-z0-9]/gi, "_")}.${extension}`;
+
+  return {
+    format: input.format,
+    data,
+    filename,
+    byteSize: data.length,
+  };
+}

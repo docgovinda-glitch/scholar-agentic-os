@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 describe("Desk — StudioPanel", () => {
-  it("runs Level 1 (proofread) with no provider/key fields shown, and renders the returned diff", async () => {
+  it("Level 1 (proofread) shows no provider/key fields and runs deterministic refinement", async () => {
     mockFetch((url) => {
       expect(url).toBe("/api/studio/refine");
       return {
@@ -31,7 +31,7 @@ describe("Desk — StudioPanel", () => {
             level: "proofread",
             originalText: "The datas was  wrong.",
             changes: [
-              { id: "c1", category: "mechanics", originalStart: 4, originalEnd: 9, originalText: "datas", replacementText: "data", reason: "Subject-verb agreement / plural form." },
+              { id: "c1", category: "mechanics", originalStart: 4, originalEnd: 9, originalText: "datas", replacementText: "data", reason: "Plural agreement" },
             ],
             voiceApplied: false,
           },
@@ -49,8 +49,46 @@ describe("Desk — StudioPanel", () => {
     fireEvent.click(screen.getByText("Refine"));
 
     expect(await screen.findByText("data")).toBeInTheDocument();
-    expect(screen.getByText(/Subject-verb agreement/)).toBeInTheDocument();
-    expect(screen.getByText(/1 changes/)).toBeInTheDocument();
+    expect(screen.getByText(/Plural agreement/)).toBeInTheDocument();
+  });
+
+  it("Level 2 (clarity) and above show provider/key fields with gating until key is entered", async () => {
+    render(<StudioPanel sessionId="s1" />);
+
+    const levelSelect = screen.getAllByRole("combobox")[0];
+    fireEvent.change(levelSelect, { target: { value: "clarity" } });
+
+    expect(await screen.findByPlaceholderText("API key")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "This is a test." } });
+    expect(screen.getByText("Refine").closest("button")).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText("API key"), { target: { value: "sk-test" } });
+    expect(screen.getByText("Refine").closest("button")).not.toBeDisabled();
+  });
+
+  it("Level 2+ requires provider and apiKey before refining", async () => {
+    mockFetch((url) => {
+      if (url === "/api/studio/refine") {
+        return {
+          status: 200,
+          body: {
+            diff: { passageId: "desk-studio-passage", level: "clarity", originalText: "x", changes: [], voiceApplied: false },
+            contentChangeCount: 0,
+            languageChangeCount: 0,
+          },
+        };
+      }
+      throw new Error(`Unmocked: ${url}`);
+    });
+
+    render(<StudioPanel sessionId="s1" />);
+    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "clarity" } });
+    fireEvent.change(screen.getByPlaceholderText("API key"), { target: { value: "sk-test" } });
+    fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Some text to clarify." } });
+    fireEvent.click(screen.getByText("Refine"));
+
+    await screen.findByText("No changes suggested.");
   });
 
   it("shows the provider/key fields for a model-backed level, and disables Refine until a key is entered", async () => {
@@ -105,5 +143,129 @@ describe("Desk — StudioPanel", () => {
 
     expect(await screen.findByText(/Denied by privacy policy/)).toBeInTheDocument();
     expect(screen.queryByText(/Allow/)).not.toBeInTheDocument();
+  });
+
+  it("builds a voice profile from samples and uses it in refinement", async () => {
+    mockFetch((url) => {
+      if (url === "/api/studio/voice-profile") {
+        return {
+          status: 200,
+          body: {
+            sampleWordCount: 2000,
+            meanSentenceLength: 18,
+            sentenceLengthStdDev: 4.2,
+            passiveVoiceRatio: 0.25,
+            semicolonRate: 2.1,
+            firstPersonRate: 45,
+            averageWordLength: 4.8,
+          },
+        };
+      }
+      if (url === "/api/studio/refine") {
+        return {
+          status: 200,
+          body: {
+            diff: { passageId: "desk-studio-passage", level: "proofread", originalText: "x", changes: [], voiceApplied: false },
+            voiceDrift: { drifted: false, notes: [] },
+            contentChangeCount: 0,
+            languageChangeCount: 0,
+          },
+        };
+      }
+      throw new Error(`Unmocked: ${url}`);
+    });
+
+    render(<StudioPanel sessionId="s1" />);
+    fireEvent.click(screen.getByText(/Voice/));
+
+    const sampleArea = screen.getByPlaceholderText(/samples/);
+    fireEvent.change(sampleArea, { target: { value: "Sample 1.\n\nSample 2." } });
+    fireEvent.click(screen.getByText("Build Profile"));
+
+    expect(await screen.findByText(/Voice profile active/)).toBeInTheDocument();
+  });
+
+  it("selects L1 profile and passes it to refinement", async () => {
+    mockFetch((url) => {
+      if (url === "/api/studio/refine") {
+        return {
+          status: 200,
+          body: {
+            diff: { passageId: "desk-studio-passage", level: "proofread", originalText: "x", changes: [], voiceApplied: false },
+            contentChangeCount: 0,
+            languageChangeCount: 0,
+          },
+        };
+      }
+      throw new Error(`Unmocked: ${url}`);
+    });
+
+    render(<StudioPanel sessionId="s1" />);
+    const l1Select = screen.getAllByRole("combobox")[1]; // Second combobox after level
+    fireEvent.change(l1Select, { target: { value: "turkish" } });
+
+    fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Test text." } });
+    fireEvent.click(screen.getByText("Refine"));
+
+    expect(await screen.findByText("No changes suggested.")).toBeInTheDocument();
+  });
+
+  it("displays voice drift warnings when refinement drifts from profile", async () => {
+    mockFetch((url) => {
+      if (url === "/api/studio/refine") {
+        return {
+          status: 200,
+          body: {
+            diff: { passageId: "desk-studio-passage", level: "proofread", originalText: "x", changes: [], voiceApplied: false },
+            voiceDrift: { drifted: true, notes: ["longer sentences", "more passive voice"] },
+            contentChangeCount: 0,
+            languageChangeCount: 0,
+          },
+        };
+      }
+      throw new Error(`Unmocked: ${url}`);
+    });
+
+    render(<StudioPanel sessionId="s1" />);
+    fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Test text." } });
+    fireEvent.click(screen.getByText("Refine"));
+
+    expect(await screen.findByText(/Voice drift detected/)).toBeInTheDocument();
+    expect(screen.getByText(/longer sentences.*passive voice/)).toBeInTheDocument();
+  });
+
+  it("surfaces content changes first, before language changes (docs 32 §7)", async () => {
+    mockFetch((url) => {
+      expect(url).toBe("/api/studio/refine");
+      return {
+        status: 200,
+        body: {
+          diff: {
+            passageId: "desk-studio-passage",
+            level: "clarity",
+            originalText: "The results suggest change.",
+            changes: [
+              { id: "c2", category: "language", originalStart: 12, originalEnd: 19, originalText: "suggest", replacementText: "indicate", reason: "Clarity" },
+              { id: "c1", category: "content", originalStart: 12, originalEnd: 19, originalText: "suggest", replacementText: "demonstrate", reason: "Strengthens claim", meaningNote: "Changes claim strength" },
+            ],
+            voiceApplied: true,
+          },
+          contentChangeCount: 1,
+          languageChangeCount: 1,
+        },
+      };
+    });
+
+    render(<StudioPanel sessionId="s1" />);
+    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "clarity" } });
+    fireEvent.change(screen.getByPlaceholderText("API key"), { target: { value: "sk-test" } });
+    fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "The results suggest change." } });
+    fireEvent.click(screen.getByText("Refine"));
+
+    const changes = await screen.findAllByRole("listitem");
+    expect(changes[0]).toHaveTextContent("demonstrate");
+    expect(changes[0]).toHaveTextContent("Content");
+    expect(changes[1]).toHaveTextContent("indicate");
+    expect(changes[1]).toHaveTextContent("Language");
   });
 });

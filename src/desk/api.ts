@@ -10,7 +10,7 @@
  * caller — this client has no special bypass.
  */
 
-import type { CanonicalDocument, InterventionLevel, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult } from "./types";
+import type { CanonicalDocument, InterventionLevel, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, VoiceProfile } from "./types";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -74,6 +74,8 @@ export async function refinePassage(params: {
   passageId: string;
   text: string;
   level: InterventionLevel;
+  l1?: string;
+  voiceProfile?: VoiceProfile;
   provider?: string;
   apiKey?: string;
 }): Promise<StudioRefineResult> {
@@ -99,4 +101,17 @@ export async function grantStudioConsent(sessionId: string, provider: string): P
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sessionId, provider }),
   }).then((r) => json(r));
+}
+
+export async function exportProject(projectId: string, format: "docx" | "odt" | "pdf"): Promise<Blob> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/export`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ format }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Export failed" }));
+    throw new Error(err.error || "Export failed");
+  }
+  return res.blob();
 }

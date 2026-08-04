@@ -48,6 +48,8 @@ import {
 import type { GateId } from "../../src/app/conductor/conductor.ts";
 import { getProjectStore } from "../../src/services/store/projectStore.ts";
 import type { ProjectRecord } from "../../src/services/store/types.ts";
+import { exportDocument } from "../../src/app/export/export.ts";
+import type { ExportFormat } from "../../src/app/export/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
 import { emptyDocument } from "../../src/domain/document/model.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
@@ -564,5 +566,45 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const gates = invalidateGate(record.gates, req.params.gate, reason);
     const updated = await store.save({ ...record, gates });
     res.json(projectView(updated));
+  });
+
+  /**
+   * Export the project's document to the specified format.
+   * Body: { format: "docx" | "odt" | "pdf" }
+   * Returns: the file as application/octet-stream with Content-Disposition header.
+   *
+   * Spec: docs/03-workflow/33-EXPORT-ARCHITECTURE.md §3 (five-stage pipeline).
+   * Currently supports: DOCX only. ODT and PDF in Phase 3.11–3.12.
+   */
+  app.post("/api/projects/:id/export", projectLimit, async (req, res) => {
+    const record = await store.get(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: `No project "${req.params.id}".` });
+    }
+    if (!record.document) {
+      return res.status(400).json({ error: "Cannot export a project with no document submitted yet." });
+    }
+
+    const { format } = req.body ?? {};
+    if (typeof format !== "string" || !["docx", "odt", "pdf"].includes(format)) {
+      return res.status(400).json({ error: "Invalid export format. Must be one of: docx, odt, pdf" });
+    }
+
+    try {
+      const result = await exportDocument({
+        document: record.document,
+        format: format as ExportFormat,
+        title: record.document.title,
+        author: "Scholar OS",
+      });
+
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${result.filename}"`);
+      res.setHeader("Content-Length", result.byteSize);
+      res.send(result.data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.status(500).json({ error: message });
+    }
   });
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { exportProject } from "../api";
 import type { Block, CanonicalDocument } from "../types";
 
 function BlockView({ block }: { block: Block }) {
@@ -33,12 +34,36 @@ export default function Primary({
   document,
   onSubmitPlainText,
   submitting,
+  projectId,
 }: {
   document: CanonicalDocument | null;
   onSubmitPlainText: (text: string) => void;
   submitting: boolean;
+  projectId: string;
 }) {
   const [draft, setDraft] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  async function handleExport(format: "docx" | "odt" | "pdf") {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const blob = await exportProject(projectId, format);
+      const url = URL.createObjectURL(blob);
+      const a = globalThis.document.createElement("a");
+      a.href = url;
+      a.download = `${document?.title || "document"}.${format}`;
+      globalThis.document.body.appendChild(a);
+      a.click();
+      globalThis.document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError((err as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   if (!document || document.blocks.length === 0) {
     return (
@@ -76,10 +101,44 @@ export default function Primary({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-10 py-6 max-w-[75ch] mx-auto w-full">
-      {document.blocks.map((b) => (
-        <BlockView key={b.id} block={b} />
-      ))}
+    <div className="flex-1 flex flex-col">
+      <div className="flex-1 overflow-y-auto px-10 py-6 max-w-[75ch] mx-auto w-full">
+        {document.blocks.map((b) => (
+          <BlockView key={b.id} block={b} />
+        ))}
+      </div>
+      {/* Export controls (docs 33-EXPORT-ARCHITECTURE.md) */}
+      <div className="border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-10 py-4">
+        <div className="max-w-[75ch] mx-auto">
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-mono uppercase tracking-wide text-[#94A3B8]">Export as:</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleExport("docx")}
+                disabled={exporting}
+                className="px-3 py-1.5 rounded text-[11px] font-mono uppercase tracking-wide bg-[color:var(--color-luminous-blue-dim)] text-white disabled:opacity-40"
+              >
+                {exporting ? "Exporting…" : "DOCX"}
+              </button>
+              <button
+                onClick={() => handleExport("odt")}
+                disabled={exporting}
+                className="px-3 py-1.5 rounded text-[11px] font-mono uppercase tracking-wide border border-[color:var(--color-border-subtle)] text-[#94A3B8] disabled:opacity-40 hover:border-[color:var(--color-luminous-blue-dim)]"
+              >
+                ODT
+              </button>
+              <button
+                onClick={() => handleExport("pdf")}
+                disabled={exporting}
+                className="px-3 py-1.5 rounded text-[11px] font-mono uppercase tracking-wide border border-[color:var(--color-border-subtle)] text-[#94A3B8] disabled:opacity-40 hover:border-[color:var(--color-luminous-blue-dim)]"
+              >
+                PDF
+              </button>
+            </div>
+            {exportError && <span className="text-[10px] text-red-400">Error: {exportError}</span>}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

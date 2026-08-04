@@ -70,6 +70,16 @@ export interface OutputTypeSummary {
 
 export type InterventionLevel = "proofread" | "clarity" | "flow" | "register" | "rewrite";
 
+export interface VoiceProfile {
+  sampleWordCount: number;
+  meanSentenceLength: number;
+  sentenceLengthStdDev: number;
+  passiveVoiceRatio: number;
+  semicolonRate: number;
+  firstPersonRate: number;
+  averageWordLength: number;
+}
+
 export type ChangeCategory = "mechanics" | "language" | "content";
 
 export interface DiffChange {
