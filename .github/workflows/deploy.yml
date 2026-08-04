@@ -1,26 +1,24 @@
 name: Deploy to Render
 
+# Production deploys are gated on a green verification job.
+#
+# This workflow previously deployed on every push to `main` AND to the
+# `claude/remaining-project-tasks-ok41cg` feature branch, with the deploy job
+# running in parallel with the test job (no `needs:`) and the test step marked
+# `continue-on-error: true`. The combined effect was that a push to an
+# unmerged feature branch shipped straight to production, and a failing test
+# suite did nothing to stop it. Both are fixed here: `main` only, and the
+# deploy waits on `verify`.
 on:
   push:
     branches:
       - main
-      - claude/remaining-project-tasks-ok41cg
+  # Allows a deliberate redeploy of main from the Actions tab without
+  # needing an empty commit.
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy to Render
-        if: github.event_name == 'push'
-        run: |
-          curl --request POST \
-            --url "https://api.render.com/deploy/srv-d9lgbn710e5c73dl8sk0?key=${{ secrets.RENDER_DEPLOY_KEY }}" \
-            --header 'accept: application/json'
-        continue-on-error: true
-
-  build-test:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +32,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: TypeScript type check
+        run: npm run lint
+
+      # No continue-on-error: a red suite must block the deploy below.
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build
         env:
@@ -41,9 +46,12 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test
-        continue-on-error: true
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl --fail --silent --show-error --request POST \
+            --url "https://api.render.com/deploy/srv-d9lgbn710e5c73dl8sk0?key=${{ secrets.RENDER_DEPLOY_KEY }}" \
+            --header 'accept: application/json'
