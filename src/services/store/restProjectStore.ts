@@ -1,0 +1,185 @@
+/**
+ * ProjectStore over Supabase's Data API (PostgREST), reached by HTTPS.
+ *
+ * An alternative backend to pgProjectStore.ts, not a replacement — both
+ * implement the same ProjectStore contract and projectStore.ts picks one at
+ * startup. This exists because the direct-Postgres path accumulated four
+ * independent failure modes, each of which cost a production outage:
+ *
+ *   1. `db.<ref>.supabase.co` publishes no A record — it is IPv6-only, and
+ *      Render's outbound network is IPv4-only, so the documented connection
+ *      string cannot resolve there at all.
+ *   2. The IPv4 pooler works around (1) but needs the right region, port, and
+ *      the `postgres.<ref>` tenant-qualified username.
+ *   3. Supabase's certificate chains to its own root, so TLS verification
+ *      fails without pinning that CA (SELF_SIGNED_CERT_IN_CHAIN).
+ *   4. It needs the database password — a credential distinct from every
+ *      other Supabase key, easy to reset without the change taking effect.
+ *
+ * This path has none of those. It is HTTPS to the same hostname the app
+ * already uses, authenticated with the service-role key already required for
+ * verifying tokens. One credential, one protocol, one hostname.
+ *
+ * SECURITY. The service-role key bypasses Row Level Security, so this module
+ * must only ever run server-side — it is imported by server/routes/project.ts,
+ * never by anything under src/desk or src/components. The table's own RLS
+ * (supabase/schema_store.sql) denies `anon` and `authenticated` outright, so
+ * the browser cannot reach these rows even though PostgREST publishes the
+ * endpoint. Ownership is still enforced in the route layer, which is the only
+ * place that can tell "not yours" from "not found".
+ *
+ * TRADE-OFF. PostgREST is less expressive than SQL and has no multi-statement
+ * transactions. That is acceptable here and nowhere near a general rule: this
+ * store's whole surface is single-row reads, single-row upserts, and one
+ * owner-scoped list. A store that needed to write two tables atomically would
+ * have to stay on the direct connection.
+ */
+
+import { initialProjectGateState } from "../../domain/project/gates";
+import { emptyGraph } from "../../domain/claim/graph";
+import { generateProjectId } from "../../app/conductor/projectStore";
+import type { ProjectRecord, ProjectStore } from "./types";
+
+/** The subset of `fetch` this store uses, so tests can supply their own. */
+export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
+
+const TABLE = "projects";
+const REQUEST_TIMEOUT_MS = 10_000;
+
+/** Column names, kept beside the row mapper so the two cannot drift apart. */
+interface ProjectRow {
+  project_id: string;
+  owner_id: string;
+  output_type_id: string;
+  answers: ProjectRecord["answers"];
+  gates: ProjectRecord["gates"];
+  document: ProjectRecord["document"] | null;
+  rubric_report: ProjectRecord["rubricReport"] | null;
+  claim_graph: ProjectRecord["claimGraph"];
+  waivers: ProjectRecord["waivers"];
+}
+
+function rowToRecord(row: ProjectRow): ProjectRecord {
+  return {
+    projectId: row.project_id,
+    ownerId: row.owner_id,
+    outputTypeId: row.output_type_id,
+    answers: row.answers,
+    gates: row.gates,
+    // PostgREST returns SQL NULL as JSON null; ProjectRecord uses undefined.
+    document: row.document ?? undefined,
+    rubricReport: row.rubric_report ?? undefined,
+    claimGraph: row.claim_graph,
+    waivers: row.waivers,
+  };
+}
+
+function recordToRow(record: ProjectRecord): ProjectRow {
+  return {
+    project_id: record.projectId,
+    owner_id: record.ownerId,
+    output_type_id: record.outputTypeId,
+    answers: record.answers,
+    gates: record.gates,
+    document: record.document ?? null,
+    rubric_report: record.rubricReport ?? null,
+    claim_graph: record.claimGraph,
+    waivers: record.waivers,
+  };
+}
+
+export interface RestStoreConfig {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  /** Injectable for tests; defaults to global fetch. */
+  fetchImpl?: FetchLike;
+}
+
+export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
+  const base = `${config.supabaseUrl.replace(/\/+$/, "")}/rest/v1/${TABLE}`;
+  const doFetch = config.fetchImpl ?? ((url, init) => fetch(url, init));
+
+  async function request(url: string, init: RequestInit = {}): Promise<unknown> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const res = await doFetch(url, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          apikey: config.serviceRoleKey,
+          Authorization: `Bearer ${config.serviceRoleKey}`,
+          "Content-Type": "application/json",
+          ...(init.headers as Record<string, string> | undefined),
+        },
+      });
+
+      if (!res.ok) {
+        // PostgREST reports failures as JSON with a `message`; surface it
+        // rather than a bare status, so a schema mismatch or an RLS denial
+        // says which it was.
+        const detail = await res.text().catch(() => "");
+        throw new Error(`Supabase Data API ${res.status}: ${detail.slice(0, 300)}`);
+      }
+
+      // 204 on writes that ask for no representation.
+      if (res.status === 204) return null;
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return {
+    async create(outputTypeId: string, ownerId: string): Promise<ProjectRecord> {
+      // Bound once: initialProjectGateState keys off the project's own id, so
+      // calling generateProjectId() inline in both places would silently give
+      // the gate state a different id than the record it belongs to.
+      const projectId = generateProjectId();
+      const record: ProjectRecord = {
+        projectId,
+        ownerId,
+        outputTypeId,
+        answers: {},
+        gates: initialProjectGateState(projectId),
+        claimGraph: emptyGraph(),
+        waivers: {},
+      };
+
+      await request(base, {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify(recordToRow(record)),
+      });
+      return record;
+    },
+
+    async get(projectId: string): Promise<ProjectRecord | undefined> {
+      const rows = (await request(
+        `${base}?project_id=eq.${encodeURIComponent(projectId)}&limit=1`
+      )) as ProjectRow[];
+      return rows?.[0] ? rowToRecord(rows[0]) : undefined;
+    },
+
+    async save(record: ProjectRecord): Promise<ProjectRecord> {
+      // Upsert. `resolution=merge-duplicates` makes POST behave as
+      // ON CONFLICT DO UPDATE against the primary key, matching the direct-SQL
+      // store's semantics — save() is called both for new and existing rows.
+      await request(base, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ ...recordToRow(record), updated_at: new Date().toISOString() }),
+      });
+      return record;
+    },
+
+    async listByOwner(ownerId: string): Promise<ProjectRecord[]> {
+      // Owner scoping is in the query, not applied after fetching — there is
+      // no request here that can return another user's rows.
+      const rows = (await request(
+        `${base}?owner_id=eq.${encodeURIComponent(ownerId)}&order=updated_at.desc`
+      )) as ProjectRow[];
+      return (rows ?? []).map(rowToRecord);
+    },
+  };
+}

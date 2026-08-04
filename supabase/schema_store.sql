@@ -16,12 +16,29 @@
 -- Run this in the Supabase SQL Editor (or via `psql "$DATABASE_URL" -f
 -- supabase/schema_store.sql`) once, before setting DATABASE_URL.
 --
--- No Row Level Security here: this table is written only from the server
--- process, over a direct Postgres connection (DATABASE_URL — Project
--- Settings -> Database -> Connection string in the Supabase dashboard),
--- never from a browser client with the anon key. That's a different trust
--- boundary from supabase/schema.sql's tables, which the browser does talk
--- to directly and which RLS is what protects.
+-- Row Level Security IS enabled below, with deliberately zero policies.
+--
+-- This reverses an earlier note here which read "No Row Level Security here:
+-- this table is written only from the server process, over a direct Postgres
+-- connection ... never from a browser client with the anon key." That was true
+-- of the direct-connection path, and it stopped being true the moment this
+-- table became reachable through Supabase's Data API (PostgREST), which
+-- publishes every table in `public` at
+-- https://<ref>.supabase.co/rest/v1/<table>. The anon key is public by design
+-- — it ships inside the browser bundle — so without RLS, anyone who viewed the
+-- page source could read and rewrite every project in the database.
+--
+-- RLS was in fact already on in the live database, but only because Supabase
+-- enables it by default on new tables. A fresh database created from this file
+-- alone would have had it OFF. That gap is closed by declaring it here.
+--
+-- Zero policies is the intended configuration, not an oversight: with RLS on
+-- and no policy, `anon` and `authenticated` can do nothing at all, while
+-- `service_role` and `postgres` still have full access because they carry
+-- BYPASSRLS. The server holds the service-role key; browsers never do.
+-- Authorization by owner is enforced in server/routes/project.ts
+-- (loadOwnedProject), which is where it can distinguish "not found" from
+-- "not yours" — a policy here could only ever deny.
 --
 -- Column shapes mirror src/app/conductor/projectStore.ts's ProjectRecord
 -- (answers/gates/document/rubric_report/claim_graph/waivers), stored as
@@ -73,6 +90,13 @@ begin
     alter table public.projects alter column owner_id set not null;
   end if;
 end $$;
+
+-- Deny-all baseline for anon/authenticated (see the note at the top of this
+-- file). FORCE additionally applies RLS to the table's owner; roles with
+-- BYPASSRLS — service_role and postgres — are unaffected either way, so the
+-- server keeps working while every browser-reachable role is locked out.
+alter table public.projects enable row level security;
+alter table public.projects force row level security;
 
 create index if not exists idx_projects_output_type on public.projects(output_type_id);
 -- Every listing query is owner-scoped and ordered by recency.
