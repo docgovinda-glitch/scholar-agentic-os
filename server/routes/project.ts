@@ -196,6 +196,29 @@ async function loadOwnedProject(
   return record;
 }
 
+/**
+ * Wrap an async route handler so a rejection becomes a 500 rather than an
+ * unhandled rejection.
+ *
+ * Express 4 does not await handlers, so `async (req, res) => { await db... }`
+ * has no error path at all: a failed query rejects, nothing catches it, and
+ * Node terminates the process. That is exactly what happened in production —
+ * one database connection failure returned 502 for every route in the service,
+ * including ones that never touch the database.
+ */
+function asyncRoute(
+  handler: (req: express.Request, res: express.Response) => Promise<unknown>
+): express.RequestHandler {
+  return (req, res, next) => {
+    handler(req, res).catch((err: unknown) => {
+      console.error(`${req.method} ${req.originalUrl} failed:`, err);
+      // A handler may already have answered before throwing.
+      if (res.headersSent) return next(err);
+      res.status(500).json({ error: "Something went wrong handling that request." });
+    });
+  };
+}
+
 export function registerProjectRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
   const store = getProjectStore();
 
@@ -232,7 +255,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   });
 
   /** Create a project bound to an output type. Body: { outputTypeId }. */
-  app.post("/api/projects", projectLimit, async (req, res) => {
+  app.post("/api/projects", projectLimit, asyncRoute(async (req, res) => {
     const { outputTypeId } = req.body ?? {};
     if (typeof outputTypeId !== "string" || outputTypeId.length === 0) {
       return res.status(400).json({ error: "Missing required field: outputTypeId" });
@@ -251,7 +274,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     gates = recomputeG3({ ...created, gates }, undefined, created.answers);
     const record = await store.save({ ...created, gates });
     res.status(201).json(projectView(record));
-  });
+  }));
 
   /**
    * The caller's own projects, most recently updated first — Desk's entry
@@ -264,16 +287,16 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * Registered before "/api/projects/:id" so Express does not match the bare
    * collection path as an id.
    */
-  app.get("/api/projects", projectLimit, async (req, res) => {
+  app.get("/api/projects", projectLimit, asyncRoute(async (req, res) => {
     const records = await store.listByOwner(currentUserId(req));
     res.json({ items: records.map((r) => projectView(r)) });
-  });
+  }));
 
-  app.get("/api/projects/:id", projectLimit, async (req, res) => {
+  app.get("/api/projects/:id", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json(projectView(record));
-  });
+  }));
 
   /**
    * Submit or update intake answers, recomputing G0's exit criteria
@@ -283,7 +306,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * rather than silently overwritten (domain/project/gates.ts's guarantee).
    * Body: { answers: Record<string, string> }
    */
-  app.patch("/api/projects/:id/intake", projectLimit, async (req, res) => {
+  app.patch("/api/projects/:id/intake", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { answers } = req.body ?? {};
@@ -311,7 +334,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       }
       throw err;
     }
-  });
+  }));
 
   /**
    * Submit or replace the project's document body and recompute G6's exit
@@ -322,7 +345,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * and any previously recorded waivers are reapplied (applyWaivers) so a
    * waiver survives a document resubmission rather than silently resetting.
    */
-  app.put("/api/projects/:id/document", projectLimit, async (req, res) => {
+  app.put("/api/projects/:id/document", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { document } = req.body ?? {};
@@ -341,17 +364,17 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       }
       throw err;
     }
-  });
+  }));
 
   /** The most recent Rubric evaluation of the project's document. 404s if no document has been submitted yet. */
-  app.get("/api/projects/:id/rubric", projectLimit, async (req, res) => {
+  app.get("/api/projects/:id/rubric", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     if (!record.rubricReport) {
       return res.status(404).json({ error: `Project "${req.params.id}" has no document submitted yet.` });
     }
     res.json(record.rubricReport);
-  });
+  }));
 
   /**
    * Waive a non-blocking Rubric finding with a reason (docs 31 §7:
@@ -363,7 +386,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * empty. Recomputes G6's exit criteria from the waived report, same as
    * the document endpoint.
    */
-  app.post("/api/projects/:id/rubric/waive", projectLimit, async (req, res) => {
+  app.post("/api/projects/:id/rubric/waive", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     if (!record.document) {
@@ -401,7 +424,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       }
       throw err;
     }
-  });
+  }));
 
   /**
    * Save a claim-graph change, then — if the project already has a
@@ -426,7 +449,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * claim graph, not the document — see fromAtlas.ts's
    * compileClaimSupportGateRules) — 409s if G6 is already signed off.
    */
-  app.post("/api/projects/:id/claims", projectLimit, async (req, res) => {
+  app.post("/api/projects/:id/claims", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { claim } = req.body ?? {};
@@ -446,7 +469,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       }
       throw err;
     }
-  });
+  }));
 
   /**
    * Bind evidence to a claim. Body: { binding: ClaimEvidenceBinding }.
@@ -457,7 +480,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * document already exists — this is exactly the action that turns a
    * failing claim_support finding into a passing one.
    */
-  app.post("/api/projects/:id/claims/:claimId/evidence", projectLimit, async (req, res) => {
+  app.post("/api/projects/:id/claims/:claimId/evidence", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { binding } = req.body ?? {};
@@ -479,28 +502,28 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       }
       throw err;
     }
-  });
+  }));
 
   /** The project's full Claim–Evidence Graph. */
-  app.get("/api/projects/:id/claims", projectLimit, async (req, res) => {
+  app.get("/api/projects/:id/claims", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json(record.claimGraph);
-  });
+  }));
 
   /** Claims with zero evidence bindings — domain/claim's unsupportedClaims(), AG-13's "unsupported" output. */
-  app.get("/api/projects/:id/claims/unsupported", projectLimit, async (req, res) => {
+  app.get("/api/projects/:id/claims/unsupported", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json({ claims: unsupportedClaims(record.claimGraph) });
-  });
+  }));
 
   /** Claims with both a supporting and a contradicting binding, surfaced for a human to resolve (never auto-resolved). */
-  app.get("/api/projects/:id/claims/conflicts", projectLimit, async (req, res) => {
+  app.get("/api/projects/:id/claims/conflicts", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json({ conflicts: findConflicts(record.claimGraph) });
-  });
+  }));
 
   /**
    * Every claim with at least one evidence binding citing `sourceId` —
@@ -508,11 +531,11 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * source X" (docs 13). Useful before retracting a source: this is what
    * `DELETE .../sources/:sourceId` is about to affect.
    */
-  app.get("/api/projects/:id/sources/:sourceId/claims", projectLimit, async (req, res) => {
+  app.get("/api/projects/:id/sources/:sourceId/claims", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json({ claims: claimsDependingOnSource(record.claimGraph, req.params.sourceId) });
-  });
+  }));
 
   /**
    * Remove a source from the Claim–Evidence Graph: every binding loses any
@@ -522,7 +545,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * Recomputes G6 if a document already exists — a retracted source can
    * turn a passing claim_support finding into a failing one.
    */
-  app.delete("/api/projects/:id/sources/:sourceId", projectLimit, async (req, res) => {
+  app.delete("/api/projects/:id/sources/:sourceId", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const claimGraph = removeSource(record.claimGraph, req.params.sourceId);
@@ -535,7 +558,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       }
       throw err;
     }
-  });
+  }));
 
   /**
    * Sign off a gate. Body: { actor }. 409s if the gate is not ready (a
@@ -546,7 +569,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * report; every other gate has no computed content yet (see this file's
    * module comment) so its snapshot is empty.
    */
-  app.post("/api/projects/:id/gates/:gate/signoff", projectLimit, async (req, res) => {
+  app.post("/api/projects/:id/gates/:gate/signoff", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     if (!isGateId(req.params.gate)) {
@@ -576,13 +599,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       }
       throw err;
     }
-  });
+  }));
 
   /**
    * Invalidate a gate, cascading forward to every gate that depended on it
    * (domain/project/gates.ts's downstream cascade). Body: { reason }.
    */
-  app.post("/api/projects/:id/gates/:gate/invalidate", projectLimit, async (req, res) => {
+  app.post("/api/projects/:id/gates/:gate/invalidate", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     if (!isGateId(req.params.gate)) {
@@ -596,7 +619,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const gates = invalidateGate(record.gates, req.params.gate, reason);
     const updated = await store.save({ ...record, gates });
     res.json(projectView(updated));
-  });
+  }));
 
   /**
    * Export the project's document to the specified format.
@@ -606,7 +629,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * Spec: docs/03-workflow/33-EXPORT-ARCHITECTURE.md §3 (five-stage pipeline).
    * Currently supports: DOCX only. ODT and PDF in Phase 3.11–3.12.
    */
-  app.post("/api/projects/:id/export", projectLimit, async (req, res) => {
+  app.post("/api/projects/:id/export", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     if (!record.document) {
@@ -634,5 +657,5 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       const message = err instanceof Error ? err.message : "Unknown error";
       res.status(500).json({ error: message });
     }
-  });
+  }));
 }
