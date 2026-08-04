@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import { PaperProject } from "../types";
 import { GlassmorphicCard } from "./SciFiComponents";
 import { Download, AlertCircle, CheckCircle2 } from "lucide-react";
-import { downloadDocx, downloadPdf, buildExportDocumentModel } from "../services/documentExportService";
+import { downloadDocx, downloadPdf, downloadOdt, buildExportDocumentModel } from "../services/documentExportService";
+
+type ExportFormatId = "pdf" | "docx" | "odt";
 
 interface ExportFormat {
-  id: "pdf" | "docx";
+  id: ExportFormatId;
   label: string;
   description: string;
   icon: string;
@@ -23,6 +25,12 @@ const EXPORT_FORMATS: ExportFormat[] = [
     label: "DOCX",
     description: "OOXML Word document for further editing",
     icon: "📝"
+  },
+  {
+    id: "odt",
+    label: "ODT",
+    description: "OpenDocument Text for LibreOffice/OpenOffice and ODF-only submission systems",
+    icon: "📃"
   }
 ];
 
@@ -31,7 +39,7 @@ interface DocumentExportPipelineProps {
 }
 
 function DocumentExportPipeline({ project }: DocumentExportPipelineProps) {
-  const [selectedFormat, setSelectedFormat] = useState<"pdf" | "docx">("pdf");
+  const [selectedFormat, setSelectedFormat] = useState<ExportFormatId>("pdf");
   const [isExporting, setIsExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -50,6 +58,8 @@ function DocumentExportPipeline({ project }: DocumentExportPipelineProps) {
     try {
       if (selectedFormat === "pdf") {
         await downloadPdf(project);
+      } else if (selectedFormat === "odt") {
+        await downloadOdt(project);
       } else {
         await downloadDocx(project);
       }
@@ -70,7 +80,7 @@ function DocumentExportPipeline({ project }: DocumentExportPipelineProps) {
           Document Export Pipeline
         </h3>
         <p className="text-xs text-slate-400 mt-1">
-          Export your manuscript as a real PDF or DOCX file
+          Export your manuscript as a real PDF, DOCX or ODT file
         </p>
       </div>
 
@@ -99,7 +109,7 @@ function DocumentExportPipeline({ project }: DocumentExportPipelineProps) {
         </div>
       </GlassmorphicCard>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {EXPORT_FORMATS.map((format) => (
           <button
             key={format.id}

@@ -421,3 +421,173 @@ export async function downloadPdf(project: PaperProject): Promise<void> {
   const blob = await exportToPdf(project);
   triggerBlobDownload(blob, filenameFor(project.title, "pdf"));
 }
+
+// ─── .odt export ──────────────────────────────────────────────────────────
+// OpenDocument Text, so the manuscript opens natively in LibreOffice/OpenOffice
+// and in the many university systems that accept ODF but not .docx. Built from
+// the same ExportDocumentModel as the .docx and .pdf paths, so all three stay
+// in step: change the model and every format follows.
+//
+// An .odt is a zip with a specific shape. Two rules are load-bearing and are
+// the usual cause of "corrupt document" when hand-rolling one:
+//   1. `mimetype` must be the FIRST entry and STORED (uncompressed).
+//   2. META-INF/manifest.xml must declare every other part.
+
+/** XML text escaping. Unescaped ampersands in a title are enough to break the file. */
+function odfEscape(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function odfParagraphs(text: string, styleName: string): string {
+  return text
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => `<text:p text:style-name="${styleName}">${odfEscape(line)}</text:p>`)
+    .join("");
+}
+
+function odfStylesXml(layout: DocumentLayout): string {
+  const margin = `${layout.marginInches}in`;
+  const lineHeight = layout.lineSpacing === "double" ? "200%" : "100%";
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.2">
+<office:styles>
+<style:style style:name="Standard" style:family="paragraph"><style:text-properties style:font-name="${odfEscape(layout.docxFontFamily)}" fo:font-size="${layout.fontSizePt}pt"/><style:paragraph-properties fo:line-height="${lineHeight}"/></style:style>
+</office:styles>
+<office:automatic-styles>
+<style:page-layout style:name="pm1"><style:page-layout-properties fo:page-width="8.5in" fo:page-height="11in" fo:margin-top="${margin}" fo:margin-bottom="${margin}" fo:margin-left="${margin}" fo:margin-right="${margin}"/></style:page-layout>
+</office:automatic-styles>
+<office:master-styles><style:master-page style:name="Standard" style:page-layout-name="pm1"/></office:master-styles>
+</office:document-styles>`;
+}
+
+function odfContentXml(model: ExportDocumentModel): string {
+  const { layout } = model;
+  const lineHeight = layout.lineSpacing === "double" ? "200%" : "100%";
+  const font = odfEscape(layout.docxFontFamily);
+  const size = `${layout.fontSizePt}pt`;
+
+  const body: string[] = [];
+
+  // Title page — mirrors the .docx block above (title, authors, field).
+  body.push(`<text:p text:style-name="TitleP">${odfEscape(model.title)}</text:p>`);
+  if (model.authorsLine) body.push(`<text:p text:style-name="CenterP">${odfEscape(model.authorsLine)}</text:p>`);
+  if (model.field) body.push(`<text:p text:style-name="FieldP">${odfEscape(model.field)}</text:p>`);
+
+  const heading = (text: string) =>
+    `<text:h text:style-name="HeadingP" text:outline-level="1">${odfEscape(text)}</text:h>`;
+
+  body.push(heading("Research Overview"));
+  if (model.researchQuestions) {
+    body.push(`<text:p text:style-name="BoldP">Research Questions</text:p>`);
+    body.push(odfParagraphs(model.researchQuestions, "BodyP"));
+  }
+  if (model.methodology) {
+    body.push(`<text:p text:style-name="BoldP">Methodology</text:p>`);
+    body.push(odfParagraphs(model.methodology, "BodyP"));
+  }
+
+  if (model.abstract) {
+    body.push(heading("Abstract"));
+    body.push(odfParagraphs(model.abstract, "BodyP"));
+  }
+
+  for (const section of model.bodySections) {
+    body.push(heading(section.heading));
+    body.push(odfParagraphs(section.content, "BodyP"));
+  }
+
+  if (model.disclosureText) {
+    body.push(heading("AI-Use Disclosure"));
+    body.push(odfParagraphs(model.disclosureText, "BodyP"));
+  }
+
+  if (model.hasReferences) {
+    body.push(heading(model.referencesHeading));
+    if (model.references.length > 0) {
+      for (const ref of model.references) {
+        body.push(`<text:p text:style-name="BodyP">${odfEscape(`${ref.name} — ${ref.url}`)}</text:p>`);
+      }
+    } else {
+      body.push(`<text:p text:style-name="BodyP">No approved sources yet.</text:p>`);
+    }
+  }
+
+  // Options rather than raw attribute strings: an earlier version appended
+  // `fo:font-size` for the title on top of the one this helper already wrote,
+  // producing a duplicate attribute. That is not merely untidy — it makes
+  // content.xml invalid XML, and readers reject the whole document.
+  const para = (
+    name: string,
+    opts: {
+      sizePt?: number;
+      bold?: boolean;
+      italic?: boolean;
+      align?: "center";
+      pageBreak?: boolean;
+    } = {}
+  ) => {
+    const text = [
+      `style:font-name="${font}"`,
+      `fo:font-size="${opts.sizePt ? `${opts.sizePt}pt` : size}"`,
+      opts.bold ? 'fo:font-weight="bold"' : "",
+      opts.italic ? 'fo:font-style="italic"' : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const paraProps = [
+      `fo:line-height="${lineHeight}"`,
+      opts.align ? `fo:text-align="${opts.align}"` : "",
+      opts.pageBreak ? 'fo:break-before="page"' : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return `<style:style style:name="${name}" style:family="paragraph" style:parent-style-name="Standard"><style:text-properties ${text}/><style:paragraph-properties ${paraProps}/></style:style>`;
+  };
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.2">
+<office:automatic-styles>
+${para("BodyP")}
+${para("BoldP", { bold: true })}
+${para("CenterP", { align: "center" })}
+${para("FieldP", { italic: true, align: "center" })}
+${para("TitleP", { sizePt: layout.fontSizePt + 4, bold: true, align: "center" })}
+${para("HeadingP", { bold: true, pageBreak: true })}
+</office:automatic-styles>
+<office:body><office:text>${body.join("")}</office:text></office:body>
+</office:document-content>`;
+}
+
+export async function exportToOdt(project: PaperProject): Promise<Blob> {
+  const JSZip = (await import("jszip")).default;
+  const model = buildExportDocumentModel(project);
+  const zip = new JSZip();
+
+  // Order and compression matter: `mimetype` first, and stored rather than
+  // deflated, or readers reject the package.
+  zip.file("mimetype", "application/vnd.oasis.opendocument.text", { compression: "STORE" });
+  zip.file("content.xml", odfContentXml(model));
+  zip.file("styles.xml", odfStylesXml(model.layout));
+  zip.file(
+    "META-INF/manifest.xml",
+    `<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
+<manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/>
+<manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+<manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/>
+</manifest:manifest>`
+  );
+
+  return zip.generateAsync({ type: "blob", mimeType: "application/vnd.oasis.opendocument.text" });
+}
+
+export async function downloadOdt(project: PaperProject): Promise<void> {
+  const blob = await exportToOdt(project);
+  triggerBlobDownload(blob, filenameFor(project.title, "odt"));
+}
