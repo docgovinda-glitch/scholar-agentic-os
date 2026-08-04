@@ -124,7 +124,7 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
       {/* Simulation Controls Menu bar */}
       <div className="bg-[#F2EFE9] border-b border-[#D1CEC7] px-5 py-3.5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-1 px-2.5 bg-[#FAF9F6] border border-[#D1CEC7] rounded text-[10px] font-mono uppercase font-bold text-[#76726A]">
+          <div className="p-1 px-2.5 bg-[#FAF9F6] border border-[#D1CEC7] rounded text-xs font-bold text-[#76726A]">
             PDF PRE-PRINT LAYOUT
           </div>
           <span className="text-xs text-[#76726A]">
@@ -138,14 +138,14 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
           <div className="flex items-center bg-[#FAF9F6] border border-[#D1CEC7] rounded p-1 gap-1">
             <button
               onClick={() => setIsDoubleColumn(false)}
-              className={`p-1 px-2 text-[10px] font-mono uppercase rounded transition-all cursor-pointer ${!isDoubleColumn ? "bg-[#1A1A1A] text-white" : "text-[#8C887F]"}`}
+              className={`p-1 px-2 text-xs rounded transition-all cursor-pointer ${!isDoubleColumn ? "bg-[#1A1A1A] text-white" : "text-[#8C887F]"}`}
               title="Single Column Layout"
             >
               1-Col
             </button>
             <button
               onClick={() => setIsDoubleColumn(true)}
-              className={`p-1 px-2 text-[10px] font-mono uppercase rounded transition-all cursor-pointer ${isDoubleColumn ? "bg-[#1A1A1A] text-white" : "text-[#8C887F]"}`}
+              className={`p-1 px-2 text-xs rounded transition-all cursor-pointer ${isDoubleColumn ? "bg-[#1A1A1A] text-white" : "text-[#8C887F]"}`}
               title="Dual Column Journal Layout"
             >
               2-Col
@@ -251,7 +251,7 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
             )}
 
             {/* Academic Running Header */}
-            <div className="border-b border-[#EAE7DF] pb-2 mb-8 flex items-center justify-between text-[10px] font-mono text-[#76726A] uppercase tracking-wider">
+            <div className="border-b border-[#EAE7DF] pb-2 mb-8 flex items-center justify-between text-xs text-[#76726A]">
               <span>{project.targetJournal?.name || "Scopus Indexed Scholarly Manuscript"}</span>
               <span>Pre-Print Document Tracker</span>
             </div>
@@ -278,13 +278,13 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
                     </p>
                   )}
                   {project.authorEmail || project.orcidId ? (
-                    <p className="text-[10px] text-[#76726A] font-mono uppercase tracking-widest mt-1">
+                    <p className="text-xs text-[#76726A] mt-1">
                       {project.authorEmail && `Email: ${project.authorEmail}`}
                       {project.authorEmail && project.orcidId && " • "}
                       {project.orcidId && `ORCID: ${project.orcidId}`}
                     </p>
                   ) : (
-                    <p className="text-[10px] text-[#76726A] font-mono uppercase tracking-widest mt-1">
+                    <p className="text-xs text-[#76726A] mt-1">
                       Nepal • Independent Scholar Status
                     </p>
                   )}
@@ -302,7 +302,7 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
                       </p>
                     )}
                     {(project.coAuthorEmail || project.coAuthorOrcidId) && (
-                      <p className="text-[9px] text-[#76726A] font-mono uppercase tracking-widest mt-0.5">
+                      <p className="text-[9px] text-[#76726A] mt-0.5">
                         {project.coAuthorEmail && `Email: ${project.coAuthorEmail}`}
                         {project.coAuthorEmail && project.coAuthorOrcidId && " • "}
                         {project.coAuthorOrcidId && `ORCID: ${project.coAuthorOrcidId}`}
@@ -375,7 +375,7 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
             </div>
 
             {/* Simulated Manuscript Page Numbers */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-mono text-[#76726A] tracking-widest uppercase">
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs text-[#76726A]">
               Page 1 of 1 // Simulated Manuscript Track
             </div>
 
@@ -387,7 +387,7 @@ export default function ManuscriptPDFViewer({ project, onClose }: ManuscriptPDFV
         <div className="bg-[#FAF8F5] border-t border-[#D1CEC7] p-4 flex justify-end">
           <button
             onClick={onClose}
-            className="px-5 py-1.5 bg-[#1A1A1A] hover:bg-neutral-800 text-white text-xs font-mono tracking-wider rounded uppercase cursor-pointer"
+            className="px-5 py-1.5 bg-[#1A1A1A] hover:bg-neutral-800 text-white text-xs rounded cursor-pointer"
           >
             Close Full Viewer
           </button>

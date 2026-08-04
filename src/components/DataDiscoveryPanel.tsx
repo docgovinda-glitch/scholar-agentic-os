@@ -188,11 +188,11 @@ export default function DataDiscoveryPanel({
       <div id="data-discovery" className="space-y-6">
         <div className="p-8 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl space-y-4">
           <div className="w-12 h-12 bg-[color:var(--color-luminous-blue)]/10 border border-[color:var(--color-luminous-blue)]/20 rounded-full flex items-center justify-center mx-auto">
-            <Database className="w-6 h-6 text-[#E2E8F0]" />
+            <Database className="w-6 h-6 text-[color:var(--text-primary)]" />
           </div>
           <div className="max-w-md mx-auto space-y-2">
-            <h3 className="text-sm font-bold text-[#E2E8F0]">This stage skips primary data for research proposals</h3>
-            <p className="text-xs text-[#94A3B8] font-sans">
+            <h3 className="text-sm font-bold text-[color:var(--text-primary)]">This stage skips primary data for research proposals</h3>
+            <p className="text-xs text-[color:var(--text-secondary)] font-sans">
               A research proposal describes planned, not yet executed, research — there's no primary or secondary
               data to collect yet, and agents don't add data sources for this format either.
             </p>
@@ -200,13 +200,13 @@ export default function DataDiscoveryPanel({
           <div className="flex justify-center gap-3">
             <button
               onClick={onBack}
-              className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[#E2E8F0] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
+              className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[color:var(--text-primary)] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
             >
               ← Back to Grounding
             </button>
             <button
               onClick={onNext}
-              className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-lg transition-all duration-200 shadow-sm cursor-pointer font-mono uppercase tracking-wider"
+              className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-lg transition-all duration-200 shadow-sm cursor-pointer"
             >
               Continue →
             </button>
@@ -221,11 +221,11 @@ export default function DataDiscoveryPanel({
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-[#E2E8F0] flex items-center gap-2">
+          <h2 className="text-lg font-bold text-[color:var(--text-primary)] flex items-center gap-2">
             <Database className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
             Phase C: Empirical & Textual Source Discovery
           </h2>
-          <p className="text-xs text-[#94A3B8] font-mono mt-0.5 uppercase tracking-wider">
+          <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
             Identify and audit authentic repositories · upload your own datasets
           </p>
         </div>
@@ -233,7 +233,7 @@ export default function DataDiscoveryPanel({
 
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm space-y-3">
-          <p className="font-semibold text-xs font-mono uppercase">⚠️ Discovery Issue: {error}</p>
+          <p className="font-semibold text-xs">⚠️ Discovery Issue: {error}</p>
           <div className="flex gap-3">
             <button
               onClick={discoverSources}
@@ -248,11 +248,11 @@ export default function DataDiscoveryPanel({
       {/* File Upload Panel */}
       <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-mono font-bold text-[#E2E8F0] uppercase tracking-wider flex items-center gap-1.5">
+          <h3 className="text-xs font-bold text-[color:var(--text-primary)] flex items-center gap-1.5">
             <FilePlus className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
             Document Upload & Profile
           </h3>
-          <span className="text-[10px] text-[#94A3B8] font-mono">
+          <span className="text-[10px] text-[color:var(--text-secondary)] font-mono">
             PDF, DOCX, TXT, XLSX supported
           </span>
         </div>
@@ -272,11 +272,11 @@ export default function DataDiscoveryPanel({
             className="hidden"
             onChange={(e) => handleFileUpload(e.target.files)}
           />
-          <Upload className="w-7 h-7 text-[#94A3B8]/50 group-hover:text-[color:var(--color-luminous-blue)] mx-auto mb-2 transition-all" />
-          <p className="text-xs text-[#94A3B8] font-sans">
+          <Upload className="w-7 h-7 text-[color:var(--text-secondary)]/50 group-hover:text-[color:var(--color-luminous-blue)] mx-auto mb-2 transition-all" />
+          <p className="text-xs text-[color:var(--text-secondary)] font-sans">
             Drag & drop or <span className="text-[color:var(--color-luminous-blue)] font-semibold">click to browse</span> your research documents
           </p>
-          <p className="text-[10px] text-[#94A3B8] mt-1">
+          <p className="text-[10px] text-[color:var(--text-secondary)] mt-1">
             Uploaded content will be parsed and used by the AI to discover more relevant sources
           </p>
         </div>
@@ -293,11 +293,11 @@ export default function DataDiscoveryPanel({
                 <div className="flex items-center gap-2.5 min-w-0">
                   <FileText className={`w-4 h-4 shrink-0 ${
                     f.status === "error" ? "text-red-500" :
-                    f.status === "parsed" ? "text-emerald-600" : "text-[#94A3B8]"
+                    f.status === "parsed" ? "text-emerald-600" : "text-[color:var(--text-secondary)]"
                   }`} />
                   <div className="min-w-0">
-                    <span className="font-mono text-[#E2E8F0] font-semibold truncate block max-w-[200px]">{f.name}</span>
-                    <span className="text-[10px] text-[#94A3B8] font-mono">
+                    <span className="font-mono text-[color:var(--text-primary)] font-semibold truncate block max-w-[200px]">{f.name}</span>
+                    <span className="text-[10px] text-[color:var(--text-secondary)] font-mono">
                       {f.sizeKb} KB · {
                         f.status === "uploading" ? "Parsing..." :
                         f.status === "parsed" ? `${f.extractedText.split(/\s+/).filter(Boolean).length} words extracted` :
@@ -330,15 +330,15 @@ export default function DataDiscoveryPanel({
         {viewingFile && (
           <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold text-[#E2E8F0] uppercase tracking-wider">
+              <span className="text-xs font-bold text-[color:var(--text-primary)]">
                 Extracted Content Preview — {viewingFile.name}
               </span>
-              <button onClick={() => setViewingFile(null)} className="text-[10px] text-[#94A3B8] hover:text-[#94A3B8] cursor-pointer font-mono">Close</button>
+              <button onClick={() => setViewingFile(null)} className="text-[10px] text-[color:var(--text-secondary)] hover:text-[color:var(--text-secondary)] cursor-pointer font-mono">Close</button>
             </div>
-            <div className="max-h-[160px] overflow-y-auto text-[11px] text-[#94A3B8] leading-relaxed whitespace-pre-wrap font-sans bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-lg p-3">
-              {viewingFile.extractedText.substring(0, 3000) || <em className="text-[#94A3B8]">No text extracted</em>}
+            <div className="max-h-[160px] overflow-y-auto text-[11px] text-[color:var(--text-secondary)] leading-relaxed whitespace-pre-wrap font-sans bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-lg p-3">
+              {viewingFile.extractedText.substring(0, 3000) || <em className="text-[color:var(--text-secondary)]">No text extracted</em>}
               {viewingFile.extractedText.length > 3000 && (
-                <span className="text-[#94A3B8] block mt-2">... [{viewingFile.extractedText.length - 3000} more characters]</span>
+                <span className="text-[color:var(--text-secondary)] block mt-2">... [{viewingFile.extractedText.length - 3000} more characters]</span>
               )}
             </div>
           </div>
@@ -348,11 +348,11 @@ export default function DataDiscoveryPanel({
       {!project.dataSources && !loading ? (
         <div className="p-8 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl space-y-4">
           <div className="w-12 h-12 bg-[color:var(--color-luminous-blue)]/10 border border-[color:var(--color-luminous-blue)]/20 rounded-full flex items-center justify-center mx-auto">
-            <Database className="w-6 h-6 text-[#E2E8F0]" />
+            <Database className="w-6 h-6 text-[color:var(--text-primary)]" />
           </div>
           <div className="max-w-md mx-auto space-y-2">
-            <h3 className="text-sm font-bold text-[#E2E8F0]">Discover Open Databases</h3>
-            <p className="text-xs text-[#94A3B8] font-sans">
+            <h3 className="text-sm font-bold text-[color:var(--text-primary)]">Discover Open Databases</h3>
+            <p className="text-xs text-[color:var(--text-secondary)] font-sans">
               The Data Agent will match your research questions and methodology against reputable open databases.
               {uploadedFiles.filter(f => f.status === "parsed").length > 0 && (
                 <span className="block mt-1 text-emerald-400 font-semibold">
@@ -364,7 +364,7 @@ export default function DataDiscoveryPanel({
           <div className="flex flex-wrap justify-center gap-3">
             <button
               onClick={discoverSources}
-              className="px-5 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-xl transition-all duration-200 shadow-sm inline-flex items-center gap-2 cursor-pointer font-mono uppercase tracking-wider"
+              className="px-5 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-xl transition-all duration-200 shadow-sm inline-flex items-center gap-2 cursor-pointer"
             >
               <Sparkles className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Query Authentic Directories
@@ -374,8 +374,8 @@ export default function DataDiscoveryPanel({
       ) : loading ? (
         <div className="p-12 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl space-y-4">
           <div className="w-10 h-10 border-2 border-[color:var(--color-luminous-blue)]/20 border-t-[color:var(--color-luminous-blue)] rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-[#E2E8F0] font-mono animate-pulse">Running methodology matching algorithm...</p>
-          <p className="text-xs text-[#94A3B8] max-w-sm mx-auto">
+          <p className="text-sm text-[color:var(--text-primary)] font-mono animate-pulse">Running methodology matching algorithm...</p>
+          <p className="text-xs text-[color:var(--text-secondary)] max-w-sm mx-auto">
             Sourcing Scopus, UN databases, DOAJ, and open academic data banks.
             {uploadedFiles.filter(f => f.status === "parsed").length > 0 && " Incorporating uploaded document context."}
           </p>
@@ -385,8 +385,8 @@ export default function DataDiscoveryPanel({
           <div className="space-y-5">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-4">
               <div>
-                <h4 className="text-sm font-bold text-[#E2E8F0]">Auditor Authorization Panel</h4>
-                <p className="text-xs text-[#94A3B8] font-sans">
+                <h4 className="text-sm font-bold text-[color:var(--text-primary)]">Auditor Authorization Panel</h4>
+                <p className="text-xs text-[color:var(--text-secondary)] font-sans">
                   Review each dataset. Pending sources are excluded from downstream drafting until approved.
                 </p>
               </div>
@@ -409,22 +409,16 @@ export default function DataDiscoveryPanel({
                     <div className="flex justify-between items-start gap-4">
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className={`text-[10px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded ${
-                            source.type === "Quantitative"
-                              ? "bg-blue-500/10 text-blue-300"
-                              : source.type === "Mixed"
-                              ? "bg-purple-500/10 text-purple-300"
-                              : "bg-indigo-500/10 text-indigo-300"
-                          }`}>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded ${ source.type === "Quantitative" ? "bg-blue-500/10 text-blue-300" : source.type === "Mixed" ? "bg-purple-500/10 text-purple-300" : "bg-indigo-500/10 text-indigo-300" }`}>
                             {source.type} Source
                           </span>
                           {source.status === "pending" && (
-                            <span className="text-[10px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-300">
+                            <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300">
                               Pending Approval
                             </span>
                           )}
                         </div>
-                        <h3 className="text-sm font-bold text-[#E2E8F0] mt-2 leading-snug">{source.name}</h3>
+                        <h3 className="text-sm font-bold text-[color:var(--text-primary)] mt-2 leading-snug">{source.name}</h3>
                         <a
                           href={source.url}
                           target="_blank"
@@ -438,8 +432,8 @@ export default function DataDiscoveryPanel({
                         onClick={() => (source.status === "approved" ? revokeApproval(index) : approveSource(index))}
                         className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0 cursor-pointer ${
                           source.status === "approved"
-                            ? "bg-emerald-500 text-white shadow-sm"
-                            : "bg-[color:var(--color-navy-3)] hover:bg-[color:var(--color-navy-4)] text-[#94A3B8]"
+                            ? "bg-emerald-500 text-[color:var(--text-primary)] shadow-sm"
+                            : "bg-[color:var(--color-navy-3)] hover:bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"
                         }`}
                         title={source.status === "approved" ? "Revoke" : "Approve"}
                       >
@@ -449,17 +443,17 @@ export default function DataDiscoveryPanel({
 
                     <div className="space-y-2 pt-3 border-t border-[color:var(--color-navy-4)]">
                       <div>
-                        <span className="text-[10px] font-bold font-mono text-[color:var(--color-luminous-blue)] uppercase block">Relevance to Study:</span>
-                        <p className="text-xs text-[#94A3B8] mt-1 leading-relaxed font-sans">{source.relevance}</p>
+                        <span className="text-xs font-bold text-[color:var(--color-luminous-blue)] block">Relevance to Study:</span>
+                        <p className="text-xs text-[color:var(--text-secondary)] mt-1 leading-relaxed font-sans">{source.relevance}</p>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold font-mono text-[color:var(--color-luminous-blue)] uppercase block">Reliability Details:</span>
-                        <p className="text-xs text-[#94A3B8] mt-1 leading-relaxed font-sans">{source.reliability}</p>
+                        <span className="text-xs font-bold text-[color:var(--color-luminous-blue)] block">Reliability Details:</span>
+                        <p className="text-xs text-[color:var(--text-secondary)] mt-1 leading-relaxed font-sans">{source.reliability}</p>
                       </div>
                       <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex gap-2 items-start">
                         <AlertOctagon className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[10px] font-bold font-mono text-amber-400 uppercase block">Inherent Limits:</span>
+                          <span className="text-xs font-bold text-amber-400 block">Inherent Limits:</span>
                           <p className="text-[11px] text-amber-300 leading-tight font-sans">{source.limitations}</p>
                         </div>
                       </div>
@@ -470,7 +464,7 @@ export default function DataDiscoveryPanel({
                     {source.status === "approved" ? (
                       <button
                         onClick={() => revokeApproval(index)}
-                        className="text-xs font-mono py-1.5 px-3 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                        className="text-xs py-1.5 px-3 rounded-lg transition-all cursor-pointer font-bold bg-red-500/10 text-red-400 hover:bg-red-500/20"
                       >
                         Revoke
                       </button>
@@ -478,13 +472,13 @@ export default function DataDiscoveryPanel({
                       <>
                         <button
                           onClick={() => rejectSource(index)}
-                          className="text-xs font-mono py-1.5 px-3 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                          className="text-xs py-1.5 px-3 rounded-lg transition-all cursor-pointer font-bold bg-red-500/10 text-red-400 hover:bg-red-500/20"
                         >
                           Reject
                         </button>
                         <button
                           onClick={() => approveSource(index)}
-                          className="text-xs font-mono py-1.5 px-3 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider bg-[color:var(--color-luminous-blue-dim)] text-white hover:bg-[color:var(--color-luminous-blue)]"
+                          className="text-xs py-1.5 px-3 rounded-lg transition-all cursor-pointer font-bold bg-[color:var(--color-luminous-blue-dim)] text-white hover:bg-[color:var(--color-luminous-blue)]"
                         >
                           Approve
                         </button>
@@ -508,13 +502,13 @@ export default function DataDiscoveryPanel({
             <div className="flex justify-between items-center pt-4 border-t border-[color:var(--color-navy-4)]">
               <button
                 onClick={onBack}
-                className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[#E2E8F0] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
+                className="px-4 py-2 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[color:var(--text-primary)] text-xs rounded-lg transition-all duration-150 cursor-pointer font-mono"
               >
                 ← Back to Grounding
               </button>
               <button
                 onClick={onNext}
-                className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-lg transition-all duration-200 shadow-sm cursor-pointer font-mono uppercase tracking-wider"
+                className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-lg transition-all duration-200 shadow-sm cursor-pointer"
               >
                 Proceed to Journal Discovery →
               </button>

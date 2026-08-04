@@ -117,8 +117,8 @@ export default function DiscoveryView({ projectId, onSourceAdd, onBack }: Discov
     <div className="h-full flex flex-col gap-4">
       {/* Header */}
       <div className="pb-2 border-b border-[color:var(--color-border-subtle)]">
-        <h2 className="text-sm font-serif font-bold text-[#F1F5F9]">Discover Sources</h2>
-        <p className="text-xs text-[#64748B] mt-1">
+        <h2 className="text-sm font-serif font-bold text-[color:var(--text-primary)]">Discover Sources</h2>
+        <p className="text-xs text-[color:var(--text-muted)] mt-1">
           Add sources from arXiv, Google Scholar, PubMed
         </p>
       </div>
@@ -132,12 +132,12 @@ export default function DiscoveryView({ projectId, onSourceAdd, onBack }: Discov
             onChange={(e) => setQuery(e.target.value)}
             onKeyPress={(e) => e.key === "Enter" && handleSearch()}
             placeholder="Search by title, author, or DOI…"
-            className="flex-1 px-3 py-2 text-xs rounded-lg bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] text-[#E2E8F0] placeholder-[#64748B] focus:outline-none focus:border-[color:var(--color-luminous-blue-dim)]"
+            className="flex-1 px-3 py-2 text-xs rounded-lg bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-none focus:border-[color:var(--color-luminous-blue-dim)]"
           />
           <button
             onClick={handleSearch}
             disabled={loading}
-            className="px-3 py-2 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs font-mono uppercase tracking-wide disabled:opacity-50"
+            className="px-3 py-2 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs disabled:opacity-50"
           >
             {loading ? "…" : "Search"}
           </button>
@@ -148,13 +148,13 @@ export default function DiscoveryView({ projectId, onSourceAdd, onBack }: Discov
       <div className="flex-1 overflow-y-auto space-y-2">
         {results.length === 0 && !loading && query && (
           <div className="text-center py-8">
-            <p className="text-[#64748B] text-xs">No results found</p>
+            <p className="text-[color:var(--text-muted)] text-xs">No results found</p>
           </div>
         )}
 
         {loading && (
           <div className="text-center py-8">
-            <div className="text-[#94A3B8] text-xs">Searching…</div>
+            <div className="text-[color:var(--text-secondary)] text-xs">Searching…</div>
           </div>
         )}
 
@@ -179,20 +179,20 @@ export default function DiscoveryView({ projectId, onSourceAdd, onBack }: Discov
 
               <div className="flex-1 min-w-0">
                 {/* Title */}
-                <h3 className="text-xs font-serif font-semibold text-[#F1F5F9] mb-1">
+                <h3 className="text-xs font-serif font-semibold text-[color:var(--text-primary)] mb-1">
                   {result.title}
                 </h3>
 
                 {/* Authors & Year */}
-                <p className="text-[10px] text-[#94A3B8] mb-2">
+                <p className="text-[10px] text-[color:var(--text-secondary)] mb-2">
                   {result.authors.join(", ")}
                   {result.year && ` · ${result.year}`}
                 </p>
 
                 {/* Venue & Source */}
-                <div className="flex gap-2 text-[10px] text-[#64748B]">
+                <div className="flex gap-2 text-[10px] text-[color:var(--text-muted)]">
                   {result.venue && <span>{result.venue}</span>}
-                  <span className="text-[#475569]">
+                  <span className="text-[color:var(--text-muted)]">
                     {result.source.charAt(0).toUpperCase() + result.source.slice(1)}
                   </span>
                 </div>
@@ -209,7 +209,7 @@ export default function DiscoveryView({ projectId, onSourceAdd, onBack }: Discov
 
                 {/* Summary */}
                 {result.summary && (
-                  <p className="text-[10px] text-[#94A3B8] mt-2 line-clamp-2">
+                  <p className="text-[10px] text-[color:var(--text-secondary)] mt-2 line-clamp-2">
                     {result.summary}
                   </p>
                 )}
@@ -224,13 +224,13 @@ export default function DiscoveryView({ projectId, onSourceAdd, onBack }: Discov
         <div className="space-y-2 border-t border-[color:var(--color-border-subtle)] pt-4">
           <button
             onClick={handleAddSelected}
-            className="w-full py-2 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs font-mono uppercase tracking-wide"
+            className="w-full py-2 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs"
           >
             Add {selectedSources.size} Source{selectedSources.size !== 1 ? "s" : ""}
           </button>
           <button
             onClick={onBack}
-            className="w-full py-2 rounded-lg border border-[color:var(--color-border-subtle)] text-[color:var(--color-luminous-blue)] text-xs font-mono uppercase tracking-wide"
+            className="w-full py-2 rounded-lg border border-[color:var(--color-border-subtle)] text-[color:var(--color-luminous-blue)] text-xs"
           >
             Done
           </button>
@@ -241,7 +241,7 @@ export default function DiscoveryView({ projectId, onSourceAdd, onBack }: Discov
         <div className="flex gap-2 border-t border-[color:var(--color-border-subtle)] pt-4">
           <button
             onClick={onBack}
-            className="flex-1 py-2 rounded-lg border border-[color:var(--color-border-subtle)] text-[color:var(--color-luminous-blue)] text-xs font-mono uppercase tracking-wide"
+            className="flex-1 py-2 rounded-lg border border-[color:var(--color-border-subtle)] text-[color:var(--color-luminous-blue)] text-xs"
           >
             Back
           </button>

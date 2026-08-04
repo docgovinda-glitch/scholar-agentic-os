@@ -64,9 +64,9 @@ import {
 
 function PanelLoadingFallback() {
   return (
-    <div className="flex items-center justify-center py-16 text-[#94A3B8]">
+    <div className="flex items-center justify-center py-16 text-[color:var(--text-secondary)]">
       <Loader2 className="w-5 h-5 animate-spin mr-2" />
-      <span className="text-xs font-mono uppercase tracking-wider">Loading…</span>
+      <span className="text-xs">Loading…</span>
     </div>
   );
 }
@@ -298,7 +298,7 @@ function App() {
   const intakeProgress = getIntakeProgress();
 
   return (
-    <div className="min-h-screen blueprint-canvas text-[#E2E8F0] flex flex-col font-sans selection:bg-[color:var(--color-luminous-blue-dim)] selection:text-white">
+    <div className="min-h-screen blueprint-canvas text-[color:var(--text-primary)] flex flex-col font-sans selection:bg-[color:var(--color-luminous-blue-dim)] selection:text-white">
       
       <AppHeader
         onboardingStep={onboardingStep}
@@ -349,7 +349,7 @@ function App() {
               <h3
                 ref={phaseHeadingRef}
                 tabIndex={-1}
-                className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 select-none pb-2 border-b border-[color:var(--color-navy-4)] focus:outline-none"
+                className="text-xs font-bold text-[color:var(--text-primary)] mb-4 select-none pb-2 border-b border-[color:var(--color-navy-4)] focus:outline-none"
               >
                 Research Phases — {WORKFLOW_PHASES.find((p) => p.id === project.currentPhase)?.name}
               </h3>
@@ -360,7 +360,7 @@ function App() {
               )}
               <div className="relative flex flex-col gap-5 pl-1.5">
                 {/* Connecting Track Line */}
-                <div className="absolute left-[20px] top-4 bottom-4 w-[2px] bg-[color:var(--color-navy-4)]" />
+                <div className="absolute left-[20px] top-4 bottom-4 w-[2px] bg-[color:var(--surface-inset)]" />
                 
                 {WORKFLOW_PHASES.map((ph, idx) => {
                   const isActive = project.currentPhase === ph.id;
@@ -375,23 +375,21 @@ function App() {
                       <div
                         className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0 transition-all duration-300 z-10 ${
                           isActive
-                            ? "bg-[color:var(--color-luminous-blue-dim)] text-white border-2 border-[color:var(--color-luminous-blue-dim)] ring-4 ring-[color:var(--color-luminous-blue)]/20 shadow-[color:var(--color-luminous-blue)]/30 shadow-md animate-pulse font-bold"
+                            ? "bg-[color:var(--color-luminous-blue-dim)] text-[color:var(--text-primary)] border-2 border-[color:var(--color-luminous-blue-dim)] ring-4 ring-[color:var(--color-luminous-blue)]/20 shadow-[color:var(--color-luminous-blue)]/30 shadow-md animate-pulse font-bold"
                             : isPast
-                            ? "bg-emerald-500 text-white border-2 border-emerald-500 shadow-md shadow-emerald-500/20 font-bold"
-                            : "bg-[color:var(--color-navy-3)] text-[#94A3B8] border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-2)] font-normal"
+                            ? "bg-emerald-500 text-[color:var(--text-primary)] border-2 border-emerald-500 shadow-md shadow-emerald-500/20 font-bold"
+                            : "bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)] border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-2)] font-normal"
                         }`}
                       >
                         {ph.id}
                       </div>
                       <div className="flex flex-col">
                         <span
-                          className={`text-[11px] font-mono leading-none tracking-wider uppercase font-semibold transition-colors duration-200 ${
-                            isActive ? "text-[#E2E8F0]" : isPast ? "text-emerald-400" : "text-[#94A3B8] group-hover:text-[#E2E8F0]"
-                          }`}
+                          className={`text-xs leading-none font-semibold transition-colors duration-200 ${ isActive ? "text-[color:var(--text-primary)]" : isPast ? "text-emerald-400" : "text-[color:var(--text-secondary)] group-hover:text-[color:var(--text-primary)]" }`}
                         >
                           {ph.name}
                         </span>
-                        <span className="text-[9px] text-[#94A3B8] mt-0.5 line-clamp-1">{ph.desc}</span>
+                        <span className="text-[9px] text-[color:var(--text-secondary)] mt-0.5 line-clamp-1">{ph.desc}</span>
                       </div>
                     </button>
                   );
@@ -532,7 +530,7 @@ function App() {
           <Suspense fallback={<PanelLoadingFallback />}>
             <div className="grid grid-cols-1 gap-6">
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   Document Export Pipeline
                 </h2>
@@ -541,7 +539,7 @@ function App() {
                 />
               </div>
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
                   <Award className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   Journal Matching Agent
                 </h2>
@@ -553,7 +551,7 @@ function App() {
                 />
               </div>
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
                   <FileSpreadsheet className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   Submission Packaging Workbench
                 </h2>
@@ -564,7 +562,7 @@ function App() {
                 />
               </div>
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   Cover Letter Generator
                 </h2>
@@ -582,7 +580,7 @@ function App() {
                 />
               </div>
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
                   <BookOpenCheck className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   Submission Checklist
                 </h2>
@@ -599,7 +597,7 @@ function App() {
                 />
               </div>
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
                   <FileSpreadsheet className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   Submission Tracker
                 </h2>
@@ -642,7 +640,7 @@ function App() {
                 />
               </div>
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   Reviewer Response Manager
                 </h2>
@@ -666,7 +664,7 @@ function App() {
           <Suspense fallback={<PanelLoadingFallback />}>
             <div className="grid grid-cols-1 gap-6">
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
                   <BookOpenCheck className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   Citation Discovery & Textual Grounding
                 </h2>
@@ -678,7 +676,7 @@ function App() {
                 />
               </div>
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm">
-                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                   Author Guidelines Parsing & Auditing
                 </h2>
@@ -739,13 +737,13 @@ function App() {
             <div className="bg-[color:var(--color-navy-3)] border-b border-[color:var(--color-navy-4)] px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
-                <h3 className="text-xs font-semibold text-[#E2E8F0] font-mono uppercase tracking-widest">
+                <h3 className="text-xs font-semibold text-[color:var(--text-primary)]">
                   Live Manuscript Compilation Workbench
                 </h3>
               </div>
               <button
                 onClick={() => setIsPdfModalOpen(false)}
-                className="p-1 px-3 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 rounded text-[11px] font-mono uppercase cursor-pointer transition-all font-semibold"
+                className="p-1 px-3 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 rounded text-xs cursor-pointer transition-all font-semibold"
               >
                 Dismiss Preview
               </button>

@@ -31,13 +31,13 @@ export default function ApprovalQueueView({
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 text-center px-4">
         <div className="text-3xl">✓</div>
-        <p className="text-[#F1F5F9] text-sm font-serif">All sources reviewed</p>
-        <p className="text-[#64748B] text-xs">
+        <p className="text-[color:var(--text-primary)] text-sm font-serif">All sources reviewed</p>
+        <p className="text-[color:var(--text-muted)] text-xs">
           {approvedCount} approved · {rejectedCount} rejected
         </p>
         <button
           onClick={onBack}
-          className="mt-4 text-[color:var(--color-luminous-blue)] text-xs font-mono uppercase tracking-wide"
+          className="mt-4 text-[color:var(--color-luminous-blue)] text-xs"
         >
           ← Back to Home
         </button>
@@ -55,7 +55,7 @@ export default function ApprovalQueueView({
     <div className="h-full flex flex-col gap-4 pb-4">
       {/* Progress */}
       <div className="text-center pt-2">
-        <p className="text-[10px] text-[#94A3B8] font-mono uppercase tracking-wide">
+        <p className="text-xs text-[color:var(--text-secondary)]">
           {currentIndex + 1} of {candidates.length}
         </p>
         <div className="mt-1 h-1 bg-[color:var(--color-navy-2)] rounded-full overflow-hidden">
@@ -70,13 +70,13 @@ export default function ApprovalQueueView({
       <div className="flex-1 rounded-lg border border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] p-4 overflow-y-auto flex flex-col gap-4">
         {/* Title & Authors */}
         <div>
-          <h2 className="text-sm font-serif font-bold text-[#F1F5F9] mb-2">{current.title}</h2>
-          <p className="text-xs text-[#94A3B8]">{current.authors.join(", ")}</p>
+          <h2 className="text-sm font-serif font-bold text-[color:var(--text-primary)] mb-2">{current.title}</h2>
+          <p className="text-xs text-[color:var(--text-secondary)]">{current.authors.join(", ")}</p>
         </div>
 
         {/* Venue & Year */}
         {(current.venue || current.year) && (
-          <div className="text-xs text-[#64748B] space-y-1">
+          <div className="text-xs text-[color:var(--text-muted)] space-y-1">
             {current.venue && <p>{current.venue}</p>}
             {current.year && <p>{current.year}</p>}
           </div>
@@ -84,32 +84,32 @@ export default function ApprovalQueueView({
 
         {/* Authenticity Checks */}
         <div className="space-y-2 pt-2 border-t border-[color:var(--color-border-subtle)]">
-          <p className="text-[10px] font-mono uppercase tracking-wide text-[#94A3B8]">
+          <p className="text-xs text-[color:var(--text-secondary)]">
             Authenticity {authenticityScore}/{authenticityTotal}
           </p>
           <div className="space-y-1 text-xs">
             <div className="flex gap-2">
               <span>{current.authenticityChecks.doiResolves ? "✓" : "✗"}</span>
-              <span className={current.authenticityChecks.doiResolves ? "text-[#86EFAC]" : "text-[#F87171]"}>
+              <span className={current.authenticityChecks.doiResolves ? "text-[color:var(--state-success)]" : "text-[color:var(--state-danger)]"}>
                 DOI resolves
               </span>
             </div>
             <div className="flex gap-2">
               <span>{current.authenticityChecks.publisherVerified ? "✓" : "✗"}</span>
-              <span className={current.authenticityChecks.publisherVerified ? "text-[#86EFAC]" : "text-[#F87171]"}>
+              <span className={current.authenticityChecks.publisherVerified ? "text-[color:var(--state-success)]" : "text-[color:var(--state-danger)]"}>
                 Publisher verified
               </span>
             </div>
             <div className="flex gap-2">
               <span>{current.authenticityChecks.notRetracted ? "✓" : "✗"}</span>
-              <span className={current.authenticityChecks.notRetracted ? "text-[#86EFAC]" : "text-[#F87171]"}>
+              <span className={current.authenticityChecks.notRetracted ? "text-[color:var(--state-success)]" : "text-[color:var(--state-danger)]"}>
                 Not retracted
               </span>
             </div>
             {current.authenticityChecks.journalRanking && (
               <div className="flex gap-2">
                 <span>ℹ</span>
-                <span className="text-[#94A3B8]">Ranking: {current.authenticityChecks.journalRanking}</span>
+                <span className="text-[color:var(--text-secondary)]">Ranking: {current.authenticityChecks.journalRanking}</span>
               </div>
             )}
           </div>
@@ -118,23 +118,23 @@ export default function ApprovalQueueView({
         {/* Reason Suggested */}
         {current.reasonSuggested && (
           <div className="pt-2 border-t border-[color:var(--color-border-subtle)]">
-            <p className="text-[10px] font-mono uppercase tracking-wide text-[#94A3B8] mb-1">Why suggested</p>
-            <p className="text-xs text-[#E2E8F0]">{current.reasonSuggested}</p>
+            <p className="text-xs text-[color:var(--text-secondary)] mb-1">Why suggested</p>
+            <p className="text-xs text-[color:var(--text-primary)]">{current.reasonSuggested}</p>
           </div>
         )}
 
         {/* Summary */}
         {current.summary && (
           <div className="pt-2 border-t border-[color:var(--color-border-subtle)]">
-            <p className="text-[10px] font-mono uppercase tracking-wide text-[#94A3B8] mb-1">Summary</p>
-            <p className="text-xs text-[#E2E8F0] line-clamp-4">{current.summary}</p>
+            <p className="text-xs text-[color:var(--text-secondary)] mb-1">Summary</p>
+            <p className="text-xs text-[color:var(--text-primary)] line-clamp-4">{current.summary}</p>
           </div>
         )}
 
         {/* Citation */}
         <div className="pt-2 border-t border-[color:var(--color-border-subtle)]">
-          <p className="text-[10px] font-mono uppercase tracking-wide text-[#94A3B8] mb-1">Citation</p>
-          <p className="text-xs font-mono text-[#94A3B8] break-words">{current.citationString}</p>
+          <p className="text-xs text-[color:var(--text-secondary)] mb-1">Citation</p>
+          <p className="text-xs font-mono text-[color:var(--text-secondary)] break-words">{current.citationString}</p>
         </div>
 
         {/* PDF Link */}
@@ -156,19 +156,19 @@ export default function ApprovalQueueView({
       <div className="flex gap-2">
         <button
           onClick={onReject}
-          className="flex-1 py-3 rounded-lg border border-[#F87171] text-[#F87171] text-xs font-mono uppercase tracking-wide hover:bg-[#F87171]/10"
+          className="flex-1 py-3 rounded-lg border border-[color:var(--state-danger)] text-[color:var(--state-danger)] text-xs hover:bg-[color:var(--state-danger)]/10"
         >
           Reject
         </button>
         <button
           onClick={onDefer}
-          className="flex-1 py-3 rounded-lg border border-[#FBBF24] text-[#FBBF24] text-xs font-mono uppercase tracking-wide hover:bg-[#FBBF24]/10"
+          className="flex-1 py-3 rounded-lg border border-[color:var(--state-warning)] text-[color:var(--state-warning)] text-xs hover:bg-[color:var(--state-warning)]/10"
         >
           Defer
         </button>
         <button
           onClick={onApprove}
-          className="flex-1 py-3 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs font-mono uppercase tracking-wide"
+          className="flex-1 py-3 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs"
         >
           Approve
         </button>
@@ -177,7 +177,7 @@ export default function ApprovalQueueView({
       {/* Back Button */}
       <button
         onClick={onBack}
-        className="text-[10px] text-[#64748B] font-mono uppercase tracking-wide text-center py-2"
+        className="text-xs text-[color:var(--text-muted)] text-center py-2"
       >
         ← Back to Home
       </button>

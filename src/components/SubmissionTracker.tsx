@@ -155,7 +155,7 @@ function SubmissionTracker({
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue font-mono text-xs font-bold uppercase transition-all flex items-center gap-2 w-fit"
+            className="px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue text-xs font-bold transition-all flex items-center gap-2 w-fit"
           >
             <Plus className="w-3 h-3" />
             New Submission
@@ -166,23 +166,23 @@ function SubmissionTracker({
       {/* Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <GlassmorphicCard className="p-3">
-          <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Total</p>
+          <p className="text-xs text-slate-400">Total</p>
           <p className="text-2xl font-bold text-slate-100">{stats.total}</p>
         </GlassmorphicCard>
         <GlassmorphicCard className="p-3">
-          <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Pending</p>
+          <p className="text-xs text-slate-400">Pending</p>
           <p className="text-2xl font-bold text-amber-400">{stats.pending}</p>
         </GlassmorphicCard>
         <GlassmorphicCard className="p-3">
-          <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Accepted</p>
+          <p className="text-xs text-slate-400">Accepted</p>
           <p className="text-2xl font-bold text-emerald-400">{stats.accepted}</p>
         </GlassmorphicCard>
         <GlassmorphicCard className="p-3">
-          <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Rejected</p>
+          <p className="text-xs text-slate-400">Rejected</p>
           <p className="text-2xl font-bold text-red-400">{stats.rejected}</p>
         </GlassmorphicCard>
         <GlassmorphicCard className="p-3">
-          <p className="text-xs text-slate-400 uppercase font-mono tracking-wide">Success Rate</p>
+          <p className="text-xs text-slate-400">Success Rate</p>
           <p className="text-2xl font-bold text-blue-400">
             {stats.total > 0 ? Math.round((stats.accepted / stats.total) * 100) : 0}%
           </p>
@@ -192,13 +192,13 @@ function SubmissionTracker({
       {/* Form */}
       {showForm && (
         <GlassmorphicCard className="p-6 space-y-4">
-          <h4 className="font-mono font-bold text-luminous-blue uppercase text-sm">
+          <h4 className="font-bold text-luminous-blue text-sm">
             {editingId ? "Edit Submission" : "Add New Submission"}
           </h4>
 
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+              <label className="block text-xs text-slate-300 mb-1.5">
                 Journal Name *
               </label>
               <input
@@ -211,7 +211,7 @@ function SubmissionTracker({
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+              <label className="block text-xs text-slate-300 mb-1.5">
                 Journal URL
               </label>
               <input
@@ -224,7 +224,7 @@ function SubmissionTracker({
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+              <label className="block text-xs text-slate-300 mb-1.5">
                 Submission Date *
               </label>
               <input
@@ -236,7 +236,7 @@ function SubmissionTracker({
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+              <label className="block text-xs text-slate-300 mb-1.5">
                 Status
               </label>
               <select
@@ -253,7 +253,7 @@ function SubmissionTracker({
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+              <label className="block text-xs text-slate-300 mb-1.5">
                 Submission ID
               </label>
               <input
@@ -266,7 +266,7 @@ function SubmissionTracker({
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase">
+              <label className="block text-xs text-slate-300 mb-1.5">
                 Notes
               </label>
               <textarea
@@ -282,13 +282,13 @@ function SubmissionTracker({
           <div className="flex gap-3">
             <button
               onClick={handleSubmit}
-              className="flex-1 px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue font-mono text-xs font-bold uppercase transition-all"
+              className="flex-1 px-4 py-2 rounded-lg bg-luminous-blue/20 hover:bg-luminous-blue/30 border border-luminous-blue/40 text-luminous-blue text-xs font-bold transition-all"
             >
               {editingId ? "Update" : "Add"} Submission
             </button>
             <button
               onClick={handleCancel}
-              className="flex-1 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-400 font-mono text-xs font-bold uppercase transition-all"
+              className="flex-1 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-400 text-xs font-bold transition-all"
             >
               Cancel
             </button>
@@ -304,11 +304,7 @@ function SubmissionTracker({
               <button
                 key={f}
                 onClick={() => setFilter(f as any)}
-                className={`px-3 py-1.5 rounded text-xs font-mono font-bold uppercase transition-all ${
-                  filter === f
-                    ? "bg-luminous-blue/30 text-luminous-blue border border-luminous-blue/40"
-                    : "text-slate-400 hover:text-slate-300"
-                }`}
+                className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${ filter === f ? "bg-luminous-blue/30 text-luminous-blue border border-luminous-blue/40" : "text-slate-400 hover:text-slate-300" }`}
               >
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
@@ -347,7 +343,7 @@ function SubmissionTracker({
                           </span>
                         )}
                       </div>
-                      <div className={`inline-block px-3 py-1 rounded-lg ${colors.bg} ${colors.text} text-xs font-mono font-bold uppercase mb-2`}>
+                      <div className={`inline-block px-3 py-1 rounded-lg ${colors.bg} ${colors.text} text-xs font-bold mb-2`}>
                         {STATUS_LABELS[submission.status]}
                       </div>
                       {submission.notes && (

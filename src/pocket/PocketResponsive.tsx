@@ -57,9 +57,9 @@ export default function PocketResponsive({
   // Mobile view (360px - 599px)
   if (view === "approval-queue") {
     return (
-      <div className="h-screen flex flex-col bg-[color:var(--color-navy-0)] text-[#E2E8F0]">
+      <div className="h-screen flex flex-col bg-[color:var(--color-navy-0)] text-[color:var(--text-primary)]">
         <div className="h-14 flex items-center px-4 border-b border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)]">
-          <p className="text-sm text-[#F1F5F9] font-serif">Source Review</p>
+          <p className="text-sm text-[color:var(--text-primary)] font-serif">Source Review</p>
         </div>
 
         <div className="flex-1 overflow-hidden px-4 py-4">
@@ -79,14 +79,14 @@ export default function PocketResponsive({
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[color:var(--color-navy-0)] text-[#E2E8F0]">
+    <div className="h-screen flex flex-col bg-[color:var(--color-navy-0)] text-[color:var(--text-primary)]">
       {/* Tablet/Desktop layout: sidebar + main area */}
       <div className="hidden md:flex flex-1 overflow-hidden">
         {/* Sidebar (tablet/desktop only) */}
         <div className="w-64 border-r border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)] flex flex-col">
           {/* Sidebar header */}
           <div className="h-14 flex items-center px-4 border-b border-[color:var(--color-border-subtle)]">
-            <h1 className="text-sm font-serif font-bold text-[#F1F5F9]">Scholar OS</h1>
+            <h1 className="text-sm font-serif font-bold text-[color:var(--text-primary)]">Scholar OS</h1>
           </div>
 
           {/* Tab navigation (vertical on tablet) */}
@@ -97,8 +97,8 @@ export default function PocketResponsive({
                 onClick={() => setCurrentTab(tab)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                   currentTab === tab
-                    ? "bg-[color:var(--color-luminous-blue-dim)] text-white"
-                    : "text-[#94A3B8] hover:bg-[color:var(--color-navy-2)]"
+                    ? "bg-[color:var(--color-luminous-blue-dim)] text-[color:var(--text-primary)]"
+                    : "text-[color:var(--text-secondary)] hover:bg-[color:var(--color-navy-2)]"
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -108,7 +108,7 @@ export default function PocketResponsive({
                     {tab === "search" && "⌕"}
                     {tab === "me" && "◍"}
                   </span>
-                  <span className="capitalize font-mono text-xs uppercase tracking-wide">
+                  <span className="capitalize text-xs">
                     {tab}
                     {tabBadges[tab] > 0 && <span className="text-amber-400 ml-1">·{tabBadges[tab]}</span>}
                   </span>
@@ -122,13 +122,13 @@ export default function PocketResponsive({
         <div className="flex-1 flex flex-col">
           {/* Header */}
           <div className="h-14 flex items-center justify-between px-6 border-b border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)]">
-            <h2 className="text-sm font-serif font-semibold text-[#F1F5F9]">
+            <h2 className="text-sm font-serif font-semibold text-[color:var(--text-primary)]">
               {currentTab === "home" && "What Needs Attention"}
               {currentTab === "projects" && "Your Projects"}
               {currentTab === "search" && "Search"}
               {currentTab === "me" && "Account Settings"}
             </h2>
-            <button className="text-lg text-[#94A3B8]">⋯</button>
+            <button className="text-lg text-[color:var(--text-secondary)]">⋯</button>
           </div>
 
           {/* Content */}
@@ -144,13 +144,13 @@ export default function PocketResponsive({
             {currentTab === "home" && (
               <button
                 onClick={() => setView("approval-queue")}
-                className="w-full py-2 px-4 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm font-mono uppercase tracking-wide"
+                className="w-full py-2 px-4 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm"
               >
                 Start Reviewing
               </button>
             )}
             {currentTab === "projects" && (
-              <button className="w-full py-2 px-4 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm font-mono uppercase tracking-wide">
+              <button className="w-full py-2 px-4 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm">
                 New Project
               </button>
             )}
@@ -168,7 +168,7 @@ export default function PocketResponsive({
             {currentTab === "search" && "Search"}
             {currentTab === "me" && "Me"}
           </button>
-          <button className="text-lg text-[#94A3B8]">⋯</button>
+          <button className="text-lg text-[color:var(--text-secondary)]">⋯</button>
         </div>
 
         {/* Content zone */}
@@ -184,13 +184,13 @@ export default function PocketResponsive({
           {currentTab === "home" && (
             <button
               onClick={() => setView("approval-queue")}
-              className="w-full py-3 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm font-mono uppercase tracking-wide"
+              className="w-full py-3 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm"
             >
               Start Reviewing
             </button>
           )}
           {currentTab === "projects" && (
-            <button className="w-full py-3 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm font-mono uppercase tracking-wide">
+            <button className="w-full py-3 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm">
               New Project
             </button>
           )}
@@ -203,7 +203,7 @@ export default function PocketResponsive({
               key={tab}
               onClick={() => setCurrentTab(tab)}
               className={`flex flex-col items-center gap-1 w-full h-full py-2 ${
-                currentTab === tab ? "text-[color:var(--color-luminous-blue)]" : "text-[#94A3B8]"
+                currentTab === tab ? "text-[color:var(--color-luminous-blue)]" : "text-[color:var(--text-secondary)]"
               }`}
             >
               <span className="text-lg">
@@ -212,7 +212,7 @@ export default function PocketResponsive({
                 {tab === "search" && "⌕"}
                 {tab === "me" && "◍"}
               </span>
-              <span className="text-[10px] font-mono uppercase tracking-wide">
+              <span className="text-xs">
                 {tab}
                 {tabBadges[tab] > 0 && <span className="text-amber-400 ml-1">·{tabBadges[tab]}</span>}
               </span>

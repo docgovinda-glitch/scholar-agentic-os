@@ -31,15 +31,15 @@ export default function CreateProjectScreen({ onCreated }: { onCreated: (project
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[color:var(--color-navy-0)] text-[#E2E8F0] p-6">
+    <div className="min-h-screen flex items-center justify-center bg-[color:var(--color-navy-0)] text-[color:var(--text-primary)] p-6">
       <div className="max-w-xl w-full">
         <h1 className="text-lg font-semibold mb-1">Scholar OS — Desk</h1>
-        <p className="text-sm text-[#94A3B8] mb-6">
+        <p className="text-sm text-[color:var(--text-secondary)] mb-6">
           Projects are what you produce — a thesis, an essay, an article. Start with what you need to hand in.
         </p>
         {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
         {!types ? (
-          <p className="text-sm text-[#64748B]">Loading output types…</p>
+          <p className="text-sm text-[color:var(--text-muted)]">Loading output types…</p>
         ) : (
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {types.map((t) => (
@@ -50,7 +50,7 @@ export default function CreateProjectScreen({ onCreated }: { onCreated: (project
                   className="w-full text-left px-4 py-3 rounded-lg border border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)] hover:border-[color:var(--color-luminous-blue-dim)] disabled:opacity-40"
                 >
                   <div className="text-sm font-medium">{t.label}</div>
-                  <div className="text-[11px] text-[#64748B] mt-0.5">{t.family}</div>
+                  <div className="text-[11px] text-[color:var(--text-muted)] mt-0.5">{t.family}</div>
                 </button>
               </li>
             ))}

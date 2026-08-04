@@ -69,14 +69,14 @@ export default function DeskShell({ projectId }: { projectId: string }) {
 
   if (!project) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[color:var(--color-navy-0)] text-[#64748B] text-sm">
+      <div className="min-h-screen flex items-center justify-center bg-[color:var(--color-navy-0)] text-[color:var(--text-muted)] text-sm">
         Loading project…
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[color:var(--color-navy-0)] text-[#E2E8F0]">
+    <div className="h-screen flex flex-col bg-[color:var(--color-navy-0)] text-[color:var(--text-primary)]">
       <Header project={project} outputTypeLabel={outputType?.label ?? project.outputTypeId} />
       <div className="flex flex-1 min-h-0">
         <Rail document={document} onJumpToBlock={jumpToBlock} />

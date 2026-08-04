@@ -40,7 +40,7 @@ const PROVIDERS = ["gemini", "openai", "claude", "cohere"];
 
 const CATEGORY_LABEL = { mechanics: "Mechanics", language: "Language", content: "Content" } as const;
 const CATEGORY_COLOR = {
-  mechanics: "text-[#94A3B8] border-[color:var(--color-border-subtle)]",
+  mechanics: "text-[color:var(--text-secondary)] border-[color:var(--color-border-subtle)]",
   language: "text-[color:var(--color-luminous-blue)] border-[color:var(--color-luminous-blue-dim)]",
   content: "text-amber-400 border-amber-500/30",
 } as const;
@@ -167,7 +167,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="border-b border-[color:var(--color-border-subtle)]">
-      <div className="flex items-center justify-between px-3 py-2 text-[10px] font-mono uppercase tracking-wide text-[#94A3B8]">
+      <div className="flex items-center justify-between px-3 py-2 text-xs text-[color:var(--text-secondary)]">
         <span>▤ Studio</span>
         <label className="flex items-center gap-1 cursor-pointer text-[10px] font-normal">
           <input
@@ -185,7 +185,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
           <select
             value={level}
             onChange={(e) => setLevel(e.target.value as InterventionLevel)}
-            className="border-0 bg-transparent w-full text-xs text-[#E2E8F0] px-2 py-1 focus:outline-none"
+            className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
           >
             {LEVELS.map((l) => (
               <option key={l.id} value={l.id}>
@@ -194,7 +194,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
             ))}
           </select>
         </div>
-        <p className="text-[10px] text-[#64748B]">{activeLevel.description}</p>
+        <p className="text-[10px] text-[color:var(--text-muted)]">{activeLevel.description}</p>
 
         {/* Provider and API key for model-backed levels */}
         {activeLevel.needsProvider && (
@@ -203,7 +203,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
               <select
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
-                className="border-0 bg-transparent text-xs text-[#E2E8F0] px-2 py-1 focus:outline-none"
+                className="border-0 bg-transparent text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
               >
                 {PROVIDERS.map((p) => (
                   <option key={p} value={p}>
@@ -218,7 +218,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="API key"
-                className="border-0 bg-transparent w-full text-xs text-[#E2E8F0] px-2 py-1 focus:outline-none"
+                className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
               />
             </div>
           </div>
@@ -230,7 +230,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
             <select
               value={l1}
               onChange={(e) => setL1(e.target.value)}
-              className="border-0 bg-transparent w-full text-xs text-[#E2E8F0] px-2 py-1 focus:outline-none"
+              className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
             >
               <option value="">No L1 (optional)</option>
               {L1_PROFILES.map((profile) => (
@@ -242,7 +242,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
           </div>
           <button
             onClick={() => setShowVoiceBuilder(!showVoiceBuilder)}
-            className="px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wide text-[#94A3B8] border border-[color:var(--color-border-subtle)] hover:border-[color:var(--color-luminous-blue-dim)]"
+            className="px-2 py-1 rounded text-xs text-[color:var(--text-secondary)] border border-[color:var(--color-border-subtle)] hover:border-[color:var(--color-luminous-blue-dim)]"
           >
             {voiceProfile ? "✓ Voice" : "Voice"}
           </button>
@@ -251,27 +251,27 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
         {/* Voice Profile builder */}
         {showVoiceBuilder && (
           <div className="rounded border border-[color:var(--color-luminous-blue-dim)] bg-[color:var(--color-navy-2)] p-2">
-            <p className="text-[10px] text-[#94A3B8] mb-1">Paste 1-3 writing samples (separate by blank lines):</p>
+            <p className="text-[10px] text-[color:var(--text-secondary)] mb-1">Paste 1-3 writing samples (separate by blank lines):</p>
             <div className="rounded bg-[color:var(--color-navy-3)] border border-[color:var(--color-border-subtle)] mb-1">
               <textarea
                 value={voiceSamples}
                 onChange={(e) => setVoiceSamples(e.target.value)}
                 rows={3}
                 placeholder="Your prior essays, thesis chapters, or writing samples..."
-                className="border-0 bg-transparent w-full text-[10px] text-[#E2E8F0] p-1 font-serif focus:outline-none"
+                className="border-0 bg-transparent w-full text-[10px] text-[color:var(--text-primary)] p-1 font-serif focus:outline-none"
               />
             </div>
             <div className="flex gap-1">
               <button
                 onClick={buildVoiceProfileFromSamples}
                 disabled={buildingVoiceProfile || !voiceSamples.trim()}
-                className="flex-1 px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wide bg-[color:var(--color-luminous-blue-dim)] text-white disabled:opacity-40"
+                className="flex-1 px-2 py-1 rounded text-xs bg-[color:var(--color-luminous-blue-dim)] text-white disabled:opacity-40"
               >
                 {buildingVoiceProfile ? "Building…" : "Build Profile"}
               </button>
               <button
                 onClick={() => setShowVoiceBuilder(false)}
-                className="px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wide border border-[color:var(--color-border-subtle)]"
+                className="px-2 py-1 rounded text-xs border border-[color:var(--color-border-subtle)]"
               >
                 Close
               </button>
@@ -288,14 +288,14 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
             onChange={(e) => setText(e.target.value)}
             rows={4}
             placeholder="Paste a passage to refine — no select-in-editor flow yet."
-            className="border-0 bg-transparent w-full text-xs text-[#E2E8F0] p-2 font-serif focus:outline-none"
+            className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] p-2 font-serif focus:outline-none"
           />
         </div>
 
         <button
           onClick={run}
           disabled={busy || text.trim().length === 0 || (activeLevel.needsProvider && apiKey.trim().length === 0)}
-          className="px-3 py-1.5 rounded bg-[color:var(--color-luminous-blue-dim)] text-white text-[11px] font-mono uppercase tracking-wide disabled:opacity-40"
+          className="px-3 py-1.5 rounded bg-[color:var(--color-luminous-blue-dim)] text-white text-xs disabled:opacity-40"
         >
           {busy ? "Running…" : "Refine"}
         </button>
@@ -303,7 +303,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
         {consentNeeded && (
           <div role="alert" className="rounded border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] p-2">
             <p className="mb-2">{consentNeeded.reason}</p>
-            <button onClick={acceptConsent} disabled={busy} className="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-[10px] uppercase font-mono">
+            <button onClick={acceptConsent} disabled={busy} className="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-xs">
               Allow {consentNeeded.provider} and retry
             </button>
           </div>
@@ -315,7 +315,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
           <div className="flex flex-col gap-2">
             {/* Summary */}
             <div className="rounded border border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-2 py-1.5">
-              <p className="text-[10px] text-[#64748B]">
+              <p className="text-[10px] text-[color:var(--text-muted)]">
                 {result.diff.changes.length} changes — {result.contentChangeCount} content, {result.languageChangeCount} language
               </p>
               {result.voiceDrift?.drifted && (
@@ -327,7 +327,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
 
             {/* Diff display */}
             {result.diff.changes.length === 0 ? (
-              <p className="text-[11px] text-[#64748B]">No changes suggested.</p>
+              <p className="text-[11px] text-[color:var(--text-muted)]">No changes suggested.</p>
             ) : (
               <ul className="flex flex-col gap-1.5 max-h-80 overflow-y-auto">
                 {/* Content changes first (docs 32 §7) */}
@@ -335,7 +335,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
                   .filter((c) => c.category === "content")
                   .map((c) => (
                     <li key={c.id} className={`rounded border px-2 py-1.5 text-[11px] ${CATEGORY_COLOR[c.category]}`}>
-                      <div className="font-mono uppercase tracking-wide text-[9px] mb-1">⚠ {CATEGORY_LABEL[c.category]}</div>
+                      <div className="text-[9px] mb-1">⚠ {CATEGORY_LABEL[c.category]}</div>
                       <div className="line-through opacity-60">{c.originalText}</div>
                       <div className="font-semibold">{c.replacementText}</div>
                       <div className="text-[10px] opacity-90 mt-1">{c.reason}</div>
@@ -347,7 +347,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
                   .filter((c) => c.category !== "content")
                   .map((c) => (
                     <li key={c.id} className={`rounded border px-2 py-1.5 text-[11px] ${CATEGORY_COLOR[c.category]}`}>
-                      <div className="font-mono uppercase tracking-wide text-[9px] mb-1">{CATEGORY_LABEL[c.category]}</div>
+                      <div className="text-[9px] mb-1">{CATEGORY_LABEL[c.category]}</div>
                       <div className="line-through opacity-60">{c.originalText}</div>
                       <div>{c.replacementText}</div>
                       <div className="text-[10px] opacity-80 mt-1">{c.reason}</div>
@@ -364,7 +364,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
             <p className="text-[10px] text-[color:var(--color-luminous-blue)]">{historySummary}</p>
             <button
               onClick={() => clearWritingHistory(sessionId)}
-              className="mt-1 text-[10px] text-[#64748B] hover:text-red-400 font-mono"
+              className="mt-1 text-[10px] text-[color:var(--text-muted)] hover:text-red-400 font-mono"
             >
               Clear history
             </button>

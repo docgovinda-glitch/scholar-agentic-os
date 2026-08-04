@@ -2,14 +2,53 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- `maximum-scale=1.0, user-scalable=no` removed: it blocked pinch-zoom
+         entirely, which fails WCAG 2.1 SC 1.4.4 (Resize Text) and is a real
+         barrier for low-vision users on the phone — the surface where this
+         product expects reading and approving to happen. iOS's zoom-on-focus
+         behaviour, the usual reason people reach for `user-scalable=no`, is
+         handled properly in src/index.css instead, by keeping focused inputs
+         at a 16px font size. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Scholar Agentic OS</title>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- Playfair Display kept loaded (not yet removed) while unmigrated components
-         still consume --font-serif; Rajdhani added as the new sci-fi v2 display face -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Matches the browser chrome to the app surface in both themes.
+         Values are --surface-canvas from src/index.css. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#FAF9F7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#191816" />
+
+    <!-- Inter only.
+         Playfair Display and Rajdhani were dropped here when the design
+         direction retired both faces (docs/06-decisions/60-DESIGN-DIRECTION.md
+         §3.5): --font-serif and --font-display now alias the sans stack, so
+         continuing to fetch them cost two font families of bandwidth on every
+         load while changing nothing on screen.
+         JetBrains Mono is deliberately not fetched — --font-mono falls back to
+         the platform's own monospace, which is already installed everywhere
+         and costs nothing. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Resolve an explicit theme choice before first paint.
+         The stylesheet already follows `prefers-color-scheme`, so this matters
+         only when the user has overridden that: without it, someone who chose
+         dark on a light-default system sees a white flash on every load.
+         Inline and synchronous by necessity — a deferred script runs after
+         first paint, which is precisely the flash being avoided. Wrapped in
+         try/catch because localStorage throws in Safari private mode. -->
+    <script>
+      try {
+        var t = localStorage.getItem('scholar-theme');
+        if (t === 'dark' || t === 'light') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    </script>
+
     <!-- iOS Web App Support -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -20,4 +59,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

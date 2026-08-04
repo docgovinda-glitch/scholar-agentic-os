@@ -116,10 +116,10 @@ export default function ResearchIntakeWizard({
       <div className="space-y-6">
         <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-3xl p-8 shadow-sm space-y-4 text-center">
           <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
-          <h2 className="text-lg font-bold text-[#E2E8F0]">
+          <h2 className="text-lg font-bold text-[color:var(--text-primary)]">
             {formatOption?.label ?? "This format"} needs a dedicated intake flow
           </h2>
-          <p className="text-xs text-[#94A3B8] font-sans max-w-lg mx-auto leading-relaxed">
+          <p className="text-xs text-[color:var(--text-secondary)] font-sans max-w-lg mx-auto leading-relaxed">
             The standard research-input fields (research questions, objectives, research gap, methodology) don't
             fit a {(formatOption?.label ?? "this format").toLowerCase()} — it needs its own fields instead
             (headline/angle, target publication or section, word count, audience, quotes/sources). That dedicated
@@ -128,7 +128,7 @@ export default function ResearchIntakeWizard({
           <button
             type="button"
             onClick={() => updateProject({ outputFormat: "" })}
-            className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white font-mono text-[10px] uppercase font-bold rounded-lg cursor-pointer transition-all"
+            className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-bold rounded-lg cursor-pointer transition-all"
           >
             ← Choose a Different Format
           </button>
@@ -386,13 +386,13 @@ export default function ResearchIntakeWizard({
 
       {/* Stage 4 selection context banner */}
       <div className="flex items-center justify-between gap-3 p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl">
-        <span className="text-xs font-mono text-[#E2E8F0]">
+        <span className="text-xs font-mono text-[color:var(--text-primary)]">
           Output format: <strong>{formatOption?.label ?? project.outputFormat}</strong>
         </span>
         <button
           type="button"
           onClick={() => updateProject({ outputFormat: "" })}
-          className="text-[10px] font-mono uppercase font-bold text-[color:var(--color-luminous-blue)] hover:underline cursor-pointer"
+          className="text-xs font-bold text-[color:var(--color-luminous-blue)] hover:underline cursor-pointer"
         >
           Change Format
         </button>
@@ -413,7 +413,7 @@ export default function ResearchIntakeWizard({
         {/* Left Card: Research Blueprint */}
         <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-[color:var(--color-navy-4)] pb-3">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] flex items-center gap-2">
+            <h3 className="text-sm font-bold text-[color:var(--text-primary)] flex items-center gap-2">
               <BookOpen className="w-4.5 h-4.5 text-[color:var(--color-luminous-blue)]" />
               Research Blueprint
             </h3>
@@ -422,7 +422,7 @@ export default function ResearchIntakeWizard({
             </span>
           </div>
           
-          <div className="space-y-2 text-xs font-mono text-[#94A3B8]">
+          <div className="space-y-2 text-xs font-mono text-[color:var(--text-secondary)]">
             <div className="flex items-center justify-between">
               <span>Step 1: Research Topic</span>
               <span className={project.title ? "text-emerald-400 font-bold" : "text-amber-400"}>
@@ -458,13 +458,13 @@ export default function ResearchIntakeWizard({
           <div className="pt-2 flex gap-3">
             <button
               onClick={loadPreset}
-              className="flex-1 py-2 border border-[color:var(--color-luminous-blue)] hover:bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)] font-mono text-[10px] uppercase font-bold rounded-lg cursor-pointer transition-all"
+              className="flex-1 py-2 border border-[color:var(--color-luminous-blue)] hover:bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--color-luminous-blue)] text-xs font-bold rounded-lg cursor-pointer transition-all"
             >
               Load 'Dharmic Ethics' Preset
             </button>
             <button
               onClick={handleNextClick}
-              className="flex-1 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white font-mono text-[10px] uppercase font-bold rounded-lg cursor-pointer transition-all shadow-sm"
+              className="flex-1 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-bold rounded-lg cursor-pointer transition-all shadow-sm"
             >
               Continue Setup
             </button>
@@ -472,7 +472,7 @@ export default function ResearchIntakeWizard({
           <button
             onClick={handleTitleOnlyClick}
             disabled={blueprintLoading}
-            className="w-full py-2 border border-dashed border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-1)] text-[#94A3B8] font-mono text-[10px] uppercase font-bold rounded-lg cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+            className="w-full py-2 border border-dashed border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-1)] text-[color:var(--text-secondary)] text-xs font-bold rounded-lg cursor-pointer transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
             {blueprintLoading && <Loader2 className="w-3 h-3 animate-spin" />}
             Start With Title Only — Let AI Draft The Rest
@@ -482,14 +482,14 @@ export default function ResearchIntakeWizard({
         {/* Right Card: Research Readiness */}
         <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm space-y-4">
           <div className="border-b border-[color:var(--color-navy-4)] pb-3">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0]">
+            <h3 className="text-sm font-bold text-[color:var(--text-primary)]">
               Research Readiness Index
             </h3>
           </div>
           
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <span className="block text-[10px] font-mono font-bold text-[#94A3B8] uppercase tracking-wider">
+              <span className="block text-xs font-bold text-[color:var(--text-secondary)]">
                 Overall Completion Metrics:
               </span>
               <div className="font-mono text-sm font-bold text-[color:var(--color-luminous-blue)] bg-[color:var(--color-navy-1)] p-3 rounded-lg border border-[color:var(--color-navy-4)]">
@@ -497,7 +497,7 @@ export default function ResearchIntakeWizard({
               </div>
             </div>
 
-            <div className="space-y-1 text-xs font-sans text-[#94A3B8] leading-relaxed">
+            <div className="space-y-1 text-xs font-sans text-[color:var(--text-secondary)] leading-relaxed">
               <div className="flex items-center gap-2">
                 {project.title ? (
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -532,10 +532,10 @@ export default function ResearchIntakeWizard({
       <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
         
         <div className="border-b border-[color:var(--color-navy-4)] pb-4">
-          <h2 className="text-lg font-bold text-[#E2E8F0]">
+          <h2 className="text-lg font-bold text-[color:var(--text-primary)]">
             Create Research Blueprint
           </h2>
-          <p className="text-xs text-[#94A3B8] font-sans mt-0.5">
+          <p className="text-xs text-[color:var(--text-secondary)] font-sans mt-0.5">
             Configure your AI research parameters and align your co-agents before manuscript generation.
           </p>
         </div>
@@ -553,14 +553,14 @@ export default function ResearchIntakeWizard({
           {/* Card Block 1: Research Topic */}
           {/* Card Block 1: Research Topic */}
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+            <label className="block text-xs font-bold text-[color:var(--text-secondary)]">
               Proposed Research Title / Topic *
             </label>
             <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
               <textarea
                 rows={3}
                 required
-                className="w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                className="w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                 placeholder="Enter your research topic/title or enter draft ideas to suggest..."
                 value={project.title}
                 onChange={(e) => {
@@ -574,7 +574,7 @@ export default function ResearchIntakeWizard({
                 type="button"
                 onClick={handleSuggestTopic}
                 disabled={topicLoading}
-                className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[#E2E8F0] font-mono text-[9px] uppercase font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[color:var(--text-primary)] text-[9px] font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
               >
                 {topicLoading && <Loader2 className="w-3 h-3 animate-spin" />}
                 Suggest Topic
@@ -583,7 +583,7 @@ export default function ResearchIntakeWizard({
                 type="button"
                 onClick={handleImproveTitle}
                 disabled={topicLoading}
-                className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[#E2E8F0] font-mono text-[9px] uppercase font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[color:var(--text-primary)] text-[9px] font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
               >
                 {topicLoading && <Loader2 className="w-3 h-3 animate-spin" />}
                 Improve Title
@@ -592,7 +592,7 @@ export default function ResearchIntakeWizard({
                 type="button"
                 onClick={handleGenerateVariations}
                 disabled={topicLoading}
-                className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[#E2E8F0] font-mono text-[9px] uppercase font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[color:var(--text-primary)] text-[9px] font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
               >
                 {topicLoading && <Loader2 className="w-3 h-3 animate-spin" />}
                 Generate Variations
@@ -601,7 +601,7 @@ export default function ResearchIntakeWizard({
                 type="button"
                 onClick={handleAutoFillBlueprint}
                 disabled={blueprintLoading || !project.title.trim()}
-                className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] text-white font-mono text-[9px] uppercase font-bold rounded-lg hover:bg-[color:var(--color-luminous-blue)] cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-sm transition-all duration-200"
+                className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] text-white text-[9px] font-bold rounded-lg hover:bg-[color:var(--color-luminous-blue)] cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-sm transition-all duration-200"
                 title="Automatically suggest and fill all other fields based on the title"
               >
                 {blueprintLoading ? (
@@ -623,7 +623,7 @@ export default function ResearchIntakeWizard({
                   type="button"
                   onClick={handleAutoFillBlueprint}
                   disabled={blueprintLoading}
-                  className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white font-mono text-[9px] uppercase font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1 shrink-0 shadow-sm"
+                  className="px-3 py-1.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-[9px] font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1 shrink-0 shadow-sm"
                 >
                   {blueprintLoading && <Loader2 className="w-3 h-3 animate-spin" />}
                   ⚡ Auto-Fill Now
@@ -632,13 +632,13 @@ export default function ResearchIntakeWizard({
             )}
 
             {topicAdvice && (
-              <div className="mt-2 p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg text-xs text-[#94A3B8] leading-relaxed whitespace-pre-wrap font-sans">
+              <div className="mt-2 p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg text-xs text-[color:var(--text-secondary)] leading-relaxed whitespace-pre-wrap font-sans">
                 {topicAdvice}
               </div>
             )}
             {topicSuggestions.length > 0 && !topicLoading && (
               <div className="mt-2 p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg space-y-1.5 shadow-sm">
-                <span className="block text-[10px] font-mono text-[#94A3B8] uppercase font-bold">Apply Suggested Title:</span>
+                <span className="block text-xs text-[color:var(--text-secondary)] font-bold">Apply Suggested Title:</span>
                 <div className="flex flex-col gap-1">
                   {topicSuggestions.map((titleSuggestion, idx) => (
                     <button
@@ -649,7 +649,7 @@ export default function ResearchIntakeWizard({
                         setTopicSuggestions([]);
                         setTopicAdvice(`Applied Title: "${titleSuggestion}"`);
                       }}
-                      className="w-full text-left p-2 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] rounded text-[11px] text-[#E2E8F0] font-sans font-medium block transition-all"
+                      className="w-full text-left p-2 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] rounded text-[11px] text-[color:var(--text-primary)] font-sans font-medium block transition-all"
                     >
                       {titleSuggestion}
                     </button>
@@ -662,7 +662,7 @@ export default function ResearchIntakeWizard({
           {/* Card Block 2: Objectives */}
           {formatConfig.fields.objectives !== "hidden" && (
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+            <label className="block text-xs font-bold text-[color:var(--text-secondary)]">
               Research Objectives {formatConfig.fields.objectives === "required" ? "*" : ""}
             </label>
             <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
@@ -670,7 +670,7 @@ export default function ResearchIntakeWizard({
                 rows={3}
                 required={formatConfig.fields.objectives === "required"}
                 disabled={blueprintLoading}
-                className={`w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0] ${blueprintLoading ? "animate-pulse text-[#94A3B8]" : ""}`}
+                className={`w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)] ${blueprintLoading ? "animate-pulse text-[color:var(--text-secondary)]" : ""}`}
                 placeholder={blueprintLoading ? "⚡ AI is drafting suggested objectives..." : "Outline the core objective parameters of this study..."}
                 value={blueprintLoading ? "⚡ AI is drafting suggested objectives..." : project.objectives}
                 onChange={(e) => updateProject({ objectives: e.target.value })}
@@ -680,7 +680,7 @@ export default function ResearchIntakeWizard({
               type="button"
               onClick={handleSuggestObjectives}
               disabled={objectivesLoading}
-              className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[#E2E8F0] font-mono text-[9px] uppercase font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
+              className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[color:var(--text-primary)] text-[9px] font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
             >
               {objectivesLoading && <Loader2 className="w-3 h-3 animate-spin" />}
               Suggest Objectives
@@ -688,10 +688,10 @@ export default function ResearchIntakeWizard({
 
             {objectivesAdvice.length > 0 && !objectivesLoading && (
               <div className="mt-3 p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl space-y-3">
-                <span className="block text-[10px] font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-wider">
+                <span className="block text-xs font-bold text-[color:var(--color-luminous-blue)]">
                   Suggested Objectives:
                 </span>
-                <ul className="list-disc pl-4 space-y-1 text-xs text-[#94A3B8] font-sans leading-relaxed">
+                <ul className="list-disc pl-4 space-y-1 text-xs text-[color:var(--text-secondary)] font-sans leading-relaxed">
                   {objectivesAdvice.map((obj, i) => (
                     <li key={i}>{obj}</li>
                   ))}
@@ -703,7 +703,7 @@ export default function ResearchIntakeWizard({
                     updateProject({ objectives: formatted });
                     setObjectivesAdvice([]);
                   }}
-                  className="px-4 py-2 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-xs text-[#E2E8F0] font-bold rounded-lg transition-all font-mono uppercase shadow-sm cursor-pointer animate-fade-in"
+                  className="px-4 py-2 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-xs text-[color:var(--text-primary)] font-bold rounded-lg transition-all shadow-sm cursor-pointer animate-fade-in"
                 >
                   Apply Suggested Objectives
                 </button>
@@ -715,7 +715,7 @@ export default function ResearchIntakeWizard({
           {/* Card Block 3: Research Questions */}
           {formatConfig.fields.researchQuestions !== "hidden" && (
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+            <label className="block text-xs font-bold text-[color:var(--text-secondary)]">
               Research Questions {formatConfig.fields.researchQuestions === "required" ? "*" : ""}
             </label>
             <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
@@ -723,7 +723,7 @@ export default function ResearchIntakeWizard({
                 rows={3}
                 required={formatConfig.fields.researchQuestions === "required"}
                 disabled={blueprintLoading}
-                className={`w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0] ${blueprintLoading ? "animate-pulse text-[#94A3B8]" : ""}`}
+                className={`w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)] ${blueprintLoading ? "animate-pulse text-[color:var(--text-secondary)]" : ""}`}
                 placeholder={blueprintLoading ? "⚡ AI is drafting suggested research questions..." : "1. What is the impact of...? 2. To what extent...?"}
                 value={blueprintLoading ? "⚡ AI is drafting suggested research questions..." : project.researchQuestions}
                 onChange={(e) => updateProject({ researchQuestions: e.target.value })}
@@ -733,32 +733,32 @@ export default function ResearchIntakeWizard({
               type="button"
               onClick={handleCheckRQs}
               disabled={rqLoading}
-              className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[#E2E8F0] font-mono text-[9px] uppercase font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
+              className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[color:var(--text-primary)] text-[9px] font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
             >
               {rqLoading && <Loader2 className="w-3 h-3 animate-spin" />}
               Analyze RQs Quality
             </button>
 
             {rqQuality && !rqLoading && (
-              <div className="mt-3 p-4 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl space-y-3 font-mono text-[10px] uppercase font-semibold text-[#E2E8F0] animate-fade-in shadow-sm">
-                <span className="block text-[10px] font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-wider">
+              <div className="mt-3 p-4 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl space-y-3 text-xs font-semibold text-[color:var(--text-primary)] animate-fade-in shadow-sm">
+                <span className="block text-xs font-bold text-[color:var(--color-luminous-blue)]">
                   AI Quality Score:
                 </span>
                 <div className="grid grid-cols-3 gap-4 border-b border-[color:var(--color-navy-4)] pb-2">
                   <div className="flex flex-col">
-                    <span className="text-[#94A3B8]">Relevance:</span>
-                    <span className="text-[#E2E8F0] font-bold text-sm">{rqQuality.relevance}%</span>
+                    <span className="text-[color:var(--text-secondary)]">Relevance:</span>
+                    <span className="text-[color:var(--text-primary)] font-bold text-sm">{rqQuality.relevance}%</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[#94A3B8]">Novelty:</span>
-                    <span className="text-[#E2E8F0] font-bold text-sm">{rqQuality.novelty}%</span>
+                    <span className="text-[color:var(--text-secondary)]">Novelty:</span>
+                    <span className="text-[color:var(--text-primary)] font-bold text-sm">{rqQuality.novelty}%</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[#94A3B8]">Publishability:</span>
-                    <span className="text-[#E2E8F0] font-bold text-sm">{rqQuality.publishability}%</span>
+                    <span className="text-[color:var(--text-secondary)]">Publishability:</span>
+                    <span className="text-[color:var(--text-primary)] font-bold text-sm">{rqQuality.publishability}%</span>
                   </div>
                 </div>
-                <p className="text-[11px] text-[#94A3B8] font-sans lowercase leading-relaxed pt-1 normal-case font-medium">
+                <p className="text-[11px] text-[color:var(--text-secondary)] font-sans lowercase leading-relaxed pt-1 normal-case font-medium">
                   <strong>Feedback:</strong> {rqQuality.feedback}
                 </p>
               </div>
@@ -770,13 +770,13 @@ export default function ResearchIntakeWizard({
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                <label className="block text-xs font-bold text-[color:var(--text-secondary)]">
                   Methodology Category *
                 </label>
                 <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                   <select
                     disabled={blueprintLoading}
-                    className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0] disabled:opacity-75"
+                    className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)] disabled:opacity-75"
                     value={blueprintLoading ? "Theoretical/Conceptual" : project.articleType}
                     onChange={(e) => updateProject({ articleType: e.target.value })}
                   >
@@ -788,7 +788,7 @@ export default function ResearchIntakeWizard({
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                <label className="block text-xs font-bold text-[color:var(--text-secondary)]">
                   Target Academic Field *
                 </label>
                 <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
@@ -796,7 +796,7 @@ export default function ResearchIntakeWizard({
                     type="text"
                     required
                     disabled={blueprintLoading}
-                    className={`w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0] ${blueprintLoading ? "animate-pulse text-[#94A3B8]" : ""}`}
+                    className={`w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)] ${blueprintLoading ? "animate-pulse text-[color:var(--text-secondary)]" : ""}`}
                     placeholder={blueprintLoading ? "⚡ Identifying field..." : "e.g. Business Ethics, Philosophy"}
                     value={blueprintLoading ? "⚡ Identifying field..." : project.field}
                     onChange={(e) => updateProject({ field: e.target.value })}
@@ -806,7 +806,7 @@ export default function ResearchIntakeWizard({
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+              <label className="block text-xs font-bold text-[color:var(--text-secondary)]">
                 Detailed Method Description {formatConfig.fields.methodology === "required" ? "*" : ""}
               </label>
               <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
@@ -814,7 +814,7 @@ export default function ResearchIntakeWizard({
                   rows={2}
                   required={formatConfig.fields.methodology === "required"}
                   disabled={blueprintLoading}
-                  className={`w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0] ${blueprintLoading ? "animate-pulse text-[#94A3B8]" : ""}`}
+                  className={`w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)] ${blueprintLoading ? "animate-pulse text-[color:var(--text-secondary)]" : ""}`}
                   placeholder={blueprintLoading ? "⚡ AI is formulating methodology..." : "Specify study framework, comparative tests, hermeneutical limits..."}
                   value={blueprintLoading ? "⚡ AI is formulating methodology..." : project.methodology}
                   onChange={(e) => updateProject({ methodology: e.target.value })}
@@ -826,25 +826,25 @@ export default function ResearchIntakeWizard({
               type="button"
               onClick={handleRecommendMethodology}
               disabled={methodologyLoading}
-              className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[#E2E8F0] font-mono text-[9px] uppercase font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
+              className="px-2.5 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] text-[color:var(--text-primary)] text-[9px] font-bold rounded hover:bg-[color:var(--color-navy-3)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
             >
               {methodologyLoading && <Loader2 className="w-3 h-3 animate-spin" />}
               Analyze Methodology Approach
             </button>
 
             {methodologyAdvice && !methodologyLoading && (
-              <div className="mt-3 p-4 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl space-y-3 text-xs text-[#94A3B8] font-sans animate-fade-in shadow-sm">
-                <span className="block text-[10px] font-mono font-bold text-[color:var(--color-luminous-blue)] uppercase tracking-wider">
+              <div className="mt-3 p-4 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl space-y-3 text-xs text-[color:var(--text-secondary)] font-sans animate-fade-in shadow-sm">
+                <span className="block text-xs font-bold text-[color:var(--color-luminous-blue)]">
                   AI Methodology Advisor:
                 </span>
                 <div className="space-y-1">
-                  <p className="font-mono text-[10px] uppercase font-bold text-[#94A3B8]">
-                    Recommended: <span className="text-[#E2E8F0] font-bold">{methodologyAdvice.methodology}</span>
+                  <p className="text-xs font-bold text-[color:var(--text-secondary)]">
+                    Recommended: <span className="text-[color:var(--text-primary)] font-bold">{methodologyAdvice.methodology}</span>
                   </p>
-                  <p className="font-mono text-[10px] uppercase font-bold text-[#94A3B8]">
+                  <p className="text-xs font-bold text-[color:var(--text-secondary)]">
                     Confidence: <span className={methodologyAdvice.confidence === "High" ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>{methodologyAdvice.confidence}</span>
                   </p>
-                  <p className="leading-relaxed mt-1 border-t border-[color:var(--color-navy-4)]/50 pt-2 text-[#94A3B8]">
+                  <p className="leading-relaxed mt-1 border-t border-[color:var(--color-navy-4)]/50 pt-2 text-[color:var(--text-secondary)]">
                     {methodologyAdvice.rationale}
                   </p>
                 </div>
@@ -854,7 +854,7 @@ export default function ResearchIntakeWizard({
                     updateProject({ methodology: `${methodologyAdvice.methodology} - Rationale: ${methodologyAdvice.rationale}` });
                     setMethodologyAdvice(null);
                   }}
-                  className="px-4 py-2 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-xs text-[#E2E8F0] font-bold rounded-lg transition-all font-mono uppercase shadow-sm cursor-pointer"
+                  className="px-4 py-2 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)] text-xs text-[color:var(--text-primary)] font-bold rounded-lg transition-all shadow-sm cursor-pointer"
                 >
                   Apply Advisor Method
                 </button>
@@ -866,7 +866,7 @@ export default function ResearchIntakeWizard({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[color:var(--color-navy-4)]/70">
             {formatConfig.fields.researchGap !== "hidden" && (
             <div className="space-y-2">
-              <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+              <label className="block text-xs font-bold text-[color:var(--text-secondary)]">
                 Research Gap {formatConfig.fields.researchGap === "required" ? "*" : ""}
               </label>
               <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
@@ -874,7 +874,7 @@ export default function ResearchIntakeWizard({
                   rows={2}
                   required={formatConfig.fields.researchGap === "required"}
                   disabled={blueprintLoading}
-                  className={`w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0] ${blueprintLoading ? "animate-pulse text-[#94A3B8]" : ""}`}
+                  className={`w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)] ${blueprintLoading ? "animate-pulse text-[color:var(--text-secondary)]" : ""}`}
                   placeholder={blueprintLoading ? "⚡ AI is identifying research gap..." : "Describe what core theoretical discrepancy or literature missing this study reconciles..."}
                   value={blueprintLoading ? "⚡ AI is identifying research gap..." : project.researchGap}
                   onChange={(e) => updateProject({ researchGap: e.target.value })}
@@ -883,14 +883,14 @@ export default function ResearchIntakeWizard({
             </div>
             )}
             <div className={formatConfig.fields.researchGap === "hidden" ? "space-y-2 md:col-span-2" : "space-y-2"}>
-              <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+              <label className="block text-xs font-bold text-[color:var(--text-secondary)]">
                 Study Keywords (Commas)
               </label>
               <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                 <input
                   type="text"
                   disabled={blueprintLoading}
-                  className={`w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0] ${blueprintLoading ? "animate-pulse text-[#94A3B8]" : ""}`}
+                  className={`w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)] ${blueprintLoading ? "animate-pulse text-[color:var(--text-secondary)]" : ""}`}
                   placeholder={blueprintLoading ? "⚡ Extracting keywords..." : "Corporate Ethics, Trusteeship..."}
                   value={blueprintLoading ? "⚡ Extracting keywords..." : project.keywords}
                   onChange={(e) => updateProject({ keywords: e.target.value })}
@@ -901,14 +901,14 @@ export default function ResearchIntakeWizard({
 
           {/* Target minimum reference count (soft target, target-workflow.md Stage 5) */}
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+            <label className="block text-xs font-bold text-[color:var(--text-secondary)]">
               Target Minimum Reference Count (Optional)
             </label>
             <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
               <input
                 type="number"
                 min={0}
-                className="w-full md:w-56 p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                className="w-full md:w-56 p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                 placeholder="e.g. 30"
                 value={project.targetReferenceCount ?? ""}
                 onChange={(e) =>
@@ -916,7 +916,7 @@ export default function ResearchIntakeWizard({
                 }
               />
             </div>
-            <p className="text-[10px] text-[#94A3B8] font-sans">
+            <p className="text-[10px] text-[color:var(--text-secondary)] font-sans">
               {formatConfig.referenceCountHint} A soft target only — it can warn at draft time but will never block
               drafting or export.
             </p>
@@ -924,23 +924,23 @@ export default function ResearchIntakeWizard({
 
           {/* Card Block: Author & Submission Metadata */}
           <div className="p-5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-2xl space-y-4">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#E2E8F0] flex items-center gap-1.5">
+            <h4 className="text-xs font-bold text-[color:var(--text-primary)] flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
               Author & Submission Metadata
             </h4>
             
             {/* Primary Author Metadata */}
             <div className="space-y-3">
-              <span className="block text-[10px] font-mono text-[#94A3B8] uppercase font-bold">Primary Author Details</span>
+              <span className="block text-xs text-[color:var(--text-secondary)] font-bold">Primary Author Details</span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="block text-[9px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                  <label className="block text-[9px] font-bold text-[color:var(--text-secondary)]">
                     Author Full Name *
                   </label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
-                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                       placeholder="e.g. Dr. Jane Doe"
                       value={project.authorName || ""}
                       onChange={(e) => updateAuthorField({ authorName: e.target.value })}
@@ -948,13 +948,13 @@ export default function ResearchIntakeWizard({
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-[9px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                  <label className="block text-[9px] font-bold text-[color:var(--text-secondary)]">
                     ORCID iD (Optional)
                   </label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
-                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                       placeholder="0000-0002-4190-3882"
                       value={project.orcidId || ""}
                       onChange={(e) => updateAuthorField({ orcidId: e.target.value })}
@@ -965,13 +965,13 @@ export default function ResearchIntakeWizard({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="block text-[9px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                  <label className="block text-[9px] font-bold text-[color:var(--text-secondary)]">
                     Institutional Affiliation *
                   </label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
-                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                       placeholder="e.g. Department of Philosophy, Oxford University"
                       value={project.authorAffiliation || ""}
                       onChange={(e) => updateAuthorField({ authorAffiliation: e.target.value })}
@@ -979,13 +979,13 @@ export default function ResearchIntakeWizard({
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-[9px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                  <label className="block text-[9px] font-bold text-[color:var(--text-secondary)]">
                     Corresponding Email Address *
                   </label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="email"
-                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                       placeholder="e.g. doc.govinda@gmail.com"
                       value={project.authorEmail || ""}
                       onChange={(e) => updateAuthorField({ authorEmail: e.target.value })}
@@ -999,16 +999,16 @@ export default function ResearchIntakeWizard({
 
             {/* Co-Author Metadata (Optional) */}
             <div className="space-y-3">
-              <span className="block text-[10px] font-mono text-[#94A3B8] uppercase font-bold">Co-Author Details (Optional)</span>
+              <span className="block text-xs text-[color:var(--text-secondary)] font-bold">Co-Author Details (Optional)</span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="block text-[9px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                  <label className="block text-[9px] font-bold text-[color:var(--text-secondary)]">
                     Co-Author Full Name
                   </label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
-                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                       placeholder="Dr. Ram Chandra Bhatta"
                       value={project.coAuthorName || ""}
                       onChange={(e) => updateAuthorField({ coAuthorName: e.target.value })}
@@ -1016,13 +1016,13 @@ export default function ResearchIntakeWizard({
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-[9px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                  <label className="block text-[9px] font-bold text-[color:var(--text-secondary)]">
                     Co-Author ORCID iD
                   </label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
-                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                       placeholder="0000-0003-1234-5678"
                       value={project.coAuthorOrcidId || ""}
                       onChange={(e) => updateAuthorField({ coAuthorOrcidId: e.target.value })}
@@ -1033,13 +1033,13 @@ export default function ResearchIntakeWizard({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="block text-[9px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                  <label className="block text-[9px] font-bold text-[color:var(--text-secondary)]">
                     Co-Author Affiliation
                   </label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="text"
-                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                       placeholder="e.g. Department of Philosophy, Oxford University"
                       value={project.coAuthorAffiliation || ""}
                       onChange={(e) => updateAuthorField({ coAuthorAffiliation: e.target.value })}
@@ -1047,13 +1047,13 @@ export default function ResearchIntakeWizard({
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-[9px] font-bold font-mono text-[#94A3B8] uppercase tracking-wider">
+                  <label className="block text-[9px] font-bold text-[color:var(--text-secondary)]">
                     Co-Author Email
                   </label>
                   <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
                     <input
                       type="email"
-                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0]"
+                      className="w-full p-2.5 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)]"
                       placeholder="ram.bhatta@tribhuvan.edu.np"
                       value={project.coAuthorEmail || ""}
                       onChange={(e) => updateAuthorField({ coAuthorEmail: e.target.value })}
@@ -1066,11 +1066,11 @@ export default function ResearchIntakeWizard({
 
           {/* Row: Dissertation Materials */}
           <div className="p-5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-2xl space-y-3">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#E2E8F0] flex items-center gap-1.5">
+            <h4 className="text-xs font-bold text-[color:var(--text-primary)] flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
               PhD Thesis Grounding & Scriptural Mandates
             </h4>
-            <p className="text-[11px] text-[#94A3B8] leading-relaxed font-sans">
+            <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed font-sans">
               All literature review and drafting co-agents are dynamically configured to build upon your uploaded doctoral dissertation or manuscript in the **Knowledge Vault**. The system prioritizes exact source grounding and domain-specific indexing to inject authentic citations throughout the workbench.
             </p>
 
@@ -1081,7 +1081,7 @@ export default function ResearchIntakeWizard({
                     <BookOpen className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-[#E2E8F0] flex items-center gap-2">
+                    <div className="text-xs font-bold text-[color:var(--text-primary)] flex items-center gap-2">
                       Knowledge Vault Primary Documents
                       {project.knowledgeVault?.files?.some((f: any) => f.isActive && f.status === 'ready') ? (
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/10 text-emerald-400 font-bold">GROUNDED</span>
@@ -1089,7 +1089,7 @@ export default function ResearchIntakeWizard({
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/10 text-amber-400 font-bold">NOT UPLOADED</span>
                       )}
                     </div>
-                    <div className="text-[10px] text-[#94A3B8]">
+                    <div className="text-[10px] text-[color:var(--text-secondary)]">
                       {project.knowledgeVault?.files?.filter((f: any) => f.isActive && f.status === 'ready').length || 0} active thesis/manuscript files indexed for automated RAG citation
                     </div>
                   </div>
@@ -1107,7 +1107,7 @@ export default function ResearchIntakeWizard({
             <div className="w-full rounded-lg border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] focus-within:border-[color:var(--color-luminous-blue)] transition-all">
               <textarea
                 rows={2}
-                className="w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[#E2E8F0] font-mono"
+                className="w-full p-3 text-xs border-0 bg-transparent focus:outline-none text-[color:var(--text-primary)] font-mono"
                 placeholder="Thesis excerpts and key materials to ground AI agent actions..."
                 value={project.dissertationMaterials}
                 onChange={(e) => updateProject({ dissertationMaterials: e.target.value })}
@@ -1119,10 +1119,10 @@ export default function ResearchIntakeWizard({
 
         {/* Status: Active agents */}
         <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 space-y-3">
-          <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#E2E8F0]">
+          <h4 className="text-xs font-bold text-[color:var(--text-primary)]">
             Active Research Agents Status
           </h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 font-mono text-[10px] text-[#94A3B8]">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 font-mono text-[10px] text-[color:var(--text-secondary)]">
             <div className="flex items-center gap-1.5">
               <span className="text-emerald-400 font-bold">✓</span>
               <span>Literature Review Agent</span>
@@ -1154,7 +1154,7 @@ export default function ResearchIntakeWizard({
         <div className="flex justify-end pt-4 border-t border-[color:var(--color-navy-4)]">
           <button
             onClick={handleNextClick}
-            className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-mono font-bold uppercase tracking-widest rounded-lg transition-all shadow-md flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-2 cursor-pointer"
           >
             <span>Generate Research Blueprint</span>
             <FileText className="w-4 h-4" />

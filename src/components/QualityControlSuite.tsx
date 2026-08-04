@@ -132,11 +132,11 @@ export default function QualityControlSuite({
     <div id="quality-control" className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[color:var(--color-navy-4)] pb-4">
         <div>
-          <h2 className="text-xl font-bold text-[#E2E8F0] flex items-center gap-2">
+          <h2 className="text-xl font-bold text-[color:var(--text-primary)] flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-[color:var(--color-luminous-blue)]" />
             Phase G: Peer Review & Pre-Flight Quality Control
           </h2>
-          <p className="text-xs text-[#94A3B8] font-medium">
+          <p className="text-xs text-[color:var(--text-secondary)] font-medium">
             Run a rigorous, pre-flight mock peer-review and editorial audit to detect guidelines gaps, style violations, and thesis drift.
           </p>
         </div>
@@ -146,7 +146,7 @@ export default function QualityControlSuite({
       {project.documentType && (
         <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-[#E2E8F0] uppercase tracking-wider flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-[color:var(--text-primary)] uppercase tracking-wider flex items-center gap-2">
               <CheckSquare className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Document Type Checklist: {getDocumentType(project.documentType)?.label}
             </h3>
@@ -193,10 +193,10 @@ export default function QualityControlSuite({
       <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-[#E2E8F0] uppercase tracking-wider">
+            <h3 className="text-sm font-semibold text-[color:var(--text-primary)] uppercase tracking-wider">
               Integrity & Ethics Review (Agent)
             </h3>
-            <p className="text-xs text-[#94A3B8] mt-1">
+            <p className="text-xs text-[color:var(--text-secondary)] mt-1">
               Runs the Research Integrity & Ethics Reviewer agent directly against your compiled manuscript text.
             </p>
           </div>
@@ -204,7 +204,7 @@ export default function QualityControlSuite({
             <button
               onClick={runIntegrityReview}
               disabled={integrityLoading || pipelineLoading}
-              className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] text-white text-xs font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50"
             >
               {integrityLoading ? "Running…" : "Run Integrity & Ethics Review"}
             </button>
@@ -212,7 +212,7 @@ export default function QualityControlSuite({
               onClick={runFullPipelineReview}
               disabled={integrityLoading || pipelineLoading}
               title="Runs the full research agent chain (literature review, research questions, methodology, statistics) for real upstream context, then the integrity review"
-              className="px-4 py-2 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-luminous-blue)]/40 text-[color:var(--color-luminous-blue)] text-xs font-mono font-bold uppercase rounded-lg transition-all cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-luminous-blue)]/40 text-[color:var(--color-luminous-blue)] text-xs font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50"
             >
               {pipelineLoading ? "Running Full Pipeline…" : "Run Full Pipeline (Deep Review)"}
             </button>
@@ -239,7 +239,7 @@ export default function QualityControlSuite({
         )}
 
         {integrityReport && (
-          <div className="space-y-3 text-xs text-[#94A3B8]">
+          <div className="space-y-3 text-xs text-[color:var(--text-secondary)]">
             <p className="font-semibold">{integrityReport.executiveSummary}</p>
             <p>
               Structural completeness:{" "}
@@ -254,15 +254,15 @@ export default function QualityControlSuite({
                 above (never a rigor/publishability verdict). */}
             {integrityReport.comparableSourceAnalysis && (
               <div className="p-3 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-lg space-y-2">
-                <p className="font-semibold text-[#E2E8F0]">Comparable Literature (real, retrieved sources)</p>
+                <p className="font-semibold text-[color:var(--text-primary)]">Comparable Literature (real, retrieved sources)</p>
                 {integrityReport.comparableSourceAnalysis.note ? (
-                  <p className="text-[#94A3B8] italic">{integrityReport.comparableSourceAnalysis.note}</p>
+                  <p className="text-[color:var(--text-secondary)] italic">{integrityReport.comparableSourceAnalysis.note}</p>
                 ) : (
                   <ul className="space-y-2">
                     {integrityReport.comparableSourceAnalysis.findings.map((f, i) => (
                       <li key={i} className="border-l-2 border-[color:var(--color-luminous-blue)]/40 pl-2">
                         <span>{f.finding}</span>{" "}
-                        <a href={f.citedPaper.url} target="_blank" rel="noreferrer" className="text-[#E2E8F0] underline">
+                        <a href={f.citedPaper.url} target="_blank" rel="noreferrer" className="text-[color:var(--text-primary)] underline">
                           [{f.citedPaper.title}]
                         </a>
                       </li>
@@ -270,7 +270,7 @@ export default function QualityControlSuite({
                   </ul>
                 )}
                 {integrityReport.comparableSourceAnalysis.retrievedPapers.length > 0 && (
-                  <p className="text-[10px] text-[#94A3B8]">
+                  <p className="text-[10px] text-[color:var(--text-secondary)]">
                     {integrityReport.comparableSourceAnalysis.retrievedPapers.length} real paper(s) retrieved for comparison — not a plagiarism, rigor, or publishability check.
                   </p>
                 )}
@@ -294,15 +294,15 @@ export default function QualityControlSuite({
             <ShieldCheck className="w-6 h-6 text-[color:var(--color-luminous-blue)] animate-pulse" />
           </div>
           <div className="max-w-md mx-auto space-y-2">
-            <h3 className="text-lg font-bold text-[#E2E8F0]">Initiate Journal Peer Audit</h3>
-            <p className="text-xs text-[#94A3B8]">
+            <h3 className="text-lg font-bold text-[color:var(--text-primary)]">Initiate Journal Peer Audit</h3>
+            <p className="text-xs text-[color:var(--text-secondary)]">
               The Quality Control suite will inspect your entire draft layout against selected formatting constraints and check terminology continuity with Chapter plans.
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
             <button
               onClick={runQualityAudits}
-              className="px-5 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-medium text-white text-xs rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer font-bold uppercase tracking-wider font-mono shadow-sm"
+              className="px-5 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-medium text-white text-xs rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer font-bold shadow-sm"
             >
               <Play className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
               Run Compliance & Style Checks
@@ -312,8 +312,8 @@ export default function QualityControlSuite({
       ) : loading ? (
         <div className="p-12 text-center bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl space-y-4">
           <div className="w-10 h-10 border-4 border-[color:var(--color-luminous-blue)]/25 border-t-[color:var(--color-luminous-blue)] rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs text-[#E2E8F0] font-mono animate-pulse font-bold uppercase tracking-wider">Running semantic style scans & citation mismatch checks...</p>
-          <p className="text-[11px] text-[#94A3B8] max-w-sm mx-auto">Evaluating citation listings, reading scripture translations, and computing thematic alignment indexes.</p>
+          <p className="text-xs text-[color:var(--text-primary)] animate-pulse font-bold">Running semantic style scans & citation mismatch checks...</p>
+          <p className="text-[11px] text-[color:var(--text-secondary)] max-w-sm mx-auto">Evaluating citation listings, reading scripture translations, and computing thematic alignment indexes.</p>
         </div>
       ) : (
         report && (
@@ -323,31 +323,31 @@ export default function QualityControlSuite({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 flex flex-col items-center text-center justify-between shadow-xs">
-                <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Thesis Grounding Consistency</span>
+                <span className="text-xs font-bold text-[color:var(--text-secondary)] block">Thesis Grounding Consistency</span>
                 <div className="text-4xl font-extrabold text-emerald-600 my-4">
                   {report.alignmentWithDissertationScore}%
                 </div>
-                <p className="text-xs text-[#94A3B8] leading-relaxed">
+                <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
                   Measures conceptual fidelity and term preservation of core thesis frameworks.
                 </p>
               </div>
 
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 flex flex-col items-center text-center justify-between shadow-xs">
-                <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Journal Compliance Match</span>
+                <span className="text-xs font-bold text-[color:var(--text-secondary)] block">Journal Compliance Match</span>
                 <div className="text-4xl font-extrabold text-[color:var(--color-luminous-blue)] my-4">
                   {report.complianceScore}%
                 </div>
-                <p className="text-xs text-[#94A3B8] leading-relaxed">
+                <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
                   Inspects citation standards, word goals, structures, and section naming patterns.
                 </p>
               </div>
 
               <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 flex flex-col items-center text-center justify-between shadow-xs">
-                <span className="text-[10px] font-bold font-mono text-[#94A3B8] block uppercase">Scholarly Rigor & Flow</span>
+                <span className="text-xs font-bold text-[color:var(--text-secondary)] block">Scholarly Rigor & Flow</span>
                 <div className="text-4xl font-extrabold text-indigo-600 my-4">
                   {report.rigorScore}%
                 </div>
-                <p className="text-xs text-[#94A3B8] leading-relaxed">
+                <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
                   Monitors syntactic clarity, depth of argumentation, and excludes robotic AI patterns.
                 </p>
               </div>
@@ -362,7 +362,7 @@ export default function QualityControlSuite({
                 
                 {/* Edits plan */}
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-4">
-                  <h3 className="text-sm font-semibold text-[#E2E8F0] font-mono uppercase tracking-wider border-b border-[color:var(--color-navy-1)] pb-2 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-[color:var(--text-primary)] border-b border-[color:var(--border-subtle)] pb-2 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
                     Prioritized Revision & Refinement Plan
                   </h3>
@@ -372,14 +372,14 @@ export default function QualityControlSuite({
                         <AlertTriangle className="w-4 h-4 text-[color:var(--color-luminous-blue)] shrink-0 mt-0.5" />
                         <div className="space-y-1 flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)]">
+                            <span className="text-xs font-bold px-2 py-0.5 rounded bg-[color:var(--color-luminous-blue)]/15 text-[color:var(--color-luminous-blue)]">
                               Action Item #{i + 1}
                             </span>
-                            <span className="text-[10px] font-mono font-semibold text-[#94A3B8]">
+                            <span className="text-[10px] font-mono font-semibold text-[color:var(--text-secondary)]">
                               Target: Draft Refinement
                             </span>
                           </div>
-                          <p className="text-xs font-sans leading-relaxed text-[#E2E8F0] font-medium pt-1">
+                          <p className="text-xs font-sans leading-relaxed text-[color:var(--text-primary)] font-medium pt-1">
                             {edit}
                           </p>
                         </div>
@@ -390,7 +390,7 @@ export default function QualityControlSuite({
 
                 {/* Originality checks */}
                 <div className="bg-[color:var(--color-navy-2)] rounded-xl p-5 border border-[color:var(--color-navy-4)] shadow-sm space-y-3">
-                  <h3 className="text-sm font-semibold text-[#E2E8F0] font-mono uppercase tracking-wider border-b border-[color:var(--color-navy-1)] pb-2 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-[color:var(--text-primary)] border-b border-[color:var(--border-subtle)] pb-2 flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     Style Authenticity & Voice Assessment
                   </h3>
@@ -411,7 +411,7 @@ export default function QualityControlSuite({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   
                   <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
-                    <span className="text-[10px] font-bold font-mono text-emerald-400 uppercase tracking-wider block border-b border-[color:var(--color-navy-1)] pb-2 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-emerald-400 block border-b border-[color:var(--border-subtle)] pb-2 flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       Strengths Identified
                     </span>
@@ -426,7 +426,7 @@ export default function QualityControlSuite({
                   </div>
 
                   <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 shadow-sm space-y-3">
-                    <span className="text-[10px] font-bold font-mono text-red-400 uppercase tracking-wider block border-b border-[color:var(--color-navy-1)] pb-2 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-red-400 block border-b border-[color:var(--border-subtle)] pb-2 flex items-center gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
                       Vulnerabilities
                     </span>
@@ -444,20 +444,20 @@ export default function QualityControlSuite({
 
                 {/* Citation verification */}
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-3">
-                  <h3 className="text-sm font-semibold text-[#E2E8F0] uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
+                  <h3 className="text-sm font-semibold text-[color:var(--text-primary)] uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
                     Citation and Bibliographical Consistency Check
                   </h3>
-                  <p className="text-xs text-[#94A3B8] leading-relaxed font-sans font-medium">
+                  <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed font-sans font-medium">
                     {report.citationAudit}
                   </p>
                 </div>
 
                 {/* Ethical statements */}
                 <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-xl p-5 space-y-3">
-                  <h3 className="text-sm font-semibold text-[#E2E8F0] uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
+                  <h3 className="text-sm font-semibold text-[color:var(--text-primary)] uppercase tracking-wider border-b border-[color:var(--color-navy-4)] pb-2">
                     Ethical Declarations & Statement Completeness
                   </h3>
-                  <p className="text-xs text-[#94A3B8] leading-relaxed font-sans font-medium">
+                  <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed font-sans font-medium">
                     {report.ethicalVerification}
                   </p>
                 </div>
@@ -469,21 +469,21 @@ export default function QualityControlSuite({
             <div className="flex justify-between items-center pt-4 border-t border-[color:var(--color-navy-4)]">
               <button
                 onClick={onBack}
-                className="px-4 py-2.5 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[#94A3B8] text-xs font-mono font-bold uppercase rounded-xl transition-all cursor-pointer"
+                className="px-4 py-2.5 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)] text-xs font-bold rounded-xl transition-all cursor-pointer"
               >
                 Back to Laboratories
               </button>
               <div className="flex gap-4">
                 <button
                   onClick={runQualityAudits}
-                  className="px-4 py-2.5 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] text-[#E2E8F0] text-xs font-mono font-bold uppercase rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="px-4 py-2.5 bg-[color:var(--color-navy-1)] hover:bg-[color:var(--color-navy-3)] border border-[color:var(--color-navy-4)] text-[color:var(--text-primary)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <RefreshCcw className="w-3.5 h-3.5" />
                   Re-audit Edits
                 </button>
                 <button
                   onClick={onNext}
-                  className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-xl font-mono uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+                  className="px-6 py-2.5 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] font-bold text-white text-xs rounded-xl transition-all cursor-pointer shadow-sm"
                 >
                   Proceed to QC Redrafting
                 </button>

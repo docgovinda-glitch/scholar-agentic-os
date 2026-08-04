@@ -93,14 +93,14 @@ export default function PocketShell({ projectId, projects = [], approvalQueue }:
   const frame =
     "flex flex-col h-[calc(100vh-13rem)] min-h-[520px] w-full max-w-md mx-auto " +
     "overflow-hidden rounded-2xl border border-[color:var(--color-border-subtle)] " +
-    "bg-[color:var(--color-navy-0)] text-[#E2E8F0]";
+    "bg-[color:var(--color-navy-0)] text-[color:var(--text-primary)]";
 
   if (view === "approval-queue") {
     return (
       <div className={frame}>
         {/* App bar */}
         <div className="h-14 shrink-0 flex items-center px-4 border-b border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)]">
-          <p className="text-sm text-[#F1F5F9] font-serif">Source Review</p>
+          <p className="text-sm text-[color:var(--text-primary)] font-serif">Source Review</p>
         </div>
 
         {decisionError && (
@@ -165,7 +165,7 @@ export default function PocketShell({ projectId, projects = [], approvalQueue }:
           {currentTab === "search" && "Search"}
           {currentTab === "me" && "Me"}
         </button>
-        <button className="text-lg text-[#94A3B8]">⋯</button>
+        <button className="text-lg text-[color:var(--text-secondary)]">⋯</button>
       </div>
 
       {/* Content zone (Read zone — docs 23 §3.1) */}
@@ -187,7 +187,7 @@ export default function PocketShell({ projectId, projects = [], approvalQueue }:
           <button
             onClick={() => setView("approval-queue")}
             disabled={!activeProjectId && queueState.candidates.length === 0}
-            className="flex-1 py-3 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm font-mono uppercase tracking-wide disabled:opacity-40"
+            className="flex-1 py-3 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm disabled:opacity-40"
             title={activeProjectId ? undefined : "Open a project first"}
           >
             Review
@@ -197,7 +197,7 @@ export default function PocketShell({ projectId, projects = [], approvalQueue }:
           <button
             onClick={() => setView("ask")}
             disabled={!activeProjectId}
-            className="flex-1 py-3 rounded-lg border border-[color:var(--color-luminous-blue-dim)] text-[color:var(--color-luminous-blue)] text-sm font-mono uppercase tracking-wide disabled:opacity-40"
+            className="flex-1 py-3 rounded-lg border border-[color:var(--color-luminous-blue-dim)] text-[color:var(--color-luminous-blue)] text-sm disabled:opacity-40"
             title={activeProjectId ? undefined : "Open a project first"}
           >
             Ask
@@ -212,7 +212,7 @@ export default function PocketShell({ projectId, projects = [], approvalQueue }:
             key={tab}
             onClick={() => setCurrentTab(tab)}
             className={`flex flex-col items-center gap-1 w-full h-full py-2 ${
-              currentTab === tab ? "text-[color:var(--color-luminous-blue)]" : "text-[#94A3B8]"
+              currentTab === tab ? "text-[color:var(--color-luminous-blue)]" : "text-[color:var(--text-secondary)]"
             }`}
           >
             <span className="text-lg">
@@ -221,7 +221,7 @@ export default function PocketShell({ projectId, projects = [], approvalQueue }:
               {tab === "search" && "⌕"}
               {tab === "me" && "◍"}
             </span>
-            <span className="text-[10px] font-mono uppercase tracking-wide">
+            <span className="text-xs">
               {tab}
               {tabBadges[tab] > 0 && <span className="text-amber-400 ml-1">·{tabBadges[tab]}</span>}
             </span>

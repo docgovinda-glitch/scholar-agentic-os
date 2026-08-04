@@ -85,7 +85,7 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
       {/* Agents Selection Card */}
       <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-5 shadow-sm space-y-4 hover-lift">
-        <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0] border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-[color:var(--text-primary)] border-b border-[color:var(--color-navy-4)] pb-2 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-[color:var(--color-luminous-blue)]" />
           OS Active Agents
         </h3>
@@ -101,22 +101,22 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
                 }}
                 className={`w-full text-left p-3 border rounded-xl transition-all duration-200 cursor-pointer flex flex-col gap-1 ${
                   isSelected
-                    ? "bg-[color:var(--color-luminous-blue)]/10 text-[#E2E8F0] border-[color:var(--color-luminous-blue)] shadow-sm"
-                    : "bg-[color:var(--color-navy-1)] text-[#E2E8F0] border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-2)] hover:border-[color:var(--color-luminous-blue)]/40"
+                    ? "bg-[color:var(--color-luminous-blue)]/10 text-[color:var(--text-primary)] border-[color:var(--color-luminous-blue)] shadow-sm"
+                    : "bg-[color:var(--color-navy-1)] text-[color:var(--text-primary)] border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-2)] hover:border-[color:var(--color-luminous-blue)]/40"
                 }`}
               >
                 <div className="flex items-center justify-between w-full">
                   <span className="text-xs font-bold font-sans">{agent.name}</span>
                   <span
                     className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 ${
-                      isSelected ? "bg-[color:var(--color-luminous-blue)]/20 text-[#0E7490]" : "bg-[color:var(--color-navy-3)] text-[#94A3B8]"
+                      isSelected ? "bg-[color:var(--color-luminous-blue)]/20 text-[color:var(--accent)]" : "bg-[color:var(--color-navy-3)] text-[color:var(--text-secondary)]"
                     }`}
                   >
-                    <span className={`w-1 h-1 rounded-full ${isSelected ? "bg-[color:var(--color-luminous-blue)] animate-pulse" : "bg-[#94A3B8]"}`}></span>
+                    <span className={`w-1 h-1 rounded-full ${isSelected ? "bg-[color:var(--color-luminous-blue)] animate-pulse" : "bg-[color:var(--text-secondary)]"}`}></span>
                     {agent.status}
                   </span>
                 </div>
-                <span className={`text-[10px] ${isSelected ? "text-[#E2E8F0]/80" : "text-[#94A3B8]"} leading-normal font-sans`}>{agent.role}</span>
+                <span className={`text-[10px] ${isSelected ? "text-[color:var(--text-primary)]/80" : "text-[color:var(--text-secondary)]"} leading-normal font-sans`}>{agent.role}</span>
               </button>
             );
           })}
@@ -127,18 +127,18 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
       <div className="lg:col-span-2 bg-[color:var(--color-navy-2)] border border-[color:var(--color-navy-4)] rounded-2xl p-6 shadow-sm flex flex-col justify-between space-y-6 hover-lift">
         <div>
           <div className="border-b border-[color:var(--color-navy-4)] pb-3 mb-4">
-            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#E2E8F0]">Agent Console: {selectedAgent}</h3>
-            <p className="text-[11px] text-[#94A3B8] font-sans mt-0.5">Consult this co-agent directly regarding scriptural references, methodological design, or structural advice.</p>
+            <h3 className="text-sm font-bold text-[color:var(--text-primary)]">Agent Console: {selectedAgent}</h3>
+            <p className="text-[11px] text-[color:var(--text-secondary)] font-sans mt-0.5">Consult this co-agent directly regarding scriptural references, methodological design, or structural advice.</p>
           </div>
 
           {response ? (
-            <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-4 text-xs text-[#E2E8F0] leading-relaxed max-h-[300px] overflow-y-auto whitespace-pre-wrap font-sans relative animate-fade-in shadow-inner">
+            <div className="bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] rounded-xl p-4 text-xs text-[color:var(--text-primary)] leading-relaxed max-h-[300px] overflow-y-auto whitespace-pre-wrap font-sans relative animate-fade-in shadow-inner">
               <div className="flex justify-between items-center mb-2 border-b border-[color:var(--color-navy-4)] pb-1.5">
-                <span className="font-bold text-[10px] font-mono text-[#94A3B8] uppercase tracking-wider">Agent Feedback:</span>
+                <span className="font-bold text-xs text-[color:var(--text-secondary)]">Agent Feedback:</span>
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="px-2 py-0.5 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-2)] text-[9px] font-mono uppercase rounded text-[#94A3B8] hover:text-[#E2E8F0] transition-colors cursor-pointer"
+                  className="px-2 py-0.5 border border-[color:var(--color-navy-4)] hover:bg-[color:var(--color-navy-2)] text-[9px] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
                 >
                   {copied ? "Copied!" : "Copy Text"}
                 </button>
@@ -146,9 +146,9 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
               {response}
             </div>
           ) : (
-            <div className="h-[200px] border border-dashed border-[color:var(--color-navy-4)] rounded-xl flex flex-col items-center justify-center text-xs text-[#94A3B8] font-sans italic p-4 text-center gap-1">
+            <div className="h-[200px] border border-dashed border-[color:var(--color-navy-4)] rounded-xl flex flex-col items-center justify-center text-xs text-[color:var(--text-secondary)] font-sans italic p-4 text-center gap-1">
               <span>Send a custom query or select a suggestion below.</span>
-              <span className="text-[10px] text-[#94A3B8]/70">The agent will return publication-ready academic references and insights.</span>
+              <span className="text-[10px] text-[color:var(--text-secondary)]/70">The agent will return publication-ready academic references and insights.</span>
             </div>
           )}
         </div>
@@ -156,14 +156,14 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
         <form onSubmit={handleConsult} className="space-y-4">
           {/* Suggestions List */}
           <div className="space-y-1.5 pt-1">
-            <span className="block text-[9px] font-mono text-[#94A3B8] uppercase tracking-wider font-bold">Suggested Prompts:</span>
+            <span className="block text-[9px] text-[color:var(--text-secondary)] font-bold">Suggested Prompts:</span>
             <div className="flex flex-col gap-1.5">
               {(suggestedQueries[selectedAgent] || []).map((suggestion, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => setQuery(suggestion)}
-                  className="px-3 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)]/40 hover:bg-[color:var(--color-navy-2)] text-[#94A3B8] hover:text-[#E2E8F0] text-[10px] rounded-lg transition-all font-sans cursor-pointer text-left block"
+                  className="px-3 py-1.5 bg-[color:var(--color-navy-1)] border border-[color:var(--color-navy-4)] hover:border-[color:var(--color-luminous-blue)]/40 hover:bg-[color:var(--color-navy-2)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] text-[10px] rounded-lg transition-all font-sans cursor-pointer text-left block"
                 >
                   💡 {suggestion}
                 </button>
@@ -182,7 +182,7 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
             <textarea
               required
               rows={3}
-              className="border-0 bg-transparent w-full p-3 text-xs text-[#E2E8F0] focus:outline-none"
+              className="border-0 bg-transparent w-full p-3 text-xs text-[color:var(--text-primary)] focus:outline-none"
               placeholder={`Ask the ${selectedAgent} a question about your project...`}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -192,7 +192,7 @@ export default function ActiveAgentsPanel({ project }: ActiveAgentsPanelProps) {
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--color-navy-4)] text-white text-xs font-mono font-bold uppercase tracking-widest rounded-lg cursor-pointer transition-all flex items-center gap-1.5 shadow-sm"
+              className="px-5 py-2 bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] disabled:bg-[color:var(--surface-inset)] text-[color:var(--text-primary)] text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 shadow-sm"
             >
               {loading ? (
                 <>

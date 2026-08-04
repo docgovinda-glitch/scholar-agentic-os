@@ -39,8 +39,8 @@ export default function AskView({
     <div className="h-full flex flex-col gap-4">
       {/* Header */}
       <div className="pb-2 border-b border-[color:var(--color-border-subtle)]">
-        <h2 className="text-sm font-serif font-bold text-[#F1F5F9]">Scholar OS Assistant</h2>
-        <p className="text-xs text-[#64748B] mt-1">Ask questions about sourcing and synthesis</p>
+        <h2 className="text-sm font-serif font-bold text-[color:var(--text-primary)]">Scholar OS Assistant</h2>
+        <p className="text-xs text-[color:var(--text-muted)] mt-1">Ask questions about sourcing and synthesis</p>
       </div>
 
       {/* Messages */}
@@ -48,8 +48,8 @@ export default function AskView({
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
             <div className="text-2xl">💬</div>
-            <p className="text-[#64748B] text-sm">No messages yet</p>
-            <p className="text-[#475569] text-xs max-w-sm">
+            <p className="text-[color:var(--text-muted)] text-sm">No messages yet</p>
+            <p className="text-[color:var(--text-muted)] text-xs max-w-sm">
               Ask about sourcing strategies, synthesis patterns, or how to refine your work.
             </p>
           </div>
@@ -62,8 +62,8 @@ export default function AskView({
               <div
                 className={`max-w-xs px-3 py-2 rounded-lg text-xs leading-relaxed ${
                   msg.role === "user"
-                    ? "bg-[color:var(--color-luminous-blue-dim)] text-white"
-                    : "bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] text-[#E2E8F0]"
+                    ? "bg-[color:var(--color-luminous-blue-dim)] text-[color:var(--text-primary)]"
+                    : "bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] text-[color:var(--text-primary)]"
                 }`}
               >
                 {msg.content}
@@ -75,9 +75,9 @@ export default function AskView({
           <div className="flex gap-3 justify-start">
             <div className="bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] px-3 py-2 rounded-lg">
               <div className="flex gap-1">
-                <span className="text-[#94A3B8] text-xs">●</span>
-                <span className="text-[#94A3B8] text-xs">●</span>
-                <span className="text-[#94A3B8] text-xs">●</span>
+                <span className="text-[color:var(--text-secondary)] text-xs">●</span>
+                <span className="text-[color:var(--text-secondary)] text-xs">●</span>
+                <span className="text-[color:var(--text-secondary)] text-xs">●</span>
               </div>
             </div>
           </div>
@@ -94,12 +94,12 @@ export default function AskView({
             onKeyPress={(e) => e.key === "Enter" && handleSend()}
             placeholder="Ask a question…"
             disabled={isLoading}
-            className="flex-1 px-3 py-2 text-xs rounded-lg bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] text-[#E2E8F0] placeholder-[#64748B] focus:outline-none focus:border-[color:var(--color-luminous-blue-dim)] disabled:opacity-50"
+            className="flex-1 px-3 py-2 text-xs rounded-lg bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-none focus:border-[color:var(--color-luminous-blue-dim)] disabled:opacity-50"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="px-3 py-2 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs font-mono uppercase tracking-wide disabled:opacity-50"
+            className="px-3 py-2 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs disabled:opacity-50"
           >
             Send
           </button>
@@ -109,7 +109,7 @@ export default function AskView({
       {/* Back Button */}
       <button
         onClick={onBack}
-        className="text-[10px] text-[#64748B] font-mono uppercase tracking-wide text-center py-2"
+        className="text-xs text-[color:var(--text-muted)] text-center py-2"
       >
         ← Back
       </button>
