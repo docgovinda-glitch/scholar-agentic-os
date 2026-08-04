@@ -1,9 +1,17 @@
-import {StrictMode} from 'react';
+import {StrictMode, lazy, Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { AuthProvider } from './auth/authContext';
 import { warmServer } from './services/serverWarmup';
+
+// Desk (docs 20/21/22) — the new-architecture client — lives entirely under
+// /desk, lazy-loaded so it costs nothing in the legacy app's bundle. This is
+// a plain pathname check, not a router: Desk has exactly one entry point
+// today (see DeskApp.tsx's own doc comment for why no router dependency
+// was added for that).
+const DeskApp = lazy(() => import('./desk/DeskApp.tsx'));
+const isDesk = window.location.pathname.startsWith('/desk');
 
 // Start waking the server before rendering, not after the first user action.
 //
@@ -17,8 +25,14 @@ void warmServer();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    {isDesk ? (
+      <Suspense fallback={null}>
+        <DeskApp />
+      </Suspense>
+    ) : (
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    )}
   </StrictMode>,
 );

@@ -1,0 +1,89 @@
+import { useCallback, useEffect, useState } from "react";
+import { getProject, getRubric, listOutputTypes, submitDocument } from "./api";
+import { plainTextToDocument } from "./plainTextToDocument";
+import Header from "./regions/Header";
+import Rail from "./regions/Rail";
+import Primary from "./regions/Primary";
+import Aside from "./regions/Aside";
+import StatusBar from "./regions/StatusBar";
+import type { CanonicalDocument, OutputTypeSummary, ProjectView, RubricReport } from "./types";
+
+/**
+ * Region shell (docs 22 §2): Header / Rail / Primary / Aside / Status. The
+ * Tray (Agents/Findings/Activity, docs 22 §3) isn't built in this first
+ * slice — Agents needs app/mesh wired to a live run stream, Activity needs
+ * an event log neither exists yet. Presets, resizing, splitting, and the
+ * command palette are also out of scope here — see this module's PR
+ * description for the full list of what this slice is and isn't.
+ */
+export default function DeskShell({ projectId }: { projectId: string }) {
+  const [project, setProject] = useState<ProjectView | null>(null);
+  const [document, setDocument] = useState<CanonicalDocument | null>(null);
+  const [rubric, setRubric] = useState<RubricReport | null>(null);
+  const [outputType, setOutputType] = useState<OutputTypeSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [proj, rub, types] = await Promise.all([getProject(projectId), getRubric(projectId), listOutputTypes()]);
+      setProject(proj);
+      setRubric(rub);
+      setOutputType(types.items.find((t) => t.id === proj.outputTypeId) ?? null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function handleSubmitPlainText(text: string) {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const doc = plainTextToDocument(projectId, project?.projectId ?? "Untitled", text);
+      const result = await submitDocument(projectId, doc);
+      setDocument(doc);
+      setProject(result);
+      setRubric(result.rubric);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function jumpToBlock(blockId: string) {
+    globalThis.document?.getElementById(blockId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[color:var(--color-navy-0)] text-red-400 text-sm p-6">
+        {error}
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[color:var(--color-navy-0)] text-[#64748B] text-sm">
+        Loading project…
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-[color:var(--color-navy-0)] text-[#E2E8F0]">
+      <Header project={project} outputTypeLabel={outputType?.label ?? project.outputTypeId} />
+      <div className="flex flex-1 min-h-0">
+        <Rail document={document} onJumpToBlock={jumpToBlock} />
+        <Primary document={document} onSubmitPlainText={handleSubmitPlainText} submitting={submitting} />
+        <Aside rubric={rubric} />
+      </div>
+      <StatusBar project={project} />
+    </div>
+  );
+}
