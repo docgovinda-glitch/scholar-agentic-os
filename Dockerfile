@@ -46,7 +46,7 @@ ENV HUSKY=0
 COPY package.json package-lock.json ./
 # server.cjs is bundled with --packages=external, so the production
 # dependencies it require()s must really exist here.
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 
