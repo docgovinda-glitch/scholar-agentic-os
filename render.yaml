@@ -66,3 +66,32 @@ services:
         sync: false
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
+      # Server-side only — NEVER prefixed VITE_, or Vite would bake it into the
+      # client bundle and hand every visitor a key that bypasses Row Level
+      # Security.
+      #
+      # Undeclared here until now, though FINAL_DEPLOYMENT_PLAN.md and
+      # POCKET_DEPLOYMENT.md both instruct setting it by hand in the Render
+      # dashboard. That worked, but left the blueprint an incomplete record of
+      # what the service needs: a blueprint re-sync or a new environment would
+      # come up without it, and requireAuth
+      # (server/src/middleware/auth.ts) answers every authenticated request
+      # with 500 "Auth service not configured" when it is absent — failing
+      # closed, but indistinguishable from an outage.
+      #
+      # `sync: false` keeps the secret out of the repository; this declares
+      # that the service requires it, not what it is.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Optional, and currently unset — which means server/routes/project.ts
+      # falls back to the in-memory project store
+      # (src/app/conductor/projectStore.ts). That store does not survive a
+      # restart, and this service is on the free plan, which spins down after
+      # ~15 minutes idle. Every Desk project a user creates is therefore lost
+      # within the hour, and nothing warns them.
+      #
+      # This must be set, and supabase/schema_store.sql applied, before Desk
+      # can be the client users are pointed at — see
+      # docs/06-decisions/61-CLIENT-CONSOLIDATION.md §5.
+      - key: DATABASE_URL
+        sync: false
