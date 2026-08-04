@@ -81,7 +81,7 @@ export default function DeskShell({ projectId }: { projectId: string }) {
       <div className="flex flex-1 min-h-0">
         <Rail document={document} onJumpToBlock={jumpToBlock} />
         <Primary document={document} onSubmitPlainText={handleSubmitPlainText} submitting={submitting} />
-        <Aside rubric={rubric} />
+        <Aside rubric={rubric} sessionId={`desk-${projectId}`} />
       </div>
       <StatusBar project={project} />
     </div>

@@ -49,13 +49,20 @@ export default function Primary({
             The real editor isn't built yet. Paste plain text below (blank lines separate paragraphs) to see the
             Outline and Compliance panels work against a real document.
           </p>
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={10}
-            className="w-full rounded-lg bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] text-[#E2E8F0] text-sm p-3 font-serif"
-            placeholder={"# Paste or type a draft here.\n\nSeparate paragraphs with a blank line."}
-          />
+          {/* index.css's global form-control override forces a white background
+              on any textarea/input/select via !important, unless it carries
+              border-0 + bg-transparent — the styling below moves to this
+              wrapper div instead, same pattern src/components/AIControlCenter.tsx
+              already uses. */}
+          <div className="w-full rounded-lg bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)]">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={10}
+              className="border-0 bg-transparent w-full text-[#E2E8F0] text-sm p-3 font-serif focus:outline-none"
+              placeholder={"# Paste or type a draft here.\n\nSeparate paragraphs with a blank line."}
+            />
+          </div>
           <button
             onClick={() => onSubmitPlainText(draft)}
             disabled={submitting || draft.trim().length === 0}
