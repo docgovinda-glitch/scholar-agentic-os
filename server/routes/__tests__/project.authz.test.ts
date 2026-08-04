@@ -23,20 +23,62 @@ import request from "supertest";
 const ALICE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const BOB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
-/**
- * Fake GoTrue, standing in for the one network call requireAuth makes.
- * "alice-token" and "bob-token" resolve to distinct users; anything else is
- * rejected the way a real expired or forged token would be.
- *
- * This intercepts `fetch` rather than mocking `@supabase/supabase-js`, because
- * the middleware no longer uses that SDK — constructing a client per request
- * pulled in a RealtimeClient that needed a WebSocket Node 20 does not have, and
- * took production down. Mocking the module would now stub something nothing
- * calls, and these tests would pass while verifying nothing.
- */
 const realFetch = global.fetch;
+
+/**
+ * Minimal PostgREST stand-in, backing the Data API store the server now
+ * selects (services/store picks it whenever Supabase credentials are present,
+ * which they must be here for requireAuth).
+ *
+ * Emulated rather than stubbed out so these tests still run the real
+ * restProjectStore — the actual production persistence path — instead of an
+ * in-memory shortcut that would pass regardless of whether that store works.
+ * It implements only what the store uses: eq filters, ordering, and an upsert.
+ */
+const table = new Map<string, Record<string, unknown>>();
+
+function postgrest(url: string, init?: RequestInit): Response {
+  const query = url.split("?")[1] ?? "";
+  const params = new URLSearchParams(query);
+  const method = (init?.method ?? "GET").toUpperCase();
+
+  if (method === "POST") {
+    const row = JSON.parse(init!.body as string) as Record<string, unknown>;
+    const key = row.project_id as string;
+    const merge = String((init?.headers as Record<string, string>)?.Prefer ?? "").includes(
+      "merge-duplicates"
+    );
+    if (table.has(key) && !merge) {
+      return { ok: false, status: 409, json: async () => ({ message: "duplicate key" }), text: async () => "duplicate key" } as Response;
+    }
+    table.set(key, { ...(table.get(key) ?? {}), ...row });
+    return { ok: true, status: 201, json: async () => null, text: async () => "" } as Response;
+  }
+
+  let rows = [...table.values()];
+  for (const [field, expr] of params.entries()) {
+    if (!expr.startsWith("eq.")) continue;
+    const want = expr.slice(3);
+    rows = rows.filter((r) => String(r[field]) === want);
+  }
+  return { ok: true, status: 200, json: async () => rows, text: async () => JSON.stringify(rows) } as Response;
+}
+
 global.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input.toString();
+
+  /**
+   * Fake GoTrue, standing in for the one network call requireAuth makes.
+   * "alice-token" and "bob-token" resolve to distinct users; anything else is
+   * rejected the way a real expired or forged token would be.
+   *
+   * This intercepts `fetch` rather than mocking `@supabase/supabase-js`,
+   * because the middleware no longer uses that SDK — constructing a client
+   * per request pulled in a RealtimeClient that needed a WebSocket Node 20
+   * does not have, and took production down. Mocking the module would now
+   * stub something nothing calls, and these tests would pass while verifying
+   * nothing.
+   */
   if (url.includes("/auth/v1/user")) {
     const headers = (init?.headers ?? {}) as Record<string, string>;
     const token = (headers.Authorization ?? "").replace(/^Bearer /, "");
@@ -52,6 +94,9 @@ global.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
       json: async () => user ?? { msg: "invalid JWT" },
     } as Response);
   }
+
+  if (url.includes("/rest/v1/projects")) return Promise.resolve(postgrest(url, init));
+
   return realFetch(input as RequestInfo, init);
 }) as typeof fetch;
 
@@ -76,6 +121,9 @@ async function createProjectAs(headers: Record<string, string>): Promise<string>
 beforeEach(() => {
   __resetProjectStoreForTests();
   __resetRateLimitStore();
+  // The Data API stand-in is the store's backing table now; leaving rows
+  // behind would let one test's project satisfy another's assertions.
+  table.clear();
 });
 
 describe("project API — authentication", () => {
