@@ -46,6 +46,9 @@ const DocumentExportPipeline = lazy(() => import("./components/DocumentExportPip
 const SubmissionTracker = lazy(() => import("./components/SubmissionTracker"));
 const ReviewerResponseManager = lazy(() => import("./components/ReviewerResponseManager"));
 
+// Pocket mobile experience
+const PocketShell = lazy(() => import("./pocket/PocketShell"));
+
 // Icons
 // (Sparkles, GraduationCap, BookOpen, Trash2, LogOut, LayoutDashboard, ArrowLeft
 // removed — they were only used by the inline header/footer JSX now replaced
@@ -77,7 +80,7 @@ export default function AppWrapper() {
 
 function App() {
   const { user, logout, project, setProject, onboardingStep, setOnboardingStep } = useAuth();
-  const [activeTab, setActiveTab] = useState<"workspace" | "vault" | "agents" | "publishing" | "citation" | "settings" | "profile">("workspace");
+  const [activeTab, setActiveTab] = useState<"workspace" | "vault" | "agents" | "publishing" | "citation" | "settings" | "profile" | "pocket">("workspace");
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   // Multi-project management
   const [viewMode, setViewMode] = useState<"dashboard" | "workspace">("dashboard");
@@ -709,6 +712,12 @@ function App() {
               currentUser={user}
               onProfileUpdated={loadAllProjects}
             />
+          </Suspense>
+        )}
+
+        {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "pocket" && (
+          <Suspense fallback={<PanelLoadingFallback />}>
+            <PocketShell />
           </Suspense>
         )}
       </main>

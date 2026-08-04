@@ -11,7 +11,8 @@ import {
   Award,
   BookOpenCheck,
   Settings,
-  User
+  User,
+  Smartphone
 } from "lucide-react";
 import { PaperProject } from "../../types";
 
@@ -116,6 +117,7 @@ export default function AppHeader({
                 <option value="#workspace/citation">Citation Center</option>
                 <option value="#workspace/settings">AI Settings</option>
                 <option value="#workspace/profile">Scholar Profile</option>
+                <option value="#workspace/pocket">Pocket Mobile</option>
               </optgroup>
             </select>
           </div>
@@ -183,7 +185,8 @@ export default function AppHeader({
           { id: "publishing", name: "Publishing Hub", icon: Award },
           { id: "citation", name: "Citation Center", icon: BookOpenCheck },
           { id: "settings", name: "Settings", icon: Settings },
-          { id: "profile", name: "Profile", icon: User }
+          { id: "profile", name: "Profile", icon: User },
+          { id: "pocket", name: "Pocket Mobile", icon: Smartphone }
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
