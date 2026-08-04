@@ -34,7 +34,7 @@ export default function HomeTab({ badgeCount, projects, onStartReviewing }: Home
       <h2 className="text-[10px] font-mono uppercase tracking-wide text-[#94A3B8]">Needs Attention</h2>
       {attention.map((p) => (
         <div key={p.projectId} className="rounded-lg border border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] p-3">
-          <h3 className="text-sm font-serif font-semibold text-[#F1F5F9] mb-1">{p.projectId}</h3>
+          <h3 className="text-sm font-serif font-semibold text-[#F1F5F9] mb-1">{p.title}</h3>
           <div className="flex gap-2 text-[11px] text-[#94A3B8]">
             {p.sourcesAwaitingApproval > 0 && <span>📬 {p.sourcesAwaitingApproval} sources</span>}
             {p.pendingStudioChanges > 0 && <span>✏️ {p.pendingStudioChanges} refinements</span>}

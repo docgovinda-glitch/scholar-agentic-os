@@ -4,6 +4,29 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
+
+/**
+ * Every /api/pocket/* route is behind requireAuth (server/src/middleware/auth.ts),
+ * which rejects any request without an `Authorization: Bearer <supabase jwt>`
+ * header. These hooks previously called bare fetch(), so every single Pocket
+ * request came back 401 — the UI wired up fine and then silently did nothing.
+ * pocketFetch is the one place that attaches the session token.
+ */
+async function pocketFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  if (!headers.has("Content-Type") && init.body) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (isSupabaseConfigured()) {
+    const { data } = await getSupabaseClient().auth.getSession();
+    const token = data.session?.access_token;
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  return fetch(input, { ...init, headers });
+}
 
 export interface PocketComment {
   id: string;
@@ -45,14 +68,13 @@ export function useApprovalQueue(projectId: string) {
   const [error, setError] = useState<string | null>(null);
   const [queueStats, setQueueStats] = useState({ total: 0, approved: 0, rejected: 0, pending: 0 });
 
-  // Load initial queue stats
-  useEffect(() => {
-    loadQueueStats();
-  }, [projectId]);
-
   const loadQueueStats = useCallback(async () => {
+    // Callers pass "" when no project is selected — see PocketShell. Skipping
+    // here keeps the hook unconditionally callable (Rules of Hooks) while
+    // still doing nothing until there is a real project to load.
+    if (!projectId) return;
     try {
-      const res = await fetch(`/api/pocket/projects/${projectId}/approval-queue`);
+      const res = await pocketFetch(`/api/pocket/projects/${projectId}/approval-queue`);
       if (!res.ok) throw new Error("Failed to load queue stats");
       const data = await res.json();
       setQueueStats(data.stats);
@@ -61,15 +83,21 @@ export function useApprovalQueue(projectId: string) {
     }
   }, [projectId]);
 
+  // Declared after loadQueueStats so the effect closes over the real function
+  // rather than the temporal-dead-zone binding it used to reference.
+  useEffect(() => {
+    loadQueueStats();
+  }, [loadQueueStats]);
+
   const submitDecision = useCallback(
     async (sourceId: string, decision: "approved" | "rejected" | "deferred") => {
+      if (!projectId) throw new Error("No project selected");
       setLoading(true);
       setError(null);
 
       try {
-        const res = await fetch(`/api/pocket/projects/${projectId}/approve-source`, {
+        const res = await pocketFetch(`/api/pocket/projects/${projectId}/approve-source`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sourceId, decision }),
         });
 
@@ -124,20 +152,16 @@ export function useDocumentComments(docId: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load comments on mount and when docId changes
-  useEffect(() => {
-    loadComments();
-  }, [docId]);
-
   const loadComments = useCallback(async () => {
+    if (!docId) return;
     setLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(`/api/pocket/documents/${docId}/comments`);
+      const res = await pocketFetch(`/api/pocket/documents/${docId}/comments`);
       if (!res.ok) throw new Error("Failed to load comments");
       const data = await res.json();
-      setComments(data.comments);
+      setComments(data.comments ?? []);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load comments";
       setError(message);
@@ -146,12 +170,17 @@ export function useDocumentComments(docId: string) {
     }
   }, [docId]);
 
+  // Load comments on mount and when docId changes.
+  useEffect(() => {
+    loadComments();
+  }, [loadComments]);
+
   const addComment = useCallback(
     async (text: string, sectionId?: string) => {
+      if (!docId) throw new Error("No document selected");
       try {
-        const res = await fetch(`/api/pocket/documents/${docId}/comments`, {
+        const res = await pocketFetch(`/api/pocket/documents/${docId}/comments`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text, sectionId }),
         });
 
@@ -173,9 +202,8 @@ export function useDocumentComments(docId: string) {
   const updateComment = useCallback(
     async (commentId: string, updates: { text?: string; resolved?: boolean }) => {
       try {
-        const res = await fetch(`/api/pocket/comments/${commentId}`, {
+        const res = await pocketFetch(`/api/pocket/comments/${commentId}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updates),
         });
 
@@ -215,24 +243,26 @@ export function usePocketChat(projectId: string) {
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Load chat history on mount
-  useEffect(() => {
-    loadMessages();
-  }, [projectId]);
-
   const loadMessages = useCallback(async () => {
+    if (!projectId) return;
     try {
-      const res = await fetch(`/api/pocket/chat/${projectId}`);
+      const res = await pocketFetch(`/api/pocket/chat/${projectId}`);
       if (!res.ok) throw new Error("Failed to load chat");
       const data = await res.json();
-      setMessages(data.messages);
+      setMessages(data.messages ?? []);
     } catch (err) {
       console.error("Chat load error:", err);
     }
   }, [projectId]);
 
+  // Load chat history on mount and when the project changes.
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
+
   const sendMessage = useCallback(
     async (text: string) => {
+      if (!projectId) throw new Error("No project selected");
       setLoading(true);
       setError(null);
 
@@ -248,9 +278,8 @@ export function usePocketChat(projectId: string) {
       try {
         abortControllerRef.current = new AbortController();
 
-        const res = await fetch("/api/pocket/chat/stream", {
+        const res = await pocketFetch("/api/pocket/chat/stream", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             projectId,
             messages: [...messages, userMessage],
@@ -338,11 +367,6 @@ export function useOfflineQueue(projectId: string) {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load queue from IndexedDB on mount
-  useEffect(() => {
-    loadQueue();
-  }, []);
-
   const loadQueue = useCallback(async () => {
     try {
       const db = await openOfflineDb();
@@ -352,6 +376,13 @@ export function useOfflineQueue(projectId: string) {
       console.error("Failed to load offline queue:", err);
     }
   }, [projectId]);
+
+  // Load queue from IndexedDB on mount and whenever the project changes —
+  // the effect previously had [] deps while loadQueue filters by projectId,
+  // so switching projects kept showing the first project's queue.
+  useEffect(() => {
+    loadQueue();
+  }, [loadQueue]);
 
   const addToQueue = useCallback(
     async (action: QueuedAction) => {
@@ -365,7 +396,9 @@ export function useOfflineQueue(projectId: string) {
         throw err;
       }
     },
-    []
+    // projectId is stamped onto every queued action; omitting it from the
+    // deps pinned this callback to the projectId from first render.
+    [projectId]
   );
 
   const syncQueue = useCallback(async () => {
@@ -375,9 +408,8 @@ export function useOfflineQueue(projectId: string) {
     setError(null);
 
     try {
-      const res = await fetch("/api/pocket/sync/actions", {
+      const res = await pocketFetch("/api/pocket/sync/actions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ actions: queue }),
       });
 

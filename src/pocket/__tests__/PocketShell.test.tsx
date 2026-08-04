@@ -8,7 +8,8 @@ import type { PocketProject, ApprovalQueueState } from "../types";
 describe("PocketShell", () => {
   const mockProjects: PocketProject[] = [
     {
-      projectId: "Project A",
+      projectId: "project-a",
+      title: "Project A",
       outputTypeId: "ot-01",
       answers: {},
       intakeCompleteness: 0.8,
@@ -20,7 +21,8 @@ describe("PocketShell", () => {
       sourcesAwaitingApproval: 3,
     },
     {
-      projectId: "Project B",
+      projectId: "project-b",
+      title: "Project B",
       outputTypeId: "ot-02",
       answers: {},
       intakeCompleteness: 0.5,
@@ -81,7 +83,7 @@ describe("PocketShell", () => {
 
   it("navigates to approval queue view", () => {
     render(<PocketShell projects={mockProjects} approvalQueue={mockApprovalQueue} />);
-    const startReviewingButton = screen.getByText("Start Reviewing");
+    const startReviewingButton = screen.getByText("Review");
     fireEvent.click(startReviewingButton);
     expect(screen.getByText("Source Review")).toBeInTheDocument();
   });
@@ -97,23 +99,55 @@ describe("PocketShell", () => {
     expect(screen.getByText("Needs Attention")).toBeInTheDocument();
   });
 
-  it("displays start reviewing button in reach zone on home tab", () => {
+  it("displays review button in reach zone on home tab", () => {
     render(<PocketShell projects={mockProjects} />);
-    const startReviewingButton = screen.getByText("Start Reviewing");
+    const startReviewingButton = screen.getByText("Review");
     expect(startReviewingButton).toBeInTheDocument();
   });
 
   it("renders approval queue with source data", () => {
     render(<PocketShell projects={mockProjects} approvalQueue={mockApprovalQueue} />);
-    const startReviewingButton = screen.getByText("Start Reviewing");
+    const startReviewingButton = screen.getByText("Review");
     fireEvent.click(startReviewingButton);
     expect(screen.getByText("Sample Paper")).toBeInTheDocument();
     expect(screen.getByText("John Doe, Jane Smith")).toBeInTheDocument();
   });
 
+  // Regression: the tabs rendered `p.projectId` as the card heading, so every
+  // project showed a raw UUID instead of its name.
+  it("shows project titles rather than project ids", () => {
+    render(<PocketShell projects={mockProjects} />);
+    fireEvent.click(screen.getByText("projects"));
+    expect(screen.getByText("Project A")).toBeInTheDocument();
+    expect(screen.queryByText("project-a")).not.toBeInTheDocument();
+  });
+
+  // Regression: useApprovalQueue used to be called conditionally
+  // (`projectId ? useApprovalQueue(projectId) : null`). Rendering with and
+  // then without a projectId changed the hook count and threw.
+  it("survives projectId appearing and disappearing", () => {
+    const { rerender } = render(<PocketShell projects={mockProjects} />);
+    expect(() => {
+      rerender(<PocketShell projectId="project-a" projects={mockProjects} />);
+      rerender(<PocketShell projects={mockProjects} />);
+    }).not.toThrow();
+  });
+
+  // Regression: AskView existed but nothing in the shell routed to it.
+  it("opens the ask view when a project is selected", () => {
+    render(<PocketShell projectId="project-a" projects={mockProjects} />);
+    fireEvent.click(screen.getByText("Ask"));
+    expect(screen.getByText("Scholar OS Assistant")).toBeInTheDocument();
+  });
+
+  it("disables ask until a project is selected", () => {
+    render(<PocketShell projects={mockProjects} />);
+    expect(screen.getByText("Ask")).toBeDisabled();
+  });
+
   it("returns to home from approval queue", () => {
     render(<PocketShell projects={mockProjects} approvalQueue={mockApprovalQueue} />);
-    const startReviewingButton = screen.getByText("Start Reviewing");
+    const startReviewingButton = screen.getByText("Review");
     fireEvent.click(startReviewingButton);
     const backButton = screen.getByText("← Back to Home");
     fireEvent.click(backButton);

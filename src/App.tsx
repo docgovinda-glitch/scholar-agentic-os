@@ -48,6 +48,7 @@ const ReviewerResponseManager = lazy(() => import("./components/ReviewerResponse
 
 // Pocket mobile experience
 const PocketShell = lazy(() => import("./pocket/PocketShell"));
+import { toPocketProjects, toApprovalQueue } from "./pocket/adapters";
 
 // Icons
 // (Sparkles, GraduationCap, BookOpen, Trash2, LogOut, LayoutDashboard, ArrowLeft
@@ -717,7 +718,15 @@ function App() {
 
         {onboardingStep === "workshop" && viewMode === "workspace" && activeTab === "pocket" && (
           <Suspense fallback={<PanelLoadingFallback />}>
-            <PocketShell />
+            {/* PocketShell's props are all optional, so mounting it bare
+                typechecked but produced a dead screen: no projectId meant the
+                approval hook never fired and every button was inert, and no
+                projects meant empty lists. */}
+            <PocketShell
+              projectId={project?.id}
+              projects={toPocketProjects(allProjects)}
+              approvalQueue={toApprovalQueue(project)}
+            />
           </Suspense>
         )}
       </main>

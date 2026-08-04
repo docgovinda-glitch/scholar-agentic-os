@@ -51,6 +51,12 @@ export interface PocketUser {
 }
 
 export interface PocketProject extends ProjectView {
+  /**
+   * Human-readable project name. ProjectView carries only `projectId` (a
+   * UUID), which the tabs were rendering as the heading — every card showed
+   * a raw identifier instead of the paper's title.
+   */
+  title: string;
   lastModified: Date;
   unreadComments: number;
   pendingStudioChanges: number;

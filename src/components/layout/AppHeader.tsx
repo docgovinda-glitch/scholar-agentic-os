@@ -67,7 +67,11 @@ export default function AppHeader({
         </div>
 
         {/* Unified Page Navigation & History Controls */}
-        <div className="flex items-center gap-2.5">
+        {/* min-w-0 so the quick-jump select below is allowed to shrink: a
+            flex item defaults to min-width:auto, which pinned this row to the
+            select's full content width (555px) and pushed the header past a
+            390px viewport, scrolling the whole page sideways on phones. */}
+        <div className="flex items-center gap-2.5 min-w-0">
           {/* Native Browser History Nav mimics */}
           <div className="chrome-dark-subtle flex items-center gap-1 border border-white/10 rounded-lg p-1 shadow-inner shrink-0">
             <button
@@ -96,11 +100,11 @@ export default function AppHeader({
           </button>
 
           {/* Quick Page Jump Dropdown */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 min-w-0">
             <select
               value={onboardingStep !== "workshop" ? `#onboarding/${onboardingStep}` : (viewMode === "dashboard" ? "#dashboard" : `#workspace/${activeTab}`)}
               onChange={(e) => { window.location.hash = e.target.value; }}
-              className="chrome-dark-subtle px-3 py-1.5 border border-white/10 rounded-lg text-xs font-mono font-bold text-[#E2E8F0] focus:ring-1 focus:ring-[color:var(--color-luminous-blue)] focus:outline-none cursor-pointer shadow-sm"
+              className="chrome-dark-subtle min-w-0 w-full max-w-[14rem] truncate px-3 py-1.5 border border-white/10 rounded-lg text-xs font-mono font-bold text-[#E2E8F0] focus:ring-1 focus:ring-[color:var(--color-luminous-blue)] focus:outline-none cursor-pointer shadow-sm"
             >
               <optgroup label="Onboarding Steps">
                 <option value="#onboarding/ai-setup">Step 2: AI Configuration</option>
@@ -123,7 +127,10 @@ export default function AppHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* flex-wrap + justify-end so this action cluster reflows onto a
+            second line on narrow screens instead of pushing the header wider
+            than the viewport. */}
+        <div className="flex flex-wrap justify-end items-center gap-2 min-w-0">
           {/* Dashboard / Workspace toggle (only if onboarding is complete) */}
           {onboardingStep === "workshop" && (
             <button

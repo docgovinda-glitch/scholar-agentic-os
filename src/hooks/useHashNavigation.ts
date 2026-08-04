@@ -4,7 +4,10 @@ export type ViewMode = "dashboard" | "workspace";
 export type OnboardingStep = string;
 export type ActiveTab = string;
 
-const KNOWN_TABS = ["workspace", "vault", "agents", "publishing", "citation", "settings", "profile"];
+// Must stay in sync with App.tsx's activeTab union and AppHeader's tab list —
+// an unlisted tab is silently dropped by parseAndApplyHash below, so its
+// deep link and its quick-jump dropdown entry both become no-ops.
+const KNOWN_TABS = ["workspace", "vault", "agents", "publishing", "citation", "settings", "profile", "pocket"];
 
 export interface UseHashNavigationParams {
   user: string | null;
@@ -64,6 +67,13 @@ export function useHashNavigation(params: UseHashNavigationParams): void {
   // the same way.
   const previousUserRef = useRef(user);
 
+  // Set on the render where authentication resolves, consumed by the
+  // state -> hash effect below so the initial deep link isn't clobbered.
+  const justAuthenticatedRef = useRef(false);
+  if (user && !previousUserRef.current) {
+    justAuthenticatedRef.current = true;
+  }
+
   // Hash -> State synchronization (and browser back/forward handling)
   useEffect(() => {
     if (!user) {
@@ -120,6 +130,22 @@ export function useHashNavigation(params: UseHashNavigationParams): void {
   // State -> Hash synchronization
   useEffect(() => {
     if (!user) return;
+
+    // Both effects fire in the same commit on the render where `user`
+    // hydrates from localStorage. The hash -> state effect above runs first
+    // and *queues* setViewMode/setActiveTab, but this effect still closes
+    // over the pre-hydration values (viewMode "dashboard", activeTab
+    // "workspace"), so it used to immediately overwrite the address bar with
+    // "#dashboard" — which then fired a hashchange that reset the state for
+    // real. Every deep link into a tab was destroyed on load this way:
+    // #workspace/vault, #workspace/publishing and #workspace/pocket all
+    // landed on the dashboard, verified in a browser. Skipping this single
+    // write lets the incoming hash win; from the next render on, state and
+    // hash agree and this effect resumes normally.
+    if (justAuthenticatedRef.current) {
+      justAuthenticatedRef.current = false;
+      return;
+    }
 
     // Navigation overhaul Phase 2 — if we're already on the right onboarding
     // step, don't touch the hash: AISetupWizard.tsx owns any sub-route

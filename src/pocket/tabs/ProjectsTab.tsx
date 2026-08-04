@@ -35,7 +35,7 @@ export default function ProjectsTab({ projects, selectedId, onSelectProject }: P
         >
           ← Back to Projects
         </button>
-        <h2 className="text-lg font-serif font-bold text-[#F1F5F9]">{selected.projectId}</h2>
+        <h2 className="text-lg font-serif font-bold text-[#F1F5F9]">{selected.title}</h2>
         <div className="space-y-2 text-sm">
           <div>
             <span className="text-[#94A3B8]">Status: </span>
@@ -66,7 +66,7 @@ export default function ProjectsTab({ projects, selectedId, onSelectProject }: P
           onClick={() => onSelectProject(p.projectId)}
           className="w-full text-left rounded-lg border border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] p-3 hover:border-[color:var(--color-luminous-blue-dim)]"
         >
-          <h3 className="text-sm font-serif font-semibold text-[#F1F5F9] mb-1">{p.projectId}</h3>
+          <h3 className="text-sm font-serif font-semibold text-[#F1F5F9] mb-1">{p.title}</h3>
           <div className="flex gap-2 text-[10px] text-[#94A3B8] mb-2">
             <span>{new Date(p.lastModified).toLocaleDateString()}</span>
           </div>
