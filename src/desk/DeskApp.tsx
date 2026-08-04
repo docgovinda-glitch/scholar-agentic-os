@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import DeskAuthGate from "./DeskAuthGate";
 import DeskShell from "./DeskShell";
 import ProjectListScreen from "./ProjectListScreen";
+import AiSetupScreen from "./setup/AiSetupScreen";
+import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useDeskSession } from "./useDeskSession";
 
 function readProjectIdFromUrl(): string | null {
@@ -26,6 +28,8 @@ function readProjectIdFromUrl(): string | null {
  */
 function DeskRoutes() {
   const session = useDeskSession();
+  const userId = session.status === "signed-in" ? session.userId : null;
+  const aiSetup = useAiSetupStatus(userId);
   const [projectId, setProjectId] = useState<string | null>(readProjectIdFromUrl);
 
   // Keep component state and the URL in step when the user presses Back or
@@ -49,6 +53,20 @@ function DeskRoutes() {
     url.searchParams.delete("project");
     window.history.pushState({}, "", url);
     setProjectId(null);
+  }
+
+  // AI setup sits between signing in and the workspace (docs 25 §1). It is
+  // skippable: skipping leaves the editor fully usable with the AI features
+  // inert, which is a real choice rather than a broken state.
+  if (aiSetup.status === "checking") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)]">
+        <p className="text-sm text-[color:var(--text-muted)]">Loading your workspace…</p>
+      </div>
+    );
+  }
+  if (aiSetup.status === "needed") {
+    return <AiSetupScreen onDone={aiSetup.complete} onSkip={aiSetup.skip} />;
   }
 
   if (!projectId) {
