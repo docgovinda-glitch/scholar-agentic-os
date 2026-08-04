@@ -67,3 +67,49 @@ export interface OutputTypeSummary {
   academicLevels: string[];
   typicalDisciplines: string[];
 }
+
+export type InterventionLevel = "proofread" | "clarity" | "flow" | "register" | "rewrite";
+
+export type ChangeCategory = "mechanics" | "language" | "content";
+
+export interface DiffChange {
+  id: string;
+  category: ChangeCategory;
+  originalStart: number;
+  originalEnd: number;
+  originalText: string;
+  replacementText: string;
+  reason: string;
+  meaningNote?: string;
+}
+
+export interface RefinementDiff {
+  passageId: string;
+  level: InterventionLevel;
+  originalText: string;
+  changes: DiffChange[];
+  voiceApplied: boolean;
+}
+
+export interface VoiceDriftReport {
+  drifted: boolean;
+  notes: string[];
+}
+
+export interface StudioRefineResult {
+  diff: RefinementDiff;
+  voiceDrift?: VoiceDriftReport;
+  contentChangeCount: number;
+  languageChangeCount: number;
+}
+
+/** Thrown-shaped, not a real Error — matches the 428/403 bodies studio.ts sends. */
+export interface StudioConsentRequired {
+  kind: "consent_required";
+  reason: string;
+  provider?: string;
+}
+export interface StudioDenied {
+  kind: "denied";
+  reason: string;
+}
