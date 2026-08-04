@@ -24,21 +24,36 @@ const ALICE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const BOB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 /**
- * Fake Supabase, standing in for the network call requireAuth makes.
+ * Fake GoTrue, standing in for the one network call requireAuth makes.
  * "alice-token" and "bob-token" resolve to distinct users; anything else is
  * rejected the way a real expired or forged token would be.
+ *
+ * This intercepts `fetch` rather than mocking `@supabase/supabase-js`, because
+ * the middleware no longer uses that SDK — constructing a client per request
+ * pulled in a RealtimeClient that needed a WebSocket Node 20 does not have, and
+ * took production down. Mocking the module would now stub something nothing
+ * calls, and these tests would pass while verifying nothing.
  */
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: () => ({
-    auth: {
-      getUser: async (token: string) => {
-        if (token === "alice-token") return { data: { user: { id: ALICE, email: "alice@example.com" } }, error: null };
-        if (token === "bob-token") return { data: { user: { id: BOB, email: "bob@example.com" } }, error: null };
-        return { data: { user: null }, error: { message: "Invalid or expired token" } };
-      },
-    },
-  }),
-}));
+const realFetch = global.fetch;
+global.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === "string" ? input : input.toString();
+  if (url.includes("/auth/v1/user")) {
+    const headers = (init?.headers ?? {}) as Record<string, string>;
+    const token = (headers.Authorization ?? "").replace(/^Bearer /, "");
+    const user =
+      token === "alice-token"
+        ? { id: ALICE, email: "alice@example.com" }
+        : token === "bob-token"
+          ? { id: BOB, email: "bob@example.com" }
+          : null;
+    return Promise.resolve({
+      ok: Boolean(user),
+      status: user ? 200 : 401,
+      json: async () => user ?? { msg: "invalid JWT" },
+    } as Response);
+  }
+  return realFetch(input as RequestInfo, init);
+}) as typeof fetch;
 
 // requireAuth reads these at module scope and 500s when unset, so they must
 // exist before server.ts is imported below.
