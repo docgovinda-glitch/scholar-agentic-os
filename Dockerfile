@@ -17,7 +17,12 @@
 # inside a container.
 
 # ---------- builder: full toolchain, produces dist/ ----------
-FROM node:20-alpine AS builder
+# Node 22, not 20. CI already runs the suite on both, and package.json pins
+# @types/node ^22, so 20 was the odd one out. It also matters at runtime: Node
+# 20 ships no global WebSocket, which crashed anything constructing a Supabase
+# client (see server/src/middleware/auth.ts). Both stages move together so the
+# build and the runtime cannot diverge.
+FROM node:22-alpine AS builder
 WORKDIR /app
 ENV HUSKY=0
 
@@ -37,7 +42,7 @@ COPY . .
 RUN npm run build
 
 # ---------- runtime: dist/ + production deps only ----------
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
