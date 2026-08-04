@@ -1,7 +1,11 @@
 # Onboarding Architecture
 
 > **Doc ID:** 25 · **Status:** Design · **Depends on:** `10`, `12`, `21`
-> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
+> **Revision:** 1† — revision-2 terminology applied; §1.2 revised 2026-08-04 (see
+> `docs/06-decisions/63-ACCESS-MODEL.md`). Remaining surface passages still need a
+> full pass. The header previously claimed "Revision: 2", which the index
+> (`README.md` rev key) never agreed with — corrected here rather than left to
+> mislead the next reader.
 
 The nine-stage path from stranger to first project, with the AI Setup Wizard and
 the Workshop specified in full.
@@ -34,24 +38,52 @@ the Workshop specified in full.
 |---|---|
 | Under 12 minutes for a defaults-accepting user (`REQ-ONB-11`) | Every stage has a fast path |
 | Resumable across sessions and devices (`REQ-ONB-10`) | State persists server-side (account) and locally (config) |
-| Local-only use requires no account | Stages 1–3 are skippable entirely for offline users |
+| Access is institutionally gated | Stages 1–3 are mandatory; an administrator approves each account (`63`) |
+| Inference may be local | The AI Setup stage offers on-device runners as peers to cloud providers |
 | Every stage after login is skippable | Skips are recorded, re-offered contextually, never nagged |
 | Teaches without patronising | Progressive disclosure (`21` §4) |
 
-### 1.2 The local-only path
+### 1.2 Local inference — and what was withdrawn
 
-A user who downloads the Desk and wants nothing to do with our servers:
+**Withdrawn:** the account-less path this section used to specify.
+
+It read: *"A user who **downloads** the Desk … Launch → AI Setup Wizard …
+No account, no email, no network. This path must be visible on **first
+launch**."* That is revision-1 text describing a desktop application. Revision 2
+opens with "Website only. No desktop application" (`01` §1), and the sentence
+did not survive that change — a website is served over the network, so "no
+network" cannot be true of it, and it has no "first launch" to be visible on.
+
+Two further reasons it is withdrawn rather than deferred:
+
+1. **It contradicts the access model.** Accounts are approved by an
+   administrator before they work (`63`), and registration requires an
+   institutional ID precisely so someone can check it. An account-less path
+   routes around the gate the product is built on.
+2. **It implies a second storage backend.** Projects persist server-side and
+   are owner-scoped. Account-less operation would need a parallel local-only
+   store, maintained forever, to serve a path the access model rejects.
+
+**Kept, and this is the part that carried the actual privacy promise:** the
+model can run on the user's own machine. `P3`/`P4` are about where a user's
+prose goes, not about whether they have an account — and prose sent to a
+runner on `localhost` never leaves the machine.
+
+The AI Setup stage therefore offers on-device runners (`src/config/localRunnerCatalog.ts`)
+as **peers** to cloud providers, not as an advanced afterthought:
 
 ```
-  Launch → AI Setup Wizard (local models) → Vault (optional)
-         → Workshop → Workspace → Project
+  Account creation → Admin approval → Sign in
+        ↓
+  AI Setup  ── cloud provider (your own key)
+            └─ local runner (nothing leaves your machine)
+        ↓
+  Knowledge Vault (optional) → Workspace → Project
 ```
 
-No account, no email, no network. This path must be **visible on first launch**,
-not hidden — it is the strongest possible demonstration of `P3` and `P4`. The
-first screen offers "Sign in or create an account" and "Use without an account"
-as peers, with a one-line explanation of what an account adds (sync, Pocket,
-managed model credits).
+A user who wants nothing sent to a third party chooses a local runner and gets
+that guarantee. They still hold an account, because that is how this product
+grants access.
 
 ---
 
