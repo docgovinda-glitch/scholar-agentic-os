@@ -1,4 +1,17 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+// These suites exercise route logic — gates, rubric, claims, refinement — not
+// authentication. requireAuth is stubbed to a fixed user so that stays their
+// subject. Enforcement itself is tested for real, unmocked, in
+// project.authz.test.ts; stubbing here and asserting there keeps each file
+// testing one thing.
+export const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
+vi.mock("../../src/middleware/auth.ts", () => ({
+  requireAuth: (req: any, _res: any, next: any) => {
+    req.user = { id: TEST_USER_ID, email: "test@example.com" };
+    next();
+  },
+}));
 import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";

@@ -55,6 +55,7 @@ export function createPool(): Pool {
 function rowToRecord(row: Record<string, unknown>): ProjectRecord {
   return {
     projectId: row.project_id as string,
+    ownerId: row.owner_id as string,
     outputTypeId: row.output_type_id as string,
     answers: row.answers as ProjectRecord["answers"],
     gates: row.gates as ProjectRecord["gates"],
@@ -67,10 +68,11 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
 
 export function createPgProjectStore(db: PgQueryable): ProjectStore {
   return {
-    async create(outputTypeId: string): Promise<ProjectRecord> {
+    async create(outputTypeId: string, ownerId: string): Promise<ProjectRecord> {
       const projectId = generateProjectId();
       const record: ProjectRecord = {
         projectId,
+        ownerId,
         outputTypeId,
         answers: {},
         gates: initialProjectGateState(projectId),
@@ -79,10 +81,11 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
       };
       await db.query(
         `insert into public.projects
-           (project_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers)
-         values ($1, $2, $3, $4, null, null, $5, $6)`,
+           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers)
+         values ($1, $2, $3, $4, $5, null, null, $6, $7)`,
         [
           record.projectId,
+          record.ownerId,
           record.outputTypeId,
           JSON.stringify(record.answers),
           JSON.stringify(record.gates),
@@ -102,8 +105,8 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
     async save(record: ProjectRecord): Promise<ProjectRecord> {
       await db.query(
         `insert into public.projects
-           (project_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, now())
+           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
          on conflict (project_id) do update set
            output_type_id = excluded.output_type_id,
            answers = excluded.answers,
@@ -115,6 +118,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
            updated_at = now()`,
         [
           record.projectId,
+          record.ownerId,
           record.outputTypeId,
           JSON.stringify(record.answers),
           JSON.stringify(record.gates),
@@ -125,6 +129,14 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
         ]
       );
       return record;
+    },
+
+    async listByOwner(ownerId: string): Promise<ProjectRecord[]> {
+      const result = await db.query(
+        `select * from public.projects where owner_id = $1 order by updated_at desc`,
+        [ownerId]
+      );
+      return result.rows.map(rowToRecord);
     },
   };
 }

@@ -31,6 +31,13 @@
 
 create table if not exists public.projects (
   project_id text primary key,
+  -- Supabase user id of the owner. Every read and write through
+  -- server/routes/project.ts is checked against this.
+  --
+  -- No foreign key to auth.users, deliberately: deleting an account must not
+  -- cascade a user's academic work out of existence without an explicit,
+  -- reviewed deletion path. Orphaned rows are the safer failure here.
+  owner_id uuid not null,
   output_type_id text not null,
   answers jsonb not null default '{}'::jsonb,
   gates jsonb not null default '{}'::jsonb,
@@ -42,4 +49,31 @@ create table if not exists public.projects (
   updated_at timestamptz not null default now()
 );
 
+-- Migration for databases created before owner_id existed.
+--
+-- `create table if not exists` above is a no-op on an existing table, so a
+-- deployed database would keep its old, owner-less shape and every insert
+-- would fail on the missing column. This adds it.
+--
+-- Existing rows are the awkward case: they were created through an
+-- unauthenticated endpoint and have no recoverable owner. They are assigned
+-- the nil UUID rather than being deleted (destroying user work) or left
+-- nullable (which would let the ownership check be bypassed by a null).
+-- No real Supabase user has the nil UUID, so those rows become unreachable
+-- through the API — quarantined, not destroyed, and available for a
+-- deliberate reassignment or purge.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'projects' and column_name = 'owner_id'
+  ) then
+    alter table public.projects add column owner_id uuid;
+    update public.projects set owner_id = '00000000-0000-0000-0000-000000000000' where owner_id is null;
+    alter table public.projects alter column owner_id set not null;
+  end if;
+end $$;
+
 create index if not exists idx_projects_output_type on public.projects(output_type_id);
+-- Every listing query is owner-scoped and ordered by recency.
+create index if not exists idx_projects_owner on public.projects(owner_id, updated_at desc);

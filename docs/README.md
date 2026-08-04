@@ -109,6 +109,7 @@ years later by someone asking "why is it like this?"
 | Doc | Purpose | Rev |
 |---|---|---|
 | [`60-DESIGN-DIRECTION.md`](06-decisions/60-DESIGN-DIRECTION.md) | Retires the sci-fi visual direction; establishes the single warm, light-and-dark token system and the contrast verification that guards it | **2** |
+| [`61-CLIENT-CONSOLIDATION.md`](06-decisions/61-CLIENT-CONSOLIDATION.md) | Desk becomes the product and the legacy client retires; records the authentication and ownership gap this surfaced, and how it was closed | **2** |
 
 **Rev key** — **2**: rewritten for revision 2 · 1†: revision-1 document with
 revision-2 terminology applied; surface and architecture passages still need a

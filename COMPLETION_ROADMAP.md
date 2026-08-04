@@ -16,7 +16,7 @@
 
 ```
 npm run lint    # tsc --noEmit + contrast verification — clean
-npm test        # 158 files, 1736 tests — all passing
+npm test        # 160 files, 1783 tests — all passing
 npm run build   # client + server bundles — succeeds
 ```
 
@@ -24,7 +24,7 @@ npm run build   # client + server bundles — succeeds
 |---|---|
 | Source files (`src`, `server`) | 431 |
 | Lines of TypeScript/TSX | ~90,000 |
-| Test files / tests | 158 / 1736 |
+| Test files / tests | 160 / 1783 |
 | `TODO` / `FIXME` markers in source | 0 |
 
 ---
@@ -97,28 +97,26 @@ first-class, and `scripts/verify-contrast.mjs` gating 80 contrast pairings in
 
 Ordered by what blocks the most.
 
-### 1. The two-client split — architectural, decide before building more UI
+### 1. Desk feature parity — decided, in progress
 
-`src/main.tsx` routes on `window.location.pathname`: `/desk` mounts `DeskApp`,
-everything else mounts the legacy phase-based `App`. These are two separate
-applications sharing a repository.
+**Decided 2026-08-04: Desk becomes the real client; the legacy app retires**
+(`docs/06-decisions/61-CLIENT-CONSOLIDATION.md`).
 
-| | Legacy `App` | `Desk` |
-|---|---|---|
-| Route | everything except `/desk` | `/desk` |
-| Size | ~81 component files | 1,163 lines total |
-| Auth | wrapped in `AuthProvider` | **none — unauthenticated** |
-| Status | what users actually get | the architecture docs 20/21/22 describe |
+Promoting Desk surfaced and closed a vulnerability first: `/api/projects` and
+`/api/studio` required no authentication, projects had no owner, and project
+ids were sequential — so any unauthenticated caller could read, overwrite, and
+export anyone's work by walking the id space. Fixed, with 37 authorization
+tests that were verified to fail when the fix is reverted.
 
-Desk is the specified architecture but is a skeleton with no auth. The legacy
-app is the real product but does not match the specified information
-architecture. Only Desk's *types* are imported elsewhere — `DeskApp` and
-`DeskShell` themselves have no consumer outside `/desk`.
+Desk now has authentication, project ownership, an owner-scoped project list,
+and working Back/Forward. What remains is feature parity:
 
-**This is the decision that gates the remaining UI work**, and it is a product
-decision, not a mechanical one: either Desk grows into the real client and the
-legacy app retires, or Desk retires and its IA is folded into the legacy app.
-Building more screens before choosing means building them twice.
+- Intake wizards, Knowledge Vault, AI setup, export pipeline UI, submission
+  tracking — all legacy-only, each needs porting onto the gate-based model
+- Onboarding (registration, password recovery, AI setup, optional Vault)
+- Pocket should become Desk's responsive form, not a third client
+- Route flip: `/desk` → `/`, legacy reachable during transition
+- Delete `src/App.tsx` and legacy-only components once nothing routes to them
 
 ### 2. Per-screen redesign
 
@@ -126,7 +124,13 @@ The design system landed; the layouts did not change. Information architecture,
 navigation, and screen-level composition are unchanged from the phase-based
 original. Now unblocked — there is one system to build against.
 
-### 3. Verification that cannot be done from source
+### 3. Test files are not typechecked
+
+`tsconfig.json` excludes `**/__tests__/**`. A `store.create()` call kept
+compiling after the signature gained a required parameter. Enabling the check
+surfaces 199 pre-existing errors, mostly `possibly undefined` after assertions.
+
+### 4. Verification that cannot be done from source
 
 - Lighthouse performance and accessibility on a real deployment
 - PWA install on physical iOS and Android devices
@@ -134,7 +138,7 @@ original. Now unblocked — there is one system to build against.
 - Contrast verification covers *tokens*; it cannot see a component that puts
   the wrong token on the wrong surface
 
-### 4. Feature gaps
+### 5. Feature gaps
 
 - OCR for scanned documents (integration)
 - Reference-manager import: Zotero, Mendeley, BibTeX, RIS
@@ -143,7 +147,7 @@ original. Now unblocked — there is one system to build against.
 - PDF export writer with proper tagging; TOC, front matter, cross-references
 - AI use declaration drafting
 
-### 5. Platform tier — not started
+### 6. Platform tier — not started
 
 Plugin runtime and sandbox, plugin registry and signing, the operator console,
 Foundry authoring and golden sets, agent release channels, feature flags with
@@ -154,12 +158,20 @@ controls, and institutional SSO/SCIM.
 
 ## Recommended order
 
-1. **Decide the client split** (§1). Everything in §2 depends on it.
-2. **Deploy and measure** (§3). Lighthouse and device testing need a running
+1. **Port onboarding to Desk** (§1). Registration, password recovery, and AI
+   setup are the only path to a usable account, and they are legacy-only —
+   Desk cannot be the front door until they move.
+2. **Deploy and measure** (§4). Lighthouse and device testing need a running
    deployment, and the results will reorder §2.
-3. **Redesign screens** (§2) against whichever client won.
-4. **Close feature gaps** (§4) — largely independent, parallelisable.
-5. **Platform tier** (§5) — not required for launch.
+3. **Port the remaining legacy surfaces** (§1) onto the gate-based model,
+   redesigning each as it moves (§2) rather than porting then restyling.
+4. **Flip the route** (§1) once parity is reached; delete legacy after.
+5. **Close feature gaps** (§5) — largely independent, parallelisable.
+6. **Platform tier** (§6) — not required for launch.
+
+§3 (typechecking tests) is not sequenced here — it is a standalone cleanup that
+can land at any point, and gets more valuable the more porting work is in
+flight.
 
 ---
 
@@ -168,7 +180,8 @@ controls, and institutional SSO/SCIM.
 - [x] Type check, test suite, and production build all green
 - [x] Contrast verified automatically, in CI
 - [x] Single design token system, light and dark
-- [ ] Client split resolved
+- [x] Client split decided — Desk, with auth and ownership enforced
+- [ ] Desk at feature parity with the legacy client
 - [ ] Lighthouse ≥ 90 performance, ≥ 95 accessibility on deployment
 - [ ] PWA installs on physical iOS and Android
 - [ ] Screen-reader pass on registration → setup → workspace → export

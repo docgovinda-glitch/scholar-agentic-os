@@ -19,9 +19,10 @@ import type { ProjectRecord, ProjectStore } from "./types";
 
 function inMemoryAsStore(): ProjectStore {
   return {
-    create: (outputTypeId) => Promise.resolve(inMemory.createProject(outputTypeId)),
+    create: (outputTypeId, ownerId) => Promise.resolve(inMemory.createProject(outputTypeId, ownerId)),
     get: (projectId) => Promise.resolve(inMemory.getProject(projectId)),
     save: (record) => Promise.resolve(inMemory.saveProject(record)),
+    listByOwner: (ownerId) => Promise.resolve(inMemory.listProjectsByOwner(ownerId)),
   };
 }
 

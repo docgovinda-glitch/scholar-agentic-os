@@ -1,16 +1,50 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+//
+// Desk end-to-end against a mocked backend contract.
+//
+// Two things changed when Desk was promoted to the real client, and both
+// show up here: it renders behind DeskAuthGate, and its entry surface is the
+// user's project list rather than a bare create form. The session is stubbed
+// signed-in so these tests stay about Desk's flow; the gate's own behaviour
+// is tested in DeskAuthGate.test.tsx, and the server-side enforcement that
+// actually protects the data is in server/routes/__tests__/project.authz.test.ts.
+
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import DeskApp from "../DeskApp";
 
+vi.mock("../useDeskSession", () => ({
+  useDeskSession: () => ({ status: "signed-in", userId: "user-1", email: "scholar@example.com" }),
+}));
+
+// api.ts asks the Supabase client for an access token on every request.
+vi.mock("../../services/supabaseClient", () => ({
+  isSupabaseConfigured: () => true,
+  getSupabaseClient: () => ({
+    auth: {
+      getSession: async () => ({ data: { session: { access_token: "test-token" } } }),
+      signOut: vi.fn(),
+    },
+  }),
+}));
+
 const originalFetch = global.fetch;
 
-function mockFetchSequence(responses: Array<{ url: RegExp; body: unknown; status?: number }>) {
-  global.fetch = vi.fn((input: RequestInfo | URL) => {
+interface MockRoute {
+  url: RegExp;
+  /** Defaults to GET. Needed because /api/projects is both the list and the create route. */
+  method?: string;
+  body: unknown;
+  status?: number;
+}
+
+function mockFetchSequence(responses: MockRoute[]) {
+  global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
-    const match = responses.find((r) => r.url.test(url));
-    if (!match) throw new Error(`Unmocked fetch: ${url}`);
+    const method = (init?.method ?? "GET").toUpperCase();
+    const match = responses.find((r) => r.url.test(url) && (r.method ?? "GET").toUpperCase() === method);
+    if (!match) throw new Error(`Unmocked fetch: ${method} ${url}`);
     return Promise.resolve({
       ok: (match.status ?? 200) < 400,
       status: match.status ?? 200,
@@ -19,43 +53,87 @@ function mockFetchSequence(responses: Array<{ url: RegExp; body: unknown; status
   }) as unknown as typeof fetch;
 }
 
+const OT = {
+  id: "OT-06",
+  label: "Journal Article",
+  aliases: [],
+  family: "article",
+  academicLevels: [],
+  typicalDisciplines: [],
+};
+
+const projectView = (projectId: string, over: Record<string, unknown> = {}) => ({
+  projectId,
+  outputTypeId: "OT-06",
+  answers: {},
+  intakeCompleteness: 0,
+  hasDocument: false,
+  gates: [{ gate: "G0", name: "Intake", status: "not_started", outstandingBlocking: [] }],
+  ...over,
+});
+
 afterEach(() => {
   global.fetch = originalFetch;
   cleanup();
   window.history.pushState({}, "", "/desk");
 });
 
-describe("Desk — end to end with a real (mocked) backend contract", () => {
-  it("shows the create-project screen when no ?project= is in the URL, and creates one from a real output type", async () => {
+describe("Desk — project list", () => {
+  it("shows the empty state when the user has no projects yet", async () => {
+    mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
+
+    render(<DeskApp />);
+
+    expect(await screen.findByText("Nothing here yet")).toBeInTheDocument();
+  });
+
+  it("lists the user's own projects and opens one", async () => {
     mockFetchSequence([
-      { url: /\/api\/atlas\/output-types$/, body: { items: [{ id: "OT-06", label: "Journal Article", aliases: [], family: "article", academicLevels: [], typicalDisciplines: [] }] } },
-      {
-        url: /\/api\/projects$/,
-        body: { projectId: "proj-1", outputTypeId: "OT-06", answers: {}, intakeCompleteness: 0, hasDocument: false, gates: [{ gate: "G0", name: "Intake", status: "not_started", outstandingBlocking: [] }] },
-      },
-      { url: /\/api\/projects\/proj-1$/, body: { projectId: "proj-1", outputTypeId: "OT-06", answers: {}, intakeCompleteness: 0, hasDocument: false, gates: [{ gate: "G0", name: "Intake", status: "not_started", outstandingBlocking: [] }] } },
-      { url: /\/api\/projects\/proj-1\/rubric$/, body: { error: "no document" }, status: 404 },
+      { url: /\/api\/projects$/, body: { items: [projectView("proj-abc", { intakeCompleteness: 0.5 })] } },
+      { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
+      { url: /\/api\/projects\/proj-abc$/, body: projectView("proj-abc") },
+      { url: /\/api\/projects\/proj-abc\/rubric$/, body: {}, status: 404 },
     ]);
 
     render(<DeskApp />);
 
-    expect(await screen.findByText("Journal Article")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Journal Article"));
+    expect(await screen.findByText(/50% of intake answered/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("OT-06"));
 
-    // Lands in the Desk shell for the newly created project — the Primary
-    // region's empty-state heading is the unambiguous signal (Rail's
-    // Outline placeholder uses similar wording).
     expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
-    expect(window.location.search).toContain("project=proj-1");
+    expect(window.location.search).toContain("project=proj-abc");
   });
 
-  it("reads ?project= from the URL and renders the shell for that project directly", async () => {
+  it("creates a project from a real output type and opens it", async () => {
+    mockFetchSequence([
+      { url: /\/api\/projects$/, body: { items: [] } },
+      { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
+      { url: /\/api\/projects$/, method: "POST", body: projectView("proj-new") },
+      { url: /\/api\/projects\/proj-new$/, body: projectView("proj-new") },
+      { url: /\/api\/projects\/proj-new\/rubric$/, body: {}, status: 404 },
+    ]);
+
+    render(<DeskApp />);
+
+    fireEvent.click(await screen.findByText("Start your first project"));
+    fireEvent.click(await screen.findByText("Journal Article"));
+
+    expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
+    expect(window.location.search).toContain("project=proj-new");
+  });
+});
+
+describe("Desk — project shell", () => {
+  it("reads ?project= from the URL and renders that project directly", async () => {
     window.history.pushState({}, "", "/desk?project=proj-42");
     mockFetchSequence([
-      { url: /\/api\/atlas\/output-types$/, body: { items: [{ id: "OT-06", label: "Journal Article", aliases: [], family: "article", academicLevels: [], typicalDisciplines: [] }] } },
+      { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       {
         url: /\/api\/projects\/proj-42$/,
-        body: { projectId: "proj-42", outputTypeId: "OT-06", answers: {}, intakeCompleteness: 0.5, hasDocument: false, gates: [{ gate: "G0", name: "Intake", status: "in_progress", outstandingBlocking: ["Title required"] }] },
+        body: projectView("proj-42", {
+          intakeCompleteness: 0.5,
+          gates: [{ gate: "G0", name: "Intake", status: "in_progress", outstandingBlocking: ["Title required"] }],
+        }),
       },
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
     ]);
@@ -70,24 +148,31 @@ describe("Desk — end to end with a real (mocked) backend contract", () => {
   it("submits pasted plain text as a document and shows real Compliance findings back", async () => {
     window.history.pushState({}, "", "/desk?project=proj-7");
     mockFetchSequence([
-      { url: /\/api\/atlas\/output-types$/, body: { items: [{ id: "OT-06", label: "Journal Article", aliases: [], family: "article", academicLevels: [], typicalDisciplines: [] }] } },
+      { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       {
         url: /\/api\/projects\/proj-7$/,
-        body: { projectId: "proj-7", outputTypeId: "OT-06", answers: {}, intakeCompleteness: 0, hasDocument: false, gates: [{ gate: "G6", name: "Rubric", status: "not_started", outstandingBlocking: [] }] },
+        body: projectView("proj-7", {
+          gates: [{ gate: "G6", name: "Rubric", status: "not_started", outstandingBlocking: [] }],
+        }),
       },
       { url: /\/api\/projects\/proj-7\/rubric$/, body: {}, status: 404 },
       {
         url: /\/api\/projects\/proj-7\/document$/,
+        method: "PUT",
         body: {
-          projectId: "proj-7",
-          outputTypeId: "OT-06",
-          answers: {},
-          intakeCompleteness: 0,
-          hasDocument: true,
-          gates: [{ gate: "G6", name: "Rubric", status: "in_progress", outstandingBlocking: ["Word count too low"] }],
+          ...projectView("proj-7", {
+            hasDocument: true,
+            gates: [{ gate: "G6", name: "Rubric", status: "in_progress", outstandingBlocking: ["Word count too low"] }],
+          }),
           rubric: {
             findings: [
-              { ruleId: "word_count", status: "fail", severity: "blocking", message: "Below the minimum word count.", remedy: "Add more content." },
+              {
+                ruleId: "word_count",
+                status: "fail",
+                severity: "blocking",
+                message: "Below the minimum word count.",
+                remedy: "Add more content.",
+              },
             ],
             blockingFailures: [],
             requiredFailures: [],
@@ -109,7 +194,7 @@ describe("Desk — end to end with a real (mocked) backend contract", () => {
     expect(screen.getByText("→ Add more content.")).toBeInTheDocument();
   });
 
-  it("shows an honest error, not a crash, when the project fetch fails", async () => {
+  it("shows an honest error with a route back, not a dead end, when the project fetch fails", async () => {
     window.history.pushState({}, "", "/desk?project=missing");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [] } },
@@ -120,5 +205,21 @@ describe("Desk — end to end with a real (mocked) backend contract", () => {
     render(<DeskApp />);
 
     expect(await screen.findByText('No project "missing".')).toBeInTheDocument();
+    // A 404 here is also what another user's project looks like from outside,
+    // so the screen must offer a way out rather than stranding the user.
+    expect(screen.getByRole("button", { name: "Back to your work" })).toBeInTheDocument();
+  });
+
+  it("surfaces an expired session as a session problem, not a project error", async () => {
+    window.history.pushState({}, "", "/desk?project=proj-9");
+    mockFetchSequence([
+      { url: /\/api\/atlas\/output-types$/, body: { items: [] } },
+      { url: /\/api\/projects\/proj-9\/rubric$/, body: {}, status: 401 },
+      { url: /\/api\/projects\/proj-9$/, body: { error: "Invalid or expired token" }, status: 401 },
+    ]);
+
+    render(<DeskApp />);
+
+    expect(await screen.findByText(/session has expired/i)).toBeInTheDocument();
   });
 });
