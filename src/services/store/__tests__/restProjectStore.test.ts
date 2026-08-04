@@ -35,11 +35,15 @@ function fakeFetch(responder: (call: Call) => { status?: number; body?: unknown 
     };
     calls.push(call);
     const { status = 200, body = [] } = responder(call);
+    // `text` is what the store actually reads. Modelled faithfully: a
+    // return=minimal write answers 201 with an EMPTY body, not "null" — the
+    // difference is what made a successful create surface as a 500.
+    const text = body === undefined ? "" : JSON.stringify(body);
     return Promise.resolve({
       ok: status >= 200 && status < 300,
       status,
       json: async () => body,
-      text: async () => JSON.stringify(body),
+      text: async () => text,
     } as Response);
   };
   return { impl, calls };
@@ -94,6 +98,31 @@ describe("restProjectStore: create", () => {
     // A second generateProjectId() call here would desynchronise the gate
     // state from the row it belongs to, and nothing downstream would notice.
     expect(JSON.stringify(record.gates)).toContain(record.projectId);
+  });
+});
+
+describe("restProjectStore: empty response bodies", () => {
+  it("treats a 201 with an empty body as success, not a parse error", async () => {
+    // PostgREST answers `Prefer: return=minimal` writes with 201 and no body.
+    // Calling res.json() on that throws "Unexpected end of JSON input", which
+    // reported a create that had genuinely succeeded as a 500.
+    const { s } = store(() => ({ status: 201, body: undefined }));
+    await expect(s.create("OT-07", OWNER)).resolves.toMatchObject({ ownerId: OWNER });
+  });
+
+  it("treats a 204 with an empty body as success", async () => {
+    const { s } = store(() => ({ status: 204, body: undefined }));
+    await expect(
+      s.save({
+        projectId: "p",
+        ownerId: OWNER,
+        outputTypeId: "OT-07",
+        answers: {},
+        gates: {} as ProjectRecord["gates"],
+        claimGraph: {} as ProjectRecord["claimGraph"],
+        waivers: {},
+      })
+    ).resolves.toBeDefined();
   });
 });
 
