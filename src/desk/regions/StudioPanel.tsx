@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { grantStudioConsent, refinePassage, StudioConsentRequiredError, StudioDeniedError } from "../api";
+import { getWritingHistory, enableWritingHistory, disableWritingHistory, clearWritingHistory, summarizeWritingHistory, recordRefinement } from "../../app/studio/writingHistory";
 import type { InterventionLevel, StudioRefineResult, VoiceProfile } from "../types";
 
 const LEVELS: { id: InterventionLevel; label: string; needsProvider: boolean; description: string }[] = [
@@ -68,6 +69,9 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showVoiceBuilder, setShowVoiceBuilder] = useState(false);
+  const [writingHistoryEnabled, setWritingHistoryEnabled] = useState(false);
+  const writingHistory = getWritingHistory(sessionId);
+  const historySummary = summarizeWritingHistory(writingHistory);
 
   const activeLevel = LEVELS.find((l) => l.id === level)!;
 
@@ -115,6 +119,17 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
         apiKey: activeLevel.needsProvider ? apiKey : undefined,
       });
       setResult(r);
+
+      // Record to Writing History if enabled (docs 32 §8)
+      if (writingHistoryEnabled) {
+        recordRefinement(
+          sessionId,
+          "desk-studio-passage",
+          level,
+          r.diff.changes.length,
+          r.contentChangeCount
+        );
+      }
     } catch (e) {
       if (e instanceof StudioConsentRequiredError) {
         setConsentNeeded({ provider: e.provider || provider, reason: e.message });
@@ -126,6 +141,15 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  function toggleWritingHistory() {
+    if (writingHistoryEnabled) {
+      disableWritingHistory(sessionId);
+    } else {
+      enableWritingHistory(sessionId);
+    }
+    setWritingHistoryEnabled(!writingHistoryEnabled);
   }
 
   async function acceptConsent() {
@@ -143,7 +167,18 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="border-b border-[color:var(--color-border-subtle)]">
-      <div className="px-3 py-2 text-[10px] font-mono uppercase tracking-wide text-[#94A3B8]">▤ Studio</div>
+      <div className="flex items-center justify-between px-3 py-2 text-[10px] font-mono uppercase tracking-wide text-[#94A3B8]">
+        <span>▤ Studio</span>
+        <label className="flex items-center gap-1 cursor-pointer text-[10px] font-normal">
+          <input
+            type="checkbox"
+            checked={writingHistoryEnabled}
+            onChange={toggleWritingHistory}
+            className="w-3 h-3 cursor-pointer"
+          />
+          Writing History
+        </label>
+      </div>
       <div className="px-3 pb-3 flex flex-col gap-2">
         {/* Intervention level selection with description */}
         <div className="rounded bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)]">
@@ -320,6 +355,19 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
                   ))}
               </ul>
             )}
+          </div>
+        )}
+
+        {/* Writing History summary (docs 32 §8) */}
+        {writingHistoryEnabled && historySummary && (
+          <div className="rounded border border-[color:var(--color-luminous-blue-dim)] bg-[color:var(--color-navy-2)] px-2 py-1.5">
+            <p className="text-[10px] text-[color:var(--color-luminous-blue)]">{historySummary}</p>
+            <button
+              onClick={() => clearWritingHistory(sessionId)}
+              className="mt-1 text-[10px] text-[#64748B] hover:text-red-400 font-mono"
+            >
+              Clear history
+            </button>
           </div>
         )}
       </div>
