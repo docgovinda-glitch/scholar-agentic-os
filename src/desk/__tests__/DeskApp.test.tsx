@@ -115,6 +115,9 @@ describe("Desk — project list", () => {
     expect(await screen.findByText(/50% of intake answered/)).toBeInTheDocument();
     fireEvent.click(screen.getByText("OT-06"));
 
+    // The shell opens on Intake while G0 is outstanding — that is the first
+    // real task, and it gates every later gate.
+    fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
     expect(window.location.search).toContain("project=proj-abc");
   });
@@ -133,12 +136,27 @@ describe("Desk — project list", () => {
     fireEvent.click(await screen.findByText("Start your first project"));
     fireEvent.click(await screen.findByText("Journal Article"));
 
+    fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
     expect(window.location.search).toContain("project=proj-new");
   });
 });
 
 describe("Desk — project shell", () => {
+  it("opens on Intake while G0 is outstanding — the first task gates the rest", async () => {
+    window.history.pushState({}, "", "/desk?project=proj-42");
+    mockFetchSequence([
+      { url: /\/api\/atlas\/output-types\/OT-06$/, body: { id: "OT-06", label: "Journal Article", family: "article", intakeSchema: { required: [], recommended: [], optional: [] } } },
+      { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
+      { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
+      { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
+    ]);
+
+    render(<DeskApp />);
+
+    expect(await screen.findByText(/About your journal article/i)).toBeInTheDocument();
+  });
+
   it("reads ?project= from the URL and renders that project directly", async () => {
     window.history.pushState({}, "", "/desk?project=proj-42");
     mockFetchSequence([
@@ -200,6 +218,7 @@ describe("Desk — project shell", () => {
 
     render(<DeskApp />);
 
+    fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     const textarea = await screen.findByPlaceholderText(/Paste or type a draft/);
     fireEvent.change(textarea, { target: { value: "First paragraph.\n\nSecond paragraph." } });
     fireEvent.click(screen.getByText("Submit document"));
