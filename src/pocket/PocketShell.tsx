@@ -10,20 +10,30 @@
  */
 
 import { useState } from "react";
-import type { PocketTab, PocketProject } from "./types";
+import type { PocketTab, PocketProject, ApprovalCandidate, ApprovalQueueState } from "./types";
 import HomeTab from "./tabs/HomeTab";
 import ProjectsTab from "./tabs/ProjectsTab";
 import SearchTab from "./tabs/SearchTab";
 import MeTab from "./tabs/MeTab";
+import ApprovalQueueView from "./views/ApprovalQueueView";
 
 interface PocketShellProps {
   projectId?: string;
   projects?: PocketProject[];
+  approvalQueue?: ApprovalQueueState;
 }
 
-export default function PocketShell({ projectId, projects = [] }: PocketShellProps) {
+export default function PocketShell({ projectId, projects = [], approvalQueue }: PocketShellProps) {
   const [currentTab, setCurrentTab] = useState<PocketTab>("home");
   const [projectDetail, setProjectDetail] = useState<string | null>(projectId ?? null);
+  const [view, setView] = useState<"tabs" | "approval-queue">("tabs");
+
+  const queueState = approvalQueue || {
+    candidates: [],
+    currentIndex: 0,
+    approvedCount: 0,
+    rejectedCount: 0,
+  };
 
   const tabBadges: Record<PocketTab, number> = {
     home: 0,
@@ -31,6 +41,51 @@ export default function PocketShell({ projectId, projects = [] }: PocketShellPro
     search: 0,
     me: 0,
   };
+
+  const handleApprove = () => {
+    if (queueState.currentIndex < queueState.candidates.length - 1) {
+      // In a real app, this would call an API to approve the source
+      // For now, just move to the next candidate
+      // This would need proper state management for tracking approvals
+    }
+  };
+
+  const handleReject = () => {
+    if (queueState.currentIndex < queueState.candidates.length - 1) {
+      // Similar to approve, in a real app this would call an API
+    }
+  };
+
+  const handleDefer = () => {
+    if (queueState.currentIndex < queueState.candidates.length - 1) {
+      // Similar to approve, in a real app this would call an API
+    }
+  };
+
+  if (view === "approval-queue") {
+    return (
+      <div className="h-screen flex flex-col bg-[color:var(--color-navy-0)] text-[#E2E8F0]">
+        {/* App bar */}
+        <div className="h-14 flex items-center px-4 border-b border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)]">
+          <p className="text-sm text-[#F1F5F9] font-serif">Source Review</p>
+        </div>
+
+        {/* Content zone with approval queue */}
+        <div className="flex-1 overflow-hidden px-4 py-4">
+          <ApprovalQueueView
+            candidates={queueState.candidates}
+            currentIndex={queueState.currentIndex}
+            approvedCount={queueState.approvedCount}
+            rejectedCount={queueState.rejectedCount}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onDefer={handleDefer}
+            onBack={() => setView("tabs")}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-[color:var(--color-navy-0)] text-[#E2E8F0]">
@@ -47,7 +102,7 @@ export default function PocketShell({ projectId, projects = [] }: PocketShellPro
 
       {/* Content zone (Read zone — docs 23 §3.1) */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        {currentTab === "home" && <HomeTab badgeCount={tabBadges.home} projects={projects} />}
+        {currentTab === "home" && <HomeTab badgeCount={tabBadges.home} projects={projects} onStartReviewing={() => setView("approval-queue")} />}
         {currentTab === "projects" && <ProjectsTab projects={projects} selectedId={projectDetail} onSelectProject={setProjectDetail} />}
         {currentTab === "search" && <SearchTab />}
         {currentTab === "me" && <MeTab />}
@@ -56,7 +111,10 @@ export default function PocketShell({ projectId, projects = [] }: PocketShellPro
       {/* Bottom action zone (Reach zone — docs 23 §3.1) */}
       <div className="h-18 flex flex-col gap-2 px-4 py-2 border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-1)]">
         {currentTab === "home" && (
-          <button className="w-full py-3 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm font-mono uppercase tracking-wide">
+          <button
+            onClick={() => setView("approval-queue")}
+            className="w-full py-3 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-sm font-mono uppercase tracking-wide"
+          >
             Start Reviewing
           </button>
         )}

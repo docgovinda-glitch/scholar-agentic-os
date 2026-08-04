@@ -9,9 +9,10 @@ import type { PocketProject } from "../types";
 interface HomeTabProps {
   badgeCount: number;
   projects: PocketProject[];
+  onStartReviewing?: () => void;
 }
 
-export default function HomeTab({ badgeCount, projects }: HomeTabProps) {
+export default function HomeTab({ badgeCount, projects, onStartReviewing }: HomeTabProps) {
   const attention = projects.filter(
     (p) => p.sourcesAwaitingApproval > 0 || p.pendingStudioChanges > 0 || p.unreadComments > 0
   );
