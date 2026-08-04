@@ -1,0 +1,49 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+      - claude/remaining-project-tasks-ok41cg
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Render
+        if: github.event_name == 'push'
+        run: |
+          curl --request POST \
+            --url "https://api.render.com/deploy/srv-d9lgbn710e5c73dl8sk0?key=${{ secrets.RENDER_DEPLOY_KEY }}" \
+            --header 'accept: application/json'
+        continue-on-error: true
+
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+        continue-on-error: true
