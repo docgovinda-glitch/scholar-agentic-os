@@ -123,3 +123,42 @@ export interface StudioDenied {
   kind: "denied";
   reason: string;
 }
+
+/** Intake field tier — drives UI treatment (docs 14 §5). */
+export type IntakeTier = "required" | "recommended" | "optional";
+
+/**
+ * One intake question, mirroring src/app/atlas/types.ts's IntakeField.
+ *
+ * `guidance` is a four-part contract the Atlas catalog validates as mandatory
+ * on every field (app/atlas/validate.ts). It is what makes it possible to ask
+ * a first-time writer for a "research question" without assuming they already
+ * know what one is — so the UI must actually show it, not just carry it.
+ */
+export interface IntakeField {
+  key: string;
+  label: string;
+  tier: IntakeTier;
+  guidance: {
+    whatItIs: string;
+    whyItMatters: string;
+    example: string;
+    defaultWithRationale: string;
+  };
+  /** Pre-fillable value — "never an empty required field" (docs 14 §5.2). */
+  defaultValue?: string;
+  /** Whether "I'm not sure yet" is an accepted answer for now. */
+  allowsProvisional: boolean;
+}
+
+/** The parts of an Atlas output-type spec the intake form needs. */
+export interface OutputTypeSpec {
+  id: string;
+  label: string;
+  family: string;
+  intakeSchema: {
+    required: IntakeField[];
+    recommended: IntakeField[];
+    optional: IntakeField[];
+  };
+}

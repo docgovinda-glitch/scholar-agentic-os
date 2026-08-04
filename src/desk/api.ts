@@ -11,7 +11,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import type { CanonicalDocument, InterventionLevel, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, VoiceProfile } from "./types";
+import type { CanonicalDocument, InterventionLevel, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, VoiceProfile } from "./types";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -77,6 +77,32 @@ export function createProject(outputTypeId: string): Promise<ProjectView> {
 /** The signed-in user's own projects, most recently updated first. */
 export function listProjects(): Promise<{ items: ProjectView[] }> {
   return authedFetch("/api/projects").then((r) => json(r));
+}
+
+/**
+ * The full Atlas spec for one output type — this is where `intakeSchema`
+ * lives. `listOutputTypes()` deliberately returns summaries only, so the
+ * "choose what you are writing" screen does not download 24 full specs.
+ */
+export function getOutputTypeSpec(outputTypeId: string): Promise<OutputTypeSpec> {
+  return authedFetch(`/api/atlas/output-types/${encodeURIComponent(outputTypeId)}`).then((r) => json(r));
+}
+
+/**
+ * Submit or update intake answers. Merges server-side, so a partial save is
+ * safe and callers need not send fields the user has not reached.
+ *
+ * Returns the updated ProjectView — including recomputed gates — because
+ * answering intake is what moves G0, and the caller needs the new gate state
+ * rather than having to re-fetch to discover it changed.
+ */
+export function saveIntakeAnswers(
+  projectId: string,
+  answers: Record<string, string>
+): Promise<ProjectView> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/intake`, "PATCH", { answers }).then((r) =>
+    json(r)
+  );
 }
 
 export function getProject(projectId: string): Promise<ProjectView> {

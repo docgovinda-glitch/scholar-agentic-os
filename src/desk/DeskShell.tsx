@@ -5,6 +5,7 @@ import Header from "./regions/Header";
 import Rail from "./regions/Rail";
 import Primary from "./regions/Primary";
 import Aside from "./regions/Aside";
+import IntakePanel from "./intake/IntakePanel";
 import StatusBar from "./regions/StatusBar";
 import type { CanonicalDocument, OutputTypeSummary, ProjectView, RubricReport } from "./types";
 
@@ -23,11 +24,24 @@ export default function DeskShell({ projectId, onClose }: { projectId: string; o
   const [outputType, setOutputType] = useState<OutputTypeSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * Which of the two working surfaces is showing.
+   *
+   * Defaults to intake, and switches to the document once G0 is satisfied —
+   * because intake is genuinely the first task, and G0 gates every later gate.
+   * `null` means "not yet decided", so the choice is made from the loaded
+   * project rather than flashing the wrong surface first.
+   */
+  const [view, setView] = useState<"intake" | "document" | null>(null);
 
   const load = useCallback(async () => {
     try {
       const [proj, rub, types] = await Promise.all([getProject(projectId), getRubric(projectId), listOutputTypes()]);
       setProject(proj);
+      // Land on whichever surface has the outstanding work. Only decided once,
+      // on load — re-deciding on every project update would yank the user out
+      // of intake the moment their last answer landed.
+      setView((current) => current ?? (proj.gates.find((g) => g.gate === "G0")?.status === "signed_off" ? "document" : "intake"));
       setRubric(rub);
       setOutputType(types.items.find((t) => t.id === proj.outputTypeId) ?? null);
     } catch (e) {
@@ -96,9 +110,39 @@ export default function DeskShell({ projectId, onClose }: { projectId: string; o
   return (
     <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
       <Header project={project} outputTypeLabel={outputType?.label ?? project.outputTypeId} onClose={onClose} />
+      <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
+        {(["intake", "document"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setView(v)}
+            aria-current={view === v ? "page" : undefined}
+            className={[
+              "-mb-px border-b-2 px-3 py-2 text-sm transition-colors duration-[var(--motion-fast)] cursor-pointer",
+              view === v
+                ? "border-[color:var(--accent)] text-[color:var(--text-primary)]"
+                : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]",
+            ].join(" ")}
+          >
+            {v === "intake" ? "Intake" : "Document"}
+          </button>
+        ))}
+      </nav>
       <div className="flex flex-1 min-h-0">
-        <Rail document={document} onJumpToBlock={jumpToBlock} />
-        <Primary document={document} onSubmitPlainText={handleSubmitPlainText} submitting={submitting} projectId={projectId} />
+        {view === "intake" ? (
+          <div className="flex-1 overflow-y-auto">
+            <IntakePanel
+              projectId={projectId}
+              project={project}
+              onSaved={(updated) => setProject(updated)}
+            />
+          </div>
+        ) : (
+          <>
+            <Rail document={document} onJumpToBlock={jumpToBlock} />
+            <Primary document={document} onSubmitPlainText={handleSubmitPlainText} submitting={submitting} projectId={projectId} />
+          </>
+        )}
         <Aside rubric={rubric} sessionId={`desk-${projectId}`} />
       </div>
       <StatusBar project={project} />
