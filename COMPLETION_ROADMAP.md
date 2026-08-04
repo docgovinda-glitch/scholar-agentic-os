@@ -16,7 +16,7 @@
 
 ```
 npm run lint    # tsc --noEmit + contrast verification — clean
-npm test        # 160 files, 1783 tests — all passing
+npm test        # 162 files, 1815 tests — all passing
 npm run build   # client + server bundles — succeeds
 ```
 
@@ -24,7 +24,7 @@ npm run build   # client + server bundles — succeeds
 |---|---|
 | Source files (`src`, `server`) | 431 |
 | Lines of TypeScript/TSX | ~90,000 |
-| Test files / tests | 160 / 1783 |
+| Test files / tests | 162 / 1815 |
 | `TODO` / `FIXME` markers in source | 0 |
 
 ---
@@ -84,6 +84,29 @@ GET    /projects/:projectId/approval-queue
 
 `supabase/schema_pocket.sql` declares the four supporting tables. The previous
 revision listed all of this as the critical unbuilt path.
+
+### Deployed and verified end to end — 2026-08-04
+
+Live at `scholar.gkshah.com.np`. Verified against production, not inferred:
+
+- Unauthenticated `/api/projects` and `/api/studio` → **401**
+- Invalid token → **401** (was 500; see below)
+- Authenticated create → list → fetch-by-id round trip through Postgres
+- A second user sees an empty list and **404** on the first user's project
+- `anon` key against the `projects` table → reads filtered to empty, writes
+  rejected with `42501`
+
+Three production faults were found and fixed along the way, all pre-existing:
+
+1. **Auth returned 500 on every authenticated request.** `requireAuth` built a
+   Supabase client per request; that constructor needs a native WebSocket, and
+   the image ran Node 20, which has none. Pocket has used `requireAuth` since it
+   was written, so Pocket's API had been dead in production the whole time.
+2. **A database error killed the whole service** — Express 4 does not await
+   route handlers, so a rejected query became an unhandled rejection and Node
+   exited, returning 502 for every route including `/api/health`.
+3. **Persistence could not reach Postgres at all** — see
+   `docs/06-decisions/62-DATABASE-ACCESS.md`.
 
 ### Design system — rebuilt 2026-08-04
 
@@ -186,5 +209,8 @@ flight.
 - [ ] PWA installs on physical iOS and Android
 - [ ] Screen-reader pass on registration → setup → workspace → export
 - [ ] All Pocket features usable at 360 px
-- [ ] Supabase schema migrated in production
-- [ ] `scholar.gkshah.com.np` resolves and serves the deployment
+- [x] Supabase schema migrated in production
+- [x] `scholar.gkshah.com.np` resolves and serves the deployment
+- [x] Authenticated persistence verified end to end in production
+- [x] Cross-user isolation verified in production (404, not 403)
+- [x] `projects` table locked down with explicit RLS

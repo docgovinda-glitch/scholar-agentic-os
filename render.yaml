@@ -83,15 +83,22 @@ services:
       # that the service requires it, not what it is.
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      # Optional, and currently unset — which means server/routes/project.ts
-      # falls back to the in-memory project store
-      # (src/app/conductor/projectStore.ts). That store does not survive a
-      # restart, and this service is on the free plan, which spins down after
-      # ~15 minutes idle. Every Desk project a user creates is therefore lost
-      # within the hour, and nothing warns them.
+      # OPTIONAL, and no longer the persistence path.
       #
-      # This must be set, and supabase/schema_store.sql applied, before Desk
-      # can be the client users are pointed at — see
-      # docs/06-decisions/61-CLIENT-CONSOLIDATION.md §5.
+      # Project persistence now runs over Supabase's HTTPS Data API, using
+      # VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY above — the two values
+      # this service already needs in order to verify tokens. Nothing else has
+      # to be configured for projects to be durable.
+      #
+      # The direct connection is retained as a fallback (it supports SQL the
+      # Data API cannot express), but it failed here four separate ways:
+      # db.<ref>.supabase.co is IPv6-only while Render's egress is IPv4-only;
+      # the IPv4 pooler needs the right region, port and tenant username;
+      # Supabase's cert chains to its own root, so TLS fails without pinning
+      # it; and it needs a database password distinct from every other
+      # credential. See docs/06-decisions/62-DATABASE-ACCESS.md.
+      #
+      # Leave unset unless you specifically need direct SQL. If you do set it,
+      # use the POOLER host, never db.<ref>.supabase.co.
       - key: DATABASE_URL
         sync: false
