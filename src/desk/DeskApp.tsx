@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import DeskAuthGate from "./DeskAuthGate";
 import DeskShell from "./DeskShell";
 import ProjectListScreen from "./ProjectListScreen";
+import AiSetupScreen from "./setup/AiSetupScreen";
+import VaultSetupScreen from "./setup/VaultSetupScreen";
+import { useAiSetupStatus } from "./setup/useAiSetupStatus";
+import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
 import { useDeskSession } from "./useDeskSession";
 
 function readProjectIdFromUrl(): string | null {
@@ -26,6 +30,11 @@ function readProjectIdFromUrl(): string | null {
  */
 function DeskRoutes() {
   const session = useDeskSession();
+  const userId = session.status === "signed-in" ? session.userId : null;
+  const aiSetup = useAiSetupStatus(userId);
+  // Gated on AI setup being finished so the two stages cannot render at once,
+  // and so the Vault query does not run before it is reachable.
+  const vaultSetup = useVaultSetupStatus(userId, aiSetup.status === "ready");
   const [projectId, setProjectId] = useState<string | null>(readProjectIdFromUrl);
 
   // Keep component state and the URL in step when the user presses Back or
@@ -49,6 +58,26 @@ function DeskRoutes() {
     url.searchParams.delete("project");
     window.history.pushState({}, "", url);
     setProjectId(null);
+  }
+
+  // AI setup sits between signing in and the workspace (docs 25 §1). It is
+  // skippable: skipping leaves the editor fully usable with the AI features
+  // inert, which is a real choice rather than a broken state.
+  if (aiSetup.status === "checking") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)]">
+        <p className="text-sm text-[color:var(--text-muted)]">Loading your workspace…</p>
+      </div>
+    );
+  }
+  if (aiSetup.status === "needed") {
+    return <AiSetupScreen onDone={aiSetup.complete} onSkip={aiSetup.skip} />;
+  }
+
+  // Knowledge Vault (docs 25 §6) — optional, and offered once. Declining is a
+  // peer option, not a lesser one, and is remembered.
+  if (vaultSetup.status === "offer") {
+    return <VaultSetupScreen onDone={vaultSetup.complete} onSkip={vaultSetup.skip} />;
   }
 
   if (!projectId) {

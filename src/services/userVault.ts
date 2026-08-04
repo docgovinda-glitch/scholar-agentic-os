@@ -1,0 +1,144 @@
+/**
+ * The user's Knowledge Vault — existence, and the secrets that must never
+ * leave their device.
+ *
+ * User-scoped, not project-scoped. The legacy Vault hangs off
+ * `PaperProject.knowledgeVault`, the same mistake `AISettings` made: a Vault is
+ * explicitly "your long-term academic knowledge repository across future
+ * projects" (docs 25 §6.2), so binding it to one project contradicts the thing
+ * it is for.
+ *
+ * WHAT IS AND IS NOT STORED SERVER-SIDE
+ *
+ * `public.user_vaults` records that a Vault exists and when. That is all.
+ * Doc 25 §6.3 fixes the Recovery Kit wording verbatim, and it is a promise the
+ * storage design has to keep:
+ *
+ *   "If you forget your passphrase, this code is the only way to open your
+ *    Vault again. We do not have a copy. We cannot reset it."
+ *
+ * So the passphrase and the recovery code are never sent to the server in any
+ * form — not encrypted, and not hashed either. A hash is still a copy for the
+ * purpose that sentence makes a promise about, and it is what would later let
+ * "reset my Vault" quietly become possible, at which point the wording above
+ * would be a lie.
+ *
+ * The recovery code is shown once, at creation, and is the user's to keep.
+ */
+
+import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
+
+const PASSPHRASE_VERIFIER = "scholar-vault-verifier";
+
+export interface VaultRecord {
+  label: string;
+  createdAt: string;
+}
+
+/* -------------------------------------------------------------------------
+ * Recovery code
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Format is `SCHL-4K9M-2XQP-7WNZ-HB3R` (docs 25 §6.3).
+ *
+ * Crockford's alphabet, minus the characters people reliably mistranscribe:
+ * no I, L, O, U. This code is copied by hand off a printout at the exact
+ * moment it matters most, and a 0/O confusion there is unrecoverable by
+ * design — there is no copy to fall back on.
+ */
+const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+export function generateRecoveryCode(): string {
+  const groups: string[] = [];
+  for (let g = 0; g < 4; g++) {
+    const bytes = crypto.getRandomValues(new Uint8Array(4));
+    // Rejection-free mapping is not needed for a 32-char alphabet: 256 is an
+    // exact multiple of 32, so the modulo is uniform.
+    groups.push(Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join(""));
+  }
+  return `SCHL-${groups.join("-")}`;
+}
+
+/* -------------------------------------------------------------------------
+ * Device-side passphrase verifier
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Records that a passphrase was set, without recording the passphrase.
+ *
+ * A SHA-256 of the passphrase is kept on this device so the UI can tell a
+ * wrong entry from a right one. It is deliberately device-local: the promise
+ * in the module header is about what OUR SERVERS hold, and this never goes
+ * there.
+ *
+ * Not a password-hashing function (no salt, no work factor) because it is not
+ * defending a credential database — it is a local equality check for a secret
+ * that never leaves the machine. Anyone who can read it can already read the
+ * Vault's own device-side material.
+ */
+async function sha256(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function setVaultPassphraseVerifier(passphrase: string): Promise<void> {
+  try {
+    localStorage.setItem(PASSPHRASE_VERIFIER, await sha256(passphrase));
+  } catch {
+    // Without persistence the passphrase simply cannot be checked next visit;
+    // it is not a reason to fail Vault creation.
+  }
+}
+
+export async function verifyVaultPassphrase(passphrase: string): Promise<boolean> {
+  try {
+    const stored = localStorage.getItem(PASSPHRASE_VERIFIER);
+    return stored !== null && stored === (await sha256(passphrase));
+  } catch {
+    return false;
+  }
+}
+
+export function hasVaultPassphraseOnThisDevice(): boolean {
+  try {
+    return localStorage.getItem(PASSPHRASE_VERIFIER) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/* -------------------------------------------------------------------------
+ * Vault existence (server-side, no secrets)
+ * ---------------------------------------------------------------------- */
+
+export async function loadVault(): Promise<VaultRecord | null> {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = getSupabaseClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return null;
+
+  const { data, error } = await supabase
+    .from("user_vaults")
+    .select("label, created_at")
+    .eq("user_id", userData.user.id)
+    .maybeSingle();
+
+  // No row is the normal state for someone who declined or has not reached
+  // this stage — not an error.
+  if (error || !data) return null;
+  return { label: data.label, createdAt: data.created_at };
+}
+
+export async function createVault(label: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { success: false, error: "Supabase is not configured." };
+  const supabase = getSupabaseClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return { success: false, error: "Not signed in." };
+
+  const { error } = await supabase
+    .from("user_vaults")
+    .upsert({ user_id: userData.user.id, label }, { onConflict: "user_id" });
+
+  return error ? { success: false, error: error.message } : { success: true };
+}

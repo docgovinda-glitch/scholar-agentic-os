@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { grantStudioConsent, refinePassage, StudioConsentRequiredError, StudioDeniedError } from "../api";
+import { loadUserAiSettings, readProviderKey } from "../../services/userAiSettings";
 import { getWritingHistory, enableWritingHistory, disableWritingHistory, clearWritingHistory, summarizeWritingHistory, recordRefinement } from "../../app/studio/writingHistory";
 import type { InterventionLevel, StudioRefineResult, VoiceProfile } from "../types";
 
@@ -59,6 +60,8 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
   const [level, setLevel] = useState<InterventionLevel>("proofread");
   const [provider, setProvider] = useState(PROVIDERS[0]);
   const [apiKey, setApiKey] = useState("");
+  /** True once the key below came from saved settings rather than being typed here. */
+  const [keyFromSettings, setKeyFromSettings] = useState(false);
   const [l1, setL1] = useState<string>("");
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
   const [voiceSamples, setVoiceSamples] = useState("");
@@ -70,6 +73,31 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
   const [busy, setBusy] = useState(false);
   const [showVoiceBuilder, setShowVoiceBuilder] = useState(false);
   const [writingHistoryEnabled, setWritingHistoryEnabled] = useState(false);
+  // Prefill from the user's saved AI configuration. Before this existed, the
+  // panel asked for an API key on every visit even though setup had already
+  // collected one — the settings had nowhere to be read from
+  // (see src/services/userAiSettings.ts).
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const settings = await loadUserAiSettings();
+      if (!active) return;
+      if (PROVIDERS.includes(settings.provider)) setProvider(settings.provider);
+      const saved = await readProviderKey(settings.provider);
+      if (!active || !saved) return;
+      setApiKey(saved);
+      setKeyFromSettings(true);
+    })().catch(() => {
+      // Prefill is a convenience, not a precondition — the panel still works
+      // with a manually entered key. Without this catch the rejection is
+      // unhandled, which in Node terminates the process and in the browser
+      // surfaces as a console error for a failure the user need not see.
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const writingHistory = getWritingHistory(sessionId);
   const historySummary = summarizeWritingHistory(writingHistory);
 
@@ -216,8 +244,12 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
               <input
                 type="password"
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="API key"
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  setKeyFromSettings(false);
+                }}
+                aria-label="API key"
+                placeholder={keyFromSettings ? "Using your saved key" : "API key"}
                 className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
               />
             </div>
