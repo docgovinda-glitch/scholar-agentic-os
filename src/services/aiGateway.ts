@@ -504,33 +504,19 @@ function createCloudAdapter(spec: CloudProviderSpec): AIProviderAdapter {
       const model = request.model || resolveProviderModel(spec.id, settings, spec.defaultModel);
       const baseUrlOverride = resolveProviderBaseUrl(spec.id, settings);
 
-      if (spec.apiStyle === "gemini" && apiKey) {
-        const base = resolveBaseUrl(spec, baseUrlOverride);
-        const url = `${base}/models/${model}:generateContent?key=${apiKey}`;
-        let response: Response;
-        try {
-          response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: request.prompt }] }],
-              systemInstruction: { parts: [{ text: request.systemInstruction }] },
-              generationConfig: {
-                temperature: request.temperature,
-                responseMimeType: request.responseMimeType,
-              },
-            }),
-          });
-        } catch (e) {
-          throw new ProviderCallError(spec.id, classifyThrownError(e, { url }));
-        }
-        if (!response.ok) {
-          throw new ProviderCallError(spec.id, await classifyResponse(response));
-        }
-        const data = await response.json();
-        return (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
-      }
-
+      // Gemini used to be special-cased here into a direct browser fetch of
+      // generativelanguage.googleapis.com. That branch carried no
+      // AbortSignal, while every other provider goes through callServerProxy,
+      // which times out via AbortSignal.timeout(PROXY_TIMEOUT_MS). So when the
+      // Gemini request stalled the promise never settled and "Test connection"
+      // span forever with no verdict — the failure mode reported from the
+      // setup wizard.
+      //
+      // It also put the user's key in a URL query string (`?key=...`) sent
+      // from the page, which leaks it into browser history and any
+      // intermediary that logs URLs. The server proxy already handles Gemini
+      // (it is the server's default provider), so there is nothing this
+      // branch bought that the shared path does not do better.
       return callServerProxy({ ...request, model }, spec.id, apiKey, settings, baseUrlOverride);
     },
 
