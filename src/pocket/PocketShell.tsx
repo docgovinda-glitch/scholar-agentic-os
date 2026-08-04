@@ -16,6 +16,7 @@ import ProjectsTab from "./tabs/ProjectsTab";
 import SearchTab from "./tabs/SearchTab";
 import MeTab from "./tabs/MeTab";
 import ApprovalQueueView from "./views/ApprovalQueueView";
+import { useApprovalQueue } from "./hooks/usePocketApi";
 
 interface PocketShellProps {
   projectId?: string;
@@ -27,6 +28,10 @@ export default function PocketShell({ projectId, projects = [], approvalQueue }:
   const [currentTab, setCurrentTab] = useState<PocketTab>("home");
   const [projectDetail, setProjectDetail] = useState<string | null>(projectId ?? null);
   const [view, setView] = useState<"tabs" | "approval-queue">("tabs");
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Use Pocket API hook for approval queue
+  const approvalApi = projectId ? useApprovalQueue(projectId) : null;
 
   const queueState = approvalQueue || {
     candidates: [],
@@ -42,23 +47,45 @@ export default function PocketShell({ projectId, projects = [], approvalQueue }:
     me: 0,
   };
 
-  const handleApprove = () => {
-    if (queueState.currentIndex < queueState.candidates.length - 1) {
-      // In a real app, this would call an API to approve the source
-      // For now, just move to the next candidate
-      // This would need proper state management for tracking approvals
+  const handleApprove = async () => {
+    if (!approvalApi || !queueState.candidates[currentIndex]) return;
+
+    const candidate = queueState.candidates[currentIndex];
+    try {
+      await approvalApi.submitDecision(candidate.id || String(currentIndex), "approved");
+      if (currentIndex < queueState.candidates.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+      }
+    } catch (error) {
+      console.error("Failed to approve source:", error);
     }
   };
 
-  const handleReject = () => {
-    if (queueState.currentIndex < queueState.candidates.length - 1) {
-      // Similar to approve, in a real app this would call an API
+  const handleReject = async () => {
+    if (!approvalApi || !queueState.candidates[currentIndex]) return;
+
+    const candidate = queueState.candidates[currentIndex];
+    try {
+      await approvalApi.submitDecision(candidate.id || String(currentIndex), "rejected");
+      if (currentIndex < queueState.candidates.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+      }
+    } catch (error) {
+      console.error("Failed to reject source:", error);
     }
   };
 
-  const handleDefer = () => {
-    if (queueState.currentIndex < queueState.candidates.length - 1) {
-      // Similar to approve, in a real app this would call an API
+  const handleDefer = async () => {
+    if (!approvalApi || !queueState.candidates[currentIndex]) return;
+
+    const candidate = queueState.candidates[currentIndex];
+    try {
+      await approvalApi.submitDecision(candidate.id || String(currentIndex), "deferred");
+      if (currentIndex < queueState.candidates.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+      }
+    } catch (error) {
+      console.error("Failed to defer source:", error);
     }
   };
 
@@ -74,7 +101,7 @@ export default function PocketShell({ projectId, projects = [], approvalQueue }:
         <div className="flex-1 overflow-hidden px-4 py-4">
           <ApprovalQueueView
             candidates={queueState.candidates}
-            currentIndex={queueState.currentIndex}
+            currentIndex={currentIndex}
             approvedCount={queueState.approvedCount}
             rejectedCount={queueState.rejectedCount}
             onApprove={handleApprove}
