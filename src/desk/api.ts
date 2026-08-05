@@ -105,6 +105,37 @@ export function saveIntakeAnswers(
   );
 }
 
+/**
+ * Sign off a gate. `actor` is recorded in the gate's signoff record — this is
+ * an accountable act, not a state toggle, so it is attributed.
+ *
+ * 409 when the gate is not ready: either a blocking exit criterion is
+ * unsatisfied, or an earlier gate it depends on is not signed off yet. The
+ * server's message names which.
+ */
+export function signOffGate(projectId: string, gate: string, actor: string): Promise<ProjectView> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/gates/${encodeURIComponent(gate)}/signoff`,
+    "POST",
+    { actor }
+  ).then((r) => json(r));
+}
+
+/**
+ * Invalidate a signed-off gate, cascading to every gate that depended on it.
+ *
+ * `reason` is required by the server and is not a formality: this undoes an
+ * approval and discards work downstream of it, so the record of why has to
+ * exist (UX3 — deliberate friction at consequential decisions).
+ */
+export function invalidateGate(projectId: string, gate: string, reason: string): Promise<ProjectView> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/gates/${encodeURIComponent(gate)}/invalidate`,
+    "POST",
+    { reason }
+  ).then((r) => json(r));
+}
+
 export function getProject(projectId: string): Promise<ProjectView> {
   return authedFetch(`/api/projects/${encodeURIComponent(projectId)}`).then((r) => json(r));
 }
