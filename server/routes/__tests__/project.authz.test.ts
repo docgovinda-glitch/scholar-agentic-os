@@ -244,6 +244,17 @@ describe("project API — ownership", () => {
     expect(res.status).toBe(404);
   });
 
+  it("refuses to add a submission to another user's project", async () => {
+    const aliceProject = await createProjectAs(asAlice());
+
+    const res = await request(app)
+      .post(`/api/projects/${aliceProject}/submissions`)
+      .set(asBob())
+      .send({ journalName: "Bob's Journal", submittedAt: "2026-01-01", status: "draft" });
+
+    expect(res.status).toBe(404);
+  });
+
   it("lets the owner keep working on their own project", async () => {
     const aliceProject = await createProjectAs(asAlice());
 

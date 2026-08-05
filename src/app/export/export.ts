@@ -9,6 +9,8 @@
 
 import type { CanonicalDocument, Block } from "../../desk/types";
 import { renderDocx } from "./docxWriter";
+import { renderOdt } from "./odtWriter";
+import { renderPdf } from "./pdfWriter";
 import type { ExportFormat, ExportInput, ExportResult, ExportMetadata, PreflightReport } from "./types";
 
 /**
@@ -58,16 +60,15 @@ function resolve(_document: CanonicalDocument): CanonicalDocument {
 
 /**
  * Stage 4: Render — convert to the target format.
- * Currently: DOCX only. Future: ODT, PDF.
  */
 async function render(document: CanonicalDocument, format: ExportFormat, metadata: ExportMetadata): Promise<Buffer> {
   switch (format) {
     case "docx":
       return renderDocx(document, metadata);
     case "odt":
-      throw new Error("ODT export not yet implemented — Phase 3.11");
+      return renderOdt(document, metadata);
     case "pdf":
-      throw new Error("PDF export not yet implemented — Phase 3.12");
+      return renderPdf(document, metadata);
     default:
       throw new Error(`Unknown export format: ${format}`);
   }
@@ -75,11 +76,16 @@ async function render(document: CanonicalDocument, format: ExportFormat, metadat
 
 /**
  * Stage 5: Verify — check the output is well-formed.
- * Stub: proper implementation checks DOCX validity, file size, etc.
+ * Stub: proper implementation checks full DOCX/ODT/PDF structural validity, not just the magic bytes.
  */
-function verify(data: Buffer): boolean {
-  // Minimal check: DOCX files start with PK (ZIP signature)
-  return data.length > 0 && data[0] === 0x50 && data[1] === 0x4b;
+function verify(data: Buffer, format: ExportFormat): boolean {
+  if (data.length === 0) return false;
+  if (format === "pdf") {
+    // PDFs start with the literal "%PDF" header.
+    return data[0] === 0x25 && data[1] === 0x50 && data[2] === 0x44 && data[3] === 0x46;
+  }
+  // DOCX and ODT are both zip containers, starting with the PK signature.
+  return data[0] === 0x50 && data[1] === 0x4b;
 }
 
 /**
@@ -103,7 +109,7 @@ export async function exportDocument(input: ExportInput): Promise<ExportResult> 
 
   const data = await render(resolved, input.format, metadata);
 
-  if (!verify(data)) {
+  if (!verify(data, input.format)) {
     throw new Error("Export verification failed — output is malformed");
   }
 

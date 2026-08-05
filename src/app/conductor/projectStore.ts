@@ -16,6 +16,7 @@ import type { CanonicalDocument } from "../../domain/document/model";
 import type { RubricReport } from "../rubric/rubric";
 import { emptyGraph } from "../../domain/claim/graph";
 import type { ClaimEvidenceGraph } from "../../domain/claim/types";
+import type { SubmissionRecord } from "../../domain/submission/types";
 
 export interface ProjectRecord {
   projectId: string;
@@ -41,6 +42,8 @@ export interface ProjectRecord {
   claimGraph: ClaimEvidenceGraph;
   /** Recorded Rubric waivers, keyed by rule id. Compiling rules from Atlas always produces unwaived rules (fromAtlas.ts has no memory), so this is what lets a waiver survive a document resubmission — see app/rubric/rubric.ts's applyWaivers. */
   waivers: Record<string, { reason: string; at: string }>;
+  /** Post-G6 submission attempts against journals — see domain/submission/types.ts. Starts empty, same as claimGraph: always present, possibly with nothing in it yet. */
+  submissions: SubmissionRecord[];
 }
 
 const projects = new Map<string, ProjectRecord>();
@@ -81,6 +84,7 @@ export function createProject(outputTypeId: string, ownerId: string): ProjectRec
     gates: initialProjectGateState(projectId),
     claimGraph: emptyGraph(),
     waivers: {},
+    submissions: [],
   };
   projects.set(projectId, record);
   return record;

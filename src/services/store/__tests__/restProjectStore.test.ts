@@ -121,6 +121,7 @@ describe("restProjectStore: empty response bodies", () => {
         gates: {} as ProjectRecord["gates"],
         claimGraph: {} as ProjectRecord["claimGraph"],
         waivers: {},
+        submissions: [],
       })
     ).resolves.toBeDefined();
   });
@@ -151,6 +152,12 @@ describe("restProjectStore: get", () => {
     expect(record?.rubricReport).toBeUndefined();
   });
 
+  it("defaults submissions to an empty list for a row that predates the column", async () => {
+    const { s } = store(() => ({ body: [row()] }));
+    const record = await s.get("proj-abc");
+    expect(record?.submissions).toEqual([]);
+  });
+
   it("url-encodes the id rather than interpolating it raw", async () => {
     const { s, calls } = store(() => ({ body: [] }));
     await s.get("proj-a b&c");
@@ -170,6 +177,7 @@ describe("restProjectStore: save", () => {
       gates: {} as ProjectRecord["gates"],
       claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
       waivers: {},
+      submissions: [],
     };
 
     await s.save(record);
@@ -190,6 +198,7 @@ describe("restProjectStore: save", () => {
       gates: {} as ProjectRecord["gates"],
       claimGraph: {} as ProjectRecord["claimGraph"],
       waivers: {},
+      submissions: [],
     });
 
     const body = calls[0].body as Record<string, unknown>;

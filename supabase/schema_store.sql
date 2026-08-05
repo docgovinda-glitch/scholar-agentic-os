@@ -62,6 +62,10 @@ create table if not exists public.projects (
   rubric_report jsonb,
   claim_graph jsonb not null default '{}'::jsonb,
   waivers jsonb not null default '{}'::jsonb,
+  -- Post-G6 submission attempts against journals (domain/submission/types.ts).
+  -- Orthogonal to the gate columns above — a project can be G6-signed-off
+  -- with any number of submission attempts against different venues.
+  submissions jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -90,6 +94,12 @@ begin
     alter table public.projects alter column owner_id set not null;
   end if;
 end $$;
+
+-- Migration for databases created before the submissions column existed.
+-- Unlike owner_id above, this has no awkward backfill case: a project with
+-- no submission history yet is simply an empty list, exactly what new rows
+-- already default to.
+alter table public.projects add column if not exists submissions jsonb not null default '[]'::jsonb;
 
 -- Deny-all baseline for anon/authenticated (see the note at the top of this
 -- file). FORCE additionally applies RLS to the table's owner; roles with

@@ -57,6 +57,7 @@ interface ProjectRow {
   rubric_report: ProjectRecord["rubricReport"] | null;
   claim_graph: ProjectRecord["claimGraph"];
   waivers: ProjectRecord["waivers"];
+  submissions: ProjectRecord["submissions"];
 }
 
 function rowToRecord(row: ProjectRow): ProjectRecord {
@@ -71,6 +72,8 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
     rubricReport: row.rubric_report ?? undefined,
     claimGraph: row.claim_graph,
     waivers: row.waivers,
+    // Rows written before this column existed have it as SQL NULL.
+    submissions: row.submissions ?? [],
   };
 }
 
@@ -85,6 +88,7 @@ function recordToRow(record: ProjectRecord): ProjectRow {
     rubric_report: record.rubricReport ?? null,
     claim_graph: record.claimGraph,
     waivers: record.waivers,
+    submissions: record.submissions,
   };
 }
 
@@ -149,6 +153,7 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
         gates: initialProjectGateState(projectId),
         claimGraph: emptyGraph(),
         waivers: {},
+        submissions: [],
       };
 
       await request(base, {

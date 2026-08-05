@@ -30,6 +30,7 @@ describe("services/store: pgProjectStore", () => {
     expect(record.outputTypeId).toBe("OT-07");
     expect(record.answers).toEqual({});
     expect(record.waivers).toEqual({});
+    expect(record.submissions).toEqual([]);
     expect(record.claimGraph.claims).toEqual([]);
     expect(record.document).toBeUndefined();
     expect(record.rubricReport).toBeUndefined();
@@ -63,6 +64,8 @@ describe("services/store: pgProjectStore", () => {
     expect(record?.document).toBeUndefined();
     expect(record?.rubricReport).toBeUndefined();
     expect(record?.answers).toEqual({ research_question: "provisional" });
+    // Row predates the submissions column — must default to an empty list, not undefined.
+    expect(record?.submissions).toEqual([]);
     expect(db.calls[0].text).toMatch(/select \* from public\.projects where project_id = \$1/i);
     expect(db.calls[0].params).toEqual(["proj-abc"]);
   });
@@ -84,6 +87,7 @@ describe("services/store: pgProjectStore", () => {
       gates: {} as ProjectRecord["gates"],
       claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
       waivers: {},
+      submissions: [],
     };
 
     const saved = await store.save(record);
@@ -117,6 +121,7 @@ describe("services/store: pgProjectStore", () => {
       document: { id: "doc-1", title: "T", blocks: [] },
       claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
       waivers: {},
+      submissions: [],
     };
 
     await store.save(record);

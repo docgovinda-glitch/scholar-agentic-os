@@ -11,7 +11,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceConflict, InterventionLevel, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, VoiceProfile } from "./types";
+import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceConflict, InterventionLevel, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, SubmissionRecord, VoiceProfile } from "./types";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -258,6 +258,36 @@ export async function refinePassage(params: {
 
 export async function grantStudioConsent(sessionId: string, provider: string): Promise<void> {
   await authedJsonFetch("/api/studio/consent", "POST", { sessionId, provider }).then((r) => json(r));
+}
+
+/** Every submission attempt recorded against the project, most-recent-first is the caller's job — the server returns them in storage order. */
+export function listSubmissions(projectId: string): Promise<{ submissions: SubmissionRecord[] }> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/submissions`).then((r) => json(r));
+}
+
+export function addSubmission(
+  projectId: string,
+  submission: Omit<SubmissionRecord, "id" | "statusUpdatedAt">
+): Promise<{ submissions: SubmissionRecord[] }> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/submissions`, "POST", submission).then((r) => json(r));
+}
+
+export function updateSubmission(
+  projectId: string,
+  submissionId: string,
+  patch: Partial<Omit<SubmissionRecord, "id" | "statusUpdatedAt">>
+): Promise<{ submissions: SubmissionRecord[] }> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/submissions/${encodeURIComponent(submissionId)}`,
+    "PATCH",
+    patch
+  ).then((r) => json(r));
+}
+
+export function deleteSubmission(projectId: string, submissionId: string): Promise<{ submissions: SubmissionRecord[] }> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/submissions/${encodeURIComponent(submissionId)}`, {
+    method: "DELETE",
+  }).then((r) => json(r));
 }
 
 export async function exportProject(projectId: string, format: "docx" | "odt" | "pdf"): Promise<Blob> {

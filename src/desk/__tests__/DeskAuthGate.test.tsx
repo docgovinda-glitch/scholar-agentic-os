@@ -142,7 +142,13 @@ describe("sign in", () => {
     await waitFor(() => expect(signIn).toHaveBeenCalled());
     // Still on sign-in: useDeskSession swaps the gate out when the session
     // appears. Routing here too would race that.
-    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    //
+    // findByRole (not getByRole): signIn having been called and the
+    // component's busy-state finally{} block having re-rendered the button
+    // back from "Signing in…" to "Sign in" are two separate microtask ticks —
+    // asserting with a retrying query avoids racing that gap, which a
+    // synchronous getByRole intermittently lost under a loaded CI runner.
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 });
 

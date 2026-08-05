@@ -758,3 +758,159 @@ describe("POST /api/projects/:id/gates/:gate/invalidate", () => {
     expect(g0.status).toBe("invalidated");
   });
 });
+
+describe("submission tracking (/api/projects/:id/submissions)", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  async function newProject() {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    return created.body.projectId as string;
+  }
+
+  describe("GET", () => {
+    it("starts empty", async () => {
+      const projectId = await newProject();
+      const res = await request(app).get(`/api/projects/${projectId}/submissions`);
+      expect(res.status).toBe(200);
+      expect(res.body.submissions).toEqual([]);
+    });
+
+    it("404s for an unknown project", async () => {
+      const res = await request(app).get("/api/projects/proj-nope/submissions");
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("POST", () => {
+    it("400s when journalName is missing", async () => {
+      const projectId = await newProject();
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/submissions`)
+        .send({ submittedAt: "2026-01-01", status: "submitted" });
+      expect(res.status).toBe(400);
+    });
+
+    it("400s for an invalid status", async () => {
+      const projectId = await newProject();
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/submissions`)
+        .send({ journalName: "Nature", submittedAt: "2026-01-01", status: "in_orbit" });
+      expect(res.status).toBe(400);
+    });
+
+    it("404s for an unknown project", async () => {
+      const res = await request(app)
+        .post("/api/projects/proj-nope/submissions")
+        .send({ journalName: "Nature", submittedAt: "2026-01-01", status: "draft" });
+      expect(res.status).toBe(404);
+    });
+
+    it("assigns an id and statusUpdatedAt, ignoring any the client sent", async () => {
+      const projectId = await newProject();
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/submissions`)
+        .send({
+          id: "client-supplied",
+          journalName: "Nature Machine Intelligence",
+          journalUrl: "https://nature.com",
+          submittedAt: "2026-01-01",
+          status: "submitted",
+          notes: "first attempt",
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.submissions).toHaveLength(1);
+      const submission = res.body.submissions[0];
+      expect(submission.id).toMatch(/^sub-/);
+      expect(submission.id).not.toBe("client-supplied");
+      expect(submission.journalName).toBe("Nature Machine Intelligence");
+      expect(submission.notes).toBe("first attempt");
+      expect(typeof submission.statusUpdatedAt).toBe("string");
+    });
+
+    it("persists across requests", async () => {
+      const projectId = await newProject();
+      await request(app)
+        .post(`/api/projects/${projectId}/submissions`)
+        .send({ journalName: "Nature", submittedAt: "2026-01-01", status: "draft" });
+      const res = await request(app).get(`/api/projects/${projectId}/submissions`);
+      expect(res.body.submissions).toHaveLength(1);
+    });
+  });
+
+  describe("PATCH", () => {
+    async function withSubmission(projectId: string) {
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/submissions`)
+        .send({ journalName: "Nature", submittedAt: "2026-01-01", status: "submitted" });
+      return res.body.submissions[0].id as string;
+    }
+
+    it("404s for an unknown submission id", async () => {
+      const projectId = await newProject();
+      const res = await request(app)
+        .patch(`/api/projects/${projectId}/submissions/sub-nope`)
+        .send({ notes: "x" });
+      expect(res.status).toBe(404);
+    });
+
+    it("400s for an invalid status", async () => {
+      const projectId = await newProject();
+      const submissionId = await withSubmission(projectId);
+      const res = await request(app)
+        .patch(`/api/projects/${projectId}/submissions/${submissionId}`)
+        .send({ status: "in_orbit" });
+      expect(res.status).toBe(400);
+    });
+
+    it("updates fields and bumps statusUpdatedAt on a real status change", async () => {
+      const projectId = await newProject();
+      const submissionId = await withSubmission(projectId);
+      const before = (await request(app).get(`/api/projects/${projectId}/submissions`)).body.submissions[0];
+
+      const res = await request(app)
+        .patch(`/api/projects/${projectId}/submissions/${submissionId}`)
+        .send({ status: "under_review" });
+      expect(res.status).toBe(200);
+      const updated = res.body.submissions[0];
+      expect(updated.status).toBe("under_review");
+      expect(updated.statusUpdatedAt).not.toBe(before.statusUpdatedAt);
+    });
+
+    it("does not bump statusUpdatedAt for a non-status edit", async () => {
+      const projectId = await newProject();
+      const submissionId = await withSubmission(projectId);
+      const before = (await request(app).get(`/api/projects/${projectId}/submissions`)).body.submissions[0];
+
+      const res = await request(app)
+        .patch(`/api/projects/${projectId}/submissions/${submissionId}`)
+        .send({ notes: "still waiting to hear back" });
+      expect(res.status).toBe(200);
+      const updated = res.body.submissions[0];
+      expect(updated.notes).toBe("still waiting to hear back");
+      expect(updated.statusUpdatedAt).toBe(before.statusUpdatedAt);
+    });
+  });
+
+  describe("DELETE", () => {
+    it("404s for an unknown submission id", async () => {
+      const projectId = await newProject();
+      const res = await request(app).delete(`/api/projects/${projectId}/submissions/sub-nope`);
+      expect(res.status).toBe(404);
+    });
+
+    it("removes the submission", async () => {
+      const projectId = await newProject();
+      const created = await request(app)
+        .post(`/api/projects/${projectId}/submissions`)
+        .send({ journalName: "Nature", submittedAt: "2026-01-01", status: "draft" });
+      const submissionId = created.body.submissions[0].id;
+
+      const res = await request(app).delete(`/api/projects/${projectId}/submissions/${submissionId}`);
+      expect(res.status).toBe(200);
+      expect(res.body.submissions).toEqual([]);
+    });
+  });
+});
