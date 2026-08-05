@@ -11,12 +11,6 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
-    optimizeDeps: {
-      // docx (Stage 12 document export, src/services/documentExportService.ts)
-      // needs to be pre-bundled explicitly for reliable dev-server behavior —
-      // confirmed required, not a defensive guess.
-      include: ['docx'],
-    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

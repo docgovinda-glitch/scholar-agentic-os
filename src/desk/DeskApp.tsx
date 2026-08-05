@@ -8,6 +8,8 @@ import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
 import { useDeskSession } from "./useDeskSession";
 import VaultScreen from "./vault/VaultScreen";
+import DeskPocketMount from "./pocket/DeskPocketMount";
+import { useDeviceClass } from "../hooks/useDeviceClass";
 
 function readProjectIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get("project");
@@ -32,6 +34,7 @@ function readProjectIdFromUrl(): string | null {
 function DeskRoutes() {
   const session = useDeskSession();
   const userId = session.status === "signed-in" ? session.userId : null;
+  const device = useDeviceClass();
   const aiSetup = useAiSetupStatus(userId);
   // Gated on AI setup being finished so the two stages cannot render at once,
   // and so the Vault query does not run before it is reachable.
@@ -103,6 +106,14 @@ function DeskRoutes() {
   // one, the same reasoning that already moved AI settings off PaperProject.
   if (vaultOpen && userId) {
     return <VaultScreen userId={userId} onClose={() => setVaultOpen(false)} />;
+  }
+
+  // Pocket (docs 23) is a deliberately narrower companion — Approve/Read/Ask/
+  // Know, not a mobile port of intake forms or the editor — so it replaces
+  // the whole mobile experience (list and open project alike) rather than
+  // nesting inside DeskShell's desktop layout.
+  if (device.isMobile) {
+    return <DeskPocketMount projectId={projectId} />;
   }
 
   if (!projectId) {

@@ -10,7 +10,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   executeWithFailover,
   ProviderCallError,
-  buildContinuationRequest,
   isFailoverSuccess,
   isFailoverFailure,
   setCooldown,
@@ -20,7 +19,6 @@ import {
   type FailoverEvent,
 } from "../providerFailover";
 import { classifyHttpError } from "../aiErrors";
-import type { AIRequest } from "../../types";
 
 beforeEach(() => {
   clearAllCooldowns();
@@ -181,45 +179,3 @@ describe("cooldowns", () => {
   });
 });
 
-describe("buildContinuationRequest — the no-work-lost mechanism", () => {
-  const base: AIRequest = {
-    systemInstruction: "You are an academic writing assistant.",
-    prompt: "Draft the methodology section.",
-    temperature: 0.8,
-    taskType: "drafting",
-  };
-
-  it("hands the partial output to the replacement provider as context", () => {
-    const partial = "This study adopts a mixed-methods design in which";
-
-    const continuation = buildContinuationRequest(base, partial);
-
-    expect(continuation.prompt).toContain(partial);
-    expect(continuation.prompt).toContain(base.prompt);
-  });
-
-  it("instructs the replacement not to repeat or reintroduce", () => {
-    // Without this, a model handed a partial answer will typically restate it,
-    // which the reader sees as duplicated text rather than a seamless resume.
-    const continuation = buildContinuationRequest(base, "Some existing text");
-
-    expect(continuation.prompt).toMatch(/do not repeat/i);
-    expect(continuation.prompt).toMatch(/do not add a new introduction/i);
-  });
-
-  it("lowers temperature so the continuation matches what came before", () => {
-    expect(buildContinuationRequest(base, "text").temperature).toBeLessThanOrEqual(0.4);
-  });
-
-  it("leaves the request untouched when nothing was produced yet", () => {
-    // Nothing to preserve means this should be an ordinary fresh attempt.
-    expect(buildContinuationRequest(base, "   ")).toBe(base);
-  });
-
-  it("preserves the system instruction and task type across the switch", () => {
-    const continuation = buildContinuationRequest(base, "text");
-
-    expect(continuation.systemInstruction).toBe(base.systemInstruction);
-    expect(continuation.taskType).toBe(base.taskType);
-  });
-});

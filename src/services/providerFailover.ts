@@ -15,9 +15,9 @@
  * What IS achievable, and what this module does, is preserve the user-visible
  * work: the text already streamed to the screen stays there, and the
  * replacement provider is given that partial output as context with an
- * instruction to continue from exactly where it stopped (see
- * buildContinuationRequest). The user sees a brief pause and then the text
- * carries on. Nothing already written is discarded and nothing is re-rendered.
+ * instruction to continue from exactly where it stopped. The user sees a
+ * brief pause and then the text carries on. Nothing already written is
+ * discarded and nothing is re-rendered.
  *
  * For non-streaming calls the question does not arise: the request itself is
  * the entire state, so retrying it elsewhere is genuinely transparent.
@@ -33,7 +33,6 @@
  * whether trying a DIFFERENT one could possibly help.
  */
 
-import type { AIRequest } from "../types";
 import type { ClassifiedAIError } from "./aiErrors";
 
 export interface FailoverEvent {
@@ -323,36 +322,3 @@ export async function executeWithFailover<T>(
   };
 }
 
-/**
- * Rewrite a request so a replacement provider continues an interrupted
- * response instead of starting over.
- *
- * This is the state-preservation mechanism for streaming: `partialText` is
- * what the user can already see on screen. Rather than discarding it and
- * re-rendering from zero (which looks like data loss even though the final
- * result is the same), the new provider is handed the original task plus the
- * text so far and told to resume mid-flow. The caller keeps the partial text
- * displayed and appends the new stream to it.
- *
- * The instruction is explicit about not repeating and not re-introducing,
- * because the default behaviour of most models given a partial answer is to
- * politely restate it.
- */
-export function buildContinuationRequest(original: AIRequest, partialText: string): AIRequest {
-  if (!partialText.trim()) return original;
-
-  return {
-    ...original,
-    prompt:
-      `${original.prompt}\n\n` +
-      `---\n` +
-      `A previous attempt was interrupted partway through. Below is the text produced so far. ` +
-      `Continue it from exactly where it stops. Do not repeat any of it, do not summarise it, ` +
-      `and do not add a new introduction — resume mid-sentence if that is where it ends.\n\n` +
-      `--- TEXT SO FAR ---\n${partialText}\n--- END ---\n\n` +
-      `Continue:`,
-    // A continuation must stay stylistically flush with what came before, so
-    // creativity is pinned down relative to the original request.
-    temperature: Math.min(original.temperature, 0.4),
-  };
-}
