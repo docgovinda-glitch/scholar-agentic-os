@@ -29,7 +29,7 @@ import {
   type CloudProviderSpec,
 } from "./src/config/providerCatalog.ts";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
-import { registerHealthRoutes, registerAdminRoutes, registerParseRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerPocketRoutes } from "./server/routes/index.ts";
+import { registerHealthRoutes, registerAdminRoutes, registerParseRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes } from "./server/routes/index.ts";
 
 dotenv.config();
 
@@ -387,7 +387,6 @@ registerParseRoutes(app, parseFileLimit, parseExternalLinkLimit, lookupDoiLimit)
 registerAIRoutes(app, aiAbuseLimit, citationStyleRegistry);
 registerStudioRoutes(app, studioLimit);
 registerProjectRoutes(app, projectLimit);
-registerPocketRoutes(app);
 
 
 // ==========================================
