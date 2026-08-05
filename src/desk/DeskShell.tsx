@@ -170,7 +170,15 @@ export default function DeskShell({ projectId, onClose }: { projectId: string; o
             <Primary document={document} onSubmitPlainText={handleSubmitPlainText} submitting={submitting} projectId={projectId} />
           </>
         )}
-        <Aside rubric={rubric} sessionId={`desk-${projectId}`} />
+        <Aside
+          projectId={projectId}
+          rubric={rubric}
+          sessionId={`desk-${projectId}`}
+          onChanged={(updated, newRubric) => {
+            setProject(updated);
+            setRubric(newRubric);
+          }}
+        />
       </div>
       <StatusBar project={project} />
     </div>

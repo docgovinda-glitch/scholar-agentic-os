@@ -190,6 +190,17 @@ export function removeSource(projectId: string, sourceId: string): Promise<Claim
   }).then((r) => json(r));
 }
 
+/**
+ * Waive a non-blocking Rubric finding with a reason (docs 31 §7: "Reason
+ * required. Appears in the compliance report"). 400s if the reason is
+ * empty or the rule is blocking severity — blocking findings are never
+ * waivable by design, so the server refuses rather than silently ignoring
+ * it. Requires a document already submitted.
+ */
+export function waiveFinding(projectId: string, ruleId: string, reason: string): Promise<ProjectView & { rubric: RubricReport }> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/rubric/waive`, "POST", { ruleId, reason }).then((r) => json(r));
+}
+
 export function getProject(projectId: string): Promise<ProjectView> {
   return authedFetch(`/api/projects/${encodeURIComponent(projectId)}`).then((r) => json(r));
 }
