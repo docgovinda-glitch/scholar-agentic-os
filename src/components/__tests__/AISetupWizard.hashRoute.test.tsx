@@ -130,6 +130,43 @@ describe("AISetupWizard — the vault gate cannot be bypassed by any hash restor
   });
 });
 
+describe("AISetupWizard — completing validation actually advances (bug: reported live, every provider)", () => {
+  // Root cause: runFinalValidation's setStep(3) really did run, but the
+  // write-back effect reflected it into the hash, firing a real hashchange
+  // that the read-side effect received and re-resolved through
+  // resolveWizardRoute — whose own job is to clamp step >= 3 back to 2 for a
+  // genuine deep link. The wizard could not tell "reading back what I just
+  // wrote" apart from "an external navigation to this same value", so a
+  // successful validation silently reverted itself on every completion,
+  // regardless of which provider was selected — not a provider bug.
+  it("reaches the completion screen and stays there, rather than snapping back to Configure Connections", async () => {
+    const AIGateway = (await import("../../services/aiGateway")).default;
+    (AIGateway.healthCheckProvider as ReturnType<typeof vi.fn>).mockResolvedValue({
+      provider: "ollama",
+      status: "offline",
+    });
+
+    window.location.hash = "#onboarding/ai-setup/local/2/ollama";
+    renderWizard();
+    await screen.findByText("Configure Connections");
+
+    fireEvent.click(screen.getByText(/validate & continue/i));
+
+    expect(await screen.findByText("No Providers Online")).toBeInTheDocument();
+    expect(screen.queryByText("Configure Connections")).not.toBeInTheDocument();
+
+    // The regression was a bounce-back arriving once jsdom actually
+    // dispatched the hashchange this component's own write triggered — which
+    // happens on a real timer, not just a microtask, so the assertion has to
+    // survive real elapsed time, not just a flushed promise queue.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(screen.getByText("No Providers Online")).toBeInTheDocument();
+    expect(screen.queryByText("Configure Connections")).not.toBeInTheDocument();
+  });
+});
+
 describe("AISetupWizard — browser back/forward moves between steps, not just in/out of the whole wizard", () => {
   it("back/forward navigate provider-selection <-> mode-selection without losing the selected mode", async () => {
     renderWizard();

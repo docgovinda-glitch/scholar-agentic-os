@@ -115,6 +115,36 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   // "unlocked". See src/utils/aiSetupWizardRouting.ts for the pure resolver
   // (unit-tested in isolation) this reads from.
   //
+  // Bug fix (2026-08-05): "Validate & Continue" reported as never actually
+  // advancing, for every provider tried (Gemini, Groq, Ollama) — not a
+  // provider issue, so not fixable per-provider. runFinalValidation's own
+  // setStep(3) really was running, but the moment it did, the write-back
+  // effect below reflected step 3 into the hash, which fires a real
+  // `hashchange` event, which the read-side effect below it receives and
+  // re-parses through resolveWizardRoute — whose OWN documented job is to
+  // clamp any step >= 3 back down to 2, because a bookmarked or reloaded
+  // link to step 3 has no real healthResults behind it. That clamp is
+  // correct for an actual external navigation; it is wrong for the wizard
+  // reading back a hash it just wrote to reflect its own real, freshly-
+  // validated state — and the previous code could not tell those two cases
+  // apart, so a successful validation silently reverted itself, every time,
+  // regardless of which provider was selected. `lastWrittenHash` is what
+  // lets it tell them apart: a hashchange whose new value is exactly the
+  // one this component itself just wrote is an echo, not a navigation, and
+  // resolving it again — through the same clamp meant for deep links — is
+  // what was undoing step 3. A real external change (a deep link on first
+  // load, or the user's own browser back/forward) never matches the pending
+  // echo and still resolves and clamps exactly as before.
+  //
+  // One-shot, not "equals the last thing we wrote": browser back/forward can
+  // legitimately revisit a hash this component wrote earlier (e.g. back then
+  // forward lands back on a hash from two steps ago), and that later revisit
+  // must be treated as the real navigation it is, not swallowed as a stale
+  // echo. Every hashchange this component did NOT just cause — matching or
+  // not — clears the pending value, so only the one echo immediately
+  // following a write is ever skipped.
+  const pendingEchoHash = React.useRef<string | null>(null);
+
   // Hash -> state: mount + hashchange only (deps: [] — this wizard only ever
   // exists while onboardingStep === "ai-setup", set once by the parent's own
   // useHashNavigation; re-subscribing per-render risks the exact unstable-
@@ -123,6 +153,11 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
   useEffect(() => {
     const parseAndApply = () => {
       const hash = window.location.hash;
+      if (pendingEchoHash.current !== null && hash === pendingEchoHash.current) {
+        pendingEchoHash.current = null;
+        return;
+      }
+      pendingEchoHash.current = null;
       const bareHash = "#onboarding/ai-setup";
       const prefix = `${bareHash}/`;
       // Real bug caught by a failing browser-back test, not assumed: the
@@ -153,6 +188,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
       ? `#onboarding/ai-setup/${selectedMode}/${step}/${selectedProviders.join(",")}`
       : "#onboarding/ai-setup";
     if (window.location.hash !== targetHash) {
+      pendingEchoHash.current = targetHash;
       window.location.hash = targetHash;
     }
   }, [selectedMode, step, selectedProviders.join(",")]);
