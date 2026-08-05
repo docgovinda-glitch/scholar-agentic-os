@@ -28,7 +28,21 @@
 
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 
-const PASSPHRASE_VERIFIER = "scholar-vault-verifier";
+const PASSPHRASE_VERIFIER_PREFIX = "scholar-vault-verifier:";
+
+/**
+ * The signed-in user, or null. Every device-local function below scopes its
+ * storage key to this — a bare constant key was the original shape, and on a
+ * shared device meant creating a second account's Vault silently overwrote
+ * the first account's verifier, permanently locking them out of a Vault the
+ * server still says exists (the same class of bug useAiSetupStatus's and
+ * useVaultSetupStatus's skip-tracking were already keyed by userId to avoid).
+ */
+async function currentUserId(): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data } = await getSupabaseClient().auth.getUser();
+  return data.user?.id ?? null;
+}
 
 export interface VaultRecord {
   label: string;
@@ -83,8 +97,10 @@ async function sha256(text: string): Promise<string> {
 }
 
 export async function setVaultPassphraseVerifier(passphrase: string): Promise<void> {
+  const userId = await currentUserId();
+  if (!userId) return;
   try {
-    localStorage.setItem(PASSPHRASE_VERIFIER, await sha256(passphrase));
+    localStorage.setItem(`${PASSPHRASE_VERIFIER_PREFIX}${userId}`, await sha256(passphrase));
   } catch {
     // Without persistence the passphrase simply cannot be checked next visit;
     // it is not a reason to fail Vault creation.
@@ -92,17 +108,21 @@ export async function setVaultPassphraseVerifier(passphrase: string): Promise<vo
 }
 
 export async function verifyVaultPassphrase(passphrase: string): Promise<boolean> {
+  const userId = await currentUserId();
+  if (!userId) return false;
   try {
-    const stored = localStorage.getItem(PASSPHRASE_VERIFIER);
+    const stored = localStorage.getItem(`${PASSPHRASE_VERIFIER_PREFIX}${userId}`);
     return stored !== null && stored === (await sha256(passphrase));
   } catch {
     return false;
   }
 }
 
-export function hasVaultPassphraseOnThisDevice(): boolean {
+export async function hasVaultPassphraseOnThisDevice(): Promise<boolean> {
+  const userId = await currentUserId();
+  if (!userId) return false;
   try {
-    return localStorage.getItem(PASSPHRASE_VERIFIER) !== null;
+    return localStorage.getItem(`${PASSPHRASE_VERIFIER_PREFIX}${userId}`) !== null;
   } catch {
     return false;
   }

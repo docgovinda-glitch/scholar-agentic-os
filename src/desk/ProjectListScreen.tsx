@@ -19,10 +19,12 @@ export default function ProjectListScreen({
   onOpen,
   userEmail,
   onOpenSettings,
+  onOpenVault,
 }: {
   onOpen: (projectId: string) => void;
   userEmail: string | null;
   onOpenSettings?: () => void;
+  onOpenVault?: () => void;
 }) {
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
   const [types, setTypes] = useState<OutputTypeSummary[] | null>(null);
@@ -70,6 +72,15 @@ export default function ProjectListScreen({
               <span className="truncate text-sm text-[color:var(--text-muted)]" title={userEmail}>
                 {userEmail}
               </span>
+            )}
+            {onOpenVault && (
+              <button
+                type="button"
+                onClick={onOpenVault}
+                className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+              >
+                Vault
+              </button>
             )}
             {onOpenSettings && (
               <button

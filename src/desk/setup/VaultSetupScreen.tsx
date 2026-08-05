@@ -16,12 +16,14 @@ import {
  * change that breaks it.
  *
  * WHAT IS BUILT, AND WHAT IS NOT. Creating a Vault here establishes it and
- * secures it — passphrase and Recovery Kit. Adding material to it from Desk
- * (PDFs, notes, datasets) and importing an existing library from Zotero or
- * BibTeX are NOT implemented in this client yet; the importers do not exist
- * anywhere in the codebase. Those options are shown as unavailable with the
- * reason, rather than as buttons that quietly do nothing — docs 22 §6.2's
- * "never a silent no-op".
+ * secures it — passphrase and Recovery Kit. Adding manual text material
+ * (notes, source citations) is built — see ../vault/VaultScreen.tsx, reached
+ * from "Vault" in the header once a Vault exists. Importing files (PDFs,
+ * datasets) or an existing library from Zotero/BibTeX is NOT implemented:
+ * both need server-side parsing that does not exist anywhere in the
+ * codebase. That option is shown as unavailable with the reason, rather than
+ * as a button that quietly does nothing — docs 22 §6.2's "never a silent
+ * no-op".
  */
 
 type Step = "offer" | "passphrase" | "recovery" | "done";
@@ -272,8 +274,8 @@ export default function VaultSetupScreen({
     <Shell>
       <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">Your Vault is ready</h1>
       <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-        It is encrypted with the passphrase you chose. Adding material to it from Desk is still being built — your
-        Vault is set up and waiting for it.
+        It is encrypted with the passphrase you chose. Find "Vault" from the header any time to add material, search
+        it, or come back to what you have already gathered.
       </p>
       <button
         type="button"

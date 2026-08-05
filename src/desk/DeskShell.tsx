@@ -24,10 +24,12 @@ export default function DeskShell({
   projectId,
   onClose,
   onOpenSettings,
+  onOpenVault,
 }: {
   projectId: string;
   onClose?: () => void;
   onOpenSettings?: () => void;
+  onOpenVault?: () => void;
 }) {
   const session = useDeskSession();
   const [project, setProject] = useState<ProjectView | null>(null);
@@ -126,6 +128,7 @@ export default function DeskShell({
         outputTypeLabel={outputType?.label ?? project.outputTypeId}
         onClose={onClose}
         onOpenSettings={onOpenSettings}
+        onOpenVault={onOpenVault}
       />
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
         {(["intake", "document", "evidence", "progress"] as const).map((v) => (
