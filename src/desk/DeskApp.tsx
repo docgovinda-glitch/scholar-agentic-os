@@ -36,6 +36,13 @@ function DeskRoutes() {
   // and so the Vault query does not run before it is reachable.
   const vaultSetup = useVaultSetupStatus(userId, aiSetup.status === "ready");
   const [projectId, setProjectId] = useState<string | null>(readProjectIdFromUrl);
+  /**
+   * Revisiting AI settings after setup. Not URL-addressed like `?project=` —
+   * there is nothing here worth bookmarking or reaching with Back, and
+   * closing it should return to exactly whatever was already on screen
+   * (list or project) rather than navigating anywhere.
+   */
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Keep component state and the URL in step when the user presses Back or
   // Forward. Without this, going back from a project left the URL on the list
@@ -80,12 +87,24 @@ function DeskRoutes() {
     return <VaultSetupScreen onDone={vaultSetup.complete} onSkip={vaultSetup.skip} />;
   }
 
+  // Revisiting settings takes over the whole screen, same as the one-time
+  // setup stages above, rather than opening as a panel over whatever was
+  // showing — reusing AiSetupScreen's own full-screen shell rather than
+  // building a second layout for the same form.
+  if (settingsOpen) {
+    return <AiSetupScreen variant="revisit" onDone={() => setSettingsOpen(false)} onCancel={() => setSettingsOpen(false)} />;
+  }
+
   if (!projectId) {
     return (
-      <ProjectListScreen onOpen={open} userEmail={session.status === "signed-in" ? session.email : null} />
+      <ProjectListScreen
+        onOpen={open}
+        userEmail={session.status === "signed-in" ? session.email : null}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
     );
   }
-  return <DeskShell projectId={projectId} onClose={close} />;
+  return <DeskShell projectId={projectId} onClose={close} onOpenSettings={() => setSettingsOpen(true)} />;
 }
 
 export default function DeskApp() {

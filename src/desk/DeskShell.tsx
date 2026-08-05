@@ -20,7 +20,15 @@ import type { CanonicalDocument, OutputTypeSummary, ProjectView, RubricReport } 
  * command palette are also out of scope here — see this module's PR
  * description for the full list of what this slice is and isn't.
  */
-export default function DeskShell({ projectId, onClose }: { projectId: string; onClose?: () => void }) {
+export default function DeskShell({
+  projectId,
+  onClose,
+  onOpenSettings,
+}: {
+  projectId: string;
+  onClose?: () => void;
+  onOpenSettings?: () => void;
+}) {
   const session = useDeskSession();
   const [project, setProject] = useState<ProjectView | null>(null);
   const [document, setDocument] = useState<CanonicalDocument | null>(null);
@@ -113,7 +121,12 @@ export default function DeskShell({ projectId, onClose }: { projectId: string; o
 
   return (
     <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
-      <Header project={project} outputTypeLabel={outputType?.label ?? project.outputTypeId} onClose={onClose} />
+      <Header
+        project={project}
+        outputTypeLabel={outputType?.label ?? project.outputTypeId}
+        onClose={onClose}
+        onOpenSettings={onOpenSettings}
+      />
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
         {(["intake", "document", "evidence", "progress"] as const).map((v) => (
           <button

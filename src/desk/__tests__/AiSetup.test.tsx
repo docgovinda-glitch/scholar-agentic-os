@@ -24,7 +24,7 @@ vi.mock("../../services/supabaseClient", () => ({
 
 const { default: AiSetupScreen } = await import("../setup/AiSetupScreen");
 const { useAiSetupStatus } = await import("../setup/useAiSetupStatus");
-const { providersWithStoredKey, readProviderKey } = await import("../../services/userAiSettings");
+const { providersWithStoredKey, readProviderKey, storeProviderKey } = await import("../../services/userAiSettings");
 
 const USER = { id: "11111111-1111-4111-8111-111111111111" };
 
@@ -103,6 +103,53 @@ describe("AiSetupScreen", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /Skip for now/ }));
     expect(onSkip).toHaveBeenCalled();
+  });
+});
+
+// Revisiting settings after the one-time setup stage is done — Header's
+// "Settings" control used to be a labelled dead stub with nowhere to go.
+// This reuses the same form (same storage functions, same validation), so
+// these tests are about what changes for the mode, not the form itself.
+describe("AiSetupScreen — revisit", () => {
+  it("has no skip — there is nothing to skip past once already set up", async () => {
+    render(<AiSetupScreen onDone={vi.fn()} onCancel={vi.fn()} variant="revisit" />);
+    await screen.findByRole("radio", { name: /Google Gemini/ });
+    expect(screen.queryByRole("button", { name: /Skip for now/ })).not.toBeInTheDocument();
+  });
+
+  it("offers a plain close instead", async () => {
+    const onCancel = vi.fn();
+    render(<AiSetupScreen onDone={vi.fn()} onCancel={onCancel} variant="revisit" />);
+    await screen.findByRole("radio", { name: /Google Gemini/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  it("loads the provider already on file, not the default", async () => {
+    from.mockReturnValue({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { provider: "openrouter", preferences: {} }, error: null }) }) }),
+      upsert: vi.fn().mockResolvedValue({ error: null }),
+    });
+    render(<AiSetupScreen onDone={vi.fn()} onCancel={vi.fn()} variant="revisit" />);
+
+    expect(await screen.findByRole("radio", { name: /OpenRouter/ })).toBeChecked();
+  });
+
+  it("can change the provider and save without retyping a key already on this device", async () => {
+    await storeProviderKey("openrouter", "sk-existing");
+    from.mockReturnValue({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { provider: "gemini", preferences: {} }, error: null }) }) }),
+      upsert: vi.fn().mockResolvedValue({ error: null }),
+    });
+    const onDone = vi.fn();
+    render(<AiSetupScreen onDone={onDone} onCancel={vi.fn()} variant="revisit" />);
+
+    fireEvent.click(await screen.findByRole("radio", { name: /OpenRouter/ }));
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
   });
 });
 
