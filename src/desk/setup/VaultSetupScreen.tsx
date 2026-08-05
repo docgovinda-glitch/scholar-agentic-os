@@ -17,13 +17,15 @@ import {
  *
  * WHAT IS BUILT, AND WHAT IS NOT. Creating a Vault here establishes it and
  * secures it — passphrase and Recovery Kit. Adding manual text material
- * (notes, source citations) is built — see ../vault/VaultScreen.tsx, reached
- * from "Vault" in the header once a Vault exists. Importing files (PDFs,
- * datasets) or an existing library from Zotero/BibTeX is NOT implemented:
- * both need server-side parsing that does not exist anywhere in the
- * codebase. That option is shown as unavailable with the reason, rather than
- * as a button that quietly does nothing — docs 22 §6.2's "never a silent
- * no-op".
+ * (notes, source citations) is built, and so is importing a BibTeX or RIS
+ * export (RIS covers Zotero/Mendeley/EndNote's own export format) — see
+ * ../vault/VaultScreen.tsx and VaultImport.tsx, reached from "Vault" in the
+ * header once a Vault exists. What is NOT implemented is doing either of
+ * those here, before a Vault exists, or importing actual files (PDFs,
+ * datasets): the latter needs server-side parsing that does not exist
+ * anywhere in the codebase. That option is shown as unavailable with the
+ * reason, rather than as a button that quietly does nothing — docs 22
+ * §6.2's "never a silent no-op".
  */
 
 type Step = "offer" | "passphrase" | "recovery" | "done";
@@ -103,11 +105,14 @@ export default function VaultSetupScreen({
             <span className="block text-sm font-medium text-[color:var(--text-muted)]">
               Import an existing library
             </span>
-            {/* Named honestly rather than shown as a live control: the Zotero,
-                Mendeley, EndNote and BibTeX importers are not built yet, in
-                this client or any other. */}
+            {/* Not offered as a way to create the Vault itself — that part is
+                real: BibTeX/RIS import (../vault/VaultImport.tsx, reachable
+                from the Vault screen once one exists) covers Zotero,
+                Mendeley, and EndNote's own export formats. What is still
+                missing is doing it right here, before a Vault exists. */}
             <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">
-              Not available yet — Zotero, Mendeley, EndNote and BibTeX import are still to be built.
+              Create a Vault first — then import a BibTeX or RIS file (from Zotero, Mendeley, or EndNote) from the
+              Vault screen.
             </span>
           </div>
 

@@ -97,14 +97,15 @@ describe("the offer", () => {
     expect(screen.getByText(/entirely optional/i)).toBeInTheDocument();
   });
 
-  it("shows import as unavailable with a reason, not as a dead button", async () => {
+  it("shows import as unavailable here specifically, not as a dead button — the real import lives on the Vault screen", async () => {
     render(<VaultSetupScreen onDone={vi.fn()} onSkip={vi.fn()} />);
     await screen.findByText(/Import an existing library/i);
 
-    // The importers do not exist anywhere in the codebase. A control that
-    // looks live and does nothing is worse than an honest label.
+    // BibTeX/RIS import is real (VaultImport.tsx) but only reachable once a
+    // Vault exists — offering it as a live control here, before one does,
+    // would be exactly the "looks live, does nothing" control this avoids.
     expect(screen.queryByRole("button", { name: /Import an existing library/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/Not available yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Create a Vault first/i)).toBeInTheDocument();
   });
 });
 

@@ -187,6 +187,18 @@ export async function listVaultItems(userId: string): Promise<VaultItem[]> {
   return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** Adds several items in sequence, returning what was actually saved — the batch shape a reference import produces. */
+export async function addVaultItems(
+  userId: string,
+  items: Array<{ title: string; content: string; citation?: string }>
+): Promise<VaultItem[]> {
+  const saved: VaultItem[] = [];
+  for (const fields of items) {
+    saved.push(await addVaultItem(userId, fields));
+  }
+  return saved;
+}
+
 /** Does not require the Vault to be unlocked — deleting a record needs no decryption. */
 export async function deleteVaultItem(userId: string, id: string): Promise<void> {
   await idbDelete(userId, id);
