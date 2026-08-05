@@ -11,7 +11,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import type { CanonicalDocument, InterventionLevel, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, VoiceProfile } from "./types";
+import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceConflict, InterventionLevel, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, VoiceProfile } from "./types";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -134,6 +134,60 @@ export function invalidateGate(projectId: string, gate: string, reason: string):
     "POST",
     { reason }
   ).then((r) => json(r));
+}
+
+/** What the claim/evidence mutation endpoints return: the updated project view plus the graph, and a fresh Rubric report once a document exists (this is exactly the action that can flip a claim-support finding). */
+type ClaimGraphMutationResult = ProjectView & { claimGraph: ClaimEvidenceGraph; rubric?: RubricReport };
+
+/** The project's full Claim–Evidence Graph. */
+export function getClaimGraph(projectId: string): Promise<ClaimEvidenceGraph> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/claims`).then((r) => json(r));
+}
+
+/** Claims with zero evidence bindings. */
+export function getUnsupportedClaims(projectId: string): Promise<{ claims: Claim[] }> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/claims/unsupported`).then((r) => json(r));
+}
+
+/** Claims with both a supporting and a contradicting binding — surfaced for a human to resolve, never auto-resolved. */
+export function getClaimConflicts(projectId: string): Promise<{ conflicts: EvidenceConflict[] }> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/claims/conflicts`).then((r) => json(r));
+}
+
+/** Every claim with at least one binding citing evidence from `sourceId` — what a retraction is about to affect. */
+export function getClaimsForSource(projectId: string, sourceId: string): Promise<{ claims: Claim[] }> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(sourceId)}/claims`).then((r) => json(r));
+}
+
+/** Add a claim to the project's Claim–Evidence Graph. 409s if the id is already used. */
+export function addClaim(projectId: string, claim: Claim): Promise<ClaimGraphMutationResult> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/claims`, "POST", { claim }).then((r) => json(r));
+}
+
+/**
+ * Bind evidence to a claim. 400s if the claim doesn't exist, the binding id
+ * is already used, or the binding has no evidence spans — a binding
+ * asserting support without a real located quote is refused server-side,
+ * not just discouraged client-side.
+ */
+export function bindEvidence(projectId: string, binding: ClaimEvidenceBinding): Promise<ClaimGraphMutationResult> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/claims/${encodeURIComponent(binding.claimId)}/evidence`,
+    "POST",
+    { binding }
+  ).then((r) => json(r));
+}
+
+/**
+ * Retract a source: every binding loses any evidence spans citing it, and
+ * any binding left with zero evidence is dropped entirely. Call
+ * getClaimsForSource() first to warn what this is about to affect — this
+ * is not reversible from here.
+ */
+export function removeSource(projectId: string, sourceId: string): Promise<ClaimGraphMutationResult> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(sourceId)}`, {
+    method: "DELETE",
+  }).then((r) => json(r));
 }
 
 export function getProject(projectId: string): Promise<ProjectView> {

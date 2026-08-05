@@ -7,6 +7,7 @@ import Primary from "./regions/Primary";
 import Aside from "./regions/Aside";
 import IntakePanel from "./intake/IntakePanel";
 import GatesPanel from "./gates/GatesPanel";
+import ClaimsPanel from "./claims/ClaimsPanel";
 import { useDeskSession } from "./useDeskSession";
 import StatusBar from "./regions/StatusBar";
 import type { CanonicalDocument, OutputTypeSummary, ProjectView, RubricReport } from "./types";
@@ -35,7 +36,7 @@ export default function DeskShell({ projectId, onClose }: { projectId: string; o
    * `null` means "not yet decided", so the choice is made from the loaded
    * project rather than flashing the wrong surface first.
    */
-  const [view, setView] = useState<"intake" | "document" | "progress" | null>(null);
+  const [view, setView] = useState<"intake" | "document" | "evidence" | "progress" | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -114,7 +115,7 @@ export default function DeskShell({ projectId, onClose }: { projectId: string; o
     <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
       <Header project={project} outputTypeLabel={outputType?.label ?? project.outputTypeId} onClose={onClose} />
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
-        {(["intake", "document", "progress"] as const).map((v) => (
+        {(["intake", "document", "evidence", "progress"] as const).map((v) => (
           <button
             key={v}
             type="button"
@@ -127,7 +128,7 @@ export default function DeskShell({ projectId, onClose }: { projectId: string; o
                 : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]",
             ].join(" ")}
           >
-            {v === "intake" ? "Intake" : v === "document" ? "Document" : "Progress"}
+            {v === "intake" ? "Intake" : v === "document" ? "Document" : v === "evidence" ? "Evidence" : "Progress"}
           </button>
         ))}
       </nav>
@@ -141,6 +142,18 @@ export default function DeskShell({ projectId, onClose }: { projectId: string; o
                  accountable act, and the gate records who performed it. */
               actor={session.status === "signed-in" ? (session.email ?? session.userId) : "unknown"}
               onChanged={(updated) => setProject(updated)}
+            />
+          </div>
+        ) : view === "evidence" ? (
+          <div className="flex-1 overflow-y-auto">
+            <ClaimsPanel
+              projectId={projectId}
+              onChanged={(updated, newRubric) => {
+                setProject(updated);
+                // Absence means "no document to evaluate against yet", not
+                // "clear the existing report" — only overwrite when present.
+                if (newRubric) setRubric(newRubric);
+              }}
             />
           </div>
         ) : view === "intake" ? (
