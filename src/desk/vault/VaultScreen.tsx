@@ -11,6 +11,7 @@ import {
   type VaultItem,
 } from "../../services/vaultContents";
 import VaultSetupScreen from "../setup/VaultSetupScreen";
+import VaultImport from "./VaultImport";
 
 /**
  * The Knowledge Vault's contents (docs 25 §6) — reachable any time from
@@ -235,6 +236,13 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
             >
               {adding ? "Cancel" : "Add material"}
             </button>
+          </div>
+
+          <div className="mb-4">
+            <VaultImport
+              userId={userId}
+              onImported={(saved) => setItems((current) => [...saved, ...(current ?? [])])}
+            />
           </div>
 
           {adding && (
