@@ -4,11 +4,6 @@ import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseCli
 /**
  * Desk's view of the Supabase session.
  *
- * Deliberately not `src/auth/authContext.tsx`. That context is the legacy
- * client's, and carries legacy concepts — a `PaperProject`, an
- * `onboardingStep` — that Desk has no use for. Coupling Desk to it would
- * reattach the client being retired to the client replacing it.
- *
  * The session here is the same thing `src/desk/api.ts` reads to build its
  * Authorization header, so what the UI believes about sign-in and what the
  * server will accept cannot drift apart.

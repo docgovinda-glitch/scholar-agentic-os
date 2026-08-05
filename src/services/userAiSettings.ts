@@ -29,7 +29,7 @@
  * See supabase/schema_user_settings.sql.
  */
 
-import type { AISettings } from "../types";
+import type { AISettings } from "./aiSettingsTypes";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 import { decryptDataAsync, encryptDataAsync } from "../utils/crypto";
 

@@ -1,17 +1,18 @@
-import {StrictMode, lazy, Suspense} from 'react';
+import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
+import DeskApp from './desk/DeskApp.tsx';
 import './index.css';
-import { AuthProvider } from './auth/authContext';
 import { warmServer } from './services/serverWarmup';
 
-// Desk (docs 20/21/22) — the new-architecture client — lives entirely under
-// /desk, lazy-loaded so it costs nothing in the legacy app's bundle. This is
-// a plain pathname check, not a router: Desk has exactly one entry point
-// today (see DeskApp.tsx's own doc comment for why no router dependency
-// was added for that).
-const DeskApp = lazy(() => import('./desk/DeskApp.tsx'));
-const isDesk = window.location.pathname.startsWith('/desk');
+/**
+ * Desk (docs 20/21/22) is the only client now — see docs
+ * 61-CLIENT-CONSOLIDATION.md. It previously lived under /desk behind a
+ * lazy-loaded pathname check, coexisting with the legacy client mounted at
+ * "/". Legacy has been fully retired: every real feature it had that Desk
+ * lacked was ported first (Vault upload/DOI lookup, PDF/ODT export,
+ * submission tracking, Pocket's mobile companion), then legacy's code was
+ * deleted outright rather than kept as a fallback.
+ */
 
 // Start waking the server before rendering, not after the first user action.
 //
@@ -25,14 +26,6 @@ void warmServer();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {isDesk ? (
-      <Suspense fallback={null}>
-        <DeskApp />
-      </Suspense>
-    ) : (
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    )}
+    <DeskApp />
   </StrictMode>,
 );

@@ -145,17 +145,41 @@ available for deliberate reassignment or purge.
 
 ## 5. What remains
 
-1. **Feature parity.** Desk covers project list, gates, document submission,
-   rubric findings, and Studio. Legacy additionally covers intake wizards, the
-   Knowledge Vault, AI setup, export pipeline UI, and submission tracking. Each
-   ports onto the gate-based model.
-2. **Onboarding.** Registration, password recovery, AI setup, and optional Vault
-   setup still live in the legacy app.
-3. **Pocket.** Currently a tab inside the legacy app. It should become Desk's
-   responsive form, not a third client.
-4. **Route flip.** `/desk` → `/`, with legacy reachable during transition.
-5. **Deletion.** `src/App.tsx` and the legacy-only components, once nothing
-   routes to them.
+All five items below are now done. Kept as a record of what shipped and in
+what order, rather than rewritten to erase the history — see each phase's
+commit for the detail.
+
+1. **Feature parity — done.** Onboarding (registration, password recovery, AI
+   setup, optional Vault setup) shipped into `src/desk/auth/AuthFlow.tsx` and
+   `src/desk/setup/`. Vault file-upload/DOI lookup, PDF/ODT export, and
+   server-persisted submission tracking shipped as three further parity
+   phases, each audited first for what was real legacy functionality worth
+   porting versus decorative/simulated filler.
+2. **Onboarding — done.** See above.
+3. **Pocket — done.** Mounted inside Desk (`src/desk/pocket/DeskPocketMount.tsx`),
+   selected by `useDeviceClass()` rather than a route — Pocket is a narrower
+   mobile companion (Approve/Read/Ask/Know), not a mobile port of Desk's
+   editor, so it replaces the whole mobile experience rather than nesting
+   inside `DeskShell`. Its data model needed no adapter: `PocketProject`
+   already extended Desk's own `ProjectView`.
+4. **Route flip — done.** `src/main.tsx` renders `DeskApp` unconditionally;
+   `/desk` and `/` now serve identical content via the existing SPA catch-all.
+5. **Deletion — done.** `src/App.tsx` and every legacy-only file (130 files,
+   plus a further batch of pre-existing orphaned dead code the deletion
+   surfaced) removed outright, not kept as a fallback.
+
+**Known follow-up, found but not addressed here:** `server/routes/ai.ts`'s
+`/api/generate*` endpoints (the `AI_GATEWAY_GENERAL_PROXY` proxy and the eight
+phase-generation routes) were legacy's client's only caller. They're now
+orphaned — still registered and compiling, just unreachable from any client —
+worth a deliberate removal pass rather than leaving them live indefinitely.
+Separately, `server/routes/pocket.ts` queries a `projects(id, user_id)` /
+`documents` schema (`supabase/schema_pocket.sql`) that doesn't match the real
+`schema_store.sql`-shaped table, and its `pool` (`server/src/db.ts`) has no
+`DATABASE_URL` configured in this environment — so Pocket's approval-queue and
+chat endpoints 500 today, independent of anything in this consolidation.
+Fixing it means the same PostgREST rewrite `src/services/store/restProjectStore.ts`
+already did for project persistence, applied to `server/routes/pocket.ts`.
 
 ### Known gap, unrelated but found here
 

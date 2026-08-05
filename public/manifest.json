@@ -2,7 +2,7 @@
   "name": "Scholar OS Pocket",
   "short_name": "Pocket",
   "description": "Mobile-first source approval and project review for academic research",
-  "start_url": "/pocket",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
