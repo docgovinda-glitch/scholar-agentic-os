@@ -182,7 +182,7 @@ export default function DeskShell({
           </div>
         ) : (
           <>
-            <Rail document={document} onJumpToBlock={jumpToBlock} />
+            <Rail document={document} outputTypeId={project.outputTypeId} onJumpToBlock={jumpToBlock} />
             <Primary document={document} onSubmitPlainText={handleSubmitPlainText} submitting={submitting} projectId={projectId} />
           </>
         )}

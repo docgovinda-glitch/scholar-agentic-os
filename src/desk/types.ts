@@ -151,7 +151,25 @@ export interface IntakeField {
   allowsProvisional: boolean;
 }
 
-/** The parts of an Atlas output-type spec the intake form needs. */
+/**
+ * One section of an output type's expected structure (docs 14 §2), mirroring
+ * src/app/atlas/types.ts's SectionSpec. `children` is only populated for
+ * chapter_based types (e.g. a doctoral dissertation's chapters).
+ */
+export interface SectionSpec {
+  key: string;
+  title: string;
+  required: boolean;
+  guidance: string;
+  children?: SectionSpec[];
+}
+
+export interface StructureSpec {
+  variant: string;
+  sections: SectionSpec[];
+}
+
+/** The parts of an Atlas output-type spec the intake form and the Rail's planned-structure preview need. */
 export interface OutputTypeSpec {
   id: string;
   label: string;
@@ -161,6 +179,7 @@ export interface OutputTypeSpec {
     recommended: IntakeField[];
     optional: IntakeField[];
   };
+  structure: StructureSpec;
 }
 
 /**
