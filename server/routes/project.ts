@@ -627,7 +627,6 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * Returns: the file as application/octet-stream with Content-Disposition header.
    *
    * Spec: docs/03-workflow/33-EXPORT-ARCHITECTURE.md §3 (five-stage pipeline).
-   * Currently supports: DOCX only. ODT and PDF in Phase 3.11–3.12.
    */
   app.post("/api/projects/:id/export", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
