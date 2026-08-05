@@ -162,3 +162,47 @@ export interface OutputTypeSpec {
     optional: IntakeField[];
   };
 }
+
+/**
+ * Claim–Evidence Graph types, mirroring src/domain/claim/types.ts. There is
+ * no source registry yet (the Knowledge Vault only tracks that a vault
+ * exists, not its contents — docs 25), so `sourceId` is free text the user
+ * types themselves, not a picker over an approved-source list.
+ */
+export interface EvidenceSpan {
+  sourceId: string;
+  locator: {
+    page?: number;
+    paragraph?: number;
+    startOffset?: number;
+    endOffset?: number;
+  };
+  quote: string;
+}
+
+export interface Claim {
+  id: string;
+  text: string;
+  draftSpanId?: string;
+}
+
+export type SupportStrength = "strong" | "moderate" | "weak" | "contradicts";
+
+export interface ClaimEvidenceBinding {
+  id: string;
+  claimId: string;
+  evidence: EvidenceSpan[];
+  strength: SupportStrength;
+  rationale: string;
+}
+
+export interface EvidenceConflict {
+  claimId: string;
+  bindingIds: string[];
+  description: string;
+}
+
+export interface ClaimEvidenceGraph {
+  claims: Claim[];
+  bindings: ClaimEvidenceBinding[];
+}
