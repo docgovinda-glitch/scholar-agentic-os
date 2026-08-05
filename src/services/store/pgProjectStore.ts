@@ -89,6 +89,8 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
     rubricReport: (row.rubric_report as ProjectRecord["rubricReport"] | null) ?? undefined,
     claimGraph: row.claim_graph as ProjectRecord["claimGraph"],
     waivers: row.waivers as ProjectRecord["waivers"],
+    // Rows written before this column existed have it as SQL NULL.
+    submissions: (row.submissions as ProjectRecord["submissions"] | null) ?? [],
   };
 }
 
@@ -104,11 +106,12 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
         gates: initialProjectGateState(projectId),
         claimGraph: emptyGraph(),
         waivers: {},
+        submissions: [],
       };
       await db.query(
         `insert into public.projects
-           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers)
-         values ($1, $2, $3, $4, $5, null, null, $6, $7)`,
+           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions)
+         values ($1, $2, $3, $4, $5, null, null, $6, $7, $8)`,
         [
           record.projectId,
           record.ownerId,
@@ -117,6 +120,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
           JSON.stringify(record.gates),
           JSON.stringify(record.claimGraph),
           JSON.stringify(record.waivers),
+          JSON.stringify(record.submissions),
         ]
       );
       return record;
@@ -131,8 +135,8 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
     async save(record: ProjectRecord): Promise<ProjectRecord> {
       await db.query(
         `insert into public.projects
-           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
          on conflict (project_id) do update set
            output_type_id = excluded.output_type_id,
            answers = excluded.answers,
@@ -141,6 +145,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
            rubric_report = excluded.rubric_report,
            claim_graph = excluded.claim_graph,
            waivers = excluded.waivers,
+           submissions = excluded.submissions,
            updated_at = now()`,
         [
           record.projectId,
@@ -152,6 +157,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
           record.rubricReport ? JSON.stringify(record.rubricReport) : null,
           JSON.stringify(record.claimGraph),
           JSON.stringify(record.waivers),
+          JSON.stringify(record.submissions),
         ]
       );
       return record;

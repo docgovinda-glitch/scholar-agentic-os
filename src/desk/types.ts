@@ -225,3 +225,40 @@ export interface ClaimEvidenceGraph {
   claims: Claim[];
   bindings: ClaimEvidenceBinding[];
 }
+
+/**
+ * Post-G6 submission tracking, mirroring src/domain/submission/types.ts.
+ * Orthogonal to the gates above — a project can carry any number of
+ * submission attempts against different journals regardless of gate state.
+ */
+export type SubmissionStatus =
+  | "draft"
+  | "submitted"
+  | "under_review"
+  | "minor_revisions"
+  | "major_revisions"
+  | "accepted"
+  | "rejected"
+  | "desk_rejected";
+
+export const SUBMISSION_STATUSES: SubmissionStatus[] = [
+  "draft",
+  "submitted",
+  "under_review",
+  "minor_revisions",
+  "major_revisions",
+  "accepted",
+  "rejected",
+  "desk_rejected",
+];
+
+export interface SubmissionRecord {
+  id: string;
+  journalName: string;
+  journalUrl?: string;
+  submittedAt: string;
+  status: SubmissionStatus;
+  journalSubmissionId?: string;
+  notes?: string;
+  statusUpdatedAt: string;
+}

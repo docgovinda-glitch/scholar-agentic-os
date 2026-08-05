@@ -8,6 +8,7 @@ import Aside from "./regions/Aside";
 import IntakePanel from "./intake/IntakePanel";
 import GatesPanel from "./gates/GatesPanel";
 import ClaimsPanel from "./claims/ClaimsPanel";
+import SubmissionsPanel from "./submissions/SubmissionsPanel";
 import { useDeskSession } from "./useDeskSession";
 import StatusBar from "./regions/StatusBar";
 import type { CanonicalDocument, OutputTypeSummary, ProjectView, RubricReport } from "./types";
@@ -46,7 +47,7 @@ export default function DeskShell({
    * `null` means "not yet decided", so the choice is made from the loaded
    * project rather than flashing the wrong surface first.
    */
-  const [view, setView] = useState<"intake" | "document" | "evidence" | "progress" | null>(null);
+  const [view, setView] = useState<"intake" | "document" | "evidence" | "progress" | "submissions" | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -131,7 +132,7 @@ export default function DeskShell({
         onOpenVault={onOpenVault}
       />
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
-        {(["intake", "document", "evidence", "progress"] as const).map((v) => (
+        {(["intake", "document", "evidence", "progress", "submissions"] as const).map((v) => (
           <button
             key={v}
             type="button"
@@ -144,7 +145,15 @@ export default function DeskShell({
                 : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]",
             ].join(" ")}
           >
-            {v === "intake" ? "Intake" : v === "document" ? "Document" : v === "evidence" ? "Evidence" : "Progress"}
+            {v === "intake"
+              ? "Intake"
+              : v === "document"
+                ? "Document"
+                : v === "evidence"
+                  ? "Evidence"
+                  : v === "progress"
+                    ? "Progress"
+                    : "Submissions"}
           </button>
         ))}
       </nav>
@@ -179,6 +188,10 @@ export default function DeskShell({
               project={project}
               onSaved={(updated) => setProject(updated)}
             />
+          </div>
+        ) : view === "submissions" ? (
+          <div className="flex-1 overflow-y-auto">
+            <SubmissionsPanel projectId={projectId} />
           </div>
         ) : (
           <>

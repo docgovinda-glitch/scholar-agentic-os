@@ -31,6 +31,7 @@
  * it's set. Every handler below is async and awaits the store accordingly.
  */
 
+import crypto from "crypto";
 import express from "express";
 import { catalog } from "../../src/app/atlas/atlas.ts";
 import {
@@ -56,6 +57,9 @@ import { emptyDocument } from "../../src/domain/document/model.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
 import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, ClaimGraphError } from "../../src/domain/claim/graph.ts";
 import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
+import { addSubmission, updateSubmission, deleteSubmission, SubmissionError } from "../../src/domain/submission/submissions.ts";
+import { SUBMISSION_STATUSES } from "../../src/domain/submission/types.ts";
+import type { SubmissionRecord, SubmissionStatus } from "../../src/domain/submission/types.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
 
@@ -100,6 +104,36 @@ function isValidEvidenceSpan(value: unknown): value is EvidenceSpan {
   for (const key of ["page", "paragraph", "startOffset", "endOffset"]) {
     if (l[key] !== undefined && typeof l[key] !== "number") return false;
   }
+  return true;
+}
+
+function isSubmissionStatus(value: unknown): value is SubmissionStatus {
+  return typeof value === "string" && (SUBMISSION_STATUSES as string[]).includes(value);
+}
+
+/** Body of POST .../submissions: everything but the id and statusUpdatedAt, which the server assigns. */
+function isValidNewSubmission(value: unknown): value is Omit<SubmissionRecord, "id" | "statusUpdatedAt"> {
+  if (typeof value !== "object" || value === null) return false;
+  const s = value as Record<string, unknown>;
+  if (typeof s.journalName !== "string" || s.journalName.trim().length === 0) return false;
+  if (typeof s.submittedAt !== "string" || s.submittedAt.length === 0) return false;
+  if (!isSubmissionStatus(s.status)) return false;
+  if (s.journalUrl !== undefined && typeof s.journalUrl !== "string") return false;
+  if (s.journalSubmissionId !== undefined && typeof s.journalSubmissionId !== "string") return false;
+  if (s.notes !== undefined && typeof s.notes !== "string") return false;
+  return true;
+}
+
+/** Body of PATCH .../submissions/:id: any subset of the mutable fields. */
+function isValidSubmissionPatch(value: unknown): value is Partial<Omit<SubmissionRecord, "id" | "statusUpdatedAt">> {
+  if (typeof value !== "object" || value === null) return false;
+  const s = value as Record<string, unknown>;
+  if (s.journalName !== undefined && (typeof s.journalName !== "string" || s.journalName.trim().length === 0)) return false;
+  if (s.submittedAt !== undefined && (typeof s.submittedAt !== "string" || s.submittedAt.length === 0)) return false;
+  if (s.status !== undefined && !isSubmissionStatus(s.status)) return false;
+  if (s.journalUrl !== undefined && typeof s.journalUrl !== "string") return false;
+  if (s.journalSubmissionId !== undefined && typeof s.journalSubmissionId !== "string") return false;
+  if (s.notes !== undefined && typeof s.notes !== "string") return false;
   return true;
 }
 
@@ -655,6 +689,77 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       res.status(500).json({ error: message });
+    }
+  }));
+
+  /**
+   * Post-G6 submission tracking (docs/domain/submission/types.ts) — orthogonal
+   * to the gate machinery above; a project can carry any number of submission
+   * attempts against different journals regardless of gate state.
+   */
+
+  /** Every submission attempt recorded against the project. */
+  app.get("/api/projects/:id/submissions", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    res.json({ submissions: record.submissions });
+  }));
+
+  /**
+   * Record a new submission attempt. Body: everything on SubmissionRecord
+   * except `id` and `statusUpdatedAt`, both assigned here.
+   */
+  app.post("/api/projects/:id/submissions", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!isValidNewSubmission(req.body)) {
+      return res.status(400).json({
+        error:
+          "Missing or malformed submission. Required: journalName (string), submittedAt (string), status (one of: " +
+          `${SUBMISSION_STATUSES.join(", ")}). Optional: journalUrl, journalSubmissionId, notes (strings).`,
+      });
+    }
+    const now = new Date().toISOString();
+    const submission: SubmissionRecord = { ...req.body, id: `sub-${crypto.randomUUID()}`, statusUpdatedAt: now };
+    const submissions = addSubmission(record.submissions, submission);
+    const updated = await store.save({ ...record, submissions });
+    res.status(201).json({ submissions: updated.submissions });
+  }));
+
+  /** Patch a submission's fields. Body: any subset of the mutable SubmissionRecord fields. */
+  app.patch("/api/projects/:id/submissions/:submissionId", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!isValidSubmissionPatch(req.body)) {
+      return res.status(400).json({
+        error: `Malformed submission patch. Allowed fields: journalName, journalUrl, submittedAt, status (one of: ${SUBMISSION_STATUSES.join(", ")}), journalSubmissionId, notes.`,
+      });
+    }
+    try {
+      const submissions = updateSubmission(record.submissions, req.params.submissionId, req.body, new Date().toISOString());
+      const updated = await store.save({ ...record, submissions });
+      res.json({ submissions: updated.submissions });
+    } catch (err) {
+      if (err instanceof SubmissionError) {
+        return res.status(404).json({ error: err.message });
+      }
+      throw err;
+    }
+  }));
+
+  /** Delete a submission record. */
+  app.delete("/api/projects/:id/submissions/:submissionId", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    try {
+      const submissions = deleteSubmission(record.submissions, req.params.submissionId);
+      const updated = await store.save({ ...record, submissions });
+      res.json({ submissions: updated.submissions });
+    } catch (err) {
+      if (err instanceof SubmissionError) {
+        return res.status(404).json({ error: err.message });
+      }
+      throw err;
     }
   }));
 }
