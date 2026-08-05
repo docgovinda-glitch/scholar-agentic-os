@@ -7,6 +7,7 @@ import VaultSetupScreen from "./setup/VaultSetupScreen";
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
 import { useDeskSession } from "./useDeskSession";
+import VaultScreen from "./vault/VaultScreen";
 
 function readProjectIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get("project");
@@ -43,6 +44,8 @@ function DeskRoutes() {
    * (list or project) rather than navigating anywhere.
    */
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Same reasoning as settingsOpen — not URL-addressed, returns to exactly what was already on screen. */
+  const [vaultOpen, setVaultOpen] = useState(false);
 
   // Keep component state and the URL in step when the user presses Back or
   // Forward. Without this, going back from a project left the URL on the list
@@ -95,16 +98,31 @@ function DeskRoutes() {
     return <AiSetupScreen variant="revisit" onDone={() => setSettingsOpen(false)} onCancel={() => setSettingsOpen(false)} />;
   }
 
+  // A Vault is "your long-term library... across future projects" (docs 25
+  // §6.2) — a peer destination to a project, not something folded inside
+  // one, the same reasoning that already moved AI settings off PaperProject.
+  if (vaultOpen && userId) {
+    return <VaultScreen userId={userId} onClose={() => setVaultOpen(false)} />;
+  }
+
   if (!projectId) {
     return (
       <ProjectListScreen
         onOpen={open}
         userEmail={session.status === "signed-in" ? session.email : null}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenVault={() => setVaultOpen(true)}
       />
     );
   }
-  return <DeskShell projectId={projectId} onClose={close} onOpenSettings={() => setSettingsOpen(true)} />;
+  return (
+    <DeskShell
+      projectId={projectId}
+      onClose={close}
+      onOpenSettings={() => setSettingsOpen(true)}
+      onOpenVault={() => setVaultOpen(true)}
+    />
+  );
 }
 
 export default function DeskApp() {

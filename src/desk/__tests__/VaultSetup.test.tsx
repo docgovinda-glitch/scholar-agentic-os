@@ -24,9 +24,8 @@ vi.mock("../../services/supabaseClient", () => ({
 
 const { default: VaultSetupScreen } = await import("../setup/VaultSetupScreen");
 const { useVaultSetupStatus } = await import("../setup/useVaultSetupStatus");
-const { generateRecoveryCode, verifyVaultPassphrase, hasVaultPassphraseOnThisDevice } = await import(
-  "../../services/userVault"
-);
+const { generateRecoveryCode, verifyVaultPassphrase, hasVaultPassphraseOnThisDevice, setVaultPassphraseVerifier } =
+  await import("../../services/userVault");
 
 const USER = { id: "11111111-1111-4111-8111-111111111111" };
 const upsert = vi.fn();
@@ -178,11 +177,27 @@ describe("the Recovery Kit", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(upsert).toHaveBeenCalled());
 
-    expect(hasVaultPassphraseOnThisDevice()).toBe(true);
+    expect(await hasVaultPassphraseOnThisDevice()).toBe(true);
     expect(await verifyVaultPassphrase("correct horse")).toBe(true);
     expect(await verifyVaultPassphrase("wrong passphrase")).toBe(false);
     // A verifier, not the secret.
     expect(JSON.stringify(localStorage)).not.toContain("correct horse");
+  });
+
+  it("keys the verifier to the signed-in user, so a shared device does not confuse accounts", async () => {
+    await reachRecoveryStep();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(upsert).toHaveBeenCalled());
+
+    // A second account creating a Vault on the same browser must not
+    // overwrite the first account's verifier — that would silently lock the
+    // first account out of a Vault the server still says exists.
+    getUser.mockResolvedValue({ data: { user: { id: "22222222-2222-4222-8222-222222222222" } } });
+    await setVaultPassphraseVerifier("someone else's passphrase");
+
+    getUser.mockResolvedValue({ data: { user: USER } });
+    expect(await verifyVaultPassphrase("correct horse")).toBe(true);
   });
 });
 

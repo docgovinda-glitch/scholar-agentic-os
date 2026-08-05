@@ -16,11 +16,13 @@ export default function Header({
   outputTypeLabel,
   onClose,
   onOpenSettings,
+  onOpenVault,
 }: {
   project: ProjectView;
   outputTypeLabel: string;
   onClose?: () => void;
   onOpenSettings?: () => void;
+  onOpenVault?: () => void;
 }) {
   const current = project.gates.find((g) => g.status !== "signed_off") ?? project.gates[project.gates.length - 1];
 
@@ -50,6 +52,15 @@ export default function Header({
         <span title="Not yet built" className="cursor-not-allowed">
           Search
         </span>
+        {onOpenVault && (
+          <button
+            type="button"
+            onClick={onOpenVault}
+            className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+          >
+            Vault
+          </button>
+        )}
         {onOpenSettings ? (
           <button
             type="button"
