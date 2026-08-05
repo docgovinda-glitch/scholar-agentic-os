@@ -12,6 +12,7 @@ import {
 } from "../../services/vaultContents";
 import VaultSetupScreen from "../setup/VaultSetupScreen";
 import VaultImport from "./VaultImport";
+import VaultDocumentImport from "./VaultDocumentImport";
 
 /**
  * The Knowledge Vault's contents (docs 25 §6) — reachable any time from
@@ -238,10 +239,14 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
             </button>
           </div>
 
-          <div className="mb-4">
+          <div className="mb-2 flex flex-wrap gap-4">
             <VaultImport
               userId={userId}
               onImported={(saved) => setItems((current) => [...saved, ...(current ?? [])])}
+            />
+            <VaultDocumentImport
+              userId={userId}
+              onImported={(saved) => setItems((current) => [saved, ...(current ?? [])])}
             />
           </div>
 
