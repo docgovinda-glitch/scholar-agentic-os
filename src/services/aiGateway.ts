@@ -641,30 +641,53 @@ function createLocalAdapter(spec: LocalRunnerSpec, overrideId?: string): AIProvi
       const start = Date.now();
       const endpoint = this.getEndpoint(settings);
       const url = `${endpoint}${spec.healthPath}`;
+
+      // Bug fix (2026-08-05): this was the one healthCheck path that never
+      // went through classifyThrownError/classifyResponse, so a browser's own
+      // raw network-error string reached the UI verbatim — "Failed to fetch"
+      // in Chromium, or the famously unhelpful "Load failed" in WebKit/Safari,
+      // reported live by a user testing exactly this path with Ollama not
+      // running. The cloud adapter above already gets a real, actionable
+      // message here ("Could not reach the local AI program. Either it is not
+      // running, or it is refusing requests from this page.") — this only
+      // needed the same treatment.
+      let response: Response;
       try {
-        const resp = await fetch(url, { signal: AbortSignal.timeout(3000) });
-        if (!resp.ok) throw new Error(`Status ${resp.status}`);
-        const data = await resp.json();
-        const models: string[] =
-          spec.apiStyle === "ollama-native"
-            ? (data.models || []).map((m: any) => m.name)
-            : (data.data || []).map((m: any) => m.id);
-        return {
-          provider: id,
-          status: "online",
-          latencyMs: Date.now() - start,
-          lastChecked: new Date().toISOString(),
-          availableModels: models,
-        };
-      } catch (e: any) {
+        response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      } catch (e) {
+        const classified = classifyThrownError(e, { url });
         return {
           provider: id,
           status: "offline",
           latencyMs: Date.now() - start,
           lastChecked: new Date().toISOString(),
-          error: e.message,
+          error: classified.remedy ? `${classified.label}. ${classified.remedy}` : classified.label,
         };
       }
+
+      if (!response.ok) {
+        const classified = await classifyResponse(response);
+        return {
+          provider: id,
+          status: "offline",
+          latencyMs: Date.now() - start,
+          lastChecked: new Date().toISOString(),
+          error: classified.remedy ? `${classified.label}. ${classified.remedy}` : classified.label,
+        };
+      }
+
+      const data = await response.json();
+      const models: string[] =
+        spec.apiStyle === "ollama-native"
+          ? (data.models || []).map((m: any) => m.name)
+          : (data.data || []).map((m: any) => m.id);
+      return {
+        provider: id,
+        status: "online",
+        latencyMs: Date.now() - start,
+        lastChecked: new Date().toISOString(),
+        availableModels: models,
+      };
     },
   };
 }
