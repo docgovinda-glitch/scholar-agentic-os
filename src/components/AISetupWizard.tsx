@@ -34,6 +34,48 @@ interface AISetupWizardProps {
 // every other mode (it is not zero-install, so a shortcut would misrepresent
 // it exactly the way the old Smart AI shortcut did).
 
+/**
+ * Seconds since `isTesting` became true, or null while idle. A health check
+ * goes through the same server proxy as a real generation call and can
+ * legitimately take up to PROXY_TIMEOUT_MS (150s) — see aiGateway.ts and
+ * serverWarmup.ts's own comments on why that ceiling is generous rather than
+ * tight. A bare spinner for that long reads as broken; this is what lets the
+ * UI say "still working" instead of going silent.
+ */
+function useElapsedSeconds(active: boolean): number | null {
+  const [elapsed, setElapsed] = useState<number | null>(null);
+  useEffect(() => {
+    if (!active) {
+      setElapsed(null);
+      return;
+    }
+    const start = Date.now();
+    setElapsed(0);
+    const id = window.setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => window.clearInterval(id);
+  }, [active]);
+  return elapsed;
+}
+
+/**
+ * Bug fix (2026-08-05): "Validate & Continue" / "Test Connection" reported
+ * as looking unresponsive. Both buttons already recover correctly once the
+ * network call settles (see runFinalValidation's own 2026-07-31 fix above),
+ * but a connection through a Render free-tier instance that has been idle,
+ * or simply a slow provider round trip, can take upwards of ten seconds
+ * with nothing on screen but a static spinner and no indication that this
+ * is expected — indistinguishable from broken to someone watching it.
+ */
+function SlowConnectionNotice({ active }: { active: boolean }) {
+  const elapsed = useElapsedSeconds(active);
+  if (elapsed === null || elapsed < 5) return null;
+  return (
+    <p className="text-[10px] text-gray-400 mt-1.5" role="status">
+      Still working ({elapsed}s) — a first connection after the server has been idle can take up to a minute or two.
+    </p>
+  );
+}
+
 export default function AISetupWizard({ project, updateProject, onComplete, onBack }: AISetupWizardProps) {
   const [step, setStep] = useState(0);
   const [selectedMode, setSelectedMode] = useState<AIModeId | null>(null);
@@ -788,7 +830,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                       </div>
                     </div>
                     
-                    <div className="flex items-end">
+                    <div className="flex flex-col items-end justify-end gap-1">
                       <button
                         onClick={() => testConnection(provider.id)}
                         disabled={isTesting}
@@ -797,6 +839,7 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
                         {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                         Test Connection
                       </button>
+                      <SlowConnectionNotice active={isTesting} />
                     </div>
                   </div>
                 </div>
@@ -813,24 +856,27 @@ export default function AISetupWizard({ project, updateProject, onComplete, onBa
           </div>
         )}
 
-        <div className="flex justify-between items-center pt-8 border-t border-[color:var(--color-navy-4)] max-w-3xl mx-auto">
-          <button
-            onClick={() => setStep(1)}
-            className="px-6 py-2.5 rounded-xl font-bold text-xs border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] text-[color:var(--text-secondary)] hover:bg-[color:var(--color-navy-2)] cursor-pointer transition-all"
-          >
-            Back
-          </button>
-          <button
-            onClick={runFinalValidation}
-            disabled={isTesting}
-            className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-          >
-            {isTesting ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Validating...</>
-            ) : (
-              <>Validate & Continue <ChevronRight className="w-4 h-4" /></>
-            )}
-          </button>
+        <div className="flex flex-col items-end gap-1.5 pt-8 border-t border-[color:var(--color-navy-4)] max-w-3xl mx-auto">
+          <div className="flex justify-between items-center w-full">
+            <button
+              onClick={() => setStep(1)}
+              className="px-6 py-2.5 rounded-xl font-bold text-xs border border-[color:var(--color-navy-4)] bg-[color:var(--color-navy-1)] text-[color:var(--text-secondary)] hover:bg-[color:var(--color-navy-2)] cursor-pointer transition-all"
+            >
+              Back
+            </button>
+            <button
+              onClick={runFinalValidation}
+              disabled={isTesting}
+              className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-[color:var(--color-luminous-blue-dim)] hover:bg-[color:var(--color-luminous-blue)] transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              {isTesting ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Validating...</>
+              ) : (
+                <>Validate & Continue <ChevronRight className="w-4 h-4" /></>
+              )}
+            </button>
+          </div>
+          <SlowConnectionNotice active={isTesting} />
         </div>
       </div>
     );
