@@ -18,9 +18,11 @@ import type { OutputTypeSummary, ProjectView } from "./types";
 export default function ProjectListScreen({
   onOpen,
   userEmail,
+  onOpenSettings,
 }: {
   onOpen: (projectId: string) => void;
   userEmail: string | null;
+  onOpenSettings?: () => void;
 }) {
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
   const [types, setTypes] = useState<OutputTypeSummary[] | null>(null);
@@ -68,6 +70,15 @@ export default function ProjectListScreen({
               <span className="truncate text-sm text-[color:var(--text-muted)]" title={userEmail}>
                 {userEmail}
               </span>
+            )}
+            {onOpenSettings && (
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+              >
+                Settings
+              </button>
             )}
             <button
               type="button"

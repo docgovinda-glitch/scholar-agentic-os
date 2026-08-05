@@ -257,3 +257,36 @@ describe("Desk — project shell", () => {
     expect(await screen.findByText(/session has expired/i)).toBeInTheDocument();
   });
 });
+
+// Header's "Settings" used to be a labelled dead stub (title="Not yet
+// built"). It now opens AiSetupScreen in its "revisit" mode and returns to
+// exactly where the user was — from the list, or from inside a project.
+describe("Desk — settings", () => {
+  it("opens from the project list and returns to it", async () => {
+    mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
+    render(<DeskApp />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    expect(await screen.findByRole("heading", { name: "AI provider" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByText("Nothing here yet")).toBeInTheDocument();
+  });
+
+  it("opens from within a project and returns to it, not to the list", async () => {
+    window.history.pushState({}, "", "/desk?project=proj-42");
+    mockFetchSequence([
+      { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
+      { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
+      { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
+    ]);
+    render(<DeskApp />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    expect(await screen.findByRole("heading", { name: "AI provider" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "← Back" }));
+    expect(await screen.findByText("Journal Article")).toBeInTheDocument();
+    expect(window.location.search).toContain("project=proj-42");
+  });
+});

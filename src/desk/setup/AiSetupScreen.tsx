@@ -32,13 +32,27 @@ import {
  * features and are not being deleted — the legacy client keeps them until it
  * retires. What is here is the path a new user needs to reach a working
  * editor: pick a provider or a local runner, supply what it needs, continue.
+ *
+ * Doubles as the settings screen a user reaches after setup (`variant:
+ * "revisit"`) rather than being a one-time-only stage with no way back in —
+ * Header's "Settings" control used to be a labelled dead stub because
+ * nothing existed to open. Every piece this needs (loadUserAiSettings,
+ * saveUserAiSettings, storeProviderKey, forgetProviderKey) already existed
+ * and was already exercised by this same screen's first run; revisiting is a
+ * copy change, not new plumbing.
  */
 export default function AiSetupScreen({
   onDone,
   onSkip,
+  onCancel,
+  variant = "onboarding",
 }: {
   onDone: () => void;
+  /** Onboarding only: "leave AI features inert for now" (docs 25). */
   onSkip?: () => void;
+  /** Revisit only: "I didn't mean to open this." Nothing here saves until Save is pressed, so this is a plain close. */
+  onCancel?: () => void;
+  variant?: "onboarding" | "revisit";
 }) {
   const [settings, setSettings] = useState<UserAiSettings>(DEFAULT_AI_SETTINGS);
   const [selected, setSelected] = useState<string>(DEFAULT_AI_SETTINGS.provider);
@@ -134,11 +148,22 @@ export default function AiSetupScreen({
   return (
     <Shell>
       <header className="mb-7">
+        {variant === "revisit" && onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="mb-4 text-sm text-[color:var(--accent)] transition-colors duration-[var(--motion-fast)] hover:text-[color:var(--accent-hover)] cursor-pointer"
+          >
+            ← Back
+          </button>
+        )}
         <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">
-          Connect an AI provider
+          {variant === "revisit" ? "AI provider" : "Connect an AI provider"}
         </h1>
         <p className="mt-1.5 text-sm text-[color:var(--text-secondary)]">
-          Scholar uses a model you choose, with your own account. Several have free tiers that need no card.
+          {variant === "revisit"
+            ? "Change the model Scholar uses, or update the key stored on this device."
+            : "Scholar uses a model you choose, with your own account. Several have free tiers that need no card."}
         </p>
       </header>
 
@@ -274,18 +299,28 @@ export default function AiSetupScreen({
           disabled={busy || (!isLocal && !apiKey.trim() && !hasKeyOnDevice)}
           className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
         >
-          {busy ? "Saving…" : "Save and continue"}
+          {busy ? "Saving…" : variant === "revisit" ? "Save changes" : "Save and continue"}
         </button>
         {/* Doc 25: every stage after login is skippable. Skipping leaves the
             editor usable and the AI features inert, which is a real choice,
-            not a broken state. */}
-        {onSkip && (
+            not a broken state. Revisit has no skip — there is nothing to
+            skip past, only a change to make or not. */}
+        {onSkip && variant === "onboarding" && (
           <button
             type="button"
             onClick={onSkip}
             className="text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
           >
             Skip for now
+          </button>
+        )}
+        {variant === "revisit" && onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
+          >
+            Cancel
           </button>
         )}
       </div>

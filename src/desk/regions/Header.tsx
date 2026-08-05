@@ -5,18 +5,22 @@ import type { ProjectView } from "../types";
  *
  * The wordmark is now a real control that returns to the project list —
  * `GET /api/projects` exists, so the "no project switcher yet; addressed by
- * ?project=<id> in the URL" note this carried no longer applies. Search and
- * settings stay visibly present but explicitly labelled not-yet-built, rather
- * than being dead controls that look live (22 §6.2's "never a silent no-op").
+ * ?project=<id> in the URL" note this carried no longer applies. Settings is
+ * now real too (AiSetupScreen's "revisit" mode). Search stays visibly
+ * present but explicitly labelled not-yet-built, rather than being a dead
+ * control that looks live (22 §6.2's "never a silent no-op") — there is no
+ * corpus/citations API yet for it to search.
  */
 export default function Header({
   project,
   outputTypeLabel,
   onClose,
+  onOpenSettings,
 }: {
   project: ProjectView;
   outputTypeLabel: string;
   onClose?: () => void;
+  onOpenSettings?: () => void;
 }) {
   const current = project.gates.find((g) => g.status !== "signed_off") ?? project.gates[project.gates.length - 1];
 
@@ -46,9 +50,19 @@ export default function Header({
         <span title="Not yet built" className="cursor-not-allowed">
           Search
         </span>
-        <span title="Not yet built" className="cursor-not-allowed">
-          Settings
-        </span>
+        {onOpenSettings ? (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+          >
+            Settings
+          </button>
+        ) : (
+          <span title="Not yet built" className="cursor-not-allowed">
+            Settings
+          </span>
+        )}
       </div>
     </header>
   );
