@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createProject, listOutputTypes, listProjects } from "./api";
 import { getSupabaseClient } from "../services/supabaseClient";
 import type { OutputTypeSummary, ProjectView } from "./types";
@@ -201,6 +201,16 @@ function EmptyState({ onStart }: { onStart: () => void }) {
   );
 }
 
+/** The catalog's own family keys (docs 14 §2) — 6 fixed values, prettified for display. */
+const FAMILY_LABEL: Record<string, string> = {
+  short_form: "Short-form writing",
+  long_form: "Long-form writing",
+  publication: "Publications",
+  proposal_funding: "Proposals & funding",
+  applied_professional: "Applied & professional",
+  presentation: "Presentations",
+};
+
 function ChooseOutputType({
   types,
   creating,
@@ -212,6 +222,22 @@ function ChooseOutputType({
   onPick: (id: string) => void;
   onCancel: () => void;
 }) {
+  const [selected, setSelected] = useState("");
+
+  // Grouped by family so a 24-entry list reads as ~6 short groups rather
+  // than one long scroll with no structure — the reason a dropdown replaced
+  // the button grid this used to be.
+  const groups = useMemo(() => {
+    if (!types) return [];
+    const byFamily = new Map<string, OutputTypeSummary[]>();
+    for (const t of types) {
+      const list = byFamily.get(t.family) ?? [];
+      list.push(t);
+      byFamily.set(t.family, list);
+    }
+    return Array.from(byFamily.entries()).sort(([a], [b]) => (FAMILY_LABEL[a] ?? a).localeCompare(FAMILY_LABEL[b] ?? b));
+  }, [types]);
+
   return (
     <>
       <div className="mb-6">
@@ -233,21 +259,40 @@ function ChooseOutputType({
       {!types ? (
         <p className="text-sm text-[color:var(--text-muted)]">Loading output types…</p>
       ) : (
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {types.map((t) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => onPick(t.id)}
-                disabled={creating}
-                className="w-full rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] px-4 py-3 text-left transition-colors duration-[var(--motion-fast)] hover:border-[color:var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
-              >
-                <span className="block text-sm font-medium text-[color:var(--text-primary)]">{t.label}</span>
-                <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">{t.family}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="flex max-w-md flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="output-type" className="text-sm font-medium text-[color:var(--text-primary)]">
+              Document type
+            </label>
+            <select
+              id="output-type"
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+              className="w-full px-3 py-2 text-sm"
+            >
+              <option value="" disabled>
+                Choose a document type…
+              </option>
+              {groups.map(([family, items]) => (
+                <optgroup key={family} label={FAMILY_LABEL[family] ?? family}>
+                  {items.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => onPick(selected)}
+            disabled={!selected || creating}
+            className="self-start rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
+          >
+            {creating ? "Creating…" : "Continue"}
+          </button>
+        </div>
       )}
     </>
   );

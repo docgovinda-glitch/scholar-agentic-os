@@ -134,7 +134,8 @@ describe("Desk — project list", () => {
     render(<DeskApp />);
 
     fireEvent.click(await screen.findByText("Start your first project"));
-    fireEvent.click(await screen.findByText("Journal Article"));
+    fireEvent.change(await screen.findByLabelText("Document type"), { target: { value: "OT-06" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
