@@ -401,6 +401,14 @@ describe("Desk — StudioPanel", () => {
       await waitFor(() => expect(capturedBody).not.toBeNull());
       expect(capturedBody).toMatchObject({ useEngine: "premium" });
       expect(capturedBody).not.toHaveProperty("apiKey");
+
+      // "Why this AI?" for Premium: Source/Provider/Model/Credits used — never a credential.
+      fireEvent.click(screen.getAllByText("Why this AI?")[0]);
+      expect(await screen.findByText("Scholar Premium")).toBeInTheDocument();
+      expect(screen.getByText("Provider:")).toBeInTheDocument();
+      expect(screen.getByText("Credits used:")).toBeInTheDocument();
+      expect(screen.getByText("2")).toBeInTheDocument();
+      expect(screen.queryByText(/sk-/)).not.toBeInTheDocument();
     });
 
     /** Studio's default routing decision used by every local test below — mockFetch() only ever needs to answer /api/ai-access/route; anything else hitting Scholar's own API is a bug in the code under test. */
@@ -413,7 +421,7 @@ describe("Desk — StudioPanel", () => {
       });
     }
 
-    it("routes to a local runner via Auto and executes it directly, never through Scholar's own server", async () => {
+    it("routes to a local runner via Auto and executes it directly, with no cloud-transfer consent prompt, since nothing leaves the device", async () => {
       mockOnlyLocalRoute();
       const localFetch = vi.fn(async (url: string) => {
         if (url === "http://localhost:11434/api/tags") {
@@ -436,15 +444,26 @@ describe("Desk — StudioPanel", () => {
       fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Some text to refine." } });
       fireEvent.click(screen.getByText("Refine"));
 
-      // First use of "ollama" for user_content — the same Warden consent
-      // gate every other provider goes through, granted the same way.
-      expect(await screen.findByText(/First use of ollama/)).toBeInTheDocument();
-      fireEvent.click(screen.getByText(/Allow Ollama and retry/));
-
+      // Local execution is Warden-evaluated exactly like every other tier —
+      // it just never lands on "ask", since there is no cloud transfer to
+      // consent to. Confirm no misleading consent prompt ever appears.
       expect(await screen.findByText(/AI used: Ollama \(llama3\.1:8b\) · local/)).toBeInTheDocument();
+      expect(screen.queryByText(/Allow Ollama and retry/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/First use of ollama/)).not.toBeInTheDocument();
       expect(localFetch).toHaveBeenCalledWith("http://localhost:11434/api/chat", expect.anything());
       // The privacy boundary itself: no call to Scholar's own refine route.
       expect(global.fetch).not.toHaveBeenCalledWith("/api/studio/refine", expect.anything());
+
+      // "Why this AI?" must accurately describe the local execution path —
+      // Source/Runtime/Model/Processing, never a Provider/Credits framing.
+      // Two toggles share the same `detailsOpen` state (the pre-run routing
+      // preview and the post-run executed-source panel) — click either.
+      fireEvent.click(screen.getAllByText("Why this AI?")[0]);
+      expect(await screen.findByText("Local")).toBeInTheDocument();
+      expect(screen.getByText("Runtime:")).toBeInTheDocument();
+      expect(screen.getByText("llama3.1:8b")).toBeInTheDocument();
+      expect(screen.getByText(/On your computer — this passage was never sent to Scholar's servers\./)).toBeInTheDocument();
+      expect(screen.queryByText("Credits used:")).not.toBeInTheDocument();
     });
 
     it("gives a clear, specific message when the local runtime doesn't answer at all", async () => {

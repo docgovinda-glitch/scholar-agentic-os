@@ -40,6 +40,7 @@ function evaluateAndResolvePrompt(req: CompletionRequest, policy: EgressPolicy):
       taskClass: req.taskClass,
       scopeId: req.scopeId,
       segments: req.segments,
+      local: req.local,
     },
     policy
   );

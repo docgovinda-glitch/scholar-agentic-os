@@ -55,6 +55,14 @@ export interface EgressRequest {
   /** Scope id (project, section, or workspace) used for restricted-mode checks. */
   scopeId?: string;
   segments: EgressSegment[];
+  /**
+   * True when `provider` is a local runtime — the request never leaves this
+   * device. Changes only the "ask" consent decision (policy.ts's
+   * decideForClass): a local call is not asked for cloud-transfer consent,
+   * since there is no cloud transfer. restricted-scope and hard `deny`
+   * decisions are unaffected — this is not a general local exemption.
+   */
+  local?: boolean;
 }
 
 export interface ClassifiedSegment extends EgressSegment {

@@ -56,6 +56,24 @@ function displayProviderName(providerId: string): string {
   return getLocalRunner(providerId)?.name ?? providerId;
 }
 
+/** "Why this AI?" Source field per tier — the label a user actually recognizes, not the internal tier string. */
+function sourceLabel(tier: string): string {
+  switch (tier) {
+    case "local":
+      return "Local";
+    case "premium":
+      return "Scholar Premium";
+    case "free":
+      return "Free";
+    case "byok":
+      return "BYOK";
+    case "manual":
+      return "Manual (Advanced mode)";
+    default:
+      return tier;
+  }
+}
+
 const CATEGORY_LABEL = { mechanics: "Mechanics", language: "Language", content: "Content" } as const;
 const CATEGORY_COLOR = {
   mechanics: "text-[color:var(--text-secondary)] border-[color:var(--color-border-subtle)]",
@@ -604,23 +622,52 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
                       {executedSource.model ? ` (${executedSource.model})` : ""} · {executedSource.tier}
                       {executedSource.creditsUsed !== undefined ? ` · ${executedSource.creditsUsed} credit${executedSource.creditsUsed === 1 ? "" : "s"}` : ""}
                     </p>
-                    {executedSource.reasoning && (
-                      <button
-                        type="button"
-                        onClick={() => setDetailsOpen(!detailsOpen)}
-                        className="text-[10px] text-[color:var(--color-luminous-blue-dim)] hover:underline shrink-0"
-                      >
-                        Why this AI?
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDetailsOpen(!detailsOpen)}
+                      className="text-[10px] text-[color:var(--color-luminous-blue-dim)] hover:underline shrink-0"
+                    >
+                      Why this AI?
+                    </button>
                   </div>
-                  {detailsOpen && executedSource.reasoning && (
-                    <p className="mt-1 text-[10px] text-[color:var(--text-muted)]">{executedSource.reasoning}</p>
-                  )}
-                  {detailsOpen && executedSource.tier === "local" && (
-                    <p className="mt-1 text-[10px] text-[color:var(--text-muted)]">
-                      Privacy: runs on your computer — this passage was never sent to Scholar's servers.
-                    </p>
+                  {/* Field-by-field breakdown: exactly what actually served this
+                      request, phrased so it can never be mistaken for a claim
+                      about a different tier. Local shows Runtime/Processing
+                      instead of Provider/Credits since no provider was billed
+                      and nothing left this device; Premium is the only tier
+                      that shows a credits figure, since it's the only one that
+                      spends any. Never includes a credential or key. */}
+                  {detailsOpen && (
+                    <dl className="mt-1 flex flex-col gap-0.5 text-[10px] text-[color:var(--text-muted)]">
+                      <div className="flex gap-1">
+                        <dt className="font-medium">Source:</dt>
+                        <dd>{sourceLabel(executedSource.tier)}</dd>
+                      </div>
+                      <div className="flex gap-1">
+                        <dt className="font-medium">{executedSource.tier === "local" ? "Runtime:" : "Provider:"}</dt>
+                        <dd>{displayProviderName(executedSource.provider)}</dd>
+                      </div>
+                      {executedSource.model && (
+                        <div className="flex gap-1">
+                          <dt className="font-medium">Model:</dt>
+                          <dd>{executedSource.model}</dd>
+                        </div>
+                      )}
+                      {executedSource.tier === "local" ? (
+                        <div className="flex gap-1">
+                          <dt className="font-medium">Processing:</dt>
+                          <dd>On your computer — this passage was never sent to Scholar's servers.</dd>
+                        </div>
+                      ) : (
+                        executedSource.creditsUsed !== undefined && (
+                          <div className="flex gap-1">
+                            <dt className="font-medium">Credits used:</dt>
+                            <dd>{executedSource.creditsUsed}</dd>
+                          </div>
+                        )
+                      )}
+                      {executedSource.reasoning && <p className="mt-0.5">{executedSource.reasoning}</p>}
+                    </dl>
                   )}
                 </div>
               )}

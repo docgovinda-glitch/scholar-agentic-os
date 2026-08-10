@@ -74,6 +74,7 @@ async function refineWithModel(input: StudioRefineInput): Promise<{ changes: Dif
       systemPrompt,
       userPrompt: input.text,
       segments: [{ label: "Your text: selected passage", text: input.text }],
+      local: input.local,
     },
     input.policy
   );

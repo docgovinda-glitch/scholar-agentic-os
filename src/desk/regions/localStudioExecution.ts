@@ -115,5 +115,6 @@ export async function refineLocally(params: {
     // builds an Authorization header from it, or sends it anywhere.
     apiKey: "local-no-credential-required",
     model,
+    local: true,
   });
 }

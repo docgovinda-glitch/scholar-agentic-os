@@ -157,6 +157,70 @@ describe("Warden: policy decisions", () => {
   });
 });
 
+describe("Warden: tier-aware policy (local execution)", () => {
+  it("allows user_content to a local runtime without asking for consent, on the very first call", () => {
+    const result = evaluate(
+      { provider: "ollama", taskClass: "drafting", segments: [{ label: "Your text", text: "x" }], local: true },
+      defaultPolicy()
+    );
+    expect(result.decision).toBe("allow");
+    expect(result.requiresConsent).toBe(false);
+  });
+
+  it("explains WHY local doesn't ask — the reason accurately says the request stays on-device, not a cloud-transfer claim", () => {
+    const result = evaluate(
+      { provider: "ollama", taskClass: "drafting", segments: [{ label: "Your text", text: "x" }], local: true },
+      defaultPolicy()
+    );
+    expect(result.reason).toMatch(/runs on your computer/i);
+    expect(result.reason).toMatch(/not sent to Scholar's AI servers/i);
+  });
+
+  it("does NOT affect the non-local ask-for-consent flow for the very same provider id", () => {
+    // Regression: marking a request `local` must never leak into how a
+    // non-local request from the same provider id is evaluated.
+    const result = evaluate(
+      { provider: "ollama", taskClass: "drafting", segments: [{ label: "Your text", text: "x" }], local: false },
+      defaultPolicy()
+    );
+    expect(result.decision).toBe("ask");
+    expect(result.requiresConsent).toBe(true);
+  });
+
+  it("still denies restricted content to a local runtime — local is not a general exemption from hard denies", () => {
+    const result = evaluate(
+      { provider: "ollama", taskClass: "drafting", segments: [{ label: "restricted participant data", text: "x" }], local: true },
+      defaultPolicy()
+    );
+    expect(result.decision).toBe("deny");
+    expect(result.requiresConsent).toBe(false);
+  });
+
+  it("still denies a scope the user has explicitly marked restricted, even for a local runtime", () => {
+    let policy = defaultPolicy();
+    policy = markRestricted(policy, "project-123");
+    const result = evaluate(
+      {
+        provider: "ollama",
+        taskClass: "drafting",
+        scopeId: "project-123",
+        segments: [{ label: "Your text", text: "x" }],
+        local: true,
+      },
+      policy
+    );
+    expect(result.decision).toBe("deny");
+  });
+
+  it("allows public/bibliographic/derived content locally exactly as it would for a cloud provider (unaffected by the local bypass)", () => {
+    const result = evaluate(
+      { provider: "ollama", taskClass: "rule_extraction", segments: [{ label: "published guideline", text: "x" }], local: true },
+      defaultPolicy()
+    );
+    expect(result.decision).toBe("allow");
+  });
+});
+
 describe("Warden: preview and minimisation", () => {
   it("the preview shows exactly what would be sent, per segment, before it is sent", () => {
     const result = evaluate(

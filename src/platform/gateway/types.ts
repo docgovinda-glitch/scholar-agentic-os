@@ -34,6 +34,8 @@ export interface CompletionRequest {
    */
   segments: { label: string; text: string }[];
   scopeId?: string;
+  /** True when `provider` is a local runtime — passed straight through to the Warden (see platform/warden/types.ts's EgressRequest.local). */
+  local?: boolean;
 }
 
 export interface CompletionResult {

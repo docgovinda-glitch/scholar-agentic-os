@@ -55,7 +55,8 @@ export function evaluate(request: EgressRequest, policy: EgressPolicy = defaultP
     policy,
     request.provider,
     overallClass,
-    request.scopeId
+    request.scopeId,
+    request.local
   );
 
   const preview = applyRedaction(classified, decision === "redact");

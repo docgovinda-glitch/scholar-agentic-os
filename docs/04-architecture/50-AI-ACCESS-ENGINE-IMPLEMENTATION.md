@@ -278,6 +278,77 @@ consent-prompt UI (already built for Free/BYOK) grants consent via
 `POST /api/studio/consent` and calls `/api/studio/refine` again, same as
 it always did; nothing about the client's retry path needed to change.
 
+### 7c. Tier-aware Warden policy (final AI execution hardening)
+
+§7b shipped local execution still asking for the SAME "send this to a cloud
+provider?" consent prompt every cloud tier gets, because the Warden's policy
+matrix (`platform/warden/policy.ts`) classified purely by content class
+(`user_content` → "ask"), with no notion of tier or data path at all. That
+prompt was misleading for local: nothing was ever going to leave the
+device, so asking the user to "allow" a cloud transfer that was never going
+to happen was not a privacy safeguard, it was noise that could train users
+to click through consent prompts without reading them.
+
+The fix is narrowly scoped, not a global "disable Warden for local"
+switch. A `local?: boolean` field was threaded through the existing request
+objects at every layer already in the call chain — no new module, no
+second policy engine:
+
+`EgressRequest` (`platform/warden/types.ts`) → `evaluate()`
+(`platform/warden/warden.ts`) → `decideForClass()` (`platform/warden/
+policy.ts`) → `CompletionRequest` (`platform/gateway/types.ts`) →
+`evaluateAndResolvePrompt()` (`platform/gateway/gateway.ts`) →
+`StudioRefineInput` (`app/studio/types.ts`) → `refineWithModel()`
+(`app/studio/studio.ts`) → `refineLocally()` (`desk/regions/
+localStudioExecution.ts`, the only caller that ever sets it `true`).
+
+`decideForClass()` checks `local` in exactly one place: inside the
+existing `if (decision === "ask")` branch. When the configured decision for
+the request's egress class is `"ask"` AND the request is local, it now
+returns `"allow"` with a reason string that accurately states the actual
+data path — `"<provider> runs on your computer. Your prompt and response
+are sent directly to your selected local AI runtime and are not sent to
+Scholar's AI servers for generation."` — instead of throwing a
+`GatewayDenied(reason, requiresConsent: true)` for the UI to turn into a
+consent prompt. Every other branch of `decideForClass()` is untouched: a
+restricted scope (`policy.restrictedScopes`) still denies unconditionally,
+and the `egressClass === "restricted"` hard-deny still returns `"deny"`
+regardless of `local` — being local is not a general exemption, only an
+answer to the one question ("does this need cloud-transfer consent?") that
+doesn't apply to it. `warden.test.ts` has a dedicated
+`"Warden: tier-aware policy (local execution)"` suite asserting exactly
+this: local + `user_content` → allow with the on-device reason text, local
++ restricted (both content-level and scope-level) → still deny, and a
+non-local request from the same provider id is completely unaffected
+(regression coverage for the "no leakage between local and non-local calls
+to the same provider id" property).
+
+Free/BYOK/Premium never set `local`, so `decideForClass()`'s behavior for
+them is byte-for-byte what it was before this pass — the consent-ask,
+remember-per-provider flow is unchanged.
+
+**Local fallback vs. denial, re-verified.** `StudioPanel.tsx`'s Auto-mode
+candidate loop still draws the line the same way it did in §7b: any
+`refineLocally()` failure that is NOT a `GatewayDenied` (unreachable
+runtime, no model loaded, a mid-generation error) falls through to the next
+router-ranked candidate; a `GatewayDenied` — now only ever a hard `deny`
+for local, since "ask" no longer applies — is re-thrown and stops the
+request rather than being silently routed around. `desk/__tests__/
+localStudioExecution.test.ts` adds direct coverage for the case
+`StudioPanel`'s own UI doesn't have a control for yet (marking a scope
+restricted): a restricted-scope local request throws the real
+`GatewayDenied` with `requiresConsent: false`, before any call reaches the
+local runtime's chat endpoint at all.
+
+**"Why this AI?" now reports per-tier fields, not one summary line.**
+`StudioPanel.tsx`'s expandable panel produces `Source` / `Runtime` (local)
+or `Provider` (every other tier) / `Model` / `Processing` (local: "On your
+computer — this passage was never sent to Scholar's servers.") or `Credits
+used` (Premium only). No tier's panel claims a guarantee its actual
+execution path doesn't provide, and no field ever renders a credential —
+covered by `StudioPanel.test.tsx` assertions for both the local and
+Premium cases.
+
 ## 8. AI Opportunity Agent
 
 `server/src/aiEngine/opportunityAgent.ts`. Admin-triggered
@@ -318,6 +389,15 @@ gaps: Local now executes for real, entirely client-side; Premium's provider
 call now goes through the same Warden 428-consent-required/403-denied flow
 Free/BYOK/manual requests use.
 
+Resolved by the final-execution-hardening pass (§7c) and no longer a gap:
+local's Warden consent prompt no longer asks the same way a cloud
+provider's does — the policy is now tier-aware and answers the
+cloud-transfer "ask" automatically for local requests, with the reason
+shown to the user accurately describing the on-device data path. A
+restricted scope or a hard `deny` still applies to local exactly as it does
+to any other tier; this was an answer to one specific misleading question,
+not a general local exemption.
+
 Remaining gaps:
 
 - **`DeskShell`'s deeper `Header` region** was wired with an "AI Access"
@@ -334,22 +414,18 @@ Remaining gaps:
   providers independently of live traffic. This was a deliberate scope
   decision (Priority 8: "minimal only — no large monitoring system"), not
   an oversight.
-- **Local execution has no `stream()` and no cancellation.** Both local
-  adapters implement only `complete()` — Studio's `refine()` (the only
-  caller) never calls `gateway.stream()` for any tier, so a streaming
-  parser would be untested, speculative code. Likewise, nothing in Studio
-  today can cancel an in-flight request, local or otherwise; a 120s
-  generation timeout bounds a hung local process, but there is no
-  mid-flight abort button. Neither is a regression — no tier had either
-  capability before this pass.
-- **Local's own Warden consent prompt asks the same way a cloud provider's
-  does**, even though nothing about a local generation actually leaves the
-  device. The policy matrix classifies by content class, not by tier, and
-  this work did not add a "local is exempt" special case — doing so would
-  be a policy change, not the execution wiring this pass scoped itself to.
-  The practical cost is a one-time "Allow Ollama and retry" click per
-  browser session, not a privacy leak: the client-side consent grant never
-  reaches the server, and no prose crosses that gate either way.
+- **Local execution has no `stream()` and no cancellation** — a deliberate
+  non-goal of both the execution-and-privacy-consistency pass and the
+  final-execution-hardening pass, not an oversight. Both local adapters
+  implement only `complete()`; Studio's `refine()` (the only caller) never
+  calls `gateway.stream()` for any tier, so a streaming parser would be
+  untested, speculative code. Likewise, nothing in Studio today can cancel
+  an in-flight request, local or otherwise; a 120s generation timeout
+  bounds a hung local process, but there is no mid-flight abort button.
+  Neither is a regression — no tier had either capability before either
+  pass. Both remain real, legitimate future enhancements if Studio ever
+  grows a streaming UI, but implementing them now, ahead of that need,
+  would be speculative.
 
 ## 10. Database objects added
 

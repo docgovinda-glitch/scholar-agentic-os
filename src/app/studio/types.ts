@@ -17,6 +17,8 @@ export interface StudioRefineInput {
   scopeId?: string;
   /** Session-scoped egress policy (carries prior provider consent). Defaults to a fresh, unconsented policy. */
   policy?: EgressPolicy;
+  /** True when `provider` is a local runtime — passed through to the Warden (see platform/warden/types.ts's EgressRequest.local). */
+  local?: boolean;
 }
 
 /** Present only when a model-backed level actually called the Gateway — absent for "proofread". Populated from platform/gateway's own CompletionResult, not re-estimated here, so this and the Gateway's own accounting can never drift. */
