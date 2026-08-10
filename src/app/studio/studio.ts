@@ -36,17 +36,17 @@ import {
   structuredResponseInstruction,
   tryParseStructuredResponse,
 } from "./structuredDiff";
-import type { StudioRefineInput, StudioRefineResult } from "./types";
+import type { StudioRefineInput, StudioRefineResult, StudioRefineUsage } from "./types";
 
 export { GatewayDenied } from "../../platform/gateway/gateway";
-export type { StudioRefineInput, StudioRefineResult } from "./types";
+export type { StudioRefineInput, StudioRefineResult, StudioRefineUsage } from "./types";
 
 async function refineDeterministic(text: string): Promise<DiffChange[]> {
   const raw = runMechanicsEngine(text);
   return excludeQuotedRanges(text, raw);
 }
 
-async function refineWithModel(input: StudioRefineInput): Promise<DiffChange[]> {
+async function refineWithModel(input: StudioRefineInput): Promise<{ changes: DiffChange[]; usage: StudioRefineUsage }> {
   if (!input.provider || !input.apiKey) {
     throw new Error(
       `Level "${input.level}" requires a model provider and API key. Only "proofread" runs without one.`
@@ -68,6 +68,7 @@ async function refineWithModel(input: StudioRefineInput): Promise<DiffChange[]> 
     {
       provider: input.provider,
       apiKey: input.apiKey,
+      model: input.model,
       taskClass: "refinement",
       scopeId: input.scopeId,
       systemPrompt,
@@ -93,7 +94,15 @@ async function refineWithModel(input: StudioRefineInput): Promise<DiffChange[]> 
     changes = fallbackDiff(input.level, input.text, result.text, "language");
   }
 
-  return excludeQuotedRanges(input.text, changes);
+  return {
+    changes: excludeQuotedRanges(input.text, changes),
+    usage: {
+      provider: result.provider,
+      model: result.model,
+      inputTokensEstimate: result.inputTokensEstimate,
+      outputTokensEstimate: result.outputTokensEstimate,
+    },
+  };
 }
 
 /** Reconstruct what the original text would look like with only the *located* structured changes applied. */
@@ -117,9 +126,15 @@ function applyKnownChangesOriginal(original: string, changes: DiffChange[]): str
  * Level "proofread" never throws GatewayDenied: it makes no outbound call.
  */
 export async function refine(input: StudioRefineInput): Promise<StudioRefineResult> {
-  const rawChanges = isDeterministicLevel(input.level)
-    ? await refineDeterministic(input.text)
-    : await refineWithModel(input);
+  let rawChanges: DiffChange[];
+  let usage: StudioRefineUsage | undefined;
+  if (isDeterministicLevel(input.level)) {
+    rawChanges = await refineDeterministic(input.text);
+  } else {
+    const modelResult = await refineWithModel(input);
+    rawChanges = modelResult.changes;
+    usage = modelResult.usage;
+  }
 
   const guarded = applyMeaningGuard(rawChanges);
 
@@ -140,6 +155,7 @@ export async function refine(input: StudioRefineInput): Promise<StudioRefineResu
     voiceDrift,
     contentChangeCount: guarded.filter((c) => c.category === "content").length,
     languageChangeCount: guarded.filter((c) => c.category === "language").length,
+    usage,
   };
 }
 

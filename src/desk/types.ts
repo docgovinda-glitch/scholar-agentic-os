@@ -106,11 +106,29 @@ export interface VoiceDriftReport {
   notes: string[];
 }
 
+/** Mirrors src/app/studio/types.ts's StudioRefineUsage — present only when a model-backed level actually called the Gateway. */
+export interface StudioRefineUsage {
+  provider: string;
+  model: string;
+  inputTokensEstimate: number;
+  outputTokensEstimate: number;
+}
+
+/** Mirrors src/app/studio/types.ts's StudioAiSource. */
+export interface StudioAiSource {
+  tier: "premium";
+  provider: string;
+  model: string;
+  creditsUsed: number;
+}
+
 export interface StudioRefineResult {
   diff: RefinementDiff;
   voiceDrift?: VoiceDriftReport;
   contentChangeCount: number;
   languageChangeCount: number;
+  usage?: StudioRefineUsage;
+  aiSource?: StudioAiSource;
 }
 
 /** Thrown-shaped, not a real Error — matches the 428/403 bodies studio.ts sends. */

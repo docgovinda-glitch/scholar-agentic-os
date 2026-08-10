@@ -42,6 +42,40 @@ export const addConnection = (providerId: string, tier: "local" | "free" | "byok
 export const removeConnection = (providerId: string) =>
   api<{ success: true }>(`/api/ai-access/connections/${encodeURIComponent(providerId)}`, { method: "DELETE" });
 
+export interface VerifyKeyResult {
+  ok: boolean;
+  modelsDetected?: number;
+  error?: string;
+}
+
+/** apiKey is sent once, transiently — same per-request-proxy pattern refinePassage() already uses, never stored server-side. */
+export const verifyProviderKey = (providerId: string, apiKey: string) =>
+  api<VerifyKeyResult>("/api/ai-access/verify-provider-key", { method: "POST", body: JSON.stringify({ providerId, apiKey }) });
+
+/** Mirrors server/src/aiEngine/omniRouter.ts's Tier/TaskType — duplicated rather than imported since that module lives server-side only. */
+export type RoutingTier = "local" | "free" | "byok" | "premium";
+export type RoutingTaskType = "simple" | "multimodal" | "reasoning" | "coding" | "long-context";
+
+export interface RoutingChoice {
+  tier: RoutingTier;
+  providerId: string;
+  modelId?: string;
+  /** Human-readable, safe to show directly — never contains a credential. */
+  reasoning: string;
+}
+
+export type RoutingDecision = { ok: true; choice: RoutingChoice; fallbacks: RoutingChoice[] } | { ok: false; reasoning: string };
+
+/**
+ * Preview of the Scholar AI Engine's pick for a task, WITHOUT executing
+ * anything — the same `assembleRoutingCandidates` + `selectProvider` the
+ * server uses for real generation (server/src/aiEngine/routingCandidates.ts,
+ * omniRouter.ts), so a caller showing "Why this AI?" is always describing
+ * the actual decision, not a separately-computed guess.
+ */
+export const routeDecision = (taskType: RoutingTaskType, privacyPreference?: "no-cloud" | "any") =>
+  api<RoutingDecision>("/api/ai-access/route", { method: "POST", body: JSON.stringify({ taskType, privacyPreference }) });
+
 // ── Admin ───────────────────────────────────────────────────────────────
 
 export const checkIsAdmin = (): Promise<boolean> =>

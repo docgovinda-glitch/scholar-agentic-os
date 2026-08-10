@@ -11,6 +11,7 @@ import {
   storeProviderKey,
   type UserAiSettings,
 } from "../../services/userAiSettings";
+import { addConnection, removeConnection, verifyProviderKey } from "../aiAccess/aiAccessApi";
 
 /**
  * Desk's AI setup.
@@ -101,11 +102,39 @@ export default function AiSetupScreen({
     setBusy(true);
     setError(null);
     try {
-      if (apiKey.trim()) {
-        await storeProviderKey(selected, apiKey.trim());
+      const enteredKey = apiKey.trim();
+      if (enteredKey) {
+        // Verify before this provider is allowed to appear connected (and
+        // therefore routable by the Omni Router) — Priority 2: "if a
+        // provider is not successfully saved, it must NOT appear as
+        // connected." A rejected/unreachable key is rolled back rather than
+        // left stored locally with no server-side record of it working.
+        const verification = await verifyProviderKey(selected, enteredKey);
+        if (!verification.ok) {
+          setError(verification.error ?? "Could not verify this key with the provider.");
+          return;
+        }
+        await storeProviderKey(selected, enteredKey);
         setConfigured(providersWithStoredKey());
         setApiKey("");
+        await addConnection(selected, spec && (spec.freeTier === "free" || spec.freeTier === "freemium") ? "free" : "byok", verification.modelsDetected);
+      } else if (!isLocal && hasKeyOnDevice) {
+        // Re-saving an already-configured provider (e.g. just switching the
+        // active default) — the connection record should already exist, but
+        // this backfills it for a key stored before this feature existed.
+        await addConnection(selected, spec && (spec.freeTier === "free" || spec.freeTier === "freemium") ? "free" : "byok");
       }
+
+      if (isLocal) {
+        const probe = detected.find((d) => d.runner.id === selected);
+        if (probe) {
+          await addConnection(selected, "local", probe.models.length);
+        }
+        // Not reachable right now — do not record a connection Omni Router
+        // would otherwise try to route to; the runner can be saved and
+        // connected later once it's actually running.
+      }
+
       const next: UserAiSettings = {
         provider: selected,
         preferences: {
@@ -135,6 +164,11 @@ export default function AiSetupScreen({
   function handleForget() {
     forgetProviderKey(selected);
     setConfigured(providersWithStoredKey());
+    // Removed from the routing pool immediately — Priority 2: "if a
+    // credential is removed, the connection must disappear from the
+    // available routing pool." Best-effort: failing silently here would
+    // leave stale local state at worst, never a false "still connected".
+    removeConnection(selected).catch(() => {});
   }
 
   if (loading) {
@@ -258,8 +292,9 @@ export default function AiSetupScreen({
                 their next device, and finding that out by surprise is worse
                 than reading one sentence now. */}
             <p id="provider-key-hint" className="text-xs text-[color:var(--text-muted)]">
-              Stored encrypted on this device only — never sent to our servers. You will enter it again on another
-              computer.{" "}
+              Stored encrypted on this device only — never stored on our servers. It passes through our server
+              transiently, once, to verify it and again each time you generate, but is never saved there. You will
+              enter it again on another computer.{" "}
               <a
                 href={spec.getKeyUrl}
                 target="_blank"

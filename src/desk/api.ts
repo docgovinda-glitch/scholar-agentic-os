@@ -234,6 +234,21 @@ export class StudioDeniedError extends Error {
   }
 }
 
+/**
+ * Thrown when the Scholar AI Engine (server-side Omni Router) has no
+ * eligible AI source for this request — Premium quota exhausted with
+ * nothing else connected, or no source at all. `reason` is the router's own
+ * human-readable explanation (server/src/aiEngine/omniRouter.ts), safe to
+ * show directly — see Priority 4/6 of the AI Engine live-wiring work.
+ */
+export class StudioNoAiSourceError extends Error {
+  readonly kind = "no_ai_source" as const;
+  constructor(reason: string) {
+    super(reason);
+    this.name = "StudioNoAiSourceError";
+  }
+}
+
 export async function refinePassage(params: {
   sessionId: string;
   passageId: string;
@@ -241,8 +256,12 @@ export async function refinePassage(params: {
   level: InterventionLevel;
   l1?: string;
   voiceProfile?: VoiceProfile;
+  /** Manual/Advanced override — supplying both bypasses server-side routing entirely, same as before this work. */
   provider?: string;
   apiKey?: string;
+  model?: string;
+  /** Omitting provider/apiKey and setting this to "premium" asks the server to route via the Scholar AI Engine using the caller's own entitlement/quota — never trusted as a client-asserted grant, always re-verified server-side. */
+  useEngine?: "premium";
 }): Promise<StudioRefineResult> {
   const res = await authedJsonFetch("/api/studio/refine", "POST", params);
   if (res.status === 428) {
@@ -252,6 +271,10 @@ export async function refinePassage(params: {
   if (res.status === 403) {
     const body = await res.json().catch(() => ({}));
     throw new StudioDeniedError(body.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const body = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(body.error || "No AI source is currently available.");
   }
   return json<StudioRefineResult>(res);
 }

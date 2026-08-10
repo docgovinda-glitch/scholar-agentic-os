@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { grantStudioConsent, refinePassage, StudioConsentRequiredError, StudioDeniedError } from "../api";
+import { grantStudioConsent, refinePassage, StudioConsentRequiredError, StudioDeniedError, StudioNoAiSourceError } from "../api";
 import { loadUserAiSettings, readProviderKey } from "../../services/userAiSettings";
+import { routeDecision, type RoutingChoice, type RoutingDecision } from "../aiAccess/aiAccessApi";
 import { getWritingHistory, enableWritingHistory, disableWritingHistory, clearWritingHistory, summarizeWritingHistory, recordRefinement } from "../../app/studio/writingHistory";
 import type { InterventionLevel, StudioRefineResult, VoiceProfile } from "../types";
 
@@ -36,8 +37,34 @@ const L1_PROFILES = [
 ] as const;
 
 // Only the providers platform/gateway can actually serve today (adapters.ts) —
-// the same catalog the Studio's complete() call resolves against.
+// the same catalog the Studio's complete() call resolves against. Advanced
+// mode only — Auto mode routes through the Scholar AI Engine instead and is
+// not limited to this list.
 const PROVIDERS = ["gemini", "openai", "claude", "cohere"];
+
+// Every model-backed Studio level is language refinement — none are
+// multimodal/long-context/code-generation — so a single Omni Router task
+// type applies uniformly, matching runPremiumRefine's server-side choice
+// (server/routes/studio.ts) so the client's preview and the server's actual
+// execution can never disagree about which tier ranks first.
+const STUDIO_TASK_TYPE = "reasoning" as const;
+
+/**
+ * The first candidate Studio can actually execute. Local is filtered out
+ * here, not upstream in the router: Local is a real, valid AI source in
+ * general (Omni Router ranks it normally), but Studio's refine() pipeline
+ * only ever calls a cloud adapter (src/app/studio/studio.ts requires
+ * provider+apiKey) — there is no local-runtime execution path wired into
+ * Studio yet, the same honest gap server/routes/studio.ts documents for the
+ * Premium path. Skipping it here means a user with only a local runner
+ * connected gets a clear "connect a cloud/Premium source" message instead of
+ * a request that silently fails against a provider id the server can't
+ * resolve.
+ */
+function executableCandidates(decision: RoutingDecision): RoutingChoice[] {
+  if (!decision.ok) return [];
+  return [decision.choice, ...decision.fallbacks].filter((c) => c.tier !== "local");
+}
 
 const CATEGORY_LABEL = { mechanics: "Mechanics", language: "Language", content: "Content" } as const;
 const CATEGORY_COLOR = {
@@ -58,10 +85,18 @@ const CATEGORY_COLOR = {
  */
 export default function StudioPanel({ sessionId }: { sessionId: string }) {
   const [level, setLevel] = useState<InterventionLevel>("proofread");
+  /** Auto routes through the Scholar AI Engine (Priority 1); Advanced is the pre-existing manual provider+key override, kept for the case Auto has nothing usable. */
+  const [mode, setMode] = useState<"auto" | "advanced">("auto");
   const [provider, setProvider] = useState(PROVIDERS[0]);
   const [apiKey, setApiKey] = useState("");
   /** True once the key below came from saved settings rather than being typed here. */
   const [keyFromSettings, setKeyFromSettings] = useState(false);
+  /** Auto mode's routing preview — refreshed whenever the level changes, so "Why this AI?" reflects the request about to be sent rather than a stale one. */
+  const [routing, setRouting] = useState<RoutingDecision | null>(null);
+  const [routingLoading, setRoutingLoading] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  /** What actually served the last completed request — distinct from `routing` (a preview), this is the record shown once a result exists. */
+  const [executedSource, setExecutedSource] = useState<{ tier: string; provider: string; model?: string; creditsUsed?: number; reasoning: string } | null>(null);
   const [l1, setL1] = useState<string>("");
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
   const [voiceSamples, setVoiceSamples] = useState("");
@@ -103,6 +138,27 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
 
   const activeLevel = LEVELS.find((l) => l.id === level)!;
 
+  // Preview the Scholar AI Engine's pick whenever a model-backed level is
+  // selected in Auto mode, so "Why this AI?" reflects the request about to
+  // be sent (Priority 6) rather than being computed only after the fact.
+  // run() below re-fetches instead of trusting this stale preview if it's
+  // missing, so a slow/failed preview never blocks the actual request.
+  useEffect(() => {
+    if (mode !== "auto" || !activeLevel.needsProvider) {
+      setRouting(null);
+      return;
+    }
+    let active = true;
+    setRoutingLoading(true);
+    routeDecision(STUDIO_TASK_TYPE)
+      .then((d) => active && setRouting(d))
+      .catch(() => active && setRouting(null))
+      .finally(() => active && setRoutingLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [mode, activeLevel.needsProvider]);
+
   async function buildVoiceProfileFromSamples() {
     if (!voiceSamples.trim()) {
       setError("Please provide writing samples to build a voice profile.");
@@ -135,7 +191,72 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
     setBusy(true);
     setError(null);
     setConsentNeeded(null);
+    // Populated during Auto selection below so the consent-retry catch below
+    // can name the actual provider attempted, not the leftover Advanced-mode
+    // dropdown value.
+    let chosenProviderId: string | undefined;
+    let chosenReasoning = "";
+    let chosenTier = "manual";
     try {
+      const refineExtra: { provider?: string; apiKey?: string; model?: string; useEngine?: "premium" } = {};
+
+      if (activeLevel.needsProvider) {
+        if (mode === "advanced") {
+          refineExtra.provider = provider;
+          refineExtra.apiKey = apiKey;
+          chosenProviderId = provider;
+          chosenTier = "manual";
+          chosenReasoning = "Manually selected in Advanced mode.";
+        } else {
+          // Re-fetch rather than trust a stale/failed preview — the request
+          // actually sent must match a real, current decision (Priority 1),
+          // never a client-side guess.
+          const decision = routing ?? (await routeDecision(STUDIO_TASK_TYPE).catch(() => null));
+          if (!decision) {
+            setError("Could not reach AI Access to choose a provider. Try again, or switch to Advanced.");
+            return;
+          }
+          if (!decision.ok) {
+            setError(decision.reasoning);
+            return;
+          }
+          const candidates = executableCandidates(decision);
+          if (candidates.length === 0) {
+            setError(
+              "Only a local runner is connected, and Studio doesn't support local execution yet. Connect a cloud, BYOK, or Premium AI source in AI Access, or switch to Advanced."
+            );
+            return;
+          }
+          for (const c of candidates) {
+            if (c.tier === "premium") {
+              refineExtra.useEngine = "premium";
+              chosenProviderId = c.providerId;
+              chosenTier = c.tier;
+              chosenReasoning = c.reasoning;
+              break;
+            }
+            // Free/BYOK keys live only on this device (never the server) —
+            // a provider the router sees as "connected" from another device
+            // has no key here, so fall through to the next candidate rather
+            // than send a request that can't succeed.
+            const key = await readProviderKey(c.providerId);
+            if (key) {
+              refineExtra.provider = c.providerId;
+              refineExtra.apiKey = key;
+              refineExtra.model = c.modelId;
+              chosenProviderId = c.providerId;
+              chosenTier = c.tier;
+              chosenReasoning = c.reasoning;
+              break;
+            }
+          }
+          if (!chosenProviderId) {
+            setError("A connected AI source was found, but its key isn't stored on this device. Open AI Access to reconnect it, or switch to Advanced.");
+            return;
+          }
+        }
+      }
+
       const r = await refinePassage({
         sessionId,
         passageId: "desk-studio-passage",
@@ -143,10 +264,16 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
         level,
         l1: l1 || undefined,
         voiceProfile: voiceProfile || undefined,
-        provider: activeLevel.needsProvider ? provider : undefined,
-        apiKey: activeLevel.needsProvider ? apiKey : undefined,
+        ...refineExtra,
       });
       setResult(r);
+      setExecutedSource(
+        r.aiSource
+          ? { tier: r.aiSource.tier, provider: r.aiSource.provider, model: r.aiSource.model, creditsUsed: r.aiSource.creditsUsed, reasoning: chosenReasoning }
+          : r.usage
+            ? { tier: chosenTier, provider: r.usage.provider, model: r.usage.model, reasoning: chosenReasoning }
+            : null
+      );
 
       // Record to Writing History if enabled (docs 32 §8)
       if (writingHistoryEnabled) {
@@ -160,9 +287,11 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
       }
     } catch (e) {
       if (e instanceof StudioConsentRequiredError) {
-        setConsentNeeded({ provider: e.provider || provider, reason: e.message });
+        setConsentNeeded({ provider: e.provider || chosenProviderId || provider, reason: e.message });
       } else if (e instanceof StudioDeniedError) {
         setError(`Denied by privacy policy: ${e.message}`);
+      } else if (e instanceof StudioNoAiSourceError) {
+        setError(e.message);
       } else {
         setError((e as Error).message);
       }
@@ -224,35 +353,81 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
         </div>
         <p className="text-[10px] text-[color:var(--text-muted)]">{activeLevel.description}</p>
 
-        {/* Provider and API key for model-backed levels */}
-        {activeLevel.needsProvider && (
-          <div className="flex gap-1.5">
-            <div className="rounded bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)]">
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
-                className="border-0 bg-transparent text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
-              >
-                {PROVIDERS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
+        {/* AI source for model-backed levels: Auto routes through the Scholar
+            AI Engine (Priority 1); Advanced is the manual override for when
+            Auto has nothing usable, or the user just wants to pick. */}
+        {activeLevel.needsProvider && mode === "auto" && (
+          <div className="rounded bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)] px-2 py-1.5 text-[11px]">
+            {routingLoading && <p className="text-[color:var(--text-muted)]">Choosing an AI source…</p>}
+            {!routingLoading && routing && routing.ok && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[color:var(--text-secondary)]">{`Will use: ${routing.choice.providerId} · ${routing.choice.tier}`}</span>
+                <button
+                  type="button"
+                  onClick={() => setDetailsOpen(!detailsOpen)}
+                  className="text-[color:var(--color-luminous-blue-dim)] hover:underline shrink-0"
+                >
+                  Why this AI?
+                </button>
+              </div>
+            )}
+            {!routingLoading && routing && !routing.ok && <p className="text-amber-400">{routing.reasoning}</p>}
+            {!routingLoading && !routing && <p className="text-[color:var(--text-muted)]">No AI source available yet — connect one in AI Access.</p>}
+            {detailsOpen && routing?.ok && (
+              <div className="mt-1.5 border-t border-[color:var(--color-border-subtle)] pt-1.5 text-[10px] text-[color:var(--text-muted)]">
+                <p>{routing.choice.reasoning}</p>
+                {routing.fallbacks.length > 0 && (
+                  <p className="mt-1">Fallback order: {routing.fallbacks.map((f) => `${f.providerId} (${f.tier})`).join(" → ")}</p>
+                )}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setMode("advanced")}
+              className="mt-1.5 text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] underline"
+            >
+              Choose manually (Advanced)
+            </button>
+          </div>
+        )}
+
+        {activeLevel.needsProvider && mode === "advanced" && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex gap-1.5">
+              <div className="rounded bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)]">
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="border-0 bg-transparent text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
+                >
+                  {PROVIDERS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1 rounded bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)]">
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => {
+                    setApiKey(e.target.value);
+                    setKeyFromSettings(false);
+                  }}
+                  aria-label="API key"
+                  placeholder={keyFromSettings ? "Using your saved key" : "API key"}
+                  className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
+                />
+              </div>
             </div>
-            <div className="flex-1 rounded bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)]">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value);
-                  setKeyFromSettings(false);
-                }}
-                aria-label="API key"
-                placeholder={keyFromSettings ? "Using your saved key" : "API key"}
-                className="border-0 bg-transparent w-full text-xs text-[color:var(--text-primary)] px-2 py-1 focus:outline-none"
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => setMode("auto")}
+              className="self-start text-[10px] text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] underline"
+            >
+              Use recommended AI (Auto)
+            </button>
           </div>
         )}
 
@@ -326,7 +501,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
 
         <button
           onClick={run}
-          disabled={busy || text.trim().length === 0 || (activeLevel.needsProvider && apiKey.trim().length === 0)}
+          disabled={busy || text.trim().length === 0 || (activeLevel.needsProvider && mode === "advanced" && apiKey.trim().length === 0)}
           className="px-3 py-1.5 rounded bg-[color:var(--color-luminous-blue-dim)] text-white text-xs disabled:opacity-40"
         >
           {busy ? "Running…" : "Refine"}
@@ -354,6 +529,29 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
                 <p className="text-[10px] text-amber-400 mt-1">
                   ⚠ Voice drift detected: {result.voiceDrift.notes.join(" · ")}
                 </p>
+              )}
+              {executedSource && (
+                <div className="mt-1.5 pt-1.5 border-t border-[color:var(--color-border-subtle)]">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] text-[color:var(--text-muted)]">
+                      AI used: {executedSource.provider}
+                      {executedSource.model ? ` (${executedSource.model})` : ""} · {executedSource.tier}
+                      {executedSource.creditsUsed !== undefined ? ` · ${executedSource.creditsUsed} credit${executedSource.creditsUsed === 1 ? "" : "s"}` : ""}
+                    </p>
+                    {executedSource.reasoning && (
+                      <button
+                        type="button"
+                        onClick={() => setDetailsOpen(!detailsOpen)}
+                        className="text-[10px] text-[color:var(--color-luminous-blue-dim)] hover:underline shrink-0"
+                      >
+                        Why this AI?
+                      </button>
+                    )}
+                  </div>
+                  {detailsOpen && executedSource.reasoning && (
+                    <p className="mt-1 text-[10px] text-[color:var(--text-muted)]">{executedSource.reasoning}</p>
+                  )}
+                </div>
               )}
             </div>
 

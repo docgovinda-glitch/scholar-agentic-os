@@ -137,13 +137,89 @@ source" message. 13 tests cover one source, many sources, fallback on
 down/degraded health, quota exhaustion with and without a fallback source,
 the `no-cloud` privacy restriction, and zero sources.
 
-**Not yet wired into a live generation call.** This pass builds and tests
-the router and exposes it via `POST /api/ai-access/route`, which computes
-and returns a decision. It does not yet replace the existing manual
-single-provider choice in `AiSetupScreen`/`src/desk/api.ts`'s
-`refinePassage()` call path — that integration is real remaining work,
-deliberately not done in this pass to avoid changing a live, working
-generation path without dedicated end-to-end testing time. See §9.
+**Wired into the live generation call.** A later pass (§7a) connected this
+router to the real `POST /api/studio/refine` execution path, replacing the
+single manually-chosen provider as the default. `POST /api/ai-access/route`
+remains the read-only decision-preview endpoint the client calls first.
+
+### 7a. Live wiring — Omni Router in the real generation path
+
+`server/src/aiEngine/routingCandidates.ts` (`assembleRoutingCandidates`) is
+the one place that builds a real `RoutingCandidate[]` from
+`user_ai_connections`, `user_entitlements` + Quota Engine, `provider_health`,
+and — for Premium — real rows in `platform_provider_credentials` (never the
+placeholder `"scholar-premium-pool"` id an earlier draft of the Premium path
+used, which was not an executable provider). Both `POST /api/ai-access/route`
+(preview) and the live execution path below call this same function, so the
+two can never disagree about what "available" means.
+
+**Premium** (`server/routes/studio.ts`'s `runPremiumRefine`): the client
+sends `useEngine: "premium"` with no `provider`/`apiKey`. The server never
+trusts that flag as a grant — it independently re-derives entitlement,
+quota, and the Omni Router's decision from the database, pre-checks the
+request's estimated cost against the plan's per-task limit
+(`estimateMaxCreditsForInput`, `creditPolicy.ts`) before calling any
+provider, and on success computes the real cost from actual token usage
+(`creditsForUsage`) and calls the existing atomic `deduct_credits` RPC
+(`creditEngine.ts`) exactly once. A provider failure tries the next
+Premium fallback (bounded, ranked by `provider_health`) without deducting;
+exhausting all fallbacks returns an error, never a silent success. Every
+attempt (success or failure) updates `provider_health`
+(`recordProviderSuccess`/`recordProviderFailure`).
+
+**Free / BYOK** (`src/desk/regions/StudioPanel.tsx`, "Auto" mode, the
+default): the client calls `POST /api/ai-access/route` for the router's
+pick, then — for a non-Premium choice — reads ITS OWN locally-stored key
+for that specific provider (`readProviderKey`, never the server) and
+supplies it directly to `refinePassage()`, same as the pre-existing manual
+path always did; the server still never holds a Free/BYOK credential. If
+no key is stored on this device for the chosen provider (e.g. the
+connection exists from a different device), the client tries the next
+router-ranked fallback rather than sending a request that cannot succeed.
+An "Advanced" mode preserves the original manual provider+key dropdown
+for when Auto has nothing usable, or the user just wants to pick.
+
+**Local** is a real, valid tier the router can rank and recommend, but
+Studio's `refine()` pipeline has no local-runtime execution path (only
+cloud adapters) — a known, stated gap, not a silent failure. When Auto
+mode's choice or every fallback is `local`, the client shows a clear
+message ("Studio doesn't support local execution yet — connect a cloud,
+BYOK, or Premium AI source") instead of sending a request the server
+cannot resolve.
+
+**Transparency** ("Why this AI?"): `StudioRefineResult` carries `usage`
+(provider/model/token estimates, for any level that called a provider) and,
+for Premium, `aiSource` (tier/provider/model/`creditsUsed`). `StudioPanel`
+shows both the router's pre-execution reasoning and, once a result exists,
+what actually ran — provider, model, tier, and credits spent — never an
+API key or other internal.
+
+Priority 7's live routing test matrix (16 scenarios: single/multiple free
+providers, local+free, BYOK+free, Premium available/unavailable, quota
+available/exhausted, provider unavailable/removed/invalid credential,
+cross-user isolation, quota/entitlement tampering, forced Premium without
+entitlement, failed generation with no deduction, and concurrent-request
+deduction) is split across
+`server/routes/__tests__/aiAccess.routingMatrix.test.ts` (decision-preview
+scenarios) and `server/routes/__tests__/studio.premium.test.ts` (execution
+scenarios) — see the header comment in the former for the exact mapping.
+Concurrent double-spend prevention is pinned at the JS-call-shape level
+only (one atomic RPC call per request, unique request id, no local
+read-modify-write of a balance); the actual guarantee is Postgres's
+`for update` row lock inside `deduct_credits()`, which a mocked-fetch unit
+test cannot exercise — that guarantee was verified live against production
+in the pass that built it (§6), not re-verified here.
+
+**Known, accepted gap in this wiring:** the Premium path's provider call
+does not go through the same 428-consent-required retry flow the
+Free/BYOK/manual path does (`GatewayDenied`/`StudioConsentRequiredError`).
+If a Warden consent check denies a Premium provider call, `runPremiumRefine`
+currently treats it as a generic provider failure (tries the next Premium
+fallback, then a 502) rather than surfacing a resumable consent prompt.
+Scholar's own Premium-pool credentials are operator-owned, not a user's,
+so this has not yet caused an observed problem, but it is a real
+inconsistency with the Free/BYOK path's UX and is flagged here rather than
+silently left for someone to discover.
 
 ## 8. AI Opportunity Agent
 
@@ -173,17 +249,22 @@ and that no Tavily key is ever sent from this module.
 
 ## 9. Known gaps — stated plainly, not silently
 
-- **Omni Router is not yet the live routing path.** `AiSetupScreen` still
-  drives a single manually-chosen provider for actual generation calls. The
-  router is built, tested, and reachable via API, but replacing the live
-  path is separate follow-up work.
-- **User-facing "Connect a provider" UI writes to `user_ai_connections`
-  metadata is not yet triggered automatically from `AiSetupScreen`'s
-  existing save flow** — `POST /api/ai-access/connections` exists and is
-  tested, but nothing calls it yet when a user actually saves a BYOK key or
-  confirms a local runtime in the existing setup screen. Until that call is
-  added, the AI Access page's "connected providers" list will under-report
-  what a user has actually configured.
+Resolved by the live-wiring pass (§7a) and no longer gaps:
+Omni Router now IS the live routing path for `POST /api/studio/refine`
+(Auto mode is `StudioPanel`'s default); `AiSetupScreen`'s save/forget flow
+now calls `POST /api/ai-access/connections` (with a live
+`POST /api/ai-access/verify-provider-key` check before a newly-entered key
+is allowed to appear connected) and `DELETE .../connections/:providerId`.
+
+Remaining gaps:
+
+- **Local has no execution path in Studio.** The Omni Router can rank and
+  recommend a local runner like any other tier, but `refine()`'s pipeline
+  only calls cloud adapters. `StudioPanel` skips a local choice/fallback
+  and tells the user to connect a cloud/BYOK/Premium source instead of
+  sending a request the server can't resolve. See §7a.
+- **Premium's provider call bypasses the Warden consent-retry flow** that
+  Free/BYOK/manual requests use — see §7a's "known, accepted gap" note.
 - **`DeskShell`'s deeper `Header` region** was wired with an "AI Access"
   entry (§1) but the mobile Pocket surface (`src/desk/pocket/`) was not
   touched — AI Access is a desktop-only entry point for now.
@@ -191,9 +272,13 @@ and that no Tavily key is ever sent from this module.
   admin-grantable only (`POST /api/admin/ai/entitlements/grant`) — there is
   no Stripe or billing-provider wiring, matching the AI Access brief's own
   scope (Section 13 describes admin actions, not a checkout flow).
-- **Provider health monitoring is passive.** `provider_health` is a real,
-  RLS-protected table with public read access, but nothing yet populates it
-  on a schedule — no health-check cron/worker was built in this pass.
+- **Provider health monitoring is reactive only.** `recordProviderSuccess`/
+  `recordProviderFailure` (`server/src/aiEngine/providerHealth.ts`) update
+  `provider_health` from the outcome of real requests as they happen; there
+  is still no scheduled/background health-check cron or worker probing
+  providers independently of live traffic. This was a deliberate scope
+  decision (Priority 8: "minimal only — no large monitoring system"), not
+  an oversight.
 
 ## 10. Database objects added
 
@@ -230,3 +315,14 @@ function's own `TAVILY_API_KEY` secret.
   appears in the outbound wire payload; decrypts back to the original),
   and `listCredentials()`'s PostgREST `select=` parameter confirmed to
   request only metadata columns.
+- Live wiring (§7a): a client-supplied `useEngine: "premium"` is never
+  trusted as a grant — entitlement/quota/decision are always re-derived
+  server-side, and a spoofed body claiming quota, entitlement, or an
+  `aiSource` has no effect (pinned test). Credits are deducted exactly once
+  per successful generation and never on a failed/rejected one, across
+  every provider-fallback path. Cross-user isolation holds for the routing
+  decision itself, not just data reads: one user's connections/entitlement
+  never leak into another's `POST /api/ai-access/route` response, even
+  when both have rows in the same tables. An undecryptable (present but
+  corrupt) Premium credential fails closed — treated like "not configured,"
+  never a crash or a charge.

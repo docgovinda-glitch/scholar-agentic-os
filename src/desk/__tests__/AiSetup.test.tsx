@@ -22,6 +22,19 @@ vi.mock("../../services/supabaseClient", () => ({
   getSupabaseClient: () => ({ auth: { getUser }, from }),
 }));
 
+// AiSetupScreen now calls the real AI Access routes (verify/add/remove
+// connection) on save — mocked here at the module boundary rather than via
+// global.fetch, since these are just plain async functions from the same
+// codebase, not a network layer worth simulating.
+const verifyProviderKey = vi.fn();
+const addConnection = vi.fn();
+const removeConnection = vi.fn();
+vi.mock("../aiAccess/aiAccessApi", () => ({
+  verifyProviderKey: (...args: unknown[]) => verifyProviderKey(...args),
+  addConnection: (...args: unknown[]) => addConnection(...args),
+  removeConnection: (...args: unknown[]) => removeConnection(...args),
+}));
+
 const { default: AiSetupScreen } = await import("../setup/AiSetupScreen");
 const { useAiSetupStatus } = await import("../setup/useAiSetupStatus");
 const { providersWithStoredKey, readProviderKey, storeProviderKey } = await import("../../services/userAiSettings");
@@ -40,6 +53,9 @@ beforeEach(() => {
   localStorage.clear();
   getUser.mockResolvedValue({ data: { user: USER } });
   noSettingsYet();
+  verifyProviderKey.mockReset().mockResolvedValue({ ok: true, modelsDetected: 3 });
+  addConnection.mockReset().mockResolvedValue({ success: true });
+  removeConnection.mockReset().mockResolvedValue({ success: true });
 });
 
 afterEach(() => {
@@ -70,7 +86,7 @@ describe("AiSetupScreen", () => {
     render(<AiSetupScreen onDone={vi.fn()} />);
     // They will be asked for it again on another machine; finding that out by
     // surprise is worse than reading one sentence now.
-    expect(await screen.findByText(/never sent to our servers/i)).toBeInTheDocument();
+    expect(await screen.findByText(/never stored on our servers/i)).toBeInTheDocument();
   });
 
   it("cannot be completed without a key", async () => {
@@ -95,6 +111,33 @@ describe("AiSetupScreen", () => {
     const row = upsert.mock.calls[0][0];
     expect(row.provider).toBe("gemini");
     expect(JSON.stringify(row)).not.toContain("sk-my-secret");
+  });
+
+  it("verifies the key with the provider before recording a connection Omni Router can route to", async () => {
+    const onDone = vi.fn();
+    render(<AiSetupScreen onDone={onDone} />);
+
+    fireEvent.change(await screen.findByLabelText("API key"), { target: { value: "sk-my-secret" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save and continue/ }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+
+    expect(verifyProviderKey).toHaveBeenCalledWith("gemini", "sk-my-secret");
+    expect(addConnection).toHaveBeenCalledWith("gemini", "free", 3);
+  });
+
+  it("does not save the key or mark the provider connected when verification is rejected", async () => {
+    verifyProviderKey.mockResolvedValue({ ok: false, error: "That key was rejected by the provider." });
+    const onDone = vi.fn();
+    render(<AiSetupScreen onDone={onDone} />);
+
+    fireEvent.change(await screen.findByLabelText("API key"), { target: { value: "sk-bad-key" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save and continue/ }));
+
+    expect(await screen.findByText(/rejected by the provider/i)).toBeInTheDocument();
+    expect(onDone).not.toHaveBeenCalled();
+    expect(addConnection).not.toHaveBeenCalled();
+    expect(providersWithStoredKey()).not.toContain("gemini");
   });
 
   it("offers a skip, per docs 25 — every stage after login is optional", async () => {
@@ -150,6 +193,20 @@ describe("AiSetupScreen — revisit", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
+  });
+
+  it("removes the connection when a saved key is forgotten, so it drops out of the routing pool", async () => {
+    await storeProviderKey("gemini", "sk-existing");
+    from.mockReturnValue({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { provider: "gemini", preferences: {} }, error: null }) }) }),
+      upsert: vi.fn().mockResolvedValue({ error: null }),
+    });
+    render(<AiSetupScreen onDone={vi.fn()} onCancel={vi.fn()} variant="revisit" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Remove the saved key for Google Gemini/ }));
+
+    expect(providersWithStoredKey()).not.toContain("gemini");
+    await waitFor(() => expect(removeConnection).toHaveBeenCalledWith("gemini"));
   });
 });
 
