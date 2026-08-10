@@ -59,6 +59,12 @@ services:
         sync: false
       - key: ENCRYPTION_KEY
         sync: false
+      # Wraps every Premium-pool provider credential (Section 10 of the AI
+      # Access architecture) — see .env.example's "Scholar AI Engine"
+      # section and supabase/schema_ai_engine.sql for the full reasoning.
+      # Distinct from ENCRYPTION_KEY above (a legacy, unrelated key).
+      - key: MASTER_KEY
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM_EMAIL

@@ -17,12 +17,14 @@ export default function Header({
   onClose,
   onOpenSettings,
   onOpenVault,
+  onOpenAiAccess,
 }: {
   project: ProjectView;
   outputTypeLabel: string;
   onClose?: () => void;
   onOpenSettings?: () => void;
   onOpenVault?: () => void;
+  onOpenAiAccess?: () => void;
 }) {
   const current = project.gates.find((g) => g.status !== "signed_off") ?? project.gates[project.gates.length - 1];
 
@@ -59,6 +61,15 @@ export default function Header({
             className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
           >
             Vault
+          </button>
+        )}
+        {onOpenAiAccess && (
+          <button
+            type="button"
+            onClick={onOpenAiAccess}
+            className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+          >
+            AI Access
           </button>
         )}
         {onOpenSettings ? (

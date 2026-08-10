@@ -20,11 +20,13 @@ export default function ProjectListScreen({
   userEmail,
   onOpenSettings,
   onOpenVault,
+  onOpenAiAccess,
 }: {
   onOpen: (projectId: string) => void;
   userEmail: string | null;
   onOpenSettings?: () => void;
   onOpenVault?: () => void;
+  onOpenAiAccess?: () => void;
 }) {
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
   const [types, setTypes] = useState<OutputTypeSummary[] | null>(null);
@@ -80,6 +82,15 @@ export default function ProjectListScreen({
                 className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
               >
                 Vault
+              </button>
+            )}
+            {onOpenAiAccess && (
+              <button
+                type="button"
+                onClick={onOpenAiAccess}
+                className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+              >
+                AI Access
               </button>
             )}
             {onOpenSettings && (

@@ -6,6 +6,7 @@ import { listCredentials, storeCredential, removeCredential, setCredentialStatus
 import { grantPremium, revokePremium } from "../src/aiEngine/entitlements";
 import { grantCredits } from "../src/aiEngine/creditEngine";
 import { writeAuditLog } from "../src/aiEngine/auditLog";
+import { runOpportunityResearch } from "../src/aiEngine/opportunityAgent";
 
 /**
  * Admin AI Infrastructure routes (Section 16) — every route here is gated
@@ -18,6 +19,11 @@ export function registerAdminRoutes(app: express.Express): void {
   const admin = express.Router();
   admin.use(express.json());
   admin.use(requireAuth, requireAdmin);
+
+  // Cheapest possible check for "should the client show an Admin link at
+  // all" — reaching this handler already proves requireAdmin passed, so the
+  // body only needs to say so.
+  admin.get("/whoami", (_req, res) => res.json({ isAdmin: true }));
 
   function actor(req: express.Request): string {
     return (req as express.Request & { user: AuthenticatedUser }).user.id;
@@ -199,6 +205,18 @@ export function registerAdminRoutes(app: express.Express): void {
     const opportunities = new SupabaseTable(restConfig(), "ai_opportunities");
     const statusFilter = typeof req.query.status === "string" ? `&status=eq.${encodeURIComponent(req.query.status)}` : "";
     res.json(await opportunities.select(`order=discovered_at.desc${statusFilter}`));
+  });
+
+  admin.post("/opportunities/research", async (req, res) => {
+    const { query } = req.body as { query: string };
+    if (!query || query.trim().length < 3) return res.status(400).json({ error: "A research query is required." });
+    try {
+      const count = await runOpportunityResearch(query.trim());
+      await writeAuditLog(actor(req), "run_opportunity_research", "opportunity_research", null, { query, foundCount: count });
+      res.json({ success: true, foundCount: count });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
   });
 
   admin.post("/opportunities/:id/review", async (req, res) => {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AiAccessPage from "./aiAccess/AiAccessPage";
 import DeskAuthGate from "./DeskAuthGate";
 import DeskShell from "./DeskShell";
 import ProjectListScreen from "./ProjectListScreen";
@@ -49,6 +50,8 @@ function DeskRoutes() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** Same reasoning as settingsOpen — not URL-addressed, returns to exactly what was already on screen. */
   const [vaultOpen, setVaultOpen] = useState(false);
+  /** Same reasoning as settingsOpen/vaultOpen. */
+  const [aiAccessOpen, setAiAccessOpen] = useState(false);
 
   // Keep component state and the URL in step when the user presses Back or
   // Forward. Without this, going back from a project left the URL on the list
@@ -101,6 +104,12 @@ function DeskRoutes() {
     return <AiSetupScreen variant="revisit" onDone={() => setSettingsOpen(false)} onCancel={() => setSettingsOpen(false)} />;
   }
 
+  // AI Access (Section 20) — status view for Local/Free/BYOK/Premium. Same
+  // full-screen-overlay treatment as settings/vault above.
+  if (aiAccessOpen) {
+    return <AiAccessPage onClose={() => setAiAccessOpen(false)} onOpenSetup={() => setSettingsOpen(true)} />;
+  }
+
   // A Vault is "your long-term library... across future projects" (docs 25
   // §6.2) — a peer destination to a project, not something folded inside
   // one, the same reasoning that already moved AI settings off PaperProject.
@@ -123,6 +132,7 @@ function DeskRoutes() {
         userEmail={session.status === "signed-in" ? session.email : null}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenVault={() => setVaultOpen(true)}
+        onOpenAiAccess={() => setAiAccessOpen(true)}
       />
     );
   }
@@ -132,6 +142,7 @@ function DeskRoutes() {
       onClose={close}
       onOpenSettings={() => setSettingsOpen(true)}
       onOpenVault={() => setVaultOpen(true)}
+      onOpenAiAccess={() => setAiAccessOpen(true)}
     />
   );
 }

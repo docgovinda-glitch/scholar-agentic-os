@@ -22,6 +22,7 @@ import { generateMasterKeyBase64 } from "../../../src/services/crypto/crypto";
 process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
 process.env.MASTER_KEY = generateMasterKeyBase64();
+process.env.GEMINI_API_KEY = "test-gemini-key";
 
 const realFetch = global.fetch;
 
@@ -86,7 +87,9 @@ const ROUTES: Array<{ method: "get" | "post" | "patch" | "delete"; path: string;
   { method: "patch", path: "/api/admin/ai/budget", body: { monthlyBudgetUsd: 500 } },
   { method: "get", path: "/api/admin/ai/platform-credentials" },
   { method: "post", path: "/api/admin/ai/platform-credentials", body: { providerId: "gemini", credential: "sk-x" } },
+  { method: "get", path: "/api/admin/ai/whoami" },
   { method: "get", path: "/api/admin/ai/opportunities" },
+  { method: "post", path: "/api/admin/ai/opportunities/research", body: { query: "free AI API tiers 2026" } },
   { method: "post", path: "/api/admin/ai/opportunities/00000000-0000-0000-0000-000000000001/review", body: { decision: "approved" } },
   { method: "get", path: "/api/admin/ai/audit-log" },
 ];
