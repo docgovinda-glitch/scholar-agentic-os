@@ -15,9 +15,10 @@
 # Auth/user/admin data: Supabase (not local Postgres)
 # Email delivery: Resend Edge Functions (not server.ts)
 #
-# VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are consumed as Docker build ARGs
-# by the Dockerfile (Render automatically forwards matching env vars as build args),
-# not just runtime env — required for Vite to bake them into the built frontend bundle.
+# VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, and VITE_CAPTCHA_SITE_KEY are consumed
+# as Docker build ARGs by the Dockerfile (Render automatically forwards matching env
+# vars as build args), not just runtime env — required for Vite to bake them into the
+# built frontend bundle.
 services:
   - type: web
     name: scholar-agentic-os
@@ -65,6 +66,13 @@ services:
       - key: VITE_SUPABASE_URL
         sync: false
       - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_CAPTCHA_SITE_KEY
+        sync: false
+      # Server-side only, verified against Cloudflare's siteverify endpoint by
+      # server/src/middleware/captchaVerify.ts — runtime env is sufficient,
+      # it never needs to reach the frontend bundle.
+      - key: CAPTCHA_SECRET_KEY
         sync: false
       # Server-side only — NEVER prefixed VITE_, or Vite would bake it into the
       # client bundle and hand every visitor a key that bypasses Row Level

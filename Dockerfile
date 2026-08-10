@@ -30,8 +30,10 @@ ENV HUSKY=0
 # not merely at runtime. Render forwards same-named env vars as build args.
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_CAPTCHA_SITE_KEY
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_CAPTCHA_SITE_KEY=$VITE_CAPTCHA_SITE_KEY
 
 # Lockfile-exact install, cached independently of source changes.
 COPY package.json package-lock.json ./
