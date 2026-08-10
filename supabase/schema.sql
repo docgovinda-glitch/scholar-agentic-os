@@ -25,8 +25,8 @@ create table if not exists public.profiles (
   phone text default '',
   affiliation text not null,
   authentic_id text default 'None',
-  is_approved boolean not null default false,
-  model_preferences jsonb, -- mirrors UserRecord.modelPreferences (a single blob, not per-provider rows)
+  account_status text not null default 'active' check (account_status in ('active', 'restricted', 'suspended', 'deleted')),
+  model_preferences jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -50,27 +50,13 @@ create table if not exists public.api_credentials (
   primary key (user_id, provider)
 );
 
--- ============================================================================
--- pending_password_resets: staging table for the existing admin-gated
--- password-reset flow (server.ts's tempPasscodeHash/resetApproved fields).
--- Preserves the current product behavior (every reset requires an admin to
--- click an emailed approval link) rather than silently switching to
--- Supabase Auth's own self-service reset flow — see the note in
--- .claude/HANDOVER.md about this being a flagged, not decided, behavior
--- choice. Row is deleted once the admin approves (see
--- supabase/functions/approve-password-reset).
--- ============================================================================
-create table if not exists public.pending_password_resets (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  new_password text not null, -- transient; deleted immediately on approval or denial
-  reset_token text not null,
-  requested_at timestamptz not null default now()
-);
 
 -- ============================================================================
 -- Auto-create a profile row when a new Supabase Auth user signs up.
--- Mirrors server.ts's /api/register: is_approved defaults to false, an
--- admin must approve before the account is usable.
+-- AUTOMATIC ACCOUNT ACTIVATION: account_status defaults to 'active' (no manual
+-- admin approval required). Accounts are immediately usable after email
+-- verification. Automated abuse protection (CAPTCHA, rate limiting, email
+-- verification) provides security without manual intervention.
 -- ============================================================================
 create or replace function public.handle_new_user()
 returns trigger
@@ -78,7 +64,7 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, username, full_name, phone, affiliation, authentic_id, is_approved)
+  insert into public.profiles (id, username, full_name, phone, affiliation, authentic_id, account_status)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'username', new.email),
@@ -86,7 +72,7 @@ begin
     coalesce(new.raw_user_meta_data->>'phone', ''),
     coalesce(new.raw_user_meta_data->>'affiliation', ''),
     coalesce(new.raw_user_meta_data->>'authentic_id', 'None'),
-    false
+    'active'
   );
   return new;
 end;
@@ -121,34 +107,15 @@ $$;
 
 grant execute on function public.email_for_username(text) to anon, authenticated;
 
--- Same rationale as email_for_username: server.ts's /api/check-approval is
--- called pre-login (no session yet) with just a username, to let the UI
--- show "pending admin approval" without requiring a password first.
-create or replace function public.is_username_approved(lookup_username text)
-returns boolean
-language sql
-security definer set search_path = public
-stable
-as $$
-  select coalesce(is_approved, false)
-  from public.profiles
-  where username = lookup_username
-  limit 1;
-$$;
-
-grant execute on function public.is_username_approved(text) to anon, authenticated;
 
 -- ============================================================================
 -- Row Level Security
 -- ============================================================================
 alter table public.profiles enable row level security;
 alter table public.api_credentials enable row level security;
-alter table public.pending_password_resets enable row level security;
 
--- Users can read/update only their own profile. Only is_approved is
--- intentionally NOT updatable by the user themselves (no policy grants
--- UPDATE on it directly to the user; the approve-registration Edge
--- Function uses the service_role key, which bypasses RLS, to flip it).
+-- Users can read/update only their own profile. account_status is NOT
+-- updatable by the user themselves (only admins via service_role can change it).
 create policy "profiles_select_own" on public.profiles
   for select using (auth.uid() = id);
 
@@ -157,8 +124,3 @@ create policy "profiles_update_own" on public.profiles
 
 create policy "api_credentials_all_own" on public.api_credentials
   for all using (auth.uid() = user_id);
-
--- pending_password_resets: no client-side policy at all — only Edge
--- Functions using the service_role key (which bypasses RLS) touch this
--- table, since it briefly holds a plaintext password in transit and must
--- never be directly readable via the anon/authenticated client role.

@@ -6,6 +6,7 @@ import {
   signUp,
   updatePassword,
 } from "../../services/supabaseAuthService";
+import CaptchaWidget from "./CaptchaWidget";
 import {
   AuthError,
   AuthForm,
@@ -56,14 +57,11 @@ export default function AuthFlow() {
       return <RecoverScreen onDone={() => setScreen("sign-in")} />;
     case "registered":
       return <RegisteredScreen onBack={() => setScreen("sign-in")} />;
-    case "awaiting-approval":
-      return <AwaitingApprovalScreen onBack={() => setScreen("sign-in")} />;
     default:
       return (
         <SignInScreen
           onRegister={() => setScreen("sign-up")}
           onForgot={() => setScreen("forgot")}
-          onAwaitingApproval={() => setScreen("awaiting-approval")}
         />
       );
   }
@@ -72,11 +70,9 @@ export default function AuthFlow() {
 function SignInScreen({
   onRegister,
   onForgot,
-  onAwaitingApproval,
 }: {
   onRegister: () => void;
   onForgot: () => void;
-  onAwaitingApproval: () => void;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -90,11 +86,6 @@ function SignInScreen({
     try {
       const result = await signIn({ username: username.trim(), password });
       if (result.success) return; // useDeskSession takes over from here.
-
-      // Awaiting approval is not a credentials failure and must not be shown
-      // as one — the password was right, and telling them otherwise sends
-      // them to reset a password that works.
-      if (result.isApproved === false) return onAwaitingApproval();
 
       setError(result.error ?? "Could not sign you in.");
     } catch (e) {
@@ -133,8 +124,8 @@ function SignInScreen({
 function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const set = useCallback(
     (key: keyof SignUpFields) => (value: string) => setFields((f) => ({ ...f, [key]: value })),
@@ -149,15 +140,16 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
     setBusy(true);
     setError(null);
     try {
-      const result = await signUp({ ...fields, username: fields.username.trim(), email: fields.email.trim() });
+      const result = await signUp({
+        ...fields,
+        username: fields.username.trim(),
+        email: fields.email.trim(),
+        captchaToken: captchaToken || undefined,
+      });
       if (!result.success) {
         setError(result.error ?? "Registration failed.");
         return;
       }
-      // signUp can succeed while the admin-notification email fails. That is
-      // not the user's problem to fix, but hiding it would leave them waiting
-      // on an approval nobody was told to give.
-      if (result.error) setWarning(result.error);
       onDone();
     } catch (e) {
       setError((e as Error).message);
@@ -170,7 +162,7 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
     <AuthShell>
       <AuthHeading
         title="Create your account"
-        subtitle="An administrator reviews new accounts before they can sign in."
+        subtitle="Verify your email to get started."
       />
       <AuthForm onSubmit={handleSubmit}>
         {SIGN_UP_FIELDS.map((f, i) => (
@@ -186,8 +178,8 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
             onChange={set(f.key)}
           />
         ))}
+        <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
-        {warning && <AuthNotice>{warning}</AuthNotice>}
         <SubmitButton busy={busy} busyLabel="Creating account…" disabled={signUpProblem(fields) !== null}>
           Create account
         </SubmitButton>
@@ -320,26 +312,7 @@ function RegisteredScreen({ onBack }: { onBack: () => void }) {
     <AuthShell>
       <AuthHeading title="Account created" />
       <AuthNotice>
-        An administrator has been notified and will review your details. You will be able to sign in once your account
-        is approved.
-      </AuthNotice>
-      <div className="mt-6">
-        <AuthLink onClick={onBack}>Back to sign in</AuthLink>
-      </div>
-    </AuthShell>
-  );
-}
-
-function AwaitingApprovalScreen({ onBack }: { onBack: () => void }) {
-  return (
-    <AuthShell>
-      <AuthHeading title="Waiting for approval" />
-      {/* UX5: name what is blocking and what would unblock it. "Sign-in
-          failed" would be both wrong and unactionable — the credentials were
-          correct. */}
-      <AuthNotice>
-        Your details were correct. Your account has not been approved yet, so an administrator still needs to review it.
-        Try again once you hear from them.
+        Check your email to verify your account. Once verified, you can sign in immediately.
       </AuthNotice>
       <div className="mt-6">
         <AuthLink onClick={onBack}>Back to sign in</AuthLink>

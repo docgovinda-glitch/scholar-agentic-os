@@ -119,20 +119,6 @@ describe("sign in", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Incorrect password credentials.");
   });
 
-  it("shows the awaiting-approval screen instead of a credentials error", async () => {
-    // The password was right. Reporting this as a sign-in failure sends the
-    // user to reset a password that works.
-    signIn.mockResolvedValue({ success: false, isApproved: false, error: "Awaiting Admin Approval" });
-    gate();
-
-    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "amara" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret123" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-
-    expect(await screen.findByText(/Waiting for approval/i)).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(/details were correct/i);
-  });
-
   it("does not navigate on success — the session subscription does that", async () => {
     gate();
     fireEvent.change(screen.getByLabelText("Username"), { target: { value: "amara" } });
@@ -190,7 +176,7 @@ describe("registration", () => {
     expect(submit).toBeEnabled();
   });
 
-  it("tells the user approval is pending rather than implying they can sign in", async () => {
+  it("shows a confirmation that the account was created", async () => {
     openSignUp();
     for (const [label, value] of [
       ["Full name", "Amara Okafor"],
@@ -206,7 +192,7 @@ describe("registration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(await screen.findByText(/Account created/i)).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(/approved/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/check your email/i);
   });
 });
 

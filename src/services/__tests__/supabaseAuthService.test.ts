@@ -52,7 +52,6 @@ vi.mock("../supabaseClient", () => ({
 import {
   signUp,
   signIn,
-  checkApproval,
   saveModelPreferences,
   saveApiKeys,
   sendPasswordResetEmail,
@@ -68,9 +67,8 @@ beforeEach(() => {
 });
 
 describe("signUp", () => {
-  it("creates the auth user and notifies the admin via the send-approval-email function", async () => {
+  it("creates the auth user with automatic account activation", async () => {
     mockAuth.signUp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
-    mockFunctionsInvoke.mockResolvedValue({ data: {}, error: null });
 
     const result = await signUp({
       username: "jdoe",
@@ -86,10 +84,9 @@ describe("signUp", () => {
     expect(mockAuth.signUp).toHaveBeenCalledWith(
       expect.objectContaining({ email: "jane@example.com", password: "hunter2-hunter2" })
     );
-    expect(mockFunctionsInvoke).toHaveBeenCalledWith("send-approval-email", expect.objectContaining({ body: expect.objectContaining({ userId: "u1" }) }));
   });
 
-  it("surfaces a Supabase Auth error without calling the notification function", async () => {
+  it("surfaces a Supabase Auth error", async () => {
     mockAuth.signUp.mockResolvedValue({ data: { user: null }, error: { message: "User already registered" } });
 
     const result = await signUp({
@@ -103,44 +100,16 @@ describe("signUp", () => {
     });
 
     expect(result).toEqual({ success: false, error: "User already registered" });
-    expect(mockFunctionsInvoke).not.toHaveBeenCalled();
-  });
-
-  it("reports success with an honest caveat when the Edge Function's own body says emailSent:false", async () => {
-    // send-approval-email always returns HTTP 200 with {success:true, emailSent,
-    // error} in its own body, regardless of whether Resend actually sent
-    // anything — supabase.functions.invoke()'s `error` only reflects
-    // transport-level failures, so signUp() must also check the body itself.
-    mockAuth.signUp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
-    mockFunctionsInvoke.mockResolvedValue({
-      data: { success: true, emailSent: false, error: "RESEND_API_KEY not configured on this Supabase project" },
-      error: null,
-    });
-
-    const result = await signUp({
-      username: "jdoe",
-      fullName: "Jane Doe",
-      email: "jane@example.com",
-      phone: "",
-      affiliation: "State University",
-      authenticId: "None",
-      password: "hunter2-hunter2",
-    });
-
-    expect(result).toEqual({
-      success: true,
-      error: "Registered, but the admin notification email couldn't be sent: RESEND_API_KEY not configured on this Supabase project",
-    });
   });
 });
 
 describe("signIn", () => {
-  it("resolves username to email, signs in, and returns the profile when approved", async () => {
+  it("resolves username to email, signs in, and returns the profile when account is active", async () => {
     mockRpc.mockResolvedValue({ data: "jane@example.com", error: null });
     mockAuth.signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
     mockFrom.mockReturnValue(
       makeChainable({
-        data: { full_name: "Jane Doe", phone: "", affiliation: "State University", authentic_id: "None", is_approved: true },
+        data: { full_name: "Jane Doe", phone: "", affiliation: "State University", authentic_id: "None", account_status: "active" },
         error: null,
       })
     );
@@ -148,17 +117,16 @@ describe("signIn", () => {
     const result = await signIn({ username: "jdoe", password: "hunter2-hunter2" });
 
     expect(result.success).toBe(true);
-    expect(result.isApproved).toBe(true);
     expect(result.profile?.email).toBe("jane@example.com");
     expect(mockRpc).toHaveBeenCalledWith("email_for_username", { lookup_username: "jdoe" });
   });
 
-  it("blocks login with a clear message when the admin hasn't approved yet", async () => {
+  it("blocks login with a clear message when the account is restricted", async () => {
     mockRpc.mockResolvedValue({ data: "jane@example.com", error: null });
     mockAuth.signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
     mockFrom.mockReturnValue(
       makeChainable({
-        data: { full_name: "Jane Doe", phone: "", affiliation: "State University", authentic_id: "None", is_approved: false },
+        data: { full_name: "Jane Doe", phone: "", affiliation: "State University", authentic_id: "None", account_status: "restricted" },
         error: null,
       })
     );
@@ -166,8 +134,7 @@ describe("signIn", () => {
     const result = await signIn({ username: "jdoe", password: "hunter2-hunter2" });
 
     expect(result.success).toBe(false);
-    expect(result.isApproved).toBe(false);
-    expect(result.error).toBe("Awaiting Admin Approval");
+    expect(result.error).toBe("Your account has been restricted. Please contact support.");
   });
 
   it("fails cleanly when no profile exists for the given username", async () => {
@@ -190,20 +157,6 @@ describe("signIn", () => {
   });
 });
 
-describe("checkApproval", () => {
-  it("returns the approval flag from the is_username_approved RPC", async () => {
-    mockRpc.mockResolvedValue({ data: true, error: null });
-    const result = await checkApproval("jdoe");
-    expect(result).toEqual({ isApproved: true });
-    expect(mockRpc).toHaveBeenCalledWith("is_username_approved", { lookup_username: "jdoe" });
-  });
-
-  it("treats an RPC error as not-approved rather than throwing", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { message: "network" } });
-    const result = await checkApproval("jdoe");
-    expect(result).toEqual({ isApproved: false });
-  });
-});
 
 describe("saveModelPreferences", () => {
   it("requires an active session", async () => {
