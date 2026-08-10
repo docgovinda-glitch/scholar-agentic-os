@@ -4,6 +4,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/re
 import "@testing-library/jest-dom/vitest";
 import StudioPanel from "../regions/StudioPanel";
 import { storeProviderKey } from "../../services/userAiSettings";
+import { __resetSessionPoliciesForTests } from "../../app/studio/sessionPolicyStore";
 
 const originalFetch = global.fetch;
 
@@ -15,8 +16,21 @@ function mockFetch(handler: (url: string, init?: RequestInit) => { status: numbe
   }) as unknown as typeof fetch;
 }
 
+/** Wraps a Scholar-side (mockFetch-installed) fetch so localhost calls are routed to a separate handler — the same split a real browser talking to both at once would have. Stays a vi.fn() spy so callers can still assert on global.fetch itself. */
+function withLocalFetch(localHandler: (url: string, init?: RequestInit) => Promise<Response>) {
+  const scholarFetch = global.fetch;
+  global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    return url.startsWith("http://localhost:11434") ? localHandler(url, init) : scholarFetch(input, init);
+  }) as unknown as typeof fetch;
+}
+
 beforeEach(() => {
   localStorage.clear();
+  // Local execution's own consent memory (localStudioExecution.ts) is the
+  // SAME module server/routes/studio.ts uses, just imported client-side —
+  // reset between tests so a grant in one doesn't leak into the next.
+  __resetSessionPoliciesForTests();
 });
 
 afterEach(() => {
@@ -389,25 +403,119 @@ describe("Desk — StudioPanel", () => {
       expect(capturedBody).not.toHaveProperty("apiKey");
     });
 
-    it("gives a clear message rather than a broken request when only a local runner is connected", async () => {
+    /** Studio's default routing decision used by every local test below — mockFetch() only ever needs to answer /api/ai-access/route; anything else hitting Scholar's own API is a bug in the code under test. */
+    function mockOnlyLocalRoute(reasoning = "Using your local ollama — runs on your own computer, nothing leaves your device.") {
       mockFetch((url) => {
         if (url === "/api/ai-access/route") {
-          return {
-            status: 200,
-            body: { ok: true, choice: { tier: "local", providerId: "ollama", reasoning: "Using your local ollama — runs on your own computer, nothing leaves your device." }, fallbacks: [] },
-          };
+          return { status: 200, body: { ok: true, choice: { tier: "local", providerId: "ollama", reasoning }, fallbacks: [] } };
         }
-        throw new Error(`Unmocked: ${url}`);
+        throw new Error(`Unmocked Scholar-side fetch: ${url}`);
       });
+    }
+
+    it("routes to a local runner via Auto and executes it directly, never through Scholar's own server", async () => {
+      mockOnlyLocalRoute();
+      const localFetch = vi.fn(async (url: string) => {
+        if (url === "http://localhost:11434/api/tags") {
+          return { ok: true, json: async () => ({ models: [{ name: "llama3.1:8b" }] }) } as Response;
+        }
+        if (url === "http://localhost:11434/api/chat") {
+          return {
+            ok: true,
+            json: async () => ({ message: { role: "assistant", content: JSON.stringify({ revised: "x", changes: [] }) } }),
+          } as Response;
+        }
+        throw new Error(`Unmocked local fetch: ${url}`);
+      });
+      withLocalFetch(localFetch);
 
       render(<StudioPanel sessionId="s1" />);
       fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "clarity" } });
-      await screen.findByText("Will use: ollama · local");
+      await screen.findByText("Will use: Ollama · local");
 
       fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Some text to refine." } });
       fireEvent.click(screen.getByText("Refine"));
 
-      expect(await screen.findByText(/Studio doesn't support local execution yet/)).toBeInTheDocument();
+      // First use of "ollama" for user_content — the same Warden consent
+      // gate every other provider goes through, granted the same way.
+      expect(await screen.findByText(/First use of ollama/)).toBeInTheDocument();
+      fireEvent.click(screen.getByText(/Allow Ollama and retry/));
+
+      expect(await screen.findByText(/AI used: Ollama \(llama3\.1:8b\) · local/)).toBeInTheDocument();
+      expect(localFetch).toHaveBeenCalledWith("http://localhost:11434/api/chat", expect.anything());
+      // The privacy boundary itself: no call to Scholar's own refine route.
+      expect(global.fetch).not.toHaveBeenCalledWith("/api/studio/refine", expect.anything());
+    });
+
+    it("gives a clear, specific message when the local runtime doesn't answer at all", async () => {
+      mockOnlyLocalRoute();
+      withLocalFetch(async () => {
+        throw new Error("connection refused");
+      });
+
+      render(<StudioPanel sessionId="s1" />);
+      fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "clarity" } });
+      await screen.findByText("Will use: Ollama · local");
+      fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Some text to refine." } });
+      fireEvent.click(screen.getByText("Refine"));
+
+      expect(await screen.findByText(/Ollama isn't reachable right now/)).toBeInTheDocument();
+    });
+
+    it("gives a clear, specific message — and a setup recommendation — when the runtime answers but no model is loaded", async () => {
+      mockOnlyLocalRoute();
+      withLocalFetch(async (url) => {
+        if (url === "http://localhost:11434/api/tags") return { ok: true, json: async () => ({ models: [] }) } as Response;
+        throw new Error(`Unmocked local fetch: ${url}`);
+      });
+
+      render(<StudioPanel sessionId="s1" />);
+      fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "clarity" } });
+      await screen.findByText("Will use: Ollama · local");
+      fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Some text to refine." } });
+      fireEvent.click(screen.getByText("Refine"));
+
+      expect(await screen.findByText(/no model is loaded/i)).toBeInTheDocument();
+      expect(await screen.findByText(/ollama pull llama3\.1:8b/)).toBeInTheDocument();
+    });
+
+    it("falls back to the next candidate when the local runtime fails, rather than stopping the whole request", async () => {
+      mockFetch((url) => {
+        if (url === "/api/ai-access/route") {
+          return {
+            status: 200,
+            body: {
+              ok: true,
+              choice: { tier: "local", providerId: "ollama", reasoning: "Using your local ollama." },
+              fallbacks: [{ tier: "free", providerId: "gemini", reasoning: "Using gemini's free tier." }],
+            },
+          };
+        }
+        if (url === "/api/studio/refine") {
+          return {
+            status: 200,
+            body: {
+              diff: { passageId: "desk-studio-passage", level: "clarity", originalText: "x", changes: [], voiceApplied: false },
+              contentChangeCount: 0,
+              languageChangeCount: 0,
+              usage: { provider: "gemini", model: "gemini-2.0-flash", inputTokensEstimate: 10, outputTokensEstimate: 5 },
+            },
+          };
+        }
+        throw new Error(`Unmocked: ${url}`);
+      });
+      withLocalFetch(async () => {
+        throw new Error("connection refused");
+      });
+      await storeProviderKey("gemini", "sk-fallback-test");
+
+      render(<StudioPanel sessionId="s1" />);
+      fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "clarity" } });
+      await screen.findByText("Will use: Ollama · local");
+      fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Some text to refine." } });
+      fireEvent.click(screen.getByText("Refine"));
+
+      expect(await screen.findByText(/AI used: gemini \(gemini-2\.0-flash\) · free/)).toBeInTheDocument();
     });
 
     it("surfaces the router's own reasoning when no AI source is available at all", async () => {

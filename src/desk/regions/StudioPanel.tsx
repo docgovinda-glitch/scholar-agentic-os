@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { grantStudioConsent, refinePassage, StudioConsentRequiredError, StudioDeniedError, StudioNoAiSourceError } from "../api";
 import { loadUserAiSettings, readProviderKey } from "../../services/userAiSettings";
-import { routeDecision, type RoutingChoice, type RoutingDecision } from "../aiAccess/aiAccessApi";
+import { routeDecision, type RoutingDecision } from "../aiAccess/aiAccessApi";
 import { getWritingHistory, enableWritingHistory, disableWritingHistory, clearWritingHistory, summarizeWritingHistory, recordRefinement } from "../../app/studio/writingHistory";
+import { getLocalRunner } from "../../config/localRunnerCatalog";
+import { refineLocally, GatewayDenied, grantLocalConsent } from "./localStudioExecution";
 import type { InterventionLevel, StudioRefineResult, VoiceProfile } from "../types";
 
 const LEVELS: { id: InterventionLevel; label: string; needsProvider: boolean; description: string }[] = [
@@ -49,21 +51,9 @@ const PROVIDERS = ["gemini", "openai", "claude", "cohere"];
 // execution can never disagree about which tier ranks first.
 const STUDIO_TASK_TYPE = "reasoning" as const;
 
-/**
- * The first candidate Studio can actually execute. Local is filtered out
- * here, not upstream in the router: Local is a real, valid AI source in
- * general (Omni Router ranks it normally), but Studio's refine() pipeline
- * only ever calls a cloud adapter (src/app/studio/studio.ts requires
- * provider+apiKey) — there is no local-runtime execution path wired into
- * Studio yet, the same honest gap server/routes/studio.ts documents for the
- * Premium path. Skipping it here means a user with only a local runner
- * connected gets a clear "connect a cloud/Premium source" message instead of
- * a request that silently fails against a provider id the server can't
- * resolve.
- */
-function executableCandidates(decision: RoutingDecision): RoutingChoice[] {
-  if (!decision.ok) return [];
-  return [decision.choice, ...decision.fallbacks].filter((c) => c.tier !== "local");
+/** A local runner's friendly name for display, falling back to the raw provider id for every non-local tier. */
+function displayProviderName(providerId: string): string {
+  return getLocalRunner(providerId)?.name ?? providerId;
 }
 
 const CATEGORY_LABEL = { mechanics: "Mechanics", language: "Language", content: "Content" } as const;
@@ -103,7 +93,8 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
   const [buildingVoiceProfile, setBuildingVoiceProfile] = useState(false);
   const [text, setText] = useState("");
   const [result, setResult] = useState<StudioRefineResult | null>(null);
-  const [consentNeeded, setConsentNeeded] = useState<{ provider: string; reason: string } | null>(null);
+  /** `local: true` when this is local execution's OWN client-side consent gate (localStudioExecution.ts) rather than the server-mediated one every other tier uses. */
+  const [consentNeeded, setConsentNeeded] = useState<{ provider: string; reason: string; local: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showVoiceBuilder, setShowVoiceBuilder] = useState(false);
@@ -198,6 +189,10 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
     let chosenReasoning = "";
     let chosenTier = "manual";
     try {
+      // Set directly by the local branch below, since local execution never
+      // goes through refinePassage()'s HTTP round trip — everything else
+      // still falls through to the refinePassage() call after this block.
+      let r: StudioRefineResult | undefined;
       const refineExtra: { provider?: string; apiKey?: string; model?: string; useEngine?: "premium" } = {};
 
       if (activeLevel.needsProvider) {
@@ -220,13 +215,12 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
             setError(decision.reasoning);
             return;
           }
-          const candidates = executableCandidates(decision);
-          if (candidates.length === 0) {
-            setError(
-              "Only a local runner is connected, and Studio doesn't support local execution yet. Connect a cloud, BYOK, or Premium AI source in AI Access, or switch to Advanced."
-            );
-            return;
-          }
+          const candidates = [decision.choice, ...decision.fallbacks];
+          // Names the most recent local-unavailability reason so the final
+          // "nothing worked" message is specific rather than generic, when
+          // local was tried and every other candidate also came up empty.
+          let localUnavailableNote: string | null = null;
+
           for (const c of candidates) {
             if (c.tier === "premium") {
               refineExtra.useEngine = "premium";
@@ -234,6 +228,57 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
               chosenTier = c.tier;
               chosenReasoning = c.reasoning;
               break;
+            }
+            if (c.tier === "local") {
+              // Executed inline, not just selected: a connection record
+              // ("this device — or another one — set this runner up once")
+              // is not proof it is reachable right now, the way a Premium
+              // credential or a device-local key already is. Availability
+              // can only be known by actually trying, so a runtime/model
+              // problem here falls through to the NEXT candidate — Part 1's
+              // "local fallback to cloud where policy permits" — rather than
+              // stopping the whole request. A privacy-restricted candidate
+              // list (no-cloud) naturally has no cloud candidate to fall
+              // back to, so this never overrides that preference.
+              // Set before the attempt, not after: a GatewayDenied (consent
+              // required) thrown from inside refineLocally() must still be
+              // attributable to THIS candidate when the outer catch below
+              // builds the consent prompt, not fall back to a stale default.
+              chosenProviderId = c.providerId;
+              chosenTier = c.tier;
+              chosenReasoning = c.reasoning;
+              try {
+                r = await refineLocally({
+                  runnerId: c.providerId,
+                  sessionId,
+                  passageId: "desk-studio-passage",
+                  text,
+                  level,
+                  l1: l1 || undefined,
+                  voiceProfile: voiceProfile || undefined,
+                });
+                break;
+              } catch (localErr) {
+                // Anything except a consent decision — unreachable runtime,
+                // no model loaded, a timeout, or the runtime returning an
+                // error mid-generation — is treated the same way: this
+                // candidate didn't work, so try the next one (Part 1's
+                // "local fallback to cloud where policy permits"). The real
+                // message is kept (not replaced with a generic one) so that
+                // if every candidate fails, the last thing actually said is
+                // still visible rather than papered over.
+                if (!(localErr instanceof GatewayDenied)) {
+                  localUnavailableNote = localErr instanceof Error ? localErr.message : String(localErr);
+                  // This candidate did not pan out — clear it so the
+                  // post-loop "did anything actually work" check isn't
+                  // fooled by a failed attempt's leftover id.
+                  chosenProviderId = undefined;
+                  chosenTier = "manual";
+                  chosenReasoning = "";
+                  continue;
+                }
+                throw localErr; // GatewayDenied (consent) — surfaced, never swallowed.
+              }
             }
             // Free/BYOK keys live only on this device (never the server) —
             // a provider the router sees as "connected" from another device
@@ -251,21 +296,27 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
             }
           }
           if (!chosenProviderId) {
-            setError("A connected AI source was found, but its key isn't stored on this device. Open AI Access to reconnect it, or switch to Advanced.");
+            setError(
+              localUnavailableNote
+                ? `${localUnavailableNote} No other AI source is currently usable. Open AI Access to reconnect one, or switch to Advanced.`
+                : "A connected AI source was found, but its key isn't stored on this device. Open AI Access to reconnect it, or switch to Advanced."
+            );
             return;
           }
         }
       }
 
-      const r = await refinePassage({
-        sessionId,
-        passageId: "desk-studio-passage",
-        text,
-        level,
-        l1: l1 || undefined,
-        voiceProfile: voiceProfile || undefined,
-        ...refineExtra,
-      });
+      if (!r) {
+        r = await refinePassage({
+          sessionId,
+          passageId: "desk-studio-passage",
+          text,
+          level,
+          l1: l1 || undefined,
+          voiceProfile: voiceProfile || undefined,
+          ...refineExtra,
+        });
+      }
       setResult(r);
       setExecutedSource(
         r.aiSource
@@ -287,7 +338,16 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
       }
     } catch (e) {
       if (e instanceof StudioConsentRequiredError) {
-        setConsentNeeded({ provider: e.provider || chosenProviderId || provider, reason: e.message });
+        setConsentNeeded({ provider: e.provider || chosenProviderId || provider, reason: e.message, local: false });
+      } else if (e instanceof GatewayDenied) {
+        // Local execution's own Warden gate (localStudioExecution.ts) — the
+        // real error class, thrown directly, since local never round-trips
+        // through the server the way every other tier's 428 does.
+        if (e.requiresConsent) {
+          setConsentNeeded({ provider: chosenProviderId || provider, reason: e.message, local: true });
+        } else {
+          setError(`Denied by privacy policy: ${e.message}`);
+        }
       } else if (e instanceof StudioDeniedError) {
         setError(`Denied by privacy policy: ${e.message}`);
       } else if (e instanceof StudioNoAiSourceError) {
@@ -313,7 +373,13 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
     if (!consentNeeded) return;
     setBusy(true);
     try {
-      await grantStudioConsent(sessionId, consentNeeded.provider);
+      if (consentNeeded.local) {
+        // Purely in-memory, in this browser tab — see localStudioExecution.ts
+        // for why local consent has no server round trip to make.
+        grantLocalConsent(sessionId, consentNeeded.provider);
+      } else {
+        await grantStudioConsent(sessionId, consentNeeded.provider);
+      }
       setConsentNeeded(null);
       await run();
     } catch (e) {
@@ -361,7 +427,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
             {routingLoading && <p className="text-[color:var(--text-muted)]">Choosing an AI source…</p>}
             {!routingLoading && routing && routing.ok && (
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[color:var(--text-secondary)]">{`Will use: ${routing.choice.providerId} · ${routing.choice.tier}`}</span>
+                <span className="text-[color:var(--text-secondary)]">{`Will use: ${displayProviderName(routing.choice.providerId)} · ${routing.choice.tier}`}</span>
                 <button
                   type="button"
                   onClick={() => setDetailsOpen(!detailsOpen)}
@@ -511,7 +577,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
           <div role="alert" className="rounded border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] p-2">
             <p className="mb-2">{consentNeeded.reason}</p>
             <button onClick={acceptConsent} disabled={busy} className="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-xs">
-              Allow {consentNeeded.provider} and retry
+              Allow {displayProviderName(consentNeeded.provider)} and retry
             </button>
           </div>
         )}
@@ -534,7 +600,7 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
                 <div className="mt-1.5 pt-1.5 border-t border-[color:var(--color-border-subtle)]">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[10px] text-[color:var(--text-muted)]">
-                      AI used: {executedSource.provider}
+                      AI used: {displayProviderName(executedSource.provider)}
                       {executedSource.model ? ` (${executedSource.model})` : ""} · {executedSource.tier}
                       {executedSource.creditsUsed !== undefined ? ` · ${executedSource.creditsUsed} credit${executedSource.creditsUsed === 1 ? "" : "s"}` : ""}
                     </p>
@@ -550,6 +616,11 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
                   </div>
                   {detailsOpen && executedSource.reasoning && (
                     <p className="mt-1 text-[10px] text-[color:var(--text-muted)]">{executedSource.reasoning}</p>
+                  )}
+                  {detailsOpen && executedSource.tier === "local" && (
+                    <p className="mt-1 text-[10px] text-[color:var(--text-muted)]">
+                      Privacy: runs on your computer — this passage was never sent to Scholar's servers.
+                    </p>
                   )}
                 </div>
               )}

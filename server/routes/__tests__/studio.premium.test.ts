@@ -485,4 +485,123 @@ describe("POST /api/studio/refine — Premium path", () => {
     const requestIds = deductCalls.map((c: { p_request_id: string }) => c.p_request_id);
     expect(new Set(requestIds).size).toBe(2);
   });
+
+  it("10. succeeds without a 428 when consent was already granted for this session/provider (every test above relies on this — pinned explicitly here)", async () => {
+    mockDb({
+      entitlement: ACTIVE_ENTITLEMENT,
+      platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
+      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" } }],
+      health: [{ provider_id: "openai", status: "healthy" }],
+      balance: [{ balance: 500 }],
+      plans: PLAN,
+      overrides: [],
+      deductResult: "ok",
+      providerResponse: successfulProviderResponse,
+    });
+    await grantConsent("prem-13", "openai");
+
+    const res = await request(app).post("/api/studio/refine").send({
+      sessionId: "prem-13",
+      passageId: "p13",
+      text: "The sample comprised 240 participants.",
+      level: "clarity",
+      useEngine: "premium",
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("11. 428s with the same consent_required shape Free/BYOK uses, and deducts nothing, when consent has never been granted", async () => {
+    const db: MockDb = {
+      entitlement: ACTIVE_ENTITLEMENT,
+      platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
+      providers: [{ id: "openai", metadata: {} }],
+      health: [],
+      balance: [{ balance: 500 }],
+      plans: PLAN,
+      overrides: [],
+      capturedWrites: {},
+    };
+    mockDb(db);
+    // Deliberately no grantConsent() call — this session has never consented for "openai".
+
+    const res = await request(app).post("/api/studio/refine").send({
+      sessionId: "prem-14",
+      passageId: "p14",
+      text: "The sample comprised 240 participants.",
+      level: "clarity",
+      useEngine: "premium",
+    });
+
+    expect(res.status).toBe(428);
+    expect(res.body).toMatchObject({ error: "consent_required", provider: "openai" });
+    expect(res.body.reason).toMatch(/first use of openai/i);
+    expect(db.capturedWrites["deduct_credits_calls"] ?? []).toEqual([]);
+  });
+
+  it("12. 403s (denied), never asking for consent, when the scope is marked restricted — and deducts nothing", async () => {
+    const db: MockDb = {
+      entitlement: ACTIVE_ENTITLEMENT,
+      platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
+      providers: [{ id: "openai", metadata: {} }],
+      health: [],
+      balance: [{ balance: 500 }],
+      plans: PLAN,
+      overrides: [],
+      capturedWrites: {},
+    };
+    mockDb(db);
+    await request(app).post("/api/studio/restrict").send({ sessionId: "prem-15", scopeId: "embargoed-chapter" });
+
+    const res = await request(app).post("/api/studio/refine").send({
+      sessionId: "prem-15",
+      passageId: "p15",
+      text: "The sample comprised 240 participants.",
+      level: "clarity",
+      useEngine: "premium",
+      scopeId: "embargoed-chapter",
+    });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({ error: "denied" });
+    expect(db.capturedWrites["deduct_credits_calls"] ?? []).toEqual([]);
+  });
+
+  it("13. retries safely after granting consent, and executes — and deducts — exactly once", async () => {
+    const db: MockDb = {
+      entitlement: ACTIVE_ENTITLEMENT,
+      platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
+      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" } }],
+      health: [{ provider_id: "openai", status: "healthy" }],
+      balance: [{ balance: 500 }],
+      plans: PLAN,
+      overrides: [],
+      deductResult: "ok",
+      providerResponse: successfulProviderResponse,
+      capturedWrites: {},
+    };
+    mockDb(db);
+
+    const first = await request(app).post("/api/studio/refine").send({
+      sessionId: "prem-16",
+      passageId: "p16",
+      text: "The sample comprised 240 participants.",
+      level: "clarity",
+      useEngine: "premium",
+    });
+    expect(first.status).toBe(428);
+    expect(db.capturedWrites["deduct_credits_calls"] ?? []).toEqual([]);
+
+    await grantConsent("prem-16", "openai");
+
+    const second = await request(app).post("/api/studio/refine").send({
+      sessionId: "prem-16",
+      passageId: "p16",
+      text: "The sample comprised 240 participants.",
+      level: "clarity",
+      useEngine: "premium",
+    });
+    expect(second.status).toBe(200);
+    expect(db.capturedWrites["deduct_credits_calls"]?.length).toBe(1);
+  });
 });

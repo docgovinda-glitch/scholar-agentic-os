@@ -11,6 +11,15 @@
  * for exercising the real consent flow end-to-end today. It is explicitly
  * NOT durable across restarts and NOT shared across instances — both are
  * the documented next step (docs 13-MODULE-SPECIFICATIONS.md §8.3).
+ *
+ * Also imported client-side, unmodified, by
+ * src/desk/regions/localStudioExecution.ts — local generation's own consent
+ * memory has to live in the browser tab (there is no server round trip to
+ * hold it for), and this module is already exactly "an in-memory Map keyed
+ * by session id" with no Node-only dependency. The browser gets its own
+ * separate module instance (a separate JS bundle entirely), so this is not
+ * shared state between server and client — just the same small, already-
+ * reusable piece of code running in two places instead of being copied.
  */
 
 import { defaultPolicy, recordConsent, markRestricted, type EgressPolicy } from "../../platform/warden/warden";

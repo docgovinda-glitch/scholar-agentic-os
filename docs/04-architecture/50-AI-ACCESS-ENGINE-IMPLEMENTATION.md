@@ -192,13 +192,9 @@ router-ranked fallback rather than sending a request that cannot succeed.
 An "Advanced" mode preserves the original manual provider+key dropdown
 for when Auto has nothing usable, or the user just wants to pick.
 
-**Local** is a real, valid tier the router can rank and recommend, but
-Studio's `refine()` pipeline has no local-runtime execution path (only
-cloud adapters) — a known, stated gap, not a silent failure. When Auto
-mode's choice or every fallback is `local`, the client shows a clear
-message ("Studio doesn't support local execution yet — connect a cloud,
-BYOK, or Premium AI source") instead of sending a request the server
-cannot resolve.
+**Local** executes for real (a later pass — see §7b) — `StudioPanel`
+attempts a chosen local candidate directly in the browser rather than
+skipping it.
 
 **Transparency** ("Why this AI?"): `StudioRefineResult` carries `usage`
 (provider/model/token estimates, for any level that called a provider) and,
@@ -223,16 +219,64 @@ read-modify-write of a balance); the actual guarantee is Postgres's
 test cannot exercise — that guarantee was verified live against production
 in the pass that built it (§6), not re-verified here.
 
-**Known, accepted gap in this wiring:** the Premium path's provider call
-does not go through the same 428-consent-required retry flow the
-Free/BYOK/manual path does (`GatewayDenied`/`StudioConsentRequiredError`).
-If a Warden consent check denies a Premium provider call, `runPremiumRefine`
-currently treats it as a generic provider failure (tries the next Premium
-fallback, then a 502) rather than surfacing a resumable consent prompt.
-Scholar's own Premium-pool credentials are operator-owned, not a user's,
-so this has not yet caused an observed problem, but it is a real
-inconsistency with the Free/BYOK path's UX and is flagged here rather than
-silently left for someone to discover.
+Premium's provider call now goes through the same 428-consent-required
+retry flow Free/BYOK/manual requests use — see §7b, which closed the gap
+this paragraph used to describe.
+
+### 7b. Local execution, and Premium's Warden/consent fix
+
+**Local runs entirely in the browser, not through the server.** A local
+runtime (Ollama, LM Studio, …) listens on the USER's own machine — Scholar's
+server has no network path to it at all, so unlike Free/BYOK/Premium, local
+execution cannot be server-mediated even transiently. `src/desk/regions/
+localStudioExecution.ts` calls `refine()` (`src/app/studio/studio.ts`)
+directly from the browser — the exact same pipeline `server/routes/
+studio.ts` uses server-side (`refine()` → `complete()`
+(`platform/gateway/gateway.ts`) → the Warden → an adapter), not a second
+implementation. This works because that whole chain is isomorphic — no
+Node-only import anywhere in it, confirmed by
+`src/platform/__tests__/architecture.test.ts`, which already confines every
+outbound `fetch()` under `src/platform` to `gateway/adapters.ts` regardless
+of which runtime calls into it. `adapters.ts` gained two local-runner
+adapter classes (`OllamaAdapter` for the native API, one shared
+OpenAI-compatible adapter for the other eight catalogued runners — see
+`src/config/localRunnerCatalog.ts`) with a 120s generation timeout and,
+deliberately, no auth header of any kind: a local runtime has no credential
+to send.
+
+Local still goes through the same Warden classify/policy gate every other
+tier does — the policy matrix doesn't exempt "local," and this work didn't
+add an exemption. What differs is WHERE consent is remembered:
+`src/app/studio/sessionPolicyStore.ts` (a plain in-memory `Map` keyed by
+session id, no Node-only dependency) is imported directly into the browser
+bundle for this, as its own separate instance scoped to a `local:` prefixed
+key — granting local consent is a same-tab, in-memory decision with no
+server round trip, exactly matching the durability class the SERVER's own
+copy of this store already has (in-memory, not durable across a restart —
+see that file's own comment).
+
+Model discovery reuses `probeRunner()` (`src/services/localRunnerProbe.ts`,
+the same function `AiSetupScreen` already uses) rather than a second
+detector. A runtime that doesn't answer, or answers with zero loaded
+models, produces a specific error (`LocalRunnerUnavailableError` /
+`LocalModelMissingError`, the latter carrying the runner's own install
+guidance) rather than a generic failure — and `StudioPanel` falls back to
+the next router-ranked candidate on any local failure short of a consent
+decision, rather than stopping the whole request (a privacy-restricted
+candidate list has no cloud candidate to fall back to, so this never
+overrides a `no-cloud` preference).
+
+**Premium's Warden/consent fix:** `runPremiumRefine` (`server/routes/
+studio.ts`) now checks for a `GatewayDenied` in its per-candidate `catch`
+BEFORE treating the failure as "this provider is down." A
+consent-required denial returns the identical `428 {error:
+"consent_required", reason, provider}` shape the manual Free/BYOK path
+already used; a hard deny (e.g. a restricted scope) returns `403 {error:
+"denied"}`. Neither deducts credits, and neither is retried against the
+next Premium fallback within the same request — the client's existing
+consent-prompt UI (already built for Free/BYOK) grants consent via
+`POST /api/studio/consent` and calls `/api/studio/refine` again, same as
+it always did; nothing about the client's retry path needed to change.
 
 ## 8. AI Opportunity Agent
 
@@ -269,15 +313,13 @@ now calls `POST /api/ai-access/connections` (with a live
 `POST /api/ai-access/verify-provider-key` check before a newly-entered key
 is allowed to appear connected) and `DELETE .../connections/:providerId`.
 
+Resolved by the execution-and-privacy-consistency pass (§7b) and no longer
+gaps: Local now executes for real, entirely client-side; Premium's provider
+call now goes through the same Warden 428-consent-required/403-denied flow
+Free/BYOK/manual requests use.
+
 Remaining gaps:
 
-- **Local has no execution path in Studio.** The Omni Router can rank and
-  recommend a local runner like any other tier, but `refine()`'s pipeline
-  only calls cloud adapters. `StudioPanel` skips a local choice/fallback
-  and tells the user to connect a cloud/BYOK/Premium source instead of
-  sending a request the server can't resolve. See §7a.
-- **Premium's provider call bypasses the Warden consent-retry flow** that
-  Free/BYOK/manual requests use — see §7a's "known, accepted gap" note.
 - **`DeskShell`'s deeper `Header` region** was wired with an "AI Access"
   entry (§1) but the mobile Pocket surface (`src/desk/pocket/`) was not
   touched — AI Access is a desktop-only entry point for now.
@@ -292,6 +334,22 @@ Remaining gaps:
   providers independently of live traffic. This was a deliberate scope
   decision (Priority 8: "minimal only — no large monitoring system"), not
   an oversight.
+- **Local execution has no `stream()` and no cancellation.** Both local
+  adapters implement only `complete()` — Studio's `refine()` (the only
+  caller) never calls `gateway.stream()` for any tier, so a streaming
+  parser would be untested, speculative code. Likewise, nothing in Studio
+  today can cancel an in-flight request, local or otherwise; a 120s
+  generation timeout bounds a hung local process, but there is no
+  mid-flight abort button. Neither is a regression — no tier had either
+  capability before this pass.
+- **Local's own Warden consent prompt asks the same way a cloud provider's
+  does**, even though nothing about a local generation actually leaves the
+  device. The policy matrix classifies by content class, not by tier, and
+  this work did not add a "local is exempt" special case — doing so would
+  be a policy change, not the execution wiring this pass scoped itself to.
+  The practical cost is a one-time "Allow Ollama and retry" click per
+  browser session, not a privacy leak: the client-side consent grant never
+  reaches the server, and no prose crosses that gate either way.
 
 ## 10. Database objects added
 
@@ -339,3 +397,12 @@ function's own `TAVILY_API_KEY` secret.
   when both have rows in the same tables. An undecryptable (present but
   corrupt) Premium credential fails closed — treated like "not configured,"
   never a crash or a charge.
+- Execution-and-privacy-consistency pass (§7b): a local generation makes no
+  call to Scholar's own API beyond the routing-decision preview (pinned
+  test — `global.fetch` asserted never called with `/api/studio/refine`
+  during local execution); neither local adapter sends any auth header, so
+  there is no credential to leak because none is ever built. Premium's
+  consent-required/denied paths deduct nothing (pinned for both, plus the
+  pre-existing forced-Premium-without-entitlement and quota-bypass tests,
+  unaffected by this change) and are never silently retried against a
+  different Premium provider.

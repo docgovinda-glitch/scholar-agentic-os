@@ -157,3 +157,103 @@ describe("platform/gateway/adapters: getAdapter", () => {
     expect(getAdapter("not-a-real-provider")).toBeUndefined();
   });
 });
+
+describe("platform/gateway/adapters: local runners", () => {
+  it("Ollama — sends the native /api/chat shape, with no auth header at all", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: { role: "assistant", content: "hello from ollama" } }),
+    });
+    global.fetch = fetchMock;
+
+    const adapter = getAdapter("ollama")!;
+    const result = await adapter.complete({
+      provider: "ollama",
+      apiKey: "",
+      taskClass: "drafting",
+      systemPrompt: "Be concise.",
+      userPrompt: "say hi",
+      model: "llama3.1:8b",
+      segments: [],
+    });
+
+    expect(result.text).toBe("hello from ollama");
+    expect(result.model).toBe("llama3.1:8b");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://localhost:11434/api/chat");
+    expect(init.headers).not.toHaveProperty("Authorization");
+    const body = JSON.parse(init.body);
+    expect(body.model).toBe("llama3.1:8b");
+    expect(body.messages).toEqual([
+      { role: "system", content: "Be concise." },
+      { role: "user", content: "say hi" },
+    ]);
+    expect(body.stream).toBe(false);
+  });
+
+  it("Ollama — throws AdapterHttpError with the status preserved on a failed request", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => "model not loaded" });
+
+    const adapter = getAdapter("ollama")!;
+    await expect(
+      adapter.complete({ provider: "ollama", apiKey: "", taskClass: "drafting", userPrompt: "hi", model: "llama3.1:8b", segments: [] })
+    ).rejects.toMatchObject({ status: 500 } as Partial<AdapterHttpError>);
+  });
+
+  it("Ollama — refuses to guess a model when none was discovered/specified", async () => {
+    global.fetch = vi.fn();
+    const adapter = getAdapter("ollama")!;
+    await expect(
+      adapter.complete({ provider: "ollama", apiKey: "", taskClass: "drafting", userPrompt: "hi", segments: [] })
+    ).rejects.toThrow(/no model specified/i);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("Ollama — translates a timeout into a clear message rather than a raw AbortError", async () => {
+    const abortError = new Error("The operation was aborted.");
+    abortError.name = "AbortError";
+    global.fetch = vi.fn().mockRejectedValue(abortError);
+
+    const adapter = getAdapter("ollama")!;
+    await expect(
+      adapter.complete({ provider: "ollama", apiKey: "", taskClass: "drafting", userPrompt: "hi", model: "llama3.1:8b", segments: [] })
+    ).rejects.toThrow(/did not respond within/i);
+  });
+
+  it("LM Studio (openai-compatible local) — sends the OpenAI chat shape to its own localhost port, no auth header", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "hello from lm studio" } }] }),
+    });
+    global.fetch = fetchMock;
+
+    const adapter = getAdapter("lmstudio")!;
+    const result = await adapter.complete({
+      provider: "lmstudio",
+      apiKey: "",
+      taskClass: "drafting",
+      userPrompt: "hi",
+      model: "qwen2.5-7b",
+      segments: [],
+    });
+
+    expect(result.text).toBe("hello from lm studio");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://localhost:1234/v1/chat/completions");
+    expect(init.headers).not.toHaveProperty("Authorization");
+    const body = JSON.parse(init.body);
+    expect(body.model).toBe("qwen2.5-7b");
+  });
+
+  it("every catalogued local runner id resolves to an adapter", async () => {
+    const { LOCAL_RUNNERS } = await import("../../../config/localRunnerCatalog");
+    for (const runner of LOCAL_RUNNERS) {
+      expect(getAdapter(runner.id), `getAdapter("${runner.id}")`).toBeDefined();
+    }
+  });
+
+  it("neither local adapter implements stream() — Studio's refine() never calls it, so nothing untested is shipped", () => {
+    expect(getAdapter("ollama")!.stream).toBeUndefined();
+    expect(getAdapter("lmstudio")!.stream).toBeUndefined();
+  });
+});

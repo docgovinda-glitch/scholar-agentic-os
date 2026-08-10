@@ -42,13 +42,25 @@ import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
  * key to do that with; falling back across tiers is the CLIENT's job
  * (src/desk/regions/StudioPanel.tsx calls /api/ai-access/route first and
  * owns retrying with its own locally-stored key for a different tier).
+ *
+ * A GatewayDenied from the Warden is handled BEFORE the generic
+ * provider-failure path below, not folded into it: a consent-required or
+ * hard-denied decision is a privacy verdict, not "this provider is down",
+ * and Free/BYOK's manual path (this same file's /api/studio/refine handler)
+ * already surfaces it as a 428/403 the client knows how to act on. Premium
+ * follows the identical rule — same GatewayDenied class, same policy
+ * object (`refineInput.policy`, from the same session-scoped store) — so a
+ * consent prompt here is stopped and returned immediately rather than
+ * silently retried against the next Premium fallback, which would either
+ * ask again for a provider that already has consent or waste an attempt on
+ * one that doesn't.
  */
 async function runPremiumRefine(
   userId: string,
   refineInput: Omit<Parameters<typeof refine>[0], "provider" | "apiKey" | "model">
 ): Promise<
   | { ok: true; result: Awaited<ReturnType<typeof refine>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
-  | { ok: false; status: number; error: string }
+  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
 > {
   const { candidates, premiumQuotaRemaining, entitlementActive, quota, defaultModelByProvider } = await assembleRoutingCandidates(userId);
 
@@ -113,6 +125,14 @@ async function runPremiumRefine(
         aiSource: { tier: "premium", provider: choice.providerId, model: model ?? usage?.model ?? "", creditsUsed: deductResult === "ok" ? creditsUsed : 0 },
       };
     } catch (err) {
+      if (err instanceof GatewayDenied) {
+        // Never counted as a provider failure (this provider isn't
+        // "down" — the request was never sent), and never deducts credits.
+        if (err.requiresConsent) {
+          return { ok: false, status: 428, error: err.message, provider: choice.providerId };
+        }
+        return { ok: false, status: 403, error: err.message };
+      }
       await recordProviderFailure(choice.providerId, err instanceof Error ? err.message : "Unknown error");
       lastError = err instanceof Error ? err.message : "Unknown error";
       // Try the next premium fallback, if any — never deducts credits for a
@@ -287,6 +307,15 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
       const userId = (req as express.Request & { user: AuthenticatedUser }).user.id;
       const outcome = await runPremiumRefine(userId, baseInput);
       if (!outcome.ok) {
+        // Matches the manual path's own 428/403 body shape exactly (below)
+        // — src/desk/api.ts's refinePassage() parses both identically
+        // regardless of which path produced them.
+        if (outcome.status === 428) {
+          return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
+        }
+        if (outcome.status === 403) {
+          return res.status(403).json({ error: "denied", reason: outcome.error });
+        }
         return res.status(outcome.status).json({ error: outcome.error });
       }
       return res.json({ ...outcome.result, aiSource: outcome.aiSource });

@@ -30,7 +30,45 @@ import {
   buildAuthHeaders,
   type CloudProviderSpec,
 } from "../../config/providerCatalog";
+import { getLocalRunner, runnerChatUrl, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
 import type { CompletionRequest, ProviderAdapter } from "./types";
+
+/**
+ * A local runtime runs on the CALLER's own machine — there is no third-party
+ * SLA to lean on, so unlike the cloud adapters above (which trust the
+ * provider's own timeout behavior), a local call gets its own bound: long
+ * enough for a slow machine to finish a real generation, short enough that a
+ * hung or crashed local process fails visibly rather than leaving Studio
+ * waiting forever.
+ */
+const LOCAL_GENERATION_TIMEOUT_MS = 120_000;
+
+async function fetchLocalWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LOCAL_GENERATION_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`Local runtime did not respond within ${LOCAL_GENERATION_TIMEOUT_MS / 1000}s.`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Unlike a cloud provider, a local runner has no catalog default model —
+ * which model is even loaded is discovered at request time (see
+ * src/desk/regions/localStudioExecution.ts), never guessed here.
+ */
+function requireLocalModel(runnerId: string, model: string | undefined): string {
+  if (!model) {
+    throw new Error(`No model specified for local runner "${runnerId}" — discover an installed model before completing.`);
+  }
+  return model;
+}
 
 /**
  * Reads a `text/event-stream` response body, yielding each `data:` line's
@@ -268,13 +306,103 @@ class CohereAdapter implements ProviderAdapter {
   // No stream() — see this file's module comment for why.
 }
 
+/**
+ * Ollama's native chat API (`/api/chat`) — distinct from every cloud adapter
+ * above in one load-bearing way: no auth header, ever. A local runtime
+ * authenticates with nothing, and this class never builds one — the whole
+ * point of "local" is that no credential exists to leak.
+ */
+class OllamaAdapter implements ProviderAdapter {
+  constructor(public id: string, private spec: LocalRunnerSpec) {}
+
+  private buildBody(req: CompletionRequest, model: string) {
+    return JSON.stringify({
+      model,
+      messages: [
+        ...(req.systemPrompt ? [{ role: "system", content: req.systemPrompt }] : []),
+        { role: "user", content: req.userPrompt },
+      ],
+      stream: false,
+      options: { temperature: req.temperature ?? 0.3 },
+    });
+  }
+
+  async complete(req: CompletionRequest): Promise<{ text: string; model: string }> {
+    const model = requireLocalModel(this.id, req.model);
+    const url = runnerChatUrl(this.spec);
+    const response = await fetchLocalWithTimeout(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: this.buildBody(req, model),
+    });
+    if (!response.ok) return throwForBadResponse(this.id, response);
+    const data = (await response.json()) as { message?: { content?: string } };
+    return { text: data.message?.content ?? "", model };
+  }
+
+  // No stream() — Studio's refine() (the only caller today) never calls
+  // gateway.stream(); an untested speculative streaming parser is worse
+  // than the honest gap (see this file's module comment on Cohere).
+}
+
+/**
+ * The eight non-Ollama local runners (LM Studio, Jan, LocalAI, llama.cpp,
+ * KoboldCPP, vLLM, Text Generation WebUI, OmniRoute) all speak the same
+ * OpenAI-compatible wire format a cloud OpenAI-compatible provider does —
+ * the request/response shape here deliberately mirrors
+ * OpenAICompatibleAdapter above for exactly that reason. What's genuinely
+ * different is the target: `runnerChatUrl` (this device's localhost, from
+ * localRunnerCatalog.ts) instead of `chatUrl` (a cloud host), and no auth
+ * header at all, ever.
+ */
+class LocalOpenAICompatibleAdapter implements ProviderAdapter {
+  constructor(public id: string, private spec: LocalRunnerSpec) {}
+
+  private buildBody(req: CompletionRequest, model: string) {
+    return JSON.stringify({
+      model,
+      messages: [
+        ...(req.systemPrompt ? [{ role: "system", content: req.systemPrompt }] : []),
+        { role: "user", content: req.userPrompt },
+      ],
+      temperature: req.temperature ?? 0.3,
+      ...(req.maxTokens ? { max_tokens: req.maxTokens } : {}),
+      ...(req.responseFormat === "json" ? { response_format: { type: "json_object" } } : {}),
+    });
+  }
+
+  async complete(req: CompletionRequest): Promise<{ text: string; model: string }> {
+    const model = requireLocalModel(this.id, req.model);
+    const url = runnerChatUrl(this.spec);
+    const response = await fetchLocalWithTimeout(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: this.buildBody(req, model),
+    });
+    if (!response.ok) return throwForBadResponse(this.id, response);
+    const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+    return { text: data.choices?.[0]?.message?.content ?? "", model };
+  }
+
+  // No stream() — see OllamaAdapter's note above; the same reasoning applies.
+}
+
 /** Build the adapter for a given provider id, or undefined if unsupported. */
 export function getAdapter(providerId: string): ProviderAdapter | undefined {
   const spec = getCloudProvider(providerId);
-  if (!spec) return undefined;
-  if (spec.apiStyle === "openai-compatible") return new OpenAICompatibleAdapter(providerId, spec);
-  if (spec.apiStyle === "anthropic") return new AnthropicAdapter(providerId, spec);
-  if (spec.apiStyle === "gemini") return new GeminiAdapter(spec);
-  if (spec.apiStyle === "cohere") return new CohereAdapter(spec);
+  if (spec) {
+    if (spec.apiStyle === "openai-compatible") return new OpenAICompatibleAdapter(providerId, spec);
+    if (spec.apiStyle === "anthropic") return new AnthropicAdapter(providerId, spec);
+    if (spec.apiStyle === "gemini") return new GeminiAdapter(spec);
+    if (spec.apiStyle === "cohere") return new CohereAdapter(spec);
+    return undefined;
+  }
+
+  const localSpec = getLocalRunner(providerId);
+  if (localSpec) {
+    if (localSpec.apiStyle === "ollama-native") return new OllamaAdapter(providerId, localSpec);
+    if (localSpec.apiStyle === "openai-compatible") return new LocalOpenAICompatibleAdapter(providerId, localSpec);
+  }
+
   return undefined;
 }
