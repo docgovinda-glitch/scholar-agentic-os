@@ -196,7 +196,14 @@ app.use(
           "https://api.datacite.org",
           "https://api.worldbank.org",
           "https://sdmx.oecd.org",
+          "https://challenges.cloudflare.com",
         ],
+        // CaptchaWidget (src/desk/auth/CaptchaWidget.tsx) injects Cloudflare
+        // Turnstile's script tag at runtime and Turnstile renders its
+        // challenge in an iframe — both are blocked by helmet's default
+        // `'self'`-only script-src/frame-src without these two additions.
+        "script-src": ["'self'", "https://challenges.cloudflare.com"],
+        "frame-src": ["'self'", "https://challenges.cloudflare.com"],
         "form-action": ["'self'", ...(supabaseOrigin ? [supabaseOrigin] : [])],
       },
     } : false,
