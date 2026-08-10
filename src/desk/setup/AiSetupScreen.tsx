@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CLOUD_PROVIDERS, type CloudProviderSpec } from "../../config/providerCatalog";
 import { LOCAL_RUNNERS, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
 import { detectRunners } from "../../services/localRunnerProbe";
+import { detectHardwareProfile, loadHardwareProfile, recommendLocalModel, type HardwareProfile } from "../../services/hardwareProfiler";
 import {
   DEFAULT_AI_SETTINGS,
   forgetProviderKey,
@@ -11,7 +12,48 @@ import {
   storeProviderKey,
   type UserAiSettings,
 } from "../../services/userAiSettings";
-import { addConnection, removeConnection, verifyProviderKey } from "../aiAccess/aiAccessApi";
+import { addConnection, getAiAccessStatus, removeConnection, verifyProviderKey, type AiAccessStatus } from "../aiAccess/aiAccessApi";
+import OnboardingProgress from "./OnboardingProgress";
+
+interface TierRecommendation {
+  headline: string;
+  reasoning: string;
+  warnings: string[];
+}
+
+/**
+ * "Based on your computer, we recommend..." (Section 5) — composed from the
+ * SAME hardware profiler AiAccessPage already uses (`recommendLocalModel`),
+ * never a second implementation. Deliberately returns `null` rather than a
+ * guess while hardware detection hasn't resolved yet, and never states a
+ * specific performance number — `recommendLocalModel` already only speaks in
+ * size classes and stated-as-rough reasoning, which this passes through
+ * verbatim rather than inventing anything stronger.
+ */
+function recommendTier(hardware: HardwareProfile | null, premiumActive: boolean): TierRecommendation | null {
+  if (premiumActive) {
+    return {
+      headline: "Scholar Premium is already active on your account — you're ready to go.",
+      reasoning: "Premium requests are billed to your subscription's credits automatically; there is nothing else to configure.",
+      warnings: [],
+    };
+  }
+  if (!hardware) return null;
+  const rec = recommendLocalModel(hardware);
+  const localViable = hardware.detectedRuntimes.length > 0 && rec.sizeClass !== "cloud-recommended" && rec.sizeClass !== "unknown";
+  if (localViable) {
+    return {
+      headline: `Based on your computer, we recommend starting with Local AI (${hardware.detectedRuntimes[0].name}, ${rec.sizeClass} models) — it runs entirely on your machine.`,
+      reasoning: rec.reasoning,
+      warnings: rec.warnings,
+    };
+  }
+  return {
+    headline: "Based on your computer, we recommend starting with a Free provider like Google Gemini.",
+    reasoning: rec.reasoning,
+    warnings: rec.warnings,
+  };
+}
 
 /**
  * Desk's AI setup.
@@ -65,6 +107,11 @@ export default function AiSetupScreen({
   /** Local runners that answered a probe on this machine. */
   const [detected, setDetected] = useState<Array<{ runner: LocalRunnerSpec; models: string[] }>>([]);
   const [probing, setProbing] = useState(true);
+  const [hardware, setHardware] = useState<HardwareProfile | null>(null);
+  /** The account's server-side AI Access state — connections/entitlement from ANY device, not just this one (Section 7 option E, Section 12 resumability). */
+  const [remoteStatus, setRemoteStatus] = useState<AiAccessStatus | null>(null);
+  /** Onboarding only: shown after a successful save (or "continue with existing"), before onDone() fires — Section 7's "AI setup complete" summary. */
+  const [showComplete, setShowComplete] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -90,6 +137,42 @@ export default function AiSetupScreen({
       active = false;
     };
   }, []);
+
+  // Hardware-aware recommendation and cross-device AI Access status
+  // (Section 5/7/12) — onboarding only. Revisit is a settings change, not a
+  // teaching moment, so it does not re-run this. A cached profile is used
+  // when one exists (loadHardwareProfile, server-saved) rather than
+  // re-probing local runtimes a second time on top of detectRunners() above;
+  // only a first-time user with nothing cached triggers a fresh detection.
+  useEffect(() => {
+    if (variant !== "onboarding") return;
+    let active = true;
+    getAiAccessStatus()
+      .then((s) => active && setRemoteStatus(s))
+      .catch(() => {
+        // Best-effort context for the recommendation/summary — never blocks
+        // the setup flow itself if the account status can't be reached.
+      });
+    loadHardwareProfile()
+      .then((cached) => {
+        if (!active) return;
+        if (cached) {
+          setHardware(cached);
+          return;
+        }
+        return detectHardwareProfile().then((fresh) => active && setHardware(fresh));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [variant]);
+
+  const recommendation = useMemo(
+    () => recommendTier(hardware, remoteStatus?.entitlement.active ?? false),
+    [hardware, remoteStatus]
+  );
+  const hasServerSideSource = (remoteStatus?.connections.length ?? 0) > 0 || (remoteStatus?.entitlement.active ?? false);
 
   const spec = useMemo(() => CLOUD_PROVIDERS.find((p) => p.id === selected), [selected]);
   const localSpec = useMemo(() => LOCAL_RUNNERS.find((r) => r.id === selected), [selected]);
@@ -153,12 +236,30 @@ export default function AiSetupScreen({
         return;
       }
       setSettings(next);
-      onDone();
+      // Onboarding shows the "AI setup complete" summary (Section 7) before
+      // handing off; revisit (a settings change, not first-run onboarding)
+      // returns immediately as it always has.
+      if (variant === "onboarding") {
+        setShowComplete(true);
+      } else {
+        onDone();
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Section 7 option E: a user whose account already has a usable AI source
+   * (from any device, or an active Premium entitlement) is not required to
+   * pick or enter anything new here — `hasServerSideSource` is what gates
+   * this button's visibility, so it is never shown, let alone reachable,
+   * when nothing is actually configured.
+   */
+  function handleContinueWithExisting() {
+    setShowComplete(true);
   }
 
   function handleForget() {
@@ -179,8 +280,60 @@ export default function AiSetupScreen({
     );
   }
 
+  if (variant === "onboarding" && showComplete) {
+    const localCount = remoteStatus?.connections.filter((c) => c.tier === "local").length ?? 0;
+    const freeCount = remoteStatus?.connections.filter((c) => c.tier === "free").length ?? 0;
+    const byokCount = remoteStatus?.connections.filter((c) => c.tier === "byok").length ?? 0;
+    const premiumActive = remoteStatus?.entitlement.active ?? false;
+    const sources: string[] = [];
+    if (localCount > 0) sources.push(`${localCount} local runner${localCount === 1 ? "" : "s"}`);
+    if (freeCount > 0) sources.push(`${freeCount} free provider${freeCount === 1 ? "" : "s"}`);
+    if (byokCount > 0) sources.push(`${byokCount} paid (BYOK) provider${byokCount === 1 ? "" : "s"}`);
+    if (premiumActive) sources.push("Scholar Premium");
+    // The provider just saved this turn may not be reflected in remoteStatus
+    // yet (fetched before this save completed) — what was just configured is
+    // still a real, known source regardless of whether the summary's own
+    // fetch has caught up.
+    if (sources.length === 0 && (hasKeyOnDevice || isLocal)) {
+      sources.push(spec?.name ?? localSpec?.name ?? "your configured provider");
+    }
+
+    return (
+      <Shell>
+        <OnboardingProgress current="ai-setup" />
+        <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">AI setup complete</h1>
+        <div className="mt-4 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-4 text-sm text-[color:var(--text-secondary)]">
+          <p>
+            <span className="font-medium text-[color:var(--text-primary)]">Available: </span>
+            {sources.length > 0
+              ? sources.join(", ")
+              : "Nothing connected yet — AI features will stay inert until you connect one."}
+          </p>
+          {recommendation && (
+            <p className="mt-2">
+              <span className="font-medium text-[color:var(--text-primary)]">Recommended: </span>
+              {recommendation.headline}
+            </p>
+          )}
+          <p className="mt-2 text-xs text-[color:var(--text-muted)]">
+            Scholar automatically chooses the best available source for each task — you never have to pick one
+            manually.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDone}
+          className="mt-6 rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
+        >
+          Continue
+        </button>
+      </Shell>
+    );
+  }
+
   return (
     <Shell>
+      {variant === "onboarding" && <OnboardingProgress current="ai-setup" />}
       <header className="mb-7">
         {variant === "revisit" && onCancel && (
           <button
@@ -200,6 +353,76 @@ export default function AiSetupScreen({
             : "Scholar uses a model you choose, with your own account. Several have free tiers that need no card."}
         </p>
       </header>
+
+      {variant === "onboarding" && (
+        <section className="mb-6 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-4">
+          <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Four ways to get AI in Scholar</h2>
+          <dl className="mt-3 flex flex-col gap-3 text-xs text-[color:var(--text-secondary)]">
+            <div>
+              <dt className="font-medium text-[color:var(--text-primary)]">Local — runs on your computer</dt>
+              <dd className="mt-0.5">
+                Free and completely private — nothing leaves your device. You install the runtime yourself (e.g.
+                Ollama). Slower than cloud, and only as capable as your hardware allows. No API key needed.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-[color:var(--text-primary)]">Free — a provider's free tier, your account</dt>
+              <dd className="mt-0.5">
+                No cost to you, but free tiers are not unlimited — each provider caps how much you can use per day or
+                month. Your text goes to that provider's servers. Needs a free API key from them.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-[color:var(--text-primary)]">Pro / BYOK — your own paid account</dt>
+              <dd className="mt-0.5">
+                You pay that provider directly; Scholar never sees or charges for it. Same privacy profile as Free —
+                your text goes to their servers. Needs your own paid API key.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-[color:var(--text-primary)]">Premium — provided by Scholar</dt>
+              <dd className="mt-0.5">
+                No key required — billed against your Premium subscription's credits instead.{" "}
+                {remoteStatus?.entitlement.active ? "Already active on your account." : "Requires an active Premium subscription."}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-xs text-[color:var(--text-muted)]">
+            Whichever you connect, Scholar automatically picks the best available one for each task — you never have
+            to configure that part yourself.
+          </p>
+        </section>
+      )}
+
+      {variant === "onboarding" && recommendation && (
+        <section className="mb-6 rounded-[var(--radius-lg)] border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] p-4">
+          <p className="text-sm font-medium text-[color:var(--text-primary)]">{recommendation.headline}</p>
+          <p className="mt-1 text-xs text-[color:var(--text-secondary)]">{recommendation.reasoning}</p>
+          {recommendation.warnings.map((w, i) => (
+            <p key={i} className="mt-1 text-xs text-[color:var(--state-warning)]">
+              {w}
+            </p>
+          ))}
+          <p className="mt-1.5 text-[10px] text-[color:var(--text-muted)]">
+            Estimated from what your browser reports — not a guaranteed measurement.
+          </p>
+        </section>
+      )}
+
+      {variant === "onboarding" && hasServerSideSource && (
+        <div className="mb-6 rounded-[var(--radius-lg)] border border-[color:var(--state-success-subtle)] bg-[color:var(--state-success-subtle)] p-4">
+          <p className="text-sm text-[color:var(--text-primary)]">
+            Your account already has a working AI source connected.
+          </p>
+          <button
+            type="button"
+            onClick={handleContinueWithExisting}
+            className="mt-2 text-sm font-medium text-[color:var(--accent)] hover:text-[color:var(--accent-hover)] cursor-pointer"
+          >
+            Continue with your existing AI setup →
+          </button>
+        </div>
+      )}
 
       <fieldset className="mb-6">
         <legend className="mb-2 text-sm font-medium text-[color:var(--text-primary)]">Provider</legend>

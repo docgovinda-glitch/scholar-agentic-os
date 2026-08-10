@@ -4,6 +4,7 @@ import {
   generateRecoveryCode,
   setVaultPassphraseVerifier,
 } from "../../services/userVault";
+import OnboardingProgress from "./OnboardingProgress";
 
 /**
  * Knowledge Vault setup — docs 25 §6, the optional stage after AI setup.
@@ -73,6 +74,7 @@ export default function VaultSetupScreen({
   if (step === "offer") {
     return (
       <Shell>
+        <OnboardingProgress current="knowledge" />
         <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">
           A Knowledge Vault is your long-term library
         </h1>
@@ -131,6 +133,7 @@ export default function VaultSetupScreen({
   if (step === "passphrase") {
     return (
       <Shell>
+        <OnboardingProgress current="knowledge" />
         <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">
           Choose a Vault passphrase
         </h1>
@@ -207,6 +210,7 @@ export default function VaultSetupScreen({
   if (step === "recovery") {
     return (
       <Shell>
+        <OnboardingProgress current="knowledge" />
         <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">
           Save your recovery code
         </h1>
@@ -277,6 +281,7 @@ export default function VaultSetupScreen({
 
   return (
     <Shell>
+      <OnboardingProgress current="workshop" />
       <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">Your Vault is ready</h1>
       <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
         It is encrypted with the passphrase you chose. Find "Vault" from the header any time to add material, search

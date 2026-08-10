@@ -29,11 +29,46 @@ vi.mock("../../services/supabaseClient", () => ({
 const verifyProviderKey = vi.fn();
 const addConnection = vi.fn();
 const removeConnection = vi.fn();
+const getAiAccessStatus = vi.fn();
 vi.mock("../aiAccess/aiAccessApi", () => ({
   verifyProviderKey: (...args: unknown[]) => verifyProviderKey(...args),
   addConnection: (...args: unknown[]) => addConnection(...args),
   removeConnection: (...args: unknown[]) => removeConnection(...args),
+  getAiAccessStatus: (...args: unknown[]) => getAiAccessStatus(...args),
 }));
+
+const NO_SERVER_SOURCE = { connections: [], entitlement: { status: "none", active: false }, quota: null, creditBalance: null };
+
+// Hardware detection itself (real GPU/storage/local-runtime probing) is
+// exercised for real in jsdom by AiSetupScreen's own useEffect regardless —
+// mocking the two async entry points here keeps the recommendation's INPUT
+// deterministic, while `recommendLocalModel` stays the real, pure function
+// (imported via importOriginal) so these tests still exercise the actual
+// size-class/reasoning logic AiAccessPage also depends on, not a duplicate.
+const loadHardwareProfile = vi.fn();
+const detectHardwareProfile = vi.fn();
+vi.mock("../../services/hardwareProfiler", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../services/hardwareProfiler")>();
+  return {
+    ...actual,
+    loadHardwareProfile: (...args: unknown[]) => loadHardwareProfile(...args),
+    detectHardwareProfile: (...args: unknown[]) => detectHardwareProfile(...args),
+  };
+});
+
+const HARDWARE_NO_LOCAL = {
+  os: "macOS",
+  cpuCores: 8,
+  architecture: "arm64",
+  ramGb: 16,
+  gpuInfo: null,
+  vramGb: null,
+  storageFreeGb: 200,
+  detectedRuntimes: [],
+  detectionMethod: "browser-api" as const,
+  detectedAt: "2026-01-01T00:00:00.000Z",
+};
+const HARDWARE_WITH_LOCAL = { ...HARDWARE_NO_LOCAL, detectedRuntimes: [{ id: "ollama", name: "Ollama", models: ["llama3.1:8b"] }] };
 
 const { default: AiSetupScreen } = await import("../setup/AiSetupScreen");
 const { useAiSetupStatus } = await import("../setup/useAiSetupStatus");
@@ -56,6 +91,9 @@ beforeEach(() => {
   verifyProviderKey.mockReset().mockResolvedValue({ ok: true, modelsDetected: 3 });
   addConnection.mockReset().mockResolvedValue({ success: true });
   removeConnection.mockReset().mockResolvedValue({ success: true });
+  getAiAccessStatus.mockReset().mockResolvedValue(NO_SERVER_SOURCE);
+  loadHardwareProfile.mockReset().mockResolvedValue(null);
+  detectHardwareProfile.mockReset().mockResolvedValue(HARDWARE_NO_LOCAL);
 });
 
 afterEach(() => {
@@ -101,6 +139,8 @@ describe("AiSetupScreen", () => {
     fireEvent.change(await screen.findByLabelText("API key"), { target: { value: "sk-my-secret" } });
     fireEvent.click(screen.getByRole("button", { name: /Save and continue/ }));
 
+    // Onboarding shows the "AI setup complete" summary before handing off.
+    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
     await waitFor(() => expect(onDone).toHaveBeenCalled());
 
     expect(providersWithStoredKey()).toContain("gemini");
@@ -120,6 +160,7 @@ describe("AiSetupScreen", () => {
     fireEvent.change(await screen.findByLabelText("API key"), { target: { value: "sk-my-secret" } });
     fireEvent.click(screen.getByRole("button", { name: /Save and continue/ }));
 
+    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
     await waitFor(() => expect(onDone).toHaveBeenCalled());
 
     expect(verifyProviderKey).toHaveBeenCalledWith("gemini", "sk-my-secret");
@@ -146,6 +187,107 @@ describe("AiSetupScreen", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /Skip for now/ }));
     expect(onSkip).toHaveBeenCalled();
+  });
+});
+
+// Section 4/5 of the first-login journey: the four AI access tiers explained
+// honestly, and a hardware-aware recommendation reusing the same profiler
+// AiAccessPage already depends on.
+describe("AiSetupScreen — tier explanation and hardware recommendation", () => {
+  it("explains all four tiers, including that free tiers are not unlimited", async () => {
+    render(<AiSetupScreen onDone={vi.fn()} />);
+
+    expect(await screen.findByText("Local — runs on your computer")).toBeInTheDocument();
+    expect(screen.getByText(/free tiers are not unlimited/i)).toBeInTheDocument();
+    expect(screen.getByText("Pro / BYOK — your own paid account")).toBeInTheDocument();
+    expect(screen.getByText("Premium — provided by Scholar")).toBeInTheDocument();
+    // Section 6: Omni Router never named as something to configure.
+    expect(screen.queryByText(/omni router/i)).not.toBeInTheDocument();
+  });
+
+  it("recommends a free provider when no local runtime is detected", async () => {
+    detectHardwareProfile.mockResolvedValue(HARDWARE_NO_LOCAL);
+    render(<AiSetupScreen onDone={vi.fn()} />);
+
+    expect(await screen.findByText(/we recommend starting with a Free provider like Google Gemini/)).toBeInTheDocument();
+  });
+
+  it("recommends Local AI, with the reason stated, when a runtime is detected and hardware supports it", async () => {
+    detectHardwareProfile.mockResolvedValue(HARDWARE_WITH_LOCAL);
+    render(<AiSetupScreen onDone={vi.fn()} />);
+
+    expect(await screen.findByText(/we recommend starting with Local AI \(Ollama, 7B–8B quantized models\)/)).toBeInTheDocument();
+    // "Why we recommend this" — the reasoning, not just a bare verdict.
+    expect(screen.getByText(/16 GB reported RAM gives a good balance/)).toBeInTheDocument();
+  });
+
+  it("never promises a specific performance number", async () => {
+    detectHardwareProfile.mockResolvedValue(HARDWARE_WITH_LOCAL);
+    render(<AiSetupScreen onDone={vi.fn()} />);
+
+    await screen.findByText(/we recommend starting with Local AI/);
+    expect(screen.queryByText(/words\/sec|tokens\/sec/i)).not.toBeInTheDocument();
+  });
+
+  it("tells the user Premium is already active, rather than asking them to configure it, when their account is entitled", async () => {
+    getAiAccessStatus.mockResolvedValue({
+      connections: [],
+      entitlement: { status: "active", active: true, planId: "premium_basic" },
+      quota: { monthlyCredits: 5000, dailyCredits: 200, perTaskMaxCredits: 50, concurrencyLimit: 2 },
+      creditBalance: { balance: 500, daily_used: 0, monthly_used: 0 },
+    });
+    render(<AiSetupScreen onDone={vi.fn()} />);
+
+    expect(await screen.findByText(/Scholar Premium is already active on your account/)).toBeInTheDocument();
+  });
+});
+
+// Section 7: several ways to finish, an honest summary, and never a false
+// "configured" claim.
+describe("AiSetupScreen — AI setup complete", () => {
+  it("summarizes the freshly-connected provider and the recommendation before handing off", async () => {
+    const onDone = vi.fn();
+    render(<AiSetupScreen onDone={onDone} />);
+
+    fireEvent.change(await screen.findByLabelText("API key"), { target: { value: "sk-my-secret" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save and continue/ }));
+
+    expect(await screen.findByRole("heading", { name: "AI setup complete" })).toBeInTheDocument();
+    expect(screen.getByText(/Available:/).closest("p")).toHaveTextContent("Google Gemini");
+    expect(screen.getByText(/Recommended:/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+  });
+
+  it("offers to continue with an AI source already connected from another device, without requiring a new key", async () => {
+    getAiAccessStatus.mockResolvedValue({
+      connections: [{ provider_id: "groq", tier: "free", status: "connected", models_detected: 5 }],
+      entitlement: { status: "none", active: false },
+      quota: null,
+      creditBalance: null,
+    });
+    const onDone = vi.fn();
+    render(<AiSetupScreen onDone={onDone} />);
+
+    const continueButton = await screen.findByRole("button", { name: /Continue with your existing AI setup/ });
+    fireEvent.click(continueButton);
+
+    expect(await screen.findByRole("heading", { name: "AI setup complete" })).toBeInTheDocument();
+    expect(screen.getByText(/Available:/).closest("p")).toHaveTextContent("1 free provider");
+    // Nothing new was submitted — no verification or connection call for a key that was never entered.
+    expect(verifyProviderKey).not.toHaveBeenCalled();
+    expect(addConnection).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+  });
+
+  it("does not offer 'continue with existing' when the account genuinely has no AI source yet", async () => {
+    render(<AiSetupScreen onDone={vi.fn()} />);
+    await screen.findByRole("radio", { name: /Google Gemini/ });
+
+    expect(screen.queryByRole("button", { name: /Continue with your existing AI setup/ })).not.toBeInTheDocument();
   });
 });
 
@@ -236,5 +378,40 @@ describe("useAiSetupStatus", () => {
 
     const someoneElse = renderHook(() => useAiSetupStatus("22222222-2222-4222-8222-222222222222"));
     await waitFor(() => expect(someoneElse.result.current.status).toBe("needed"));
+  });
+
+  // Priority: AI setup completion must be resumable across devices, not only
+  // trusted from this device's localStorage — a user who connected a
+  // provider on their laptop must not be asked to set up AI again on a
+  // desktop that has never stored a key.
+  it("is ready on a device with no local key when the account already has a connected provider", async () => {
+    getAiAccessStatus.mockResolvedValue({
+      connections: [{ provider_id: "groq", tier: "free", status: "connected", models_detected: 2 }],
+      entitlement: { status: "none", active: false },
+      quota: null,
+      creditBalance: null,
+    });
+
+    const { result } = renderHook(() => useAiSetupStatus(USER.id));
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+  });
+
+  it("is ready on a device with no local key when the account has an active Premium entitlement", async () => {
+    getAiAccessStatus.mockResolvedValue({
+      connections: [],
+      entitlement: { status: "active", active: true, planId: "premium_basic" },
+      quota: { monthlyCredits: 5000, dailyCredits: 200, perTaskMaxCredits: 50, concurrencyLimit: 2 },
+      creditBalance: { balance: 500, daily_used: 0, monthly_used: 0 },
+    });
+
+    const { result } = renderHook(() => useAiSetupStatus(USER.id));
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+  });
+
+  it("falls back to 'needed' rather than blocking when the server check fails", async () => {
+    getAiAccessStatus.mockRejectedValue(new Error("network down"));
+
+    const { result } = renderHook(() => useAiSetupStatus(USER.id));
+    await waitFor(() => expect(result.current.status).toBe("needed"));
   });
 });

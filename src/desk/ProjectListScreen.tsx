@@ -21,18 +21,39 @@ export default function ProjectListScreen({
   onOpenSettings,
   onOpenVault,
   onOpenAiAccess,
+  showWelcome,
+  onWelcomeSeen,
 }: {
   onOpen: (projectId: string) => void;
   userEmail: string | null;
   onOpenSettings?: () => void;
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
+  /**
+   * Section 11 of the first-login journey: true only for the render right
+   * after onboarding (AI Setup, then Knowledge) just finished — never on a
+   * plain revisit to this screen, and never again after this mount even if
+   * the caller's own flag is cleared out from under a still-mounted instance.
+   */
+  showWelcome?: boolean;
+  /** Consumes the one-time flag above so a later remount of this same screen doesn't show it again. */
+  onWelcomeSeen?: () => void;
 }) {
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
   const [types, setTypes] = useState<OutputTypeSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [creating, setCreating] = useState(false);
+  // Captured once at mount, deliberately not derived from the live prop: the
+  // banner must stay visible until the user dismisses it, even after
+  // onWelcomeSeen() below has already told the parent to stop passing
+  // showWelcome=true on future renders/mounts.
+  const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
+
+  // Intentionally mount-only (empty deps) — see welcomeVisible's comment above.
+  useEffect(() => {
+    if (showWelcome) onWelcomeSeen?.();
+  }, []);
 
   const load = useCallback(() => {
     listProjects()
@@ -114,6 +135,27 @@ export default function ProjectListScreen({
       </header>
 
       <main className="mx-auto max-w-3xl px-5 py-8">
+        {welcomeVisible && (
+          <div
+            role="status"
+            className="mb-6 flex items-center justify-between gap-4 rounded-[var(--radius-md)] border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-4 py-3"
+          >
+            <div>
+              <p className="text-sm font-medium text-[color:var(--text-primary)]">Welcome to your Scholar Workshop</p>
+              <p className="mt-0.5 text-xs text-[color:var(--text-secondary)]">
+                This is where your projects live. Start one whenever you're ready.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWelcomeVisible(false)}
+              className="shrink-0 rounded-[var(--radius-sm)] px-2 py-1 text-xs text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {error && (
           <p
             role="alert"

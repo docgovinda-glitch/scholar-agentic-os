@@ -10,6 +10,33 @@
 The nine-stage path from stranger to first project, with the AI Setup Wizard and
 the Workshop specified in full.
 
+> **Implemented slice (2026-08-10):** Desk (`src/desk/DeskApp.tsx`) implements
+> the middle of this flow — AI Setup → Knowledge Vault (optional) → the
+> workspace ("Workshop" below is the project list/shell, not the seven-module
+> interactive tutorial §7 describes, which is not built) — as a real, gated,
+> resumable sequence, narrower than this section's full nine-stage vision.
+> What is real:
+>
+> - **AI Setup** (`src/desk/setup/AiSetupScreen.tsx`) explains all four AI
+>   access tiers (Local/Free/BYOK/Premium) with honest cost/privacy/difficulty
+>   language, gives a hardware-aware recommendation (reusing
+>   `src/services/hardwareProfiler.ts`, §5.2's detection but not its
+>   multi-step wizard), and completion is a real, server-trusted, resumable
+>   signal — `user_ai_connections`/`user_entitlements` from ANY device, not
+>   only a key stored on this one (§10.1's `REQ-ONB-10`), with a device-local
+>   skip re-offered contextually as this section specifies.
+> - **Knowledge Vault setup** (`src/desk/setup/VaultSetupScreen.tsx`) matches
+>   §6's offer/passphrase/Recovery-Kit shape closely; import (§6.1) is real
+>   but only reachable once a Vault exists (`VaultImport.tsx`), not from this
+>   screen directly.
+> - Stage 1-3 (account creation, email verification, institutional approval)
+>   and stage 7-9 (the interactive Workshop tutorial, workspace creation, the
+>   backup conversation) are NOT built — Desk's login is Supabase auth without
+>   an approval queue, and onboarding ends at the project list, not a
+>   dedicated workspace/backup step. See
+>   `docs/04-architecture/50-AI-ACCESS-ENGINE-IMPLEMENTATION.md` for the AI
+>   Setup piece's own implementation record.
+
 ---
 
 ## 1. The flow

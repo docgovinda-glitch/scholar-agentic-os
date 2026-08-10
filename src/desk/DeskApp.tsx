@@ -52,6 +52,15 @@ function DeskRoutes() {
   const [vaultOpen, setVaultOpen] = useState(false);
   /** Same reasoning as settingsOpen/vaultOpen. */
   const [aiAccessOpen, setAiAccessOpen] = useState(false);
+  /**
+   * Section 11: true for exactly the one transition out of the Knowledge
+   * Vault stage (declined or completed) — Knowledge is always the last
+   * onboarding gate before the workspace, so that transition is the single
+   * place "onboarding just finished" is really true. A returning user whose
+   * onboarding was already done in a past session never sees vaultSetup's
+   * "offer" branch at all, so this never fires for them.
+   */
+  const [justFinishedOnboarding, setJustFinishedOnboarding] = useState(false);
 
   // Keep component state and the URL in step when the user presses Back or
   // Forward. Without this, going back from a project left the URL on the list
@@ -93,7 +102,18 @@ function DeskRoutes() {
   // Knowledge Vault (docs 25 §6) — optional, and offered once. Declining is a
   // peer option, not a lesser one, and is remembered.
   if (vaultSetup.status === "offer") {
-    return <VaultSetupScreen onDone={vaultSetup.complete} onSkip={vaultSetup.skip} />;
+    return (
+      <VaultSetupScreen
+        onDone={() => {
+          setJustFinishedOnboarding(true);
+          vaultSetup.complete();
+        }}
+        onSkip={() => {
+          setJustFinishedOnboarding(true);
+          vaultSetup.skip();
+        }}
+      />
+    );
   }
 
   // Revisiting settings takes over the whole screen, same as the one-time
@@ -133,6 +153,8 @@ function DeskRoutes() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenVault={() => setVaultOpen(true)}
         onOpenAiAccess={() => setAiAccessOpen(true)}
+        showWelcome={justFinishedOnboarding}
+        onWelcomeSeen={() => setJustFinishedOnboarding(false)}
       />
     );
   }

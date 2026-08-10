@@ -74,3 +74,34 @@ describe("the document-type dropdown", () => {
     expect(createProject).toHaveBeenCalledWith("OT-09");
   });
 });
+
+// Section 11: the one-time Workshop welcome shown right after onboarding.
+describe("the Workshop welcome banner", () => {
+  it("shows and consumes the one-time flag when the caller signals onboarding just finished", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    const onWelcomeSeen = vi.fn();
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={onWelcomeSeen} />);
+
+    expect(await screen.findByText("Welcome to your Scholar Workshop")).toBeInTheDocument();
+    expect(onWelcomeSeen).toHaveBeenCalled();
+  });
+
+  it("stays visible until dismissed, even though the flag was already consumed", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={vi.fn()} />);
+
+    const banner = await screen.findByText("Welcome to your Scholar Workshop");
+    expect(banner).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText("Welcome to your Scholar Workshop")).not.toBeInTheDocument();
+  });
+
+  it("never shows for a returning user with nothing to welcome them to", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    await screen.findByText("Nothing here yet");
+    expect(screen.queryByText("Welcome to your Scholar Workshop")).not.toBeInTheDocument();
+  });
+});

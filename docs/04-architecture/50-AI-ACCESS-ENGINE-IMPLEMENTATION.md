@@ -27,6 +27,19 @@ unchanged: it stays in the existing `AiSetupScreen`
 (`src/desk/setup/AiSetupScreen.tsx`), which predates this work. AI Access is
 the status view on top of it, not a second setup flow.
 
+`AiSetupScreen` doubles as the first-login onboarding step (docs
+25-ONBOARDING-ARCHITECTURE.md's "AI Setup", gated by
+`src/desk/setup/useAiSetupStatus.ts`) — a later pass made that gate's
+"already configured" signal server-trusted rather than only a key on this
+device: `GET /api/ai-access/status` (connections or an active entitlement,
+from ANY device) is checked as a fallback before asking a returning user to
+set up AI again. The onboarding variant also explains the four tiers'
+cost/privacy/difficulty honestly, gives a hardware-aware recommendation
+(reusing `recommendLocalModel` below, not a second implementation), and ends
+with an "AI setup complete" summary rather than silently trusting that
+something got configured. See docs 25's own status note for the full
+first-login journey this fits into.
+
 ## 2. Provider & Model Registry
 
 `public.ai_providers` / `public.ai_models` (`supabase/schema_ai_engine.sql`)
