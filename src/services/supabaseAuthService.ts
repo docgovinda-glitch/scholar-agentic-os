@@ -23,6 +23,7 @@ export interface SignUpInput {
   affiliation: string;
   authenticId: string;
   password: string;
+  captchaToken?: string;
 }
 
 export interface ServiceResult {
@@ -49,14 +50,32 @@ export function safeAuthErrorMessage(error: { message?: string; status?: number 
 }
 
 /**
- * Registers a new scholar. Supabase Auth creates the auth.users row;
- * the on_auth_user_created trigger (supabase/schema.sql) automatically
- * creates a matching profiles row with account_status = 'active'.
- * Accounts are immediately usable after email verification.
- * Automated abuse protection (CAPTCHA, rate limiting, email verification)
- * provides security without manual admin intervention.
+ * Registers a new scholar. Verifies CAPTCHA token if provided, then creates
+ * an auth.users row via Supabase Auth. The on_auth_user_created trigger
+ * (supabase/schema.sql) automatically creates a matching profiles row with
+ * account_status = 'active'. Accounts are immediately usable after email
+ * verification. Automated abuse protection (CAPTCHA, rate limiting, email
+ * verification) provides security without manual admin intervention.
  */
 export async function signUp(input: SignUpInput): Promise<ServiceResult> {
+  // Verify CAPTCHA token if provided
+  if (input.captchaToken) {
+    try {
+      const verifyResponse = await fetch("/api/auth/verify-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ captchaToken: input.captchaToken }),
+      });
+
+      if (!verifyResponse.ok) {
+        const errorData = (await verifyResponse.json()) as { error?: string };
+        return { success: false, error: errorData.error || "CAPTCHA verification failed. Please try again." };
+      }
+    } catch (error) {
+      return { success: false, error: `CAPTCHA verification error: ${error instanceof Error ? error.message : "unknown"}` };
+    }
+  }
+
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase.auth.signUp({

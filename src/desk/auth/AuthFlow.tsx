@@ -140,7 +140,12 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
     setBusy(true);
     setError(null);
     try {
-      const result = await signUp({ ...fields, username: fields.username.trim(), email: fields.email.trim() });
+      const result = await signUp({
+        ...fields,
+        username: fields.username.trim(),
+        email: fields.email.trim(),
+        captchaToken: captchaToken || undefined,
+      });
       if (!result.success) {
         setError(result.error ?? "Registration failed.");
         return;
