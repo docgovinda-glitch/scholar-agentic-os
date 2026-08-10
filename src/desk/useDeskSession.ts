@@ -13,6 +13,15 @@ export type SessionState =
   | { status: "loading" }
   | { status: "signed-out" }
   | { status: "signed-in"; userId: string; email: string | null }
+  /**
+   * A recovery link was just followed. Distinct from "signed-out" so
+   * DeskAuthGate can send AuthFlow straight to the set-new-password screen
+   * instead of AuthFlow having to rediscover this for itself — by the time
+   * AuthFlow would mount and run its own check, Supabase has already
+   * consumed the one-time PASSWORD_RECOVERY event and stripped the URL's
+   * token fragment, so a second, later check reliably finds nothing.
+   */
+  | { status: "recovery" }
   /** Supabase env vars are absent — the app cannot authenticate anyone. */
   | { status: "unconfigured" };
 
@@ -53,8 +62,9 @@ export function useDeskSession(): SessionState {
 
     function resolve(session: { user?: { id: string; email?: string | null } | null } | null | undefined) {
       if (!active) return;
+      if (recovering) return setState({ status: "recovery" });
       const user = session?.user;
-      if (!user || recovering) return setState({ status: "signed-out" });
+      if (!user) return setState({ status: "signed-out" });
       setState({ status: "signed-in", userId: user.id, email: user.email ?? null });
     }
 

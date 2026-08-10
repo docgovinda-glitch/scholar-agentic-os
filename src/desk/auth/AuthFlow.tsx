@@ -40,12 +40,16 @@ import {
  * so a successful sign-in needs no navigation of its own — pushing a route
  * here would race that subscription.
  */
-export default function AuthFlow() {
-  const [screen, setScreen] = useState<AuthScreen>("sign-in");
+export default function AuthFlow({ initialScreen = "sign-in" }: { initialScreen?: AuthScreen } = {}) {
+  const [screen, setScreen] = useState<AuthScreen>(initialScreen);
 
-  // A recovery link lands the user on the app with a recovery session already
-  // established. This must be checked on mount rather than reached by
-  // navigation: the user clicked a link in their email, not a button here.
+  // Belt-and-suspenders: useDeskSession is the authoritative recovery-link
+  // detector now (it runs first, before this component even mounts, and
+  // passes the result down as `initialScreen`) — by the time this effect
+  // could run, Supabase has typically already consumed the one-time
+  // PASSWORD_RECOVERY event and stripped the URL's token fragment, so this
+  // rarely fires on its own. Left in case a recovery event ever arrives
+  // while this screen is already mounted rather than on a fresh page load.
   useEffect(() => onPasswordRecovery(() => setScreen("recover")), []);
 
   switch (screen) {

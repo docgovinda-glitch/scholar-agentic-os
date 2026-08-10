@@ -49,6 +49,10 @@ export default function DeskAuthGate({ children }: { children: ReactNode }) {
   }
 
   if (session.status === "signed-out") return <AuthFlow />;
+  // Sent straight to the set-new-password screen: see useDeskSession's
+  // "recovery" status doc comment for why AuthFlow can't be trusted to
+  // rediscover this on its own.
+  if (session.status === "recovery") return <AuthFlow initialScreen="recover" />;
 
   return <>{children}</>;
 }

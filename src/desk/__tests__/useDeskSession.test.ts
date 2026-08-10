@@ -48,23 +48,23 @@ afterEach(() => {
 });
 
 describe("useDeskSession — password recovery", () => {
-  it("stays signed-out when the URL carries a recovery marker, even though a session exists", async () => {
+  it("reports recovery, not signed-in, when the URL carries a recovery marker even though a session exists", async () => {
     window.history.replaceState(null, "", "/#access_token=t&type=recovery");
     mockGetSession.mockResolvedValue({ data: { session: { user: USER } } });
 
     const { result } = renderHook(() => useDeskSession());
 
-    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+    await waitFor(() => expect(result.current.status).toBe("recovery"));
   });
 
-  it("stays signed-out when the PASSWORD_RECOVERY event arrives after getSession() already resolved signed-in", async () => {
+  it("switches to recovery when the PASSWORD_RECOVERY event arrives after getSession() already resolved signed-in", async () => {
     mockGetSession.mockResolvedValue({ data: { session: { user: USER } } });
 
     const { result } = renderHook(() => useDeskSession());
     await waitFor(() => expect(result.current.status).toBe("signed-in"));
 
     authChangeHandler?.("PASSWORD_RECOVERY", { user: USER });
-    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+    await waitFor(() => expect(result.current.status).toBe("recovery"));
   });
 
   it("becomes signed-in once USER_UPDATED confirms the new password was saved", async () => {
@@ -72,7 +72,7 @@ describe("useDeskSession — password recovery", () => {
     mockGetSession.mockResolvedValue({ data: { session: { user: USER } } });
 
     const { result } = renderHook(() => useDeskSession());
-    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+    await waitFor(() => expect(result.current.status).toBe("recovery"));
 
     authChangeHandler?.("USER_UPDATED", { user: USER });
     await waitFor(() => expect(result.current.status).toBe("signed-in"));

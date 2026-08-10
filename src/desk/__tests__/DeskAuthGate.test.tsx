@@ -73,6 +73,17 @@ describe("DeskAuthGate", () => {
     expect(screen.queryByText("Your work")).not.toBeInTheDocument();
   });
 
+  it("goes straight to the set-new-password screen on a recovery session, without waiting on AuthFlow's own detection", () => {
+    // useDeskSession's "recovery" status carries the AuthFlow needs directly
+    // (see its doc comment): by the time AuthFlow could mount and check for
+    // itself, Supabase has already consumed the one-time PASSWORD_RECOVERY
+    // event, so recoveryCallback is deliberately left unfired here.
+    useDeskSession.mockReturnValue({ status: "recovery" });
+    gate();
+    expect(screen.getByText(/Set a new password/i)).toBeInTheDocument();
+    expect(screen.queryByText("Your work")).not.toBeInTheDocument();
+  });
+
   it("does not render app content while the session is still resolving", () => {
     useDeskSession.mockReturnValue({ status: "loading" });
     gate();
