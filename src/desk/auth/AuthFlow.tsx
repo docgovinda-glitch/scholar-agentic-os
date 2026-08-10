@@ -6,6 +6,7 @@ import {
   signUp,
   updatePassword,
 } from "../../services/supabaseAuthService";
+import CaptchaWidget from "./CaptchaWidget";
 import {
   AuthError,
   AuthForm,
@@ -123,8 +124,8 @@ function SignInScreen({
 function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const set = useCallback(
     (key: keyof SignUpFields) => (value: string) => setFields((f) => ({ ...f, [key]: value })),
@@ -172,6 +173,7 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
             onChange={set(f.key)}
           />
         ))}
+        <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
         <SubmitButton busy={busy} busyLabel="Creating account…" disabled={signUpProblem(fields) !== null}>
           Create account
