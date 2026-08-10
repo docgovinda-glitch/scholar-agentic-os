@@ -2,10 +2,9 @@
  * The states Desk's unauthenticated surface can be in.
  *
  * Kept as data rather than scattered booleans because these are genuinely
- * exclusive — a user is on exactly one of them — and because two are reached
- * by events rather than by clicking: "recover" is entered when Supabase parses
- * a recovery link out of the URL, and "awaiting-approval" when a sign-in
- * succeeds against Auth but the profile has not been approved yet.
+ * exclusive — a user is on exactly one of them — and because one is reached
+ * by an event rather than by clicking: "recover" is entered when Supabase parses
+ * a recovery link out of the URL.
  */
 export type AuthScreen =
   | "sign-in"
@@ -14,9 +13,7 @@ export type AuthScreen =
   | "forgot"
   /** Setting a new password inside a recovery session. */
   | "recover"
-  /** Registered, admin approval outstanding — a dead end until an admin acts. */
-  | "awaiting-approval"
-  /** Registration submitted; the confirmation/approval mail is on its way. */
+  /** Registration submitted; email verification is on its way. */
   | "registered";
 
 /**
@@ -34,10 +31,9 @@ export function passwordProblem(password: string): string | null {
 }
 
 /**
- * Sign-up asks for seven fields because `signUp()` writes all of them into the
- * profile an administrator reviews before approving the account. An empty
- * affiliation or a missing institutional ID leaves them approving a stranger,
- * so these are required here rather than nullable in the database.
+ * Sign-up asks for seven fields: full name, username, email, phone, affiliation,
+ * institutional ID, and password. These fields establish the scholar's identity
+ * and are all required.
  */
 export interface SignUpFields {
   username: string;
@@ -78,7 +74,7 @@ export const SIGN_UP_FIELDS: ReadonlyArray<{
     label: "Institutional ID",
     type: "text",
     autoComplete: "off",
-    hint: "Student or staff number — an administrator checks this before approving you.",
+    hint: "Student or staff number.",
   },
   { key: "password", label: "Password", type: "password", autoComplete: "new-password" },
 ];

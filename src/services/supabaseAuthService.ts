@@ -50,10 +50,11 @@ export function safeAuthErrorMessage(error: { message?: string; status?: number 
 
 /**
  * Registers a new scholar. Supabase Auth creates the auth.users row;
- * the on_auth_user_created trigger (supabase/schema.sql) creates the
- * matching profiles row with is_approved = false. Then invokes the
- * send-approval-email Edge Function so an admin gets the same
- * approve-registration email server.ts used to send via Resend.
+ * the on_auth_user_created trigger (supabase/schema.sql) automatically
+ * creates a matching profiles row with account_status = 'active'.
+ * Accounts are immediately usable after email verification.
+ * Automated abuse protection (CAPTCHA, rate limiting, email verification)
+ * provides security without manual admin intervention.
  */
 export async function signUp(input: SignUpInput): Promise<ServiceResult> {
   const supabase = getSupabaseClient();
@@ -79,33 +80,6 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
     return { success: false, error: "Sign-up did not return a user record." };
   }
 
-  const { data: emailData, error: emailError } = await supabase.functions.invoke("send-approval-email", {
-    body: {
-      userId: data.user.id,
-      username: input.username,
-      fullName: input.fullName,
-      email: input.email,
-      phone: input.phone,
-      affiliation: input.affiliation,
-      authenticId: input.authenticId,
-    },
-  });
-
-  if (emailError) {
-    // Registration itself succeeded — the admin-notification email failing
-    // shouldn't block the user's signup, but it should be visible to them
-    // (mirrors server.ts's requiresClientEmail fallback messaging).
-    return { success: true, error: `Registered, but admin notification failed: ${emailError.message}` };
-  }
-
-  if (emailData && emailData.emailSent === false) {
-    // The Edge Function itself always returns HTTP 200 (so `emailError`
-    // above is never set for this case) even when Resend fails internally —
-    // check its own reported emailSent field too, or a real send failure
-    // here would be invisible to the caller.
-    return { success: true, error: `Registered, but the admin notification email couldn't be sent${emailData.error ? `: ${emailData.error}` : "."}` };
-  }
-
   return { success: true };
 }
 
@@ -115,7 +89,6 @@ export interface SignInInput {
 }
 
 export interface SignInResult extends ServiceResult {
-  isApproved?: boolean;
   profile?: {
     fullName: string;
     email: string;
@@ -125,7 +98,7 @@ export interface SignInResult extends ServiceResult {
   };
 }
 
-/** Logs in by username (resolved to an email via the email_for_username RPC — see supabase/schema.sql), then checks the admin-approval gate exactly as /api/verify-and-sync-profile did. */
+/** Logs in by username (resolved to an email via the email_for_username RPC). */
 export async function signIn(input: SignInInput): Promise<SignInResult> {
   const supabase = getSupabaseClient();
 
@@ -148,7 +121,7 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("full_name, phone, affiliation, authentic_id, is_approved")
+    .select("full_name, phone, affiliation, authentic_id, account_status")
     .eq("id", signInData.user.id)
     .single();
 
@@ -156,13 +129,18 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
     return { success: false, error: "Scholar profile not found." };
   }
 
-  if (!profile.is_approved) {
-    return { success: false, isApproved: false, error: "Awaiting Admin Approval" };
+  if (profile.account_status !== 'active') {
+    const statusMessages: Record<string, string> = {
+      'restricted': 'Your account has been restricted. Please contact support.',
+      'suspended': 'Your account has been suspended. Please contact support.',
+      'deleted': 'Your account has been deleted.',
+    };
+    const statusMessage = statusMessages[profile.account_status as string] || 'Your account is not active.';
+    return { success: false, error: statusMessage };
   }
 
   return {
     success: true,
-    isApproved: true,
     profile: {
       fullName: profile.full_name,
       email,
@@ -173,15 +151,6 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
   };
 }
 
-/** Pre-login approval check (server.ts's /api/check-approval) via the is_username_approved RPC — no session required. */
-export async function checkApproval(username: string): Promise<{ isApproved: boolean }> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase.rpc("is_username_approved", { lookup_username: username });
-  if (error) {
-    return { isApproved: false };
-  }
-  return { isApproved: Boolean(data) };
-}
 
 /** Requires an active session (RLS: profiles_update_own). */
 export async function saveModelPreferences(preferences: Record<string, unknown>): Promise<ServiceResult> {
