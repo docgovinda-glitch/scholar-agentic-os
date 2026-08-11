@@ -164,3 +164,38 @@ describe("hardDeleteUser", () => {
     expect(deleteWasCalled).toBe(false);
   });
 });
+
+describe("searchUsers — PostgREST filter escaping", () => {
+  it("quotes the search term so its punctuation cannot restructure the or= filter", async () => {
+    let requestedUrl = "";
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      requestedUrl = typeof input === "string" ? input : input.toString();
+      return Promise.resolve(jsonResponse(200, []));
+    }) as unknown as typeof fetch;
+
+    // `,` separates or= branches, `.` separates column/operator/value and
+    // `(` `)` delimit the group — encodeURIComponent leaves all four alone,
+    // so interpolating this term raw let it rewrite the query it was meant
+    // to be a value inside.
+    await searchUsers("Smith (Lab), Dept.");
+
+    const decoded = decodeURIComponent(requestedUrl);
+    expect(decoded).toContain('username.ilike."*Smith (Lab), Dept.*"');
+    expect(decoded).toContain('full_name.ilike."*Smith (Lab), Dept.*"');
+    // Exactly two branches — the term's own comma did not become a third.
+    expect(decoded.match(/ilike\./g)?.length).toBe(2);
+  });
+
+  it("escapes quotes and backslashes inside the quoted value", async () => {
+    let requestedUrl = "";
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      requestedUrl = typeof input === "string" ? input : input.toString();
+      return Promise.resolve(jsonResponse(200, []));
+    }) as unknown as typeof fetch;
+
+    await searchUsers('a"b\\c');
+
+    const decoded = decodeURIComponent(requestedUrl);
+    expect(decoded).toContain('username.ilike."*a\\"b\\\\c*"');
+  });
+});

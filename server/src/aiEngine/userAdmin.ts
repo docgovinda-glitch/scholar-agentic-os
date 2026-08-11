@@ -97,6 +97,24 @@ export interface UserSearchResult {
 }
 
 /**
+ * Wraps a value for use inside a PostgREST filter.
+ *
+ * `encodeURIComponent` alone is not enough here and was the bug this
+ * replaces: it leaves `(`, `)`, `,` and `.` untouched, and those are
+ * PostgREST's OWN grammar — `,` separates the branches of an `or=(...)`,
+ * `.` separates column from operator from value, and the parentheses
+ * delimit the group. Interpolating a raw search term therefore let the term
+ * restructure the query it was supposed to be a value in: `Smith (Lab)`
+ * simply 400s, but a `,`-bearing term injects an extra filter branch.
+ *
+ * Double-quoting is PostgREST's sanctioned escape for a value containing
+ * grammar characters; inside the quotes only `"` and `\` need escaping.
+ */
+function pgrstQuoted(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/**
  * Matches on username/full name (via profiles, a direct ilike query) OR
  * email (via GoTrue's admin user list, paged through and filtered in
  * memory — the Admin API does not expose a reliable server-side email
@@ -107,8 +125,13 @@ export async function searchUsers(query: string): Promise<UserSearchResult[]> {
   const q = query.trim();
   if (q.length < 2) return [];
 
+  // The `*` wildcards belong to the pattern, so they go INSIDE the quoted
+  // value; the whole `or=(...)` group is then percent-encoded as one query
+  // parameter value.
+  const pattern = pgrstQuoted(`*${q}*`);
+  const orGroup = `(username.ilike.${pattern},full_name.ilike.${pattern})`;
   const profiles = await profileTable().select(
-    `or=(username.ilike.*${encodeURIComponent(q)}*,full_name.ilike.*${encodeURIComponent(q)}*)&select=id,username,full_name,account_status&limit=25`
+    `or=${encodeURIComponent(orGroup)}&select=id,username,full_name,account_status&limit=25`
   );
 
   const byId = new Map<string, UserSearchResult>();

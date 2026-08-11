@@ -97,7 +97,24 @@ export async function listAdmins(): Promise<AdminUser[]> {
   });
 }
 
-/** `scopes` defaults to every scope ("full admin") when omitted, matching the pre-scopes behavior this replaces. */
+/**
+ * Grants admin status. `scopes` defaults to NONE when omitted — the new
+ * admin can reach the unscoped, read-only admin views (dashboard, usage,
+ * audit) and nothing else until someone sets their scopes.
+ *
+ * This doc previously claimed the opposite ("defaults to every scope, full
+ * admin, matching the pre-scopes behaviour this replaces") while the code
+ * inserted `[]`. Least privilege is the right default and the code is what
+ * kept, so the doc is corrected rather than the behaviour: a missing field
+ * in a request body must never be the thing that hands out every permission,
+ * and POST /api/admin/ai/admins (server/routes/admin.ts) always sends the
+ * scopes chosen in the panel.
+ *
+ * Note for anyone migrating a pre-scopes database: existing admin_users rows
+ * take `'{}'` from the ADMIN ROSTER v2 default, so they land here too and
+ * need their scopes set explicitly. The MAIN_ADMIN_EMAIL admin is unaffected
+ * — it holds every scope implicitly and is not a row in this table.
+ */
 export async function grantAdmin(userId: string, grantedBy: string, scopes?: Scope[], note?: string): Promise<void> {
   try {
     await adminTable().insert({

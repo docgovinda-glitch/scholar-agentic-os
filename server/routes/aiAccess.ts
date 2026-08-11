@@ -1,5 +1,6 @@
 import express from "express";
 import { requireAuth, type AuthenticatedUser } from "../src/middleware/auth";
+import { asyncHandler } from "../src/middleware/asyncHandler";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest";
 import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements";
 import { getEffectiveQuota } from "../src/aiEngine/quotaEngine";
@@ -55,28 +56,40 @@ export function registerAiAccessRoutes(app: express.Express): void {
     }
   });
 
-  router.post("/connections", async (req, res) => {
-    const { providerId, tier, modelsDetected } = req.body as { providerId: string; tier: "local" | "free" | "byok"; modelsDetected?: number };
-    if (!providerId || !tier) return res.status(400).json({ error: "providerId and tier are required." });
+  // asyncHandler, not a bare `async` handler: these two write to Supabase
+  // and had no error path at all. A foreign-key violation from an unseeded
+  // ai_providers registry — the realistic first-run case — rejected the
+  // handler's promise, which Express 4 drops on the floor, so the request
+  // hung with no response and AI Setup could never finish. `/status` above
+  // catches its own errors (and answers 503) and so already behaved.
+  router.post(
+    "/connections",
+    asyncHandler(async (req, res) => {
+      const { providerId, tier, modelsDetected } = req.body as { providerId: string; tier: "local" | "free" | "byok"; modelsDetected?: number };
+      if (!providerId || !tier) return res.status(400).json({ error: "providerId and tier are required." });
 
-    const connections = new SupabaseTable(restConfig(), "user_ai_connections");
-    await connections.upsert({
-      user_id: userId(req),
-      provider_id: providerId,
-      tier,
-      status: "connected",
-      last_verified_at: new Date().toISOString(),
-      models_detected: modelsDetected ?? null,
-      updated_at: new Date().toISOString(),
-    } as any);
-    res.json({ success: true });
-  });
+      const connections = new SupabaseTable(restConfig(), "user_ai_connections");
+      await connections.upsert({
+        user_id: userId(req),
+        provider_id: providerId,
+        tier,
+        status: "connected",
+        last_verified_at: new Date().toISOString(),
+        models_detected: modelsDetected ?? null,
+        updated_at: new Date().toISOString(),
+      } as any);
+      res.json({ success: true });
+    })
+  );
 
-  router.delete("/connections/:providerId", async (req, res) => {
-    const connections = new SupabaseTable(restConfig(), "user_ai_connections");
-    await connections.delete(`user_id=eq.${encodeURIComponent(userId(req))}&provider_id=eq.${encodeURIComponent(req.params.providerId)}`);
-    res.json({ success: true });
-  });
+  router.delete(
+    "/connections/:providerId",
+    asyncHandler(async (req, res) => {
+      const connections = new SupabaseTable(restConfig(), "user_ai_connections");
+      await connections.delete(`user_id=eq.${encodeURIComponent(userId(req))}&provider_id=eq.${encodeURIComponent(req.params.providerId)}`);
+      res.json({ success: true });
+    })
+  );
 
   /**
    * Verifies a BYOK/Free key actually works, before the client marks the

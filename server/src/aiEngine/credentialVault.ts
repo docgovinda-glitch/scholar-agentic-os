@@ -22,7 +22,6 @@
  * immediately after the provider call).
  */
 
-import { randomUUID } from "node:crypto";
 import { decryptToString, encrypt, generateCEK, getMasterKeyFromEnv, unwrapKey, wrapKey } from "../../../src/services/crypto/crypto";
 import type { EncryptedPayload } from "../../../src/services/crypto/types";
 import { getSupabaseRestConfig, SupabaseTable } from "../supabaseRest";
@@ -93,16 +92,31 @@ export async function storeCredential(
   const encryptedCredential = encrypt(plaintextCredential, cek);
   const encryptedCek = wrapKey(cek, masterKey);
 
-  await table().upsert({
-    id: randomUUID(),
-    provider_id: providerId,
-    label,
-    encrypted_cek: encryptedCek,
-    encrypted_credential: encryptedCredential,
-    masked_preview: maskedPreview(plaintextCredential),
-    status: "active",
-    created_by: createdBy,
-  });
+  // Conflict target is (provider_id, label) — the unique constraint added in
+  // schema_ai_engine.sql's "CREDENTIAL ROTATION" section — so rotating a key
+  // REPLACES the row for that provider rather than adding a second active
+  // one alongside it. No `id` is sent: on insert the column takes its
+  // gen_random_uuid() default, and on update the existing id is preserved
+  // (sending a fresh one here was what defeated the upsert in the first
+  // place, since a never-seen primary key cannot collide).
+  //
+  // last_verified_at is cleared deliberately: it described the key being
+  // replaced, and leaving it behind would show the admin panel a
+  // verification timestamp for a credential that is no longer stored.
+  await table().upsert(
+    {
+      provider_id: providerId,
+      label,
+      encrypted_cek: encryptedCek,
+      encrypted_credential: encryptedCredential,
+      masked_preview: maskedPreview(plaintextCredential),
+      status: "active",
+      created_by: createdBy,
+      last_verified_at: null,
+      updated_at: new Date().toISOString(),
+    },
+    "provider_id,label"
+  );
 }
 
 /**
@@ -112,8 +126,14 @@ export async function storeCredential(
  * persist the return value.
  */
 export async function getDecryptedCredential(providerId: string, label = "default"): Promise<string | null> {
+  // The unique (provider_id, label) constraint means there is at most one
+  // row to find. `order` is still explicit so that a database which has not
+  // yet had that migration applied — and may therefore still hold duplicates
+  // from before storeCredential() was fixed — deterministically returns the
+  // NEWEST credential rather than whichever row PostgREST happened to reach
+  // first under a bare `limit=1`.
   const row = await table().selectOne(
-    `provider_id=eq.${encodeURIComponent(providerId)}&label=eq.${encodeURIComponent(label)}&status=eq.active`
+    `provider_id=eq.${encodeURIComponent(providerId)}&label=eq.${encodeURIComponent(label)}&status=eq.active&order=created_at.desc,id.desc`
   );
   if (!row) return null;
 

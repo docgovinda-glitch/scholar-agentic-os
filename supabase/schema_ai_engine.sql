@@ -696,3 +696,37 @@ $$;
 
 revoke execute on function public.deduct_credits(uuid, numeric, numeric, numeric, text, uuid, text, numeric) from public, anon, authenticated;
 grant execute on function public.deduct_credits(uuid, numeric, numeric, numeric, text, uuid, text, numeric) to service_role;
+
+-- ============================================================================
+-- CREDENTIAL ROTATION: one credential row per (provider, label)
+-- ============================================================================
+--
+-- credentialVault.storeCredential() upserts, but this table's only unique
+-- constraint was its `id` primary key and the payload carried a freshly
+-- generated `id` every call — so PostgREST's merge-duplicates resolution had
+-- nothing that could ever collide, and every rotation INSERTED another row
+-- instead of replacing the previous one. Both rows then carried
+-- status='active' for the same (provider_id, label), and
+-- getDecryptedCredential's `limit=1` has no ORDER BY, so PostgREST could
+-- return either one: rotating away from a leaked or expired key was not
+-- guaranteed to take effect.
+--
+-- Collapse any duplicates that already exist down to the newest row per
+-- (provider_id, label), then add the unique constraint that gives the upsert
+-- a real conflict target. storeCredential() no longer sends `id` at all, so
+-- an insert takes the column default and an update keeps the existing id.
+--
+-- Idempotent: the delete is a no-op once there are no duplicates, and the
+-- drop-then-add converges to exactly one constraint however many times it
+-- runs.
+
+delete from public.platform_provider_credentials a
+  using public.platform_provider_credentials b
+  where a.provider_id = b.provider_id
+    and a.label = b.label
+    and (a.created_at, a.id) < (b.created_at, b.id);
+
+alter table public.platform_provider_credentials
+  drop constraint if exists platform_provider_credentials_provider_label_key;
+alter table public.platform_provider_credentials
+  add constraint platform_provider_credentials_provider_label_key unique (provider_id, label);

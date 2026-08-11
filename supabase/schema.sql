@@ -33,6 +33,19 @@ create table if not exists public.profiles (
 
 create index if not exists idx_profiles_username on public.profiles(username);
 
+-- account_status was added to the create-table above only AFTER this file's
+-- first deployments, so on any database that already has a profiles table
+-- the `create table if not exists` is a no-op and the column would never
+-- appear — while handle_new_user() below INSERTs into it and signIn()
+-- (src/services/supabaseAuthService.ts) SELECTs it. Without this backfill
+-- every new signup fails inside the trigger and every existing user gets
+-- "Scholar profile not found" at login. Idempotent: when the column is
+-- already present the whole statement, check constraint included, is
+-- skipped, so this is safe to re-run alongside the rest of the file.
+alter table public.profiles
+  add column if not exists account_status text not null default 'active'
+  check (account_status in ('active', 'restricted', 'suspended', 'deleted'));
+
 -- ============================================================================
 -- api_credentials: normalizes UserRecord.encryptedApiKeys / apiKeyHashes
 -- (previously two parallel {[provider]: string} maps) into one row per
@@ -114,13 +127,65 @@ grant execute on function public.email_for_username(text) to anon, authenticated
 alter table public.profiles enable row level security;
 alter table public.api_credentials enable row level security;
 
--- Users can read/update only their own profile. account_status is NOT
--- updatable by the user themselves (only admins via service_role can change it).
+-- Users can read/update only their own profile. `drop policy if exists`
+-- before each create keeps this section re-runnable against a database that
+-- already has an earlier version of these policies.
+drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles
   for select using (auth.uid() = id);
 
+drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own" on public.profiles
-  for update using (auth.uid() = id);
+  for update using (auth.uid() = id) with check (auth.uid() = id);
 
+drop policy if exists "api_credentials_all_own" on public.api_credentials;
 create policy "api_credentials_all_own" on public.api_credentials
-  for all using (auth.uid() = user_id);
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ----------------------------------------------------------------------------
+-- account_status is admin-only, enforced for real.
+-- ----------------------------------------------------------------------------
+-- RLS decides which ROWS a role may update, never which COLUMNS. So
+-- profiles_update_own above — on its own, as this file previously shipped —
+-- let a suspended user run
+--     update public.profiles set account_status = 'active' where id = auth.uid();
+-- and lift their own suspension, even though the comment here claimed
+-- otherwise. Two independent controls now enforce the claim:
+--
+-- 1. Column-level UPDATE privileges. `authenticated` may write only the
+--    self-service profile fields; account_status is simply not among them,
+--    so the update above is rejected before RLS is even consulted. The one
+--    client-side writer is saveModelPreferences()
+--    (src/services/supabaseAuthService.ts), which touches model_preferences
+--    and updated_at — both granted below.
+-- 2. A trigger, as a backstop, in case a later `grant` widens (1) again.
+--    Deliberately NOT `security definer`: current_user must resolve to the
+--    role that actually issued the UPDATE (PostgREST does `set local role`),
+--    which a definer-rights function would mask with the function owner.
+--
+-- The service-role key used by server/ (admin suspension, requireAdmin-gated)
+-- bypasses RLS and passes both checks, which is exactly the intended path.
+
+revoke update on public.profiles from anon, authenticated;
+grant update (username, full_name, phone, affiliation, authentic_id, model_preferences, updated_at)
+  on public.profiles to authenticated;
+
+create or replace function public.enforce_account_status_admin_only()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.account_status is distinct from old.account_status
+     and current_user not in ('service_role', 'postgres', 'supabase_admin') then
+    raise exception 'account_status can only be changed by an administrator'
+      using errcode = 'insufficient_privilege';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_account_status_guard on public.profiles;
+create trigger profiles_account_status_guard
+  before update on public.profiles
+  for each row execute procedure public.enforce_account_status_admin_only();

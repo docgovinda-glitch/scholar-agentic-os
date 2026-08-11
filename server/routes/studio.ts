@@ -25,9 +25,21 @@ import { selectProvider, type RoutingContext } from "../src/aiEngine/omniRouter.
 import { getDecryptedCredential } from "../src/aiEngine/credentialVault.ts";
 import { checkPerTaskLimit } from "../src/aiEngine/quotaEngine.ts";
 import { creditsForUsage, estimateMaxCreditsForInput } from "../src/aiEngine/creditPolicy.ts";
-import { deductCredits } from "../src/aiEngine/creditEngine.ts";
+import { deductCredits, type DeductResult } from "../src/aiEngine/creditEngine.ts";
 import { recordProviderFailure, recordProviderSuccess } from "../src/aiEngine/providerHealth.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
+
+/**
+ * Why a charge was refused, in the user's terms. Keyed on every non-"ok"
+ * DeductResult so adding a new refusal reason to the credit engine is a type
+ * error here rather than a silently generic message.
+ */
+const DEDUCT_FAILURE_MESSAGES: Record<Exclude<DeductResult, "ok">, string> = {
+  daily_limit_exceeded: "You've reached your daily Premium credit limit. It resets at the start of tomorrow (UTC).",
+  weekly_limit_exceeded: "You've reached your weekly Premium credit limit. It resets at the start of next week (UTC).",
+  monthly_limit_exceeded: "You've reached your monthly Premium credit limit. It resets at the start of next month (UTC).",
+  insufficient_balance: "You don't have enough Premium credits left for this request.",
+};
 
 /**
  * Runs Studio's Premium path: independently re-derives the Omni Router's
@@ -87,6 +99,21 @@ async function runPremiumRefine(
     return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
   }
 
+  // The Omni Router only excludes Premium candidates once the balance hits
+  // zero, so a user with 2 credits left could still reach a provider with a
+  // request estimated at 40 and only be stopped by deduct_credits AFTER the
+  // provider had been paid. This is the same `balance < amount` comparison
+  // deduct_credits itself makes — no window/reset logic is duplicated here,
+  // deliberately: the daily/weekly/monthly caps stay the database's call,
+  // decided under its row lock, and are handled after the call below.
+  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
+    return {
+      ok: false,
+      status: 402,
+      error: `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
+    };
+  }
+
   const attempts = [decision.choice, ...decision.fallbacks].filter((c) => c.tier === "premium");
   let lastError = "No Premium provider is currently available.";
 
@@ -98,33 +125,24 @@ async function runPremiumRefine(
       continue;
     }
 
-    const model = choice.modelId ?? defaultModelByProvider.get(choice.providerId) ?? undefined;
+    // `||`, not `??`: assembleRoutingCandidates builds defaultModelByProvider
+    // as `metadata?.defaultModel ?? ""`, so a provider row with no configured
+    // default yields an EMPTY STRING, which `??` passes straight through. The
+    // adapter would then fall back to its own default while the usage ledger
+    // and the "Why this AI?" panel both recorded "" — losing the record of
+    // which model actually ran.
+    const model = choice.modelId || defaultModelByProvider.get(choice.providerId) || undefined;
     const start = Date.now();
+
+    // Only the provider call itself belongs in this try. Post-success
+    // bookkeeping (deduct/record) used to share it, so a Supabase blip while
+    // charging would land in the provider-failure branch below: it marked a
+    // provider that had just answered correctly as DOWN, then continued the
+    // loop and re-ran the whole generation against the next one — paying two
+    // providers for one request and charging the user for neither.
+    let result: Awaited<ReturnType<typeof refine>>;
     try {
-      const result = await refine({ ...refineInput, provider: choice.providerId, apiKey: credential, model });
-      await recordProviderSuccess(choice.providerId, Date.now() - start);
-
-      const usage = result.usage;
-      const creditsUsed = usage ? creditsForUsage(usage.inputTokensEstimate, usage.outputTokensEstimate) : preCheckAmount;
-      const requestId = randomUUID();
-      const deductResult = await deductCredits(
-        userId,
-        creditsUsed,
-        quota?.dailyCredits ?? null,
-        quota?.monthlyCredits ?? null,
-        "usage",
-        requestId,
-        `studio refine: ${choice.providerId}`,
-        quota?.weeklyCredits ?? null
-      );
-
-      await recordUsage(userId, choice.providerId, model ?? usage?.model ?? "", usage, requestId, deductResult === "ok" ? creditsUsed : 0);
-
-      return {
-        ok: true,
-        result,
-        aiSource: { tier: "premium", provider: choice.providerId, model: model ?? usage?.model ?? "", creditsUsed: deductResult === "ok" ? creditsUsed : 0 },
-      };
+      result = await refine({ ...refineInput, provider: choice.providerId, apiKey: credential, model });
     } catch (err) {
       if (err instanceof GatewayDenied) {
         // Never counted as a provider failure (this provider isn't
@@ -138,7 +156,51 @@ async function runPremiumRefine(
       lastError = err instanceof Error ? err.message : "Unknown error";
       // Try the next premium fallback, if any — never deducts credits for a
       // failed attempt (Priority 5).
+      continue;
     }
+
+    await recordProviderSuccess(choice.providerId, Date.now() - start);
+
+    const usage = result.usage;
+    const modelUsed = model ?? usage?.model ?? "";
+    const creditsUsed = usage ? creditsForUsage(usage.inputTokensEstimate, usage.outputTokensEstimate) : preCheckAmount;
+    const requestId = randomUUID();
+    const deductResult = await deductCredits(
+      userId,
+      creditsUsed,
+      quota?.dailyCredits ?? null,
+      quota?.monthlyCredits ?? null,
+      "usage",
+      requestId,
+      `studio refine: ${choice.providerId}`,
+      quota?.weeklyCredits ?? null
+    );
+
+    // A non-"ok" result means a daily/weekly/monthly cap or the balance
+    // stopped the charge. The refinement is NOT returned in that case: doing
+    // so (the previous behaviour) handed back a completed Premium generation,
+    // recorded zero credits, left the balance untouched, and so made every
+    // request past the cap free and unlimited — the cap enforced nothing.
+    //
+    // The provider has already been paid for this call by then, which is why
+    // the balance pre-check below the router runs first and makes reaching
+    // here rare; it cannot be eliminated entirely, because only
+    // deduct_credits (which holds the row lock) can decide a window limit
+    // authoritatively. The spend is still recorded, as a quota_exhausted
+    // ledger row charged 0, so the gap between provider cost and revenue
+    // stays auditable rather than invisible.
+    if (deductResult !== "ok") {
+      await recordUsage(userId, choice.providerId, modelUsed, usage, requestId, 0, "quota_exhausted");
+      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+    }
+
+    await recordUsage(userId, choice.providerId, modelUsed, usage, requestId, creditsUsed, "success");
+
+    return {
+      ok: true,
+      result,
+      aiSource: { tier: "premium", provider: choice.providerId, model: modelUsed, creditsUsed },
+    };
   }
 
   return { ok: false, status: 502, error: lastError };
@@ -154,8 +216,11 @@ interface UsageLedgerRow extends Record<string, unknown> {
   output_tokens: number | null;
   scholar_credits_charged: number;
   request_id: string;
-  status: "success";
+  status: UsageStatus;
 }
+
+/** Subset of ai_usage_ledger.status (schema_ai_engine.sql) this route writes. */
+type UsageStatus = "success" | "quota_exhausted";
 
 async function recordUsage(
   userId: string,
@@ -163,7 +228,8 @@ async function recordUsage(
   modelId: string,
   usage: { inputTokensEstimate: number; outputTokensEstimate: number } | undefined,
   requestId: string,
-  creditsCharged: number
+  creditsCharged: number,
+  status: UsageStatus
 ): Promise<void> {
   const config = getSupabaseRestConfig();
   if (!config) return;
@@ -178,7 +244,7 @@ async function recordUsage(
     output_tokens: usage?.outputTokensEstimate ?? null,
     scholar_credits_charged: creditsCharged,
     request_id: requestId,
-    status: "success",
+    status,
   });
 }
 
@@ -306,7 +372,21 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
 
     if (wantsPremium) {
       const userId = (req as express.Request & { user: AuthenticatedUser }).user.id;
-      const outcome = await runPremiumRefine(userId, baseInput);
+      // runPremiumRefine reads Supabase before it reaches its own try/catch
+      // (routing candidates, entitlement, quota), and a SupabaseRestError from
+      // any of those throws straight out. Express 4 does not catch rejections
+      // from an async handler and this app installs no error middleware, so
+      // outside a try this left the request with no response at all — the
+      // client hung until it timed out. Everything below is already inside
+      // the handler's own try; only this call was not.
+      let outcome: Awaited<ReturnType<typeof runPremiumRefine>>;
+      try {
+        outcome = await runPremiumRefine(userId, baseInput);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
+      }
+
       if (!outcome.ok) {
         // Matches the manual path's own 428/403 body shape exactly (below)
         // — src/desk/api.ts's refinePassage() parses both identically

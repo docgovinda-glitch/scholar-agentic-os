@@ -105,9 +105,18 @@ export class SupabaseTable<Row extends Record<string, unknown>> {
     });
   }
 
-  /** Upsert on the table's primary key. */
-  async upsert(row: Partial<Row> | Partial<Row>[]): Promise<void> {
-    await this.request("", {
+  /**
+   * Upsert. `onConflict` names the unique column(s) PostgREST resolves
+   * against, e.g. "provider_id,label"; omit it only when the table's PRIMARY
+   * KEY is the intended conflict target AND the caller supplies that key.
+   *
+   * A row carrying a freshly generated primary key can never collide with an
+   * existing one, so an upsert without `onConflict` over such a row is
+   * always a plain INSERT — silently, with no error to notice. Either send
+   * the key you mean to match on, or name a different conflict target here.
+   */
+  async upsert(row: Partial<Row> | Partial<Row>[], onConflict?: string): Promise<void> {
+    await this.request(onConflict ? `?on_conflict=${encodeURIComponent(onConflict)}` : "", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify(row),
