@@ -605,3 +605,175 @@ describe("POST /api/studio/refine — Premium path", () => {
     expect(db.capturedWrites["deduct_credits_calls"]?.length).toBe(1);
   });
 });
+
+/**
+ * Regressions for the credit/bookkeeping half of runPremiumRefine — the
+ * behaviour that decides whether a Premium cap actually costs anything to
+ * exceed, and whether a healthy provider can be blamed for a Supabase blip.
+ */
+describe("POST /api/studio/refine — Premium metering", () => {
+  it("does not hand back a generation it could not charge for when a window limit is hit", async () => {
+    const db: MockDb = {
+      entitlement: ACTIVE_ENTITLEMENT,
+      platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
+      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" } }],
+      health: [{ provider_id: "openai", status: "healthy" }],
+      balance: [{ balance: 500 }],
+      plans: PLAN,
+      overrides: [],
+      // The balance is fine; the DAILY window is what stops the charge, and
+      // only deduct_credits can know that — it holds the row lock.
+      deductResult: "daily_limit_exceeded",
+      providerResponse: successfulProviderResponse,
+      capturedWrites: {},
+    };
+    mockDb(db);
+    await grantConsent("prem-credit-1", "openai");
+
+    const res = await request(app).post("/api/studio/refine").send({
+      sessionId: "prem-credit-1",
+      passageId: "pc1",
+      text: "The sample comprised 240 participants.",
+      level: "clarity",
+      useEngine: "premium",
+    });
+
+    // Previously this returned 200 with the full refinement, creditsUsed: 0,
+    // and an untouched balance — making every request past the cap free and
+    // unlimited, which is to say the cap enforced nothing at all.
+    expect(res.status).toBe(402);
+    expect(res.body.error).toMatch(/daily/i);
+    expect(res.body.revised).toBeUndefined();
+
+    // The provider was still paid, so the spend stays on the ledger — as a
+    // quota_exhausted row charged 0, not as a silent gap.
+    const ledger = db.capturedWrites["ai_usage_ledger"] ?? [];
+    expect(ledger.length).toBe(1);
+    expect(ledger[0].status).toBe("quota_exhausted");
+    expect(ledger[0].scholar_credits_charged).toBe(0);
+  });
+
+  it("402s before calling the provider when the balance cannot cover the estimate", async () => {
+    const db: MockDb = {
+      entitlement: ACTIVE_ENTITLEMENT,
+      platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
+      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" } }],
+      health: [{ provider_id: "openai", status: "healthy" }],
+      // Non-zero, so the router still offers the provider — but nowhere near
+      // the estimate for this passage.
+      balance: [{ balance: 1 }],
+      plans: [{ id: "premium_basic", monthly_credits: 5000, daily_credits: 200, per_task_max_credits: null, concurrency_limit: 2 }],
+      overrides: [],
+      deductResult: "ok",
+      providerResponse: successfulProviderResponse,
+      capturedWrites: {},
+    };
+    mockDb(db);
+    await grantConsent("prem-credit-2", "openai");
+
+    const res = await request(app).post("/api/studio/refine").send({
+      sessionId: "prem-credit-2",
+      passageId: "pc2",
+      text: "A very long passage that will not fit in one credit. ".repeat(100),
+      level: "clarity",
+      useEngine: "premium",
+    });
+
+    expect(res.status).toBe(402);
+    // Nothing was charged and nothing was spent with a provider.
+    expect(db.capturedWrites["deduct_credits_calls"] ?? []).toEqual([]);
+    expect(db.capturedWrites["ai_usage_ledger"] ?? []).toEqual([]);
+  });
+
+  it("does not blame the provider or re-run the generation when post-success bookkeeping fails", async () => {
+    let providerCalls = 0;
+    const db: MockDb = {
+      entitlement: ACTIVE_ENTITLEMENT,
+      platformCredentials: [
+        encryptedCredentialRow("openai", "sk-openai-test-key"),
+        encryptedCredentialRow("gemini", "sk-gemini-test-key"),
+      ],
+      providers: [
+        { id: "openai", metadata: { defaultModel: "gpt-4o-mini" } },
+        { id: "gemini", metadata: { defaultModel: "gemini-2.0-flash" } },
+      ],
+      health: [
+        { provider_id: "openai", status: "healthy" },
+        { provider_id: "gemini", status: "healthy" },
+      ],
+      balance: [{ balance: 500 }],
+      plans: PLAN,
+      overrides: [],
+      providerResponse: () => {
+        providerCalls++;
+        return successfulProviderResponse();
+      },
+      capturedWrites: {},
+    };
+    mockDb(db);
+
+    // Make the credit RPC itself fail, AFTER the provider has already answered.
+    const withFailingDeduct = global.fetch as any;
+    global.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/rest/v1/rpc/deduct_credits")) {
+        return Promise.resolve({ ok: false, status: 500, text: async () => "boom", json: async () => ({}) } as Response);
+      }
+      return withFailingDeduct(input, init);
+    }) as typeof fetch;
+
+    await grantConsent("prem-credit-3", "openai");
+    await grantConsent("prem-credit-3", "gemini");
+
+    const res = await request(app).post("/api/studio/refine").send({
+      sessionId: "prem-credit-3",
+      passageId: "pc3",
+      text: "The sample comprised 240 participants.",
+      level: "clarity",
+      useEngine: "premium",
+    });
+
+    // deduct/record used to share the provider call's catch, so a failure
+    // here marked a provider that had just answered correctly as DOWN and
+    // fell through to the next one — paying two providers for one request.
+    expect(providerCalls).toBe(1);
+    const healthWrites = db.capturedWrites["provider_health"] ?? [];
+    expect(healthWrites.filter((w: any) => w.status === "down")).toEqual([]);
+    expect(res.status).toBe(503);
+  });
+
+  it("records the model the adapter actually used, never an empty string, when the catalog has no default", async () => {
+    const db: MockDb = {
+      entitlement: ACTIVE_ENTITLEMENT,
+      platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
+      // metadata.defaultModel absent -> routingCandidates maps it to "", which
+      // `??` passed straight through as the model id.
+      providers: [{ id: "openai", metadata: {} }],
+      health: [{ provider_id: "openai", status: "healthy" }],
+      balance: [{ balance: 500 }],
+      plans: PLAN,
+      overrides: [],
+      deductResult: "ok",
+      providerResponse: successfulProviderResponse,
+      capturedWrites: {},
+    };
+    mockDb(db);
+    await grantConsent("prem-credit-4", "openai");
+
+    const res = await request(app).post("/api/studio/refine").send({
+      sessionId: "prem-credit-4",
+      passageId: "pc4",
+      text: "The sample comprised 240 participants.",
+      level: "clarity",
+      useEngine: "premium",
+    });
+
+    expect(res.status).toBe(200);
+    const ledger = db.capturedWrites["ai_usage_ledger"] ?? [];
+    expect(ledger.length).toBe(1);
+    // Whatever the adapter reported, the recorded model must not be the empty
+    // string the catalog default produced.
+    expect(ledger[0].model_id).not.toBe("");
+    expect(res.body.aiSource.model).not.toBe("");
+  });
+});

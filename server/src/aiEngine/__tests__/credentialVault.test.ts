@@ -121,3 +121,47 @@ describe("removeCredential", () => {
     expect(url).toContain("id=eq.c1");
   });
 });
+
+describe("credential rotation", () => {
+  it("upserts on (provider_id, label) and sends no id, so a rotation replaces the row instead of adding a second active one", async () => {
+    let writeUrl = "";
+    let writtenRow: any = null;
+
+    mockFetch((url, init) => {
+      if (init?.method === "POST") {
+        writeUrl = url;
+        writtenRow = JSON.parse(init.body as string);
+        return textResponse(201, "");
+      }
+      return textResponse(200, "[]");
+    });
+
+    await storeCredential("openai", "default", "sk-rotated-key-9999", "admin-1");
+
+    // Without a conflict target PostgREST resolves against the primary key.
+    // The payload used to carry a freshly generated `id`, which can never
+    // collide, so merge-duplicates silently degraded to a plain INSERT and
+    // every rotation left the previous key behind, still status='active'.
+    expect(writeUrl).toContain("on_conflict=provider_id%2Clabel");
+    expect(writtenRow).not.toHaveProperty("id");
+    expect(writtenRow.status).toBe("active");
+    // The previous key's verification timestamp must not carry over onto a
+    // credential that is no longer the one stored.
+    expect(writtenRow.last_verified_at).toBeNull();
+  });
+
+  it("asks for the newest active row deterministically, so a pre-migration database with duplicates cannot serve a rotated-away key", async () => {
+    let selectUrl = "";
+    mockFetch((url) => {
+      selectUrl = url;
+      return textResponse(200, "[]");
+    });
+
+    await getDecryptedCredential("openai");
+
+    expect(selectUrl).toContain("status=eq.active");
+    // A bare `limit=1` with no ORDER BY lets PostgREST return either
+    // duplicate; the order makes "newest wins" the guaranteed outcome.
+    expect(selectUrl).toContain("order=created_at.desc,id.desc");
+  });
+});

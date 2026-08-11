@@ -14,6 +14,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
+import { getCaptchaConfig } from "./captchaService";
 
 export interface SignUpInput {
   username: string;
@@ -50,16 +51,38 @@ export function safeAuthErrorMessage(error: { message?: string; status?: number 
 }
 
 /**
- * Registers a new scholar. Verifies CAPTCHA token if provided, then creates
- * an auth.users row via Supabase Auth. The on_auth_user_created trigger
- * (supabase/schema.sql) automatically creates a matching profiles row with
- * account_status = 'active'. Accounts are immediately usable after email
- * verification. Automated abuse protection (CAPTCHA, rate limiting, email
- * verification) provides security without manual admin intervention.
+ * Registers a new scholar, then lets the on_auth_user_created trigger
+ * (supabase/schema.sql) create the matching profiles row with
+ * account_status = 'active'. Accounts are usable after email verification.
+ *
+ * CAPTCHA — where it is actually enforced, and why it is enforced twice:
+ *
+ * This function runs in the BROWSER and calls Supabase Auth directly, so no
+ * check written here can be a security boundary: a bot skips this code and
+ * POSTs to Supabase's /auth/v1/signup itself. The previous version guarded
+ * the whole verification with `if (input.captchaToken)`, which meant simply
+ * omitting the field — the exact thing an abusive client does — skipped it,
+ * and Turnstile protected nothing at all.
+ *
+ * The real enforcement point is therefore `options.captchaToken` below:
+ * Supabase Auth validates it server-side, at the endpoint that actually
+ * creates the user, and rejects the signup itself when it is missing or
+ * bad. That requires Turnstile to be switched on in the Supabase dashboard
+ * (Authentication -> Attack Protection); VITE_CAPTCHA_SITE_KEY on its own
+ * only renders the widget.
+ *
+ * The /api/auth/verify-signup call is kept ahead of it as a fail-closed
+ * front door: it turns an unsolved challenge into a clear message before a
+ * signup attempt is made, and now refuses outright when CAPTCHA is
+ * configured but no token was produced, instead of falling through.
  */
 export async function signUp(input: SignUpInput): Promise<ServiceResult> {
-  // Verify CAPTCHA token if provided
-  if (input.captchaToken) {
+  const captcha = getCaptchaConfig();
+
+  if (captcha.enabled) {
+    if (!input.captchaToken) {
+      return { success: false, error: "Please complete the CAPTCHA challenge before creating your account." };
+    }
     try {
       const verifyResponse = await fetch("/api/auth/verify-signup", {
         method: "POST",
@@ -68,7 +91,7 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
       });
 
       if (!verifyResponse.ok) {
-        const errorData = (await verifyResponse.json()) as { error?: string };
+        const errorData = (await verifyResponse.json().catch(() => ({}))) as { error?: string };
         return { success: false, error: errorData.error || "CAPTCHA verification failed. Please try again." };
       }
     } catch (error) {
@@ -82,6 +105,7 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
     email: input.email,
     password: input.password,
     options: {
+      captchaToken: input.captchaToken,
       data: {
         username: input.username,
         full_name: input.fullName,

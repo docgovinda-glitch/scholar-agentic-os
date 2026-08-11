@@ -118,3 +118,56 @@ describe("cleanup", () => {
     expect(true).toBe(true);
   });
 });
+
+/**
+ * Express 4 does not catch a rejected promise from an `async` handler, and
+ * this app installs no error middleware — so a write route without its own
+ * error path left the request open with no status and no body, and the
+ * client simply waited until it timed out. The realistic trigger is a
+ * foreign-key violation from an ai_providers registry that has not been
+ * seeded yet, which is exactly the first-run state AI Setup runs in.
+ */
+describe("AI Access write routes answer instead of hanging when Supabase rejects", () => {
+  function mockFailingWrites() {
+    global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/auth/v1/user")) {
+        const token = (init?.headers as Record<string, string>)?.Authorization?.replace("Bearer ", "");
+        if (token === "alice-token") return Promise.resolve(jsonResponse(200, { id: ALICE, email: "alice@example.com" }));
+        return Promise.resolve(jsonResponse(401, {}));
+      }
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (url.includes("/rest/v1/user_ai_connections") && method !== "GET") {
+        return Promise.resolve(
+          textResponse(409, 'insert or update on table "user_ai_connections" violates foreign key constraint')
+        );
+      }
+      return Promise.resolve(textResponse(200, "[]"));
+    }) as unknown as typeof fetch;
+  }
+
+  it("POST /connections returns an error response rather than hanging", async () => {
+    const app = await buildApp();
+    mockFailingWrites();
+
+    const res = await request(app)
+      .post("/api/ai-access/connections")
+      .set("Authorization", "Bearer alice-token")
+      .send({ providerId: "gemini", tier: "free" });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBeTruthy();
+  });
+
+  it("DELETE /connections/:providerId returns an error response rather than hanging", async () => {
+    const app = await buildApp();
+    mockFailingWrites();
+
+    const res = await request(app)
+      .delete("/api/ai-access/connections/gemini")
+      .set("Authorization", "Bearer alice-token");
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBeTruthy();
+  });
+});

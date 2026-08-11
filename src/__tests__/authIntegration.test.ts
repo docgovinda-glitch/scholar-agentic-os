@@ -130,7 +130,11 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
       expect(mockAuth.signUp).not.toHaveBeenCalled();
     });
 
-    it("allows signup without CAPTCHA if token is not provided", async () => {
+    // This previously asserted the opposite ("allows signup without CAPTCHA if
+    // token is not provided"), which is precisely how a bot signs up: omitting
+    // the field skipped verification entirely and Turnstile protected nothing.
+    // With CAPTCHA configured, a missing token must fail closed.
+    it("refuses signup when CAPTCHA is configured but no token was produced", async () => {
       mockAuth.signUp.mockResolvedValueOnce({
         data: { user: { id: "user-456", email: "test2@example.com" } },
         error: null,
@@ -154,14 +158,56 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
         // No captchaToken provided
       });
 
-      expect(result.success).toBe(true);
-      // fetch should NOT be called if no CAPTCHA token
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/CAPTCHA/i);
+      // Rejected before any account could be created, and with no pointless
+      // round-trip to the verification endpoint.
+      expect(mockAuth.signUp).not.toHaveBeenCalled();
       expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("passes the CAPTCHA token to Supabase Auth, which is the enforcing side", async () => {
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+      mockAuth.signUp.mockResolvedValueOnce({
+        data: { user: { id: "user-457", email: "test3@example.com" } },
+        error: null,
+      });
+
+      await signUp({
+        username: "testuser3",
+        fullName: "Test User 3",
+        email: "test3@example.com",
+        phone: "+1234567890",
+        affiliation: "Test University",
+        authenticId: "T12347",
+        password: "TestPassword123!",
+        captchaToken: "valid_captcha_token",
+      });
+
+      // signUp() runs in the browser, so its own /api/auth/verify-signup check
+      // is a front door, not a boundary — a bot skips this code and posts to
+      // Supabase directly. The token therefore has to reach Supabase Auth,
+      // which validates it server-side at the endpoint that creates the user.
+      expect(mockAuth.signUp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: expect.objectContaining({ captchaToken: "valid_captcha_token" }),
+        })
+      );
     });
   });
 
   describe("Test 2: Email Verification Workflow", () => {
     it("creates user with unverified email status after signup", async () => {
+      // CAPTCHA is mocked as configured for this whole file, so a signup that
+      // is meant to SUCCEED has to carry a token and let verification pass —
+      // this test is about email verification, not about CAPTCHA.
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
       mockAuth.signUp.mockResolvedValueOnce({
         data: { user: { id: "user-789", email: "unverified@example.com" } },
         error: null,
@@ -175,6 +221,7 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
         affiliation: "Test University",
         authenticId: "T12347",
         password: "TestPassword123!",
+        captchaToken: "valid_captcha_token",
       });
 
       expect(result.success).toBe(true);
@@ -391,6 +438,12 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
 
   describe("Test 6: Account Status Validation", () => {
     it("sets account_status to 'active' on successful signup", async () => {
+      // See the note in Test 2: CAPTCHA is configured for this file, so a
+      // signup expected to succeed carries a token and passes verification.
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
       mockAuth.signUp.mockResolvedValueOnce({
         data: { user: { id: "user-active", email: "active@example.com" } },
         error: null,
@@ -404,6 +457,7 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
         affiliation: "Test University",
         authenticId: "T12350",
         password: "TestPassword123!",
+        captchaToken: "valid_captcha_token",
       });
 
       expect(result.success).toBe(true);
