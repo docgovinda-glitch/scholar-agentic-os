@@ -26,6 +26,12 @@ async function rpc(config: NonNullable<ReturnType<typeof getSupabaseRestConfig>>
   return res.json();
 }
 
+/** PostgREST's "no function matches these argument names" response — the shape it returns when p_weekly_limit isn't a parameter this database's deduct_credits has yet. */
+function isUnknownRpcSignatureError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes("rpc/deduct_credits 404") || message.includes("PGRST202") || message.includes("Could not find the function");
+}
+
 export async function deductCredits(
   userId: string,
   amount: number,
@@ -38,7 +44,7 @@ export async function deductCredits(
 ): Promise<DeductResult> {
   const config = getSupabaseRestConfig();
   if (!config) throw new Error("Supabase is not configured.");
-  const result = await rpc(config, "deduct_credits", {
+  const baseArgs = {
     p_user_id: userId,
     p_amount: amount,
     p_daily_limit: dailyLimit,
@@ -46,9 +52,21 @@ export async function deductCredits(
     p_reason: reason,
     p_request_id: requestId,
     p_note: note ?? null,
-    p_weekly_limit: weeklyLimit ?? null,
-  });
-  return result as DeductResult;
+  };
+  try {
+    const result = await rpc(config, "deduct_credits", { ...baseArgs, p_weekly_limit: weeklyLimit ?? null });
+    return result as DeductResult;
+  } catch (err) {
+    // The schema_ai_engine.sql migration adding p_weekly_limit may not be
+    // applied to this database yet (it's appended, idempotent, but still a
+    // manual step — see that file's own comment). Retrying without it
+    // means a not-yet-migrated database keeps working exactly as it did
+    // before this parameter existed, rather than every Premium generation
+    // failing outright until someone runs the migration.
+    if (!isUnknownRpcSignatureError(err)) throw err;
+    const result = await rpc(config, "deduct_credits", baseArgs);
+    return result as DeductResult;
+  }
 }
 
 export async function grantCredits(

@@ -59,6 +59,36 @@ describe("deductCredits", () => {
     global.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 500, text: async () => "boom" } as Response)) as unknown as typeof fetch;
     await expect(deductCredits("u1", 30, null, null, "usage", "req-1")).rejects.toThrow();
   });
+
+  it("falls back to the pre-migration 7-argument call when the database doesn't have p_weekly_limit yet, instead of failing every deduction", async () => {
+    const bodies: any[] = [];
+    let call = 0;
+    global.fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      call += 1;
+      bodies.push(init?.body ? JSON.parse(init.body as string) : null);
+      if (call === 1) {
+        // PostgREST's real shape for "no function matches these argument names".
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          text: async () => JSON.stringify({ code: "PGRST202", message: "Could not find the function public.deduct_credits(...) in the schema cache" }),
+        } as Response);
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => "ok" } as Response);
+    }) as unknown as typeof fetch;
+
+    const result = await deductCredits("u1", 30, 200, 5000, "usage", "req-1", "generation", 1000);
+
+    expect(result).toBe("ok");
+    expect(call).toBe(2);
+    expect(bodies[0]).toHaveProperty("p_weekly_limit", 1000);
+    expect(bodies[1]).not.toHaveProperty("p_weekly_limit");
+  });
+
+  it("still throws (does not silently retry) on an unrelated RPC failure", async () => {
+    global.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 500, text: async () => "internal error" } as Response)) as unknown as typeof fetch;
+    await expect(deductCredits("u1", 30, null, null, "usage", "req-1", undefined, 1000)).rejects.toThrow();
+  });
 });
 
 describe("grantCredits", () => {

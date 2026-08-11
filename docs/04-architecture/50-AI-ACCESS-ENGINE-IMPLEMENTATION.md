@@ -620,19 +620,41 @@ in the UI at all — the `/quota-overrides` route existed server-side with
 no client caller) now sets monthly/weekly/daily together, reached through
 a real user search rather than a raw user-id paste field.
 
-**Schema migration is written, not yet applied to production.** This
-session has no Supabase service-role credential or direct database
-connection — every table/column addition and the `deduct_credits`
-replacement are appended to `supabase/schema_ai_engine.sql` under its own
-"ADMIN ROSTER v2" heading, written idempotently (`add column if not
-exists`, `create or replace function`) so it's safe to run once against a
-database that already has the rest of this file applied. **Whoever has the
+**Schema migration is written, not yet applied to production — and the
+code was specifically hardened to stay working until it is.** This session
+has no Supabase service-role credential or direct database connection —
+every table/column addition and the `deduct_credits` replacement are
+appended to `supabase/schema_ai_engine.sql` under its own "ADMIN ROSTER
+v2" heading, written idempotently (`add column if not exists`,
+`create or replace function`) so it's safe to run once against a database
+that already has the rest of this file applied. **Whoever has the
 production Supabase SQL Editor needs to run the new block at the bottom of
-that file, and set `MAIN_ADMIN_EMAIL` in Render's environment, before any
-of this section's features work in production** — until then, the code
-paths that touch the new columns/parameter will error (or, in
-`isAccountBlocked`'s and `getAdminInfo`'s explicitly fail-open designs,
-silently no-op) rather than corrupt anything.
+that file, and set `MAIN_ADMIN_EMAIL` in Render's environment, for the new
+features in this section to actually work.**
+
+Getting that ordering safe took a real fix, caught only by testing against
+the shape of a live, unmigrated database rather than assuming "additive
+migration" meant "safe to deploy first": PostgREST errors outright on a
+`select=` naming a column that doesn't exist yet, and on an RPC call
+whose JSON body names a parameter the stored function doesn't declare —
+neither behaves like a normal "column/param is just absent" case.
+`requireAdmin.ts`'s `lookupAdminRow` and `adminUsers.ts`'s `listAdmins`
+both dropped their explicit `select=user_id,...,scopes` column lists in
+favor of PostgREST's default `select=*`, which returns whatever columns
+actually exist — pre-migration, `scopes` is simply absent from the row,
+which `getAdminInfo`'s `row.scopes ?? []` already handled. `creditEngine.
+ts`'s `deductCredits()` now tries the call WITH `p_weekly_limit` first
+and, specifically on PostgREST's "could not find the function" response
+(not any other failure), retries once without it — so an unmigrated
+database's Premium generation path keeps working exactly as it did before
+this feature existed, rather than every deduction failing outright the
+moment this code deployed. Both are pinned by tests (`requireAdmin.test.ts`,
+`creditEngine.test.ts`'s "falls back to the pre-migration 7-argument
+call..."). New-only capabilities that write the new columns (granting a
+scoped admin, setting a weekly quota override) still require the
+migration to have run — there's no way around that, and they fail with a
+direct database error rather than silently doing nothing, which is the
+honest outcome for a feature that hasn't been enabled yet.
 
 **Tests.** `requireAdmin.test.ts` (+23: main-admin bypass never queries
 `admin_users`, `isMainAdmin`/`isValidScope`/`getAdminInfo` directly,

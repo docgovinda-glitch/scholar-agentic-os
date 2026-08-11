@@ -62,7 +62,12 @@ function profileTable() {
 }
 
 export async function listAdmins(): Promise<AdminUser[]> {
-  const rows = await adminTable().select("order=granted_at.asc&select=user_id,granted_by,granted_at,note,scopes");
+  // No explicit `select=` column list here either, for the same reason as
+  // requireAdmin.ts's lookupAdminRow: `scopes` may not exist yet on a
+  // database this migration hasn't been applied to, and PostgREST errors
+  // on a named column that isn't there — "*" degrades to whatever columns
+  // actually exist instead of breaking the whole roster listing.
+  const rows = await adminTable().select("order=granted_at.asc");
   if (rows.length === 0) return [];
 
   // Best-effort name resolution: admin_users only stores the id, and a

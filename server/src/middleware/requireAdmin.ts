@@ -79,7 +79,15 @@ async function lookupAdminRow(userId: string): Promise<AdminUserRow | undefined>
   const config = getSupabaseRestConfig();
   if (!config) return undefined;
   const table = new SupabaseTable<AdminUserRow>(config, "admin_users");
-  return table.selectOne(`user_id=eq.${encodeURIComponent(userId)}&select=user_id,scopes`);
+  // No explicit `select=` column list: PostgREST errors on a column that
+  // doesn't exist yet, and this table's `scopes` column is a migration
+  // that may not have been applied to a given database yet (see
+  // schema_ai_engine.sql's "ADMIN ROSTER v2"). Selecting "*" returns
+  // whatever columns actually exist — pre-migration, `scopes` is simply
+  // absent from the row and getAdminInfo's `row.scopes ?? []` already
+  // handles that — so admin auth itself never breaks on an unmigrated
+  // database, only the scope-specific features do.
+  return table.selectOne(`user_id=eq.${encodeURIComponent(userId)}`);
 }
 
 export async function getAdminInfo(user: AuthenticatedUser): Promise<AdminInfo> {
