@@ -85,6 +85,20 @@ export const checkIsAdmin = (): Promise<boolean> =>
 
 export const getAdminDashboard = () => api<Record<string, unknown>>("/api/admin/ai/dashboard");
 
+export interface AdminRosterEntry {
+  userId: string;
+  grantedBy: string | null;
+  grantedAt: string;
+  note: string | null;
+  username: string | null;
+  fullName: string | null;
+}
+export const getAdmins = () => api<AdminRosterEntry[]>("/api/admin/ai/admins");
+export const grantAdminAccess = (userId: string, note?: string) =>
+  api<{ success: true }>("/api/admin/ai/admins", { method: "POST", body: JSON.stringify({ userId, note }) });
+export const revokeAdminAccess = (userId: string) =>
+  api<{ success: true }>(`/api/admin/ai/admins/${encodeURIComponent(userId)}`, { method: "DELETE" });
+
 export interface AdminProvider {
   id: string;
   name: string;

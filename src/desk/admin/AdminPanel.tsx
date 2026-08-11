@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
 import {
   getAdminDashboard,
   getAdminProviders,
@@ -14,15 +15,19 @@ import {
   runOpportunityResearch,
   reviewOpportunity,
   getAuditLog,
+  getAdmins,
+  grantAdminAccess,
+  revokeAdminAccess,
   type AdminProvider,
   type PremiumPlan,
   type UsageRow,
   type PlatformBudget,
   type Opportunity,
   type AuditLogEntry,
+  type AdminRosterEntry,
 } from "../aiAccess/aiAccessApi";
 
-type Tab = "dashboard" | "providers" | "premium" | "usage" | "budget" | "opportunities" | "audit";
+type Tab = "dashboard" | "providers" | "premium" | "usage" | "budget" | "opportunities" | "admins" | "audit";
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "dashboard", label: "Dashboard" },
@@ -31,6 +36,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "usage", label: "Usage" },
   { id: "budget", label: "Cost & Budget" },
   { id: "opportunities", label: "AI Opportunity Agent" },
+  { id: "admins", label: "Admins" },
   { id: "audit", label: "Audit Logs" },
 ];
 
@@ -76,6 +82,7 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
         {tab === "usage" && <UsageTab />}
         {tab === "budget" && <BudgetTab />}
         {tab === "opportunities" && <OpportunitiesTab />}
+        {tab === "admins" && <AdminsTab />}
         {tab === "audit" && <AuditTab />}
       </div>
     </div>
@@ -418,6 +425,127 @@ function OpportunitiesTab() {
         </Card>
       ))}
       {opportunities.length === 0 && !error && <p className="text-sm text-[color:var(--text-muted)]">No pending opportunities. Run research to look for some.</p>}
+    </div>
+  );
+}
+
+/**
+ * Who can reach this panel at all. Before this tab existed, admin_users was
+ * only viewable or editable with a raw SQL statement in Supabase — invisible
+ * from the app, easy to lose track of. Granting/revoking here still goes
+ * through the same requireAdmin-gated routes as every other tab, so this is
+ * not a new hole: an admin is required to create another one.
+ */
+function AdminsTab() {
+  const [admins, setAdmins] = useState<AdminRosterEntry[]>([]);
+  const [selfId, setSelfId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [newUserId, setNewUserId] = useState("");
+  const [newNote, setNewNote] = useState("");
+
+  function load() {
+    getAdmins().then(setAdmins).catch((e) => setError((e as Error).message));
+  }
+  useEffect(() => {
+    load();
+    if (isSupabaseConfigured()) {
+      getSupabaseClient()
+        .auth.getUser()
+        .then(({ data }) => setSelfId(data.user?.id ?? null));
+    }
+  }, []);
+
+  async function handleGrant() {
+    setMessage(null);
+    setError(null);
+    try {
+      await grantAdminAccess(newUserId.trim(), newNote.trim() || undefined);
+      setMessage(`Granted admin access to ${newUserId.trim()}.`);
+      setNewUserId("");
+      setNewNote("");
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function handleRevoke(userId: string) {
+    setMessage(null);
+    setError(null);
+    try {
+      await revokeAdminAccess(userId);
+      setMessage(`Revoked admin access from ${userId}.`);
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <ErrorNotice error={error} />
+      {message && <p role="status" className="text-sm text-[color:var(--text-secondary)]">{message}</p>}
+
+      <Card>
+        <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Grant admin access</h2>
+        <p className="mt-1 text-xs text-[color:var(--text-muted)]">
+          Only grant this to someone who should be able to see and change every user's Premium entitlement, platform provider
+          credentials, and budget — everything on this screen.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            value={newUserId}
+            onChange={(e) => setNewUserId(e.target.value)}
+            placeholder="User id"
+            className="min-w-[220px] flex-1 rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2.5 py-1.5 text-sm"
+          />
+          <input
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder="Note (optional)"
+            className="w-56 rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2.5 py-1.5 text-sm"
+          />
+          <button
+            type="button"
+            onClick={handleGrant}
+            disabled={!newUserId.trim()}
+            className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          >
+            Grant admin
+          </button>
+        </div>
+      </Card>
+
+      <div className="space-y-2">
+        {admins.map((a) => (
+          <div key={a.userId} className="flex items-center justify-between rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-2.5">
+            <div>
+              <span className="text-sm font-medium text-[color:var(--text-primary)]">{a.fullName ?? a.username ?? a.userId}</span>
+              {a.username && <span className="ml-2 text-xs text-[color:var(--text-muted)]">@{a.username}</span>}
+              <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">
+                Granted {new Date(a.grantedAt).toLocaleDateString()}
+                {a.note ? ` — ${a.note}` : ""}
+                {a.userId === selfId ? " — this is you" : ""}
+              </p>
+            </div>
+            {a.userId === selfId ? (
+              <span className="shrink-0 text-xs text-[color:var(--text-muted)]" title="You can't revoke your own admin access here — ask another admin, or edit the database directly.">
+                (you)
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleRevoke(a.userId)}
+                className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[color:var(--state-danger)]"
+              >
+                Revoke
+              </button>
+            )}
+          </div>
+        ))}
+        {admins.length === 0 && !error && <p className="text-sm text-[color:var(--text-muted)]">No admins found.</p>}
+      </div>
     </div>
   );
 }

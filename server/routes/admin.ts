@@ -7,6 +7,7 @@ import { grantPremium, revokePremium } from "../src/aiEngine/entitlements";
 import { grantCredits } from "../src/aiEngine/creditEngine";
 import { writeAuditLog } from "../src/aiEngine/auditLog";
 import { runOpportunityResearch } from "../src/aiEngine/opportunityAgent";
+import { listAdmins, grantAdmin, revokeAdmin, AlreadyAdminError } from "../src/aiEngine/adminUsers";
 
 /**
  * Admin AI Infrastructure routes (Section 16) — every route here is gated
@@ -231,6 +232,46 @@ export function registerAdminRoutes(app: express.Express): void {
     await reviews.insert({ opportunity_id: req.params.id, admin_id: actor(req), decision, notes: notes ?? null } as any);
     await opportunities.update(`id=eq.${encodeURIComponent(req.params.id)}`, { status: decision } as any);
     await writeAuditLog(actor(req), "review_opportunity", "ai_opportunity", req.params.id, { decision, notes });
+    res.json({ success: true });
+  });
+
+  // ── Admins (who can reach this panel at all) ─────────────────────────
+  // admin_users otherwise has zero UI — the only other way to see or change
+  // this roster is a raw SQL statement against Supabase. Listing/granting/
+  // revoking here is itself gated by the same requireAdmin this whole
+  // router already enforces, so an admin is required to create another one.
+  admin.get("/admins", async (_req, res) => {
+    try {
+      res.json(await listAdmins());
+    } catch (err) {
+      res.status(503).json({ error: (err as Error).message });
+    }
+  });
+
+  admin.post("/admins", async (req, res) => {
+    const { userId, note } = req.body as { userId: string; note?: string };
+    if (!userId) return res.status(400).json({ error: "userId is required." });
+    try {
+      await grantAdmin(userId, actor(req), note);
+      res.json({ success: true });
+    } catch (err) {
+      if (err instanceof AlreadyAdminError) {
+        return res.status(409).json({ error: err.message });
+      }
+      res.status(503).json({ error: (err as Error).message });
+    }
+  });
+
+  admin.delete("/admins/:userId", async (req, res) => {
+    // Refusing self-revoke isn't about protecting any one admin — it's
+    // that admin_users has no other UI: if the last admin revoked
+    // themselves, nobody could ever grant admin access again short of a
+    // raw SQL statement in Supabase. Blocking it unconditionally is the
+    // simplest rule that can't produce that lockout.
+    if (req.params.userId === actor(req)) {
+      return res.status(400).json({ error: "You cannot revoke your own admin access here — ask another admin, or edit the database directly." });
+    }
+    await revokeAdmin(req.params.userId, actor(req));
     res.json({ success: true });
   });
 

@@ -449,11 +449,30 @@ function's own `TAVILY_API_KEY` secret.
 ## 12. Security properties verified, not merely asserted
 
 - `requireAdmin` (`server/src/middleware/requireAdmin.ts`) checked live
-  against every one of 18 admin routes: 401 with no session, 403 for a
-  real authenticated non-admin, pass-through for a real admin (58 tests,
+  against every one of 24 admin routes: 401 with no session, 403 for a
+  real authenticated non-admin, pass-through for a real admin (73 tests,
   `server/routes/__tests__/admin.authz.test.ts`).
   `server/routes/aiAccess.ts` scopes every query to the token-verified
   user id, never a client-supplied one (6 tests).
+- **Who is an admin is itself now visible and manageable, not just
+  enforced.** `admin_users` (`supabase/schema_ai_engine.sql`) is the sole
+  authorization source of truth for `requireAdmin` — RLS with zero
+  policies, unreachable by any client-held key, only the server's
+  service-role key can touch it. Before this pass, the only way to see or
+  change that roster was a raw SQL statement in the Supabase dashboard.
+  `server/src/aiEngine/adminUsers.ts` (`listAdmins`/`grantAdmin`/
+  `revokeAdmin`) and a new "Admins" tab in `AdminPanel.tsx` make it
+  visible and editable — but only through the same `requireAdmin`-gated
+  `/api/admin/ai/admins` routes as everything else, so granting admin
+  status is itself an admin-only, audited action (`writeAuditLog`), never
+  a new hole. An admin can never revoke their own access through this UI
+  (`server/routes/admin.ts`'s `DELETE /admins/:userId` rejects
+  `userId === actor(req)` with 400) — the only other way to edit
+  `admin_users` is raw SQL, so a self-revoke risks a total lockout with no
+  path back in; this rule exists to make that impossible, not to protect
+  any individual admin. 9 tests (`server/routes/__tests__/
+  admin.admins.test.ts`) cover the roster-profile join, a duplicate grant
+  returning a clear 409 rather than a raw 500, and the self-revoke block.
 - `deduct_credits`/`grant_credits`: `EXECUTE` confirmed restricted to
   `service_role` + `postgres` only, via a live query against
   `information_schema.routine_privileges` — not just written in the
