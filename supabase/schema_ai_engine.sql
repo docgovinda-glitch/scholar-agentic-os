@@ -594,11 +594,19 @@ alter table public.premium_plans add column if not exists weekly_credits integer
 alter table public.credit_balances add column if not exists weekly_used numeric not null default 0;
 alter table public.credit_balances add column if not exists weekly_reset_at timestamptz not null default now();
 
--- Same function identity as before (uuid, numeric, numeric, numeric, text,
--- uuid, text) plus one new trailing parameter with a default — Postgres
--- treats this as replacing the existing function (preserving its OID and
--- anything depending on it) rather than creating an overload, provided every
--- new parameter has a default and comes after all non-default parameters.
+-- Adding a parameter changes the function's identity (Postgres identifies a
+-- function by name + full parameter TYPE list, not a prefix of it) — even
+-- with a default, `create or replace function` on a new signature creates a
+-- SECOND overload rather than replacing the seven-argument original
+-- (confirmed against production: both existed simultaneously, correctly
+-- locked down, until the explicit drop below). The drop first makes this
+-- file's re-application idempotent and converges to one function, matching
+-- what every other statement in this section already does with
+-- `if not exists`. Both the drop and the create are safe to run against a
+-- database that already applied only the seven-argument version, or one
+-- that's already been through this exact drop-then-create once before.
+drop function if exists public.deduct_credits(uuid, numeric, numeric, numeric, text, uuid, text);
+
 -- The revoke/grant below re-states the same lockdown this function has
 -- always had (§ "CREDIT ENGINE" above) against its new signature.
 create or replace function public.deduct_credits(
