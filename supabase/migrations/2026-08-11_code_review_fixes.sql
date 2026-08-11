@@ -39,23 +39,22 @@ alter table public.profiles
   add column if not exists account_status text not null default 'active'
   check (account_status in ('active', 'restricted', 'suspended', 'deleted'));
 
--- Carry forward any project still on the old boolean: an account that was
--- never approved becomes 'restricted' rather than silently 'active'. Runs only
--- where is_approved still exists, and only over rows left at the 'active'
--- default, so re-running it cannot overwrite an admin's later decision.
-do $$
-begin
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'profiles' and column_name = 'is_approved'
-  ) then
-    execute $sql$
-      update public.profiles
-        set account_status = 'restricted'
-        where is_approved = false and account_status = 'active'
-    $sql$;
-  end if;
-end $$;
+-- DELIBERATELY NO is_approved -> account_status CARRY-FORWARD.
+--
+-- An earlier draft of this migration mapped `is_approved = false` to
+-- 'restricted', on the theory that a never-approved account should not be
+-- silently activated. Checking the live database first showed that would have
+-- been actively harmful: every profile there carries is_approved = false while
+-- correctly sitting at account_status = 'active', because the product retired
+-- admin approval in favour of automatic activation (see handle_new_user in
+-- schema.sql) and left the old boolean behind at its `default false`. The
+-- column records the absence of a flow, not a decision about any user, so
+-- reading it as one would have suspended the entire user base — including the
+-- main admin, locking the project's own owner out.
+--
+-- account_status is therefore left exactly as it stands. is_approved is left
+-- in place too rather than dropped: it is inert, and removing a column is not
+-- something a fix-up migration should decide on its own.
 
 -- ----------------------------------------------------------------------------
 -- 2. account_status must be admin-only, enforced rather than asserted
