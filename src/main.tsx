@@ -5,13 +5,19 @@ import './index.css';
 import { warmServer } from './services/serverWarmup';
 
 /**
- * Desk (docs 20/21/22) is the only client now — see docs
+ * Desk (docs 20/21/22) is the main client — see docs
  * 61-CLIENT-CONSOLIDATION.md. It previously lived under /desk behind a
  * lazy-loaded pathname check, coexisting with the legacy client mounted at
  * "/". Legacy has been fully retired: every real feature it had that Desk
  * lacked was ported first (Vault upload/DOI lookup, PDF/ODT export,
  * submission tracking, Pocket's mobile companion), then legacy's code was
  * deleted outright rather than kept as a fallback.
+ *
+ * /admin is the one other real destination: the Admin AI Infrastructure
+ * panel's own dedicated page (src/admin/AdminApp.tsx), not a button
+ * anywhere inside Desk — no user-facing link ever points at it. A router
+ * library would be overkill for two possible roots; this is the same
+ * lazy pathname check Desk itself used to live behind.
  */
 
 // Start waking the server before rendering, not after the first user action.
@@ -24,8 +30,20 @@ import { warmServer } from './services/serverWarmup';
 // to a state and never rejects, so nothing here can block or break rendering.
 void warmServer();
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <DeskApp />
-  </StrictMode>,
-);
+const root = createRoot(document.getElementById('root')!);
+
+if (window.location.pathname.startsWith('/admin')) {
+  import('./admin/AdminApp.tsx').then(({ default: AdminApp }) => {
+    root.render(
+      <StrictMode>
+        <AdminApp />
+      </StrictMode>,
+    );
+  });
+} else {
+  root.render(
+    <StrictMode>
+      <DeskApp />
+    </StrictMode>,
+  );
+}

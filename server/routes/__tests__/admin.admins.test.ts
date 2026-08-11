@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import express from "express";
+import { SCOPES } from "../../src/middleware/requireAdmin";
 
 const ADMIN_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const OTHER_ADMIN_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -49,8 +50,9 @@ function mockFetch(state: MockState) {
     if (url.includes("/rest/v1/admin_users")) {
       if (method === "GET") {
         if (url.includes(`user_id=eq.${ADMIN_ID}`)) {
-          // requireAdmin's own lookup.
-          return Promise.resolve(jsonResponse(200, [{ user_id: ADMIN_ID }]));
+          // requireAdmin's own lookup — full scopes, since this file tests
+          // the /admins routes' own business logic, not scope gating.
+          return Promise.resolve(jsonResponse(200, [{ user_id: ADMIN_ID, scopes: SCOPES }]));
         }
         // listAdmins()'s full-roster select.
         return Promise.resolve(jsonResponse(200, state.adminUsersRows));
@@ -147,6 +149,55 @@ describe("POST /api/admin/ai/admins", () => {
       .send({ userId: TARGET_ID });
     expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/already an admin/i);
+  });
+
+  it("400s a grant naming an unknown scope", async () => {
+    const app = await buildApp({ adminUsersRows: [], insertShouldConflict: false });
+    const res = await request(app)
+      .post("/api/admin/ai/admins")
+      .set("Authorization", "Bearer admin-token")
+      .send({ userId: TARGET_ID, scopes: ["manage_premium", "not_a_real_scope"] });
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts a grant with a real subset of scopes", async () => {
+    const app = await buildApp({ adminUsersRows: [], insertShouldConflict: false });
+    const res = await request(app)
+      .post("/api/admin/ai/admins")
+      .set("Authorization", "Bearer admin-token")
+      .send({ userId: TARGET_ID, scopes: ["manage_premium", "manage_users"] });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("PATCH /api/admin/ai/admins/:userId/scopes", () => {
+  it("updates another admin's scopes", async () => {
+    const app = await buildApp({ adminUsersRows: [], insertShouldConflict: false });
+    const res = await request(app)
+      .patch(`/api/admin/ai/admins/${TARGET_ID}/scopes`)
+      .set("Authorization", "Bearer admin-token")
+      .send({ scopes: ["manage_budget"] });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true });
+  });
+
+  it("400s an unknown scope", async () => {
+    const app = await buildApp({ adminUsersRows: [], insertShouldConflict: false });
+    const res = await request(app)
+      .patch(`/api/admin/ai/admins/${TARGET_ID}/scopes`)
+      .set("Authorization", "Bearer admin-token")
+      .send({ scopes: ["not_a_real_scope"] });
+    expect(res.status).toBe(400);
+  });
+
+  it("refuses to let an admin edit their own scopes here", async () => {
+    const app = await buildApp({ adminUsersRows: [], insertShouldConflict: false });
+    const res = await request(app)
+      .patch(`/api/admin/ai/admins/${ADMIN_ID}/scopes`)
+      .set("Authorization", "Bearer admin-token")
+      .send({ scopes: ["manage_budget"] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/cannot change your own permissions/i);
   });
 });
 

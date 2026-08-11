@@ -501,3 +501,154 @@ function's own `TAVILY_API_KEY` secret.
   pre-existing forced-Premium-without-entitlement and quota-bypass tests,
   unaffected by this change) and are never silently retried against a
   different Premium provider.
+
+## 13. Admin plane: dedicated `/admin`, permission scopes, user management
+
+Doc `49`'s target architecture describes a fully separate admin plane —
+different deployment, different credentials, a signed one-way registry.
+That is out of proportion for this product's actual operational scale (see
+doc `49` §1's own "two people, not an SRE" framing) and remains future
+work; what shipped here is the practical middle ground the product needed
+now: a genuinely isolated *entry point* on the same deployment, plus real
+per-admin permission scoping and the user-management capabilities doc `49`
+§2's "User management" row calls for, which didn't exist in any form
+before this pass.
+
+**Isolation: `/admin` is its own page, not a button.** Before this pass,
+`AiAccessPage.tsx` — reachable by every signed-in user, by design, since
+it's each user's own AI-connection status view — conditionally rendered an
+"Admin" button for whoever `checkIsAdmin()` said was an admin. That button
+and its `AdminPanel` import are gone from that file entirely. The panel now
+lives only behind `src/admin/AdminApp.tsx`, mounted at `/admin` by a
+pathname check in `main.tsx` (the same lazy-pathname pattern Desk itself
+used to live behind, per that file's own comment — no router library
+added for one extra destination). Three consequences:
+
+- No user-facing link anywhere in Desk points at `/admin` — reaching it
+  requires typing the URL.
+- Vite code-splits `AdminApp` into its own chunk (`AdminApp-*.js`, ~28KB);
+  an ordinary user's bundle never downloads the admin panel's code at all.
+- A non-admin who does land on `/admin` — signed out, or signed in but not
+  in `admin_users` — sees a plain `404 — page not found.`, not an "access
+  denied" that would confirm an admin system exists at that URL. `AdminApp`
+  reuses the same browser Supabase session Desk uses (one client,
+  localStorage-backed, same origin) — an admin already signed in elsewhere
+  in the browser skips straight to the server's `/whoami` check; anyone
+  else gets a plain username+password form, the same `signIn()` every
+  Scholar account already uses (an admin's admin-ness is a property of
+  their normal account, not a second credential).
+
+As every admin surface's own comment already said before this pass: the
+component being reachable proves nothing on its own — it's
+`server/routes/admin.ts`'s checks that matter. That remains true; this
+work makes the *client* isolation match it, since "any signed-in user can
+open the container the admin button lives in" was never actually a hole,
+but it was still worth closing so the admin surface isn't visible
+scaffolding in a bundle every user downloads.
+
+**Permission scopes, and a hardcoded root admin that can't be locked
+out.** `admin_users` (schema in `schema_ai_engine.sql`) gained a `scopes
+text[]` column — six named permissions (`manage_providers`,
+`manage_premium`, `manage_budget`, `manage_opportunities`, `manage_users`,
+`manage_admins`; the full list and what each unlocks lives in
+`server/src/middleware/requireAdmin.ts`'s `SCOPES`/`SCOPE_LABELS`).
+`requireAdmin` still answers "is this user an admin at all" (any row, any
+scopes, including none — enough for the read-only dashboard/usage/audit
+views); every mutating route additionally calls
+`requireScopeInline(req, res, scope)`, which reads the `req.adminInfo` the
+router-level `requireAdmin` already populated rather than re-querying. An
+admin the main admin granted zero scopes to can see everything read-only
+and change nothing.
+
+`MAIN_ADMIN_EMAIL` (server env var, `.env.example`) names one account that
+is never a row in `admin_users` at all — `isMainAdmin()` compares it
+against the verified token's own email on every request and, on a match,
+short-circuits to every scope without touching the database. This exists
+for one reason: `admin_users` has no way to bootstrap or recover itself —
+the `/admins` routes are the only non-SQL way to edit that table, and every
+one of them requires `manage_admins` to already be held by someone. Without
+an identity outside that table, the roster could be edited into a state
+with zero admins and no path back in short of raw SQL. The main admin is
+that identity — permanent by construction, not merely convention.
+
+The self-lockout rule from the original admin-roster pass generalizes the
+same way: an admin can revoke or re-scope anyone except themselves
+(`DELETE /admins/:userId`, `PATCH /admins/:userId/scopes`, and the new
+`PATCH /users/:userId/status` / `DELETE /users/:userId` all reject
+`userId === actor(req)`), so no admin can accidentally strip their own
+access with nothing left standing to reverse it.
+
+**User management — search, suspend/restore, permanent deletion.**
+`server/src/aiEngine/userAdmin.ts` is new. `searchUsers()` matches on
+`profiles.username`/`full_name` (a direct `ilike` query) and, for an
+email-shaped query, on email via GoTrue's admin user-list endpoint (paged
+and filtered in memory — the Admin API doesn't expose a reliable
+server-side email filter across Supabase versions, and this product's user
+count doesn't need anything fancier yet), merging both by user id.
+
+Suspend/restore (`setAccountStatus`) writes `profiles.account_status`
+(the enum has existed since `schema.sql`, but nothing ever wrote it from
+an admin action before this). This is now a REAL control, not merely a
+UI toggle: `requireAuth` (`server/src/middleware/auth.ts`) checks
+`account_status` on every authenticated request, not only the login
+screen's own client-side check — a suspended account's still-valid
+Supabase JWT previously reached every server route untouched, so "suspend"
+was cosmetic against any client that skipped the login screen. The check
+fails OPEN on a lookup error or a missing/malformed profile row (a
+transient Supabase hiccup must not lock out every authenticated user in
+the product, and the blast radius of that fail-open window is far smaller
+than the alternative) — only an actual, present, non-`'active'` string
+blocks a request.
+
+`hardDeleteUser()` is irreversible by design and treated that way: the
+client requires typing the account's current email before the button
+enables, and the server independently re-verifies that exact email against
+GoTrue's own record for that id (`getGoTrueUser`) before calling GoTrue's
+admin delete endpoint — never trusting the client's cached copy of who a
+user id belongs to. Deletion cascades through every table with
+`on delete cascade references auth.users(id)`.
+
+**Weekly credit window.** Alongside the existing daily/monthly windows,
+`credit_balances` gained `weekly_used`/`weekly_reset_at`, and
+`deduct_credits()` gained a `p_weekly_limit` parameter using the same
+lazy-reset pattern (`date_trunc('week', now())`, ISO week/Monday start) as
+the daily and monthly checks it sits between. `premium_plans` and
+`user_quota_overrides` both gained `weekly_credits`; `getEffectiveQuota()`
+resolves it the same override-then-plan-default way as every other quota
+field. The Premium admin tab's quota-override form (previously nonexistent
+in the UI at all — the `/quota-overrides` route existed server-side with
+no client caller) now sets monthly/weekly/daily together, reached through
+a real user search rather than a raw user-id paste field.
+
+**Schema migration is written, not yet applied to production.** This
+session has no Supabase service-role credential or direct database
+connection — every table/column addition and the `deduct_credits`
+replacement are appended to `supabase/schema_ai_engine.sql` under its own
+"ADMIN ROSTER v2" heading, written idempotently (`add column if not
+exists`, `create or replace function`) so it's safe to run once against a
+database that already has the rest of this file applied. **Whoever has the
+production Supabase SQL Editor needs to run the new block at the bottom of
+that file, and set `MAIN_ADMIN_EMAIL` in Render's environment, before any
+of this section's features work in production** — until then, the code
+paths that touch the new columns/parameter will error (or, in
+`isAccountBlocked`'s and `getAdminInfo`'s explicitly fail-open designs,
+silently no-op) rather than corrupt anything.
+
+**Tests.** `requireAdmin.test.ts` (+23: main-admin bypass never queries
+`admin_users`, `isMainAdmin`/`isValidScope`/`getAdminInfo` directly,
+`requireScope`/`requireScopeInline` pass/fail on every combination).
+`auth.test.ts` (+7: suspended/restricted/deleted accounts 403, active and
+restored accounts pass, missing-row and lookup-error fail open).
+`userAdmin.test.ts` (new, 10: profile/email search matching and merging,
+GoTrue-list failure doesn't lose profile matches, suspend/restore audit
+actions, delete confirmation match/mismatch/lookup-failure). `admin.
+admins.test.ts` (+7: scope validation on grant, scope editing, self-scope-
+edit blocked). `admin.users.test.ts` (new, 9: search/suspend/restore/
+delete business logic, self-action blocked for status and delete).
+`admin.authz.test.ts` (+ new "scope boundary" `describe.each`: a real
+admin with zero scopes gets 403 on every one of the 16 scope-gated routes
+— the existing "any real admin passes" coverage used a full-scope admin
+and would not have caught a missing `requireScopeInline` call).
+`AdminApp.test.tsx` (new, 7: login/not-found/authorized routing, failed
+and successful sign-in, sign-out). `quotaEngine.test.ts`/
+`creditEngine.test.ts` extended for `weeklyCredits`/`weekly_limit_exceeded`.

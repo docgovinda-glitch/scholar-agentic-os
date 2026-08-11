@@ -114,7 +114,8 @@ async function runPremiumRefine(
         quota?.monthlyCredits ?? null,
         "usage",
         requestId,
-        `studio refine: ${choice.providerId}`
+        `studio refine: ${choice.providerId}`,
+        quota?.weeklyCredits ?? null
       );
 
       await recordUsage(userId, choice.providerId, model ?? usage?.model ?? "", usage, requestId, deductResult === "ok" ? creditsUsed : 0);

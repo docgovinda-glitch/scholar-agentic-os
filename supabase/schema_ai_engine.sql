@@ -563,3 +563,128 @@ $$;
 
 revoke execute on function public.grant_credits(uuid, numeric, text, text) from public, anon, authenticated;
 grant execute on function public.grant_credits(uuid, numeric, text, text) to service_role;
+
+-- ============================================================================
+-- ADMIN ROSTER v2: per-admin permission scopes, and a weekly quota window
+-- ============================================================================
+--
+-- Idempotent additions on top of the tables/function above — safe to run
+-- against a database that already has this file applied. Adds two things:
+--
+-- 1. admin_users.scopes: until now every admin_users row meant "full access
+--    to everything requireAdmin gates" (a flat boolean). This adds named
+--    permission scopes so the hardcoded main admin (identified by
+--    MAIN_ADMIN_EMAIL, server/src/middleware/requireAdmin.ts — never a row
+--    in this table, so it can never be revoked by anyone including itself)
+--    can grant another admin a SUBSET of capabilities rather than all of
+--    them. The valid scope names are enforced in application code
+--    (server/src/middleware/requireAdmin.ts's SCOPES), not a DB check
+--    constraint, so adding a new scope later never requires a migration.
+--
+-- 2. A weekly credit window, alongside the existing daily/monthly ones —
+--    same lazy-reset pattern (a counter whose window has elapsed is zeroed
+--    the first time it's touched after the window passes), using
+--    date_trunc('week', now()) (ISO week, Monday start) for the boundary.
+
+alter table public.admin_users add column if not exists scopes text[] not null default '{}';
+
+alter table public.user_quota_overrides add column if not exists weekly_credits integer;
+alter table public.premium_plans add column if not exists weekly_credits integer;
+
+alter table public.credit_balances add column if not exists weekly_used numeric not null default 0;
+alter table public.credit_balances add column if not exists weekly_reset_at timestamptz not null default now();
+
+-- Same function identity as before (uuid, numeric, numeric, numeric, text,
+-- uuid, text) plus one new trailing parameter with a default — Postgres
+-- treats this as replacing the existing function (preserving its OID and
+-- anything depending on it) rather than creating an overload, provided every
+-- new parameter has a default and comes after all non-default parameters.
+-- The revoke/grant below re-states the same lockdown this function has
+-- always had (§ "CREDIT ENGINE" above) against its new signature.
+create or replace function public.deduct_credits(
+  p_user_id uuid,
+  p_amount numeric,
+  p_daily_limit numeric,
+  p_monthly_limit numeric,
+  p_reason text,
+  p_request_id uuid,
+  p_note text default null,
+  p_weekly_limit numeric default null
+) returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_balance numeric;
+  v_daily_used numeric;
+  v_weekly_used numeric;
+  v_monthly_used numeric;
+  v_daily_reset timestamptz;
+  v_weekly_reset timestamptz;
+  v_monthly_reset timestamptz;
+begin
+  insert into public.credit_balances (user_id) values (p_user_id)
+  on conflict (user_id) do nothing;
+
+  select balance, daily_used, weekly_used, monthly_used, daily_reset_at, weekly_reset_at, monthly_reset_at
+    into v_balance, v_daily_used, v_weekly_used, v_monthly_used, v_daily_reset, v_weekly_reset, v_monthly_reset
+    from public.credit_balances where user_id = p_user_id for update;
+
+  if v_daily_reset < date_trunc('day', now()) then
+    v_daily_used := 0;
+    v_daily_reset := date_trunc('day', now());
+  end if;
+  if v_weekly_reset < date_trunc('week', now()) then
+    v_weekly_used := 0;
+    v_weekly_reset := date_trunc('week', now());
+  end if;
+  if v_monthly_reset < date_trunc('month', now()) then
+    v_monthly_used := 0;
+    v_monthly_reset := date_trunc('month', now());
+  end if;
+
+  if p_daily_limit is not null and v_daily_used + p_amount > p_daily_limit then
+    update public.credit_balances set daily_used = v_daily_used, daily_reset_at = v_daily_reset,
+      weekly_used = v_weekly_used, weekly_reset_at = v_weekly_reset,
+      monthly_used = v_monthly_used, monthly_reset_at = v_monthly_reset where user_id = p_user_id;
+    return 'daily_limit_exceeded';
+  end if;
+  if p_weekly_limit is not null and v_weekly_used + p_amount > p_weekly_limit then
+    update public.credit_balances set daily_used = v_daily_used, daily_reset_at = v_daily_reset,
+      weekly_used = v_weekly_used, weekly_reset_at = v_weekly_reset,
+      monthly_used = v_monthly_used, monthly_reset_at = v_monthly_reset where user_id = p_user_id;
+    return 'weekly_limit_exceeded';
+  end if;
+  if p_monthly_limit is not null and v_monthly_used + p_amount > p_monthly_limit then
+    update public.credit_balances set daily_used = v_daily_used, daily_reset_at = v_daily_reset,
+      weekly_used = v_weekly_used, weekly_reset_at = v_weekly_reset,
+      monthly_used = v_monthly_used, monthly_reset_at = v_monthly_reset where user_id = p_user_id;
+    return 'monthly_limit_exceeded';
+  end if;
+  if v_balance < p_amount then
+    update public.credit_balances set daily_used = v_daily_used, daily_reset_at = v_daily_reset,
+      weekly_used = v_weekly_used, weekly_reset_at = v_weekly_reset,
+      monthly_used = v_monthly_used, monthly_reset_at = v_monthly_reset where user_id = p_user_id;
+    return 'insufficient_balance';
+  end if;
+
+  update public.credit_balances
+    set balance = v_balance - p_amount,
+        daily_used = v_daily_used + p_amount,
+        weekly_used = v_weekly_used + p_amount,
+        monthly_used = v_monthly_used + p_amount,
+        daily_reset_at = v_daily_reset,
+        weekly_reset_at = v_weekly_reset,
+        monthly_reset_at = v_monthly_reset,
+        updated_at = now()
+    where user_id = p_user_id;
+
+  insert into public.credit_ledger (user_id, delta, reason, request_id, note)
+    values (p_user_id, -p_amount, p_reason, p_request_id, p_note);
+
+  return 'ok';
+end;
+$$;
+
+revoke execute on function public.deduct_credits(uuid, numeric, numeric, numeric, text, uuid, text, numeric) from public, anon, authenticated;
+grant execute on function public.deduct_credits(uuid, numeric, numeric, numeric, text, uuid, text, numeric) to service_role;

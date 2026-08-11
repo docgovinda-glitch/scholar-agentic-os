@@ -1,13 +1,14 @@
 import express from "express";
 import { requireAuth, type AuthenticatedUser } from "../src/middleware/auth";
-import { requireAdmin } from "../src/middleware/requireAdmin";
+import { requireAdmin, requireScopeInline, isValidScope, type AdminInfo, type Scope } from "../src/middleware/requireAdmin";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest";
 import { listCredentials, storeCredential, removeCredential, setCredentialStatus } from "../src/aiEngine/credentialVault";
 import { grantPremium, revokePremium } from "../src/aiEngine/entitlements";
 import { grantCredits } from "../src/aiEngine/creditEngine";
 import { writeAuditLog } from "../src/aiEngine/auditLog";
 import { runOpportunityResearch } from "../src/aiEngine/opportunityAgent";
-import { listAdmins, grantAdmin, revokeAdmin, AlreadyAdminError } from "../src/aiEngine/adminUsers";
+import { listAdmins, grantAdmin, revokeAdmin, updateAdminScopes, AlreadyAdminError } from "../src/aiEngine/adminUsers";
+import { searchUsers, setAccountStatus, hardDeleteUser, DeleteConfirmationMismatchError } from "../src/aiEngine/userAdmin";
 
 /**
  * Admin AI Infrastructure routes (Section 16) — every route here is gated
@@ -15,16 +16,26 @@ import { listAdmins, grantAdmin, revokeAdmin, AlreadyAdminError } from "../src/a
  * server-verified check against public.admin_users, never a client-supplied
  * flag. Section 33 lists this file as previously an empty placeholder — no
  * admin surface existed anywhere in this codebase before it.
+ *
+ * requireAdmin alone means "some kind of admin" — enough for the read-only
+ * routes (dashboard, usage, budget/premium-plans/providers/models/
+ * platform-credentials GETs, audit log, admin roster listing). Every
+ * mutating route additionally calls requireScopeInline(req, res, scope) as
+ * its first line, reading the req.adminInfo the router-level requireAdmin
+ * already populated — see server/src/middleware/requireAdmin.ts's SCOPES
+ * for the full list and what each one gates.
  */
 export function registerAdminRoutes(app: express.Express): void {
   const admin = express.Router();
   admin.use(express.json());
   admin.use(requireAuth, requireAdmin);
 
-  // Cheapest possible check for "should the client show an Admin link at
-  // all" — reaching this handler already proves requireAdmin passed, so the
-  // body only needs to say so.
-  admin.get("/whoami", (_req, res) => res.json({ isAdmin: true }));
+  // What the client needs to decide which tabs to even show — reaching this
+  // handler already proves requireAdmin passed.
+  admin.get("/whoami", (req, res) => {
+    const info = (req as express.Request & { adminInfo: AdminInfo }).adminInfo;
+    res.json({ isAdmin: true, isMainAdmin: info.isMainAdmin, scopes: info.scopes });
+  });
 
   function actor(req: express.Request): string {
     return (req as express.Request & { user: AuthenticatedUser }).user.id;
@@ -76,6 +87,7 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.patch("/providers/:id", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_providers")) return;
     const providers = new SupabaseTable(restConfig(), "ai_providers");
     const patch = req.body as { enabled?: boolean };
     await providers.update(`id=eq.${encodeURIComponent(req.params.id)}`, { ...patch, updated_at: new Date().toISOString() } as any);
@@ -90,6 +102,7 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.patch("/models/:id", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_providers")) return;
     const models = new SupabaseTable(restConfig(), "ai_models");
     const patch = req.body as { enabled?: boolean; premium_eligible?: boolean; free_eligible?: boolean };
     await models.update(`id=eq.${encodeURIComponent(req.params.id)}`, { ...patch, updated_at: new Date().toISOString() } as any);
@@ -104,6 +117,7 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.post("/premium-plans", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_premium")) return;
     const plans = new SupabaseTable(restConfig(), "premium_plans");
     await plans.upsert({ ...(req.body as object), updated_at: new Date().toISOString() } as any);
     await writeAuditLog(actor(req), "upsert_premium_plan", "premium_plan", (req.body as { id?: string }).id ?? null, req.body as Record<string, unknown>);
@@ -112,6 +126,7 @@ export function registerAdminRoutes(app: express.Express): void {
 
   // ── Entitlements (grant/revoke Premium) ─────────────────────────────
   admin.post("/entitlements/grant", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_premium")) return;
     const { userId, planId, expiry } = req.body as { userId: string; planId: string; expiry: string | null };
     if (!userId || !planId) return res.status(400).json({ error: "userId and planId are required." });
     await grantPremium(userId, planId, expiry ?? null, actor(req));
@@ -119,6 +134,7 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.post("/entitlements/revoke", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_premium")) return;
     const { userId } = req.body as { userId: string };
     if (!userId) return res.status(400).json({ error: "userId is required." });
     await revokePremium(userId, actor(req));
@@ -126,13 +142,20 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   // ── Quota overrides ──────────────────────────────────────────────────
+  admin.get("/quota-overrides/:userId", async (req, res) => {
+    const overrides = new SupabaseTable(restConfig(), "user_quota_overrides");
+    res.json((await overrides.selectOne(`user_id=eq.${encodeURIComponent(req.params.userId)}`)) ?? null);
+  });
+
   admin.post("/quota-overrides", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_premium")) return;
     const overrides = new SupabaseTable(restConfig(), "user_quota_overrides");
     const body = req.body as { userId: string } & Record<string, unknown>;
     if (!body.userId) return res.status(400).json({ error: "userId is required." });
     await overrides.upsert({
       user_id: body.userId,
       monthly_credits: body.monthlyCredits ?? null,
+      weekly_credits: body.weeklyCredits ?? null,
       daily_credits: body.dailyCredits ?? null,
       per_task_max_credits: body.perTaskMaxCredits ?? null,
       concurrency_limit: body.concurrencyLimit ?? null,
@@ -146,6 +169,7 @@ export function registerAdminRoutes(app: express.Express): void {
 
   // ── Credits (admin grant / bonus) ───────────────────────────────────
   admin.post("/credits/grant", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_premium")) return;
     const { userId, amount, reason, note } = req.body as { userId: string; amount: number; reason?: "admin_grant" | "bonus"; note?: string };
     if (!userId || typeof amount !== "number" || amount <= 0) {
       return res.status(400).json({ error: "userId and a positive amount are required." });
@@ -169,6 +193,7 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.patch("/budget", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_budget")) return;
     const budgets = new SupabaseTable(restConfig(), "platform_budgets");
     await budgets.upsert({ id: 1, ...(req.body as object), updated_at: new Date().toISOString() } as any);
     await writeAuditLog(actor(req), "update_budget", "platform_budget", "1", req.body as Record<string, unknown>);
@@ -181,6 +206,7 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.post("/platform-credentials", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_providers")) return;
     const { providerId, label, credential } = req.body as { providerId: string; label?: string; credential: string };
     if (!providerId || !credential) return res.status(400).json({ error: "providerId and credential are required." });
     await storeCredential(providerId, label ?? "default", credential, actor(req));
@@ -189,6 +215,7 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.patch("/platform-credentials/:id/status", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_providers")) return;
     const { status } = req.body as { status: "active" | "disabled" | "error" };
     await setCredentialStatus(req.params.id, status);
     await writeAuditLog(actor(req), "update_platform_credential_status", "platform_credential", req.params.id, { status });
@@ -196,6 +223,7 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.delete("/platform-credentials/:id", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_providers")) return;
     await removeCredential(req.params.id);
     await writeAuditLog(actor(req), "remove_platform_credential", "platform_credential", req.params.id, {});
     res.json({ success: true });
@@ -209,6 +237,7 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.post("/opportunities/research", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_opportunities")) return;
     const { query } = req.body as { query: string };
     if (!query || query.trim().length < 3) return res.status(400).json({ error: "A research query is required." });
     try {
@@ -221,6 +250,7 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.post("/opportunities/:id/review", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_opportunities")) return;
     const { decision, notes } = req.body as { decision: "approved" | "rejected" | "ignored"; notes?: string };
     if (!["approved", "rejected", "ignored"].includes(decision)) {
       return res.status(400).json({ error: "decision must be approved, rejected, or ignored." });
@@ -249,10 +279,14 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.post("/admins", async (req, res) => {
-    const { userId, note } = req.body as { userId: string; note?: string };
+    if (!requireScopeInline(req, res, "manage_admins")) return;
+    const { userId, scopes, note } = req.body as { userId: string; scopes?: string[]; note?: string };
     if (!userId) return res.status(400).json({ error: "userId is required." });
+    if (scopes && scopes.some((s) => !isValidScope(s))) {
+      return res.status(400).json({ error: `Unknown scope in [${scopes.join(", ")}].` });
+    }
     try {
-      await grantAdmin(userId, actor(req), note);
+      await grantAdmin(userId, actor(req), scopes as Scope[] | undefined, note);
       res.json({ success: true });
     } catch (err) {
       if (err instanceof AlreadyAdminError) {
@@ -263,16 +297,75 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   admin.delete("/admins/:userId", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_admins")) return;
     // Refusing self-revoke isn't about protecting any one admin — it's
     // that admin_users has no other UI: if the last admin revoked
     // themselves, nobody could ever grant admin access again short of a
     // raw SQL statement in Supabase. Blocking it unconditionally is the
-    // simplest rule that can't produce that lockout.
+    // simplest rule that can't produce that lockout. (The hardcoded main
+    // admin isn't a row here at all, so this can never target it anyway.)
     if (req.params.userId === actor(req)) {
       return res.status(400).json({ error: "You cannot revoke your own admin access here — ask another admin, or edit the database directly." });
     }
     await revokeAdmin(req.params.userId, actor(req));
     res.json({ success: true });
+  });
+
+  admin.patch("/admins/:userId/scopes", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_admins")) return;
+    if (req.params.userId === actor(req)) {
+      return res.status(400).json({ error: "You cannot change your own permissions here — ask another admin." });
+    }
+    const { scopes } = req.body as { scopes: string[] };
+    if (!Array.isArray(scopes) || scopes.some((s) => !isValidScope(s))) {
+      return res.status(400).json({ error: `scopes must be an array drawn from the known permission list.` });
+    }
+    await updateAdminScopes(req.params.userId, scopes as Scope[], actor(req));
+    res.json({ success: true });
+  });
+
+  // ── Users (search, suspend/restore, hard delete) ─────────────────────
+  admin.get("/users/search", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_users")) return;
+    const q = typeof req.query.q === "string" ? req.query.q : "";
+    try {
+      res.json(await searchUsers(q));
+    } catch (err) {
+      res.status(503).json({ error: (err as Error).message });
+    }
+  });
+
+  admin.patch("/users/:userId/status", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_users")) return;
+    if (req.params.userId === actor(req)) {
+      return res.status(400).json({ error: "You cannot change your own account status here." });
+    }
+    const { status, reason } = req.body as { status: "active" | "suspended"; reason?: string };
+    if (status !== "active" && status !== "suspended") {
+      return res.status(400).json({ error: `status must be "active" or "suspended".` });
+    }
+    await setAccountStatus(req.params.userId, status, actor(req), reason);
+    res.json({ success: true });
+  });
+
+  admin.delete("/users/:userId", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_users")) return;
+    if (req.params.userId === actor(req)) {
+      return res.status(400).json({ error: "You cannot delete your own account here." });
+    }
+    const { confirmEmail } = req.body as { confirmEmail?: string };
+    if (!confirmEmail) {
+      return res.status(400).json({ error: "confirmEmail is required — type the account's email to confirm this permanent deletion." });
+    }
+    try {
+      await hardDeleteUser(req.params.userId, confirmEmail, actor(req));
+      res.json({ success: true });
+    } catch (err) {
+      if (err instanceof DeleteConfirmationMismatchError) {
+        return res.status(400).json({ error: err.message });
+      }
+      res.status(503).json({ error: (err as Error).message });
+    }
   });
 
   // ── Audit log ────────────────────────────────────────────────────────

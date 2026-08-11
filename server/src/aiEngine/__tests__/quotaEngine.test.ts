@@ -29,7 +29,7 @@ describe("getEffectiveQuota", () => {
     });
 
     const limits = await getEffectiveQuota("u1", "premium_basic");
-    expect(limits).toEqual({ monthlyCredits: 5000, dailyCredits: 200, perTaskMaxCredits: 50, concurrencyLimit: 2 });
+    expect(limits).toEqual({ monthlyCredits: 5000, weeklyCredits: null, dailyCredits: 200, perTaskMaxCredits: 50, concurrencyLimit: 2 });
   });
 
   it("overrides individual fields without discarding the plan's other defaults", async () => {
@@ -40,7 +40,17 @@ describe("getEffectiveQuota", () => {
     });
 
     const limits = await getEffectiveQuota("u1", "premium_basic");
-    expect(limits).toEqual({ monthlyCredits: 5000, dailyCredits: 200, perTaskMaxCredits: 500, concurrencyLimit: 2 });
+    expect(limits).toEqual({ monthlyCredits: 5000, weeklyCredits: null, dailyCredits: 200, perTaskMaxCredits: 500, concurrencyLimit: 2 });
+  });
+
+  it("uses the override's weekly credits when set, otherwise the plan's", async () => {
+    mockFetch({
+      premium_plans: [{ id: "premium_basic", monthly_credits: 5000, weekly_credits: 1000, daily_credits: 200, per_task_max_credits: 50, concurrency_limit: 2 }],
+      user_quota_overrides: [{ user_id: "u1", monthly_credits: null, weekly_credits: 1500, daily_credits: null, per_task_max_credits: null, concurrency_limit: null }],
+    });
+
+    const limits = await getEffectiveQuota("u1", "premium_basic");
+    expect(limits.weeklyCredits).toBe(1500);
   });
 
   it("defaults concurrency to 1 when neither plan nor override has one", async () => {
@@ -51,7 +61,7 @@ describe("getEffectiveQuota", () => {
 });
 
 describe("checkPerTaskLimit", () => {
-  const limits: QuotaLimits = { monthlyCredits: 5000, dailyCredits: 200, perTaskMaxCredits: 50, concurrencyLimit: 2 };
+  const limits: QuotaLimits = { monthlyCredits: 5000, weeklyCredits: 1000, dailyCredits: 200, perTaskMaxCredits: 50, concurrencyLimit: 2 };
 
   it("allows a task at or under the cap", () => {
     expect(checkPerTaskLimit(50, limits).allowed).toBe(true);

@@ -34,6 +34,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
+import { getSupabaseRestConfig, SupabaseTable } from "../supabaseRest";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -97,6 +98,42 @@ export async function verifyAccessToken(token: string): Promise<VerifyResult> {
   }
 }
 
+interface ProfileStatusRow extends Record<string, unknown> {
+  account_status: string;
+}
+
+/**
+ * profiles.account_status ('active' | 'restricted' | 'suspended' |
+ * 'deleted', schema.sql) previously blocked nothing beyond the browser's own
+ * sign-in screen (src/services/supabaseAuthService.ts) — a suspended
+ * account's still-valid Supabase JWT reached every server API route
+ * untouched, so "suspend" was cosmetic against a client that skipped that
+ * one screen. This makes it real: any non-'active' status is rejected here,
+ * the one checkpoint nearly every authenticated route passes through.
+ *
+ * Deliberately fails OPEN on a lookup error (network hiccup, Supabase
+ * blip) — unlike token verification above, which fails closed. Blocking
+ * every authenticated user in the product because one extra profiles query
+ * timed out would be a worse outage than the narrow window this creates (a
+ * suspended account keeps working until the next successful check). A
+ * missing profile row (e.g. a signup race before the trigger that creates
+ * one has run) is treated the same way — active by default, not blocked.
+ */
+async function isAccountBlocked(userId: string): Promise<boolean> {
+  const config = getSupabaseRestConfig();
+  if (!config) return false;
+  try {
+    const table = new SupabaseTable<ProfileStatusRow>(config, "profiles");
+    const row = await table.selectOne(`id=eq.${encodeURIComponent(userId)}&select=account_status`);
+    // Only an actual, present, non-'active' string blocks — an
+    // unexpectedly-shaped or missing field fails open rather than locking
+    // everyone out over a malformed response.
+    return typeof row?.account_status === "string" && row.account_status !== "active";
+  } catch {
+    return false;
+  }
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -113,6 +150,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const result = await verifyAccessToken(token);
 
   if (result.ok && result.user) {
+    if (await isAccountBlocked(result.user.id)) {
+      res.status(403).json({ error: "This account is suspended." });
+      return;
+    }
     (req as Request & { user?: AuthenticatedUser }).user = result.user;
     next();
     return;

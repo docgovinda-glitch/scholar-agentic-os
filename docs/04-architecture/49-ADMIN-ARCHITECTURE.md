@@ -345,20 +345,27 @@ the operator articulate the reason at the moment they act.
 ## 13. Current state
 
 `server/routes/admin.ts` and an admin approval UI at `/admin/approve-scholar`
-exist, on the same server as user-facing routes.
+exist, on the same server as user-facing routes. A later pass (docs
+50-AI-ACCESS-ENGINE-IMPLEMENTATION.md §13) added a dedicated `/admin` entry
+point with its own login, per-admin permission scopes, and real user
+search/suspend/restore/delete — a practical middle ground given this
+product's actual two-person operational scale (§1), not the fully separate
+admin plane this doc describes as the target.
 
 | Current | Target |
 |---|---|
-| Admin routes on the user-facing server | Physically separate admin plane |
+| Admin routes on the same server as user-facing routes, but a dedicated `/admin` client entry point with no user-facing link, its own login, and code-split out of every ordinary user's bundle (doc 50 §13) | Physically separate admin plane — different deployment, different network |
 | No plane isolation | Enforced two-plane isolation with CI verification |
-| Manual user approval as the main admin function | Thirteen capability areas |
+| Flat admin_users boolean, now with six named permission scopes an admin can be granted a subset of, plus a hardcoded, unrevokable root admin (doc 50 §13) — still not the thirteen capability areas below | Thirteen capability areas |
+| User management: search (username/full name/email), suspend/restore, permanent delete now real (doc 50 §13) — resend verification, MFA reset, session revocation, and device lists still don't exist | Full "Authentication" row (reset MFA, revoke sessions, view devices) |
 | No agent versioning | The Foundry with evaluation-gated promotion |
 | No feature flags | Flags with targeting and kill switches |
 | No golden sets | Per-agent evaluation suites |
-| No admin audit | Immutable audit with required justification |
+| Admin audit exists (`admin_audit_log`, doc 50 §12/§13) but without a required-justification field | Immutable audit with required justification |
 | No aggregate analytics | Privacy-preserving aggregate telemetry |
 | Shared AI credentials | Separate `admin/gateway` with separate credentials |
 
-The existing approval workflow is a reasonable seed for user management; the
-isolation boundary is new construction and is a Phase 1 concern, because
+The existing approval workflow, extended by doc 50 §13's user management, is
+a reasonable seed for the "User management" capability row; the isolation
+boundary is still new construction and is a Phase 1 concern, because
 retrofitting plane separation is far harder than building it.

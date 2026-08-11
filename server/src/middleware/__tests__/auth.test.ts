@@ -36,7 +36,17 @@ function mockFetch(impl: (url: string, init?: RequestInit) => Promise<Response> 
 }
 
 const jsonResponse = (status: number, body: unknown) =>
-  ({ ok: status >= 200 && status < 300, status, json: async () => body }) as Response;
+  ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) }) as Response;
+
+/** Routes /auth/v1/user to `user` and /rest/v1/profiles to `profileRows` — for the account-status enforcement tests below, which exercise both calls requireAuth now makes. */
+function mockFetchWithProfile(user: unknown, profileRows: unknown[]) {
+  global.fetch = vi.fn((input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/auth/v1/user")) return Promise.resolve(jsonResponse(200, user));
+    if (url.includes("/rest/v1/profiles")) return Promise.resolve(jsonResponse(200, profileRows));
+    return Promise.resolve(jsonResponse(200, []));
+  }) as unknown as typeof fetch;
+}
 
 function mockRes() {
   const res = {
@@ -174,5 +184,72 @@ describe("requireAuth", () => {
       await requireAuth({ headers: { authorization: "Bearer t" } } as never, mockRes() as never, next as never);
       expect(next).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe("requireAuth: account-status enforcement", () => {
+  let next: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    next = vi.fn();
+  });
+
+  it("403s a valid token whose account is suspended — a valid JWT is no longer enough on its own", async () => {
+    mockFetchWithProfile({ id: "user-1", email: "a@example.com" }, [{ account_status: "suspended" }]);
+    const res = mockRes();
+
+    await requireAuth({ headers: { authorization: "Bearer good" } } as never, res as never, next as never);
+
+    expect(res.statusCode).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("403s restricted and deleted accounts too, not only suspended", async () => {
+    for (const status of ["restricted", "deleted"]) {
+      next = vi.fn();
+      mockFetchWithProfile({ id: "user-1", email: "a@example.com" }, [{ account_status: status }]);
+      const res = mockRes();
+      await requireAuth({ headers: { authorization: "Bearer good" } } as never, res as never, next as never);
+      expect(res.statusCode).toBe(403);
+      expect(next).not.toHaveBeenCalled();
+    }
+  });
+
+  it("continues for an active account", async () => {
+    mockFetchWithProfile({ id: "user-1", email: "a@example.com" }, [{ account_status: "active" }]);
+    const res = mockRes();
+
+    await requireAuth({ headers: { authorization: "Bearer good" } } as never, res as never, next as never);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(res.statusCode).toBe(0);
+  });
+
+  it("a restored account (suspended -> active) passes again", async () => {
+    mockFetchWithProfile({ id: "user-1", email: "a@example.com" }, [{ account_status: "active" }]);
+    const res = mockRes();
+    await requireAuth({ headers: { authorization: "Bearer good" } } as never, res as never, next as never);
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("fails OPEN (still continues) when the profile row is missing entirely", async () => {
+    mockFetchWithProfile({ id: "user-1", email: "a@example.com" }, []);
+    const res = mockRes();
+
+    await requireAuth({ headers: { authorization: "Bearer good" } } as never, res as never, next as never);
+
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("fails OPEN (still continues) when the profiles lookup itself errors — an outage there must not lock out every user", async () => {
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/auth/v1/user")) return Promise.resolve(jsonResponse(200, { id: "user-1", email: "a@example.com" }));
+      throw new Error("profiles table unreachable");
+    }) as unknown as typeof fetch;
+    const res = mockRes();
+
+    await requireAuth({ headers: { authorization: "Bearer good" } } as never, res as never, next as never);
+
+    expect(next).toHaveBeenCalledOnce();
   });
 });

@@ -37,12 +37,22 @@ describe("deductCredits", () => {
       p_reason: "usage",
       p_request_id: "req-1",
       p_note: "generation",
+      p_weekly_limit: null,
     });
   });
 
-  it("propagates daily_limit_exceeded / insufficient_balance as the return value, not an exception", async () => {
+  it("forwards a weekly limit when one is passed", async () => {
+    const spy = mockFetch("ok");
+    await deductCredits("u1", 30, 200, 5000, "usage", "req-1", "generation", 1000);
+    expect(spy.getBody()).toMatchObject({ p_weekly_limit: 1000 });
+  });
+
+  it("propagates daily_limit_exceeded / weekly_limit_exceeded / insufficient_balance as the return value, not an exception", async () => {
     mockFetch("daily_limit_exceeded");
     expect(await deductCredits("u1", 30, 10, null, "usage", "req-1")).toBe("daily_limit_exceeded");
+
+    mockFetch("weekly_limit_exceeded");
+    expect(await deductCredits("u1", 30, null, null, "usage", "req-1", undefined, 10)).toBe("weekly_limit_exceeded");
   });
 
   it("throws on a genuine RPC failure (5xx, misconfiguration)", async () => {

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { detectHardwareProfile, loadHardwareProfile, recommendLocalModel, saveHardwareProfile, type HardwareProfile } from "../../services/hardwareProfiler";
-import AdminPanel from "../admin/AdminPanel";
-import { checkIsAdmin, getAiAccessStatus, type AiAccessStatus } from "./aiAccessApi";
+import { getAiAccessStatus, type AiAccessStatus } from "./aiAccessApi";
 
 /**
  * AI Access — Section 20. The user's own view of where their AI comes from.
@@ -13,19 +12,22 @@ import { checkIsAdmin, getAiAccessStatus, type AiAccessStatus } from "./aiAccess
  * stays where it already lived and worked before this file existed:
  * AiSetupScreen (src/desk/setup/AiSetupScreen.tsx) — this page is the
  * status view, not a second setup flow.
+ *
+ * No admin entry point lives here anymore — the Admin AI Infrastructure
+ * panel moved to its own dedicated /admin URL (src/admin/AdminApp.tsx),
+ * reachable by no link an ordinary user ever sees. This page is open to
+ * every signed-in user by design (it's each user's own status view), so it
+ * must never be the thing that reveals admin functionality exists.
  */
 export default function AiAccessPage({ onClose, onOpenSetup }: { onClose: () => void; onOpenSetup: () => void }) {
   const [status, setStatus] = useState<AiAccessStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hardware, setHardware] = useState<HardwareProfile | null>(null);
   const [detecting, setDetecting] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
     getAiAccessStatus().then(setStatus).catch((e) => setError((e as Error).message));
     loadHardwareProfile().then(setHardware);
-    checkIsAdmin().then(setIsAdmin);
   }, []);
 
   async function handleDetectHardware() {
@@ -39,10 +41,6 @@ export default function AiAccessPage({ onClose, onOpenSetup }: { onClose: () => 
     }
   }
 
-  if (showAdmin) {
-    return <AdminPanel onClose={() => setShowAdmin(false)} />;
-  }
-
   const localConnections = status?.connections.filter((c) => c.tier === "local") ?? [];
   const freeConnections = status?.connections.filter((c) => c.tier === "free") ?? [];
   const byokConnections = status?.connections.filter((c) => c.tier === "byok") ?? [];
@@ -54,15 +52,6 @@ export default function AiAccessPage({ onClose, onOpenSetup }: { onClose: () => 
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-4">
           <h1 className="text-base font-semibold tracking-tight text-[color:var(--text-primary)]">AI Access</h1>
           <div className="flex items-center gap-3">
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => setShowAdmin(true)}
-                className="rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]"
-              >
-                Admin
-              </button>
-            )}
             <button
               type="button"
               onClick={onClose}
@@ -112,9 +101,11 @@ export default function AiAccessPage({ onClose, onOpenSetup }: { onClose: () => 
           {premiumActive && status?.quota && (
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[color:var(--text-secondary)]">
               <div>Monthly credits: {status.quota.monthlyCredits ?? "Unlimited"}</div>
+              <div>Weekly credits: {status.quota.weeklyCredits ?? "Unlimited"}</div>
               <div>Daily credits: {status.quota.dailyCredits ?? "Unlimited"}</div>
               <div>Balance: {status.creditBalance?.balance ?? 0}</div>
               <div>Used this month: {status.creditBalance?.monthly_used ?? 0}</div>
+              <div>Used this week: {status.creditBalance?.weekly_used ?? 0}</div>
             </div>
           )}
         </TierCard>

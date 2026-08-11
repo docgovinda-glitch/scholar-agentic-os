@@ -30,8 +30,8 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 export interface AiAccessStatus {
   connections: Array<{ provider_id: string; tier: "local" | "free" | "byok"; status: string; models_detected: number | null }>;
   entitlement: { status: string; active: boolean; planId?: string | null; expiry?: string | null };
-  quota: { monthlyCredits: number | null; dailyCredits: number | null; perTaskMaxCredits: number | null; concurrencyLimit: number } | null;
-  creditBalance: { balance: number; daily_used: number; monthly_used: number } | null;
+  quota: { monthlyCredits: number | null; weeklyCredits: number | null; dailyCredits: number | null; perTaskMaxCredits: number | null; concurrencyLimit: number } | null;
+  creditBalance: { balance: number; daily_used: number; weekly_used: number; monthly_used: number } | null;
 }
 
 export const getAiAccessStatus = () => api<AiAccessStatus>("/api/ai-access/status");
@@ -78,10 +78,18 @@ export const routeDecision = (taskType: RoutingTaskType, privacyPreference?: "no
 
 // ── Admin ───────────────────────────────────────────────────────────────
 
-export const checkIsAdmin = (): Promise<boolean> =>
-  api<{ isAdmin: boolean }>("/api/admin/ai/whoami")
-    .then(() => true)
-    .catch(() => false);
+/** Mirrors server/src/middleware/requireAdmin.ts's SCOPES — kept in sync by hand, same pattern as RoutingTier above. */
+export const SCOPES = ["manage_providers", "manage_premium", "manage_budget", "manage_opportunities", "manage_users", "manage_admins"] as const;
+export type Scope = (typeof SCOPES)[number];
+
+export interface AdminWhoAmI {
+  isAdmin: boolean;
+  isMainAdmin: boolean;
+  scopes: Scope[];
+}
+/** Never throws: a non-admin (or a logged-out caller) gets {isAdmin:false, ...} rather than a rejected promise, since "am I an admin" is a status check, not an action that can fail. */
+export const getAdminWhoAmI = (): Promise<AdminWhoAmI> =>
+  api<AdminWhoAmI>("/api/admin/ai/whoami").catch(() => ({ isAdmin: false, isMainAdmin: false, scopes: [] }));
 
 export const getAdminDashboard = () => api<Record<string, unknown>>("/api/admin/ai/dashboard");
 
@@ -90,14 +98,51 @@ export interface AdminRosterEntry {
   grantedBy: string | null;
   grantedAt: string;
   note: string | null;
+  scopes: Scope[];
   username: string | null;
   fullName: string | null;
 }
 export const getAdmins = () => api<AdminRosterEntry[]>("/api/admin/ai/admins");
-export const grantAdminAccess = (userId: string, note?: string) =>
-  api<{ success: true }>("/api/admin/ai/admins", { method: "POST", body: JSON.stringify({ userId, note }) });
+export const grantAdminAccess = (userId: string, scopes?: Scope[], note?: string) =>
+  api<{ success: true }>("/api/admin/ai/admins", { method: "POST", body: JSON.stringify({ userId, scopes, note }) });
 export const revokeAdminAccess = (userId: string) =>
   api<{ success: true }>(`/api/admin/ai/admins/${encodeURIComponent(userId)}`, { method: "DELETE" });
+export const setAdminScopes = (userId: string, scopes: Scope[]) =>
+  api<{ success: true }>(`/api/admin/ai/admins/${encodeURIComponent(userId)}/scopes`, { method: "PATCH", body: JSON.stringify({ scopes }) });
+
+export interface UserSearchResult {
+  userId: string;
+  email: string | null;
+  username: string | null;
+  fullName: string | null;
+  accountStatus: string | null;
+}
+export const searchUsers = (q: string) => api<UserSearchResult[]>(`/api/admin/ai/users/search?q=${encodeURIComponent(q)}`);
+export const setUserAccountStatus = (userId: string, status: "active" | "suspended", reason?: string) =>
+  api<{ success: true }>(`/api/admin/ai/users/${encodeURIComponent(userId)}/status`, { method: "PATCH", body: JSON.stringify({ status, reason }) });
+/** confirmEmail must match the account's actual current email — checked again server-side, never trusted from the client alone. Irreversible. */
+export const deleteUserPermanently = (userId: string, confirmEmail: string) =>
+  api<{ success: true }>(`/api/admin/ai/users/${encodeURIComponent(userId)}`, { method: "DELETE", body: JSON.stringify({ confirmEmail }) });
+
+export interface QuotaOverride {
+  user_id: string;
+  monthly_credits: number | null;
+  weekly_credits: number | null;
+  daily_credits: number | null;
+  per_task_max_credits: number | null;
+  concurrency_limit: number | null;
+  reason: string | null;
+}
+export const getQuotaOverride = (userId: string) => api<QuotaOverride | null>(`/api/admin/ai/quota-overrides/${encodeURIComponent(userId)}`);
+export const setQuotaOverride = (override: {
+  userId: string;
+  monthlyCredits?: number | null;
+  weeklyCredits?: number | null;
+  dailyCredits?: number | null;
+  perTaskMaxCredits?: number | null;
+  concurrencyLimit?: number | null;
+  reason?: string;
+}) => api<{ success: true }>("/api/admin/ai/quota-overrides", { method: "POST", body: JSON.stringify(override) });
 
 export interface AdminProvider {
   id: string;
@@ -114,6 +159,7 @@ export interface PremiumPlan {
   id: string;
   name: string;
   monthly_credits: number;
+  weekly_credits: number | null;
   daily_credits: number | null;
   per_task_max_credits: number | null;
   concurrency_limit: number;

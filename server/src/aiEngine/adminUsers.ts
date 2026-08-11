@@ -14,12 +14,14 @@
 
 import { getSupabaseRestConfig, SupabaseRestError, SupabaseTable } from "../supabaseRest";
 import { writeAuditLog } from "./auditLog";
+import { isValidScope, type Scope } from "../middleware/requireAdmin";
 
 interface AdminUserRow extends Record<string, unknown> {
   user_id: string;
   granted_by: string | null;
   granted_at: string;
   note: string | null;
+  scopes: string[] | null;
 }
 
 interface ProfileRow extends Record<string, unknown> {
@@ -33,6 +35,7 @@ export interface AdminUser {
   grantedBy: string | null;
   grantedAt: string;
   note: string | null;
+  scopes: Scope[];
   /** From public.profiles, best-effort — null if the account has no profile row. */
   username: string | null;
   fullName: string | null;
@@ -59,7 +62,7 @@ function profileTable() {
 }
 
 export async function listAdmins(): Promise<AdminUser[]> {
-  const rows = await adminTable().select("order=granted_at.asc");
+  const rows = await adminTable().select("order=granted_at.asc&select=user_id,granted_by,granted_at,note,scopes");
   if (rows.length === 0) return [];
 
   // Best-effort name resolution: admin_users only stores the id, and a
@@ -82,15 +85,23 @@ export async function listAdmins(): Promise<AdminUser[]> {
       grantedBy: r.granted_by,
       grantedAt: r.granted_at,
       note: r.note,
+      scopes: (r.scopes ?? []).filter(isValidScope),
       username: p?.username ?? null,
       fullName: p?.full_name ?? null,
     };
   });
 }
 
-export async function grantAdmin(userId: string, grantedBy: string, note?: string): Promise<void> {
+/** `scopes` defaults to every scope ("full admin") when omitted, matching the pre-scopes behavior this replaces. */
+export async function grantAdmin(userId: string, grantedBy: string, scopes?: Scope[], note?: string): Promise<void> {
   try {
-    await adminTable().insert({ user_id: userId, granted_by: grantedBy, granted_at: new Date().toISOString(), note: note ?? null });
+    await adminTable().insert({
+      user_id: userId,
+      granted_by: grantedBy,
+      granted_at: new Date().toISOString(),
+      note: note ?? null,
+      scopes: scopes ?? [],
+    });
   } catch (err) {
     // Postgres unique_violation on the user_id primary key — this user
     // already has a row. A clear, specific error beats a raw 500.
@@ -99,10 +110,15 @@ export async function grantAdmin(userId: string, grantedBy: string, note?: strin
     }
     throw err;
   }
-  await writeAuditLog(grantedBy, "grant_admin", "user", userId, note ? { note } : {});
+  await writeAuditLog(grantedBy, "grant_admin", "user", userId, { scopes: scopes ?? [], note });
 }
 
 export async function revokeAdmin(userId: string, revokedBy: string): Promise<void> {
   await adminTable().delete(`user_id=eq.${encodeURIComponent(userId)}`);
   await writeAuditLog(revokedBy, "revoke_admin", "user", userId, {});
+}
+
+export async function updateAdminScopes(userId: string, scopes: Scope[], setBy: string): Promise<void> {
+  await adminTable().update(`user_id=eq.${encodeURIComponent(userId)}`, { scopes });
+  await writeAuditLog(setBy, "update_admin_scopes", "user", userId, { scopes });
 }

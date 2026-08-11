@@ -7,7 +7,7 @@
 
 import { getSupabaseRestConfig } from "../supabaseRest";
 
-export type DeductResult = "ok" | "daily_limit_exceeded" | "monthly_limit_exceeded" | "insufficient_balance";
+export type DeductResult = "ok" | "daily_limit_exceeded" | "weekly_limit_exceeded" | "monthly_limit_exceeded" | "insufficient_balance";
 
 async function rpc(config: NonNullable<ReturnType<typeof getSupabaseRestConfig>>, fn: string, args: Record<string, unknown>): Promise<unknown> {
   const res = await fetch(`${config.supabaseUrl.replace(/\/+$/, "")}/rest/v1/rpc/${fn}`, {
@@ -33,7 +33,8 @@ export async function deductCredits(
   monthlyLimit: number | null,
   reason: "usage",
   requestId: string,
-  note?: string
+  note?: string,
+  weeklyLimit?: number | null
 ): Promise<DeductResult> {
   const config = getSupabaseRestConfig();
   if (!config) throw new Error("Supabase is not configured.");
@@ -45,6 +46,7 @@ export async function deductCredits(
     p_reason: reason,
     p_request_id: requestId,
     p_note: note ?? null,
+    p_weekly_limit: weeklyLimit ?? null,
   });
   return result as DeductResult;
 }

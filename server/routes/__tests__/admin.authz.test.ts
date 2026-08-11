@@ -13,6 +13,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import express from "express";
+import { SCOPES } from "../../src/middleware/requireAdmin";
 
 const ADMIN_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const NON_ADMIN_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -38,10 +39,13 @@ function mockFetch() {
       return Promise.resolve(jsonResponse(401, {}));
     }
 
-    // admin_users lookup (server/src/middleware/requireAdmin.ts).
+    // admin_users lookup (server/src/middleware/requireAdmin.ts). The mock
+    // admin has every scope — this suite's job is proving every route
+    // requires SOME real admin-ness, not exercising individual scopes
+    // (that's admin.admins.test.ts and requireAdmin.test.ts's job).
     if (url.includes("/rest/v1/admin_users")) {
       const isAdminQuery = url.includes(`user_id=eq.${ADMIN_ID}`);
-      return Promise.resolve(textResponse(200, JSON.stringify(isAdminQuery ? [{ user_id: ADMIN_ID }] : [])));
+      return Promise.resolve(textResponse(200, JSON.stringify(isAdminQuery ? [{ user_id: ADMIN_ID, scopes: SCOPES }] : [])));
     }
 
     // Everything past the gate: an empty-but-valid PostgREST response is
@@ -80,6 +84,7 @@ const ROUTES: Array<{ method: "get" | "post" | "patch" | "delete"; path: string;
   { method: "post", path: "/api/admin/ai/premium-plans", body: { id: "premium_basic", name: "Basic" } },
   { method: "post", path: "/api/admin/ai/entitlements/grant", body: { userId: NON_ADMIN_ID, planId: "premium_basic", expiry: null } },
   { method: "post", path: "/api/admin/ai/entitlements/revoke", body: { userId: NON_ADMIN_ID } },
+  { method: "get", path: `/api/admin/ai/quota-overrides/${NON_ADMIN_ID}` },
   { method: "post", path: "/api/admin/ai/quota-overrides", body: { userId: NON_ADMIN_ID } },
   { method: "post", path: "/api/admin/ai/credits/grant", body: { userId: NON_ADMIN_ID, amount: 100 } },
   { method: "get", path: "/api/admin/ai/usage" },
@@ -91,6 +96,10 @@ const ROUTES: Array<{ method: "get" | "post" | "patch" | "delete"; path: string;
   { method: "get", path: "/api/admin/ai/admins" },
   { method: "post", path: "/api/admin/ai/admins", body: { userId: NON_ADMIN_ID } },
   { method: "delete", path: "/api/admin/ai/admins/00000000-0000-0000-0000-000000000099" },
+  { method: "patch", path: "/api/admin/ai/admins/00000000-0000-0000-0000-000000000099/scopes", body: { scopes: ["manage_budget"] } },
+  { method: "get", path: "/api/admin/ai/users/search?q=alice" },
+  { method: "patch", path: "/api/admin/ai/users/00000000-0000-0000-0000-000000000099/status", body: { status: "suspended" } },
+  { method: "delete", path: "/api/admin/ai/users/00000000-0000-0000-0000-000000000099", body: { confirmEmail: "x@example.com" } },
   { method: "get", path: "/api/admin/ai/opportunities" },
   { method: "post", path: "/api/admin/ai/opportunities/research", body: { query: "free AI API tiers 2026" } },
   { method: "post", path: "/api/admin/ai/opportunities/00000000-0000-0000-0000-000000000001/review", body: { decision: "approved" } },
@@ -115,6 +124,56 @@ describe.each(ROUTES)("$method $path", ({ method, path, body }) => {
     const res = await request(app)[method](path).set("Authorization", "Bearer admin-token").send(body ?? {});
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(403);
+  });
+});
+
+// Every mutating route's required scope (server/routes/admin.ts's
+// requireScopeInline calls) — a SEPARATE mock admin below has zero scopes,
+// so this proves each one is actually enforced, not just "some admin
+// passes" (which the suite above already covers with a full-scope admin).
+const SCOPED_ROUTES: Array<{ method: "patch" | "post" | "delete"; path: string; body?: object }> = [
+  { method: "patch", path: "/api/admin/ai/providers/gemini", body: { enabled: false } },
+  { method: "patch", path: "/api/admin/ai/models/gemini:gemini-2.5-flash", body: { enabled: false } },
+  { method: "post", path: "/api/admin/ai/premium-plans", body: { id: "premium_basic", name: "Basic" } },
+  { method: "post", path: "/api/admin/ai/entitlements/grant", body: { userId: NON_ADMIN_ID, planId: "premium_basic", expiry: null } },
+  { method: "post", path: "/api/admin/ai/entitlements/revoke", body: { userId: NON_ADMIN_ID } },
+  { method: "post", path: "/api/admin/ai/quota-overrides", body: { userId: NON_ADMIN_ID } },
+  { method: "post", path: "/api/admin/ai/credits/grant", body: { userId: NON_ADMIN_ID, amount: 100 } },
+  { method: "patch", path: "/api/admin/ai/budget", body: { monthlyBudgetUsd: 500 } },
+  { method: "post", path: "/api/admin/ai/platform-credentials", body: { providerId: "gemini", credential: "sk-x" } },
+  { method: "post", path: "/api/admin/ai/opportunities/research", body: { query: "free AI API tiers 2026" } },
+  { method: "post", path: "/api/admin/ai/opportunities/00000000-0000-0000-0000-000000000001/review", body: { decision: "approved" } },
+  { method: "post", path: "/api/admin/ai/admins", body: { userId: NON_ADMIN_ID } },
+  { method: "delete", path: "/api/admin/ai/admins/00000000-0000-0000-0000-000000000099" },
+  { method: "patch", path: "/api/admin/ai/admins/00000000-0000-0000-0000-000000000099/scopes", body: { scopes: ["manage_budget"] } },
+  { method: "patch", path: "/api/admin/ai/users/00000000-0000-0000-0000-000000000099/status", body: { status: "suspended" } },
+  { method: "delete", path: "/api/admin/ai/users/00000000-0000-0000-0000-000000000099", body: { confirmEmail: "x@example.com" } },
+];
+
+const NO_SCOPE_ADMIN_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+
+function mockFetchNoScopeAdmin() {
+  global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/auth/v1/user")) {
+      return Promise.resolve(jsonResponse(200, { id: NO_SCOPE_ADMIN_ID, email: "noscope-admin@example.com" }));
+    }
+    if (url.includes("/rest/v1/admin_users")) {
+      const isThisAdmin = url.includes(`user_id=eq.${NO_SCOPE_ADMIN_ID}`);
+      // A real row exists (requireAdmin passes — this IS an admin) but with
+      // an empty scopes array, so every requireScopeInline check must fail.
+      return Promise.resolve(textResponse(200, JSON.stringify(isThisAdmin ? [{ user_id: NO_SCOPE_ADMIN_ID, scopes: [] }] : [])));
+    }
+    return Promise.resolve(textResponse(200, "[]"));
+  }) as unknown as typeof fetch;
+}
+
+describe.each(SCOPED_ROUTES)("scope boundary: $method $path", ({ method, path, body }) => {
+  it("403s a real admin who has no scopes at all (requireAdmin passes, requireScopeInline must not)", async () => {
+    mockFetchNoScopeAdmin();
+    const app = await buildApp();
+    const res = await request(app)[method](path).set("Authorization", "Bearer noscope-token").send(body ?? {});
+    expect(res.status).toBe(403);
   });
 });
 

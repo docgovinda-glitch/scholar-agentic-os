@@ -72,7 +72,11 @@ describe("GET /api/ai-access/status", () => {
     const dataUrls = capture.urls.filter((u) => u.includes("/rest/v1/"));
     expect(dataUrls.length).toBeGreaterThan(0);
     for (const u of dataUrls) {
-      expect(u).toContain(`user_id=eq.${ALICE}`);
+      // Most tables key on user_id; profiles (checked by requireAuth's
+      // account-status gate, server/src/middleware/auth.ts) keys on id —
+      // both correctly scope to Alice's own verified id, never a
+      // client-supplied one.
+      expect(u.includes(`user_id=eq.${ALICE}`) || u.includes(`id=eq.${ALICE}`)).toBe(true);
       expect(u).not.toContain("someone-elses-id");
     }
   });
