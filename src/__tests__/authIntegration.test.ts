@@ -53,7 +53,7 @@ vi.mock("../services/captchaService", () => ({
   clearCaptcha: vi.fn(),
 }));
 
-import { signUp, signIn } from "../services/supabaseAuthService";
+import { signUp, signIn, sendPasswordResetEmail } from "../services/supabaseAuthService";
 import { getCaptchaConfig } from "../services/captchaService";
 
 describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
@@ -195,6 +195,42 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
         expect.objectContaining({
           options: expect.objectContaining({ captchaToken: "valid_captcha_token" }),
         })
+      );
+    });
+  });
+
+  describe("Test 1b: CAPTCHA on sign-in and password reset", () => {
+    // Supabase Auth's CAPTCHA setting is per-PROJECT, not per-endpoint:
+    // enabling it protects the password grant and /recover at the same moment
+    // it protects signup. A sign-in that sends no token therefore stops working
+    // the instant CAPTCHA is switched on, locking out every existing user.
+    it("passes the CAPTCHA token through to signInWithPassword", async () => {
+      mockRpc.mockResolvedValueOnce({ data: "user@example.com", error: null });
+      mockAuth.signInWithPassword.mockResolvedValueOnce({
+        data: { user: { id: "user-1", email: "user@example.com" } },
+        error: null,
+      });
+      mockFrom.mockReturnValue(
+        makeChainable({ data: { full_name: "U", phone: "", affiliation: "A", authentic_id: "None", account_status: "active" }, error: null })
+      );
+
+      await signIn({ username: "someone", password: "pw", captchaToken: "signin_token" });
+
+      expect(mockAuth.signInWithPassword).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: expect.objectContaining({ captchaToken: "signin_token" }),
+        })
+      );
+    });
+
+    it("passes the CAPTCHA token through to resetPasswordForEmail", async () => {
+      mockAuth.resetPasswordForEmail.mockResolvedValueOnce({ data: {}, error: null });
+
+      await sendPasswordResetEmail("user@example.com", "reset_token");
+
+      expect(mockAuth.resetPasswordForEmail).toHaveBeenCalledWith(
+        "user@example.com",
+        expect.objectContaining({ captchaToken: "reset_token" })
       );
     });
   });
