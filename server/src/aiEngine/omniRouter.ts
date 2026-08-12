@@ -76,7 +76,12 @@ function reasoningFor(tier: Tier, providerId: string): string {
     case "byok":
       return `Using your connected ${providerId} account.`;
     case "premium":
-      return `Using Scholar Premium (${providerId}) — this uses your Premium credits.`;
+      // Deliberately names no provider. The user router passes a synthetic id
+      // here because which platform resource serves a Premium request is the
+      // admin router's decision and is not disclosed to the user — naming it
+      // would undo that, and interpolating the synthetic id read as the
+      // nonsense "Scholar Premium (premium)".
+      return "Using Scholar Premium — this uses your Premium credits, and Scholar picks the best available source.";
   }
 }
 

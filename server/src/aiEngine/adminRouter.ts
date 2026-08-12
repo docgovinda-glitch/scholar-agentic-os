@@ -98,12 +98,37 @@ export async function resourceIdsForPlan(planId: string): Promise<string[]> {
   return rows.map((r) => r.resource_id);
 }
 
-/** Replace a plan's grants wholesale — the admin edits the set, not individual rows. */
+/**
+ * Set a plan's grants to exactly `resourceIds`.
+ *
+ * Differential, NOT delete-then-insert. The previous version deleted every row
+ * for the plan and then inserted the new set as two separate PostgREST calls,
+ * which are not one transaction: if the insert failed — a dropped connection,
+ * a resource deleted between the two calls — the plan was left with NO
+ * resources at all. Since a plan with no grants grants nothing, that silently
+ * turned Premium off for every subscriber on it, from an edit that appeared to
+ * fail harmlessly.
+ *
+ * Adding first and removing second also means the intermediate state is a
+ * superset rather than an empty set, so a request racing this edit still
+ * resolves a resource.
+ */
 export async function setPlanResources(planId: string, resourceIds: string[]): Promise<void> {
   const table = planResourcesTable();
-  await table.delete(`plan_id=eq.${encodeURIComponent(planId)}`);
-  if (resourceIds.length > 0) {
-    await table.insert(resourceIds.map((resource_id) => ({ plan_id: planId, resource_id })));
+  const wanted = new Set(resourceIds);
+  const current = new Set(await resourceIdsForPlan(planId));
+
+  const toAdd = [...wanted].filter((id) => !current.has(id));
+  const toRemove = [...current].filter((id) => !wanted.has(id));
+
+  if (toAdd.length > 0) {
+    await table.insert(toAdd.map((resource_id) => ({ plan_id: planId, resource_id })));
+  }
+  if (toRemove.length > 0) {
+    // PostgREST `in.(…)` — one call rather than one per row, and scoped to
+    // this plan so it can never touch another's grants.
+    const list = toRemove.map((id) => encodeURIComponent(id)).join(",");
+    await table.delete(`plan_id=eq.${encodeURIComponent(planId)}&resource_id=in.(${list})`);
   }
 }
 
