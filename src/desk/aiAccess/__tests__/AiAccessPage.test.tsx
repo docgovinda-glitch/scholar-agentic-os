@@ -217,3 +217,19 @@ describe("Premium", () => {
     await waitFor(() => expect(api.requestPremium).toHaveBeenCalledWith("premium_basic", undefined));
   });
 });
+
+describe("Error handling", () => {
+  it("surfaces the HTTP failure when an error response has no object body", async () => {
+    // The client's api() helper read `body.error` on a body that could be
+    // null, throwing a TypeError that replaced the real failure with an
+    // unrelated crash. GET /premium-request genuinely returns bare `null`, so
+    // this shape is not hypothetical.
+    const api = await import("../aiAccessApi");
+    vi.mocked(api.getAiAccessStatus).mockRejectedValueOnce(new Error("Request failed (503)"));
+    renderPage();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Request failed \(503\)/);
+    // The page still renders its catalogue rather than blanking.
+    expect(await screen.findByRole("button", { name: "Free AI" })).toBeInTheDocument();
+  });
+});

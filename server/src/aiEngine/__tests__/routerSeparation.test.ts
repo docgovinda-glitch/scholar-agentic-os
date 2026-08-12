@@ -13,7 +13,8 @@ process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
 
 const { assembleUserCandidates, PREMIUM_PSEUDO_PROVIDER } = await import("../userRouter");
-const { premiumCatalogueForUser, toPublicResources, resolvePremiumResources } = await import("../adminRouter");
+const { premiumCatalogueForUser, toPublicResources, resolvePremiumResources, setPlanResources } = await import("../adminRouter");
+const { selectProvider } = await import("../omniRouter");
 
 const realFetch = global.fetch;
 afterEach(() => {
@@ -217,5 +218,58 @@ describe("Provider-agnostic Premium", () => {
     const catalogue = await premiumCatalogueForUser(USER);
 
     expect(catalogue).toEqual({ active: false, planId: null, resources: [] });
+  });
+});
+
+
+describe("Plan resource grants — edited without ever emptying", () => {
+  /** Captures the sequence of writes so we can assert the intermediate state. */
+  function mockWrites(existing: string[]) {
+    const calls: Array<{ method: string; url: string; body: unknown }> = [];
+    global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method !== "GET") calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : null });
+      const body = method === "GET" ? existing.map((resource_id) => ({ resource_id })) : [];
+      return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(body), json: async () => body } as Response);
+    }) as unknown as typeof fetch;
+    return calls;
+  }
+
+  it("adds before removing, so a request racing the edit never sees an empty plan", async () => {
+    const calls = mockWrites(["r1", "r2"]);
+    await setPlanResources("premium_basic", ["r2", "r3"]);
+
+    // Delete-then-insert would leave the plan with NO resources between the
+    // two calls, and permanently so if the insert then failed — silently
+    // turning Premium off for every subscriber on that plan.
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].body).toEqual([{ plan_id: "premium_basic", resource_id: "r3" }]);
+    expect(calls[1].method).toBe("DELETE");
+    expect(calls[1].url).toContain("resource_id=in.(r1)");
+    // Scoped to this plan, so another plan's grants can never be caught up in it.
+    expect(calls[1].url).toContain("plan_id=eq.premium_basic");
+  });
+
+  it("writes nothing at all when the set is unchanged", async () => {
+    const calls = mockWrites(["r1", "r2"]);
+    await setPlanResources("premium_basic", ["r1", "r2"]);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("Premium routing reason", () => {
+  it("names no provider — the synthetic id must never reach the user", () => {
+    const decision = selectProvider(
+      [{ tier: "premium", providerId: PREMIUM_PSEUDO_PROVIDER, eligible: true, health: "unknown" }],
+      { taskType: "reasoning", privacyPreference: "any", premiumQuotaRemaining: 100 }
+    );
+
+    expect(decision.ok).toBe(true);
+    if (!decision.ok) return;
+    // Interpolating the synthetic id produced the nonsense "Scholar Premium
+    // (premium)"; naming the real provider would undo the abstraction.
+    expect(decision.choice.reasoning).not.toContain("(premium)");
+    expect(decision.choice.reasoning).toMatch(/Scholar Premium/);
   });
 });

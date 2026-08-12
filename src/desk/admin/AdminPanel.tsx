@@ -705,6 +705,16 @@ function ResourcesTab() {
 function PremiumRequestsQueue() {
   const [rows, setRows] = useState<PremiumRequestRow[]>([]);
   const [plans, setPlans] = useState<PremiumPlan[]>([]);
+  /**
+   * Chosen plan per request, held in state rather than read back off the DOM.
+   * The previous version used an uncontrolled <select defaultValue> and then
+   * document.getElementById to read it at click time: requests and plans load
+   * from two independent promises, so when plans arrived second the select
+   * mounted with no options, defaultValue never reapplied, and Approve either
+   * silently returned or sent whatever the browser had defaulted to.
+   */
+  const [chosen, setChosen] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function load() {
@@ -712,6 +722,39 @@ function PremiumRequestsQueue() {
     getPremiumPlans().then(setPlans).catch(() => {});
   }
   useEffect(load, []);
+
+  /** The plan this row will be approved with: the admin's pick, else what the user asked for, else the first plan. */
+  const planFor = (r: PremiumRequestRow) => chosen[r.id] ?? r.requestedPlanId ?? plans[0]?.id ?? "";
+
+  async function approve(r: PremiumRequestRow) {
+    const planId = planFor(r);
+    if (!planId) {
+      setError("Create a Premium plan before approving requests.");
+      return;
+    }
+    setBusy(r.id);
+    setError(null);
+    try {
+      await approvePremiumRequest(r.id, planId);
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function decline(r: PremiumRequestRow) {
+    setBusy(r.id);
+    try {
+      await declinePremiumRequest(r.id);
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
     <Card>
@@ -729,11 +772,17 @@ function PremiumRequestsQueue() {
                 Asked for {r.requestedPlanId ?? "no specific plan"} on {new Date(r.createdAt).toLocaleDateString()}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
+                <label className="sr-only" htmlFor={`plan-${r.id}`}>
+                  Plan to grant
+                </label>
                 <select
                   id={`plan-${r.id}`}
-                  defaultValue={r.requestedPlanId ?? plans[0]?.id ?? ""}
+                  value={planFor(r)}
+                  onChange={(e) => setChosen((c) => ({ ...c, [r.id]: e.target.value }))}
+                  disabled={plans.length === 0}
                   className="rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2 py-1 text-xs"
                 >
+                  {plans.length === 0 && <option value="">No plans configured</option>}
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
@@ -742,19 +791,17 @@ function PremiumRequestsQueue() {
                 </select>
                 <button
                   type="button"
-                  onClick={() => {
-                    const sel = document.getElementById(`plan-${r.id}`) as HTMLSelectElement | null;
-                    if (!sel?.value) return;
-                    approvePremiumRequest(r.id, sel.value).then(load).catch((e) => setError((e as Error).message));
-                  }}
-                  className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1 text-xs font-medium"
+                  onClick={() => void approve(r)}
+                  disabled={busy === r.id}
+                  className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1 text-xs font-medium disabled:opacity-50"
                 >
-                  Approve
+                  {busy === r.id ? "Working…" : "Approve"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => declinePremiumRequest(r.id).then(load).catch((e) => setError((e as Error).message))}
-                  className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium text-[color:var(--state-danger)]"
+                  onClick={() => void decline(r)}
+                  disabled={busy === r.id}
+                  className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium text-[color:var(--state-danger)] disabled:opacity-50"
                 >
                   Decline
                 </button>

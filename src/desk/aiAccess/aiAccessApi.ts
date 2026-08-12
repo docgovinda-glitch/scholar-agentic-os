@@ -20,8 +20,15 @@ async function authHeaders(): Promise<Record<string, string>> {
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = { "Content-Type": "application/json", ...(init.headers as Record<string, string> | undefined), ...(await authHeaders()) };
   const res = await fetch(path, { ...init, headers });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error || `Request failed (${res.status})`);
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    // Guarded: a non-OK response whose body is null (or an array, or a bare
+    // string) used to throw a TypeError here, hiding the actual HTTP failure
+    // behind an unrelated crash. `null` is a real shape this client sees —
+    // GET /premium-request returns it when a user has never asked.
+    const message = body && typeof body === "object" && !Array.isArray(body) ? (body as { error?: string }).error : undefined;
+    throw new Error(message || `Request failed (${res.status})`);
+  }
   return body as T;
 }
 
