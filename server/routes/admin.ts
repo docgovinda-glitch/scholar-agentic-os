@@ -98,10 +98,69 @@ export function registerAdminRoutes(app: express.Express): void {
   admin.patch("/providers/:id", async (req, res) => {
     if (!requireScopeInline(req, res, "manage_providers")) return;
     const providers = new SupabaseTable(restConfig(), "ai_providers");
-    const patch = req.body as { enabled?: boolean };
-    await providers.update(`id=eq.${encodeURIComponent(req.params.id)}`, { ...patch, updated_at: new Date().toISOString() } as any);
+    const body = req.body as { enabled?: unknown; premiumEnabled?: unknown; premiumModels?: unknown };
+
+    // Built field by field rather than spreading req.body. The previous
+    // version passed the request body straight into the UPDATE, so any column
+    // name a caller invented was written verbatim — a scoped admin could edit
+    // base_url, api_style or category through a route that advertises only an
+    // enabled toggle. Naming the writable fields keeps that closed as the
+    // table grows.
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (typeof body.enabled === "boolean") patch.enabled = body.enabled;
+    if (typeof body.premiumEnabled === "boolean") patch.premium_enabled = body.premiumEnabled;
+    if (Array.isArray(body.premiumModels) && body.premiumModels.every((m) => typeof m === "string")) {
+      patch.premium_models = body.premiumModels;
+    }
+    if (Object.keys(patch).length === 1) {
+      return res.status(400).json({ error: "Nothing to update. Supply enabled, premiumEnabled, or premiumModels." });
+    }
+
+    await providers.update(`id=eq.${encodeURIComponent(req.params.id)}`, patch as any);
     await writeAuditLog(actor(req), "update_provider", "ai_provider", req.params.id, patch);
     res.json({ success: true });
+  });
+
+  /**
+   * Everyone who currently holds Premium, with the plan and expiry that makes
+   * it true. The roster the request asked for: entitlement rows joined to the
+   * profile behind each, so an admin can see WHO is subscribed rather than
+   * only being able to grant and revoke by user id.
+   *
+   * Reads user_entitlements directly (service-role, RLS-bypassing) — the same
+   * table isEntitlementActive checks at request time, so this list and the
+   * enforcement can never disagree.
+   */
+  admin.get("/premium-subscribers", async (_req, res) => {
+    const entitlements = new SupabaseTable<Record<string, unknown>>(restConfig(), "user_entitlements");
+    const profiles = new SupabaseTable<Record<string, unknown>>(restConfig(), "profiles");
+
+    const rows = await entitlements.select("status=eq.active&order=start_date.desc");
+    const ids = [...new Set(rows.map((r) => String(r.user_id)))];
+    const profileRows = ids.length
+      ? await profiles.select(`id=in.(${ids.map((i) => encodeURIComponent(i)).join(",")})&select=id,username,full_name,account_status`)
+      : [];
+    const byId = new Map(profileRows.map((p) => [String(p.id), p]));
+
+    const now = Date.now();
+    res.json(
+      rows.map((r) => {
+        const expiry = r.expiry ? Date.parse(String(r.expiry)) : null;
+        const p = byId.get(String(r.user_id));
+        return {
+          userId: r.user_id,
+          planId: r.plan_id,
+          startDate: r.start_date,
+          expiry: r.expiry,
+          // "status=active" is what the row says; whether it is active TODAY
+          // also depends on expiry, exactly as isEntitlementActive computes it.
+          currentlyActive: expiry === null || Number.isNaN(expiry) ? true : expiry > now,
+          username: p?.username ?? null,
+          fullName: p?.full_name ?? null,
+          accountStatus: p?.account_status ?? null,
+        };
+      })
+    );
   });
 
   admin.get("/models", async (req, res) => {

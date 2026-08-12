@@ -204,7 +204,7 @@ describe("POST /api/studio/refine — Premium path", () => {
     mockDb({
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" } }],
+      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -232,7 +232,7 @@ describe("POST /api/studio/refine — Premium path", () => {
     mockDb({
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [{ provider_id: "openai", status: "active" }],
-      providers: [{ id: "openai", metadata: {} }],
+      providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
       health: [],
       balance: [{ balance: 500 }],
       plans: [{ id: "premium_basic", monthly_credits: 5000, daily_credits: 200, per_task_max_credits: 1, concurrency_limit: 2 }],
@@ -264,7 +264,7 @@ describe("POST /api/studio/refine — Premium path", () => {
     const db: MockDb = {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: {} }],
+      providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
       health: [],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -296,8 +296,8 @@ describe("POST /api/studio/refine — Premium path", () => {
         encryptedCredentialRow("gemini", "sk-gemini-test-key"),
       ],
       providers: [
-        { id: "openai", metadata: {} },
-        { id: "gemini", metadata: {} },
+        { id: "openai", metadata: {}, premium_enabled: true },
+        { id: "gemini", metadata: {}, premium_enabled: true },
       ],
       health: [
         { provider_id: "openai", status: "down" },
@@ -334,7 +334,7 @@ describe("POST /api/studio/refine — Premium path", () => {
     const db: MockDb = {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [invalidCredentialRow("openai")],
-      providers: [{ id: "openai", metadata: {} }],
+      providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
       health: [],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -361,8 +361,8 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [invalidCredentialRow("openai"), encryptedCredentialRow("gemini", "sk-gemini-test-key")],
       providers: [
-        { id: "openai", metadata: {} },
-        { id: "gemini", metadata: {} },
+        { id: "openai", metadata: {}, premium_enabled: true },
+        { id: "gemini", metadata: {}, premium_enabled: true },
       ],
       health: [
         { provider_id: "openai", status: "healthy" },
@@ -393,7 +393,7 @@ describe("POST /api/studio/refine — Premium path", () => {
     mockDb({
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [{ provider_id: "openai", status: "active" }],
-      providers: [{ id: "openai", metadata: {} }],
+      providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
       health: [],
       balance: [{ balance: 0 }],
       plans: PLAN,
@@ -439,7 +439,7 @@ describe("POST /api/studio/refine — Premium path", () => {
     const db: MockDb = {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" } }],
+      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -490,7 +490,7 @@ describe("POST /api/studio/refine — Premium path", () => {
     mockDb({
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" } }],
+      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -515,7 +515,7 @@ describe("POST /api/studio/refine — Premium path", () => {
     const db: MockDb = {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: {} }],
+      providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
       health: [],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -543,7 +543,7 @@ describe("POST /api/studio/refine — Premium path", () => {
     const db: MockDb = {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: {} }],
+      providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
       health: [],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -571,7 +571,7 @@ describe("POST /api/studio/refine — Premium path", () => {
     const db: MockDb = {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" } }],
+      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -616,7 +616,7 @@ describe("POST /api/studio/refine — Premium metering", () => {
     const db: MockDb = {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" } }],
+      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -657,7 +657,7 @@ describe("POST /api/studio/refine — Premium metering", () => {
     const db: MockDb = {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
-      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" } }],
+      providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
       health: [{ provider_id: "openai", status: "healthy" }],
       // Non-zero, so the router still offers the provider — but nowhere near
       // the estimate for this passage.
@@ -694,8 +694,8 @@ describe("POST /api/studio/refine — Premium metering", () => {
         encryptedCredentialRow("gemini", "sk-gemini-test-key"),
       ],
       providers: [
-        { id: "openai", metadata: { defaultModel: "gpt-4o-mini" } },
-        { id: "gemini", metadata: { defaultModel: "gemini-2.0-flash" } },
+        { id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true },
+        { id: "gemini", metadata: { defaultModel: "gemini-2.0-flash" }, premium_enabled: true },
       ],
       health: [
         { provider_id: "openai", status: "healthy" },
@@ -748,7 +748,7 @@ describe("POST /api/studio/refine — Premium metering", () => {
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
       // metadata.defaultModel absent -> routingCandidates maps it to "", which
       // `??` passed straight through as the model id.
-      providers: [{ id: "openai", metadata: {} }],
+      providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,

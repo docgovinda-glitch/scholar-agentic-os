@@ -730,3 +730,31 @@ alter table public.platform_provider_credentials
   drop constraint if exists platform_provider_credentials_provider_label_key;
 alter table public.platform_provider_credentials
   add constraint platform_provider_credentials_provider_label_key unique (provider_id, label);
+
+-- ============================================================================
+-- PREMIUM CATALOGUE: which providers/models Premium users may actually use
+-- ============================================================================
+--
+-- Until now "Premium" meant "any provider with an active platform credential"
+-- — runPremiumRefine simply took every active row in
+-- platform_provider_credentials as an eligible candidate. That conflates two
+-- different decisions: whether Scholar HOLDS a key for a provider, and
+-- whether Scholar wants to SPEND it on Premium users. An admin adding a
+-- credential to test a provider silently made it live for every subscriber.
+--
+-- These two columns separate them. `premium_enabled` is the admin's explicit
+-- opt-in per provider; `premium_models` optionally narrows Premium to
+-- specific model ids (empty array = the provider's catalogue default, which
+-- is the existing behaviour).
+--
+-- Deliberately on ai_providers rather than a new table: the admin panel
+-- already lists and toggles providers from here, and the routing layer
+-- already joins to it for defaultModel, so this adds a column to a table both
+-- sides already read instead of a join neither currently makes.
+--
+-- Default false is the safe direction: after this migration no provider is
+-- Premium-eligible until an admin says so. Existing deployments should expect
+-- to switch their intended providers on once, in Admin -> AI Infrastructure.
+
+alter table public.ai_providers add column if not exists premium_enabled boolean not null default false;
+alter table public.ai_providers add column if not exists premium_models text[] not null default '{}';
