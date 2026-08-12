@@ -6,7 +6,16 @@ import { useEffect } from "react";
 import ProviderDetail, { Chip } from "./ProviderDetail";
 import LocalRunnerDetail from "./LocalRunnerDetail";
 import { byokProviders, freeProviders, useAiAccess, type ProviderView } from "./useAiAccess";
-import { getPremiumCatalog, type PremiumCatalog } from "./aiAccessApi";
+import {
+  getPremiumCatalog,
+  getOfferedPlans,
+  getMyPremiumRequest,
+  requestPremium,
+  withdrawPremiumRequest,
+  type PremiumCatalog,
+  type OfferedPlan,
+  type MyPremiumRequest,
+} from "./aiAccessApi";
 
 /**
  * AI Access — the user's provider and model manager.
@@ -507,20 +516,53 @@ function CloudSection({
 
 function PremiumSection({ access }: { access: ReturnType<typeof useAiAccess> }) {
   const [catalog, setCatalog] = useState<PremiumCatalog | null>(null);
-  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [plans, setPlans] = useState<OfferedPlan[]>([]);
+  const [myRequest, setMyRequest] = useState<MyPremiumRequest | null>(null);
+  const [chosenPlan, setChosenPlan] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    getPremiumCatalog()
-      .then(setCatalog)
-      .catch((e) => setCatalogError((e as Error).message));
-  }, []);
+  function reload() {
+    getPremiumCatalog().then(setCatalog).catch(() => setCatalog(null));
+    getOfferedPlans().then(setPlans).catch(() => setPlans([]));
+    getMyPremiumRequest().then(setMyRequest).catch(() => setMyRequest(null));
+  }
+  useEffect(reload, []);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await requestPremium(chosenPlan || undefined, note.trim() || undefined);
+      setNote("");
+      reload();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function withdraw() {
+    setBusy(true);
+    try {
+      await withdrawPremiumRequest();
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const q = access.status?.quota;
   const b = access.status?.creditBalance;
+  const pending = myRequest?.status === "pending";
+  const expiry = access.status?.entitlement.expiry;
+  const expiresInDays = expiry ? Math.ceil((Date.parse(expiry) - Date.now()) / 86_400_000) : null;
 
   return (
     <div className="space-y-5">
-      <SectionHeading title="Premium" blurb="AI paid for by Scholar. You never enter a key — requests run through Scholar's own server." />
+      <SectionHeading title="Premium" blurb="AI paid for by Scholar. You never enter a key — requests run on Scholar's own infrastructure." />
 
       <section
         className={`rounded-[var(--radius-md)] border p-4 ${
@@ -532,14 +574,17 @@ function PremiumSection({ access }: { access: ReturnType<typeof useAiAccess> }) 
         <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">
           Subscription status: {access.premiumActive ? "Active" : "Not subscribed"}
         </h3>
-        {access.premiumActive ? (
-          <p className="mt-1 text-xs text-[color:var(--text-secondary)]">
-            Nothing to configure. Scholar uses Premium automatically when it is the best available source for a task.
-          </p>
-        ) : (
-          <p className="mt-1 text-xs text-[color:var(--text-secondary)]">
-            Premium is granted by an administrator. Your status is checked on Scholar's server on every request — it is not
-            something this page can switch on.
+        <p className="mt-1 text-xs text-[color:var(--text-secondary)]">
+          {access.premiumActive
+            ? "Nothing to configure. Scholar uses Premium automatically when it is the best available source for a task."
+            : "Your status is verified on Scholar's server on every request — this page cannot switch it on."}
+        </p>
+        {/* Told before it lapses rather than discovered by a failed request. */}
+        {access.premiumActive && expiresInDays !== null && expiresInDays <= 14 && (
+          <p className="mt-2 text-xs font-medium text-[color:var(--state-warning)]">
+            {expiresInDays <= 0
+              ? "Your Premium subscription has expired."
+              : `Your Premium subscription ends in ${expiresInDays} day${expiresInDays === 1 ? "" : "s"}. Contact an administrator to renew.`}
           </p>
         )}
       </section>
@@ -550,36 +595,130 @@ function PremiumSection({ access }: { access: ReturnType<typeof useAiAccess> }) 
           <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-[color:var(--text-secondary)]">
             <Stat label="Balance" value={b?.balance ?? 0} />
             <Stat label="Per-task cap" value={q.perTaskMaxCredits ?? "Unlimited"} />
-            <Stat label="Daily" value={`${b?.daily_used ?? 0} / ${q.dailyCredits ?? "∞"}`} />
-            <Stat label="Weekly" value={`${b?.weekly_used ?? 0} / ${q.weeklyCredits ?? "∞"}`} />
-            <Stat label="Monthly" value={`${b?.monthly_used ?? 0} / ${q.monthlyCredits ?? "∞"}`} />
+            <Stat label="Daily" value={`${b?.daily_used ?? 0} / ${q.dailyCredits ?? "\u221e"}`} />
+            <Stat label="Weekly" value={`${b?.weekly_used ?? 0} / ${q.weeklyCredits ?? "\u221e"}`} />
+            <Stat label="Monthly" value={`${b?.monthly_used ?? 0} / ${q.monthlyCredits ?? "\u221e"}`} />
             <Stat label="At once" value={q.concurrencyLimit} />
           </dl>
         </section>
       )}
 
-      <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
-        <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">Available Premium models</h3>
-        <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-          Chosen by the administrator. Scholar's own keys stay on the server and are never sent to your browser.
-        </p>
-        {catalogError && <p className="mt-2 text-xs text-[color:var(--state-warning)]">Could not load the Premium catalogue ({catalogError}).</p>}
-        {catalog && catalog.providers.length === 0 && (
-          <p className="mt-2 text-sm text-[color:var(--text-muted)]">The administrator has not enabled any Premium providers yet.</p>
-        )}
-        {catalog && catalog.providers.length > 0 && (
-          <ul className="mt-3 space-y-2">
-            {catalog.providers.map((p) => (
-              <li key={p.providerId} className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-2">
-                <p className="text-sm font-medium text-[color:var(--text-primary)]">{p.name}</p>
-                <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">
-                  {p.models.length > 0 ? p.models.join(", ") : "Default model chosen automatically"}
-                </p>
+      {/* What the subscriber is entitled to, named by capability. There is
+          deliberately no provider or model here — the administrator can move a
+          capability between providers and this list does not change. */}
+      {access.premiumActive && (
+        <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
+          <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">What your plan includes</h3>
+          {catalog && catalog.resources.length === 0 && (
+            <p className="mt-2 text-sm text-[color:var(--text-muted)]">Your plan does not grant any Premium AI yet.</p>
+          )}
+          <ul className="mt-2 space-y-2">
+            {catalog?.resources.map((r) => (
+              <li key={r.id} className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-2">
+                <p className="text-sm font-medium text-[color:var(--text-primary)]">{r.label}</p>
+                {r.description && <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">{r.description}</p>}
+                {r.capabilities.length > 0 && (
+                  <p className="mt-1 flex flex-wrap gap-1">
+                    {r.capabilities.map((c) => (
+                      <Chip key={c} tone="neutral">
+                        {c}
+                      </Chip>
+                    ))}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
+
+      {/* The self-service path. Before this, a non-subscriber saw "granted by
+          an administrator" and had no action available at all. */}
+      {!access.premiumActive && (
+        <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
+          <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">Request Premium</h3>
+
+          {pending ? (
+            <>
+              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
+                Your request is waiting for an administrator's decision.
+              </p>
+              <button
+                type="button"
+                onClick={() => void withdraw()}
+                disabled={busy}
+                className="mt-3 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60"
+              >
+                Withdraw request
+              </button>
+            </>
+          ) : (
+            <>
+              {myRequest?.status === "declined" && (
+                <p className="mt-2 text-sm text-[color:var(--state-warning)]">
+                  A previous request was declined{myRequest.decision_note ? `: ${myRequest.decision_note}` : "."} You can ask again.
+                </p>
+              )}
+              {plans.length > 0 ? (
+                <>
+                  <p className="mt-1 text-xs text-[color:var(--text-muted)]">Choose the plan you would like.</p>
+                  <ul className="mt-2 space-y-2">
+                    {plans.map((p) => (
+                      <li key={p.id}>
+                        <label className="flex cursor-pointer items-start gap-2 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-2">
+                          <input
+                            type="radio"
+                            name="plan"
+                            value={p.id}
+                            checked={chosenPlan === p.id}
+                            onChange={() => setChosenPlan(p.id)}
+                            className="mt-1"
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium text-[color:var(--text-primary)]">{p.name}</span>
+                            {p.description && <span className="block text-xs text-[color:var(--text-muted)]">{p.description}</span>}
+                            <span className="mt-0.5 block text-xs text-[color:var(--text-secondary)]">
+                              {p.monthlyCredits ?? "\u221e"} credits/month
+                              {p.dailyCredits ? ` \u00b7 ${p.dailyCredits}/day` : ""}
+                            </span>
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-[color:var(--text-muted)]">
+                  No plans are being offered right now. You can still send a request and an administrator will follow up.
+                </p>
+              )}
+              <label htmlFor="premium-note" className="mt-3 block text-xs font-medium text-[color:var(--text-primary)]">
+                Anything you want to add (optional)
+              </label>
+              <textarea
+                id="premium-note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                className="mt-1 w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              />
+              {error && (
+                <p role="alert" className="mt-2 text-sm text-[color:var(--state-danger)]">
+                  {error}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={busy}
+                className="mt-3 rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] disabled:opacity-60"
+              >
+                {busy ? "Sending\u2026" : "Request Premium"}
+              </button>
+            </>
+          )}
+        </section>
+      )}
     </div>
   );
 }

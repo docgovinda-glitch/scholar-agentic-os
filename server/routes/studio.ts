@@ -20,8 +20,8 @@ import { ALL_L1_PROFILES } from "../../src/domain/language/l1Patterns.ts";
 import { buildVoiceProfile } from "../../src/domain/language/voiceProfile.ts";
 import type { InterventionLevel, VoiceProfile } from "../../src/domain/language/types.ts";
 import { requireAuth, type AuthenticatedUser } from "../src/middleware/auth.ts";
-import { assembleRoutingCandidates } from "../src/aiEngine/routingCandidates.ts";
-import { selectProvider, type RoutingContext } from "../src/aiEngine/omniRouter.ts";
+import { assembleUserCandidates } from "../src/aiEngine/userRouter.ts";
+import { resolvePremiumResources } from "../src/aiEngine/adminRouter.ts";
 import { getDecryptedCredential } from "../src/aiEngine/credentialVault.ts";
 import { checkPerTaskLimit } from "../src/aiEngine/quotaEngine.ts";
 import { creditsForUsage, estimateMaxCreditsForInput } from "../src/aiEngine/creditPolicy.ts";
@@ -74,23 +74,12 @@ async function runPremiumRefine(
   | { ok: true; result: Awaited<ReturnType<typeof refine>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
   | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
 > {
-  const { candidates, premiumQuotaRemaining, entitlementActive, quota, defaultModelByProvider } = await assembleRoutingCandidates(userId);
+  // The USER's own router settles quota and entitlement; it knows Premium
+  // only as one opaque capability, never as a list of providers.
+  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
 
   if (!entitlementActive) {
     return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
-  }
-
-  const premiumCandidates = candidates.filter((c) => c.tier === "premium");
-  // Studio's task shape today is language refinement; "reasoning" matches
-  // the tier-preference ordering already documented in omniRouter.ts's
-  // TIER_ORDER (free/byok/premium/local — local is excluded below anyway,
-  // studio has no local-execution path). Fed through selectProvider() so
-  // multiple configured Premium-pool providers are still ranked by real
-  // health, not tried in an arbitrary order.
-  const context: RoutingContext = { taskType: "reasoning", privacyPreference: "any", premiumQuotaRemaining };
-  let decision = selectProvider(premiumCandidates, context);
-  if (!decision.ok) {
-    return { ok: false, status: 402, error: decision.reasoning };
   }
 
   const preCheckAmount = estimateMaxCreditsForInput(refineInput.text);
@@ -110,28 +99,44 @@ async function runPremiumRefine(
     return {
       ok: false,
       status: 402,
-      error: `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
+      // Nothing left at all and "not quite enough for this one" are different
+      // situations to be in, and the first is the one a user needs named
+      // plainly — an arithmetic shortfall message would read as though a
+      // smaller request might work when none will.
+      error:
+        premiumQuotaRemaining <= 0
+          ? "Your Premium quota for this period is exhausted."
+          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
     };
   }
 
-  const attempts = [decision.choice, ...decision.fallbacks].filter((c) => c.tier === "premium");
-  let lastError = "No Premium provider is currently available.";
+  // The ADMIN's router decides which of the platform's own resources serves
+  // this request. Resolved here rather than in the user's router so the two
+  // stay separate systems: the user's side asked for "Premium", and what
+  // Premium is made of is the administrator's business. Re-pointing a
+  // resource at a different provider changes this list and nothing else.
+  const resources = await resolvePremiumResources(userId, "reasoning");
+  if (resources.length === 0) {
+    return {
+      ok: false,
+      status: 402,
+      error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator.",
+    };
+  }
 
-  for (const choice of attempts) {
-    const credential = await getDecryptedCredential(choice.providerId).catch(() => null);
+  let lastError = "No Premium resource is currently available.";
+
+  for (const resource of resources) {
+    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
     if (!credential) {
-      await recordProviderFailure(choice.providerId, "No active platform credential configured.");
-      lastError = `${choice.providerId} is not currently configured.`;
+      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+      // Named by the admin's label, not the provider — the message may reach
+      // the user, and Premium does not disclose what runs underneath.
+      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
       continue;
     }
 
-    // `||`, not `??`: assembleRoutingCandidates builds defaultModelByProvider
-    // as `metadata?.defaultModel ?? ""`, so a provider row with no configured
-    // default yields an EMPTY STRING, which `??` passes straight through. The
-    // adapter would then fall back to its own default while the usage ledger
-    // and the "Why this AI?" panel both recorded "" — losing the record of
-    // which model actually ran.
-    const model = choice.modelId || defaultModelByProvider.get(choice.providerId) || undefined;
+    const model = resource.modelId || undefined;
     const start = Date.now();
 
     // Only the provider call itself belongs in this try. Post-success
@@ -142,24 +147,24 @@ async function runPremiumRefine(
     // providers for one request and charging the user for neither.
     let result: Awaited<ReturnType<typeof refine>>;
     try {
-      result = await refine({ ...refineInput, provider: choice.providerId, apiKey: credential, model });
+      result = await refine({ ...refineInput, provider: resource.providerId, apiKey: credential, model });
     } catch (err) {
       if (err instanceof GatewayDenied) {
         // Never counted as a provider failure (this provider isn't
         // "down" — the request was never sent), and never deducts credits.
         if (err.requiresConsent) {
-          return { ok: false, status: 428, error: err.message, provider: choice.providerId };
+          return { ok: false, status: 428, error: err.message, provider: resource.providerId };
         }
         return { ok: false, status: 403, error: err.message };
       }
-      await recordProviderFailure(choice.providerId, err instanceof Error ? err.message : "Unknown error");
+      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
       lastError = err instanceof Error ? err.message : "Unknown error";
       // Try the next premium fallback, if any — never deducts credits for a
       // failed attempt (Priority 5).
       continue;
     }
 
-    await recordProviderSuccess(choice.providerId, Date.now() - start);
+    await recordProviderSuccess(resource.providerId, Date.now() - start);
 
     const usage = result.usage;
     const modelUsed = model ?? usage?.model ?? "";
@@ -172,7 +177,7 @@ async function runPremiumRefine(
       quota?.monthlyCredits ?? null,
       "usage",
       requestId,
-      `studio refine: ${choice.providerId}`,
+      `studio refine: ${resource.label}`,
       quota?.weeklyCredits ?? null
     );
 
@@ -190,16 +195,20 @@ async function runPremiumRefine(
     // ledger row charged 0, so the gap between provider cost and revenue
     // stays auditable rather than invisible.
     if (deductResult !== "ok") {
-      await recordUsage(userId, choice.providerId, modelUsed, usage, requestId, 0, "quota_exhausted");
+      await recordUsage(userId, resource.providerId, modelUsed, usage, requestId, 0, "quota_exhausted");
       return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
     }
 
-    await recordUsage(userId, choice.providerId, modelUsed, usage, requestId, creditsUsed, "success");
+    await recordUsage(userId, resource.providerId, modelUsed, usage, requestId, creditsUsed, "success");
 
     return {
       ok: true,
       result,
-      aiSource: { tier: "premium", provider: choice.providerId, model: modelUsed, creditsUsed },
+      // The user is told the admin's resource LABEL, never the provider or
+      // model behind it. That is what makes Premium provider-agnostic: an
+      // admin re-pointing "Advanced writing" from one provider to another
+      // changes nothing the subscriber sees.
+      aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed },
     };
   }
 

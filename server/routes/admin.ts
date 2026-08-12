@@ -9,6 +9,7 @@ import { grantCredits } from "../src/aiEngine/creditEngine";
 import { writeAuditLog } from "../src/aiEngine/auditLog";
 import { runOpportunityResearch } from "../src/aiEngine/opportunityAgent";
 import { listAdmins, grantAdmin, revokeAdmin, updateAdminScopes, AlreadyAdminError } from "../src/aiEngine/adminUsers";
+import { listResources, createResource, updateResource, deleteResource, resourceIdsForPlan, setPlanResources } from "../src/aiEngine/adminRouter";
 import { searchUsers, setAccountStatus, hardDeleteUser, DeleteConfirmationMismatchError } from "../src/aiEngine/userAdmin";
 
 /**
@@ -121,6 +122,172 @@ export function registerAdminRoutes(app: express.Express): void {
     res.json({ success: true });
   });
 
+  /** Create or update a Premium plan. Named fields only, same rule as elsewhere. */
+  admin.post("/premium-plans", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_premium")) return;
+    const b = req.body as Record<string, unknown>;
+    if (typeof b.id !== "string" || !b.id.trim()) return res.status(400).json({ error: "id is required." });
+    if (typeof b.name !== "string" || !b.name.trim()) return res.status(400).json({ error: "name is required." });
+
+    const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+    const plans = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_plans");
+    await plans.upsert(
+      {
+        id: b.id.trim(),
+        name: b.name.trim(),
+        description: typeof b.description === "string" ? b.description : null,
+        monthly_credits: num(b.monthlyCredits) ?? 0,
+        weekly_credits: num(b.weeklyCredits),
+        daily_credits: num(b.dailyCredits),
+        per_task_max_credits: num(b.perTaskMaxCredits),
+        concurrency_limit: num(b.concurrencyLimit) ?? 1,
+        sort_order: num(b.sortOrder) ?? 0,
+        user_requestable: b.userRequestable !== false,
+        enabled: b.enabled !== false,
+        updated_at: new Date().toISOString(),
+      },
+      "id"
+    );
+    await writeAuditLog(actor(req), "upsert_premium_plan", "premium_plan", b.id, { name: b.name });
+    res.json({ success: true });
+  });
+
+  // ── Admin AI Router: the resource pool ───────────────────────────────
+  //
+  // The platform's OWN AI infrastructure, entirely separate from anything a
+  // user configured. Nothing in this section reads user_ai_connections or any
+  // other record of a user's private provider choices.
+
+  admin.get("/resources", async (_req, res) => {
+    res.json(await listResources());
+  });
+
+  admin.post("/resources", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_providers")) return;
+    const b = req.body as Record<string, unknown>;
+    if (typeof b.label !== "string" || !b.label.trim()) return res.status(400).json({ error: "label is required." });
+    if (typeof b.providerId !== "string" || !b.providerId) return res.status(400).json({ error: "providerId is required." });
+    if (!["local", "free", "paid", "byok"].includes(String(b.accessType))) {
+      return res.status(400).json({ error: "accessType must be local, free, paid or byok." });
+    }
+    await createResource({
+      label: b.label.trim(),
+      description: typeof b.description === "string" ? b.description : null,
+      provider_id: b.providerId,
+      model_id: typeof b.modelId === "string" && b.modelId ? b.modelId : null,
+      access_type: b.accessType as "local" | "free" | "paid" | "byok",
+      capabilities: Array.isArray(b.capabilities) ? (b.capabilities as string[]).filter((c) => typeof c === "string") : [],
+      cost_per_1k_usd: typeof b.costPer1kUsd === "number" ? b.costPer1kUsd : null,
+      credential_label: typeof b.credentialLabel === "string" && b.credentialLabel ? b.credentialLabel : "default",
+      enabled: b.enabled !== false,
+    });
+    await writeAuditLog(actor(req), "create_ai_resource", "ai_resource", String(b.label), { providerId: b.providerId });
+    res.json({ success: true });
+  });
+
+  admin.patch("/resources/:id", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_providers")) return;
+    const b = req.body as Record<string, unknown>;
+    // Named fields only — same reasoning as PATCH /providers/:id.
+    const patch: Record<string, unknown> = {};
+    if (typeof b.label === "string") patch.label = b.label;
+    if (typeof b.description === "string" || b.description === null) patch.description = b.description;
+    if (typeof b.modelId === "string" || b.modelId === null) patch.model_id = b.modelId;
+    if (typeof b.enabled === "boolean") patch.enabled = b.enabled;
+    if (typeof b.costPer1kUsd === "number" || b.costPer1kUsd === null) patch.cost_per_1k_usd = b.costPer1kUsd;
+    if (Array.isArray(b.capabilities)) patch.capabilities = (b.capabilities as string[]).filter((c) => typeof c === "string");
+    if (Object.keys(patch).length === 0) return res.status(400).json({ error: "Nothing to update." });
+
+    await updateResource(req.params.id, patch);
+    await writeAuditLog(actor(req), "update_ai_resource", "ai_resource", req.params.id, patch);
+    res.json({ success: true });
+  });
+
+  admin.delete("/resources/:id", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_providers")) return;
+    await deleteResource(req.params.id);
+    await writeAuditLog(actor(req), "delete_ai_resource", "ai_resource", req.params.id, {});
+    res.json({ success: true });
+  });
+
+  // ── Plans: which resources each plan grants ──────────────────────────
+  admin.get("/plans/:planId/resources", async (req, res) => {
+    res.json(await resourceIdsForPlan(req.params.planId));
+  });
+
+  admin.put("/plans/:planId/resources", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_premium")) return;
+    const { resourceIds } = req.body as { resourceIds?: unknown };
+    if (!Array.isArray(resourceIds) || !resourceIds.every((r) => typeof r === "string")) {
+      return res.status(400).json({ error: "resourceIds must be an array of resource ids." });
+    }
+    await setPlanResources(req.params.planId, resourceIds as string[]);
+    await writeAuditLog(actor(req), "set_plan_resources", "premium_plan", req.params.planId, { count: resourceIds.length });
+    res.json({ success: true });
+  });
+
+  // ── Premium requests: the approval queue ─────────────────────────────
+  admin.get("/premium-requests", async (req, res) => {
+    const requests = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_requests");
+    const profiles = new SupabaseTable<Record<string, unknown>>(restConfig(), "profiles");
+    const status = typeof req.query.status === "string" ? req.query.status : "pending";
+    const rows = await requests.select(`status=eq.${encodeURIComponent(status)}&order=created_at.desc&limit=100`);
+
+    const ids = [...new Set(rows.map((r) => String(r.user_id)))];
+    const profileRows = ids.length
+      ? await profiles.select(`id=in.(${ids.map((i) => encodeURIComponent(i)).join(",")})&select=id,username,full_name`)
+      : [];
+    const byId = new Map(profileRows.map((p) => [String(p.id), p]));
+
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        userId: r.user_id,
+        requestedPlanId: r.requested_plan_id,
+        note: r.note,
+        status: r.status,
+        createdAt: r.created_at,
+        username: byId.get(String(r.user_id))?.username ?? null,
+        fullName: byId.get(String(r.user_id))?.full_name ?? null,
+      }))
+    );
+  });
+
+  /** Approve a request: grants the plan and closes the request in one action. */
+  admin.post("/premium-requests/:id/approve", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_premium")) return;
+    const { planId, expiry, note } = req.body as { planId?: string; expiry?: string | null; note?: string };
+    if (!planId) return res.status(400).json({ error: "planId is required." });
+
+    const requests = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_requests");
+    const row = await requests.selectOne(`id=eq.${encodeURIComponent(req.params.id)}`);
+    if (!row) return res.status(404).json({ error: "That request no longer exists." });
+
+    await grantPremium(String(row.user_id), planId, expiry ?? null, actor(req));
+    await requests.update(`id=eq.${encodeURIComponent(req.params.id)}`, {
+      status: "approved",
+      decided_by: actor(req),
+      decided_at: new Date().toISOString(),
+      decision_note: note ?? null,
+    });
+    await writeAuditLog(actor(req), "approve_premium_request", "premium_request", req.params.id, { planId });
+    res.json({ success: true });
+  });
+
+  admin.post("/premium-requests/:id/decline", async (req, res) => {
+    if (!requireScopeInline(req, res, "manage_premium")) return;
+    const { note } = req.body as { note?: string };
+    const requests = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_requests");
+    await requests.update(`id=eq.${encodeURIComponent(req.params.id)}`, {
+      status: "declined",
+      decided_by: actor(req),
+      decided_at: new Date().toISOString(),
+      decision_note: note ?? null,
+    });
+    await writeAuditLog(actor(req), "decline_premium_request", "premium_request", req.params.id, {});
+    res.json({ success: true });
+  });
+
   /**
    * Everyone who currently holds Premium, with the plan and expiry that makes
    * it true. The roster the request asked for: entitlement rows joined to the
@@ -155,6 +322,10 @@ export function registerAdminRoutes(app: express.Express): void {
           // "status=active" is what the row says; whether it is active TODAY
           // also depends on expiry, exactly as isEntitlementActive computes it.
           currentlyActive: expiry === null || Number.isNaN(expiry) ? true : expiry > now,
+          // Both sides currently find out about a lapse by failure. Fourteen
+          // days is enough notice to renew before anything stops working.
+          expiringSoon:
+            expiry !== null && !Number.isNaN(expiry) && expiry > now && expiry - now < 14 * 24 * 60 * 60 * 1000,
           username: p?.username ?? null,
           fullName: p?.full_name ?? null,
           accountStatus: p?.account_status ?? null,
@@ -182,14 +353,6 @@ export function registerAdminRoutes(app: express.Express): void {
   admin.get("/premium-plans", async (_req, res) => {
     const plans = new SupabaseTable(restConfig(), "premium_plans");
     res.json(await plans.select());
-  });
-
-  admin.post("/premium-plans", async (req, res) => {
-    if (!requireScopeInline(req, res, "manage_premium")) return;
-    const plans = new SupabaseTable(restConfig(), "premium_plans");
-    await plans.upsert({ ...(req.body as object), updated_at: new Date().toISOString() } as any);
-    await writeAuditLog(actor(req), "upsert_premium_plan", "premium_plan", (req.body as { id?: string }).id ?? null, req.body as Record<string, unknown>);
-    res.json({ success: true });
   });
 
   // ── Entitlements (grant/revoke Premium) ─────────────────────────────
@@ -248,10 +411,51 @@ export function registerAdminRoutes(app: express.Express): void {
   });
 
   // ── Usage ────────────────────────────────────────────────────────────
-  admin.get("/usage", async (req, res) => {
-    const ledger = new SupabaseTable(restConfig(), "ai_usage_ledger");
-    const limit = typeof req.query.limit === "string" ? req.query.limit : "100";
-    res.json(await ledger.select(`order=created_at.desc&limit=${encodeURIComponent(limit)}`));
+  /**
+   * AGGREGATE usage only — never a per-request log tied to a user.
+   *
+   * This used to return raw ai_usage_ledger rows, each carrying user_id
+   * alongside provider_id and model_id. Even though the ledger holds only
+   * platform-paid (Premium) requests, that shape let an administrator read an
+   * individual's request history, which the platform's privacy rule forbids:
+   * an admin may know WHO subscribes and WHAT the platform spends in total,
+   * not what any one person asked for or when.
+   *
+   * What is kept is what running the platform actually requires — totals per
+   * resource for infrastructure and cost decisions, and per-subscriber credit
+   * totals for billing, which is the minimum that makes quotas enforceable.
+   * Neither exposes an individual request.
+   */
+  admin.get("/usage", async (_req, res) => {
+    const ledger = new SupabaseTable<Record<string, unknown>>(restConfig(), "ai_usage_ledger");
+    const rows = await ledger.select("select=provider_id,model_id,scholar_credits_charged,status,created_at,user_id&order=created_at.desc&limit=2000");
+
+    const byResource = new Map<string, { providerId: string; modelId: string | null; requests: number; credits: number; errors: number }>();
+    const byUser = new Map<string, number>();
+    let totalCredits = 0;
+
+    for (const r of rows) {
+      const key = `${String(r.provider_id ?? "unknown")}::${String(r.model_id ?? "")}`;
+      const entry = byResource.get(key) ?? { providerId: String(r.provider_id ?? "unknown"), modelId: (r.model_id as string) ?? null, requests: 0, credits: 0, errors: 0 };
+      const credits = Number(r.scholar_credits_charged ?? 0);
+      entry.requests += 1;
+      entry.credits += credits;
+      if (r.status !== "success") entry.errors += 1;
+      byResource.set(key, entry);
+
+      totalCredits += credits;
+      // Per-subscriber TOTALS for billing. Deliberately a single number per
+      // user — no provider, no model, no timestamps, nothing about any
+      // individual request.
+      byUser.set(String(r.user_id), (byUser.get(String(r.user_id)) ?? 0) + credits);
+    }
+
+    res.json({
+      totalRequests: rows.length,
+      totalCredits,
+      byResource: [...byResource.values()].sort((a, b) => b.credits - a.credits),
+      billing: [...byUser.entries()].map(([userId, credits]) => ({ userId, credits })).sort((a, b) => b.credits - a.credits),
+    });
   });
 
   // ── Cost & Budget ────────────────────────────────────────────────────

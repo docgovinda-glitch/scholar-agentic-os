@@ -52,18 +52,53 @@ export interface VerifyKeyResult {
 export const verifyProviderKey = (providerId: string, apiKey: string) =>
   api<VerifyKeyResult>("/api/ai-access/verify-provider-key", { method: "POST", body: JSON.stringify({ providerId, apiKey }) });
 
-export interface PremiumCatalog {
-  active: boolean;
-  providers: Array<{ providerId: string; name: string; models: string[] }>;
+export interface PublicResource {
+  id: string;
+  label: string;
+  description: string | null;
+  capabilities: string[];
 }
 
-/**
- * Which Premium providers/models this user may use. Server-gated on the
- * caller's own entitlement and never includes a credential — Scholar's
- * platform keys stay server-side, which is the entire distinction between
- * Premium and BYOK.
- */
+export interface PremiumCatalog {
+  active: boolean;
+  planId: string | null;
+  /**
+   * Resource LABELS and capabilities only. Deliberately no provider or model:
+   * the admin router strips those before they leave the server, so an admin
+   * can re-point a Premium capability at a different provider without a
+   * subscriber seeing any change.
+   */
+  resources: PublicResource[];
+}
+
 export const getPremiumCatalog = () => api<PremiumCatalog>("/api/ai-access/premium-catalog");
+
+export interface OfferedPlan {
+  id: string;
+  name: string;
+  description: string | null;
+  monthlyCredits: number | null;
+  weeklyCredits: number | null;
+  dailyCredits: number | null;
+  perTaskMaxCredits: number | null;
+  concurrencyLimit: number;
+}
+/** Plans a user may ask for. Admin-only plans are never listed. */
+export const getOfferedPlans = () => api<OfferedPlan[]>("/api/ai-access/premium-plans");
+
+export interface MyPremiumRequest {
+  id: string;
+  requested_plan_id: string | null;
+  note: string | null;
+  status: "pending" | "approved" | "declined" | "withdrawn";
+  created_at: string;
+  decision_note: string | null;
+}
+export const getMyPremiumRequest = () => api<MyPremiumRequest | null>("/api/ai-access/premium-request");
+export const requestPremium = (planId?: string, note?: string) =>
+  api<{ success: true }>("/api/ai-access/premium-request", { method: "POST", body: JSON.stringify({ planId, note }) });
+export const withdrawPremiumRequest = () =>
+  api<{ success: true }>("/api/ai-access/premium-request", { method: "DELETE" });
 
 /** Mirrors server/src/aiEngine/omniRouter.ts's Tier/TaskType — duplicated rather than imported since that module lives server-side only. */
 export type RoutingTier = "local" | "free" | "byok" | "premium";
@@ -163,27 +198,18 @@ export interface AdminProvider {
   category: string;
   enabled: boolean;
   free_tier_kind: string | null;
-  /** Admin opt-in for spending Scholar's own credential on this provider. Absent on a pre-migration database. */
-  premium_enabled?: boolean;
-  /** Empty means "use the provider's catalogue default" for Premium requests. */
-  premium_models?: string[];
 }
 export const getAdminProviders = () => api<AdminProvider[]>("/api/admin/ai/providers");
 export const setProviderEnabled = (id: string, enabled: boolean) =>
   api<{ success: true }>(`/api/admin/ai/providers/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ enabled }) });
-/** Controls whether Premium subscribers may be routed to this provider, and to which models. */
-export const setProviderPremium = (id: string, premiumEnabled: boolean, premiumModels?: string[]) =>
-  api<{ success: true }>(`/api/admin/ai/providers/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    body: JSON.stringify({ premiumEnabled, ...(premiumModels ? { premiumModels } : {}) }),
-  });
-
 export interface PremiumSubscriber {
   userId: string;
   planId: string | null;
   startDate: string | null;
   expiry: string | null;
   currentlyActive: boolean;
+  /** Within 14 days of expiry — worth renewing before it lapses. */
+  expiringSoon?: boolean;
   username: string | null;
   fullName: string | null;
   accountStatus: string | null;
@@ -212,16 +238,72 @@ export const revokePremiumFrom = (userId: string) =>
 export const grantCreditsTo = (userId: string, amount: number, note?: string) =>
   api<{ success: true }>("/api/admin/ai/credits/grant", { method: "POST", body: JSON.stringify({ userId, amount, note }) });
 
-export interface UsageRow {
-  id: string;
-  user_id: string;
-  provider_id: string | null;
-  tier: string;
-  scholar_credits_charged: number | null;
-  status: string;
-  created_at: string;
+/**
+ * Aggregate usage only. There is deliberately no per-request, per-user row
+ * here: an admin may see what the platform spends in total and what each
+ * subscriber owes, never what an individual asked for or when.
+ */
+export interface UsageSummary {
+  totalRequests: number;
+  totalCredits: number;
+  byResource: Array<{ providerId: string; modelId: string | null; requests: number; credits: number; errors: number }>;
+  billing: Array<{ userId: string; credits: number }>;
 }
-export const getUsage = () => api<UsageRow[]>("/api/admin/ai/usage");
+export const getUsage = () => api<UsageSummary>("/api/admin/ai/usage");
+
+// ── Admin AI Router: resource pool ─────────────────────────────────────
+
+export interface AiResource {
+  id: string;
+  label: string;
+  description: string | null;
+  provider_id: string;
+  model_id: string | null;
+  access_type: "local" | "free" | "paid" | "byok";
+  capabilities: string[] | null;
+  cost_per_1k_usd: number | null;
+  enabled: boolean;
+  credential_label: string;
+}
+export const getResources = () => api<AiResource[]>("/api/admin/ai/resources");
+export const createResource = (input: {
+  label: string;
+  providerId: string;
+  modelId?: string;
+  accessType: "local" | "free" | "paid" | "byok";
+  description?: string;
+  capabilities?: string[];
+  costPer1kUsd?: number | null;
+  credentialLabel?: string;
+}) => api<{ success: true }>("/api/admin/ai/resources", { method: "POST", body: JSON.stringify(input) });
+export const updateResource = (id: string, patch: Record<string, unknown>) =>
+  api<{ success: true }>(`/api/admin/ai/resources/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) });
+export const deleteResource = (id: string) =>
+  api<{ success: true }>(`/api/admin/ai/resources/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+export const getPlanResources = (planId: string) => api<string[]>(`/api/admin/ai/plans/${encodeURIComponent(planId)}/resources`);
+export const setPlanResources = (planId: string, resourceIds: string[]) =>
+  api<{ success: true }>(`/api/admin/ai/plans/${encodeURIComponent(planId)}/resources`, { method: "PUT", body: JSON.stringify({ resourceIds }) });
+
+export interface PremiumRequestRow {
+  id: string;
+  userId: string;
+  requestedPlanId: string | null;
+  note: string | null;
+  status: string;
+  createdAt: string;
+  username: string | null;
+  fullName: string | null;
+}
+export const getPremiumRequests = (status = "pending") =>
+  api<PremiumRequestRow[]>(`/api/admin/ai/premium-requests?status=${encodeURIComponent(status)}`);
+export const approvePremiumRequest = (id: string, planId: string, expiry?: string | null, note?: string) =>
+  api<{ success: true }>(`/api/admin/ai/premium-requests/${encodeURIComponent(id)}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ planId, expiry: expiry ?? null, note }),
+  });
+export const declinePremiumRequest = (id: string, note?: string) =>
+  api<{ success: true }>(`/api/admin/ai/premium-requests/${encodeURIComponent(id)}/decline`, { method: "POST", body: JSON.stringify({ note }) });
 
 export interface PlatformBudget {
   monthly_budget_usd: number;
