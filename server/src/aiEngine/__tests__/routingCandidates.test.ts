@@ -49,14 +49,48 @@ describe("assembleRoutingCandidates", () => {
       credit_balances: [{ balance: 250 }],
       premium_plans: [{ id: "premium_basic", monthly_credits: 5000, daily_credits: 200, per_task_max_credits: 50, concurrency_limit: 2 }],
       user_quota_overrides: [],
-      ai_providers: [],
+      // premium_enabled is the admin's opt-in to spend Scholar's own
+      // credential on this provider; without it a stored key is inert.
+      ai_providers: [{ id: "gemini", metadata: {}, premium_enabled: true }],
     });
 
     const { candidates, premiumQuotaRemaining, entitlementActive, quota } = await assembleRoutingCandidates("u1");
-    expect(candidates).toEqual([{ tier: "premium", providerId: "gemini", eligible: true, health: "healthy" }]);
+    expect(candidates).toEqual([{ tier: "premium", providerId: "gemini", eligible: true, health: "healthy", modelId: undefined }]);
     expect(premiumQuotaRemaining).toBe(250);
     expect(entitlementActive).toBe(true);
     expect(quota?.dailyCredits).toBe(200);
+  });
+
+  it("ignores an active platform credential whose provider the admin has not opted in to Premium", async () => {
+    mockFetch({
+      user_ai_connections: [],
+      user_entitlements: [{ user_id: "u1", plan_id: "premium_basic", status: "active", start_date: null, expiry: null }],
+      provider_health: [{ provider_id: "gemini", status: "healthy" }],
+      platform_provider_credentials: [{ provider_id: "gemini", status: "active" }],
+      credit_balances: [{ balance: 250 }],
+      premium_plans: [{ id: "premium_basic", monthly_credits: 5000, daily_credits: 200, per_task_max_credits: 50, concurrency_limit: 2 }],
+      user_quota_overrides: [],
+      ai_providers: [{ id: "gemini", metadata: {} }],
+    });
+
+    const { candidates } = await assembleRoutingCandidates("u1");
+    expect(candidates).toEqual([]);
+  });
+
+  it("passes the admin's chosen Premium model through as the candidate's modelId", async () => {
+    mockFetch({
+      user_ai_connections: [],
+      user_entitlements: [{ user_id: "u1", plan_id: "premium_basic", status: "active", start_date: null, expiry: null }],
+      provider_health: [{ provider_id: "gemini", status: "healthy" }],
+      platform_provider_credentials: [{ provider_id: "gemini", status: "active" }],
+      credit_balances: [{ balance: 250 }],
+      premium_plans: [{ id: "premium_basic", monthly_credits: 5000, daily_credits: 200, per_task_max_credits: 50, concurrency_limit: 2 }],
+      user_quota_overrides: [],
+      ai_providers: [{ id: "gemini", metadata: {}, premium_enabled: true, premium_models: ["gemini-2.5-pro"] }],
+    });
+
+    const { candidates } = await assembleRoutingCandidates("u1");
+    expect(candidates[0].modelId).toBe("gemini-2.5-pro");
   });
 
   it("adds no Premium candidate at all when the user has no entitlement, even if platform credentials exist", async () => {

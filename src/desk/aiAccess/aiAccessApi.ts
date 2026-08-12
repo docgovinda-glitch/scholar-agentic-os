@@ -52,6 +52,19 @@ export interface VerifyKeyResult {
 export const verifyProviderKey = (providerId: string, apiKey: string) =>
   api<VerifyKeyResult>("/api/ai-access/verify-provider-key", { method: "POST", body: JSON.stringify({ providerId, apiKey }) });
 
+export interface PremiumCatalog {
+  active: boolean;
+  providers: Array<{ providerId: string; name: string; models: string[] }>;
+}
+
+/**
+ * Which Premium providers/models this user may use. Server-gated on the
+ * caller's own entitlement and never includes a credential — Scholar's
+ * platform keys stay server-side, which is the entire distinction between
+ * Premium and BYOK.
+ */
+export const getPremiumCatalog = () => api<PremiumCatalog>("/api/ai-access/premium-catalog");
+
 /** Mirrors server/src/aiEngine/omniRouter.ts's Tier/TaskType — duplicated rather than imported since that module lives server-side only. */
 export type RoutingTier = "local" | "free" | "byok" | "premium";
 export type RoutingTaskType = "simple" | "multimodal" | "reasoning" | "coding" | "long-context";
@@ -150,10 +163,32 @@ export interface AdminProvider {
   category: string;
   enabled: boolean;
   free_tier_kind: string | null;
+  /** Admin opt-in for spending Scholar's own credential on this provider. Absent on a pre-migration database. */
+  premium_enabled?: boolean;
+  /** Empty means "use the provider's catalogue default" for Premium requests. */
+  premium_models?: string[];
 }
 export const getAdminProviders = () => api<AdminProvider[]>("/api/admin/ai/providers");
 export const setProviderEnabled = (id: string, enabled: boolean) =>
   api<{ success: true }>(`/api/admin/ai/providers/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ enabled }) });
+/** Controls whether Premium subscribers may be routed to this provider, and to which models. */
+export const setProviderPremium = (id: string, premiumEnabled: boolean, premiumModels?: string[]) =>
+  api<{ success: true }>(`/api/admin/ai/providers/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ premiumEnabled, ...(premiumModels ? { premiumModels } : {}) }),
+  });
+
+export interface PremiumSubscriber {
+  userId: string;
+  planId: string | null;
+  startDate: string | null;
+  expiry: string | null;
+  currentlyActive: boolean;
+  username: string | null;
+  fullName: string | null;
+  accountStatus: string | null;
+}
+export const getPremiumSubscribers = () => api<PremiumSubscriber[]>("/api/admin/ai/premium-subscribers");
 
 export interface PremiumPlan {
   id: string;

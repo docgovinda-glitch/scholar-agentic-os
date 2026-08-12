@@ -175,12 +175,33 @@ describe("POST /api/ai-access/route — routing matrix", () => {
     db.balances = [{ user_id: ALICE, balance: 500 }];
     db.plans = PLAN;
     db.platformCredentials = [{ provider_id: "openai", status: "active" }];
+    // Holding a credential is not enough on its own — the admin must also have
+    // opted this provider in to Premium (ai_providers.premium_enabled). Test 5b
+    // below pins the other half of that rule.
+    db.providers = [{ id: "openai", metadata: {}, premium_enabled: true }];
     mockFetch(db);
 
     const res = await route(await buildApp(), "alice-token", "reasoning");
     expect(res.status).toBe(200);
     // The real admin-configured provider id, never the old "scholar-premium-pool" placeholder.
     expect(res.body.choice).toMatchObject({ tier: "premium", providerId: "openai" });
+  });
+
+  it("5b. a platform credential alone does NOT make a provider Premium — the admin must opt it in", async () => {
+    const db = emptyDb();
+    db.users["alice-token"] = { id: ALICE, email: "alice@example.com" };
+    db.entitlements = [ACTIVE_ENTITLEMENT(ALICE)];
+    db.balances = [{ user_id: ALICE, balance: 500 }];
+    db.plans = PLAN;
+    db.platformCredentials = [{ provider_id: "openai", status: "active" }];
+    // Same as test 5 but premium_enabled is absent, which is how every
+    // provider starts. An admin storing a key to try a provider out must not
+    // thereby start spending it on every subscriber.
+    db.providers = [{ id: "openai", metadata: {} }];
+    mockFetch(db);
+
+    const res = await route(await buildApp(), "alice-token", "reasoning");
+    expect(res.body.ok).toBe(false);
   });
 
   it("6. Premium never appears as a candidate for a user with no entitlement, even when platform credentials exist", async () => {

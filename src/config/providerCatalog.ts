@@ -78,6 +78,63 @@ export interface CloudProviderSpec {
   requiresCustomBaseUrl?: boolean;
   /** Shown under the key input when requiresCustomBaseUrl is set */
   customBaseUrlHint?: string;
+  /**
+   * Honest one-line statement of the rate/usage ceiling, or omitted when the
+   * provider publishes none. Kept separate from freeTierNote (which describes
+   * what you GET) because the AI Access UI shows them as distinct facts: what
+   * it costs, versus what it caps.
+   */
+  usageLimitsNote?: string;
+  /**
+   * Set false only for a provider reachable with no account at all. Every
+   * cloud provider in this catalog needs one, so this defaults to true via
+   * providerAccessFacts() rather than being repeated on 37 entries.
+   */
+  requiresRegistration?: boolean;
+}
+
+/**
+ * The plain-language facts the AI Access UI shows for a provider, derived in
+ * one place so every surface makes the SAME claim about cost and limits.
+ *
+ * The distinction that matters most here is "completely free" versus "free
+ * tier": the product's rule (see FreeTierKind) is that a finite pot of trial
+ * credits must never be presented as ongoing free access. Nothing in this
+ * catalog is currently `freeTier: "free"` — every cloud provider wants an
+ * account — so `costLabel` says "Free tier" or "Trial credits" honestly
+ * rather than flattening both to "Free".
+ */
+export interface ProviderAccessFacts {
+  costLabel: "Completely free" | "Free tier" | "Trial credits" | "Paid";
+  /** True when a user can realistically use this without ever paying. */
+  usableWithoutPaying: boolean;
+  requiresApiKey: boolean;
+  requiresRegistration: boolean;
+  /** null when the provider publishes no specific cap. */
+  usageLimits: string | null;
+  /** The honest sentence about what the free access actually is. */
+  costNote: string;
+}
+
+const COST_LABEL: Record<FreeTierKind, ProviderAccessFacts["costLabel"]> = {
+  free: "Completely free",
+  freemium: "Free tier",
+  "trial-credits": "Trial credits",
+  paid: "Paid",
+};
+
+export function providerAccessFacts(spec: CloudProviderSpec): ProviderAccessFacts {
+  return {
+    costLabel: COST_LABEL[spec.freeTier],
+    usableWithoutPaying: spec.freeTier === "free" || spec.freeTier === "freemium",
+    // Every cloud provider here authenticates with a key; local runners (see
+    // localRunnerCatalog.ts) are the ones that need none, and they are not in
+    // this catalog.
+    requiresApiKey: true,
+    requiresRegistration: spec.requiresRegistration ?? true,
+    usageLimits: spec.usageLimitsNote ?? null,
+    costNote: spec.freeTierNote,
+  };
 }
 
 /**
@@ -528,6 +585,211 @@ export const CLOUD_PROVIDERS: CloudProviderSpec[] = [
     description: "Answers grounded in live web search — useful for checking recent literature.",
     icon: "◭",
     color: "#20808D",
+  },
+
+  // ── Added 2026-08-12, to widen the free/free-tier choice ────────────────
+  //
+  // Every entry below had its `${baseUrl}${modelsPath}` probed live before
+  // being added: a 200 or 401 proves the endpoint exists and authenticates,
+  // which is the same bar the rest of this file is held to. Three candidates
+  // were REJECTED by that probe rather than added on the strength of a
+  // remembered URL — Targon returned HTTP 410 (retiring, exactly the way
+  // GitHub Models did above), and Kluster.ai and Lambda were unreachable.
+  // A provider that fails the probe is left out, never guessed at.
+  {
+    id: "nvidia",
+    name: "NVIDIA NIM",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://integrate.api.nvidia.com/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "meta/llama-3.3-70b-instruct",
+    models: ["meta/llama-3.3-70b-instruct", "deepseek-ai/deepseek-r1", "qwen/qwen2.5-72b-instruct"],
+    freeTier: "freemium",
+    freeTierNote: "Free API credits for developer accounts on build.nvidia.com; no card required to start.",
+    usageLimitsNote: "Credits are consumed per request; rate limits apply on the free developer tier.",
+    getKeyUrl: "https://build.nvidia.com/",
+    description: "NVIDIA's hosted open models — a large catalogue with a genuinely free developer allowance.",
+    icon: "◈",
+    color: "#76B900",
+  },
+  {
+    id: "scaleway",
+    name: "Scaleway",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://api.scaleway.ai/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "llama-3.3-70b-instruct",
+    models: ["llama-3.3-70b-instruct", "qwen2.5-coder-32b-instruct", "mistral-nemo-instruct-2407"],
+    freeTier: "freemium",
+    freeTierNote: "Free tier on Scaleway's Generative APIs with published per-minute token limits.",
+    usageLimitsNote: "Requests and tokens are capped per minute on the free tier.",
+    getKeyUrl: "https://console.scaleway.com/iam/api-keys",
+    description: "European cloud provider serving open models from EU data centres.",
+    icon: "◧",
+    color: "#4F0599",
+  },
+  {
+    id: "nscale",
+    name: "Nscale",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://inference.api.nscale.com/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "meta-llama/Llama-3.3-70B-Instruct",
+    models: ["meta-llama/Llama-3.3-70B-Instruct", "Qwen/Qwen2.5-Coder-32B-Instruct", "deepseek-ai/DeepSeek-R1"],
+    freeTier: "trial-credits",
+    freeTierNote: "Free credits on signup, then pay-as-you-go per token.",
+    getKeyUrl: "https://console.nscale.com/",
+    description: "Sustainable-compute provider hosting open models at low per-token cost.",
+    icon: "◨",
+    color: "#0EA5E9",
+  },
+  {
+    id: "inferencenet",
+    name: "Inference.net",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://api.inference.net/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "meta-llama/llama-3.3-70b-instruct/fp-8",
+    models: ["meta-llama/llama-3.3-70b-instruct/fp-8", "deepseek/deepseek-r1/fp-8"],
+    freeTier: "freemium",
+    freeTierNote: "Free allowance on signup; usage beyond it is billed per token.",
+    getKeyUrl: "https://inference.net/",
+    description: "Low-cost serverless inference for open models.",
+    icon: "◩",
+    color: "#2563EB",
+  },
+  {
+    id: "arliai",
+    name: "Arli AI",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://api.arliai.com/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "Meta-Llama-3.1-8B-Instruct",
+    models: ["Meta-Llama-3.1-8B-Instruct", "Mistral-Nemo-12B-Instruct-2407"],
+    freeTier: "freemium",
+    freeTierNote: "Free plan with a limited number of parallel requests; paid plans lift the cap.",
+    usageLimitsNote: "Free plan restricts concurrent requests and model size.",
+    getKeyUrl: "https://www.arliai.com/",
+    description: "Unlimited-token subscription service for open models, with a usable free plan.",
+    icon: "◪",
+    color: "#8B5CF6",
+  },
+  {
+    id: "upstage",
+    name: "Upstage (Solar)",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://api.upstage.ai/v1/solar",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "solar-pro2",
+    models: ["solar-pro2", "solar-mini"],
+    freeTier: "trial-credits",
+    freeTierNote: "Free trial credits on signup, then pay-as-you-go.",
+    getKeyUrl: "https://console.upstage.ai/api-keys",
+    description: "Korean provider whose Solar models are strong on document understanding.",
+    icon: "☀",
+    color: "#8B5CF6",
+  },
+  {
+    id: "stepfun",
+    name: "StepFun",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://api.stepfun.com/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "step-1-8k",
+    models: ["step-1-8k", "step-1-32k", "step-2-16k"],
+    freeTier: "trial-credits",
+    freeTierNote: "Trial credits on signup, then pay-as-you-go.",
+    getKeyUrl: "https://platform.stepfun.com/",
+    description: "Chinese provider with long-context and multimodal Step models.",
+    icon: "◫",
+    color: "#0891B2",
+  },
+  {
+    id: "hunyuan",
+    name: "Tencent Hunyuan",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://api.hunyuan.cloud.tencent.com/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "hunyuan-turbos-latest",
+    models: ["hunyuan-turbos-latest", "hunyuan-large", "hunyuan-standard"],
+    freeTier: "freemium",
+    freeTierNote: "Several Hunyuan models are offered free of charge; the larger ones are billed.",
+    getKeyUrl: "https://console.cloud.tencent.com/hunyuan/api-key",
+    description: "Tencent's Hunyuan family via an OpenAI-compatible endpoint.",
+    icon: "◬",
+    color: "#1E6FFF",
+  },
+  {
+    id: "baseten",
+    name: "Baseten",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://inference.baseten.co/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "deepseek-ai/DeepSeek-V3-0324",
+    models: ["deepseek-ai/DeepSeek-V3-0324", "meta-llama/Llama-4-Maverick-17B-128E-Instruct"],
+    freeTier: "trial-credits",
+    freeTierNote: "Free credits on signup, then pay-as-you-go.",
+    getKeyUrl: "https://app.baseten.co/settings/api_keys",
+    description: "Model-serving platform with a fast dedicated inference endpoint.",
+    icon: "◭",
+    color: "#7C3AED",
+  },
+  {
+    id: "vercelgateway",
+    name: "Vercel AI Gateway",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://ai-gateway.vercel.sh/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "openai/gpt-4o-mini",
+    models: ["openai/gpt-4o-mini", "anthropic/claude-3-5-haiku", "google/gemini-2.0-flash"],
+    freeTier: "trial-credits",
+    freeTierNote: "Free credits for Vercel accounts, then billed per token at provider rates.",
+    getKeyUrl: "https://vercel.com/dashboard/ai-gateway",
+    description: "One key routing to many providers, with automatic failover between them.",
+    icon: "▲",
+    color: "#000000",
+  },
+  {
+    id: "minimax",
+    name: "MiniMax",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://api.minimaxi.com/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "MiniMax-Text-01",
+    models: ["MiniMax-Text-01", "abab6.5s-chat"],
+    freeTier: "trial-credits",
+    freeTierNote: "Trial credits on signup, then pay-as-you-go.",
+    getKeyUrl: "https://www.minimaxi.com/",
+    description: "Very long context windows — useful for whole-document work.",
+    icon: "◮",
+    color: "#F43F5E",
+  },
+  {
+    id: "featherless",
+    name: "Featherless AI",
+    apiStyle: "openai-compatible",
+    baseUrl: "https://api.featherless.ai/v1",
+    chatPath: "/chat/completions",
+    modelsPath: "/models",
+    defaultModel: "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    models: ["meta-llama/Meta-Llama-3.1-8B-Instruct", "mistralai/Mistral-Nemo-Instruct-2407"],
+    freeTier: "paid",
+    freeTierNote: "Flat monthly subscription rather than per-token billing; no free tier.",
+    getKeyUrl: "https://featherless.ai/account/api-keys",
+    description: "Subscription access to a very large catalogue of Hugging Face models.",
+    icon: "◯",
+    color: "#0D9488",
   },
 ];
 

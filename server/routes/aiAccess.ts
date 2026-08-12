@@ -5,7 +5,7 @@ import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest";
 import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements";
 import { getEffectiveQuota } from "../src/aiEngine/quotaEngine";
 import { selectProvider, type RoutingContext, type TaskType } from "../src/aiEngine/omniRouter";
-import { assembleRoutingCandidates } from "../src/aiEngine/routingCandidates";
+import { assembleRoutingCandidates, getPremiumCatalogue } from "../src/aiEngine/routingCandidates";
 import { getCloudProvider, discoverModelsUrl, buildAuthHeaders } from "../../src/config/providerCatalog";
 
 /**
@@ -160,6 +160,28 @@ export function registerAiAccessRoutes(app: express.Express): void {
       res.status(503).json({ error: (err as Error).message });
     }
   });
+
+  /**
+   * What Premium offers this user — provider names and model ids only.
+   *
+   * Gated on the caller's own entitlement, checked server-side against
+   * user_entitlements on every call: a non-subscriber gets an empty list
+   * rather than a preview of what they are not paying for. Scholar's platform
+   * credentials are never part of this response (or any response) — the whole
+   * point of Premium is that the key stays on the server, so the browser
+   * learns only which provider and model it may ask for.
+   */
+  router.get(
+    "/premium-catalog",
+    asyncHandler(async (req, res) => {
+      const uid = userId(req);
+      const entitlement = await getEntitlement(uid);
+      if (!isEntitlementActive(entitlement)) {
+        return res.json({ active: false, providers: [] });
+      }
+      res.json({ active: true, providers: await getPremiumCatalogue() });
+    })
+  );
 
   app.use("/api/ai-access", router);
 }

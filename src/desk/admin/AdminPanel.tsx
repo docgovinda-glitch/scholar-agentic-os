@@ -4,6 +4,9 @@ import {
   getAdminDashboard,
   getAdminProviders,
   setProviderEnabled,
+  setProviderPremium,
+  getPremiumSubscribers,
+  type PremiumSubscriber,
   getPremiumPlans,
   grantPremiumTo,
   revokePremiumFrom,
@@ -183,25 +186,117 @@ function ProvidersTab() {
     load();
   }
 
+  async function togglePremium(p: AdminProvider) {
+    await setProviderPremium(p.id, !p.premium_enabled);
+    load();
+  }
+
+  async function editPremiumModels(p: AdminProvider) {
+    const current = (p.premium_models ?? []).join(", ");
+    const next = window.prompt(
+      `Models Premium subscribers may use on ${p.name}.\n\nComma-separated. Leave empty to use the provider's own default model.`,
+      current
+    );
+    if (next === null) return;
+    await setProviderPremium(
+      p.id,
+      p.premium_enabled ?? false,
+      next.split(",").map((m) => m.trim()).filter(Boolean)
+    );
+    load();
+  }
+
   return (
     <div className="space-y-2">
       <ErrorNotice error={error} />
+      <p className="text-xs text-[color:var(--text-muted)]">
+        <strong className="font-semibold text-[color:var(--text-secondary)]">Enabled</strong> controls whether the provider
+        can be used at all. <strong className="font-semibold text-[color:var(--text-secondary)]">Premium</strong> is a
+        separate, explicit opt-in to spend Scholar's own credential on it for subscribers — storing a platform key does not
+        by itself make a provider available to Premium users.
+      </p>
       {providers.map((p) => (
-        <div key={p.id} className="flex items-center justify-between rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-2.5">
-          <div>
-            <span className="text-sm font-medium text-[color:var(--text-primary)]">{p.name}</span>
-            <span className="ml-2 text-xs text-[color:var(--text-muted)]">{p.category}</span>
+        <div key={p.id} className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-[color:var(--text-primary)]">{p.name}</span>
+              <span className="ml-2 text-xs text-[color:var(--text-muted)]">{p.category}</span>
+              {p.premium_enabled && (
+                <span className="ml-2 rounded-full border border-[color:var(--state-success)] px-2 py-0.5 text-[11px] font-medium text-[color:var(--state-success)]">
+                  Premium
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => togglePremium(p)}
+                className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
+              >
+                {p.premium_enabled ? "Remove from Premium" : "Add to Premium"}
+              </button>
+              <button
+                type="button"
+                onClick={() => editPremiumModels(p)}
+                className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
+              >
+                Models
+              </button>
+              <button
+                type="button"
+                onClick={() => toggle(p)}
+                className={`rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium ${p.enabled ? "text-[color:var(--state-danger)]" : "text-[color:var(--text-primary)]"}`}
+              >
+                {p.enabled ? "Disable" : "Enable"}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => toggle(p)}
-            className={`rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium ${p.enabled ? "text-[color:var(--state-danger)]" : "text-[color:var(--text-primary)]"}`}
-          >
-            {p.enabled ? "Disable" : "Enable"}
-          </button>
+          {p.premium_enabled && (
+            <p className="mt-1 text-xs text-[color:var(--text-muted)]">
+              Premium models: {(p.premium_models ?? []).length > 0 ? (p.premium_models ?? []).join(", ") : "provider default"}
+            </p>
+          )}
         </div>
       ))}
     </div>
+  );
+}
+
+/** The roster of who actually holds Premium — read from the same table the router enforces against. */
+function PremiumSubscribersList() {
+  const [subs, setSubs] = useState<PremiumSubscriber[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getPremiumSubscribers().then(setSubs).catch((e) => setError((e as Error).message));
+  }, []);
+
+  return (
+    <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
+      <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">Premium subscribers ({subs.length})</h3>
+      <ErrorNotice error={error} />
+      {subs.length === 0 ? (
+        <p className="mt-2 text-sm text-[color:var(--text-muted)]">Nobody currently holds Premium.</p>
+      ) : (
+        <ul className="mt-2 space-y-1.5">
+          {subs.map((s) => (
+            <li key={s.userId} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm text-[color:var(--text-primary)]">
+                  {s.fullName || s.username || s.userId}
+                  {!s.currentlyActive && (
+                    <span className="ml-2 text-xs font-medium text-[color:var(--state-warning)]">expired</span>
+                  )}
+                </p>
+                <p className="text-xs text-[color:var(--text-muted)]">
+                  {s.planId ?? "no plan"} · {s.expiry ? `expires ${new Date(s.expiry).toLocaleDateString()}` : "no expiry"}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -299,6 +394,11 @@ function PremiumTab() {
     <div className="space-y-4">
       <ErrorNotice error={error} />
       {message && <p role="status" className="text-sm text-[color:var(--text-secondary)]">{message}</p>}
+
+      {/* Who currently holds Premium. Granting/revoking below works by user id
+          and always did; without this list there was no way to see the result,
+          or to answer "who is subscribed" at all. */}
+      <PremiumSubscribersList />
 
       <Card>
         <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Plans</h2>
