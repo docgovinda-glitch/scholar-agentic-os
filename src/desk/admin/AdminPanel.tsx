@@ -4,7 +4,6 @@ import {
   getAdminDashboard,
   getAdminProviders,
   setProviderEnabled,
-  setProviderPremium,
   getPremiumSubscribers,
   type PremiumSubscriber,
   getPremiumPlans,
@@ -31,7 +30,18 @@ import {
   type Scope,
   type AdminProvider,
   type PremiumPlan,
-  type UsageRow,
+  type UsageSummary,
+  getResources,
+  createResource,
+  updateResource,
+  deleteResource,
+  getPlanResources,
+  setPlanResources,
+  type AiResource,
+  getPremiumRequests,
+  approvePremiumRequest,
+  declinePremiumRequest,
+  type PremiumRequestRow,
   type PlatformBudget,
   type Opportunity,
   type AuditLogEntry,
@@ -39,11 +49,12 @@ import {
   type UserSearchResult,
 } from "../aiAccess/aiAccessApi";
 
-type Tab = "dashboard" | "providers" | "premium" | "usage" | "budget" | "opportunities" | "users" | "admins" | "audit";
+type Tab = "dashboard" | "providers" | "resources" | "premium" | "usage" | "budget" | "opportunities" | "users" | "admins" | "audit";
 
 const TABS: Array<{ id: Tab; label: string; requiredScope?: Scope }> = [
   { id: "dashboard", label: "Dashboard" },
   { id: "providers", label: "Providers", requiredScope: "manage_providers" },
+  { id: "resources", label: "AI Router", requiredScope: "manage_providers" },
   { id: "premium", label: "Premium", requiredScope: "manage_premium" },
   { id: "usage", label: "Usage" },
   { id: "budget", label: "Cost & Budget", requiredScope: "manage_budget" },
@@ -115,6 +126,7 @@ export default function AdminPanel({ onClose, closeLabel = "Close", identity }: 
       <div className="mx-auto max-w-4xl px-5 py-6">
         {tab === "dashboard" && <DashboardTab />}
         {tab === "providers" && canSee("providers") && <ProvidersTab />}
+        {tab === "resources" && canSee("resources") && <ResourcesTab />}
         {tab === "premium" && canSee("premium") && <PremiumTab />}
         {tab === "usage" && <UsageTab />}
         {tab === "budget" && canSee("budget") && <BudgetTab />}
@@ -186,76 +198,27 @@ function ProvidersTab() {
     load();
   }
 
-  async function togglePremium(p: AdminProvider) {
-    await setProviderPremium(p.id, !p.premium_enabled);
-    load();
-  }
-
-  async function editPremiumModels(p: AdminProvider) {
-    const current = (p.premium_models ?? []).join(", ");
-    const next = window.prompt(
-      `Models Premium subscribers may use on ${p.name}.\n\nComma-separated. Leave empty to use the provider's own default model.`,
-      current
-    );
-    if (next === null) return;
-    await setProviderPremium(
-      p.id,
-      p.premium_enabled ?? false,
-      next.split(",").map((m) => m.trim()).filter(Boolean)
-    );
-    load();
-  }
-
   return (
     <div className="space-y-2">
       <ErrorNotice error={error} />
       <p className="text-xs text-[color:var(--text-muted)]">
-        <strong className="font-semibold text-[color:var(--text-secondary)]">Enabled</strong> controls whether the provider
-        can be used at all. <strong className="font-semibold text-[color:var(--text-secondary)]">Premium</strong> is a
-        separate, explicit opt-in to spend Scholar's own credential on it for subscribers — storing a platform key does not
-        by itself make a provider available to Premium users.
+        Whether Scholar can talk to this provider at all. What Premium subscribers may use is set separately, per plan, under{" "}
+        <strong className="font-semibold text-[color:var(--text-secondary)]">AI Router</strong>: a plan grants specific AI
+        resources, so storing a platform key never by itself starts spending it.
       </p>
       {providers.map((p) => (
-        <div key={p.id} className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-[color:var(--text-primary)]">{p.name}</span>
-              <span className="ml-2 text-xs text-[color:var(--text-muted)]">{p.category}</span>
-              {p.premium_enabled && (
-                <span className="ml-2 rounded-full border border-[color:var(--state-success)] px-2 py-0.5 text-[11px] font-medium text-[color:var(--state-success)]">
-                  Premium
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => togglePremium(p)}
-                className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
-              >
-                {p.premium_enabled ? "Remove from Premium" : "Add to Premium"}
-              </button>
-              <button
-                type="button"
-                onClick={() => editPremiumModels(p)}
-                className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
-              >
-                Models
-              </button>
-              <button
-                type="button"
-                onClick={() => toggle(p)}
-                className={`rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium ${p.enabled ? "text-[color:var(--state-danger)]" : "text-[color:var(--text-primary)]"}`}
-              >
-                {p.enabled ? "Disable" : "Enable"}
-              </button>
-            </div>
+        <div key={p.id} className="flex items-center justify-between rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-2.5">
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-[color:var(--text-primary)]">{p.name}</span>
+            <span className="ml-2 text-xs text-[color:var(--text-muted)]">{p.category}</span>
           </div>
-          {p.premium_enabled && (
-            <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-              Premium models: {(p.premium_models ?? []).length > 0 ? (p.premium_models ?? []).join(", ") : "provider default"}
-            </p>
-          )}
+          <button
+            type="button"
+            onClick={() => toggle(p)}
+            className={`rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium ${p.enabled ? "text-[color:var(--state-danger)]" : "text-[color:var(--text-primary)]"}`}
+          >
+            {p.enabled ? "Disable" : "Enable"}
+          </button>
         </div>
       ))}
     </div>
@@ -286,6 +249,9 @@ function PremiumSubscribersList() {
                   {s.fullName || s.username || s.userId}
                   {!s.currentlyActive && (
                     <span className="ml-2 text-xs font-medium text-[color:var(--state-warning)]">expired</span>
+                  )}
+                  {s.currentlyActive && s.expiringSoon && (
+                    <span className="ml-2 text-xs font-medium text-[color:var(--state-warning)]">expiring soon</span>
                   )}
                 </p>
                 <p className="text-xs text-[color:var(--text-muted)]">
@@ -398,6 +364,7 @@ function PremiumTab() {
       {/* Who currently holds Premium. Granting/revoking below works by user id
           and always did; without this list there was no way to see the result,
           or to answer "who is subscribed" at all. */}
+      <PremiumRequestsQueue />
       <PremiumSubscribersList />
 
       <Card>
@@ -489,26 +456,314 @@ function PremiumTab() {
 }
 
 function UsageTab() {
-  const [rows, setRows] = useState<UsageRow[]>([]);
+  const [data, setData] = useState<UsageSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getUsage().then(setRows).catch((e) => setError((e as Error).message));
+    getUsage().then(setData).catch((e) => setError((e as Error).message));
   }, []);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       <ErrorNotice error={error} />
-      {rows.length === 0 && !error && <p className="text-sm text-[color:var(--text-muted)]">No usage recorded yet.</p>}
-      {rows.map((r) => (
-        <div key={r.id} className="flex items-center justify-between rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-2 text-sm">
-          <span className="text-[color:var(--text-secondary)]">
-            {r.tier} · {r.provider_id ?? "—"} · {r.status}
-          </span>
-          <span className="text-[color:var(--text-muted)]">{r.scholar_credits_charged ?? 0} credits</span>
-        </div>
-      ))}
+      <p className="text-xs text-[color:var(--text-muted)]">
+        Aggregate figures only. This deliberately shows no per-request history for any individual — an administrator can see
+        what the platform spends and what each subscriber owes, not what a person asked for or when. Only platform-paid
+        (Premium) requests are recorded at all; a user's own local, free or BYOK use is never logged.
+      </p>
+
+      {data && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Stat label="Premium requests" value={String(data.totalRequests)} />
+            <Stat label="Credits charged" value={String(data.totalCredits)} />
+          </div>
+
+          <Card>
+            <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">By resource</h2>
+            {data.byResource.length === 0 ? (
+              <p className="mt-2 text-sm text-[color:var(--text-muted)]">No Premium usage yet.</p>
+            ) : (
+              <ul className="mt-2 space-y-1">
+                {data.byResource.map((r) => (
+                  <li key={`${r.providerId}-${r.modelId}`} className="flex justify-between text-sm text-[color:var(--text-secondary)]">
+                    <span>
+                      {r.providerId}
+                      {r.modelId ? ` \u00b7 ${r.modelId}` : ""}
+                    </span>
+                    <span>
+                      {r.requests} req \u00b7 {r.credits} credits
+                      {r.errors > 0 ? ` \u00b7 ${r.errors} failed` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          <Card>
+            <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Billing totals</h2>
+            <p className="mt-1 text-xs text-[color:var(--text-muted)]">Credits charged per subscriber, for invoicing. No request detail.</p>
+            {data.billing.length === 0 ? (
+              <p className="mt-2 text-sm text-[color:var(--text-muted)]">Nothing charged yet.</p>
+            ) : (
+              <ul className="mt-2 space-y-1">
+                {data.billing.map((b) => (
+                  <li key={b.userId} className="flex justify-between text-sm text-[color:var(--text-secondary)]">
+                    <span className="truncate">{b.userId}</span>
+                    <span>{b.credits} credits</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </>
+      )}
     </div>
+  );
+}
+
+/**
+ * ADMIN AI ROUTER — the platform's own resource pool.
+ *
+ * Entirely separate from any user's router: nothing here reads or can read
+ * which providers a user configured. These are the administrator's own
+ * resources, and which of them each Premium plan may draw on.
+ */
+function ResourcesTab() {
+  const [resources, setResources] = useState<AiResource[]>([]);
+  const [providers, setProviders] = useState<AdminProvider[]>([]);
+  const [plans, setPlans] = useState<PremiumPlan[]>([]);
+  const [planId, setPlanId] = useState("");
+  const [granted, setGranted] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const [label, setLabel] = useState("");
+  const [providerId, setProviderId] = useState("");
+  const [modelId, setModelId] = useState("");
+  const [accessType, setAccessType] = useState<"local" | "free" | "paid" | "byok">("paid");
+
+  function load() {
+    getResources().then(setResources).catch((e) => setError((e as Error).message));
+    getAdminProviders().then(setProviders).catch(() => {});
+    getPremiumPlans().then(setPlans).catch(() => {});
+  }
+  useEffect(load, []);
+
+  useEffect(() => {
+    if (!planId) return setGranted([]);
+    getPlanResources(planId).then(setGranted).catch(() => setGranted([]));
+  }, [planId]);
+
+  async function add() {
+    if (!label.trim() || !providerId) return;
+    try {
+      await createResource({ label: label.trim(), providerId, modelId: modelId.trim() || undefined, accessType });
+      setLabel("");
+      setModelId("");
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function toggleGrant(resourceId: string) {
+    const next = granted.includes(resourceId) ? granted.filter((r) => r !== resourceId) : [...granted, resourceId];
+    setGranted(next);
+    await setPlanResources(planId, next).catch((e) => setError((e as Error).message));
+  }
+
+  return (
+    <div className="space-y-4">
+      <ErrorNotice error={error} />
+      <p className="text-xs text-[color:var(--text-muted)]">
+        An <strong className="font-semibold text-[color:var(--text-secondary)]">AI resource</strong> is one provider+model
+        pairing the platform owns. Premium plans grant resources, and subscribers see only the resource's{" "}
+        <strong className="font-semibold text-[color:var(--text-secondary)]">label</strong> — so you can re-point a
+        capability at a different provider without any subscriber reconfiguring anything.
+      </p>
+
+      <Card>
+        <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Add a resource</h2>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Label users see, e.g. Advanced writing"
+            className="rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2.5 py-1.5 text-sm"
+          />
+          <select
+            value={providerId}
+            onChange={(e) => setProviderId(e.target.value)}
+            className="rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2.5 py-1.5 text-sm"
+          >
+            <option value="">Choose a provider…</option>
+            {providers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <input
+            value={modelId}
+            onChange={(e) => setModelId(e.target.value)}
+            placeholder="Model id (optional)"
+            className="rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2.5 py-1.5 text-sm"
+          />
+          <select
+            value={accessType}
+            onChange={(e) => setAccessType(e.target.value as typeof accessType)}
+            className="rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2.5 py-1.5 text-sm"
+          >
+            <option value="local">Local — costs the platform nothing</option>
+            <option value="free">Free tier</option>
+            <option value="paid">Paid — spends the platform credential</option>
+            <option value="byok">Admin-owned key</option>
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={add}
+          disabled={!label.trim() || !providerId}
+          className="mt-2 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+        >
+          Add resource
+        </button>
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Resource pool ({resources.length})</h2>
+        {resources.length === 0 ? (
+          <p className="mt-2 text-sm text-[color:var(--text-muted)]">No resources yet. Premium cannot run until at least one exists.</p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {resources.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[color:var(--text-primary)]">{r.label}</p>
+                  <p className="text-xs text-[color:var(--text-muted)]">
+                    {r.provider_id}
+                    {r.model_id ? ` \u00b7 ${r.model_id}` : ""} \u00b7 {r.access_type}
+                    {r.enabled ? "" : " \u00b7 disabled"}
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => updateResource(r.id, { enabled: !r.enabled }).then(load)}
+                    className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
+                  >
+                    {r.enabled ? "Disable" : "Enable"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteResource(r.id).then(load)}
+                    className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[color:var(--state-danger)] hover:bg-[color:var(--surface-hover)]"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Grant resources to a plan</h2>
+        <select
+          value={planId}
+          onChange={(e) => setPlanId(e.target.value)}
+          className="mt-2 w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2.5 py-1.5 text-sm"
+        >
+          <option value="">Choose a plan…</option>
+          {plans.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        {planId && (
+          <ul className="mt-2 space-y-1">
+            {resources.map((r) => (
+              <li key={r.id}>
+                <label className="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
+                  <input type="checkbox" checked={granted.includes(r.id)} onChange={() => toggleGrant(r.id)} />
+                  {r.label}
+                </label>
+              </li>
+            ))}
+            {resources.length === 0 && <li className="text-sm text-[color:var(--text-muted)]">Add a resource first.</li>}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/** Pending Premium requests, approved or declined in one action. */
+function PremiumRequestsQueue() {
+  const [rows, setRows] = useState<PremiumRequestRow[]>([]);
+  const [plans, setPlans] = useState<PremiumPlan[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  function load() {
+    getPremiumRequests("pending").then(setRows).catch((e) => setError((e as Error).message));
+    getPremiumPlans().then(setPlans).catch(() => {});
+  }
+  useEffect(load, []);
+
+  return (
+    <Card>
+      <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Premium requests ({rows.length})</h2>
+      <ErrorNotice error={error} />
+      {rows.length === 0 ? (
+        <p className="mt-2 text-sm text-[color:var(--text-muted)]">No requests waiting.</p>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {rows.map((r) => (
+            <li key={r.id} className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-2">
+              <p className="text-sm font-medium text-[color:var(--text-primary)]">{r.fullName || r.username || r.userId}</p>
+              {r.note && <p className="mt-0.5 text-xs text-[color:var(--text-secondary)]">“{r.note}”</p>}
+              <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">
+                Asked for {r.requestedPlanId ?? "no specific plan"} on {new Date(r.createdAt).toLocaleDateString()}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <select
+                  id={`plan-${r.id}`}
+                  defaultValue={r.requestedPlanId ?? plans[0]?.id ?? ""}
+                  className="rounded-[var(--radius-sm)] border border-[color:var(--border-control)] px-2 py-1 text-xs"
+                >
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sel = document.getElementById(`plan-${r.id}`) as HTMLSelectElement | null;
+                    if (!sel?.value) return;
+                    approvePremiumRequest(r.id, sel.value).then(load).catch((e) => setError((e as Error).message));
+                  }}
+                  className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1 text-xs font-medium"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => declinePremiumRequest(r.id).then(load).catch((e) => setError((e as Error).message))}
+                  className="rounded-[var(--radius-sm)] px-3 py-1 text-xs font-medium text-[color:var(--state-danger)]"
+                >
+                  Decline
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 

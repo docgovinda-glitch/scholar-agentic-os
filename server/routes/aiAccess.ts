@@ -5,7 +5,8 @@ import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest";
 import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements";
 import { getEffectiveQuota } from "../src/aiEngine/quotaEngine";
 import { selectProvider, type RoutingContext, type TaskType } from "../src/aiEngine/omniRouter";
-import { assembleRoutingCandidates, getPremiumCatalogue } from "../src/aiEngine/routingCandidates";
+import { routeForUser } from "../src/aiEngine/userRouter";
+import { premiumCatalogueForUser } from "../src/aiEngine/adminRouter";
 import { getCloudProvider, discoverModelsUrl, buildAuthHeaders } from "../../src/config/providerCatalog";
 
 /**
@@ -152,9 +153,11 @@ export function registerAiAccessRoutes(app: express.Express): void {
       const { taskType, privacyPreference } = req.body as { taskType: TaskType; privacyPreference?: "no-cloud" | "any" };
       if (!taskType) return res.status(400).json({ error: "taskType is required." });
 
-      const { candidates, premiumQuotaRemaining } = await assembleRoutingCandidates(userId(req));
-      const context: RoutingContext = { taskType, privacyPreference: privacyPreference ?? "any", premiumQuotaRemaining };
-      const decision = selectProvider(candidates, context);
+      // The USER's own router, over the user's own providers only. Premium
+      // appears as one opaque capability when entitled; which platform
+      // resource would serve it is the admin router's business and is not
+      // disclosed here.
+      const decision = await routeForUser(userId(req), { taskType, privacyPreference: privacyPreference ?? "any" });
       res.json(decision);
     } catch (err) {
       res.status(503).json({ error: (err as Error).message });
@@ -162,24 +165,98 @@ export function registerAiAccessRoutes(app: express.Express): void {
   });
 
   /**
-   * What Premium offers this user — provider names and model ids only.
+   * What Premium offers this user — resource LABELS and capabilities only.
    *
-   * Gated on the caller's own entitlement, checked server-side against
-   * user_entitlements on every call: a non-subscriber gets an empty list
-   * rather than a preview of what they are not paying for. Scholar's platform
-   * credentials are never part of this response (or any response) — the whole
-   * point of Premium is that the key stays on the server, so the browser
-   * learns only which provider and model it may ask for.
+   * Never provider ids, model ids, costs or credentials: premiumCatalogueForUser
+   * strips those inside the admin router, so no caller here can forward them by
+   * accident. That is what makes the Premium layer provider-agnostic — an admin
+   * re-pointing a resource from one provider to another changes nothing a
+   * subscriber sees or has to reconfigure.
+   *
+   * Gated on the caller's own entitlement, re-checked server-side on every call.
    */
   router.get(
     "/premium-catalog",
     asyncHandler(async (req, res) => {
-      const uid = userId(req);
-      const entitlement = await getEntitlement(uid);
-      if (!isEntitlementActive(entitlement)) {
-        return res.json({ active: false, providers: [] });
-      }
-      res.json({ active: true, providers: await getPremiumCatalogue() });
+      res.json(await premiumCatalogueForUser(userId(req)));
+    })
+  );
+
+  /**
+   * The plans a user may ask for, and their own outstanding request.
+   *
+   * Only `user_requestable` and enabled plans are listed — an admin-only plan
+   * stays grantable without ever being advertised.
+   */
+  router.get(
+    "/premium-plans",
+    asyncHandler(async (_req, res) => {
+      const plans = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_plans");
+      const rows = await plans.select("enabled=is.true&user_requestable=is.true&order=sort_order,name");
+      res.json(
+        rows.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description ?? null,
+          monthlyCredits: p.monthly_credits ?? null,
+          weeklyCredits: p.weekly_credits ?? null,
+          dailyCredits: p.daily_credits ?? null,
+          perTaskMaxCredits: p.per_task_max_credits ?? null,
+          concurrencyLimit: p.concurrency_limit ?? 1,
+        }))
+      );
+    })
+  );
+
+  /** The caller's own Premium request, if any. Scoped to their own id. */
+  router.get(
+    "/premium-request",
+    asyncHandler(async (req, res) => {
+      const requests = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_requests");
+      const row = await requests.selectOne(
+        `user_id=eq.${encodeURIComponent(userId(req))}&order=created_at.desc`
+      );
+      res.json(row ?? null);
+    })
+  );
+
+  /**
+   * Ask an administrator for Premium. Closes the loop that previously dead-ended
+   * at "Premium is granted by an administrator" with no action available.
+   *
+   * A partial unique index (premium_requests, status='pending') means a second
+   * open request is rejected by the database rather than by a check here that
+   * could race.
+   */
+  router.post(
+    "/premium-request",
+    asyncHandler(async (req, res) => {
+      const { planId, note } = req.body as { planId?: string; note?: string };
+      const requests = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_requests");
+
+      const existing = await requests.selectOne(`user_id=eq.${encodeURIComponent(userId(req))}&status=eq.pending`);
+      if (existing) return res.status(409).json({ error: "You already have a Premium request waiting for a decision." });
+
+      await requests.insert({
+        user_id: userId(req),
+        requested_plan_id: planId ?? null,
+        note: typeof note === "string" && note.trim() ? note.trim().slice(0, 1000) : null,
+        status: "pending",
+      });
+      res.json({ success: true });
+    })
+  );
+
+  /** Withdraw one's own pending request. */
+  router.delete(
+    "/premium-request",
+    asyncHandler(async (req, res) => {
+      const requests = new SupabaseTable<Record<string, unknown>>(restConfig(), "premium_requests");
+      await requests.update(`user_id=eq.${encodeURIComponent(userId(req))}&status=eq.pending`, {
+        status: "withdrawn",
+        decided_at: new Date().toISOString(),
+      });
+      res.json({ success: true });
     })
   );
 

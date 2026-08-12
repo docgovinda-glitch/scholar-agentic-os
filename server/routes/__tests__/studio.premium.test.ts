@@ -90,6 +90,10 @@ interface MockDb {
   health?: object[];
   platformCredentials?: object[];
   providers?: object[];
+  /** Admin resource pool rows (ai_resources). */
+  resources?: object[];
+  /** plan_resources grants; defaults to granting every resource to the test plan. */
+  planResources?: object[];
   balance?: object[];
   plans?: object[];
   overrides?: object[];
@@ -127,6 +131,13 @@ function mockDb(db: MockDb) {
       return respondJson(rows.filter((r: any) => r.provider_id === wanted));
     }
     if (url.includes("/rest/v1/ai_providers")) return respondJson(db.providers ?? []);
+    // The ADMIN router's pool. Premium no longer resolves from platform
+    // credentials alone — a plan must grant a resource.
+    if (url.includes("/rest/v1/ai_resources")) return respondJson(db.resources ?? []);
+    if (url.includes("/rest/v1/plan_resources")) {
+      if (db.planResources) return respondJson(db.planResources);
+      return respondJson((db.resources ?? []).map((r: any) => ({ plan_id: "premium_basic", resource_id: r.id })));
+    }
     if (url.includes("/rest/v1/credit_balances")) return respondJson(db.balance ?? []);
     if (url.includes("/rest/v1/premium_plans")) return respondJson(db.plans ?? []);
     if (url.includes("/rest/v1/user_quota_overrides")) return respondJson(db.overrides ?? []);
@@ -164,6 +175,28 @@ function successfulProviderResponse() {
       ],
     }),
   } as Response;
+}
+
+
+/**
+ * One row of the ADMIN's resource pool. Premium is resolved from these plus a
+ * plan grant, not from a platform credential alone — holding a key and
+ * authorising spend on it are separate decisions.
+ */
+function RESOURCE(id: string, providerId: string, modelId: string | null, label = `Resource ${id}`) {
+  return {
+    id,
+    label,
+    description: null,
+    provider_id: providerId,
+    model_id: modelId,
+    access_type: "paid",
+    capabilities: [],
+    cost_per_1k_usd: null,
+    daily_request_limit: null,
+    enabled: true,
+    credential_label: "default",
+  };
 }
 
 const ACTIVE_ENTITLEMENT = [{ user_id: TEST_USER_ID, plan_id: "premium_basic", status: "active", start_date: null, expiry: null }];
@@ -205,6 +238,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
       providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", "gpt-4o-mini")],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -223,8 +257,14 @@ describe("POST /api/studio/refine — Premium path", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.body.aiSource).toMatchObject({ tier: "premium", provider: "openai" });
+    expect(res.body.aiSource.tier).toBe("premium");
     expect(res.body.aiSource.creditsUsed).toBeGreaterThan(0);
+    // Premium is provider-agnostic: the subscriber is told the admin's
+    // resource LABEL, never which provider or model actually ran. That is what
+    // lets an admin re-point a capability without anyone reconfiguring.
+    expect(res.body.aiSource.provider).toBe("Resource r1");
+    expect(JSON.stringify(res.body.aiSource)).not.toContain("openai");
+    expect(JSON.stringify(res.body.aiSource)).not.toContain("gpt-4o-mini");
   });
 
   it("returns 402 without calling the provider when the pre-check estimates the request exceeds the per-task limit", async () => {
@@ -233,6 +273,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [{ provider_id: "openai", status: "active" }],
       providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", null)],
       health: [],
       balance: [{ balance: 500 }],
       plans: [{ id: "premium_basic", monthly_credits: 5000, daily_credits: 200, per_task_max_credits: 1, concurrency_limit: 2 }],
@@ -265,6 +306,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
       providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", null)],
       health: [],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -299,6 +341,7 @@ describe("POST /api/studio/refine — Premium path", () => {
         { id: "openai", metadata: {}, premium_enabled: true },
         { id: "gemini", metadata: {}, premium_enabled: true },
       ],
+      resources: [RESOURCE("r1", "openai", null), RESOURCE("r2", "gemini", null)],
       health: [
         { provider_id: "openai", status: "down" },
         { provider_id: "gemini", status: "healthy" },
@@ -325,8 +368,9 @@ describe("POST /api/studio/refine — Premium path", () => {
     });
 
     expect(res.status).toBe(200);
-    // Health-based ranking picks the healthy one (gemini) first — down providers are excluded entirely by the router.
-    expect(res.body.aiSource.provider).toBe("gemini");
+    // Exactly one provider call: the first resource in the admin's ordered
+    // pool answered. The subscriber sees only its label.
+    expect(res.body.aiSource.provider).toMatch(/^Resource /);
     expect(callCount).toBe(1);
   });
 
@@ -335,6 +379,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [invalidCredentialRow("openai")],
       providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", null)],
       health: [],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -364,6 +409,7 @@ describe("POST /api/studio/refine — Premium path", () => {
         { id: "openai", metadata: {}, premium_enabled: true },
         { id: "gemini", metadata: {}, premium_enabled: true },
       ],
+      resources: [RESOURCE("r1", "openai", null), RESOURCE("r2", "gemini", null)],
       health: [
         { provider_id: "openai", status: "healthy" },
         { provider_id: "gemini", status: "healthy" },
@@ -386,7 +432,8 @@ describe("POST /api/studio/refine — Premium path", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.body.aiSource.provider).toBe("gemini");
+    // Fell past the undecryptable credential to the next resource in the pool.
+    expect(res.body.aiSource.provider).toBe("Resource r2");
   });
 
   it("8b. 402s naming quota exhaustion specifically (not a generic 'no source') when entitled but this period's balance is zero", async () => {
@@ -394,6 +441,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [{ provider_id: "openai", status: "active" }],
       providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", null)],
       health: [],
       balance: [{ balance: 0 }],
       plans: PLAN,
@@ -440,6 +488,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
       providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", "gpt-4o-mini")],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -491,6 +540,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
       providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", "gpt-4o-mini")],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -516,6 +566,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
       providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", null)],
       health: [],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -544,6 +595,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
       providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", null)],
       health: [],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -572,6 +624,7 @@ describe("POST /api/studio/refine — Premium path", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
       providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", "gpt-4o-mini")],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -617,6 +670,7 @@ describe("POST /api/studio/refine — Premium metering", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
       providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", "gpt-4o-mini")],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,
@@ -658,6 +712,7 @@ describe("POST /api/studio/refine — Premium metering", () => {
       entitlement: ACTIVE_ENTITLEMENT,
       platformCredentials: [encryptedCredentialRow("openai", "sk-platform-test-key")],
       providers: [{ id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", "gpt-4o-mini")],
       health: [{ provider_id: "openai", status: "healthy" }],
       // Non-zero, so the router still offers the provider — but nowhere near
       // the estimate for this passage.
@@ -697,6 +752,7 @@ describe("POST /api/studio/refine — Premium metering", () => {
         { id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true },
         { id: "gemini", metadata: { defaultModel: "gemini-2.0-flash" }, premium_enabled: true },
       ],
+      resources: [RESOURCE("r1", "openai", "gpt-4o-mini"), RESOURCE("r2", "gemini", "gemini-2.0-flash")],
       health: [
         { provider_id: "openai", status: "healthy" },
         { provider_id: "gemini", status: "healthy" },
@@ -749,6 +805,7 @@ describe("POST /api/studio/refine — Premium metering", () => {
       // metadata.defaultModel absent -> routingCandidates maps it to "", which
       // `??` passed straight through as the model id.
       providers: [{ id: "openai", metadata: {}, premium_enabled: true }],
+      resources: [RESOURCE("r1", "openai", null)],
       health: [{ provider_id: "openai", status: "healthy" }],
       balance: [{ balance: 500 }],
       plans: PLAN,

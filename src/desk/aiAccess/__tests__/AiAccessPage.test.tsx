@@ -22,7 +22,11 @@ vi.mock("../aiAccessApi", () => ({
   addConnection: vi.fn(async () => ({ success: true })),
   removeConnection: vi.fn(async () => ({ success: true })),
   verifyProviderKey: vi.fn(async () => ({ ok: true, modelsDetected: 7 })),
-  getPremiumCatalog: vi.fn(async () => ({ active: false, providers: [] })),
+  getPremiumCatalog: vi.fn(async () => ({ active: false, planId: null, resources: [] })),
+  getOfferedPlans: vi.fn(async () => []),
+  getMyPremiumRequest: vi.fn(async () => null),
+  requestPremium: vi.fn(async () => ({ success: true })),
+  withdrawPremiumRequest: vi.fn(async () => ({ success: true })),
 }));
 
 vi.mock("../../../services/userAiSettings", () => ({
@@ -175,20 +179,41 @@ describe("Premium", () => {
 
     expect(await screen.findByText(/Subscription status: Not subscribed/i)).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/Paste your key/i)).not.toBeInTheDocument();
-    expect(await screen.findByText(/granted by an administrator/i)).toBeInTheDocument();
+    // Status is decided on the server; the pane offers a request rather than
+    // a switch.
+    expect(await screen.findByText(/verified on Scholar's server/i)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Request Premium/i })).toBeInTheDocument();
   });
 
-  it("lists the admin-chosen Premium providers when subscribed", async () => {
+  it("names Premium capabilities by the admin's label, never the provider behind them", async () => {
     const api = await import("../aiAccessApi");
     status.entitlement = { status: "active", active: true };
     vi.mocked(api.getPremiumCatalog).mockResolvedValueOnce({
       active: true,
-      providers: [{ providerId: "openai", name: "OpenAI", models: ["gpt-4o-mini"] }],
+      planId: "premium_basic",
+      resources: [{ id: "r1", label: "Advanced writing", description: "Best quality drafting", capabilities: ["reasoning"] }],
     });
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Premium" }));
 
     expect(await screen.findByText(/Subscription status: Active/i)).toBeInTheDocument();
-    expect(await screen.findByText("gpt-4o-mini")).toBeInTheDocument();
+    expect(await screen.findByText("Advanced writing")).toBeInTheDocument();
+    // The provider-agnostic promise: nothing in this pane names a provider or
+    // a model, so an admin can re-point the capability freely.
+    expect(document.body.textContent).not.toMatch(/openai|gpt-4o|gemini/i);
+  });
+
+  it("lets a non-subscriber request Premium — the path that previously dead-ended", async () => {
+    const api = await import("../aiAccessApi");
+    vi.mocked(api.getOfferedPlans).mockResolvedValueOnce([
+      { id: "premium_basic", name: "Premium Basic", description: "For everyday writing", monthlyCredits: 5000, weeklyCredits: null, dailyCredits: 200, perTaskMaxCredits: 50, concurrencyLimit: 2 },
+    ]);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Premium" }));
+
+    fireEvent.click(await screen.findByLabelText(/Premium Basic/i));
+    fireEvent.click(screen.getByRole("button", { name: /Request Premium/i }));
+
+    await waitFor(() => expect(api.requestPremium).toHaveBeenCalledWith("premium_basic", undefined));
   });
 });
