@@ -1,17 +1,23 @@
 /**
- * Onboarding progress indicator — Section 15 of the first-login journey.
+ * Onboarding progress indicator — Section 15 of the first-login journey:
+ * Login -> AI Access -> Knowledge Vault (optional) -> Workshop.
  *
  * Purely orientational: "where am I in this three-step flow", nothing here
- * is interactive or skips ahead (skipping is each stage's own affordance,
- * not a click on this strip). Shown only on the onboarding path, never on
- * AiSetupScreen's "revisit" variant — there is no multi-stage flow to be
- * "in" once onboarding is already behind the user.
+ * is interactive or skips ahead (skipping is each stage's own affordance, not
+ * a click on this strip). Shown only on the onboarding path — AiAccessPage's
+ * "onboarding" mode and VaultSetupScreen — never once onboarding is behind
+ * the user, since there is no multi-stage flow left to be "in".
+ *
+ * The `id` "ai-setup" is kept as the internal identifier for the first stage
+ * even though the page behind it is now AI Access (there used to be a
+ * separate AiSetupScreen) — renaming the id would be a pointless diff through
+ * every caller for something nothing outside this file reads.
  */
 
 export type OnboardingStage = "ai-setup" | "knowledge" | "workshop";
 
 const STEPS: { id: OnboardingStage; label: string; optional?: boolean }[] = [
-  { id: "ai-setup", label: "AI Setup" },
+  { id: "ai-setup", label: "AI Access" },
   { id: "knowledge", label: "Knowledge", optional: true },
   { id: "workshop", label: "Workshop" },
 ];

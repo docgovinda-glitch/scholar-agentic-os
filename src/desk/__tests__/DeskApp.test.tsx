@@ -39,7 +39,15 @@ vi.mock("../../services/supabaseClient", () => ({
       signOut: vi.fn(),
     },
     from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }),
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: null, error: null }),
+          // Account Settings' getProfile() — a generic empty profile is fine
+          // here since these tests are about the nav/routing shell, not the
+          // form's own content (that's AccountSettingsScreen's own coverage).
+          single: async () => ({ data: { username: "u", full_name: "", phone: "", affiliation: "" }, error: null }),
+        }),
+      }),
     }),
   }),
 }));
@@ -260,17 +268,20 @@ describe("Desk — project shell", () => {
 });
 
 // Header's "Settings" used to be a labelled dead stub (title="Not yet
-// built"). It now opens AiSetupScreen in its "revisit" mode and returns to
-// exactly where the user was — from the list, or from inside a project.
-describe("Desk — settings", () => {
+// built"), then opened AiSetupScreen in its "revisit" mode. AI configuration
+// now lives entirely in AI Access (its own nav item, tested below); this nav
+// item is "Account Settings" — profile/account fields only — and still
+// returns to exactly where the user was, from the list or from inside a
+// project.
+describe("Desk — account settings", () => {
   it("opens from the project list and returns to it", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
     render(<DeskApp />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
-    expect(await screen.findByRole("heading", { name: "AI provider" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Account Settings" }));
+    expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(await screen.findByText("Nothing here yet")).toBeInTheDocument();
   });
 
@@ -283,11 +294,36 @@ describe("Desk — settings", () => {
     ]);
     render(<DeskApp />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
-    expect(await screen.findByRole("heading", { name: "AI provider" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Account Settings" }));
+    expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "← Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(await screen.findByText("Journal Article")).toBeInTheDocument();
     expect(window.location.search).toContain("project=proj-42");
+  });
+});
+
+// AI configuration's single source of truth (Header/ProjectListScreen's "AI
+// Access" nav item) — the same page the onboarding gate renders, in "manage"
+// mode. There is no separate AI Settings entry point left anywhere.
+describe("Desk — AI Access", () => {
+  it("has no separate AI Settings nav item — AI Access is the only one", async () => {
+    mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
+    render(<DeskApp />);
+    await screen.findByRole("button", { name: "AI Access" });
+    expect(screen.queryByRole("button", { name: /^AI Settings$/ })).not.toBeInTheDocument();
+  });
+
+  it("opens from the project list, in manage mode (no onboarding Skip/Continue), and returns to it", async () => {
+    mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
+    render(<DeskApp />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "AI Access" }));
+    expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Skip for now" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(await screen.findByText("Nothing here yet")).toBeInTheDocument();
   });
 });

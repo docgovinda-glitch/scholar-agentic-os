@@ -18,7 +18,7 @@ import type { OutputTypeSummary, ProjectView } from "./types";
 export default function ProjectListScreen({
   onOpen,
   userEmail,
-  onOpenSettings,
+  onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
   showWelcome,
@@ -26,7 +26,7 @@ export default function ProjectListScreen({
 }: {
   onOpen: (projectId: string) => void;
   userEmail: string | null;
-  onOpenSettings?: () => void;
+  onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
   /**
@@ -114,13 +114,13 @@ export default function ProjectListScreen({
                 AI Access
               </button>
             )}
-            {onOpenSettings && (
+            {onOpenAccountSettings && (
               <button
                 type="button"
-                onClick={onOpenSettings}
+                onClick={onOpenAccountSettings}
                 className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
               >
-                Settings
+                Account Settings
               </button>
             )}
             <button

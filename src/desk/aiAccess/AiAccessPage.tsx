@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import ProviderDetail, { Chip } from "./ProviderDetail";
 import LocalRunnerDetail from "./LocalRunnerDetail";
 import { byokProviders, freeProviders, useAiAccess, type ProviderView } from "./useAiAccess";
+import OnboardingProgress from "../setup/OnboardingProgress";
 import {
   getPremiumCatalog,
   getOfferedPlans,
@@ -18,26 +19,31 @@ import {
 } from "./aiAccessApi";
 
 /**
- * AI Access — the user's provider and model manager.
+ * AI Access — the single source of truth for a user's AI provider and model
+ * configuration. Reached two ways, both landing on the exact same page and
+ * the exact same connection data:
  *
- * What this replaced, and why: this page used to be four read-only tier cards
- * plus a "Connect a provider" button that handed off to the onboarding setup
- * screen. That screen asks "which ONE provider do you want", so the whole
- * surface could only ever express a single choice — which is why every tier
- * read "Not configured" with no way to fix it from here.
+ *  - "onboarding" mode: the first stop after login for a user who has not yet
+ *    configured anything (docs 25 §1.1) — DeskApp renders this in place of
+ *    the gate a standalone AiSetupScreen used to own. That screen is gone: it
+ *    asked "which ONE provider do you want", which could only ever express a
+ *    single choice, and it duplicated everything this page already does
+ *    per-provider. `onContinue`/`onSkip` map to the same
+ *    useAiSetupStatus().complete()/skip() the old screen drove.
+ *  - "manage" mode (default): reached from the "AI Access" nav item at any
+ *    later point, to change what was set up.
  *
- * The rebuild is a new view over the SAME storage that was already
- * multi-provider (see useAiAccess.ts's header for why nothing underneath
- * needed replacing). AiSetupScreen is deliberately left intact and still owns
- * first-run onboarding; this owns ongoing management, and the two now share
- * one connection model instead of disagreeing about how many providers a user
- * may have.
+ * What this replaced originally (2026-08-12 rebuild): this page used to be
+ * four read-only tier cards plus a "Connect a provider" button handing off to
+ * the onboarding screen — the reason every tier read "Not configured" with no
+ * way to fix it from here. The rebuild is a new view over the SAME storage
+ * that was already multi-provider (see useAiAccess.ts's header).
  *
- * Layout is a left rail of sections rather than one long page, per the
- * request: each section renders its own list, and selecting a provider swaps
- * the right pane for that provider's own configuration rather than scrolling
- * to it. Nothing about Omni Router is presented as configurable — Section
- * 4/20's rule that routing is automatic still holds.
+ * Layout is a left rail of sections rather than one long page: each section
+ * renders its own list, and selecting a provider swaps the right pane for
+ * that provider's own configuration rather than scrolling to it. Nothing
+ * about Omni Router is presented as configurable — Section 4/20's rule that
+ * routing is automatic still holds.
  */
 
 type SectionId = "overview" | "local" | "free" | "byok" | "premium" | "models" | "settings";
@@ -52,7 +58,26 @@ const SECTIONS: Array<{ id: SectionId; label: string; hint: string }> = [
   { id: "settings", label: "Settings", hint: "Routing and security" },
 ];
 
-export default function AiAccessPage({ onClose, onOpenSetup }: { onClose: () => void; onOpenSetup: () => void }) {
+export default function AiAccessPage({
+  onClose,
+  mode = "manage",
+  onContinue,
+  onSkip,
+}: {
+  /** Required in "manage" mode (the default). Unused in "onboarding" mode — there is nothing to "close" back to yet. */
+  onClose?: () => void;
+  /**
+   * "manage" (default): reached via the "AI Access" nav item — renders a
+   * "Close" button that returns to wherever the user already was.
+   * "onboarding": this page IS the first stage after login — renders
+   * "Skip for now" / "Continue" and the onboarding progress strip instead.
+   */
+  mode?: "onboarding" | "manage";
+  /** Onboarding only: move on, having configured (or deliberately not configured) an AI source right now. */
+  onContinue?: () => void;
+  /** Onboarding only: explicit "not now" — must survive a reload without re-asking (docs 25 §1.1). */
+  onSkip?: () => void;
+}) {
   const access = useAiAccess();
   const [section, setSection] = useState<SectionId>("overview");
   /** Provider id whose detail pane is open, or null for the section's list. */
@@ -68,14 +93,38 @@ export default function AiAccessPage({ onClose, onOpenSetup }: { onClose: () => 
       <header className="border-b border-[color:var(--border-subtle)]">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-4">
           <h1 className="text-base font-semibold tracking-tight text-[color:var(--text-primary)]">AI Access</h1>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]"
-          >
-            Close
-          </button>
+          {mode === "onboarding" ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onSkip}
+                className="rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]"
+              >
+                Skip for now
+              </button>
+              <button
+                type="button"
+                onClick={onContinue}
+                className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)]"
+              >
+                Continue
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]"
+            >
+              Close
+            </button>
+          )}
         </div>
+        {mode === "onboarding" && (
+          <div className="mx-auto max-w-5xl px-5 pb-3">
+            <OnboardingProgress current="ai-setup" />
+          </div>
+        )}
       </header>
 
       <div className="mx-auto grid max-w-5xl gap-6 px-5 py-6 md:grid-cols-[13rem_minmax(0,1fr)]">
@@ -120,7 +169,7 @@ export default function AiAccessPage({ onClose, onOpenSetup }: { onClose: () => 
           {openProvider ? (
             <DetailPane access={access} providerId={openProvider} section={section} onBack={() => setOpenProvider(null)} />
           ) : (
-            <SectionPane access={access} section={section} onOpen={setOpenProvider} onGo={go} onOpenSetup={onOpenSetup} />
+            <SectionPane access={access} section={section} onOpen={setOpenProvider} onGo={go} />
           )}
         </main>
       </div>
@@ -196,17 +245,15 @@ function SectionPane({
   section,
   onOpen,
   onGo,
-  onOpenSetup,
 }: {
   access: ReturnType<typeof useAiAccess>;
   section: SectionId;
   onOpen: (id: string) => void;
   onGo: (s: SectionId) => void;
-  onOpenSetup: () => void;
 }) {
   switch (section) {
     case "overview":
-      return <OverviewSection access={access} onGo={onGo} onOpen={onOpen} onOpenSetup={onOpenSetup} />;
+      return <OverviewSection access={access} onGo={onGo} onOpen={onOpen} />;
     case "local":
       return <LocalSection access={access} onOpen={onOpen} />;
     case "free":
@@ -235,12 +282,10 @@ function OverviewSection({
   access,
   onGo,
   onOpen,
-  onOpenSetup,
 }: {
   access: ReturnType<typeof useAiAccess>;
   onGo: (s: SectionId) => void;
   onOpen: (id: string) => void;
-  onOpenSetup: () => void;
 }) {
   const counts = useMemo(
     () => ({
@@ -294,9 +339,6 @@ function OverviewSection({
             </button>
             <button type="button" onClick={() => onGo("free")} className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-sm font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]">
               Browse Free AI
-            </button>
-            <button type="button" onClick={onOpenSetup} className="rounded-[var(--radius-sm)] px-3 py-1.5 text-sm text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]">
-              Guided setup
             </button>
           </div>
         </section>

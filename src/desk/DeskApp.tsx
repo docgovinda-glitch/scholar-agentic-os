@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
+import AccountSettingsScreen from "./account/AccountSettingsScreen";
 import AiAccessPage from "./aiAccess/AiAccessPage";
 import DeskAuthGate from "./DeskAuthGate";
 import DeskShell from "./DeskShell";
 import ProjectListScreen from "./ProjectListScreen";
-import AiSetupScreen from "./setup/AiSetupScreen";
 import VaultSetupScreen from "./setup/VaultSetupScreen";
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
@@ -42,15 +42,21 @@ function DeskRoutes() {
   const vaultSetup = useVaultSetupStatus(userId, aiSetup.status === "ready");
   const [projectId, setProjectId] = useState<string | null>(readProjectIdFromUrl);
   /**
-   * Revisiting AI settings after setup. Not URL-addressed like `?project=` —
-   * there is nothing here worth bookmarking or reaching with Back, and
-   * closing it should return to exactly whatever was already on screen
-   * (list or project) rather than navigating anywhere.
+   * Revisiting Account Settings (profile/account fields — never AI
+   * configuration, see AccountSettingsScreen's own header comment). Not
+   * URL-addressed like `?project=` — there is nothing here worth bookmarking
+   * or reaching with Back, and closing it should return to exactly whatever
+   * was already on screen (list or project) rather than navigating anywhere.
    */
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  /** Same reasoning as settingsOpen — not URL-addressed, returns to exactly what was already on screen. */
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  /** Same reasoning as accountSettingsOpen — not URL-addressed, returns to exactly what was already on screen. */
   const [vaultOpen, setVaultOpen] = useState(false);
-  /** Same reasoning as settingsOpen/vaultOpen. */
+  /**
+   * Revisiting AI Access (Section 20) after onboarding — the SAME page the
+   * "needed" branch below renders for a first-time user, just in "manage"
+   * mode instead of "onboarding" mode. One page, one connection model, two
+   * entry points.
+   */
   const [aiAccessOpen, setAiAccessOpen] = useState(false);
   /**
    * Section 11: true for exactly the one transition out of the Knowledge
@@ -85,9 +91,15 @@ function DeskRoutes() {
     setProjectId(null);
   }
 
-  // AI setup sits between signing in and the workspace (docs 25 §1). It is
+  // AI Access sits between signing in and the workspace (docs 25 §1):
+  // Login -> AI Access -> Knowledge Vault (optional) -> Workshop. It is
   // skippable: skipping leaves the editor fully usable with the AI features
-  // inert, which is a real choice rather than a broken state.
+  // inert, which is a real choice rather than a broken state. This is the
+  // SAME AiAccessPage the "AI Access" nav item opens later — "onboarding"
+  // mode only changes the header (Skip/Continue instead of Close) and adds
+  // the progress strip; the connection data and every section are identical,
+  // so there is exactly one AI-configuration surface, not two that could
+  // drift apart.
   if (aiSetup.status === "checking") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)]">
@@ -96,7 +108,7 @@ function DeskRoutes() {
     );
   }
   if (aiSetup.status === "needed") {
-    return <AiSetupScreen onDone={aiSetup.complete} onSkip={aiSetup.skip} />;
+    return <AiAccessPage mode="onboarding" onContinue={aiSetup.complete} onSkip={aiSetup.skip} />;
   }
 
   // Knowledge Vault (docs 25 §6) — optional, and offered once. Declining is a
@@ -116,18 +128,17 @@ function DeskRoutes() {
     );
   }
 
-  // Revisiting settings takes over the whole screen, same as the one-time
-  // setup stages above, rather than opening as a panel over whatever was
-  // showing — reusing AiSetupScreen's own full-screen shell rather than
-  // building a second layout for the same form.
-  if (settingsOpen) {
-    return <AiSetupScreen variant="revisit" onDone={() => setSettingsOpen(false)} onCancel={() => setSettingsOpen(false)} />;
+  // Account Settings (profile/account fields, never AI configuration) —
+  // full-screen overlay, same treatment as Vault/AI Access below.
+  if (accountSettingsOpen) {
+    return <AccountSettingsScreen onClose={() => setAccountSettingsOpen(false)} />;
   }
 
-  // AI Access (Section 20) — status view for Local/Free/BYOK/Premium. Same
-  // full-screen-overlay treatment as settings/vault above.
+  // AI Access (Section 20), revisited — "manage" mode (the default): every
+  // provider/model/Premium control a user needs, reached from the nav item
+  // rather than the onboarding gate above.
   if (aiAccessOpen) {
-    return <AiAccessPage onClose={() => setAiAccessOpen(false)} onOpenSetup={() => setSettingsOpen(true)} />;
+    return <AiAccessPage onClose={() => setAiAccessOpen(false)} />;
   }
 
   // A Vault is "your long-term library... across future projects" (docs 25
@@ -150,7 +161,7 @@ function DeskRoutes() {
       <ProjectListScreen
         onOpen={open}
         userEmail={session.status === "signed-in" ? session.email : null}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenAccountSettings={() => setAccountSettingsOpen(true)}
         onOpenVault={() => setVaultOpen(true)}
         onOpenAiAccess={() => setAiAccessOpen(true)}
         showWelcome={justFinishedOnboarding}
@@ -162,7 +173,7 @@ function DeskRoutes() {
     <DeskShell
       projectId={projectId}
       onClose={close}
-      onOpenSettings={() => setSettingsOpen(true)}
+      onOpenAccountSettings={() => setAccountSettingsOpen(true)}
       onOpenVault={() => setVaultOpen(true)}
       onOpenAiAccess={() => setAiAccessOpen(true)}
     />

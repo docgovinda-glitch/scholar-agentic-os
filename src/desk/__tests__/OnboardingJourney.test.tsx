@@ -166,9 +166,13 @@ afterEach(() => {
 });
 
 describe("the canonical first-login journey", () => {
-  it("1. a brand-new user is taken to AI Setup, not straight to the workspace", async () => {
+  it("1. a brand-new user is taken to AI Access, not straight to the workspace", async () => {
     render(<DeskApp />);
-    expect(await screen.findByRole("heading", { name: "Connect an AI provider" })).toBeInTheDocument();
+    // AI Access's own h1, in onboarding mode — the same page the "AI Access"
+    // nav item opens later, distinguished from a plain revisit by the
+    // Skip/Continue header (asserted in test 3/4 below) rather than a
+    // separate screen.
+    expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
     expect(screen.queryByText("Nothing here yet")).not.toBeInTheDocument();
   });
 
@@ -178,17 +182,23 @@ describe("the canonical first-login journey", () => {
 
     render(<DeskApp />);
     expect(await screen.findByText("Nothing here yet")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Connect an AI provider" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "AI Access" })).not.toBeInTheDocument();
     expect(screen.queryByText(/long-term library/i)).not.toBeInTheDocument();
   });
 
-  it("3. completing AI Setup moves to Knowledge Setup next, not straight to the workspace", async () => {
+  it("3. completing AI Access moves to Knowledge Setup next, not straight to the workspace", async () => {
     render(<DeskApp />);
-    await screen.findByRole("heading", { name: "Connect an AI provider" });
+    await screen.findByRole("heading", { name: "AI Access" });
 
-    fireEvent.change(await screen.findByLabelText("API key"), { target: { value: "sk-my-secret" } });
-    fireEvent.click(screen.getByRole("button", { name: /Save and continue/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    // Configure a provider — the same per-provider flow AiAccessPage.test.tsx
+    // covers in isolation — then advance via the onboarding header's Continue.
+    fireEvent.click(await screen.findByRole("button", { name: "Free AI" }));
+    fireEvent.click(await screen.findByText("Groq"));
+    fireEvent.change(await screen.findByPlaceholderText(/Paste your key/i), { target: { value: "sk-my-secret" } });
+    fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
+    await waitFor(() => expect(addConnection).toHaveBeenCalledWith("groq", "free", 3));
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(await screen.findByText(/long-term library/i)).toBeInTheDocument();
   });
@@ -231,10 +241,10 @@ describe("the canonical first-login journey", () => {
     expect(screen.queryByRole("heading", { name: "Connect an AI provider" })).not.toBeInTheDocument();
   });
 
-  it("9. a direct project URL mid-onboarding still shows AI Setup first, never the project underneath it", async () => {
+  it("9. a direct project URL mid-onboarding still shows AI Access first, never the project underneath it", async () => {
     window.history.pushState({}, "", "/desk?project=some-project");
     render(<DeskApp />);
-    expect(await screen.findByRole("heading", { name: "Connect an AI provider" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
   });
 
   it("10. once onboarding is complete, a fresh mount does not loop back into it", async () => {
@@ -247,7 +257,7 @@ describe("the canonical first-login journey", () => {
 
     render(<DeskApp />);
     expect(await screen.findByText("Nothing here yet")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Connect an AI provider" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "AI Access" })).not.toBeInTheDocument();
     expect(screen.queryByText(/long-term library/i)).not.toBeInTheDocument();
   });
 });
