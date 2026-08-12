@@ -82,13 +82,14 @@ function SignInScreen({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const result = await signIn({ username: username.trim(), password });
+      const result = await signIn({ username: username.trim(), password, captchaToken: captchaToken || undefined });
       if (result.success) return; // useDeskSession takes over from here.
 
       setError(result.error ?? "Could not sign you in.");
@@ -112,6 +113,15 @@ function SignInScreen({
           onChange={setPassword}
           autoComplete="current-password"
         />
+        {/*
+          Sign-in needs the challenge too, not just sign-up: Supabase Auth's
+          CAPTCHA setting is per-project, so enabling it protects the password
+          grant at the same moment it protects signup. Without this the widget
+          would only exist on the registration screen and every existing user
+          would be locked out the moment CAPTCHA was switched on. Renders
+          nothing at all when VITE_CAPTCHA_SITE_KEY is unset.
+        */}
+        <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
         <SubmitButton busy={busy} busyLabel="Signing in…" disabled={!username.trim() || !password}>
           Sign in
@@ -200,13 +210,14 @@ function ForgotScreen({ onBack }: { onBack: () => void }) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const result = await sendPasswordResetEmail(email.trim());
+      const result = await sendPasswordResetEmail(email.trim(), captchaToken || undefined);
       if (result.success) setSent(true);
       else setError(result.error ?? "Could not send the reset email.");
     } catch (e) {
@@ -239,6 +250,8 @@ function ForgotScreen({ onBack }: { onBack: () => void }) {
       <AuthHeading title="Reset your password" subtitle="We will email you a link to set a new one." />
       <AuthForm onSubmit={handleSubmit}>
         <Field id="reset-email" label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" autoFocus />
+        {/* /recover is covered by the same project-wide CAPTCHA setting — see SignInScreen. */}
+        <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
         <SubmitButton busy={busy} busyLabel="Sending…" disabled={!email.trim()}>
           Send reset link

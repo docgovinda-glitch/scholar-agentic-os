@@ -129,6 +129,7 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
 export interface SignInInput {
   username: string;
   password: string;
+  captchaToken?: string;
 }
 
 export interface SignInResult extends ServiceResult {
@@ -141,7 +142,17 @@ export interface SignInResult extends ServiceResult {
   };
 }
 
-/** Logs in by username (resolved to an email via the email_for_username RPC). */
+/**
+ * Logs in by username (resolved to an email via the email_for_username RPC).
+ *
+ * Carries a CAPTCHA token for the same reason signUp() does, and it is not
+ * optional in practice: Supabase Auth's CAPTCHA setting is per-PROJECT, not
+ * per-endpoint. Switching it on protects the password grant behind this call
+ * and the /recover endpoint behind sendPasswordResetEmail() at the same moment
+ * it protects signup — so a sign-in that sends no token stops working the
+ * instant CAPTCHA is enabled, locking out every existing user. All three call
+ * sites therefore pass one.
+ */
 export async function signIn(input: SignInInput): Promise<SignInResult> {
   const supabase = getSupabaseClient();
 
@@ -156,6 +167,7 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
   const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
     email,
     password: input.password,
+    options: { captchaToken: input.captchaToken },
   });
 
   if (signInError) {
@@ -270,10 +282,13 @@ export async function saveApiKeys(apiKeys: Record<string, string>): Promise<Serv
  * account; it always resolves successfully regardless of whether the email
  * is actually registered, to avoid leaking which emails have accounts.
  */
-export async function sendPasswordResetEmail(email: string): Promise<ServiceResult> {
+export async function sendPasswordResetEmail(email: string, captchaToken?: string): Promise<ServiceResult> {
   const supabase = getSupabaseClient();
+  // /recover is covered by the same project-wide CAPTCHA setting as signup and
+  // the password grant — see signIn()'s comment.
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin,
+    captchaToken,
   });
   if (error) {
     return { success: false, error: safeAuthErrorMessage(error, "Failed to send the password reset email. Please try again shortly.") };

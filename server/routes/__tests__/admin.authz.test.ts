@@ -177,6 +177,55 @@ describe.each(SCOPED_ROUTES)("scope boundary: $method $path", ({ method, path, b
   });
 });
 
+/**
+ * Express 4 drops a rejected promise from an `async` handler: no status, no
+ * body, no error middleware — the request is simply left open until the client
+ * gives up. Most routes in admin.ts had no try/catch of their own, so any
+ * Supabase failure hung the admin panel rather than reporting itself.
+ *
+ * registerAdminRoutes now builds its router with createAsyncRouter(), which
+ * wraps every handler. This asserts the property across the WHOLE route table
+ * rather than per route, so an admin route added later is covered the moment
+ * it joins ROUTES — the same reasoning as the authorization sweep above.
+ *
+ * A hang IS the failure here: supertest never resolves, so the test times out
+ * and fails rather than passing quietly.
+ */
+function mockFetchSupabaseDown() {
+  global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+
+    // Auth and the admin lookup still work — we are testing what happens when
+    // the request gets PAST the gate and then the data layer fails.
+    if (url.includes("/auth/v1/user")) {
+      const token = (init?.headers as Record<string, string>)?.Authorization?.replace("Bearer ", "");
+      if (token === "admin-token") return Promise.resolve(jsonResponse(200, { id: ADMIN_ID, email: "admin@example.com" }));
+      return Promise.resolve(jsonResponse(401, {}));
+    }
+    if (url.includes("/rest/v1/admin_users")) {
+      return Promise.resolve(textResponse(200, JSON.stringify([{ user_id: ADMIN_ID, scopes: SCOPES }])));
+    }
+
+    // Everything else — every table read/write and every RPC — is down.
+    return Promise.resolve(textResponse(500, "supabase is unavailable"));
+  }) as unknown as typeof fetch;
+}
+
+describe.each(ROUTES)("never hangs when Supabase is down: $method $path", ({ method, path, body }) => {
+  it("answers with a status instead of leaving the request open", async () => {
+    mockFetchSupabaseDown();
+    const app = await buildApp();
+    const res = await request(app)[method](path).set("Authorization", "Bearer admin-token").send(body ?? {});
+
+    // The specific code is not the point — a route with its own try/catch may
+    // answer 503, one relying on the router-level wrapper also answers 503,
+    // and a route that needs no Supabase call at all may still answer 200.
+    // What matters is that a response arrives at all.
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(600);
+  });
+});
+
 describe("cleanup", () => {
   it("restores the real fetch", () => {
     global.fetch = realFetch;

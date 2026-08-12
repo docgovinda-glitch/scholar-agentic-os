@@ -1,5 +1,6 @@
 import express from "express";
 import { requireAuth, type AuthenticatedUser } from "../src/middleware/auth";
+import { createAsyncRouter } from "../src/middleware/asyncHandler";
 import { requireAdmin, requireScopeInline, isValidScope, type AdminInfo, type Scope } from "../src/middleware/requireAdmin";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest";
 import { listCredentials, storeCredential, removeCredential, setCredentialStatus } from "../src/aiEngine/credentialVault";
@@ -24,9 +25,17 @@ import { searchUsers, setAccountStatus, hardDeleteUser, DeleteConfirmationMismat
  * its first line, reading the req.adminInfo the router-level requireAdmin
  * already populated — see server/src/middleware/requireAdmin.ts's SCOPES
  * for the full list and what each one gates.
+ *
+ * The router comes from createAsyncRouter(), NOT express.Router(): almost
+ * every route below is `async` and writes to Supabase, and Express 4 silently
+ * drops a rejected promise from an async handler — no status, no body, no
+ * error middleware, just a request left open until the client times out. Most
+ * routes here had no try/catch at all, so any Supabase error hung the admin
+ * panel instead of reporting itself. See createAsyncRouter's own comment for
+ * why this is done at the router rather than per route.
  */
 export function registerAdminRoutes(app: express.Express): void {
-  const admin = express.Router();
+  const admin = createAsyncRouter();
   admin.use(express.json());
   admin.use(requireAuth, requireAdmin);
 
