@@ -207,6 +207,69 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
 }
 
 
+export interface ProfileFields {
+  username: string;
+  fullName: string;
+  phone: string;
+  affiliation: string;
+}
+
+/**
+ * The signed-in user's own editable profile fields, for Account Settings.
+ * `username` is included for display only — see saveProfileFields for why it
+ * is not itself editable here.
+ */
+export async function getProfile(): Promise<{ success: true; profile: ProfileFields } | { success: false; error: string }> {
+  const supabase = getSupabaseClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { success: false, error: "Not signed in." };
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("username, full_name, phone, affiliation")
+    .eq("id", userData.user.id)
+    .single();
+
+  if (error || !data) {
+    return { success: false, error: error?.message ?? "Could not load your profile." };
+  }
+  return {
+    success: true,
+    profile: { username: data.username, fullName: data.full_name, phone: data.phone ?? "", affiliation: data.affiliation },
+  };
+}
+
+/**
+ * Updates the signed-in user's own name/phone/affiliation. Requires an
+ * active session (RLS: profiles_update_own — see supabase/schema.sql).
+ *
+ * `username` is deliberately NOT accepted here even though the schema grants
+ * self-service UPDATE on that column: it is also the login identifier
+ * (`email_for_username` resolves it to an email pre-authentication), so
+ * changing it safely means checking uniqueness and handling a user whose
+ * muscle-memory login now 404s — a real feature, not an Account Settings
+ * field, and out of scope for this screen.
+ */
+export async function saveProfileFields(fields: Pick<ProfileFields, "fullName" | "phone" | "affiliation">): Promise<ServiceResult> {
+  const supabase = getSupabaseClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { success: false, error: "Not signed in." };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ full_name: fields.fullName, phone: fields.phone, affiliation: fields.affiliation, updated_at: new Date().toISOString() })
+    .eq("id", userData.user.id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+  return { success: true };
+}
+
 /** Requires an active session (RLS: profiles_update_own). */
 export async function saveModelPreferences(preferences: Record<string, unknown>): Promise<ServiceResult> {
   const supabase = getSupabaseClient();

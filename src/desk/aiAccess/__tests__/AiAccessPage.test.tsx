@@ -58,7 +58,7 @@ beforeEach(() => {
 });
 
 function renderPage() {
-  return render(<AiAccessPage onClose={() => {}} onOpenSetup={() => {}} />);
+  return render(<AiAccessPage onClose={() => {}} />);
 }
 
 describe("AI Access navigation", () => {
@@ -231,5 +231,50 @@ describe("Error handling", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/Request failed \(503\)/);
     // The page still renders its catalogue rather than blanking.
     expect(await screen.findByRole("button", { name: "Free AI" })).toBeInTheDocument();
+  });
+});
+
+describe("Onboarding mode — AI Access as the first destination after login", () => {
+  it("in manage mode (default), shows Close and never Skip/Continue", async () => {
+    renderPage();
+    expect(await screen.findByRole("button", { name: "Close" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Skip for now" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
+  });
+
+  it("in onboarding mode, shows Skip/Continue instead of Close, and the progress strip", async () => {
+    render(<AiAccessPage mode="onboarding" onContinue={() => {}} onSkip={() => {}} />);
+    expect(await screen.findByRole("button", { name: "Skip for now" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+    // Onboarding progress: this stage current, Knowledge and Workshop ahead.
+    expect(screen.getByRole("list", { name: "Onboarding progress" })).toBeInTheDocument();
+  });
+
+  it("Skip calls onSkip, not onContinue", async () => {
+    const onContinue = vi.fn();
+    const onSkip = vi.fn();
+    render(<AiAccessPage mode="onboarding" onContinue={onContinue} onSkip={onSkip} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
+    expect(onSkip).toHaveBeenCalled();
+    expect(onContinue).not.toHaveBeenCalled();
+  });
+
+  it("Continue calls onContinue and is available even with nothing connected — every stage stays skippable", async () => {
+    const onContinue = vi.fn();
+    render(<AiAccessPage mode="onboarding" onContinue={onContinue} onSkip={() => {}} />);
+
+    const continueButton = await screen.findByRole("button", { name: "Continue" });
+    expect(continueButton).toBeEnabled();
+    fireEvent.click(continueButton);
+    expect(onContinue).toHaveBeenCalled();
+  });
+
+  it("has no 'Guided setup' handoff — every section is already its own guided flow", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Overview" }));
+    expect(await screen.findByText(/Nothing connected yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guided setup" })).not.toBeInTheDocument();
   });
 });

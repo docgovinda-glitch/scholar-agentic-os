@@ -24,13 +24,13 @@ import type { CanonicalDocument, OutputTypeSummary, ProjectView, RubricReport } 
 export default function DeskShell({
   projectId,
   onClose,
-  onOpenSettings,
+  onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
 }: {
   projectId: string;
   onClose?: () => void;
-  onOpenSettings?: () => void;
+  onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
 }) {
@@ -130,7 +130,7 @@ export default function DeskShell({
         project={project}
         outputTypeLabel={outputType?.label ?? project.outputTypeId}
         onClose={onClose}
-        onOpenSettings={onOpenSettings}
+        onOpenAccountSettings={onOpenAccountSettings}
         onOpenVault={onOpenVault}
         onOpenAiAccess={onOpenAiAccess}
       />

@@ -5,24 +5,26 @@ import type { ProjectView } from "../types";
  *
  * The wordmark is now a real control that returns to the project list —
  * `GET /api/projects` exists, so the "no project switcher yet; addressed by
- * ?project=<id> in the URL" note this carried no longer applies. Settings is
- * now real too (AiSetupScreen's "revisit" mode). Search stays visibly
- * present but explicitly labelled not-yet-built, rather than being a dead
- * control that looks live (22 §6.2's "never a silent no-op") — there is no
- * corpus/citations API yet for it to search.
+ * ?project=<id> in the URL" note this carried no longer applies. AI
+ * configuration lives entirely under "AI Access" (the single source of truth
+ * for it — there is no separate AI Settings anymore); "Account Settings" is
+ * profile/account fields only. Search stays visibly present but explicitly
+ * labelled not-yet-built, rather than being a dead control that looks live
+ * (22 §6.2's "never a silent no-op") — there is no corpus/citations API yet
+ * for it to search.
  */
 export default function Header({
   project,
   outputTypeLabel,
   onClose,
-  onOpenSettings,
+  onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
 }: {
   project: ProjectView;
   outputTypeLabel: string;
   onClose?: () => void;
-  onOpenSettings?: () => void;
+  onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
 }) {
@@ -72,17 +74,17 @@ export default function Header({
             AI Access
           </button>
         )}
-        {onOpenSettings ? (
+        {onOpenAccountSettings ? (
           <button
             type="button"
-            onClick={onOpenSettings}
+            onClick={onOpenAccountSettings}
             className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
           >
-            Settings
+            Account Settings
           </button>
         ) : (
           <span title="Not yet built" className="cursor-not-allowed">
-            Settings
+            Account Settings
           </span>
         )}
       </div>
