@@ -239,13 +239,17 @@ describe("signIn", () => {
     expect(result.error).toBe("Your account has been restricted. Please contact support.");
   });
 
-  it("fails cleanly when no profile exists for the given username", async () => {
+  it("fails cleanly when no profile exists for the given username, without confirming the username doesn't exist", async () => {
     mockRpc.mockResolvedValue({ data: null, error: null });
 
     const result = await signIn({ username: "ghost", password: "x" });
 
     expect(result.success).toBe(false);
     expect(mockAuth.signInWithPassword).not.toHaveBeenCalled();
+    // A message like "No account found with that User ID" would let this
+    // form be used to enumerate registered usernames.
+    expect(result.error).not.toMatch(/no account/i);
+    expect(result.error).toBe("Invalid credentials. Please check your User ID, email, or mobile number and try again.");
   });
 
   it("fails cleanly when no profile exists for the given email", async () => {
@@ -258,13 +262,15 @@ describe("signIn", () => {
     expect(mockAuth.signInWithPassword).toHaveBeenCalled();
   });
 
-  it("fails cleanly when no profile exists for the given phone number", async () => {
+  it("fails cleanly when no profile exists for the given phone number, without confirming the number doesn't exist", async () => {
     mockRpc.mockResolvedValue({ data: null, error: null });
 
     const result = await signIn({ username: "+19999999999", password: "x" });
 
     expect(result.success).toBe(false);
     expect(mockAuth.signInWithPassword).not.toHaveBeenCalled();
+    expect(result.error).not.toMatch(/no account/i);
+    expect(result.error).toBe("Invalid credentials. Please check your User ID, email, or mobile number and try again.");
   });
 
   it("reports incorrect password without leaking whether the account exists", async () => {
@@ -484,29 +490,29 @@ describe("requestProfileUpdate", () => {
 
 describe("resendVerificationEmail", () => {
   it("successfully resends verification email", async () => {
-    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: null });
+    mockAuth.resend = vi.fn().mockResolvedValue({ error: null });
     const result = await resendVerificationEmail({ email: "user@example.com" });
     expect(result.success).toBe(true);
     expect(result.emailSent).toBe(true);
-    expect(mockAuth.resendSignUpEmail).toHaveBeenCalledWith("user@example.com");
+    expect(mockAuth.resend).toHaveBeenCalledWith({ type: "signup", email: "user@example.com" });
   });
 
   it("handles user not found error", async () => {
-    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: { message: "user_not_found" } });
+    mockAuth.resend = vi.fn().mockResolvedValue({ error: { message: "user_not_found" } });
     const result = await resendVerificationEmail({ email: "nonexistent@example.com" });
     expect(result.success).toBe(false);
     expect(result.error).toContain("No account found");
   });
 
   it("handles already verified error", async () => {
-    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: { message: "already confirmed" } });
+    mockAuth.resend = vi.fn().mockResolvedValue({ error: { message: "already confirmed" } });
     const result = await resendVerificationEmail({ email: "verified@example.com" });
     expect(result.success).toBe(false);
     expect(result.error).toContain("already been verified");
   });
 
   it("handles generic errors gracefully", async () => {
-    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: { message: "Email service error", status: 500 } });
+    mockAuth.resend = vi.fn().mockResolvedValue({ error: { message: "Email service error", status: 500 } });
     const result = await resendVerificationEmail({ email: "user@example.com" });
     expect(result.success).toBe(false);
     // Error should be a helpful message, not the raw error

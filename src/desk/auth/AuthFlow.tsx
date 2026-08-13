@@ -49,9 +49,18 @@ import ScholarCoreLanding from "../ScholarCoreLanding";
 export default function AuthFlow({
   initialScreen = "landing",
   verifiedEmail,
+  onEmailVerificationAcknowledged,
 }: {
   initialScreen?: AuthScreen;
   verifiedEmail?: string | null;
+  /**
+   * Called when the user dismisses the email-verification success screen.
+   * They already hold a valid session at that point (Supabase auto-signs in
+   * on verification) — this tells useDeskSession to drop its "email-verified"
+   * status back to "signed-in" so DeskAuthGate renders the real app, rather
+   * than making them re-enter credentials for a session they already have.
+   */
+  onEmailVerificationAcknowledged?: () => void;
 } = {}) {
   const [screen, setScreen] = useState<AuthScreen>(initialScreen);
   const [registeredEmail, setRegisteredEmail] = useState<string>("");
@@ -84,7 +93,12 @@ export default function AuthFlow({
     case "resend-verification":
       return <ResendVerificationScreen email={registeredEmail} onBack={() => setScreen("registered")} />;
     case "email-verification-success":
-      return <EmailVerificationSuccessScreen email={verifiedEmail} onContinue={() => setScreen("sign-in")} />;
+      return (
+        <EmailVerificationSuccessScreen
+          email={verifiedEmail}
+          onContinue={onEmailVerificationAcknowledged ?? (() => setScreen("sign-in"))}
+        />
+      );
     default:
       return (
         <SignInScreen
@@ -424,11 +438,11 @@ function EmailVerificationSuccessScreen({ email, onContinue }: { email?: string 
       <AuthNotice>
         {email ? (
           <>
-            Your email address <strong>{email}</strong> has been successfully verified. You can now sign in to Scholar Core and access all features.
+            Your email address <strong>{email}</strong> has been successfully verified. You're signed in and ready to go.
           </>
         ) : (
           <>
-            Your email address has been successfully verified. You can now sign in to Scholar Core and access all features.
+            Your email address has been successfully verified. You're signed in and ready to go.
           </>
         )}
       </AuthNotice>
@@ -437,7 +451,7 @@ function EmailVerificationSuccessScreen({ email, onContinue }: { email?: string 
           onClick={onContinue}
           className="w-full rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
         >
-          Continue to sign in
+          Continue to Scholar Core
         </button>
       </div>
     </AuthShell>
@@ -475,7 +489,7 @@ function ResendVerificationScreen({ email, onBack }: { email: string; onBack: ()
         We'll send another verification email to <strong>{email}</strong>.
       </AuthNotice>
       <AuthForm onSubmit={(e) => { e.preventDefault(); handleResend(); }}>
-        {message && <AuthNotice className="text-[color:var(--success)]">{message}</AuthNotice>}
+        {message && <AuthNotice>{message}</AuthNotice>}
         {error && <AuthError>{error}</AuthError>}
         <button
           type="submit"

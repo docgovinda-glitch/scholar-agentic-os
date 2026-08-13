@@ -84,6 +84,29 @@ describe("DeskAuthGate", () => {
     expect(screen.queryByText("Your work")).not.toBeInTheDocument();
   });
 
+  it("shows the verification success screen, not app content, on an email-verified session", () => {
+    const acknowledge = vi.fn();
+    useDeskSession.mockReturnValue({ status: "email-verified", userId: "u1", email: "a@example.com", acknowledge });
+    gate();
+    expect(screen.getByText(/Email verified/i)).toBeInTheDocument();
+    expect(screen.queryByText("Your work")).not.toBeInTheDocument();
+  });
+
+  it("calls acknowledge() when Continue is clicked, so the app can actually be reached", () => {
+    // Regression test: acknowledge() must be wired all the way from
+    // useDeskSession through DeskAuthGate and AuthFlow to the success
+    // screen's button — a version of this that only changed AuthFlow's own
+    // local screen state would pass every other assertion here while still
+    // leaving the user permanently stuck, since useDeskSession's session
+    // status is what actually decides whether app content renders.
+    const acknowledge = vi.fn();
+    useDeskSession.mockReturnValue({ status: "email-verified", userId: "u1", email: "a@example.com", acknowledge });
+    gate();
+
+    fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
+    expect(acknowledge).toHaveBeenCalled();
+  });
+
   it("does not render app content while the session is still resolving", () => {
     useDeskSession.mockReturnValue({ status: "loading" });
     gate();

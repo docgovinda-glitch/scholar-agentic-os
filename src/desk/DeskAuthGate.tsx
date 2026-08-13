@@ -55,7 +55,14 @@ export default function DeskAuthGate({ children }: { children: ReactNode }) {
   if (session.status === "recovery") return <AuthFlow initialScreen="recover" />;
   // Email verification link was followed: show success screen before allowing
   // the user to proceed to the authenticated app.
-  if (session.status === "email-verified") return <AuthFlow initialScreen="email-verification-success" verifiedEmail={session.email} />;
+  if (session.status === "email-verified")
+    return (
+      <AuthFlow
+        initialScreen="email-verification-success"
+        verifiedEmail={session.email}
+        onEmailVerificationAcknowledged={session.acknowledge}
+      />
+    );
 
   return <>{children}</>;
 }

@@ -192,10 +192,14 @@ async function resolveIdentifierToEmail(identifier: string): Promise<{ email: st
   }
 
   if (type === "username") {
-    const { data: email, error } = await supabase.rpc("email_for_username", {
+    // On lookup failure, deliberately no identifier-specific error: reporting
+    // "no account with that User ID" here would let this form be used to
+    // enumerate registered usernames. signIn() falls back to one generic
+    // message shared by every identifier type when email comes back null.
+    const { data: email } = await supabase.rpc("email_for_username", {
       lookup_username: identifier,
     });
-    return { email: email ?? null, error: error ? "No account found with that User ID." : undefined };
+    return { email: email ?? null };
   }
 
   if (type === "email") {
@@ -207,10 +211,12 @@ async function resolveIdentifierToEmail(identifier: string): Promise<{ email: st
   }
 
   if (type === "phone") {
-    const { data: email, error } = await supabase.rpc("email_for_phone_e164", {
+    // Same enumeration concern as the username branch above — no
+    // identifier-specific error on lookup failure.
+    const { data: email } = await supabase.rpc("email_for_phone_e164", {
       lookup_phone_e164: identifier,
     });
-    return { email: email ?? null, error: error ? "No account found with that mobile number." : undefined };
+    return { email: email ?? null };
   }
 
   return { email: null, error: "Could not resolve login identifier." };
@@ -338,13 +344,13 @@ export interface ResendVerificationEmailResult extends ServiceResult {
  * This is called from the RegisteredScreen when a user doesn't receive
  * their initial verification email and needs it resent.
  *
- * Supabase Auth handles the actual email sending via resendSignUpEmail(),
- * which looks up the user by email and resends the confirmation link.
+ * Supabase Auth handles the actual email sending via resend(), which looks
+ * up the user by email and resends the confirmation link.
  */
 export async function resendVerificationEmail(input: ResendVerificationEmailInput): Promise<ResendVerificationEmailResult> {
   const supabase = getSupabaseClient();
 
-  const { error } = await supabase.auth.resendSignUpEmail(input.email.trim());
+  const { error } = await supabase.auth.resend({ type: "signup", email: input.email.trim() });
 
   if (error) {
     // Provide helpful messages for common errors
