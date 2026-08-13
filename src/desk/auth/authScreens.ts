@@ -16,6 +16,8 @@ import { DEFAULT_COUNTRY_ISO2, e164Problem, findCountry } from "../../config/cou
  * a recovery link out of the URL.
  */
 export type AuthScreen =
+  | "landing"
+  /** Initial landing page explaining Scholar Core. */
   | "sign-in"
   | "sign-up"
   /** Requesting a reset email. */

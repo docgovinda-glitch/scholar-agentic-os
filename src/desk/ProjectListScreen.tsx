@@ -2,18 +2,23 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createProject, listOutputTypes, listProjects } from "./api";
 import { getSupabaseClient } from "../services/supabaseClient";
 import type { OutputTypeSummary, ProjectView } from "./types";
+import ScholarCoreLogo from "../components/ScholarCoreLogo";
 
 /**
- * Desk's entry surface: the signed-in user's own projects.
+ * Desk's entry surface: the signed-in user's own projects — transformed into
+ * the SCHOLAR CORE Research Command Center.
  *
- * Desk previously had no way to reach a project except by already knowing its
- * id and putting it in the URL (`?project=`) — with no listing, no ownership,
- * and no auth, so any id worked for anyone. Now that projects have an owner,
- * `GET /api/projects` is owner-scoped and this is the only route into one.
+ * This is the primary interface for signed-in users:
+ * - Shows SCHOLAR CORE branding prominently
+ * - Explains what Scholar Core is
+ * - Provides quick access to major capabilities (Research, Knowledge, Documents, etc.)
+ * - Lists the user's recent projects
+ * - Offers a way to create new projects
  *
- * Creation is folded in rather than living on its own screen: with a list to
- * return to, "start something new" is an action on this surface, not a
- * separate destination.
+ * Desk previously had no way to reach a project except by already knowing its id
+ * and putting it in the URL (`?project=`) — with no listing, no ownership, and
+ * no auth. Now that projects have an owner, `GET /api/projects` is owner-scoped
+ * and this is the only route into one.
  */
 export default function ProjectListScreen({
   onOpen,
@@ -87,63 +92,68 @@ export default function ProjectListScreen({
 
   return (
     <div className="min-h-screen bg-[color:var(--surface-canvas)]">
+      {/* Header with SCHOLAR CORE branding and navigation */}
       <header className="border-b border-[color:var(--border-subtle)]">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-4">
-          <h1 className="text-base font-semibold tracking-tight text-[color:var(--text-primary)]">Scholar</h1>
-          <div className="flex items-center gap-3 min-w-0">
-            {userEmail && (
-              <span className="truncate text-sm text-[color:var(--text-muted)]" title={userEmail}>
-                {userEmail}
-              </span>
-            )}
-            {onOpenVault && (
+        <div className="mx-auto max-w-6xl px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <ScholarCoreLogo size="md" withText className="text-[color:var(--text-primary)]" />
+            <div className="flex items-center gap-3 min-w-0">
+              {userEmail && (
+                <span className="truncate text-sm text-[color:var(--text-muted)]" title={userEmail}>
+                  {userEmail}
+                </span>
+              )}
+              {onOpenVault && (
+                <button
+                  type="button"
+                  onClick={onOpenVault}
+                  className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+                >
+                  Knowledge
+                </button>
+              )}
+              {onOpenAiAccess && (
+                <button
+                  type="button"
+                  onClick={onOpenAiAccess}
+                  className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+                >
+                  AI
+                </button>
+              )}
+              {onOpenAccountSettings && (
+                <button
+                  type="button"
+                  onClick={onOpenAccountSettings}
+                  className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+                >
+                  Account
+                </button>
+              )}
               <button
                 type="button"
-                onClick={onOpenVault}
+                onClick={() => getSupabaseClient().auth.signOut()}
                 className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
               >
-                Vault
+                Sign out
               </button>
-            )}
-            {onOpenAiAccess && (
-              <button
-                type="button"
-                onClick={onOpenAiAccess}
-                className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
-              >
-                AI Access
-              </button>
-            )}
-            {onOpenAccountSettings && (
-              <button
-                type="button"
-                onClick={onOpenAccountSettings}
-                className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
-              >
-                Account Settings
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => getSupabaseClient().auth.signOut()}
-              className="shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
-            >
-              Sign out
-            </button>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-5 py-8">
+      <main className="mx-auto max-w-6xl px-5 py-8">
         {welcomeVisible && (
           <div
             role="status"
-            className="mb-6 flex items-center justify-between gap-4 rounded-[var(--radius-md)] border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-4 py-3"
+            className="mb-8 flex items-center justify-between gap-4 rounded-[var(--radius-md)] border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-4 py-3"
           >
             <div>
-              <p className="text-sm font-medium text-[color:var(--text-primary)]">Welcome to your Scholar Workshop</p>
+              <p className="text-sm font-medium text-[color:var(--text-primary)]">
+                Welcome to Scholar Core
+              </p>
               <p className="mt-0.5 text-xs text-[color:var(--text-secondary)]">
-                This is where your projects live. Start one whenever you're ready.
+                Your research command center is ready. Start a new project or explore your research tools.
               </p>
             </div>
             <button
@@ -174,11 +184,52 @@ export default function ProjectListScreen({
           />
         ) : (
           <>
+            {/* What is Scholar Core section */}
+            <section className="mb-12 p-6 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+              <h2 className="text-lg font-semibold mb-2">Your Research Command Center</h2>
+              <p className="text-sm text-[color:var(--text-secondary)] mb-4">
+                Scholar Core connects research, knowledge, and creation in one workspace. Use the tools below to
+                organize your research and create scholarly documents.
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <CapabilityCard
+                  icon="📝"
+                  title="Projects"
+                  desc="Create and work on research projects, theses, essays, articles, and more."
+                  action="See your projects below"
+                />
+                <CapabilityCard
+                  icon="📚"
+                  title="Knowledge Vault"
+                  desc="Store, organize, and access all your research materials and sources."
+                  action="Open Knowledge Vault"
+                  onClick={onOpenVault}
+                />
+                <CapabilityCard
+                  icon="🧠"
+                  title="AI Assistance"
+                  desc="Configure AI to help analyze, summarize, and understand information."
+                  action="Manage AI"
+                  onClick={onOpenAiAccess}
+                />
+                <CapabilityCard
+                  icon="⚙️"
+                  title="Settings"
+                  desc="Manage your account, profile, subscription, and preferences."
+                  action="Account Settings"
+                  onClick={onOpenAccountSettings}
+                />
+              </div>
+            </section>
+
+            {/* Projects section */}
             <div className="mb-6 flex items-end justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight text-[color:var(--text-primary)]">Your work</h2>
+                <h2 className="text-lg font-semibold tracking-tight text-[color:var(--text-primary)]">
+                  Your Projects
+                </h2>
                 <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                  Everything you are writing, most recent first.
+                  Everything you are working on, most recent first.
                 </p>
               </div>
               <button
@@ -206,6 +257,37 @@ export default function ProjectListScreen({
           </>
         )}
       </main>
+    </div>
+  );
+}
+
+function CapabilityCard({
+  icon,
+  title,
+  desc,
+  action,
+  onClick,
+}: {
+  icon: string;
+  title: string;
+  desc: string;
+  action: string;
+  onClick?: () => void;
+}) {
+  return (
+    <div className="p-4 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)]">
+      <div className="text-2xl mb-2">{icon}</div>
+      <h3 className="font-semibold text-sm mb-1">{title}</h3>
+      <p className="text-xs text-[color:var(--text-secondary)] mb-3">{desc}</p>
+      {onClick && (
+        <button
+          onClick={onClick}
+          className="text-xs text-[color:var(--accent)] hover:text-[color:var(--accent-hover)] transition-colors cursor-pointer font-medium"
+        >
+          {action} →
+        </button>
+      )}
+      {!onClick && <p className="text-xs text-[color:var(--text-muted)]">{action}</p>}
     </div>
   );
 }
@@ -238,17 +320,17 @@ function ProjectRow({ project, onOpen }: { project: ProjectView; onOpen: () => v
 function EmptyState({ onStart }: { onStart: () => void }) {
   return (
     <div className="rounded-[var(--radius-lg)] border border-dashed border-[color:var(--border-default)] px-6 py-12 text-center">
-      <p className="text-sm font-medium text-[color:var(--text-primary)]">Nothing here yet</p>
+      <p className="text-sm font-medium text-[color:var(--text-primary)]">No projects yet</p>
       <p className="mx-auto mt-1.5 max-w-sm text-sm text-[color:var(--text-secondary)]">
-        Start with what you have to hand in — a thesis, an essay, an article. Scholar builds the structure and the
-        rules around that choice.
+        Start with what you're working on — a thesis, essay, article, proposal, or professional document. Scholar Core
+        builds the structure and research workflow around it.
       </p>
       <button
         type="button"
         onClick={onStart}
         className="mt-5 rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
       >
-        Start your first project
+        Create your first project
       </button>
     </div>
   );
@@ -299,7 +381,7 @@ function ChooseOutputType({
           onClick={onCancel}
           className="mb-4 text-sm text-[color:var(--accent)] transition-colors duration-[var(--motion-fast)] hover:text-[color:var(--accent-hover)] cursor-pointer"
         >
-          ← Back to your work
+          ← Back to your command center
         </button>
         <h2 className="text-lg font-semibold tracking-tight text-[color:var(--text-primary)]">
           What are you producing?

@@ -262,7 +262,7 @@ describe("Premium", () => {
     expect(screen.queryByPlaceholderText(/Paste your key/i)).not.toBeInTheDocument();
     // Status is decided on the server; the pane offers a request rather than
     // a switch.
-    expect(await screen.findByText(/verified on Scholar's server/i)).toBeInTheDocument();
+    expect(await screen.findByText(/verified on Scholar Core's server/i)).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Request Premium/i })).toBeInTheDocument();
   });
 

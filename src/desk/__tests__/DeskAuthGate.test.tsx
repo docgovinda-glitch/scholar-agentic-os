@@ -106,8 +106,14 @@ describe("DeskAuthGate", () => {
 describe("sign in", () => {
   beforeEach(() => useDeskSession.mockReturnValue({ status: "signed-out" }));
 
-  it("labels its inputs, rather than relying on placeholders", () => {
+  function navigateToSignIn() {
     gate();
+    // The landing page shows first; navigate to sign-in from there
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  }
+
+  it("labels its inputs, rather than relying on placeholders", () => {
+    navigateToSignIn();
     // A placeholder is not a label: it vanishes on focus and is not reliably
     // announced.
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
@@ -115,13 +121,13 @@ describe("sign in", () => {
   });
 
   it("keeps submit disabled until both fields are filled", () => {
-    gate();
+    navigateToSignIn();
     expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
   });
 
   it("surfaces a credentials failure as an announced error", async () => {
     signIn.mockResolvedValue({ success: false, error: "Incorrect password credentials." });
-    gate();
+    navigateToSignIn();
 
     fireEvent.change(screen.getByLabelText("Username"), { target: { value: "amara" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret123" } });
@@ -131,7 +137,7 @@ describe("sign in", () => {
   });
 
   it("does not navigate on success — the session subscription does that", async () => {
-    gate();
+    navigateToSignIn();
     fireEvent.change(screen.getByLabelText("Username"), { target: { value: "amara" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret123" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
@@ -152,9 +158,14 @@ describe("sign in", () => {
 describe("registration", () => {
   beforeEach(() => useDeskSession.mockReturnValue({ status: "signed-out" }));
 
-  function openSignUp() {
+  function navigateToSignUp() {
     gate();
-    fireEvent.click(screen.getByRole("button", { name: "Create an account" }));
+    // The landing page shows first; navigate to sign-up from there
+    fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  }
+
+  function openSignUp() {
+    navigateToSignUp();
   }
 
   /** Fills every required field except whatever the caller omits, so a test can isolate one gating condition at a time. Institution is intentionally not included — it's optional. */
@@ -256,8 +267,14 @@ describe("registration", () => {
 describe("password reset", () => {
   beforeEach(() => useDeskSession.mockReturnValue({ status: "signed-out" }));
 
-  it("does not confirm whether an address has an account", async () => {
+  function navigateToForgotPassword() {
     gate();
+    // Navigate through landing page to sign-in screen
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  }
+
+  it("does not confirm whether an address has an account", async () => {
+    navigateToForgotPassword();
     fireEvent.click(screen.getByRole("button", { name: "Forgot your password?" }));
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "someone@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Send reset link" }));
@@ -268,7 +285,7 @@ describe("password reset", () => {
   });
 
   it("switches to the set-new-password screen when a recovery link is detected", async () => {
-    gate();
+    navigateToForgotPassword();
     expect(onPasswordRecovery).toHaveBeenCalled();
 
     // The user arrived by clicking a link in their email, not by navigating
@@ -279,7 +296,7 @@ describe("password reset", () => {
   });
 
   it("blocks submission while the two passwords differ", async () => {
-    gate();
+    navigateToForgotPassword();
     recoveryCallback?.();
     await screen.findByText(/Set a new password/i);
 
@@ -294,7 +311,7 @@ describe("password reset", () => {
   });
 
   it("saves the new password through the auth service", async () => {
-    gate();
+    navigateToForgotPassword();
     recoveryCallback?.();
     await screen.findByText(/Set a new password/i);
 

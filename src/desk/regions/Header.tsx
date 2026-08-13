@@ -1,4 +1,5 @@
 import type { ProjectView } from "../types";
+import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 
 /**
  * Region A (docs 22 §2).
@@ -36,12 +37,16 @@ export default function Header({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-[var(--radius-sm)] px-1.5 py-1 font-semibold text-[color:var(--text-primary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+          className="rounded-[var(--radius-sm)] px-1.5 py-1 font-semibold text-[color:var(--text-primary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] cursor-pointer flex items-center gap-2"
         >
-          Scholar
+          <ScholarCoreLogo size="sm" className="text-[color:var(--text-primary)]" />
+          <span className="hidden sm:inline text-xs">SCHOLAR CORE</span>
         </button>
       ) : (
-        <span className="font-semibold text-[color:var(--text-primary)]">Scholar</span>
+        <div className="flex items-center gap-2">
+          <ScholarCoreLogo size="sm" className="text-[color:var(--text-primary)]" />
+          <span className="hidden sm:inline font-semibold text-[color:var(--text-primary)] text-xs">SCHOLAR CORE</span>
+        </div>
       )}
       <span className="text-[color:var(--text-muted)]" aria-hidden="true">
         /

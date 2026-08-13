@@ -40,7 +40,7 @@ async function openChooser() {
   listProjects.mockResolvedValue({ items: [] });
   listOutputTypes.mockResolvedValue({ items: TYPES });
   render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
-  fireEvent.click(await screen.findByText("Start your first project"));
+  fireEvent.click(await screen.findByText("Create your first project"));
   await screen.findByLabelText("Document type");
 }
 
@@ -82,7 +82,7 @@ describe("the Workshop welcome banner", () => {
     const onWelcomeSeen = vi.fn();
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={onWelcomeSeen} />);
 
-    expect(await screen.findByText("Welcome to your Scholar Workshop")).toBeInTheDocument();
+    expect(await screen.findByText("Welcome to Scholar Core")).toBeInTheDocument();
     expect(onWelcomeSeen).toHaveBeenCalled();
   });
 
@@ -90,18 +90,18 @@ describe("the Workshop welcome banner", () => {
     listProjects.mockResolvedValue({ items: [] });
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={vi.fn()} />);
 
-    const banner = await screen.findByText("Welcome to your Scholar Workshop");
+    const banner = await screen.findByText("Welcome to Scholar Core");
     expect(banner).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText("Welcome to your Scholar Workshop")).not.toBeInTheDocument();
+    expect(screen.queryByText("Welcome to Scholar Core")).not.toBeInTheDocument();
   });
 
   it("never shows for a returning user with nothing to welcome them to", async () => {
     listProjects.mockResolvedValue({ items: [] });
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
-    await screen.findByText("Nothing here yet");
-    expect(screen.queryByText("Welcome to your Scholar Workshop")).not.toBeInTheDocument();
+    await screen.findByText("No projects yet");
+    expect(screen.queryByText("Welcome to Scholar Core")).not.toBeInTheDocument();
   });
 });

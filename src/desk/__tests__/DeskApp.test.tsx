@@ -107,7 +107,7 @@ describe("Desk — project list", () => {
 
     render(<DeskApp />);
 
-    expect(await screen.findByText("Nothing here yet")).toBeInTheDocument();
+    expect(await screen.findByText("No projects yet")).toBeInTheDocument();
   });
 
   it("lists the user's own projects and opens one", async () => {
@@ -141,7 +141,7 @@ describe("Desk — project list", () => {
 
     render(<DeskApp />);
 
-    fireEvent.click(await screen.findByText("Start your first project"));
+    fireEvent.click(await screen.findByText("Create your first project"));
     fireEvent.change(await screen.findByLabelText("Document type"), { target: { value: "OT-06" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
@@ -278,11 +278,11 @@ describe("Desk — account settings", () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
     render(<DeskApp />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Account Settings" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Account Settings/ }));
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(await screen.findByText("Nothing here yet")).toBeInTheDocument();
+    expect(await screen.findByText("No projects yet")).toBeInTheDocument();
   });
 
   it("opens from within a project and returns to it, not to the list", async () => {
@@ -310,7 +310,7 @@ describe("Desk — AI Access", () => {
   it("has no separate AI Settings nav item — AI Access is the only one", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
     render(<DeskApp />);
-    await screen.findByRole("button", { name: "AI Access" });
+    await screen.findByRole("button", { name: /Manage AI/ });
     expect(screen.queryByRole("button", { name: /^AI Settings$/ })).not.toBeInTheDocument();
   });
 
@@ -318,12 +318,12 @@ describe("Desk — AI Access", () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
     render(<DeskApp />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "AI Access" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Manage AI/ }));
     expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Skip for now" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(await screen.findByText("Nothing here yet")).toBeInTheDocument();
+    expect(await screen.findByText("No projects yet")).toBeInTheDocument();
   });
 });
