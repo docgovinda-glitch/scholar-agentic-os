@@ -15,12 +15,10 @@ import "@testing-library/jest-dom/vitest";
 const getProfile = vi.fn();
 const saveProfileFields = vi.fn();
 const updatePassword = vi.fn();
-const uploadIdDocument = vi.fn();
 vi.mock("../../../services/supabaseAuthService", () => ({
   getProfile: (...args: unknown[]) => getProfile(...args),
   saveProfileFields: (...args: unknown[]) => saveProfileFields(...args),
   updatePassword: (...args: unknown[]) => updatePassword(...args),
-  uploadIdDocument: (...args: unknown[]) => uploadIdDocument(...args),
 }));
 
 const getAiAccessStatus = vi.fn();
@@ -38,18 +36,14 @@ const PROFILE = {
   phoneCountryCode: "+1",
   phoneE164: "+15550100",
   affiliation: "Analytical Engines Ltd",
-  authenticId: "S-1815",
   userType: "student",
   educationLevel: "undergraduate",
-  idVerificationStatus: "verification_required",
-  idDocumentPath: null,
 };
 
 beforeEach(() => {
   getProfile.mockReset().mockResolvedValue({ success: true, profile: PROFILE });
   saveProfileFields.mockReset().mockResolvedValue({ success: true });
   updatePassword.mockReset().mockResolvedValue({ success: true });
-  uploadIdDocument.mockReset().mockResolvedValue({ success: true });
   getAiAccessStatus.mockReset().mockResolvedValue({ connections: [], entitlement: { status: "none", active: false }, quota: null, creditBalance: null });
 });
 
@@ -70,7 +64,7 @@ describe("AccountSettingsScreen — loading and identity", () => {
     expect(screen.getByLabelText("Full name")).toHaveValue("Ada Lovelace");
     expect(screen.getByLabelText("Phone")).toHaveValue("5550100");
     expect(screen.getByLabelText("Institution")).toHaveValue("Analytical Engines Ltd");
-    expect(screen.getByLabelText("Institutional ID")).toHaveValue("S-1815");
+    expect(screen.queryByLabelText("Institutional ID")).not.toBeInTheDocument();
   });
 
   it("surfaces a load error rather than rendering a blank form", async () => {
@@ -106,11 +100,21 @@ describe("AccountSettingsScreen — editing profile fields", () => {
         phone: "5550199",
         phoneCountryCode: "+1",
         affiliation: "Analytical Engines Ltd",
-        authenticId: "S-1815",
         userType: "student",
         educationLevel: "undergraduate",
       })
     );
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+  });
+
+  it("allows Institution to be cleared and saved blank — it is optional", async () => {
+    render(<AccountSettingsScreen onClose={() => {}} />);
+    await screen.findByLabelText("Full name");
+
+    fireEvent.change(screen.getByLabelText("Institution"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(saveProfileFields).toHaveBeenCalledWith(expect.objectContaining({ affiliation: "" })));
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
   });
 
@@ -149,13 +153,6 @@ describe("AccountSettingsScreen — editing profile fields", () => {
 });
 
 describe("AccountSettingsScreen — system-controlled fields", () => {
-  it("shows the verification status as read-only text, not an editable field", async () => {
-    render(<AccountSettingsScreen onClose={() => {}} />);
-    await screen.findByLabelText("Full name");
-
-    expect(screen.getByText("Verification Required")).toBeInTheDocument();
-  });
-
   it("shows the current plan and disables Upgrade when no handler is wired", async () => {
     render(<AccountSettingsScreen onClose={() => {}} />);
     await screen.findByLabelText("Full name");
@@ -183,30 +180,15 @@ describe("AccountSettingsScreen — system-controlled fields", () => {
   });
 });
 
-describe("AccountSettingsScreen — institutional ID document", () => {
-  function makeFile(name: string, type: string, size: number) {
-    const file = new File(["x".repeat(size)], name, { type });
-    return file;
-  }
-
-  it("uploads a selected document and reports success", async () => {
+describe("AccountSettingsScreen — institutional ID removal", () => {
+  it("renders no institutional ID or document upload UI anywhere on the screen", async () => {
     render(<AccountSettingsScreen onClose={() => {}} />);
     await screen.findByLabelText("Full name");
 
-    const input = screen.getByLabelText("Institutional ID Document");
-    const file = makeFile("id.pdf", "application/pdf", 1024);
-    fireEvent.change(input, { target: { files: [file] } });
-
-    fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
-
-    await waitFor(() => expect(uploadIdDocument).toHaveBeenCalledWith(file));
-    expect(await screen.findByText("Document submitted for verification.")).toBeInTheDocument();
-  });
-
-  it("keeps Upload document disabled until a file is chosen", async () => {
-    render(<AccountSettingsScreen onClose={() => {}} />);
-    await screen.findByLabelText("Full name");
-    expect(screen.getByRole("button", { name: "Upload document" })).toBeDisabled();
+    expect(screen.queryByLabelText("Institutional ID")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Institutional ID Document")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upload document" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/institutional id/i)).not.toBeInTheDocument();
   });
 });
 

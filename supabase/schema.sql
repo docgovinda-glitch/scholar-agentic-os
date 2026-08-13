@@ -18,13 +18,34 @@
 -- non-credential fields. Auth itself (email/password) is owned by
 -- Supabase's built-in auth.users — we never store or compare passwords here.
 -- ============================================================================
+-- Institutional ID (2026-08-14: removed completely — see
+-- supabase/migrations/2026-08-14_account_system_repair.sql's header for
+-- why) is not a column here. affiliation (Institution) is nullable: not
+-- every user belongs to one. phone_country_code + phone_e164 (generated)
+-- carry the country-code selector's structured phone; user_type/
+-- education_level are the two role/level dropdowns, each backed by a CHECK
+-- constraint naming the exact same values as src/config/accountSchema.ts.
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text unique not null,
   full_name text not null,
   phone text default '',
-  affiliation text not null,
-  authentic_id text default 'None',
+  phone_country_code text not null default '',
+  phone_e164 text generated always as (
+    case
+      when phone_country_code <> '' and phone <> ''
+        then phone_country_code || regexp_replace(phone, '\D', '', 'g')
+      else null
+    end
+  ) stored,
+  affiliation text,
+  user_type text check (user_type is null or user_type in (
+    'student', 'teacher_faculty', 'administrator', 'freelance_researcher'
+  )),
+  education_level text check (education_level is null or education_level in (
+    'secondary', 'undergraduate', 'masters', 'mphil', 'phd',
+    'postdoctoral', 'faculty_academic', 'other'
+  )),
   account_status text not null default 'active' check (account_status in ('active', 'restricted', 'suspended', 'deleted')),
   model_preferences jsonb,
   created_at timestamptz not null default now(),
@@ -42,6 +63,15 @@ create index if not exists idx_profiles_username on public.profiles(username);
 -- "Scholar profile not found" at login. Idempotent: when the column is
 -- already present the whole statement, check constraint included, is
 -- skipped, so this is safe to re-run alongside the rest of the file.
+--
+-- The same "an existing deployment won't pick up a bare CREATE TABLE
+-- change" problem applies to every column added since — see
+-- supabase/migrations/2026-08-14_account_system_repair.sql for the
+-- idempotent ALTER TABLE statements an already-deployed project needs to
+-- run to reach this same shape (that migration is also what fixed the
+-- production "column profiles.phone_country_code does not exist" error:
+-- an earlier migration adding these columns was written and verified
+-- locally but never actually applied to the live database).
 alter table public.profiles
   add column if not exists account_status text not null default 'active'
   check (account_status in ('active', 'restricted', 'suspended', 'deleted'));
@@ -77,14 +107,19 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, username, full_name, phone, affiliation, authentic_id, account_status)
+  insert into public.profiles (
+    id, username, full_name, phone, phone_country_code, affiliation,
+    user_type, education_level, account_status
+  )
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'username', new.email),
     coalesce(new.raw_user_meta_data->>'full_name', ''),
     coalesce(new.raw_user_meta_data->>'phone', ''),
-    coalesce(new.raw_user_meta_data->>'affiliation', ''),
-    coalesce(new.raw_user_meta_data->>'authentic_id', 'None'),
+    coalesce(new.raw_user_meta_data->>'phone_country_code', ''),
+    nullif(new.raw_user_meta_data->>'affiliation', ''),
+    nullif(new.raw_user_meta_data->>'user_type', ''),
+    nullif(new.raw_user_meta_data->>'education_level', ''),
     'active'
   );
   return new;
@@ -167,8 +202,10 @@ create policy "api_credentials_all_own" on public.api_credentials
 -- bypasses RLS and passes both checks, which is exactly the intended path.
 
 revoke update on public.profiles from anon, authenticated;
-grant update (username, full_name, phone, affiliation, authentic_id, model_preferences, updated_at)
-  on public.profiles to authenticated;
+grant update (
+  username, full_name, phone, phone_country_code, affiliation,
+  user_type, education_level, model_preferences, updated_at
+) on public.profiles to authenticated;
 
 create or replace function public.enforce_account_status_admin_only()
 returns trigger

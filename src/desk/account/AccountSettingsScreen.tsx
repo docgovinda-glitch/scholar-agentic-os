@@ -1,16 +1,8 @@
 import { useEffect, useState } from "react";
-import { getProfile, saveProfileFields, updatePassword, uploadIdDocument, type ProfileFields } from "../../services/supabaseAuthService";
+import { getProfile, saveProfileFields, updatePassword, type ProfileFields } from "../../services/supabaseAuthService";
 import { getAiAccessStatus } from "../aiAccess/aiAccessApi";
-import {
-  EDUCATION_LEVELS,
-  ID_DOCUMENT_ACCEPT_ATTR,
-  ID_DOCUMENT_HELP_TEXT,
-  ID_DOCUMENT_MAX_BYTES,
-  USER_TYPES,
-  idDocumentProblem,
-  verificationStatusLabel,
-} from "../../config/accountSchema";
-import { Field, FileField, PhoneField, SelectField } from "../auth/AuthLayout";
+import { EDUCATION_LEVELS, USER_TYPES } from "../../config/accountSchema";
+import { Field, PhoneField, SelectField } from "../auth/AuthLayout";
 import { e164Problem } from "../../config/countries";
 
 /**
@@ -24,7 +16,7 @@ import { e164Problem } from "../../config/countries";
  *
  * Single Source of Truth with Create Account (AuthFlow.tsx's SignUpScreen):
  * both screens render the SAME fields, from the SAME shared components
- * (Field/SelectField/FileField/PhoneField in ./auth/AuthLayout) and the SAME
+ * (Field/SelectField/PhoneField in ./auth/AuthLayout) and the SAME
  * validators/options (config/accountSchema.ts, config/countries.ts) — see
  * accountSchema.ts's header comment for why that file exists. The only
  * intentional difference is password: Create Account requires one up front,
@@ -33,11 +25,15 @@ import { e164Problem } from "../../config/countries";
  *
  * `username` is shown but not editable (see saveProfileFields's doc comment
  * — it doubles as the login identifier, so changing it is a real feature
- * with uniqueness/re-login implications, not a field on this form). Email,
- * verification status, and subscription plan are shown but are
- * system-controlled — see their own read-only sections below — never
- * ordinary editable text inputs, per the user-controlled vs system-controlled
- * split this screen and Create Account both respect.
+ * with uniqueness/re-login implications, not a field on this form). Email
+ * and subscription plan are shown but are system-controlled — see their own
+ * read-only sections below — never ordinary editable text inputs, per the
+ * user-controlled vs system-controlled split this screen and Create Account
+ * both respect.
+ *
+ * 2026-08-14: Institutional ID and its document/verification workflow were
+ * removed completely (accountSchema.ts's header comment explains why), and
+ * Institution is optional here exactly as it is at registration.
  */
 export default function AccountSettingsScreen({
   onClose,
@@ -52,7 +48,6 @@ export default function AccountSettingsScreen({
   const [phoneCountryCode, setPhoneCountryCode] = useState("");
   const [phone, setPhone] = useState("");
   const [affiliation, setAffiliation] = useState("");
-  const [authenticId, setAuthenticId] = useState("");
   const [userType, setUserType] = useState("");
   const [educationLevel, setEducationLevel] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -67,11 +62,6 @@ export default function AccountSettingsScreen({
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSaved, setPasswordSaved] = useState(false);
 
-  const [document, setDocument] = useState<File | null>(null);
-  const [documentBusy, setDocumentBusy] = useState(false);
-  const [documentError, setDocumentError] = useState<string | null>(null);
-  const [documentSaved, setDocumentSaved] = useState(false);
-
   const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
@@ -83,7 +73,6 @@ export default function AccountSettingsScreen({
           setPhoneCountryCode(result.profile.phoneCountryCode);
           setPhone(result.profile.phone);
           setAffiliation(result.profile.affiliation);
-          setAuthenticId(result.profile.authenticId);
           setUserType(result.profile.userType);
           setEducationLevel(result.profile.educationLevel);
         } else {
@@ -113,7 +102,6 @@ export default function AccountSettingsScreen({
         phone: phone.trim(),
         phoneCountryCode,
         affiliation: affiliation.trim(),
-        authenticId: authenticId.trim(),
         userType,
         educationLevel,
       });
@@ -150,30 +138,6 @@ export default function AccountSettingsScreen({
       setConfirmPassword("");
     } finally {
       setPasswordBusy(false);
-    }
-  }
-
-  async function handleUploadDocument() {
-    setDocumentError(null);
-    setDocumentSaved(false);
-    const problem = idDocumentProblem(document);
-    if (problem) {
-      setDocumentError(problem);
-      return;
-    }
-    setDocumentBusy(true);
-    try {
-      const result = await uploadIdDocument(document!);
-      if (!result.success) {
-        setDocumentError(result.error ?? "Could not upload your document.");
-        return;
-      }
-      setDocumentSaved(true);
-      setDocument(null);
-      // Reflect the new pending status immediately, without a full reload.
-      setProfile((p) => (p ? { ...p, idVerificationStatus: "pending_verification" } : p));
-    } finally {
-      setDocumentBusy(false);
     }
   }
 
@@ -240,9 +204,7 @@ export default function AccountSettingsScreen({
                 onNumberChange={setPhone}
               />
 
-              <Field id="account-affiliation" label="Institution" value={affiliation} onChange={setAffiliation} />
-
-              <Field id="account-authenticId" label="Institutional ID" value={authenticId} onChange={setAuthenticId} />
+              <Field id="account-affiliation" label="Institution" value={affiliation} onChange={setAffiliation} required={false} />
 
               <SelectField id="account-userType" label="User Type" value={userType} onChange={setUserType} options={USER_TYPES} />
 
@@ -276,41 +238,6 @@ export default function AccountSettingsScreen({
           )}
           {!profile && !loadError && <p className="mt-3 text-sm text-[color:var(--text-muted)]">Loading…</p>}
         </section>
-
-        {profile && (
-          <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
-            <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Institutional ID Verification</h2>
-            <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-              Status: <span className="font-medium text-[color:var(--text-primary)]">{verificationStatusLabel(profile.idVerificationStatus)}</span>
-            </p>
-
-            <div className="mt-4">
-              <FileField
-                id="account-idDocument"
-                label="Institutional ID Document"
-                file={document}
-                onChange={setDocument}
-                accept={ID_DOCUMENT_ACCEPT_ATTR}
-                maxBytes={ID_DOCUMENT_MAX_BYTES}
-                helpText={`${ID_DOCUMENT_HELP_TEXT} Accepted: PDF, JPG, PNG, WEBP.`}
-                error={documentError}
-              />
-              {documentSaved && (
-                <p role="status" className="mt-2 text-sm text-[color:var(--state-success)]">
-                  Document submitted for verification.
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => void handleUploadDocument()}
-                disabled={documentBusy || !document}
-                className="mt-3 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60"
-              >
-                {documentBusy ? "Uploading…" : "Upload document"}
-              </button>
-            </div>
-          </section>
-        )}
 
         <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
           <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Subscription</h2>
