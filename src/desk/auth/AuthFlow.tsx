@@ -15,6 +15,9 @@ import {
   AuthNotice,
   AuthShell,
   Field,
+  FileField,
+  PhoneField,
+  SelectField,
   SubmitButton,
 } from "./AuthLayout";
 import {
@@ -25,6 +28,8 @@ import {
   type AuthScreen,
   type SignUpFields,
 } from "./authScreens";
+import { EDUCATION_LEVELS, ID_DOCUMENT_ACCEPT_ATTR, ID_DOCUMENT_HELP_TEXT, ID_DOCUMENT_MAX_BYTES, USER_TYPES } from "../../config/accountSchema";
+import { getCaptchaConfig } from "../../services/captchaService";
 
 /**
  * Desk's unauthenticated surface: sign in, register, recover a password.
@@ -137,6 +142,7 @@ function SignInScreen({
 
 function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
+  const [document, setDocument] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -146,9 +152,11 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
     []
   );
 
+  const captchaRequired = getCaptchaConfig().enabled;
+  const problem = signUpProblem(fields, document) ?? (captchaRequired && !captchaToken ? "Complete the CAPTCHA challenge." : null);
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const problem = signUpProblem(fields);
     if (problem) return setError(problem);
 
     setBusy(true);
@@ -179,7 +187,7 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
         subtitle="Verify your email to get started."
       />
       <AuthForm onSubmit={handleSubmit}>
-        {SIGN_UP_FIELDS.map((f, i) => (
+        {SIGN_UP_FIELDS.filter((f) => f.key !== "password").map((f, i) => (
           <Field
             key={f.key}
             id={`signup-${f.key}`}
@@ -192,9 +200,48 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
             onChange={set(f.key)}
           />
         ))}
+        <PhoneField
+          idPrefix="signup-phone"
+          countryCode={fields.phoneCountryCode}
+          onCountryCodeChange={set("phoneCountryCode")}
+          number={fields.phone}
+          onNumberChange={set("phone")}
+        />
+        <SelectField
+          id="signup-userType"
+          label="User Type"
+          value={fields.userType}
+          onChange={set("userType")}
+          options={USER_TYPES}
+        />
+        <SelectField
+          id="signup-educationLevel"
+          label="Level of Education"
+          value={fields.educationLevel}
+          onChange={set("educationLevel")}
+          options={EDUCATION_LEVELS}
+        />
+        <FileField
+          id="signup-idDocument"
+          label="Institutional ID Document"
+          file={document}
+          onChange={setDocument}
+          accept={ID_DOCUMENT_ACCEPT_ATTR}
+          maxBytes={ID_DOCUMENT_MAX_BYTES}
+          helpText={`${ID_DOCUMENT_HELP_TEXT} Accepted: PDF, JPG, PNG, WEBP.`}
+        />
+        <Field
+          id="signup-password"
+          label="Password"
+          type="password"
+          autoComplete="new-password"
+          value={fields.password}
+          onChange={set("password")}
+          showPasswordToggle
+        />
         <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
-        <SubmitButton busy={busy} busyLabel="Creating account…" disabled={signUpProblem(fields) !== null}>
+        <SubmitButton busy={busy} busyLabel="Creating account…" disabled={problem !== null}>
           Create account
         </SubmitButton>
       </AuthForm>
@@ -329,7 +376,9 @@ function RegisteredScreen({ onBack }: { onBack: () => void }) {
     <AuthShell>
       <AuthHeading title="Account created" />
       <AuthNotice>
-        Check your email to verify your account. Once verified, you can sign in immediately.
+        Check your email to verify your account. Once verified, you can sign in immediately. Your institutional ID
+        document could not be uploaded until you have a verified session, so finish that step from Account Settings
+        right after your first sign-in — your account shows "Verification Required" until you do.
       </AuthNotice>
       <div className="mt-6">
         <AuthLink onClick={onBack}>Back to sign in</AuthLink>

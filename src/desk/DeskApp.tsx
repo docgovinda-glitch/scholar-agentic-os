@@ -58,6 +58,8 @@ function DeskRoutes() {
    * entry points.
    */
   const [aiAccessOpen, setAiAccessOpen] = useState(false);
+  /** Which AiAccessPage section to land on next open — "premium" when reached via Account Settings' "Upgrade to Premium" / "Manage Premium Plan" button, "overview" otherwise. */
+  const [aiAccessSection, setAiAccessSection] = useState<"overview" | "premium">("overview");
   /**
    * Section 11: true for exactly the one transition out of the Knowledge
    * Vault stage (declined or completed) — Knowledge is always the last
@@ -131,14 +133,28 @@ function DeskRoutes() {
   // Account Settings (profile/account fields, never AI configuration) —
   // full-screen overlay, same treatment as Vault/AI Access below.
   if (accountSettingsOpen) {
-    return <AccountSettingsScreen onClose={() => setAccountSettingsOpen(false)} />;
+    return (
+      <AccountSettingsScreen
+        onClose={() => setAccountSettingsOpen(false)}
+        onManagePremium={() => {
+          setAiAccessSection("premium");
+          setAccountSettingsOpen(false);
+          setAiAccessOpen(true);
+        }}
+      />
+    );
   }
 
   // AI Access (Section 20), revisited — "manage" mode (the default): every
   // provider/model/Premium control a user needs, reached from the nav item
   // rather than the onboarding gate above.
   if (aiAccessOpen) {
-    return <AiAccessPage onClose={() => setAiAccessOpen(false)} />;
+    return (
+      <AiAccessPage
+        onClose={() => setAiAccessOpen(false)}
+        initialSection={aiAccessSection}
+      />
+    );
   }
 
   // A Vault is "your long-term library... across future projects" (docs 25

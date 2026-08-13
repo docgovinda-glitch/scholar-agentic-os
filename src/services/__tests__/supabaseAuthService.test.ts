@@ -33,6 +33,8 @@ const mockAuth = {
 const mockFrom = vi.fn();
 const mockRpc = vi.fn();
 const mockFunctionsInvoke = vi.fn();
+const mockStorageUpload = vi.fn();
+const mockStorage = { from: vi.fn(() => ({ upload: mockStorageUpload })) };
 // Every existing test in this file assumes a configured Supabase project —
 // default true so none of them need to know this mock exists. The
 // onPasswordRecovery/onGoogleSignIn regression tests below flip it to
@@ -45,6 +47,7 @@ vi.mock("../supabaseClient", () => ({
     from: mockFrom,
     rpc: mockRpc,
     functions: { invoke: mockFunctionsInvoke },
+    storage: mockStorage,
   }),
   isSupabaseConfigured: () => mockIsSupabaseConfigured(),
 }));
@@ -52,6 +55,9 @@ vi.mock("../supabaseClient", () => ({
 import {
   signUp,
   signIn,
+  getProfile,
+  saveProfileFields,
+  uploadIdDocument,
   saveModelPreferences,
   saveApiKeys,
   sendPasswordResetEmail,
@@ -74,15 +80,25 @@ describe("signUp", () => {
       username: "jdoe",
       fullName: "Jane Doe",
       email: "jane@example.com",
-      phone: "",
+      phone: "5550100",
+      phoneCountryCode: "+1",
       affiliation: "State University",
       authenticId: "None",
+      userType: "student",
+      educationLevel: "undergraduate",
       password: "hunter2-hunter2",
     });
 
     expect(result.success).toBe(true);
     expect(mockAuth.signUp).toHaveBeenCalledWith(
       expect.objectContaining({ email: "jane@example.com", password: "hunter2-hunter2" })
+    );
+    expect(mockAuth.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          data: expect.objectContaining({ phone_country_code: "+1", user_type: "student", education_level: "undergraduate" }),
+        }),
+      })
     );
   });
 
@@ -94,8 +110,11 @@ describe("signUp", () => {
       fullName: "Jane Doe",
       email: "jane@example.com",
       phone: "",
+      phoneCountryCode: "+1",
       affiliation: "State University",
       authenticId: "None",
+      userType: "student",
+      educationLevel: "undergraduate",
       password: "hunter2-hunter2",
     });
 
@@ -157,6 +176,118 @@ describe("signIn", () => {
   });
 });
 
+
+describe("getProfile", () => {
+  it("requires an active session", async () => {
+    mockAuth.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    const result = await getProfile();
+    expect(result).toEqual({ success: false, error: "Not signed in." });
+  });
+
+  it("combines the profiles row with auth.getUser()'s email, never a duplicated copy from `profiles`", async () => {
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", email: "jane@example.com" } }, error: null });
+    mockFrom.mockReturnValue(
+      makeChainable({
+        data: {
+          username: "jdoe",
+          full_name: "Jane Doe",
+          phone: "5550100",
+          phone_country_code: "+1",
+          phone_e164: "+15550100",
+          affiliation: "State University",
+          authentic_id: "S-1",
+          user_type: "student",
+          education_level: "undergraduate",
+          id_verification_status: "verification_required",
+          id_document_path: null,
+        },
+        error: null,
+      })
+    );
+
+    const result = await getProfile();
+    expect(result).toEqual({
+      success: true,
+      profile: {
+        username: "jdoe",
+        fullName: "Jane Doe",
+        email: "jane@example.com",
+        phone: "5550100",
+        phoneCountryCode: "+1",
+        phoneE164: "+15550100",
+        affiliation: "State University",
+        authenticId: "S-1",
+        userType: "student",
+        educationLevel: "undergraduate",
+        idVerificationStatus: "verification_required",
+        idDocumentPath: null,
+      },
+    });
+  });
+});
+
+describe("saveProfileFields", () => {
+  it("never accepts username or idVerificationStatus — both are out of scope for this form", async () => {
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    mockFrom.mockReturnValue(makeChainable({ data: null, error: null }));
+
+    const result = await saveProfileFields({
+      fullName: "Jane Doe",
+      phone: "5550100",
+      phoneCountryCode: "+1",
+      affiliation: "State University",
+      authenticId: "S-1",
+      userType: "student",
+      educationLevel: "undergraduate",
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockFrom).toHaveBeenCalledWith("profiles");
+  });
+});
+
+describe("uploadIdDocument", () => {
+  it("requires an active session", async () => {
+    mockAuth.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    const file = new File(["scan"], "id.pdf", { type: "application/pdf" });
+    const result = await uploadIdDocument(file);
+    expect(result).toEqual({ success: false, error: "Not signed in." });
+  });
+
+  it("rejects an unaccepted file type before ever calling Storage", async () => {
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    const file = new File(["scan"], "id.txt", { type: "text/plain" });
+    const result = await uploadIdDocument(file);
+    expect(result.success).toBe(false);
+    expect(mockStorageUpload).not.toHaveBeenCalled();
+  });
+
+  it("uploads to id-documents under the user's own folder, then calls submit_id_document", async () => {
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    mockStorageUpload.mockResolvedValue({ data: { path: "u1/some-file.pdf" }, error: null });
+    mockRpc.mockResolvedValue({ data: null, error: null });
+
+    const file = new File(["scan"], "id.pdf", { type: "application/pdf" });
+    const result = await uploadIdDocument(file);
+
+    expect(result).toEqual({ success: true });
+    expect(mockStorage.from).toHaveBeenCalledWith("id-documents");
+    const [path] = mockStorageUpload.mock.calls[0];
+    expect(path.startsWith("u1/")).toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith("submit_id_document", { document_path: path });
+  });
+
+  it("surfaces a Storage upload error without calling the RPC", async () => {
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    mockStorageUpload.mockResolvedValue({ data: null, error: { message: "Bucket not found" } });
+
+    const file = new File(["scan"], "id.pdf", { type: "application/pdf" });
+    const result = await uploadIdDocument(file);
+
+    expect(result).toEqual({ success: false, error: "Bucket not found" });
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+});
 
 describe("saveModelPreferences", () => {
   it("requires an active session", async () => {

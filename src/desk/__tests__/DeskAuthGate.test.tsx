@@ -157,9 +157,47 @@ describe("registration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create an account" }));
   }
 
+  /** Fills every required field except whatever the caller omits, so a test can isolate one gating condition at a time. */
+  function fillSignUpForm({ skip = [] as string[] } = {}) {
+    const textFields: Array<[string, string]> = [
+      ["Full name", "Amara Okafor"],
+      ["Username", "amara"],
+      ["Email", "amara@example.com"],
+      ["Phone", "9800000000"],
+      ["Institution", "Test University"],
+      ["Institutional ID", "S123"],
+      ["Password", "longenough1"],
+    ];
+    for (const [label, value] of textFields) {
+      if (skip.includes(label)) continue;
+      fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    }
+    if (!skip.includes("User Type")) {
+      fireEvent.change(screen.getByLabelText("User Type"), { target: { value: "student" } });
+    }
+    if (!skip.includes("Level of Education")) {
+      fireEvent.change(screen.getByLabelText("Level of Education"), { target: { value: "undergraduate" } });
+    }
+    if (!skip.includes("Institutional ID Document")) {
+      const file = new File(["id-scan"], "id.pdf", { type: "application/pdf" });
+      fireEvent.change(screen.getByLabelText("Institutional ID Document"), { target: { files: [file] } });
+    }
+  }
+
   it("collects every field an administrator reviews", () => {
     openSignUp();
-    for (const label of ["Full name", "Username", "Email", "Phone", "Institution", "Institutional ID", "Password"]) {
+    for (const label of [
+      "Full name",
+      "Username",
+      "Email",
+      "Phone",
+      "Institution",
+      "Institutional ID",
+      "User Type",
+      "Level of Education",
+      "Institutional ID Document",
+      "Password",
+    ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
   });
@@ -169,17 +207,7 @@ describe("registration", () => {
     const submit = screen.getByRole("button", { name: "Create account" });
     expect(submit).toBeDisabled();
 
-    for (const [label, value] of [
-      ["Full name", "Amara Okafor"],
-      ["Username", "amara"],
-      ["Email", "amara@example.com"],
-      ["Phone", "+1000000"],
-      ["Institution", "Test University"],
-      ["Institutional ID", "S123"],
-    ] as const) {
-      fireEvent.change(screen.getByLabelText(label), { target: { value } });
-    }
-    // Six of seven filled, and a password below the minimum.
+    fillSignUpForm({ skip: ["Password"] });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "short" } });
     expect(submit).toBeDisabled();
 
@@ -187,23 +215,36 @@ describe("registration", () => {
     expect(submit).toBeEnabled();
   });
 
+  it("keeps submit disabled without the institutional ID document, even with every other field valid", () => {
+    openSignUp();
+    fillSignUpForm({ skip: ["Institutional ID Document"] });
+    expect(screen.getByRole("button", { name: "Create account" })).toBeDisabled();
+  });
+
   it("shows a confirmation that the account was created", async () => {
     openSignUp();
-    for (const [label, value] of [
-      ["Full name", "Amara Okafor"],
-      ["Username", "amara"],
-      ["Email", "amara@example.com"],
-      ["Phone", "+1000000"],
-      ["Institution", "Test University"],
-      ["Institutional ID", "S123"],
-      ["Password", "longenough1"],
-    ] as const) {
-      fireEvent.change(screen.getByLabelText(label), { target: { value } });
-    }
+    fillSignUpForm();
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(await screen.findByText(/Account created/i)).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(/check your email/i);
+  });
+
+  it("passes the structured phone and role fields through to signUp", async () => {
+    openSignUp();
+    fillSignUpForm();
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await waitFor(() =>
+      expect(signUp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phone: "9800000000",
+          phoneCountryCode: "+977",
+          userType: "student",
+          educationLevel: "undergraduate",
+        })
+      )
+    );
   });
 });
 

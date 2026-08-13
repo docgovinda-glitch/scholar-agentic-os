@@ -526,6 +526,17 @@ button:disabled {
   }
 }
 
+/* Required-field marker for auth/account forms (AuthLayout.tsx's
+   RequiredMark). A CSS ::after rather than a DOM text node: jsdom/
+   dom-accessibility-api (Testing Library's getByLabelText) does not
+   evaluate generated content, so this stays purely visual and never joins
+   the label's accessible name — a DOM "*" character, even wrapped in
+   aria-hidden, was confirmed to still be included in the computed name. */
+.required-mark::after {
+  content: " *";
+  color: var(--state-danger);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
