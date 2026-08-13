@@ -22,7 +22,16 @@
  * rather than buried in docs.
  *
  * (Browsers treat http://localhost and http://127.0.0.1 as trustworthy
- * origins, so mixed-content blocking is NOT the problem here — CORS is.)
+ * origins for classic mixed-content purposes, so mixed-content blocking is
+ * not the whole story — CORS is the bigger piece of it. But as of Chrome 142
+ * (2025-10-28), that is no longer the complete picture either: Local Network
+ * Access (LNA) is a distinct, newer restriction gating ANY fetch from a
+ * public-address-space page to a loopback/private-network target, requiring
+ * both a one-time browser permission grant and an
+ * `Access-Control-Allow-Private-Network: true` response header IN ADDITION
+ * to the Access-Control-Allow-Origin corsGuidance below already covers. See
+ * src/services/localRuntimeConnectivity.ts for the LNA-aware diagnosis this
+ * file's corsGuidance strings don't by themselves capture.)
  */
 
 export type LocalApiStyle = "ollama-native" | "openai-compatible";

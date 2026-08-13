@@ -17,7 +17,7 @@
  * environment (same variables the running server uses).
  */
 
-import { CLOUD_PROVIDERS } from "../src/config/providerCatalog";
+import { CLOUD_PROVIDERS, type CloudProviderSpec } from "../src/config/providerCatalog";
 import { LOCAL_RUNNERS } from "../src/config/localRunnerCatalog";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
@@ -75,7 +75,7 @@ async function main() {
   await upsert("ai_providers", providerRows);
   console.log(`Upserted ${providerRows.length} providers.`);
 
-  const modelRows = CLOUD_PROVIDERS.flatMap((p) =>
+  const modelRows = CLOUD_PROVIDERS.flatMap((p: CloudProviderSpec) =>
     p.models.map((modelId) => ({
       id: `${p.id}:${modelId}`,
       provider_id: p.id,

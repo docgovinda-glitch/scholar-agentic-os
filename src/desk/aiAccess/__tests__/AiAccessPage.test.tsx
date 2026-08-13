@@ -42,6 +42,7 @@ vi.mock("../../../services/hardwareProfiler", () => ({
   loadHardwareProfile: vi.fn(async () => null),
   detectHardwareProfile: vi.fn(async () => null),
   saveHardwareProfile: vi.fn(async () => {}),
+  saveManualHardwareProfile: vi.fn(async () => {}),
   recommendLocalModel: vi.fn(() => ({ sizeClass: "unknown", reasoning: "", warnings: [] })),
 }));
 
@@ -98,6 +99,53 @@ describe("AI Access navigation", () => {
   });
 });
 
+describe("Manual hardware entry", () => {
+  it("is always available, independent of whether auto-detection found anything", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Local AI" }));
+
+    expect(await screen.findByText("Not detected yet.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Enter your hardware manually" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save my hardware" })).toBeDisabled();
+  });
+
+  it("saves only the fields the user filled in, and reloads the hardware summary", async () => {
+    const hardwareModule = await import("../../../services/hardwareProfiler");
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Local AI" }));
+
+    fireEvent.change(screen.getByLabelText("RAM (GB)"), { target: { value: "32" } });
+    const save = screen.getByRole("button", { name: "Save my hardware" });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+
+    await waitFor(() =>
+      expect(hardwareModule.saveManualHardwareProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ ramGb: 32, os: undefined })
+      )
+    );
+    expect(await screen.findByText(/Saved\./)).toBeInTheDocument();
+    // Reloads via loadHardwareProfile so the summary card reflects the save immediately.
+    expect(hardwareModule.loadHardwareProfile).toHaveBeenCalled();
+  });
+});
+
+describe("Local runner configuration", () => {
+  it("keeps the free-text model field behind an Advanced toggle before anything is detected, matching the cloud dropdown's opt-in framing", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Local AI" }));
+    fireEvent.click(await screen.findByText("Ollama"));
+
+    expect(await screen.findByText(/Detect models first, or check Advanced/i)).toBeInTheDocument();
+    const advancedToggle = screen.getByRole("checkbox", { name: /Advanced: use a custom model ID/i });
+    expect(advancedToggle).not.toBeChecked();
+    expect(screen.queryByPlaceholderText(/Exact model name/i)).not.toBeInTheDocument();
+
+    fireEvent.click(advancedToggle);
+    expect(screen.getByPlaceholderText(/Exact model name/i)).toBeInTheDocument();
+  });
+});
+
 describe("Per-provider configuration", () => {
   it("opens a configuration surface for the chosen provider, naming that provider — not a shared generic form", async () => {
     renderPage();
@@ -119,6 +167,39 @@ describe("Per-provider configuration", () => {
     expect(await screen.findByText("Free tier")).toBeInTheDocument();
     expect(await screen.findByText("API key required")).toBeInTheDocument();
     expect(await screen.findByText("Account required")).toBeInTheDocument();
+  });
+
+  it("offers a real model dropdown for a provider, not a free-text field, with Advanced as an opt-in escape hatch", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Free AI" }));
+    fireEvent.click(await screen.findByText("Groq"));
+
+    const advancedToggle = await screen.findByRole("checkbox", { name: /Advanced: use a custom model ID/i });
+    expect(advancedToggle).not.toBeChecked();
+
+    // The primary control is a real <select>, listing real catalog models —
+    // not an <input> a user has to already know a model id to fill in.
+    const select = screen.getByRole("combobox");
+    const optionValues = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
+    expect(optionValues).toContain("llama-3.3-70b-versatile");
+    expect(screen.queryByPlaceholderText(/Exact model id/i)).not.toBeInTheDocument();
+
+    // Checking Advanced swaps in the free-text field, pre-filled with the
+    // select's current value so switching modes never loses the choice.
+    fireEvent.click(advancedToggle);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    const customInput = screen.getByPlaceholderText(/Exact model id/i) as HTMLInputElement;
+    expect(customInput.value).toBe("llama-3.3-70b-versatile");
+  });
+
+  it("labels a deprecated model in the dropdown rather than presenting it as current", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Pro / BYOK" }));
+    fireEvent.click(await screen.findByText("Anthropic Claude"));
+
+    const select = (await screen.findByRole("combobox")) as HTMLSelectElement;
+    const deprecatedOption = Array.from(select.options).find((o) => o.value === "claude-opus-4-8");
+    expect(deprecatedOption?.textContent).toMatch(/deprecated/i);
   });
 
   it("verifies a key before saving it, and records the connection", async () => {

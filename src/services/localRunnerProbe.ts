@@ -3,7 +3,7 @@ import { LOCAL_RUNNERS, type LocalRunnerSpec } from "../config/localRunnerCatalo
 /**
  * Detect whether a local model runner is reachable from this browser.
  *
- * Two things make this less obvious than "fetch and see".
+ * Three things make this less obvious than "fetch and see".
  *
  * 1. CORS. The page is served from https://scholar.gkshah.com.np and the
  *    runner listens on http://localhost — a cross-origin request the runner
@@ -18,6 +18,21 @@ import { LOCAL_RUNNERS, type LocalRunnerSpec } from "../config/localRunnerCatalo
  * 2. Mixed content. An https page cannot make http requests to most origins,
  *    but browsers exempt loopback (localhost / 127.0.0.1) as a potentially
  *    trustworthy origin, which is what makes this possible at all.
+ *
+ * 3. Local Network Access (added 2026-08-13). As of Chrome 142 (shipped
+ *    2025-10-28), the mixed-content exemption in point 2 is no longer the
+ *    whole story: LNA is a distinct, newer restriction that gates ANY fetch
+ *    from a public-address-space page — like this one — to a loopback or
+ *    private-network target, regardless of scheme. It requires (a) a
+ *    one-time native browser permission prompt this code cannot suppress or
+ *    answer on the user's behalf, and (b) the runner's response to the CORS
+ *    preflight including `Access-Control-Allow-Private-Network: true`, IN
+ *    ADDITION TO the classic `Access-Control-Allow-Origin` point 1 already
+ *    covers — so a runner with correct CORS-origin config can still be
+ *    blocked on current Chrome if it doesn't also send that header. See
+ *    services/localRuntimeConnectivity.ts, which wraps probeRunner below
+ *    with an LNA-aware diagnosis and the guidance this file's own
+ *    catalog-driven corsGuidance strings don't yet cover.
  */
 
 export type ProbeResult =
@@ -49,7 +64,15 @@ function extractModels(body: unknown): string[] {
 export async function probeRunner(
   runner: LocalRunnerSpec,
   endpointOverride?: string,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  /**
+   * Extra fields merged into the fetch's RequestInit — currently used by
+   * localRuntimeConnectivity.ts to add the experimental `targetAddressSpace`
+   * field Chrome's Local Network Access looks for. Untyped (RequestInit
+   * doesn't declare it yet) rather than widening this function's own public
+   * contract for one caller's one non-standard field.
+   */
+  extraInit?: Record<string, unknown>
 ): Promise<ProbeResult> {
   const base = (endpointOverride || runner.defaultEndpoint).replace(/\/+$/, "");
   const controller = new AbortController();
@@ -59,7 +82,7 @@ export async function probeRunner(
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
 
   try {
-    const res = await fetchImpl(`${base}${runner.healthPath}`, { signal: controller.signal });
+    const res = await fetchImpl(`${base}${runner.healthPath}`, { signal: controller.signal, ...extraInit } as RequestInit);
     if (!res.ok) return { reachable: false, reason: "unreachable" };
     return { reachable: true, models: extractModels(await res.json().catch(() => null)) };
   } catch {

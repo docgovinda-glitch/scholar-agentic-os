@@ -57,8 +57,23 @@ export interface CloudProviderSpec {
   chatPath: string;
   /** Appended to baseUrl to list models; null when the provider exposes no such endpoint */
   modelsPath: string | null;
+  /**
+   * @deprecated Kept for the (few) remaining direct readers, but no longer
+   * the authority on what model a provider's UI should default to — use
+   * config/modelCatalog.ts's getDefaultModelId() instead, which knows about
+   * deprecated/current status. This field is still the last-resort fallback
+   * getDefaultModelId() returns for a provider with zero catalog entries.
+   */
   defaultModel: string;
-  /** Suggestions only — see the accuracy note in this file's header */
+  /**
+   * @deprecated Suggestions only, and no longer what the AI Access UI's
+   * model dropdown is built from — see config/modelCatalog.ts's
+   * getModelsForProvider() for the structured, capability-aware
+   * replacement. Kept here only as raw data other tooling (e.g.
+   * scripts/seedAiRegistry.ts) still reads; not removed outright since
+   * ~37 entries' worth of call sites would need touching for no behavior
+   * change.
+   */
   models: string[];
   freeTier: FreeTierKind;
   /** One honest line about what the free access actually is */
@@ -141,7 +156,7 @@ export function providerAccessFacts(spec: CloudProviderSpec): ProviderAccessFact
  * Ordered so the most useful "I want to start now, for free" options appear
  * first in the UI — this list order IS the display order.
  */
-export const CLOUD_PROVIDERS: CloudProviderSpec[] = [
+export const CLOUD_PROVIDERS = [
   // ── Genuinely free / generous free tiers ────────────────────────────────
   {
     id: "gemini",
@@ -791,7 +806,7 @@ export const CLOUD_PROVIDERS: CloudProviderSpec[] = [
     icon: "◯",
     color: "#0D9488",
   },
-];
+] as const satisfies CloudProviderSpec[];
 
 /** Providers that are NOT reachable via the same-origin server proxy and must
  *  be called directly from the browser. Kept as an explicit list because each
@@ -821,7 +836,12 @@ export function getOpenAICompatibleProviders(): CloudProviderSpec[] {
 
 /** Free-first ordering for the UI's "recommended" section. */
 export function getFreeAccessProviders(): CloudProviderSpec[] {
-  return CLOUD_PROVIDERS.filter((p) => p.freeTier === "free" || p.freeTier === "freemium");
+  // Typed explicitly as CloudProviderSpec (not the narrower literal union
+  // CLOUD_PROVIDERS' `as const` infers from today's data) so this still
+  // compiles correctly if a future entry ever uses freeTier: "free" — none
+  // do today, per this file's header comment, but the check should stay
+  // correct rather than only working by the accident of current data.
+  return CLOUD_PROVIDERS.filter((p: CloudProviderSpec) => p.freeTier === "free" || p.freeTier === "freemium");
 }
 
 /**

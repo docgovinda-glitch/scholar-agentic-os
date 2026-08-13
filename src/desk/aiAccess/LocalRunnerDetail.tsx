@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { resolveRunnerEndpoint, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
-import { probeRunner } from "../../services/localRunnerProbe";
+import { checkLocalRuntimeConnectivity } from "../../services/localRuntimeConnectivity";
 import { Chip } from "./ProviderDetail";
 import type { ProviderView } from "./useAiAccess";
 
@@ -39,9 +39,16 @@ export default function LocalRunnerDetail({
   const [endpoint, setEndpoint] = useState(savedEndpoint ?? runner.defaultEndpoint);
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState(view.selectedModel ?? "");
+  // Only meaningful while models.length === 0 (no live probe results yet) —
+  // once models are detected the <select> is always primary, matching
+  // ProviderDetail.tsx's ModelSelectField's "dropdown first, free text is an
+  // opt-in advanced action" rule. Starts open when there's already a saved
+  // choice, since that value didn't come from a probe.
+  const [useCustomModelId, setUseCustomModelId] = useState(Boolean(view.selectedModel));
   const [probing, setProbing] = useState(false);
   const [probeError, setProbeError] = useState<string | null>(null);
   const [reachable, setReachable] = useState<boolean | null>(null);
+  const [verificationNotes, setVerificationNotes] = useState<string[]>([]);
   const [makeDefault, setMakeDefault] = useState(!view.connected);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -50,9 +57,10 @@ export default function LocalRunnerDetail({
     setProbing(true);
     setProbeError(null);
     setSaved(null);
+    setVerificationNotes([]);
     try {
-      const result = await probeRunner(runner, resolveRunnerEndpoint(runner, endpoint));
-      if (result.reachable) {
+      const result = await checkLocalRuntimeConnectivity(runner, resolveRunnerEndpoint(runner, endpoint));
+      if (result.diagnosis === "reachable") {
         setReachable(true);
         setModels(result.models);
         if (!model && result.models.length > 0) setModel(result.models[0]);
@@ -62,12 +70,8 @@ export default function LocalRunnerDetail({
       } else {
         setReachable(false);
         setModels([]);
-        // probeRunner cannot distinguish CORS rejection from connection
-        // refused from timeout — a browser genuinely reports all three the
-        // same way — so the message must not claim to know which it was.
-        setProbeError(
-          `Could not reach ${runner.name} at that address. It may not be running, the address may be wrong, or it may be refusing requests from this page.`
-        );
+        setProbeError(result.guidance);
+        setVerificationNotes(result.requiresRealMachineVerification);
       }
     } catch (e) {
       setReachable(false);
@@ -166,10 +170,17 @@ export default function LocalRunnerDetail({
           {probeError && (
             <div role="alert" className="mt-2 rounded-[var(--radius-sm)] border border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] p-3">
               <p className="text-sm text-[color:var(--state-warning)]">{probeError}</p>
-              {reachable === false && (
-                <p className="mt-2 text-xs text-[color:var(--text-secondary)]">
-                  Most often this is the cross-origin setting in step 2, not a wrong address. {runner.corsGuidance}
-                </p>
+              {verificationNotes.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-medium text-[color:var(--text-secondary)]">
+                    What we can't confirm from here
+                  </summary>
+                  <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-[color:var(--text-muted)]">
+                    {verificationNotes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                </details>
               )}
             </div>
           )}
@@ -189,12 +200,24 @@ export default function LocalRunnerDetail({
               ))}
             </select>
           ) : (
-            <input
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="Detect models first, or type a model name"
-              className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-            />
+            <>
+              {useCustomModelId ? (
+                <input
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="Exact model name this runner has loaded"
+                  className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              ) : (
+                <p className="text-sm italic text-[color:var(--text-muted)]">
+                  Detect models first, or check Advanced below to type one.
+                </p>
+              )}
+              <label className="mt-2 flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
+                <input type="checkbox" checked={useCustomModelId} onChange={(e) => setUseCustomModelId(e.target.checked)} />
+                Advanced: use a custom model ID
+              </label>
+            </>
           )}
           <label className="mt-3 flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
             <input type="checkbox" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />
