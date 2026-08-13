@@ -308,6 +308,29 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
 }
 
 /**
+ * Fails OPEN (treats an RPC error as "available"), not closed. These three
+ * functions are a soft, real-time UX layer on top of enforcement that does
+ * not depend on them: Supabase Auth's own built-in email uniqueness (always
+ * on, unrelated to any migration here — see signUp()'s empty-identities
+ * check above, which is the real duplicate-email backstop), and the
+ * database's own unique constraints on profiles.username and
+ * profiles.phone_e164 (supabase/migrations/2026-08-15_auth_uniqueness_
+ * constraints.sql). If check_username_available/check_email_available/
+ * check_phone_available's migration
+ * (2026-08-15_duplicate_identifier_detection.sql) hasn't actually been
+ * applied to a given Supabase project, the RPC call errors with "function
+ * does not exist" — failing closed here (as an earlier version of this code
+ * did) would have silently blocked every signup on that project, treating
+ * every identifier as "taken." Failing open costs only the early inline
+ * warning; the real backstops above still catch a genuine duplicate at
+ * signUp() time either way.
+ */
+function availableOnRpcFailure(error: unknown, isAvailable: boolean | null): boolean {
+  if (error) return true;
+  return isAvailable ?? true;
+}
+
+/**
  * Check if a username is available (not already taken).
  *
  * Called during signup form validation to provide real-time feedback
@@ -318,8 +341,7 @@ export async function checkUsernameAvailable(username: string): Promise<boolean>
   const { data: isAvailable, error } = await supabase.rpc("check_username_available", {
     lookup_username: username.trim(),
   });
-  if (error) return false; // On error, assume not available (fail safe)
-  return isAvailable ?? false;
+  return availableOnRpcFailure(error, isAvailable);
 }
 
 /**
@@ -333,8 +355,7 @@ export async function checkEmailAvailable(email: string): Promise<boolean> {
   const { data: isAvailable, error } = await supabase.rpc("check_email_available", {
     lookup_email: email.trim(),
   });
-  if (error) return false; // On error, assume not available (fail safe)
-  return isAvailable ?? false;
+  return availableOnRpcFailure(error, isAvailable);
 }
 
 /**
@@ -348,8 +369,7 @@ export async function checkPhoneAvailable(phoneE164: string): Promise<boolean> {
   const { data: isAvailable, error } = await supabase.rpc("check_phone_available", {
     lookup_phone_e164: phoneE164.trim(),
   });
-  if (error) return false; // On error, assume not available (fail safe)
-  return isAvailable ?? false;
+  return availableOnRpcFailure(error, isAvailable);
 }
 
 export interface ResendVerificationEmailInput {

@@ -582,10 +582,16 @@ describe("availability checks", () => {
     expect(result).toBe(false);
   });
 
-  it("checkUsernameAvailable handles RPC errors gracefully", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { message: "RPC error" } });
+  it("checkUsernameAvailable fails OPEN on an RPC error — e.g. the check_username_available migration isn't applied yet — rather than blocking every signup", async () => {
+    // This is the opposite of "fail safe" in the sense of rejecting the
+    // input: if this returned false here, a Supabase project missing this
+    // migration would show every username as "already taken," blocking
+    // signup entirely. Real duplicate-username enforcement is the
+    // database's own unique constraint, independent of this RPC — see
+    // availableOnRpcFailure()'s doc comment in supabaseAuthService.ts.
+    mockRpc.mockResolvedValue({ data: null, error: { message: "function check_username_available does not exist" } });
     const result = await checkUsernameAvailable("someuser");
-    expect(result).toBe(false);
+    expect(result).toBe(true);
   });
 
   it("checkEmailAvailable returns true when email is available", async () => {
@@ -601,6 +607,12 @@ describe("availability checks", () => {
     expect(result).toBe(false);
   });
 
+  it("checkEmailAvailable fails open on an RPC error, same reasoning as checkUsernameAvailable", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "function check_email_available does not exist" } });
+    const result = await checkEmailAvailable("someone@example.com");
+    expect(result).toBe(true);
+  });
+
   it("checkPhoneAvailable returns true when phone is available", async () => {
     mockRpc.mockResolvedValue({ data: true, error: null });
     const result = await checkPhoneAvailable("+15550000000");
@@ -614,10 +626,10 @@ describe("availability checks", () => {
     expect(result).toBe(false);
   });
 
-  it("checkPhoneAvailable handles RPC errors gracefully", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { message: "RPC error" } });
+  it("checkPhoneAvailable fails open on an RPC error, same reasoning as checkUsernameAvailable", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "function check_phone_available does not exist" } });
     const result = await checkPhoneAvailable("+15550100000");
-    expect(result).toBe(false);
+    expect(result).toBe(true);
   });
 });
 
