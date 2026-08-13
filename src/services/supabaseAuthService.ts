@@ -15,14 +15,18 @@
 
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 import { getCaptchaConfig } from "./captchaService";
+import { ID_DOCUMENT_ACCEPTED_TYPES } from "../config/accountSchema";
 
 export interface SignUpInput {
   username: string;
   fullName: string;
   email: string;
   phone: string;
+  phoneCountryCode: string;
   affiliation: string;
   authenticId: string;
+  userType: string;
+  educationLevel: string;
   password: string;
   captchaToken?: string;
 }
@@ -110,8 +114,11 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
         username: input.username,
         full_name: input.fullName,
         phone: input.phone,
+        phone_country_code: input.phoneCountryCode,
         affiliation: input.affiliation,
         authentic_id: input.authenticId,
+        user_type: input.userType,
+        education_level: input.educationLevel,
       },
     },
   });
@@ -210,14 +217,28 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
 export interface ProfileFields {
   username: string;
   fullName: string;
+  email: string;
   phone: string;
+  phoneCountryCode: string;
+  phoneE164: string;
   affiliation: string;
+  authenticId: string;
+  userType: string;
+  educationLevel: string;
+  /** System-controlled — see accountSchema.ts's VERIFICATION_STATUSES. Never sent back by saveProfileFields. */
+  idVerificationStatus: string;
+  idDocumentPath: string | null;
 }
 
 /**
- * The signed-in user's own editable profile fields, for Account Settings.
- * `username` is included for display only — see saveProfileFields for why it
- * is not itself editable here.
+ * The signed-in user's own profile, for Account Settings — both the fields
+ * it can edit (see saveProfileFields) and the system-controlled ones it can
+ * only display (email, verification status, document path). `username` is
+ * included for display only — see saveProfileFields for why it is not
+ * itself editable here. Email comes from auth.getUser(), never from
+ * `profiles`, so there is exactly one place it is stored (Supabase Auth
+ * owns it) — duplicating it into `profiles` would be the same
+ * two-sources-of-truth problem this whole schema exists to avoid.
  */
 export async function getProfile(): Promise<{ success: true; profile: ProfileFields } | { success: false; error: string }> {
   const supabase = getSupabaseClient();
@@ -228,7 +249,9 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("username, full_name, phone, affiliation")
+    .select(
+      "username, full_name, phone, phone_country_code, phone_e164, affiliation, authentic_id, user_type, education_level, id_verification_status, id_document_path"
+    )
     .eq("id", userData.user.id)
     .single();
 
@@ -237,13 +260,29 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
   }
   return {
     success: true,
-    profile: { username: data.username, fullName: data.full_name, phone: data.phone ?? "", affiliation: data.affiliation },
+    profile: {
+      username: data.username,
+      fullName: data.full_name,
+      email: userData.user.email ?? "",
+      phone: data.phone ?? "",
+      phoneCountryCode: data.phone_country_code ?? "",
+      phoneE164: data.phone_e164 ?? "",
+      affiliation: data.affiliation,
+      authenticId: data.authentic_id ?? "",
+      userType: data.user_type ?? "",
+      educationLevel: data.education_level ?? "",
+      idVerificationStatus: data.id_verification_status ?? "verification_required",
+      idDocumentPath: data.id_document_path,
+    },
   };
 }
 
 /**
- * Updates the signed-in user's own name/phone/affiliation. Requires an
+ * Updates the signed-in user's own editable profile fields. Requires an
  * active session (RLS: profiles_update_own — see supabase/schema.sql).
+ * Exactly the user-editable set from accountSchema.ts — never
+ * idVerificationStatus/idDocumentPath (system-controlled; see
+ * uploadIdDocument) and never email (owned by Supabase Auth, not `profiles`).
  *
  * `username` is deliberately NOT accepted here even though the schema grants
  * self-service UPDATE on that column: it is also the login identifier
@@ -252,7 +291,9 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
  * muscle-memory login now 404s — a real feature, not an Account Settings
  * field, and out of scope for this screen.
  */
-export async function saveProfileFields(fields: Pick<ProfileFields, "fullName" | "phone" | "affiliation">): Promise<ServiceResult> {
+export async function saveProfileFields(
+  fields: Pick<ProfileFields, "fullName" | "phone" | "phoneCountryCode" | "affiliation" | "authenticId" | "userType" | "educationLevel">
+): Promise<ServiceResult> {
   const supabase = getSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) {
@@ -261,11 +302,60 @@ export async function saveProfileFields(fields: Pick<ProfileFields, "fullName" |
 
   const { error } = await supabase
     .from("profiles")
-    .update({ full_name: fields.fullName, phone: fields.phone, affiliation: fields.affiliation, updated_at: new Date().toISOString() })
+    .update({
+      full_name: fields.fullName,
+      phone: fields.phone,
+      phone_country_code: fields.phoneCountryCode,
+      affiliation: fields.affiliation,
+      authentic_id: fields.authenticId,
+      user_type: fields.userType,
+      education_level: fields.educationLevel,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", userData.user.id);
 
   if (error) {
     return { success: false, error: error.message };
+  }
+  return { success: true };
+}
+
+/**
+ * Uploads the signed-in user's institutional ID document and, on success,
+ * calls submit_id_document() (supabase/migrations/2026-08-13_unified_account_
+ * profile.sql) to record it and move id_verification_status to
+ * 'pending_verification'. Requires an active session — this is why the
+ * document can't be attached at registration time: mailer_autoconfirm is
+ * off in production, so signUp() returns no session until the user verifies
+ * their email, and a File can't be carried across that gap. Registration
+ * collects and client-validates the file to gate the Create Account button;
+ * this function is what actually stores it, the first time the user reaches
+ * an authenticated session (via Account Settings).
+ */
+export async function uploadIdDocument(file: File): Promise<ServiceResult> {
+  const supabase = getSupabaseClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { success: false, error: "Not signed in." };
+  }
+  if (!(ID_DOCUMENT_ACCEPTED_TYPES as readonly string[]).includes(file.type)) {
+    return { success: false, error: "That file type isn't accepted. Use a PDF, JPG, PNG, or WEBP." };
+  }
+
+  const extension = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
+  const path = `${userData.user.id}/${crypto.randomUUID()}${extension}`;
+
+  const { error: uploadError } = await supabase.storage.from("id-documents").upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  });
+  if (uploadError) {
+    return { success: false, error: uploadError.message };
+  }
+
+  const { error: rpcError } = await supabase.rpc("submit_id_document", { document_path: path });
+  if (rpcError) {
+    return { success: false, error: rpcError.message };
   }
   return { success: true };
 }

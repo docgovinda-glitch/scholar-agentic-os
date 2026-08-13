@@ -1,4 +1,6 @@
-import type { FormEvent, ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import type { Option } from "../../config/accountSchema";
+import { COUNTRIES, type Country } from "../../config/countries";
 
 /**
  * Shared chrome and controls for Desk's auth screens.
@@ -9,7 +11,25 @@ import type { FormEvent, ReactNode } from "react";
  * rather than hand-maintained. The legacy gate this replaces reimplemented
  * those per screen and drifted — placeholders standing in for labels in some
  * places, silent validation failures in others.
+ *
+ * Also imported directly by desk/account/AccountSettingsScreen.tsx: Field,
+ * SelectField, FileField and PhoneField are the one definition of each
+ * control shared by Create Account and Account Settings (see
+ * config/accountSchema.ts's header comment for why that sharing matters) —
+ * neither screen re-implements its own version.
  */
+
+/**
+ * Applied to a required field's <label> to paint a trailing " *" — see
+ * index.css's .required-mark rule for why this is a CSS ::after and not a
+ * DOM text node: a literal "*" character, even wrapped in aria-hidden, was
+ * confirmed (via a failing getByLabelText("Full name")) to still be
+ * included in the accessible name Testing Library and screen readers
+ * compute from a label's content.
+ */
+function labelClass(required: boolean): string {
+  return `text-sm font-medium text-[color:var(--text-primary)]${required ? " required-mark" : ""}`;
+}
 
 export function AuthShell({ children }: { children: ReactNode }) {
   return (
@@ -42,6 +62,8 @@ export function Field({
   hint,
   autoFocus,
   required = true,
+  disabled = false,
+  showPasswordToggle = false,
 }: {
   id: string;
   label: string;
@@ -52,32 +74,239 @@ export function Field({
   hint?: string;
   autoFocus?: boolean;
   required?: boolean;
+  disabled?: boolean;
+  /** Only meaningful when type="password" — adds a Show/Hide toggle button. */
+  showPasswordToggle?: boolean;
 }) {
+  const [visible, setVisible] = useState(false);
   const hintId = hint ? `${id}-hint` : undefined;
+  const resolvedType = showPasswordToggle ? (visible ? "text" : "password") : type;
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-[color:var(--text-primary)]">
+      <label htmlFor={id} className={labelClass(required)}>
         {label}
       </label>
-      <input
-        id={id}
-        name={id}
-        type={type}
-        value={value}
-        required={required}
-        autoComplete={autoComplete}
-        autoFocus={autoFocus}
-        // Ties the hint to the input so it is read out with the field rather
-        // than floating unattached below it.
-        aria-describedby={hintId}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 text-sm"
-      />
+      <div className={showPasswordToggle ? "relative" : undefined}>
+        <input
+          id={id}
+          name={id}
+          type={resolvedType}
+          value={value}
+          required={required}
+          disabled={disabled}
+          autoComplete={autoComplete}
+          autoFocus={autoFocus}
+          // Ties the hint to the input so it is read out with the field rather
+          // than floating unattached below it.
+          aria-describedby={hintId}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full px-3 py-2 text-sm ${showPasswordToggle ? "pr-14" : ""}`}
+        />
+        {showPasswordToggle && (
+          <button
+            type="button"
+            onClick={() => setVisible((v) => !v)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
+          >
+            {visible ? "Hide" : "Show"}
+          </button>
+        )}
+      </div>
       {hint && (
         <p id={hintId} className="text-xs text-[color:var(--text-muted)]">
           {hint}
         </p>
       )}
+    </div>
+  );
+}
+
+export function SelectField({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+  required = true,
+  hint,
+  placeholder = "Select…",
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly Option[];
+  required?: boolean;
+  hint?: string;
+  placeholder?: string;
+}) {
+  const hintId = hint ? `${id}-hint` : undefined;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className={labelClass(required)}>
+        {label}
+      </label>
+      <select
+        id={id}
+        name={id}
+        value={value}
+        required={required}
+        aria-describedby={hintId}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3 py-2 text-sm"
+      >
+        <option value="" disabled={required}>
+          {placeholder}
+        </option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {hint && (
+        <p id={hintId} className="text-xs text-[color:var(--text-muted)]">
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function formatBytes(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(bytes < 1024 * 1024 ? 3 : 1)} MB`;
+}
+
+/**
+ * Institutional ID document upload. Shows required/accepted-format/max-size
+ * status up front, then the selected file's name and size with a Remove
+ * action once one is chosen — never a silent, unlabeled file input.
+ */
+export function FileField({
+  id,
+  label,
+  file,
+  onChange,
+  accept,
+  maxBytes,
+  required = true,
+  helpText,
+  error,
+}: {
+  id: string;
+  label: string;
+  file: File | null;
+  onChange: (file: File | null) => void;
+  accept: string;
+  maxBytes?: number;
+  required?: boolean;
+  helpText?: string;
+  error?: string | null;
+}) {
+  const hintId = `${id}-hint`;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className={labelClass(required)}>
+        {label}
+      </label>
+      {!file && (
+        <input
+          id={id}
+          name={id}
+          type="file"
+          accept={accept}
+          required={required}
+          aria-describedby={hintId}
+          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+          className="w-full text-sm"
+        />
+      )}
+      {file && (
+        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-2 text-sm">
+          <span className="truncate text-[color:var(--text-primary)]">
+            {file.name} ({formatBytes(file.size)})
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="shrink-0 text-xs font-medium text-[color:var(--accent)] hover:text-[color:var(--accent-hover)] cursor-pointer"
+          >
+            Remove
+          </button>
+        </div>
+      )}
+      <p id={hintId} className="text-xs text-[color:var(--text-muted)]">
+        {helpText}
+        {maxBytes ? ` Max size ${formatBytes(maxBytes)}.` : ""}
+      </p>
+      {error && <AuthError>{error}</AuthError>}
+    </div>
+  );
+}
+
+/**
+ * The one phone-number control used by both Create Account and Account
+ * Settings: a searchable country selector (flag + dial code) plus a local
+ * number input, kept as two separate pieces of state (phoneCountryCode,
+ * phone) exactly as accountSchema.ts's canonical schema stores them —
+ * countries.ts's normalizeE164/e164Problem are what combine them, so this
+ * component never invents its own formatting or validation.
+ */
+export function PhoneField({
+  idPrefix = "phone",
+  countryCode,
+  onCountryCodeChange,
+  number,
+  onNumberChange,
+  required = true,
+  error,
+}: {
+  idPrefix?: string;
+  countryCode: string;
+  onCountryCodeChange: (dialCode: string) => void;
+  number: string;
+  onNumberChange: (value: string) => void;
+  required?: boolean;
+  error?: string | null;
+}) {
+  const selected: Country | undefined = COUNTRIES.find((c) => c.dialCode === countryCode);
+  const numberId = `${idPrefix}-number`;
+  const countryId = `${idPrefix}-country-code`;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={numberId} className={labelClass(required)}>
+        Phone
+      </label>
+      <div className="flex gap-2">
+        <label className="sr-only" htmlFor={countryId}>
+          Country code
+        </label>
+        <select
+          id={countryId}
+          name={countryId}
+          value={selected ? `${selected.iso2}:${selected.dialCode}` : ""}
+          onChange={(e) => onCountryCodeChange(e.target.value.split(":")[1] ?? e.target.value)}
+          className="w-28 shrink-0 px-2 py-2 text-sm"
+        >
+          {COUNTRIES.map((c) => (
+            <option key={c.iso2} value={`${c.iso2}:${c.dialCode}`}>
+              {c.flag} {c.dialCode}
+            </option>
+          ))}
+        </select>
+        <input
+          id={numberId}
+          name={numberId}
+          type="tel"
+          inputMode="numeric"
+          value={number}
+          required={required}
+          placeholder="9851108291"
+          onChange={(e) => onNumberChange(e.target.value)}
+          className="w-full px-3 py-2 text-sm"
+        />
+      </div>
+      {error && <AuthError>{error}</AuthError>}
     </div>
   );
 }

@@ -63,6 +63,7 @@ export default function AiAccessPage({
   mode = "manage",
   onContinue,
   onSkip,
+  initialSection = "overview",
 }: {
   /** Required in "manage" mode (the default). Unused in "onboarding" mode — there is nothing to "close" back to yet. */
   onClose?: () => void;
@@ -77,9 +78,11 @@ export default function AiAccessPage({
   onContinue?: () => void;
   /** Onboarding only: explicit "not now" — must survive a reload without re-asking (docs 25 §1.1). */
   onSkip?: () => void;
+  /** Which section to land on, e.g. "premium" when reached from Account Settings' "Upgrade to Premium" button. */
+  initialSection?: SectionId;
 }) {
   const access = useAiAccess();
-  const [section, setSection] = useState<SectionId>("overview");
+  const [section, setSection] = useState<SectionId>(initialSection);
   /** Provider id whose detail pane is open, or null for the section's list. */
   const [openProvider, setOpenProvider] = useState<string | null>(null);
 
