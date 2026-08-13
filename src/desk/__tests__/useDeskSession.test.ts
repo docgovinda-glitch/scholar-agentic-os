@@ -89,3 +89,54 @@ describe("useDeskSession — password recovery", () => {
     await waitFor(() => expect(result.current.status).toBe("signed-in"));
   });
 });
+
+describe("useDeskSession — email verification", () => {
+  it("reports email-verified, not signed-in, when the URL carries a signup verification marker", async () => {
+    window.history.replaceState(null, "", "/#access_token=t&type=signup");
+    mockGetSession.mockResolvedValue({ data: { session: { user: USER } } });
+
+    const { result } = renderHook(() => useDeskSession());
+
+    await waitFor(() => expect(result.current.status).toBe("email-verified"));
+    expect(result.current).toMatchObject({ userId: "u1", email: "amara@example.com" });
+  });
+
+  it("acknowledge() transitions straight to signed-in without a second sign-in", async () => {
+    // Regression test: the "Continue" button on the verification success
+    // screen used to only change AuthFlow's own local UI state — it never
+    // told useDeskSession anything, so this status never cleared and
+    // DeskAuthGate kept refusing to render the app even though the user
+    // already held a valid session from Supabase's auto sign-in on
+    // verification. acknowledge() is the fix: it must actually flip the
+    // reported status.
+    window.history.replaceState(null, "", "/#access_token=t&type=signup");
+    mockGetSession.mockResolvedValue({ data: { session: { user: USER } } });
+
+    const { result } = renderHook(() => useDeskSession());
+    await waitFor(() => expect(result.current.status).toBe("email-verified"));
+
+    if (result.current.status !== "email-verified") throw new Error("expected email-verified");
+    result.current.acknowledge();
+
+    await waitFor(() => expect(result.current.status).toBe("signed-in"));
+    expect(result.current).toMatchObject({ status: "signed-in", userId: "u1", email: "amara@example.com" });
+  });
+
+  it("does not fall back into email-verified on a later SIGNED_IN event after acknowledge()", async () => {
+    // Without clearing the closure flag, a token refresh or re-authentication
+    // firing SIGNED_IN after acknowledge() would resolve back into
+    // "email-verified" and re-trap the user on the confirmation screen.
+    window.history.replaceState(null, "", "/#access_token=t&type=signup");
+    mockGetSession.mockResolvedValue({ data: { session: { user: USER } } });
+
+    const { result } = renderHook(() => useDeskSession());
+    await waitFor(() => expect(result.current.status).toBe("email-verified"));
+
+    if (result.current.status !== "email-verified") throw new Error("expected email-verified");
+    result.current.acknowledge();
+    await waitFor(() => expect(result.current.status).toBe("signed-in"));
+
+    authChangeHandler?.("SIGNED_IN", { user: USER });
+    await waitFor(() => expect(result.current.status).toBe("signed-in"));
+  });
+});

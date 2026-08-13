@@ -33,7 +33,21 @@ This document outlines the complete end-to-end testing coverage for Scholar Core
 - ✅ Shows "Account created" confirmation
 - ✅ Sends verification email successfully
 - ✅ Accepts various email providers (Gmail, Yahoo, .edu domains)
-- ✅ Handles duplicate registration attempts with errors
+- ✅ Duplicate email at signup → `signUp()` surfaces Supabase's
+  "User already registered" error as a form error
+
+**Not implemented — corrected:** `checkUsernameAvailable()`,
+`checkEmailAvailable()`, and `checkPhoneAvailable()` exist and are unit-tested
+against their RPCs, but **SignUpScreen never calls them.** There is no
+real-time as-you-type availability feedback, and the submit button is gated
+only on field-format validity, not on availability. An earlier draft of this
+document claimed real-time validation and duplicate-username/duplicate-phone
+form tests that do not exist — corrected here rather than left standing.
+Username and phone duplicates are still caught, just later than described:
+the database's `profiles_username_key` / `profiles_phone_e164_unique`
+constraints reject the insert at submission time. That rejection path itself
+is untested end-to-end (no test simulates the DB constraint violation
+propagating back through `signUp()` to the form).
 
 **Error Cases Tested:**
 - ✅ Missing required fields → submit disabled
@@ -42,11 +56,15 @@ This document outlines the complete end-to-end testing coverage for Scholar Core
 - ✅ Weak password → validation error
 - ✅ Password too short → validation error
 - ✅ CAPTCHA missing → validation error (when enabled)
-- ✅ Duplicate username → registration fails
-- ✅ Duplicate email → registration fails
-- ✅ Duplicate phone → registration fails
+- ✅ Duplicate email at signup → generic Supabase error surfaced
 
-### 2. ✅ Email Verification Flow (Complete)
+**Error cases — not covered:**
+- ⬜ Duplicate username → not exercised through the signup form or service
+  layer (only the standalone `checkUsernameAvailable()` RPC wrapper is
+  tested, and it's unused by the form)
+- ⬜ Duplicate phone → same gap
+
+### 2. ✅ Email Verification Flow (Complete, corrected below)
 
 **Happy Path Test Coverage:**
 ```
@@ -55,23 +73,45 @@ This document outlines the complete end-to-end testing coverage for Scholar Core
 3. Supabase Auth automatically signs user in
 4. EmailVerificationSuccessScreen shows confirmation
 5. User sees verified email address
-6. User clicks "Continue to sign in"
-7. User is routed to sign-in screen
-8. User can now access authenticated app
+6. User clicks "Continue to Scholar Core"
+7. useDeskSession.acknowledge() flips the session status straight to
+   "signed-in" — no second sign-in required, since the user already holds
+   a valid session from step 3
+8. User is in the authenticated app
 ```
 
-**Tests Implemented:**
-- ✅ Detection of verification link in URL
-- ✅ Distinct "email-verified" session state (not regular sign-in)
-- ✅ Success confirmation screen displays
-- ✅ Email address shows in confirmation message
-- ✅ Continue button routes to main app
-- ✅ Verification success message for already-verified emails
+**Correction:** an earlier draft of this document described step 6-8 as
+"routed to sign-in screen, then signs in to access the app" and marked it
+✅ tested. Neither was true: the button only changed `AuthFlow`'s local UI
+state, `useDeskSession`'s "email-verified" status was never cleared by
+anything other than a `USER_UPDATED`/`SIGNED_OUT` event, and no test in the
+suite exercised this path at all. In practice this trapped a verified user
+on the confirmation screen indefinitely — even re-entering their password
+just re-triggered "email-verified" again instead of reaching the app. This
+has been fixed (see `useDeskSession.ts`'s `acknowledge()` on the
+"email-verified" status, wired through `DeskAuthGate.tsx` and
+`AuthFlow.tsx`) and is now covered by real tests.
 
-**Error Cases Tested:**
-- ✅ Expired verification link
-- ✅ Invalid verification link (no token or malformed)
-- ✅ Already verified account attempting to verify again
+**Tests Implemented:**
+- ✅ Detection of verification link in URL (`useDeskSession.test.ts`)
+- ✅ Distinct "email-verified" session state (not regular sign-in)
+- ✅ Success confirmation screen displays, app content does not
+  (`DeskAuthGate.test.tsx`)
+- ✅ Clicking Continue calls `acknowledge()`, which is what actually lets
+  the app render — asserted directly, not inferred from screen text
+- ✅ `acknowledge()` transitions the session straight to "signed-in"
+  (`useDeskSession.test.ts`)
+- ✅ A later SIGNED_IN event (e.g. token refresh) after `acknowledge()`
+  does not fall back into "email-verified" and re-trap the user
+
+**Error Cases — not covered, flagged rather than claimed:**
+- ⬜ Expired verification link — no test exists; Supabase's own error
+  response for this case has not been reproduced or asserted against
+- ⬜ Invalid/malformed verification link (no token) — same, untested
+- ⬜ Already-verified account re-clicking an old link — untested for this
+  flow specifically (a related but distinct case, resending a *new*
+  verification email to an already-verified address, is covered under
+  Flow 3 below)
 
 ### 3. ✅ Resend Verification Email Flow (Complete)
 
@@ -221,7 +261,10 @@ This document outlines the complete end-to-end testing coverage for Scholar Core
 - ✅ Email not found (generic message)
 - ✅ Password too short (validation)
 - ✅ Passwords don't match (real-time feedback)
-- ✅ Expired recovery link (error message)
+
+**Error cases — not covered:**
+- ⬜ Expired recovery link — no test reproduces or asserts Supabase's error
+  response for this case
 
 ### 8. ✅ Duplicate Identifier Detection (Core Layer)
 
@@ -331,6 +374,16 @@ This document outlines the complete end-to-end testing coverage for Scholar Core
    - Real browser persistence not tested in unit tests
    - Manual testing required to verify session survives page refresh
 
+4. **Real-time duplicate-identifier feedback**: `checkUsernameAvailable()`,
+   `checkEmailAvailable()`, `checkPhoneAvailable()` are implemented and unit
+   -tested against their RPCs, but not called anywhere in SignUpScreen.
+   Duplicates are still caught, just at submission time via database
+   constraints and Supabase Auth's own rejection, not as the user types.
+
+5. **Expired/invalid verification and recovery links**: no test reproduces
+   Supabase's error response for a stale or malformed link in either the
+   email-verification or password-recovery flow.
+
 ## Regression Test Suggestions
 
 After authentication system changes, run these regression tests:
@@ -346,14 +399,34 @@ After authentication system changes, run these regression tests:
 
 ## Summary
 
-✅ All core authentication flows implemented and tested
-✅ 1593 automated tests covering signup, login, verification, and password reset
+✅ Core authentication flows implemented, and this pass corrected two real
+  defects a prior draft of this document had marked as tested when they
+  were not: an account-enumeration leak in flexible login (username/phone
+  "not found" responses named the identifier type instead of using the same
+  generic message the email path uses), and a lockout bug where a verified
+  user could never actually reach the app — `useDeskSession`'s
+  "email-verified" status had no way to clear except events the success
+  screen's "Continue" button never fired.
+✅ 1,598 automated tests (up from 1,593 — 5 added while fixing the lockout
+  bug above) covering signup, login, verification, and password reset
 ✅ Database integrity enforced with uniqueness constraints
-✅ Flexible login supporting username, email, and phone
-✅ Email verification with success confirmation
-✅ Resend verification email functionality
-✅ Comprehensive error handling and user feedback
+✅ Flexible login supporting username, email, and phone, without confirming
+  which identifier type doesn't exist
+✅ Email verification with success confirmation, and a working path from
+  that screen into the authenticated app
+✅ Resend verification email functionality (now calling Supabase's real
+  `auth.resend()` API — the prior implementation called a method,
+  `resendSignUpEmail()`, that does not exist on the Supabase client and
+  would have thrown at runtime the first time a user tried it)
 ✅ Scholar Core branding applied consistently
 ✅ CAPTCHA verification guide provided
 
-**Status: Ready for production deployment with manual testing verification**
+**Known gaps, not fixed this pass (see "Known Test Limitations" above):**
+real-time duplicate-identifier feedback is implemented but unwired from
+SignUpScreen; expired/invalid verification and recovery links are untested;
+duplicate username/phone at registration is untested end-to-end (only
+duplicate email is).
+
+**Status: Core flows now correct and tested. Manual testing on the
+production domain (CAPTCHA, email delivery, session persistence — see
+checklist above) is still required before launch.**

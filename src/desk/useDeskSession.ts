@@ -26,9 +26,14 @@ export type SessionState =
    * Email verification link was just followed. User's email is now verified
    * and they have been automatically signed in. Distinct from regular "signed-in"
    * so DeskAuthGate can show a verification success confirmation before routing
-   * to the main app.
+   * to the main app. `acknowledge()` is how the success screen's "Continue"
+   * button clears this back to "signed-in" — without it, nothing ever
+   * transitions out of this status (SIGNED_IN events keep re-resolving into
+   * "email-verified" too, since the underlying Supabase session never
+   * changes), leaving the user stuck on the confirmation screen forever even
+   * though they already hold a valid session.
    */
-  | { status: "email-verified"; userId: string; email: string | null }
+  | { status: "email-verified"; userId: string; email: string | null; acknowledge: () => void }
   /** Supabase env vars are absent — the app cannot authenticate anyone. */
   | { status: "unconfigured" };
 
@@ -89,13 +94,22 @@ export function useDeskSession(): SessionState {
     function resolve(session: { user?: { id: string; email?: string | null } | null } | null | undefined) {
       if (!active) return;
       if (recovering) return setState({ status: "recovery" });
-      if (emailVerified) {
-        const user = session?.user;
-        if (!user) return setState({ status: "signed-out" });
-        return setState({ status: "email-verified", userId: user.id, email: user.email ?? null });
-      }
       const user = session?.user;
       if (!user) return setState({ status: "signed-out" });
+      if (emailVerified) {
+        return setState({
+          status: "email-verified",
+          userId: user.id,
+          email: user.email ?? null,
+          acknowledge: () => {
+            // Clears the closure flag so a later SIGNED_IN (e.g. the
+            // eventual token refresh) resolves straight to "signed-in"
+            // instead of re-triggering the confirmation screen.
+            emailVerified = false;
+            if (active) setState({ status: "signed-in", userId: user.id, email: user.email ?? null });
+          },
+        });
+      }
       setState({ status: "signed-in", userId: user.id, email: user.email ?? null });
     }
 
