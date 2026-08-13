@@ -116,7 +116,7 @@ describe("sign in", () => {
     navigateToSignIn();
     // A placeholder is not a label: it vanishes on focus and is not reliably
     // announced.
-    expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    expect(screen.getByLabelText("User ID, email, or mobile number")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
   });
 
@@ -129,7 +129,7 @@ describe("sign in", () => {
     signIn.mockResolvedValue({ success: false, error: "Incorrect password credentials." });
     navigateToSignIn();
 
-    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "amara" } });
+    fireEvent.change(screen.getByLabelText("User ID, email, or mobile number"), { target: { value: "amara" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret123" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
@@ -138,7 +138,7 @@ describe("sign in", () => {
 
   it("does not navigate on success — the session subscription does that", async () => {
     navigateToSignIn();
-    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "amara" } });
+    fireEvent.change(screen.getByLabelText("User ID, email, or mobile number"), { target: { value: "amara" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret123" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
@@ -225,7 +225,7 @@ describe("registration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(await screen.findByText(/Account created/i)).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(/check your email/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/Check your inbox/i);
   });
 
   it("passes the structured phone and role fields through to signUp", async () => {

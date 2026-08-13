@@ -61,6 +61,10 @@ import {
   requestProfileUpdate,
   onPasswordRecovery,
   onGoogleSignIn,
+  checkUsernameAvailable,
+  checkEmailAvailable,
+  checkPhoneAvailable,
+  resendVerificationEmail,
 } from "../supabaseAuthService";
 
 beforeEach(() => {
@@ -174,6 +178,51 @@ describe("signIn", () => {
     expect(mockRpc).toHaveBeenCalledWith("email_for_username", { lookup_username: "jdoe" });
   });
 
+  it("resolves email directly and signs in (unified login via email)", async () => {
+    mockAuth.signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    mockFrom.mockReturnValue(
+      makeChainable({
+        data: { full_name: "Jane Doe", phone: "", affiliation: "State University", account_status: "active" },
+        error: null,
+      })
+    );
+
+    const result = await signIn({ username: "jane@example.com", password: "hunter2-hunter2" });
+
+    expect(result.success).toBe(true);
+    expect(result.profile?.email).toBe("jane@example.com");
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockAuth.signInWithPassword).toHaveBeenCalledWith({
+      email: "jane@example.com",
+      password: "hunter2-hunter2",
+      options: { captchaToken: undefined },
+    });
+  });
+
+  it("resolves phone number in E.164 format to email and signs in (unified login via phone)", async () => {
+    mockRpc.mockResolvedValue({ data: "jane@example.com", error: null });
+    mockAuth.signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    mockFrom.mockReturnValue(
+      makeChainable({
+        data: { full_name: "Jane Doe", phone: "5550100", phone_country_code: "+1", affiliation: "State University", account_status: "active" },
+        error: null,
+      })
+    );
+
+    const result = await signIn({ username: "+15550100", password: "hunter2-hunter2" });
+
+    expect(result.success).toBe(true);
+    expect(result.profile?.email).toBe("jane@example.com");
+    expect(mockRpc).toHaveBeenCalledWith("email_for_phone_e164", { lookup_phone_e164: "+15550100" });
+  });
+
+  it("rejects truly invalid identifier format (with special characters)", async () => {
+    const result = await signIn({ username: "user name@!", password: "hunter2-hunter2" });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Invalid");
+  });
+
   it("blocks login with a clear message when the account is restricted", async () => {
     mockRpc.mockResolvedValue({ data: "jane@example.com", error: null });
     mockAuth.signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
@@ -199,6 +248,25 @@ describe("signIn", () => {
     expect(mockAuth.signInWithPassword).not.toHaveBeenCalled();
   });
 
+  it("fails cleanly when no profile exists for the given email", async () => {
+    mockAuth.signInWithPassword.mockResolvedValue({ data: { user: null }, error: { message: "Invalid login credentials" } });
+
+    const result = await signIn({ username: "nonexistent@example.com", password: "x" });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Incorrect password. Please try again.");
+    expect(mockAuth.signInWithPassword).toHaveBeenCalled();
+  });
+
+  it("fails cleanly when no profile exists for the given phone number", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null });
+
+    const result = await signIn({ username: "+19999999999", password: "x" });
+
+    expect(result.success).toBe(false);
+    expect(mockAuth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
   it("reports incorrect password without leaking whether the account exists", async () => {
     mockRpc.mockResolvedValue({ data: "jane@example.com", error: null });
     mockAuth.signInWithPassword.mockResolvedValue({ data: { user: null }, error: { message: "Invalid login credentials" } });
@@ -206,7 +274,7 @@ describe("signIn", () => {
     const result = await signIn({ username: "jdoe", password: "wrong" });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Incorrect password credentials.");
+    expect(result.error).toBe("Incorrect password. Please try again.");
   });
 });
 
@@ -411,6 +479,91 @@ describe("requestProfileUpdate", () => {
     // Deterministic: hashing the same key again must produce the identical digest.
     const again = await requestProfileUpdate({ username: "jdoe", pendingPhone: "555-0100" });
     expect(again.keyHash).toBe(result.keyHash);
+  });
+});
+
+describe("resendVerificationEmail", () => {
+  it("successfully resends verification email", async () => {
+    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: null });
+    const result = await resendVerificationEmail({ email: "user@example.com" });
+    expect(result.success).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(mockAuth.resendSignUpEmail).toHaveBeenCalledWith("user@example.com");
+  });
+
+  it("handles user not found error", async () => {
+    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: { message: "user_not_found" } });
+    const result = await resendVerificationEmail({ email: "nonexistent@example.com" });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("No account found");
+  });
+
+  it("handles already verified error", async () => {
+    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: { message: "already confirmed" } });
+    const result = await resendVerificationEmail({ email: "verified@example.com" });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("already been verified");
+  });
+
+  it("handles generic errors gracefully", async () => {
+    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: { message: "Email service error", status: 500 } });
+    const result = await resendVerificationEmail({ email: "user@example.com" });
+    expect(result.success).toBe(false);
+    // Error should be a helpful message, not the raw error
+    expect(result.error).toBeDefined();
+  });
+});
+
+describe("availability checks", () => {
+  it("checkUsernameAvailable returns true when username is available", async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
+    const result = await checkUsernameAvailable("newuser");
+    expect(result).toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith("check_username_available", { lookup_username: "newuser" });
+  });
+
+  it("checkUsernameAvailable returns false when username is taken", async () => {
+    mockRpc.mockResolvedValue({ data: false, error: null });
+    const result = await checkUsernameAvailable("existinguser");
+    expect(result).toBe(false);
+  });
+
+  it("checkUsernameAvailable handles RPC errors gracefully", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "RPC error" } });
+    const result = await checkUsernameAvailable("someuser");
+    expect(result).toBe(false);
+  });
+
+  it("checkEmailAvailable returns true when email is available", async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
+    const result = await checkEmailAvailable("new@example.com");
+    expect(result).toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith("check_email_available", { lookup_email: "new@example.com" });
+  });
+
+  it("checkEmailAvailable returns false when email is taken", async () => {
+    mockRpc.mockResolvedValue({ data: false, error: null });
+    const result = await checkEmailAvailable("existing@example.com");
+    expect(result).toBe(false);
+  });
+
+  it("checkPhoneAvailable returns true when phone is available", async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
+    const result = await checkPhoneAvailable("+15550000000");
+    expect(result).toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith("check_phone_available", { lookup_phone_e164: "+15550000000" });
+  });
+
+  it("checkPhoneAvailable returns false when phone is taken", async () => {
+    mockRpc.mockResolvedValue({ data: false, error: null });
+    const result = await checkPhoneAvailable("+15559999999");
+    expect(result).toBe(false);
+  });
+
+  it("checkPhoneAvailable handles RPC errors gracefully", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "RPC error" } });
+    const result = await checkPhoneAvailable("+15550100000");
+    expect(result).toBe(false);
   });
 });
 
