@@ -25,7 +25,9 @@ export type AuthScreen =
   /** Setting a new password inside a recovery session. */
   | "recover"
   /** Registration submitted; email verification is on its way. */
-  | "registered";
+  | "registered"
+  /** Email verification link was clicked; email is now verified. */
+  | "email-verification-success";
 
 /**
  * Password rule, applied at the form so the failure is immediate rather than a

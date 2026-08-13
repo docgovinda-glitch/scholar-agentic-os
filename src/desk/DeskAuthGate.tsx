@@ -53,6 +53,9 @@ export default function DeskAuthGate({ children }: { children: ReactNode }) {
   // "recovery" status doc comment for why AuthFlow can't be trusted to
   // rediscover this on its own.
   if (session.status === "recovery") return <AuthFlow initialScreen="recover" />;
+  // Email verification link was followed: show success screen before allowing
+  // the user to proceed to the authenticated app.
+  if (session.status === "email-verified") return <AuthFlow initialScreen="email-verification-success" verifiedEmail={session.email} />;
 
   return <>{children}</>;
 }

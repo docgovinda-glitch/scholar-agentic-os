@@ -45,7 +45,13 @@ import ScholarCoreLanding from "../ScholarCoreLanding";
  * so a successful sign-in needs no navigation of its own — pushing a route
  * here would race that subscription.
  */
-export default function AuthFlow({ initialScreen = "landing" }: { initialScreen?: AuthScreen } = {}) {
+export default function AuthFlow({
+  initialScreen = "landing",
+  verifiedEmail,
+}: {
+  initialScreen?: AuthScreen;
+  verifiedEmail?: string | null;
+} = {}) {
   const [screen, setScreen] = useState<AuthScreen>(initialScreen);
 
   // Belt-and-suspenders: useDeskSession is the authoritative recovery-link
@@ -73,6 +79,8 @@ export default function AuthFlow({ initialScreen = "landing" }: { initialScreen?
       return <RecoverScreen onDone={() => setScreen("sign-in")} />;
     case "registered":
       return <RegisteredScreen onBack={() => setScreen("sign-in")} />;
+    case "email-verification-success":
+      return <EmailVerificationSuccessScreen email={verifiedEmail} onContinue={() => setScreen("sign-in")} />;
     default:
       return (
         <SignInScreen
@@ -386,6 +394,33 @@ function RegisteredScreen({ onBack }: { onBack: () => void }) {
       </AuthNotice>
       <div className="mt-6">
         <AuthLink onClick={onBack}>Back to sign in</AuthLink>
+      </div>
+    </AuthShell>
+  );
+}
+
+function EmailVerificationSuccessScreen({ email, onContinue }: { email?: string | null; onContinue: () => void }) {
+  return (
+    <AuthShell>
+      <AuthHeading title="Email verified!" subtitle="Your account is now active and ready to use." />
+      <AuthNotice>
+        {email ? (
+          <>
+            Your email address <strong>{email}</strong> has been successfully verified. You can now sign in to Scholar Core and access all features.
+          </>
+        ) : (
+          <>
+            Your email address has been successfully verified. You can now sign in to Scholar Core and access all features.
+          </>
+        )}
+      </AuthNotice>
+      <div className="mt-6">
+        <button
+          onClick={onContinue}
+          className="w-full rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
+        >
+          Continue to sign in
+        </button>
       </div>
     </AuthShell>
   );
