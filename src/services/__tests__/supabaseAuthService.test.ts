@@ -174,6 +174,51 @@ describe("signIn", () => {
     expect(mockRpc).toHaveBeenCalledWith("email_for_username", { lookup_username: "jdoe" });
   });
 
+  it("resolves email directly and signs in (unified login via email)", async () => {
+    mockAuth.signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    mockFrom.mockReturnValue(
+      makeChainable({
+        data: { full_name: "Jane Doe", phone: "", affiliation: "State University", account_status: "active" },
+        error: null,
+      })
+    );
+
+    const result = await signIn({ username: "jane@example.com", password: "hunter2-hunter2" });
+
+    expect(result.success).toBe(true);
+    expect(result.profile?.email).toBe("jane@example.com");
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockAuth.signInWithPassword).toHaveBeenCalledWith({
+      email: "jane@example.com",
+      password: "hunter2-hunter2",
+      options: { captchaToken: undefined },
+    });
+  });
+
+  it("resolves phone number in E.164 format to email and signs in (unified login via phone)", async () => {
+    mockRpc.mockResolvedValue({ data: "jane@example.com", error: null });
+    mockAuth.signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    mockFrom.mockReturnValue(
+      makeChainable({
+        data: { full_name: "Jane Doe", phone: "5550100", phone_country_code: "+1", affiliation: "State University", account_status: "active" },
+        error: null,
+      })
+    );
+
+    const result = await signIn({ username: "+15550100", password: "hunter2-hunter2" });
+
+    expect(result.success).toBe(true);
+    expect(result.profile?.email).toBe("jane@example.com");
+    expect(mockRpc).toHaveBeenCalledWith("email_for_phone_e164", { lookup_phone_e164: "+15550100" });
+  });
+
+  it("rejects truly invalid identifier format (with special characters)", async () => {
+    const result = await signIn({ username: "user name@!", password: "hunter2-hunter2" });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Invalid");
+  });
+
   it("blocks login with a clear message when the account is restricted", async () => {
     mockRpc.mockResolvedValue({ data: "jane@example.com", error: null });
     mockAuth.signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
@@ -199,6 +244,25 @@ describe("signIn", () => {
     expect(mockAuth.signInWithPassword).not.toHaveBeenCalled();
   });
 
+  it("fails cleanly when no profile exists for the given email", async () => {
+    mockAuth.signInWithPassword.mockResolvedValue({ data: { user: null }, error: { message: "Invalid login credentials" } });
+
+    const result = await signIn({ username: "nonexistent@example.com", password: "x" });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Incorrect password. Please try again.");
+    expect(mockAuth.signInWithPassword).toHaveBeenCalled();
+  });
+
+  it("fails cleanly when no profile exists for the given phone number", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null });
+
+    const result = await signIn({ username: "+19999999999", password: "x" });
+
+    expect(result.success).toBe(false);
+    expect(mockAuth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
   it("reports incorrect password without leaking whether the account exists", async () => {
     mockRpc.mockResolvedValue({ data: "jane@example.com", error: null });
     mockAuth.signInWithPassword.mockResolvedValue({ data: { user: null }, error: { message: "Invalid login credentials" } });
@@ -206,7 +270,7 @@ describe("signIn", () => {
     const result = await signIn({ username: "jdoe", password: "wrong" });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Incorrect password credentials.");
+    expect(result.error).toBe("Incorrect password. Please try again.");
   });
 });
 

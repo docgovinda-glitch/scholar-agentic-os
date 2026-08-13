@@ -116,7 +116,15 @@ function SignInScreen({
     <AuthShell>
       <AuthHeading title="Sign in" subtitle="Reach your work." />
       <AuthForm onSubmit={handleSubmit}>
-        <Field id="username" label="Username" value={username} onChange={setUsername} autoComplete="username" autoFocus />
+        <Field
+          id="username"
+          label="User ID, email, or mobile number"
+          value={username}
+          onChange={setUsername}
+          autoComplete="username"
+          hint="Enter your username, email address, or mobile number in E.164 format (e.g., +15551234567)"
+          autoFocus
+        />
         <Field
           id="password"
           label="Password"

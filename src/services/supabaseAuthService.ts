@@ -132,7 +132,7 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
 }
 
 export interface SignInInput {
-  username: string;
+  username: string; // Actually a flexible identifier: username, email, or mobile number
   password: string;
   captchaToken?: string;
 }
@@ -147,25 +147,95 @@ export interface SignInResult extends ServiceResult {
 }
 
 /**
- * Logs in by username (resolved to an email via the email_for_username RPC).
+ * Detect the type of login identifier the user entered.
  *
- * Carries a CAPTCHA token for the same reason signUp() does, and it is not
- * optional in practice: Supabase Auth's CAPTCHA setting is per-PROJECT, not
- * per-endpoint. Switching it on protects the password grant behind this call
- * and the /recover endpoint behind sendPasswordResetEmail() at the same moment
- * it protects signup — so a sign-in that sends no token stops working the
- * instant CAPTCHA is enabled, locking out every existing user. All three call
- * sites therefore pass one.
+ * Returns the RPC function name to call for that identifier type.
+ * Auto-detection allows users to sign in with:
+ *   - Username (e.g., "john_doe")
+ *   - Email (e.g., "john@example.com")
+ *   - Mobile number in E.164 format (e.g., "+19800000000")
+ */
+function detectIdentifierType(identifier: string): "username" | "email" | "phone" | "unknown" {
+  identifier = identifier.trim();
+
+  // E.164 phone format: starts with + followed by 1-3 digits (country code), then digits
+  // Examples: +19800000000, +977800000000, +442071838750
+  if (/^\+\d{1,3}\d{6,14}$/.test(identifier)) {
+    return "phone";
+  }
+
+  // Email: contains @ symbol and looks like valid email
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
+    return "email";
+  }
+
+  // Default to username (alphanumeric, underscore, dash, etc.)
+  if (/^[a-zA-Z0-9_-]{1,}$/.test(identifier)) {
+    return "username";
+  }
+
+  return "unknown";
+}
+
+/**
+ * Resolve a flexible login identifier (username, email, or phone) to an email address.
+ *
+ * Called during sign-in to get the email for Supabase Auth's signInWithPassword,
+ * which requires email even when the user logged in with username or phone.
+ */
+async function resolveIdentifierToEmail(identifier: string): Promise<{ email: string | null; error?: string }> {
+  const supabase = getSupabaseClient();
+  const type = detectIdentifierType(identifier);
+
+  if (type === "unknown") {
+    return { email: null, error: "Invalid User ID, email, or mobile number format." };
+  }
+
+  if (type === "username") {
+    const { data: email, error } = await supabase.rpc("email_for_username", {
+      lookup_username: identifier,
+    });
+    return { email: email ?? null, error: error ? "No account found with that User ID." : undefined };
+  }
+
+  if (type === "email") {
+    // Email lookup: directly query auth.users or use a dedicated RPC
+    // For now, we'll handle this on the next Supabase signInWithPassword call
+    // by trying email directly. If the email doesn't exist in auth.users,
+    // signInWithPassword will fail with "Invalid login credentials."
+    return { email: identifier };
+  }
+
+  if (type === "phone") {
+    const { data: email, error } = await supabase.rpc("email_for_phone_e164", {
+      lookup_phone_e164: identifier,
+    });
+    return { email: email ?? null, error: error ? "No account found with that mobile number." : undefined };
+  }
+
+  return { email: null, error: "Could not resolve login identifier." };
+}
+
+/**
+ * Logs in with flexible identifier support: username, email, or mobile number.
+ *
+ * Auto-detects which type of identifier was entered, resolves it to an email,
+ * then authenticates with Supabase Auth.
+ *
+ * Carries a CAPTCHA token for the same reason signUp() does: Supabase Auth's
+ * CAPTCHA setting is per-PROJECT, not per-endpoint. Switching it on protects
+ * the password grant behind this call and the /recover endpoint behind
+ * sendPasswordResetEmail() at the same moment it protects signup.
  */
 export async function signIn(input: SignInInput): Promise<SignInResult> {
   const supabase = getSupabaseClient();
 
-  const { data: email, error: lookupError } = await supabase.rpc("email_for_username", {
-    lookup_username: input.username,
-  });
+  // Resolve the flexible identifier (username, email, or phone) to an email address
+  const { email, error: resolveError } = await resolveIdentifierToEmail(input.username);
 
-  if (lookupError || !email) {
-    return { success: false, error: "No scholar found with that username." };
+  if (!email) {
+    // Provide a generic error that doesn't confirm/deny account existence
+    return { success: false, error: resolveError || "Invalid credentials. Please check your User ID, email, or mobile number and try again." };
   }
 
   const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -175,7 +245,7 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
   });
 
   if (signInError) {
-    return { success: false, error: "Incorrect password credentials." };
+    return { success: false, error: "Incorrect password. Please try again." };
   }
 
   const { data: profile, error: profileError } = await supabase

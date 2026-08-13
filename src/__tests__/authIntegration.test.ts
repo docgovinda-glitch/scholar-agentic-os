@@ -461,7 +461,7 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe("Incorrect password credentials.");
+      expect(result.error).toBe("Incorrect password. Please try again.");
     });
 
     it("includes retry-after information in rate limit response", async () => {
