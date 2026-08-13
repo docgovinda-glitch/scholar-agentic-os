@@ -157,15 +157,13 @@ describe("registration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create an account" }));
   }
 
-  /** Fills every required field except whatever the caller omits, so a test can isolate one gating condition at a time. */
+  /** Fills every required field except whatever the caller omits, so a test can isolate one gating condition at a time. Institution is intentionally not included — it's optional. */
   function fillSignUpForm({ skip = [] as string[] } = {}) {
     const textFields: Array<[string, string]> = [
       ["Full name", "Amara Okafor"],
       ["Username", "amara"],
       ["Email", "amara@example.com"],
       ["Phone", "9800000000"],
-      ["Institution", "Test University"],
-      ["Institutional ID", "S123"],
       ["Password", "longenough1"],
     ];
     for (const [label, value] of textFields) {
@@ -178,31 +176,19 @@ describe("registration", () => {
     if (!skip.includes("Level of Education")) {
       fireEvent.change(screen.getByLabelText("Level of Education"), { target: { value: "undergraduate" } });
     }
-    if (!skip.includes("Institutional ID Document")) {
-      const file = new File(["id-scan"], "id.pdf", { type: "application/pdf" });
-      fireEvent.change(screen.getByLabelText("Institutional ID Document"), { target: { files: [file] } });
-    }
   }
 
-  it("collects every field an administrator reviews", () => {
+  it("collects every field an administrator reviews, and none of the removed institutional-ID fields", () => {
     openSignUp();
-    for (const label of [
-      "Full name",
-      "Username",
-      "Email",
-      "Phone",
-      "Institution",
-      "Institutional ID",
-      "User Type",
-      "Level of Education",
-      "Institutional ID Document",
-      "Password",
-    ]) {
+    for (const label of ["Full name", "Username", "Email", "Phone", "Institution", "User Type", "Level of Education", "Password"]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByLabelText("Institutional ID")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Institutional ID Document")).not.toBeInTheDocument();
+    expect(screen.queryByText(/institutional id/i)).not.toBeInTheDocument();
   });
 
-  it("keeps submit disabled until all fields are valid", () => {
+  it("keeps submit disabled until all required fields are valid", () => {
     openSignUp();
     const submit = screen.getByRole("button", { name: "Create account" });
     expect(submit).toBeDisabled();
@@ -215,10 +201,11 @@ describe("registration", () => {
     expect(submit).toBeEnabled();
   });
 
-  it("keeps submit disabled without the institutional ID document, even with every other field valid", () => {
+  it("allows submission with Institution left blank — it is optional", () => {
     openSignUp();
-    fillSignUpForm({ skip: ["Institutional ID Document"] });
-    expect(screen.getByRole("button", { name: "Create account" })).toBeDisabled();
+    fillSignUpForm();
+    expect(screen.getByLabelText("Institution")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Create account" })).toBeEnabled();
   });
 
   it("shows a confirmation that the account was created", async () => {
@@ -245,6 +232,24 @@ describe("registration", () => {
         })
       )
     );
+  });
+
+  it.each([
+    "scholar@gmail.com",
+    "scholar@yahoo.com",
+    "scholar@outlook.com",
+    "scholar@protonmail.com",
+    "scholar@tribhuvan.edu.np",
+    "scholar@my-research-lab.org",
+  ])("accepts %s — no Gmail-only or provider-specific restriction", async (email) => {
+    openSignUp();
+    fillSignUpForm();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: email } });
+    const submit = screen.getByRole("button", { name: "Create account" });
+    expect(submit).toBeEnabled();
+
+    fireEvent.click(submit);
+    await waitFor(() => expect(signUp).toHaveBeenCalledWith(expect.objectContaining({ email })));
   });
 });
 

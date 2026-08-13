@@ -33,8 +33,6 @@ const mockAuth = {
 const mockFrom = vi.fn();
 const mockRpc = vi.fn();
 const mockFunctionsInvoke = vi.fn();
-const mockStorageUpload = vi.fn();
-const mockStorage = { from: vi.fn(() => ({ upload: mockStorageUpload })) };
 // Every existing test in this file assumes a configured Supabase project —
 // default true so none of them need to know this mock exists. The
 // onPasswordRecovery/onGoogleSignIn regression tests below flip it to
@@ -47,7 +45,6 @@ vi.mock("../supabaseClient", () => ({
     from: mockFrom,
     rpc: mockRpc,
     functions: { invoke: mockFunctionsInvoke },
-    storage: mockStorage,
   }),
   isSupabaseConfigured: () => mockIsSupabaseConfigured(),
 }));
@@ -57,7 +54,6 @@ import {
   signIn,
   getProfile,
   saveProfileFields,
-  uploadIdDocument,
   saveModelPreferences,
   saveApiKeys,
   sendPasswordResetEmail,
@@ -83,7 +79,6 @@ describe("signUp", () => {
       phone: "5550100",
       phoneCountryCode: "+1",
       affiliation: "State University",
-      authenticId: "None",
       userType: "student",
       educationLevel: "undergraduate",
       password: "hunter2-hunter2",
@@ -102,6 +97,46 @@ describe("signUp", () => {
     );
   });
 
+  it("never sends authentic_id — institutional ID was removed completely", async () => {
+    mockAuth.signUp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+
+    await signUp({
+      username: "jdoe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      phone: "5550100",
+      phoneCountryCode: "+1",
+      affiliation: "State University",
+      userType: "student",
+      educationLevel: "undergraduate",
+      password: "hunter2-hunter2",
+    });
+
+    const [[callArgs]] = mockAuth.signUp.mock.calls;
+    expect(callArgs.options.data).not.toHaveProperty("authentic_id");
+  });
+
+  it("allows affiliation to be sent as an empty string — Institution is optional", async () => {
+    mockAuth.signUp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+
+    const result = await signUp({
+      username: "jdoe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      phone: "5550100",
+      phoneCountryCode: "+1",
+      affiliation: "",
+      userType: "student",
+      educationLevel: "undergraduate",
+      password: "hunter2-hunter2",
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockAuth.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({ options: expect.objectContaining({ data: expect.objectContaining({ affiliation: "" }) }) })
+    );
+  });
+
   it("surfaces a Supabase Auth error", async () => {
     mockAuth.signUp.mockResolvedValue({ data: { user: null }, error: { message: "User already registered" } });
 
@@ -112,7 +147,6 @@ describe("signUp", () => {
       phone: "",
       phoneCountryCode: "+1",
       affiliation: "State University",
-      authenticId: "None",
       userType: "student",
       educationLevel: "undergraduate",
       password: "hunter2-hunter2",
@@ -128,7 +162,7 @@ describe("signIn", () => {
     mockAuth.signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
     mockFrom.mockReturnValue(
       makeChainable({
-        data: { full_name: "Jane Doe", phone: "", affiliation: "State University", authentic_id: "None", account_status: "active" },
+        data: { full_name: "Jane Doe", phone: "", affiliation: "State University", account_status: "active" },
         error: null,
       })
     );
@@ -145,7 +179,7 @@ describe("signIn", () => {
     mockAuth.signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
     mockFrom.mockReturnValue(
       makeChainable({
-        data: { full_name: "Jane Doe", phone: "", affiliation: "State University", authentic_id: "None", account_status: "restricted" },
+        data: { full_name: "Jane Doe", phone: "", affiliation: "State University", account_status: "restricted" },
         error: null,
       })
     );
@@ -184,7 +218,7 @@ describe("getProfile", () => {
     expect(result).toEqual({ success: false, error: "Not signed in." });
   });
 
-  it("combines the profiles row with auth.getUser()'s email, never a duplicated copy from `profiles`", async () => {
+  it("combines the profiles row with auth.getUser()'s email, never a duplicated copy from `profiles`, and carries no institutional-ID field", async () => {
     mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", email: "jane@example.com" } }, error: null });
     mockFrom.mockReturnValue(
       makeChainable({
@@ -195,11 +229,8 @@ describe("getProfile", () => {
           phone_country_code: "+1",
           phone_e164: "+15550100",
           affiliation: "State University",
-          authentic_id: "S-1",
           user_type: "student",
           education_level: "undergraduate",
-          id_verification_status: "verification_required",
-          id_document_path: null,
         },
         error: null,
       })
@@ -216,18 +247,40 @@ describe("getProfile", () => {
         phoneCountryCode: "+1",
         phoneE164: "+15550100",
         affiliation: "State University",
-        authenticId: "S-1",
         userType: "student",
         educationLevel: "undergraduate",
-        idVerificationStatus: "verification_required",
-        idDocumentPath: null,
       },
     });
+  });
+
+  it("defaults affiliation to an empty string rather than throwing when a row has none", async () => {
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", email: "jane@example.com" } }, error: null });
+    mockFrom.mockReturnValue(
+      makeChainable({
+        data: {
+          username: "jdoe",
+          full_name: "Jane Doe",
+          phone: "",
+          phone_country_code: "",
+          phone_e164: null,
+          affiliation: null,
+          user_type: null,
+          education_level: null,
+        },
+        error: null,
+      })
+    );
+
+    const result = await getProfile();
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.profile.affiliation).toBe("");
+    }
   });
 });
 
 describe("saveProfileFields", () => {
-  it("never accepts username or idVerificationStatus — both are out of scope for this form", async () => {
+  it("never accepts username — out of scope for this form — and never sends authentic_id", async () => {
     mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
     mockFrom.mockReturnValue(makeChainable({ data: null, error: null }));
 
@@ -236,7 +289,6 @@ describe("saveProfileFields", () => {
       phone: "5550100",
       phoneCountryCode: "+1",
       affiliation: "State University",
-      authenticId: "S-1",
       userType: "student",
       educationLevel: "undergraduate",
     });
@@ -244,48 +296,23 @@ describe("saveProfileFields", () => {
     expect(result.success).toBe(true);
     expect(mockFrom).toHaveBeenCalledWith("profiles");
   });
-});
 
-describe("uploadIdDocument", () => {
-  it("requires an active session", async () => {
-    mockAuth.getUser.mockResolvedValue({ data: { user: null }, error: null });
-    const file = new File(["scan"], "id.pdf", { type: "application/pdf" });
-    const result = await uploadIdDocument(file);
-    expect(result).toEqual({ success: false, error: "Not signed in." });
-  });
-
-  it("rejects an unaccepted file type before ever calling Storage", async () => {
+  it("allows saving an empty affiliation — Institution is optional", async () => {
     mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
-    const file = new File(["scan"], "id.txt", { type: "text/plain" });
-    const result = await uploadIdDocument(file);
-    expect(result.success).toBe(false);
-    expect(mockStorageUpload).not.toHaveBeenCalled();
-  });
+    const update = vi.fn(() => makeChainable({ data: null, error: null }));
+    mockFrom.mockReturnValue({ ...makeChainable({ data: null, error: null }), update });
 
-  it("uploads to id-documents under the user's own folder, then calls submit_id_document", async () => {
-    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
-    mockStorageUpload.mockResolvedValue({ data: { path: "u1/some-file.pdf" }, error: null });
-    mockRpc.mockResolvedValue({ data: null, error: null });
+    const result = await saveProfileFields({
+      fullName: "Jane Doe",
+      phone: "5550100",
+      phoneCountryCode: "+1",
+      affiliation: "",
+      userType: "student",
+      educationLevel: "undergraduate",
+    });
 
-    const file = new File(["scan"], "id.pdf", { type: "application/pdf" });
-    const result = await uploadIdDocument(file);
-
-    expect(result).toEqual({ success: true });
-    expect(mockStorage.from).toHaveBeenCalledWith("id-documents");
-    const [path] = mockStorageUpload.mock.calls[0];
-    expect(path.startsWith("u1/")).toBe(true);
-    expect(mockRpc).toHaveBeenCalledWith("submit_id_document", { document_path: path });
-  });
-
-  it("surfaces a Storage upload error without calling the RPC", async () => {
-    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
-    mockStorageUpload.mockResolvedValue({ data: null, error: { message: "Bucket not found" } });
-
-    const file = new File(["scan"], "id.pdf", { type: "application/pdf" });
-    const result = await uploadIdDocument(file);
-
-    expect(result).toEqual({ success: false, error: "Bucket not found" });
-    expect(mockRpc).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ affiliation: "" }));
   });
 });
 

@@ -20,8 +20,6 @@ interface RequestBody {
   pendingPhone?: string;
   pendingFullName?: string;
   pendingAffiliation?: string;
-  pendingAuthenticId?: string;
-  pendingIdDocumentName?: string;
 }
 
 Deno.serve(async (req) => {
@@ -29,7 +27,7 @@ Deno.serve(async (req) => {
   if (preflight) return preflight;
 
   const body: RequestBody = await req.json();
-  const { username, pendingEmail, pendingPhone, pendingFullName, pendingAffiliation, pendingAuthenticId, pendingIdDocumentName } = body;
+  const { username, pendingEmail, pendingPhone, pendingFullName, pendingAffiliation } = body;
 
   if (!username) {
     return new Response(JSON.stringify({ error: "Username is required" }), {
@@ -45,8 +43,6 @@ Deno.serve(async (req) => {
     pendingEmail && `<tr><td><strong>New Email</strong></td><td>${pendingEmail}</td></tr>`,
     pendingPhone && `<tr><td><strong>New WhatsApp Number</strong></td><td>${pendingPhone}</td></tr>`,
     pendingAffiliation && `<tr><td><strong>New Affiliation</strong></td><td>${pendingAffiliation}</td></tr>`,
-    pendingAuthenticId && `<tr><td><strong>New Authentic ID</strong></td><td>${pendingAuthenticId}</td></tr>`,
-    pendingIdDocumentName && `<tr><td><strong>Uploaded Identification</strong></td><td>${pendingIdDocumentName}</td></tr>`,
   ]
     .filter(Boolean)
     .join("");

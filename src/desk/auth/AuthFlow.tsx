@@ -15,7 +15,6 @@ import {
   AuthNotice,
   AuthShell,
   Field,
-  FileField,
   PhoneField,
   SelectField,
   SubmitButton,
@@ -28,7 +27,7 @@ import {
   type AuthScreen,
   type SignUpFields,
 } from "./authScreens";
-import { EDUCATION_LEVELS, ID_DOCUMENT_ACCEPT_ATTR, ID_DOCUMENT_HELP_TEXT, ID_DOCUMENT_MAX_BYTES, USER_TYPES } from "../../config/accountSchema";
+import { EDUCATION_LEVELS, USER_TYPES } from "../../config/accountSchema";
 import { getCaptchaConfig } from "../../services/captchaService";
 
 /**
@@ -142,7 +141,6 @@ function SignInScreen({
 
 function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
-  const [document, setDocument] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -153,7 +151,7 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
   );
 
   const captchaRequired = getCaptchaConfig().enabled;
-  const problem = signUpProblem(fields, document) ?? (captchaRequired && !captchaToken ? "Complete the CAPTCHA challenge." : null);
+  const problem = signUpProblem(fields) ?? (captchaRequired && !captchaToken ? "Complete the CAPTCHA challenge." : null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -196,6 +194,7 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
             hint={f.hint}
             autoComplete={f.autoComplete}
             autoFocus={i === 0}
+            required={f.required ?? true}
             value={fields[f.key]}
             onChange={set(f.key)}
           />
@@ -220,15 +219,6 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
           value={fields.educationLevel}
           onChange={set("educationLevel")}
           options={EDUCATION_LEVELS}
-        />
-        <FileField
-          id="signup-idDocument"
-          label="Institutional ID Document"
-          file={document}
-          onChange={setDocument}
-          accept={ID_DOCUMENT_ACCEPT_ATTR}
-          maxBytes={ID_DOCUMENT_MAX_BYTES}
-          helpText={`${ID_DOCUMENT_HELP_TEXT} Accepted: PDF, JPG, PNG, WEBP.`}
         />
         <Field
           id="signup-password"
@@ -376,9 +366,7 @@ function RegisteredScreen({ onBack }: { onBack: () => void }) {
     <AuthShell>
       <AuthHeading title="Account created" />
       <AuthNotice>
-        Check your email to verify your account. Once verified, you can sign in immediately. Your institutional ID
-        document could not be uploaded until you have a verified session, so finish that step from Account Settings
-        right after your first sign-in — your account shows "Verification Required" until you do.
+        Check your email to verify your account. Once verified, you can sign in immediately.
       </AuthNotice>
       <div className="mt-6">
         <AuthLink onClick={onBack}>Back to sign in</AuthLink>

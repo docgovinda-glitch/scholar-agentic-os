@@ -16,13 +16,24 @@
  *
  * What is NOT here, deliberately: password rules stay in
  * desk/auth/authScreens.ts (password is the one intentional difference
- * between the two screens — see AccountSettingsScreen's own header comment),
- * and the file itself (the institutional ID document) is handled by
- * services/supabaseAuthService.ts's uploadIdDocument, since a File object
- * cannot be JSON-serialised the way every other field here can.
+ * between the two screens — see AccountSettingsScreen's own header comment).
+ *
+ * 2026-08-14 account-system repair: Institutional ID and its document
+ * upload were removed completely (they made a normal registration
+ * impossible to submit in practice — the Create Account button could never
+ * enable without a document most users had no reason to have), Institution
+ * became optional (not every user belongs to one), and User Type was cut
+ * back to the four roles actually wanted. See
+ * supabase/migrations/2026-08-14_account_system_repair.sql for the matching
+ * database change — that migration also fixes the root cause of the
+ * "column profiles.phone_country_code does not exist" production error:
+ * the PREVIOUS migration that added phone_country_code/user_type/
+ * education_level was written and verified locally but was never actually
+ * applied to the production database, so the columns this file's Option
+ * lists describe never existed there until now.
  *
  * Database-side enforcement: every enum below has a matching Postgres CHECK
- * constraint in supabase/migrations/2026-08-13_unified_account_profile.sql,
+ * constraint in supabase/migrations/2026-08-14_account_system_repair.sql,
  * naming the exact same values. That is not an accident either — a client
  * validator alone would only stop the app's own UI from submitting a bad
  * value, not a direct PostgREST call, and "userType/educationLevel have one
@@ -41,9 +52,6 @@ export const USER_TYPES: readonly Option[] = [
   { value: "teacher_faculty", label: "Teacher / Faculty" },
   { value: "administrator", label: "Administrator" },
   { value: "freelance_researcher", label: "Freelance Researcher" },
-  { value: "independent_researcher", label: "Independent Researcher" },
-  { value: "research_professional", label: "Research Professional" },
-  { value: "other", label: "Other" },
 ] as const;
 
 /** Section 4 of the request this file implements. */
@@ -66,52 +74,6 @@ export function isValidUserType(value: string): value is UserTypeValue {
 }
 export function isValidEducationLevel(value: string): value is EducationLevelValue {
   return EDUCATION_LEVELS.some((o) => o.value === value);
-}
-
-/**
- * Institutional ID verification state (section 5). System-controlled end to
- * end: neither the RLS column grant nor any client function lets a user set
- * this directly (see the migration's submit_id_document() function) — a
- * self-service upload can only ever move a row to 'pending_verification',
- * and only an administrator (service role) can reach 'verified'/'rejected'.
- */
-export const VERIFICATION_STATUSES: readonly Option[] = [
-  { value: "verification_required", label: "Verification Required" },
-  { value: "pending_verification", label: "Pending Verification" },
-  { value: "verified", label: "Verified" },
-  { value: "rejected", label: "Rejected" },
-] as const;
-
-export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number]["value"];
-
-export function verificationStatusLabel(status: string | null | undefined): string {
-  return VERIFICATION_STATUSES.find((o) => o.value === status)?.label ?? "Verification Required";
-}
-
-/**
- * The institutional ID document itself (section 5). Enforced both here (so
- * the UI can reject a bad file before spending an upload) and again at the
- * Storage bucket (a client-side check alone is never a security boundary —
- * see supabase/migrations/2026-08-13_unified_account_profile.sql's bucket
- * config for the same limit applied server-side).
- */
-export const ID_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
-export const ID_DOCUMENT_ACCEPTED_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
-export const ID_DOCUMENT_ACCEPT_ATTR = ".pdf,.jpg,.jpeg,.png,.webp";
-export const ID_DOCUMENT_HELP_TEXT = "Upload your valid student, faculty, staff, or institutional identification document.";
-
-export function idDocumentProblem(file: File | null): string | null {
-  if (!file) return "An institutional ID document is required.";
-  if (!(ID_DOCUMENT_ACCEPTED_TYPES as readonly string[]).includes(file.type)) {
-    return "That file type isn't accepted. Use a PDF, JPG, PNG, or WEBP.";
-  }
-  if (file.size > ID_DOCUMENT_MAX_BYTES) {
-    return "That file is too large. The limit is 10 MB.";
-  }
-  if (file.size === 0) {
-    return "That file appears to be empty.";
-  }
-  return null;
 }
 
 /* ----------------------------------------------------------------------
@@ -142,14 +104,6 @@ export function emailProblem(value: string): string | null {
   if (v.length === 0) return "Email is required.";
   if (!EMAIL_RE.test(v)) return "Enter a valid email address.";
   return null;
-}
-
-export function affiliationProblem(value: string): string | null {
-  return value.trim().length === 0 ? "Institution / Organization is required." : null;
-}
-
-export function institutionalIdProblem(value: string): string | null {
-  return value.trim().length === 0 ? "Institutional ID is required." : null;
 }
 
 export function userTypeProblem(value: string): string | null {
