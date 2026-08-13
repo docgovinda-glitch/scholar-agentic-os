@@ -21,6 +21,10 @@ const signIn = vi.fn();
 const signUp = vi.fn();
 const sendPasswordResetEmail = vi.fn();
 const updatePassword = vi.fn();
+const resendVerificationEmail = vi.fn();
+const checkUsernameAvailable = vi.fn();
+const checkEmailAvailable = vi.fn();
+const checkPhoneAvailable = vi.fn();
 /** Captures the callback so a test can fire a recovery link's arrival. */
 let recoveryCallback: (() => void) | null = null;
 const onPasswordRecovery = vi.fn((cb: () => void) => {
@@ -34,6 +38,10 @@ vi.mock("../../services/supabaseAuthService", () => ({
   sendPasswordResetEmail: (...a: unknown[]) => sendPasswordResetEmail(...a),
   updatePassword: (...a: unknown[]) => updatePassword(...a),
   onPasswordRecovery: (cb: () => void) => onPasswordRecovery(cb),
+  resendVerificationEmail: (...a: unknown[]) => resendVerificationEmail(...a),
+  checkUsernameAvailable: (...a: unknown[]) => checkUsernameAvailable(...a),
+  checkEmailAvailable: (...a: unknown[]) => checkEmailAvailable(...a),
+  checkPhoneAvailable: (...a: unknown[]) => checkPhoneAvailable(...a),
 }));
 
 const { default: DeskAuthGate } = await import("../DeskAuthGate");
@@ -51,6 +59,13 @@ beforeEach(() => {
   signUp.mockResolvedValue({ success: true });
   sendPasswordResetEmail.mockResolvedValue({ success: true });
   updatePassword.mockResolvedValue({ success: true });
+  resendVerificationEmail.mockResolvedValue({ success: true, emailSent: true });
+  // Every identifier is available by default so existing signup tests that
+  // don't care about duplicate detection aren't blocked by it; individual
+  // tests below override these to exercise the "taken" paths.
+  checkUsernameAvailable.mockResolvedValue(true);
+  checkEmailAvailable.mockResolvedValue(true);
+  checkPhoneAvailable.mockResolvedValue(true);
   recoveryCallback = null;
 });
 
@@ -240,6 +255,73 @@ describe("registration", () => {
     fillSignUpForm();
     expect(screen.getByLabelText("Institution")).toHaveValue("");
     expect(screen.getByRole("button", { name: "Create account" })).toBeEnabled();
+  });
+
+  it("checks username availability on blur and blocks submission when it's taken", async () => {
+    checkUsernameAvailable.mockResolvedValue(false);
+    openSignUp();
+    fillSignUpForm();
+
+    fireEvent.blur(screen.getByLabelText("Username"));
+
+    expect(await screen.findByText(/username is already taken/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create account" })).toBeDisabled();
+    expect(checkUsernameAvailable).toHaveBeenCalledWith("amara");
+  });
+
+  it("checks email availability on blur and blocks submission when it's taken, suggesting sign-in", async () => {
+    checkEmailAvailable.mockResolvedValue(false);
+    openSignUp();
+    fillSignUpForm();
+
+    fireEvent.blur(screen.getByLabelText("Email"));
+
+    expect(await screen.findByText(/email address is already registered/i)).toBeInTheDocument();
+    expect(screen.getByText(/sign in if this is your account/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create account" })).toBeDisabled();
+  });
+
+  it("checks phone availability on blur and blocks submission when it's taken", async () => {
+    checkPhoneAvailable.mockResolvedValue(false);
+    openSignUp();
+    fillSignUpForm();
+
+    fireEvent.blur(screen.getByLabelText("Phone"));
+
+    expect(await screen.findByText(/mobile number is already registered/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create account" })).toBeDisabled();
+    expect(checkPhoneAvailable).toHaveBeenCalledWith("+9779800000000");
+  });
+
+  it("re-checks availability once more at submit time as a defense against a check that never ran", async () => {
+    // No blur ever fires here — this simulates every field being filled by
+    // browser autofill and the user going straight to Create account, which
+    // the on-blur checks alone would never catch.
+    checkEmailAvailable.mockResolvedValue(false);
+    openSignUp();
+    fillSignUpForm();
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    // Renders twice by design — once as the field-level error under Email,
+    // once as the form-level AuthError — hence findAllByText, not findByText.
+    await waitFor(() => expect(screen.getAllByText(/email address is already registered/i).length).toBeGreaterThan(0));
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
+  it("clears a stale 'taken' verdict once the field is edited to a different value", async () => {
+    checkUsernameAvailable.mockResolvedValue(false);
+    openSignUp();
+    fillSignUpForm();
+    fireEvent.blur(screen.getByLabelText("Username"));
+    expect(await screen.findByText(/username is already taken/i)).toBeInTheDocument();
+
+    checkUsernameAvailable.mockResolvedValue(true);
+    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "amara2" } });
+    expect(screen.queryByText(/username is already taken/i)).not.toBeInTheDocument();
+
+    fireEvent.blur(screen.getByLabelText("Username"));
+    await waitFor(() => expect(checkUsernameAvailable).toHaveBeenLastCalledWith("amara2"));
+    expect(screen.queryByText(/username is already taken/i)).not.toBeInTheDocument();
   });
 
   it("shows a confirmation that the account was created", async () => {

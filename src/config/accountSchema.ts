@@ -85,10 +85,13 @@ export function fullNameProblem(value: string): string | null {
 }
 
 /**
- * Format only — whether the username is actually free is a uniqueness
- * question the database's own `profiles.username unique` constraint settles
- * authoritatively (see signUp()'s doc comment on why a client-side
- * availability check would just be a second, racy source of truth).
+ * Format only. Whether the username is actually free is checked separately —
+ * SignUpScreen calls checkUsernameAvailable() on blur for real-time feedback,
+ * but that check is advisory, not authoritative: it can race a concurrent
+ * signup of the same username between the check and submission. The
+ * database's `profiles.username unique` constraint is what actually
+ * prevents a duplicate from being created, no matter what this function or
+ * the availability check said.
  */
 export function usernameProblem(value: string): string | null {
   const v = value.trim();

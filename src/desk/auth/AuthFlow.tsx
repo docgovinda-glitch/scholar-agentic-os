@@ -6,6 +6,9 @@ import {
   signUp,
   updatePassword,
   resendVerificationEmail,
+  checkUsernameAvailable,
+  checkEmailAvailable,
+  checkPhoneAvailable,
 } from "../../services/supabaseAuthService";
 import CaptchaWidget from "./CaptchaWidget";
 import {
@@ -28,7 +31,8 @@ import {
   type AuthScreen,
   type SignUpFields,
 } from "./authScreens";
-import { EDUCATION_LEVELS, USER_TYPES } from "../../config/accountSchema";
+import { EDUCATION_LEVELS, USER_TYPES, usernameProblem, emailProblem } from "../../config/accountSchema";
+import { normalizeE164, e164Problem } from "../../config/countries";
 import { getCaptchaConfig } from "../../services/captchaService";
 import ScholarCoreLanding from "../ScholarCoreLanding";
 
@@ -181,19 +185,81 @@ function SignInScreen({
   );
 }
 
+/** Availability verdict for one identifier field, tagged with the exact value it was checked against — see checkedAgainst()'s doc comment for why. */
+type Availability = { checkedValue: string; status: "checking" | "available" | "taken" } | null;
+
+function checkedAgainst(availability: Availability, currentValue: string): Availability {
+  // A verdict only means something for the exact text it was run against —
+  // if the user has since edited the field, an old "taken" would otherwise
+  // keep showing against different text than what's now typed. Returning
+  // null for a stale verdict, rather than clearing state on every keystroke,
+  // means the check result survives being temporarily "stale" mid-typing and
+  // reappears correctly if the user types back to the exact value that was
+  // already checked (e.g. undoes an edit) — cheaper than a fresh RPC call.
+  return availability && availability.checkedValue === currentValue ? availability : null;
+}
+
 function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onBack: () => void }) {
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [usernameAvailability, setUsernameAvailability] = useState<Availability>(null);
+  const [emailAvailability, setEmailAvailability] = useState<Availability>(null);
+  const [phoneAvailability, setPhoneAvailability] = useState<Availability>(null);
 
   const set = useCallback(
     (key: keyof SignUpFields) => (value: string) => setFields((f) => ({ ...f, [key]: value })),
     []
   );
 
+  const username = fields.username.trim();
+  const email = fields.email.trim();
+  const phoneE164 = normalizeE164(fields.phoneCountryCode, fields.phone);
+
+  const usernameStatus = checkedAgainst(usernameAvailability, username);
+  const emailStatus = checkedAgainst(emailAvailability, email);
+  const phoneStatus = checkedAgainst(phoneAvailability, phoneE164 ?? "");
+
+  const USERNAME_TAKEN_MESSAGE = "This username is already taken. Please choose a different username.";
+  const EMAIL_TAKEN_MESSAGE = "This email address is already registered. Please use a different email address, or sign in if this is your account.";
+  const PHONE_TAKEN_MESSAGE = "This mobile number is already registered. Please use a different mobile number.";
+
+  async function checkUsernameField() {
+    const value = fields.username.trim();
+    if (!value || usernameProblem(value)) return;
+    setUsernameAvailability({ checkedValue: value, status: "checking" });
+    const available = await checkUsernameAvailable(value);
+    setUsernameAvailability({ checkedValue: value, status: available ? "available" : "taken" });
+  }
+
+  async function checkEmailField() {
+    const value = fields.email.trim();
+    if (!value || emailProblem(value)) return;
+    setEmailAvailability({ checkedValue: value, status: "checking" });
+    const available = await checkEmailAvailable(value);
+    setEmailAvailability({ checkedValue: value, status: available ? "available" : "taken" });
+  }
+
+  async function checkPhoneField() {
+    if (e164Problem(fields.phoneCountryCode, fields.phone)) return;
+    const e164 = normalizeE164(fields.phoneCountryCode, fields.phone);
+    if (!e164) return;
+    setPhoneAvailability({ checkedValue: e164, status: "checking" });
+    const available = await checkPhoneAvailable(e164);
+    setPhoneAvailability({ checkedValue: e164, status: available ? "available" : "taken" });
+  }
+
   const captchaRequired = getCaptchaConfig().enabled;
-  const problem = signUpProblem(fields) ?? (captchaRequired && !captchaToken ? "Complete the CAPTCHA challenge." : null);
+  const problem =
+    signUpProblem(fields) ??
+    (usernameStatus?.status === "taken" ? USERNAME_TAKEN_MESSAGE : null) ??
+    (emailStatus?.status === "taken" ? EMAIL_TAKEN_MESSAGE : null) ??
+    (phoneStatus?.status === "taken" ? PHONE_TAKEN_MESSAGE : null) ??
+    (usernameStatus?.status === "checking" || emailStatus?.status === "checking" || phoneStatus?.status === "checking"
+      ? "Checking availability…"
+      : null) ??
+    (captchaRequired && !captchaToken ? "Complete the CAPTCHA challenge." : null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -202,17 +268,47 @@ function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onB
     setBusy(true);
     setError(null);
     try {
+      // Defense-in-depth, not the primary check: re-verify all three
+      // identifiers are still free immediately before submitting, in case
+      // this screen never ran an on-blur check at all (e.g. every field was
+      // filled by browser autofill and the user went straight to submit —
+      // `problem` above only catches a check that already ran and came back
+      // "taken", not one that never ran) or because availability could have
+      // changed since an earlier check (someone else registered the same
+      // identifier in between). The database's own unique constraints are
+      // what actually prevent a duplicate no matter what this says.
+      const [usernameOk, emailOk, phoneOk] = await Promise.all([
+        checkUsernameAvailable(username),
+        checkEmailAvailable(email),
+        phoneE164 ? checkPhoneAvailable(phoneE164) : Promise.resolve(true),
+      ]);
+      if (!usernameOk) {
+        setUsernameAvailability({ checkedValue: username, status: "taken" });
+        setError(USERNAME_TAKEN_MESSAGE);
+        return;
+      }
+      if (!emailOk) {
+        setEmailAvailability({ checkedValue: email, status: "taken" });
+        setError(EMAIL_TAKEN_MESSAGE);
+        return;
+      }
+      if (!phoneOk) {
+        setPhoneAvailability({ checkedValue: phoneE164 ?? "", status: "taken" });
+        setError(PHONE_TAKEN_MESSAGE);
+        return;
+      }
+
       const result = await signUp({
         ...fields,
-        username: fields.username.trim(),
-        email: fields.email.trim(),
+        username,
+        email,
         captchaToken: captchaToken || undefined,
       });
       if (!result.success) {
         setError(result.error ?? "Registration failed.");
         return;
       }
-      onDone(fields.email);
+      onDone(email);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -239,6 +335,14 @@ function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onB
             required={f.required ?? true}
             value={fields[f.key]}
             onChange={set(f.key)}
+            onBlur={f.key === "username" ? checkUsernameField : f.key === "email" ? checkEmailField : undefined}
+            error={
+              f.key === "username" && usernameStatus?.status === "taken"
+                ? USERNAME_TAKEN_MESSAGE
+                : f.key === "email" && emailStatus?.status === "taken"
+                  ? EMAIL_TAKEN_MESSAGE
+                  : null
+            }
           />
         ))}
         <PhoneField
@@ -247,6 +351,8 @@ function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onB
           onCountryCodeChange={set("phoneCountryCode")}
           number={fields.phone}
           onNumberChange={set("phone")}
+          onBlur={checkPhoneField}
+          error={phoneStatus?.status === "taken" ? PHONE_TAKEN_MESSAGE : null}
         />
         <SelectField
           id="signup-userType"

@@ -128,6 +128,28 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
     return { success: false, error: "Sign-up did not return a user record." };
   }
 
+  // Supabase Auth's own signUp() docs (GoTrueClient.d.ts): "If signUp() is
+  // called for an existing confirmed user... an obfuscated/fake user object
+  // is returned" rather than an error, when Confirm Email is on (as it must
+  // be for this app's verification flow) — done deliberately, so a stranger
+  // probing the endpoint can't use it to enumerate registered emails. No new
+  // email is sent and no account is created. Without this check, that case
+  // was indistinguishable from a real signup: the caller sees `data.user`
+  // and `error: null` either way, so the UI showed "Account created! Check
+  // your email" to someone re-registering an address that never gets a
+  // fresh email — the exact confusing symptom this was written to catch.
+  // An empty `identities` array is the concrete signal Supabase returns for
+  // this case (a genuinely new signup always has one identity for the
+  // provider just used); SignUpScreen's own pre-submit availability check is
+  // the primary defense; this is the fallback for the race where the email
+  // was taken between that check and this call completing.
+  if (data.user.identities && data.user.identities.length === 0) {
+    return {
+      success: false,
+      error: "This email address is already registered. Try signing in, or use \"Forgot your password?\" if you don't remember your password.",
+    };
+  }
+
   return { success: true };
 }
 

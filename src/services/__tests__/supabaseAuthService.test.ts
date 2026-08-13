@@ -158,6 +158,54 @@ describe("signUp", () => {
 
     expect(result).toEqual({ success: false, error: "User already registered" });
   });
+
+  it("treats Supabase's obfuscated fake-user response (empty identities) as an already-registered email, not a fresh signup", async () => {
+    // Per @supabase/auth-js's own signUp() docs: when Confirm Email is on and
+    // signUp() is called for an existing CONFIRMED user, Supabase returns a
+    // fake user object with error: null instead of an error, to avoid email
+    // enumeration. An empty identities array is what a real new signup never
+    // has (it always gets exactly one identity for the provider just used).
+    mockAuth.signUp.mockResolvedValue({
+      data: { user: { id: "u1", email: "jane@example.com", identities: [] } },
+      error: null,
+    });
+
+    const result = await signUp({
+      username: "jdoe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      phone: "",
+      phoneCountryCode: "+1",
+      affiliation: "State University",
+      userType: "student",
+      educationLevel: "undergraduate",
+      password: "hunter2-hunter2",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("already registered");
+  });
+
+  it("treats a non-empty identities array as a genuine new signup", async () => {
+    mockAuth.signUp.mockResolvedValue({
+      data: { user: { id: "u1", email: "jane@example.com", identities: [{ id: "identity-1" }] } },
+      error: null,
+    });
+
+    const result = await signUp({
+      username: "jdoe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      phone: "",
+      phoneCountryCode: "+1",
+      affiliation: "State University",
+      userType: "student",
+      educationLevel: "undergraduate",
+      password: "hunter2-hunter2",
+    });
+
+    expect(result).toEqual({ success: true });
+  });
 });
 
 describe("signIn", () => {
