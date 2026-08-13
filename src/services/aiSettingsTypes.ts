@@ -6,6 +6,18 @@
  * dragging this along. See docs 61-CLIENT-CONSOLIDATION.md.
  */
 
+import { CLOUD_PROVIDERS } from "../config/providerCatalog";
+
+/**
+ * Every id in src/config/providerCatalog.ts, derived rather than
+ * hand-spelled. Fixes a real drift bug: AISettings.provider used to list
+ * ~14 provider ids by hand, a subset that predated the 2026-07 catalog
+ * expansion to 37 providers — the other ~23 fell through the `(string & {})`
+ * escape hatch below with no compile-time link back to the catalog, so a
+ * typo'd or renamed id there was caught by nothing.
+ */
+export type CloudProviderId = (typeof CLOUD_PROVIDERS)[number]["id"];
+
 export interface HealthStatus {
   provider: string;
   status: 'online' | 'offline' | 'degraded' | 'unchecked';
@@ -24,17 +36,20 @@ export interface AISettings {
   /**
    * The active provider id.
    *
-   * The named members are the historical ids that have dedicated settings
-   * fields below and are referenced by name across the codebase. The trailing
-   * `(string & {})` admits the ~20 additional providers added in 2026-07 from
-   * src/config/providerCatalog.ts and the local runners from
-   * src/config/localRunnerCatalog.ts, whose keys/endpoints live in the vault
-   * and in localEndpoints/localModels rather than in their own fields — while
-   * still giving editors autocomplete for the common ones.
+   * `"auto"`/`"server"` are pseudo-providers (no catalog entry); the
+   * historical named members below (ollama/custom/omniroute) are local
+   * runners with dedicated settings fields; `CloudProviderId` covers every
+   * catalog provider, kept in sync automatically since it's derived from
+   * CLOUD_PROVIDERS rather than hand-copied. The trailing `(string & {})`
+   * stays as an escape hatch for local runner ids
+   * (src/config/localRunnerCatalog.ts, keyed via localEndpoints/localModels
+   * rather than their own fields) and any settings value saved before a
+   * provider was removed from the catalog — so loading old data never fails
+   * just because its type got stricter.
    */
   provider:
-    | "auto" | "server" | "gemini" | "openai" | "ollama" | "custom" | "claude" | "deepseek"
-    | "cohere" | "qwen" | "omniroute" | "groq" | "together" | "openrouter"
+    | "auto" | "server" | "ollama" | "custom" | "omniroute"
+    | CloudProviderId
     | (string & {});
   ollamaModel?: string;
   ollamaEndpoint?: string;

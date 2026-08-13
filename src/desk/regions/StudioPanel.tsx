@@ -4,6 +4,7 @@ import { loadUserAiSettings, readProviderKey } from "../../services/userAiSettin
 import { routeDecision, type RoutingDecision } from "../aiAccess/aiAccessApi";
 import { getWritingHistory, enableWritingHistory, disableWritingHistory, clearWritingHistory, summarizeWritingHistory, recordRefinement } from "../../app/studio/writingHistory";
 import { getLocalRunner } from "../../config/localRunnerCatalog";
+import { CLOUD_PROVIDERS } from "../../config/providerCatalog";
 import { refineLocally, GatewayDenied, grantLocalConsent } from "./localStudioExecution";
 import type { InterventionLevel, StudioRefineResult, VoiceProfile } from "../types";
 
@@ -38,11 +39,17 @@ const L1_PROFILES = [
   "Urdu",
 ] as const;
 
-// Only the providers platform/gateway can actually serve today (adapters.ts) —
-// the same catalog the Studio's complete() call resolves against. Advanced
-// mode only — Auto mode routes through the Scholar AI Engine instead and is
-// not limited to this list.
-const PROVIDERS = ["gemini", "openai", "claude", "cohere"];
+// Every provider platform/gateway/adapters.ts can serve — derived from the
+// catalog rather than hand-listed. This used to be a hardcoded 4-provider
+// array with a comment claiming it was "the providers platform/gateway can
+// actually serve today," which was already wrong by the time this comment
+// was written: adapters.ts's generic OpenAICompatibleAdapter alone serves
+// every "openai-compatible"-apiStyle catalog entry (~30 of 37), not just
+// gemini/openai/claude/cohere, so Groq/Mistral/DeepSeek/OpenRouter/etc. were
+// silently unreachable from this Advanced-mode dropdown. Advanced mode only
+// — Auto mode routes through the Scholar AI Engine instead and is not
+// limited to this list.
+const PROVIDERS: string[] = CLOUD_PROVIDERS.map((p) => p.id);
 
 // Every model-backed Studio level is language refinement — none are
 // multimodal/long-context/code-generation — so a single Omni Router task

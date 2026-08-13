@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import AccountSettingsScreen from "./account/AccountSettingsScreen";
-import AiAccessPage from "./aiAccess/AiAccessPage";
+import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
 import DeskAuthGate from "./DeskAuthGate";
 import DeskShell from "./DeskShell";
 import ProjectListScreen from "./ProjectListScreen";
@@ -59,7 +59,7 @@ function DeskRoutes() {
    */
   const [aiAccessOpen, setAiAccessOpen] = useState(false);
   /** Which AiAccessPage section to land on next open — "premium" when reached via Account Settings' "Upgrade to Premium" / "Manage Premium Plan" button, "overview" otherwise. */
-  const [aiAccessSection, setAiAccessSection] = useState<"overview" | "premium">("overview");
+  const [aiAccessSection, setAiAccessSection] = useState<SectionId>("overview");
   /**
    * Section 11: true for exactly the one transition out of the Knowledge
    * Vault stage (declined or completed) — Knowledge is always the last

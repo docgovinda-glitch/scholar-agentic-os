@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { providerAccessFacts, type CloudProviderSpec } from "../../config/providerCatalog";
+import { getDefaultModelId, getModelsForProvider } from "../../config/modelCatalog";
+import ModelSelectField from "./ModelSelectField";
 import type { ConnectionTier, ProviderView } from "./useAiAccess";
 
 /**
@@ -39,8 +41,9 @@ export default function ProviderDetail({
   onBack: () => void;
 }) {
   const facts = providerAccessFacts(spec);
+  const models = getModelsForProvider(spec.id, tier === "free" ? "free" : "byok");
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState(view.selectedModel ?? spec.defaultModel);
+  const [model, setModel] = useState(view.selectedModel ?? getDefaultModelId(spec.id));
   const [baseUrl, setBaseUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,19 +158,11 @@ export default function ProviderDetail({
         </Step>
 
         <Step n={3} title="Choose a model">
-          <input
-            list={`models-${spec.id}`}
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-          />
-          <datalist id={`models-${spec.id}`}>
-            {spec.models.map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
+          <ModelSelectField id={`model-${spec.id}`} models={models} value={model} onChange={setModel} />
           <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-            Suggestions only — providers rotate model names often, so you can type any name this provider accepts.
+            {models.length > 0
+              ? "Deprecated or unverified entries are labeled — pick Advanced to type any model id this provider accepts."
+              : "No catalogued models for this provider yet — type any model id this provider accepts."}
           </p>
           {view.connected && (
             <button

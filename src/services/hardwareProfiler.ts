@@ -31,7 +31,7 @@ export interface HardwareProfile {
   vramGb: number | null;
   storageFreeGb: number | null;
   detectedRuntimes: Array<{ id: string; name: string; models: string[] }>;
-  detectionMethod: "browser-api";
+  detectionMethod: "browser-api" | "manual";
   detectedAt: string;
 }
 
@@ -181,7 +181,7 @@ interface HardwareProfileRow {
   storage_free_gb: number | null;
   detected_runtimes: HardwareProfile["detectedRuntimes"];
   detected_models: string[];
-  detection_method: "browser-api";
+  detection_method: "browser-api" | "manual";
   detected_at: string;
 }
 
@@ -204,6 +204,60 @@ export async function saveHardwareProfile(profile: HardwareProfile): Promise<voi
     detected_models: profile.detectedRuntimes.flatMap((r) => r.models),
     detection_method: profile.detectionMethod,
     detected_at: profile.detectedAt,
+  };
+
+  await supabase.from("hardware_profiles").upsert(row);
+}
+
+export interface ManualHardwareInput {
+  os?: string;
+  cpuCores?: number;
+  architecture?: string;
+  ramGb?: number;
+  gpuInfo?: string;
+  vramGb?: number;
+  storageFreeGb?: number;
+}
+
+/**
+ * Section 16's "manual entry" path — a user who knows their own machine
+ * better than a Chrome-capped navigator.deviceMemory can say so directly.
+ * Writes to the SAME hardware_profiles row saveHardwareProfile() does (the
+ * table is one row per user, not one per detection method): this is a
+ * deliberate override action, replacing whatever profile — auto-detected or
+ * previously manual — Scholar was using for recommendations, not a second,
+ * blended profile. detection_method: "manual" is how a later read tells the
+ * two apart; recommendLocalModel() callers should prefer a manually-entered
+ * profile when one exists, since the user chose to state it.
+ *
+ * Every field is optional and a blank one is written as null, never a
+ * fallback guess — "Unknown" stays the honest default a UI shows for it,
+ * exactly as for an auto-detected field the browser couldn't determine. An
+ * all-blank input is a no-op: there is nothing an all-null manual row would
+ * say that omitting the write doesn't already say.
+ */
+export async function saveManualHardwareProfile(input: ManualHardwareInput): Promise<void> {
+  const hasAnyField = Object.values(input).some((v) => v !== undefined && v !== "");
+  if (!hasAnyField) return;
+
+  if (!isSupabaseConfigured()) return;
+  const supabase = getSupabaseClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return;
+
+  const row: HardwareProfileRow & { user_id: string } = {
+    user_id: userData.user.id,
+    os: input.os || null,
+    cpu_cores: input.cpuCores ?? null,
+    architecture: input.architecture || null,
+    ram_gb: input.ramGb ?? null,
+    gpu_info: input.gpuInfo || null,
+    vram_gb: input.vramGb ?? null,
+    storage_free_gb: input.storageFreeGb ?? null,
+    detected_runtimes: [],
+    detected_models: [],
+    detection_method: "manual",
+    detected_at: new Date().toISOString(),
   };
 
   await supabase.from("hardware_profiles").upsert(row);

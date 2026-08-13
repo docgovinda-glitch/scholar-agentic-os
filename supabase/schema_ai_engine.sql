@@ -80,6 +80,30 @@ create table if not exists public.ai_models (
 
 create index if not exists ai_models_provider_id_idx on public.ai_models(provider_id);
 
+-- ============================================================================
+-- STATUS (2026-08-13 AI configuration layer refactor): ai_models' rich
+-- columns above — capabilities, context_window, modalities, speed_class,
+-- cost_class, premium_eligible, free_eligible — are not read by any live
+-- server code path as of this refactor. They were written by
+-- src/services/aiRegistry.ts, a client-side registry reader that turned out
+-- to be imported only by its own test (confirmed by repo-wide search) and
+-- has been deleted. The structured, capability-aware model data those
+-- columns were meant to hold now lives in src/config/modelCatalog.ts
+-- instead — a static, isomorphic file (same reasoning as
+-- providerCatalog.ts's own header: it must render the AI Access model
+-- dropdown synchronously, with no DB round trip, so the settings page never
+-- blocks on or fails because of a database read).
+--
+-- These columns and this table are NOT being dropped here — ai_providers.id
+-- stays live as user_ai_connections' FK anchor, scripts/seedAiRegistry.ts
+-- still projects providerCatalog.ts/localRunnerCatalog.ts into these tables
+-- for the admin dashboard, and a schema deletion is a separate, higher-risk
+-- change than this refactor's scope. If a real "disable this model for
+-- everyone" admin feature is ever built against ai_models.enabled, that is
+-- a deliberate follow-up, not an accidental side effect of reading this
+-- comment.
+-- ============================================================================
+
 -- Public catalog: every signed-in and anonymous visitor can read what
 -- providers/models exist (needed to render the AI Access page and setup
 -- guide before sign-in). Writes are admin-only, done through server routes
@@ -755,6 +779,24 @@ alter table public.platform_provider_credentials
 -- Default false is the safe direction: after this migration no provider is
 -- Premium-eligible until an admin says so. Existing deployments should expect
 -- to switch their intended providers on once, in Admin -> AI Infrastructure.
+--
+-- STATUS (2026-08-13 AI configuration layer refactor, correcting the claim
+-- above): these two columns are NOT read by the live Premium enforcement
+-- path. server/src/aiEngine/adminRouter.ts's resolvePremiumResources() —
+-- confirmed by reading it directly — gates Premium eligibility purely on
+-- ai_resources/plan_resources (added by 2026-08-12_two_router_architecture.
+-- sql, after this comment was written), never on premium_enabled/
+-- premium_models. Separately, the file this section's own history refers
+-- to (server/src/aiEngine/routingCandidates.ts) does not exist anywhere in
+-- the repository. Confirmed via repo-wide search: no client UI renders a
+-- control for either column — the only reachable path is a raw
+-- PATCH /api/admin/ai/providers/:id call (server/routes/admin.ts), never a
+-- rendered admin panel toggle, so there is no user-facing control to
+-- mislead anyone today. Left in place rather than dropped or reused (see
+-- this file's own credential/registry sections for the same reasoning) —
+-- wiring real enforcement to these columns, or removing them, is a Premium
+-- *policy* decision belonging to whoever owns that system, not a
+-- side effect of an AI configuration/infrastructure refactor.
 
 alter table public.ai_providers add column if not exists premium_enabled boolean not null default false;
 alter table public.ai_providers add column if not exists premium_models text[] not null default '{}';

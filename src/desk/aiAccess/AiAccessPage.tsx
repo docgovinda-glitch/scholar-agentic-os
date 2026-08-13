@@ -5,6 +5,7 @@ import { detectHardwareProfile, loadHardwareProfile, recommendLocalModel, saveHa
 import { useEffect } from "react";
 import ProviderDetail, { Chip } from "./ProviderDetail";
 import LocalRunnerDetail from "./LocalRunnerDetail";
+import ManualHardwareForm from "./ManualHardwareForm";
 import { byokProviders, freeProviders, useAiAccess, type ProviderView } from "./useAiAccess";
 import OnboardingProgress from "../setup/OnboardingProgress";
 import {
@@ -46,7 +47,7 @@ import {
  * routing is automatic still holds.
  */
 
-type SectionId = "overview" | "local" | "free" | "byok" | "premium" | "models" | "settings";
+export type SectionId = "overview" | "local" | "free" | "byok" | "premium" | "models" | "settings";
 
 const SECTIONS: Array<{ id: SectionId; label: string; hint: string }> = [
   { id: "overview", label: "Overview", hint: "What is connected" },
@@ -452,7 +453,8 @@ function LocalSection({ access, onOpen }: { access: ReturnType<typeof useAiAcces
         {hardware ? (
           <div className="mt-3 space-y-2">
             <p className="text-xs text-[color:var(--text-secondary)]">
-              {hardware.os ?? "Unknown OS"} · {hardware.cpuCores ?? "?"} cores · {hardware.ramGb ?? "?"} GB RAM (browser estimate)
+              {hardware.os ?? "Unknown OS"} · {hardware.cpuCores ?? "?"} cores · {hardware.ramGb ?? "?"} GB RAM (
+              {hardware.detectionMethod === "manual" ? "your entry" : "browser estimate"})
             </p>
             {(() => {
               const rec = recommendLocalModel(hardware);
@@ -481,6 +483,8 @@ function LocalSection({ access, onOpen }: { access: ReturnType<typeof useAiAcces
           {detecting ? "Detecting…" : "Detect my hardware"}
         </button>
       </section>
+
+      <ManualHardwareForm onSaved={() => void loadHardwareProfile().then(setHardware)} />
     </div>
   );
 }

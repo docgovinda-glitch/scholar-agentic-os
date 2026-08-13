@@ -1,6 +1,17 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
-import { recommendLocalModel, type HardwareProfile } from "../hardwareProfiler";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const mockUpsert = vi.fn(async () => ({ data: null, error: null }));
+const mockFrom = vi.fn(() => ({ upsert: mockUpsert }));
+const mockGetUser = vi.fn(async () => ({ data: { user: { id: "u1" } } }));
+const mockIsSupabaseConfigured = vi.fn(() => true);
+
+vi.mock("../supabaseClient", () => ({
+  getSupabaseClient: () => ({ auth: { getUser: mockGetUser }, from: mockFrom }),
+  isSupabaseConfigured: () => mockIsSupabaseConfigured(),
+}));
+
+import { recommendLocalModel, saveManualHardwareProfile, type HardwareProfile } from "../hardwareProfiler";
 
 function profile(overrides: Partial<HardwareProfile> = {}): HardwareProfile {
   return {
@@ -50,5 +61,57 @@ describe("recommendLocalModel", () => {
   it("declines to recommend a size class when RAM could not be detected", () => {
     const rec = recommendLocalModel(profile({ ramGb: null }));
     expect(rec.sizeClass).toBe("unknown");
+  });
+});
+
+describe("saveManualHardwareProfile", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    mockIsSupabaseConfigured.mockReturnValue(true);
+  });
+
+  it("upserts with detection_method: manual", async () => {
+    await saveManualHardwareProfile({ ramGb: 32, os: "Windows" });
+
+    expect(mockFrom).toHaveBeenCalledWith("hardware_profiles");
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: "u1", ram_gb: 32, os: "Windows", detection_method: "manual" })
+    );
+  });
+
+  it("writes null for every field the user left blank, never a guessed fallback", async () => {
+    await saveManualHardwareProfile({ ramGb: 16 });
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ram_gb: 16,
+        os: null,
+        cpu_cores: null,
+        architecture: null,
+        gpu_info: null,
+        vram_gb: null,
+        storage_free_gb: null,
+      })
+    );
+  });
+
+  it("is a no-op when every field is blank — never writes an all-null row", async () => {
+    await saveManualHardwareProfile({});
+    await saveManualHardwareProfile({ os: "" });
+
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when Supabase isn't configured", async () => {
+    mockIsSupabaseConfigured.mockReturnValue(false);
+    await saveManualHardwareProfile({ ramGb: 16 });
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when there is no signed-in user", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    await saveManualHardwareProfile({ ramGb: 16 });
+    expect(mockFrom).not.toHaveBeenCalled();
   });
 });
