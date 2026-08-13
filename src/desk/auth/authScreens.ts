@@ -27,7 +27,9 @@ export type AuthScreen =
   /** Registration submitted; email verification is on its way. */
   | "registered"
   /** Email verification link was clicked; email is now verified. */
-  | "email-verification-success";
+  | "email-verification-success"
+  /** Resending verification email. */
+  | "resend-verification";
 
 /**
  * Password rule, applied at the form so the failure is immediate rather than a

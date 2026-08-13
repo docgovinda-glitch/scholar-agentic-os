@@ -5,6 +5,7 @@ import {
   signIn,
   signUp,
   updatePassword,
+  resendVerificationEmail,
 } from "../../services/supabaseAuthService";
 import CaptchaWidget from "./CaptchaWidget";
 import {
@@ -53,6 +54,7 @@ export default function AuthFlow({
   verifiedEmail?: string | null;
 } = {}) {
   const [screen, setScreen] = useState<AuthScreen>(initialScreen);
+  const [registeredEmail, setRegisteredEmail] = useState<string>("");
 
   // Belt-and-suspenders: useDeskSession is the authoritative recovery-link
   // detector now (it runs first, before this component even mounts, and
@@ -72,13 +74,15 @@ export default function AuthFlow({
         />
       );
     case "sign-up":
-      return <SignUpScreen onDone={() => setScreen("registered")} onBack={() => setScreen("sign-in")} />;
+      return <SignUpScreen onDone={(email) => { setRegisteredEmail(email); setScreen("registered"); }} onBack={() => setScreen("sign-in")} />;
     case "forgot":
       return <ForgotScreen onBack={() => setScreen("sign-in")} />;
     case "recover":
       return <RecoverScreen onDone={() => setScreen("sign-in")} />;
     case "registered":
-      return <RegisteredScreen onBack={() => setScreen("sign-in")} />;
+      return <RegisteredScreen email={registeredEmail} onBack={() => setScreen("sign-in")} onResend={() => setScreen("resend-verification")} />;
+    case "resend-verification":
+      return <ResendVerificationScreen email={registeredEmail} onBack={() => setScreen("registered")} />;
     case "email-verification-success":
       return <EmailVerificationSuccessScreen email={verifiedEmail} onContinue={() => setScreen("sign-in")} />;
     default:
@@ -163,7 +167,7 @@ function SignInScreen({
   );
 }
 
-function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onBack: () => void }) {
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -194,7 +198,7 @@ function SignUpScreen({ onDone, onBack }: { onDone: () => void; onBack: () => vo
         setError(result.error ?? "Registration failed.");
         return;
       }
-      onDone();
+      onDone(fields.email);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -385,14 +389,28 @@ function RecoverScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-function RegisteredScreen({ onBack }: { onBack: () => void }) {
+function RegisteredScreen({ email, onBack, onResend }: { email: string; onBack: () => void; onResend: () => void }) {
   return (
     <AuthShell>
       <AuthHeading title="Account created" />
       <AuthNotice>
-        Check your email to verify your account. Once verified, you can sign in immediately.
+        {email ? (
+          <>
+            A verification email has been sent to <strong>{email}</strong>. Check your inbox and click the link to verify your account and sign in.
+          </>
+        ) : (
+          <>
+            A verification email has been sent to your inbox. Click the link to verify your account and sign in.
+          </>
+        )}
       </AuthNotice>
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col items-start gap-3">
+        <button
+          onClick={onResend}
+          className="text-sm text-[color:var(--accent)] transition-colors duration-[var(--motion-fast)] hover:text-[color:var(--accent-hover)] cursor-pointer"
+        >
+          Didn't receive the email? Resend it
+        </button>
         <AuthLink onClick={onBack}>Back to sign in</AuthLink>
       </div>
     </AuthShell>
@@ -421,6 +439,54 @@ function EmailVerificationSuccessScreen({ email, onContinue }: { email?: string 
         >
           Continue to sign in
         </button>
+      </div>
+    </AuthShell>
+  );
+}
+
+function ResendVerificationScreen({ email, onBack }: { email: string; onBack: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleResend() {
+    if (!email) return;
+    setBusy(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const result = await resendVerificationEmail({ email: email.trim() });
+      if (result.success) {
+        setMessage("Verification email resent! Check your inbox.");
+      } else {
+        setError(result.error ?? "Could not resend the email.");
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthShell>
+      <AuthHeading title="Resend verification email" />
+      <AuthNotice>
+        We'll send another verification email to <strong>{email}</strong>.
+      </AuthNotice>
+      <AuthForm onSubmit={(e) => { e.preventDefault(); handleResend(); }}>
+        {message && <AuthNotice className="text-[color:var(--success)]">{message}</AuthNotice>}
+        {error && <AuthError>{error}</AuthError>}
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
+        >
+          {busy ? "Sending…" : "Resend email"}
+        </button>
+      </AuthForm>
+      <div className="mt-6">
+        <AuthLink onClick={onBack}>Back</AuthLink>
       </div>
     </AuthShell>
   );

@@ -324,6 +324,42 @@ export async function checkPhoneAvailable(phoneE164: string): Promise<boolean> {
   return isAvailable ?? false;
 }
 
+export interface ResendVerificationEmailInput {
+  email: string;
+}
+
+export interface ResendVerificationEmailResult extends ServiceResult {
+  emailSent?: boolean;
+}
+
+/**
+ * Resend the email verification email to the given address.
+ *
+ * This is called from the RegisteredScreen when a user doesn't receive
+ * their initial verification email and needs it resent.
+ *
+ * Supabase Auth handles the actual email sending via resendSignUpEmail(),
+ * which looks up the user by email and resends the confirmation link.
+ */
+export async function resendVerificationEmail(input: ResendVerificationEmailInput): Promise<ResendVerificationEmailResult> {
+  const supabase = getSupabaseClient();
+
+  const { error } = await supabase.auth.resendSignUpEmail(input.email.trim());
+
+  if (error) {
+    // Provide helpful messages for common errors
+    if (error.message.includes("user_not_found")) {
+      return { success: false, error: "No account found with that email address. Please check and try again, or sign up if you don't have an account." };
+    }
+    if (error.message.includes("already confirmed")) {
+      return { success: false, error: "This email address has already been verified. You can sign in now." };
+    }
+    return { success: false, error: safeAuthErrorMessage(error, "Could not resend the verification email. Please try again or contact support.") };
+  }
+
+  return { success: true, emailSent: true };
+}
+
 
 export interface ProfileFields {
   username: string;

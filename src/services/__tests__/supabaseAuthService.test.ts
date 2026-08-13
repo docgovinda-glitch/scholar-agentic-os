@@ -64,6 +64,7 @@ import {
   checkUsernameAvailable,
   checkEmailAvailable,
   checkPhoneAvailable,
+  resendVerificationEmail,
 } from "../supabaseAuthService";
 
 beforeEach(() => {
@@ -478,6 +479,38 @@ describe("requestProfileUpdate", () => {
     // Deterministic: hashing the same key again must produce the identical digest.
     const again = await requestProfileUpdate({ username: "jdoe", pendingPhone: "555-0100" });
     expect(again.keyHash).toBe(result.keyHash);
+  });
+});
+
+describe("resendVerificationEmail", () => {
+  it("successfully resends verification email", async () => {
+    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: null });
+    const result = await resendVerificationEmail({ email: "user@example.com" });
+    expect(result.success).toBe(true);
+    expect(result.emailSent).toBe(true);
+    expect(mockAuth.resendSignUpEmail).toHaveBeenCalledWith("user@example.com");
+  });
+
+  it("handles user not found error", async () => {
+    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: { message: "user_not_found" } });
+    const result = await resendVerificationEmail({ email: "nonexistent@example.com" });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("No account found");
+  });
+
+  it("handles already verified error", async () => {
+    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: { message: "already confirmed" } });
+    const result = await resendVerificationEmail({ email: "verified@example.com" });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("already been verified");
+  });
+
+  it("handles generic errors gracefully", async () => {
+    mockAuth.resendSignUpEmail = vi.fn().mockResolvedValue({ error: { message: "Email service error", status: 500 } });
+    const result = await resendVerificationEmail({ email: "user@example.com" });
+    expect(result.success).toBe(false);
+    // Error should be a helpful message, not the raw error
+    expect(result.error).toBeDefined();
   });
 });
 

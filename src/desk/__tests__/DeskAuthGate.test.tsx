@@ -225,7 +225,7 @@ describe("registration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(await screen.findByText(/Account created/i)).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(/check your email/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/Check your inbox/i);
   });
 
   it("passes the structured phone and role fields through to signUp", async () => {
