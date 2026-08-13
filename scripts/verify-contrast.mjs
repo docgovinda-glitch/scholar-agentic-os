@@ -113,6 +113,10 @@ const CHECKS = [
   ['--state-warning', ['--state-warning-subtle'], 4.5, 'warning callout text'],
   ['--state-danger', ['--state-danger-subtle'], 4.5, 'error callout text'],
   ['--state-info', ['--state-info-subtle'], 4.5, 'info callout text'],
+  // AuthNotice (auth confirmations — "check your email", "reset link sent")
+  // uses the brand accent tint rather than --state-info-subtle's blue, so it
+  // reads as Scholar Core rather than a generic info-blue callout.
+  ['--accent', ['--accent-subtle'], 4.5, 'AuthNotice callout text'],
 ];
 
 /* --- Run ------------------------------------------------------------------ */

@@ -158,6 +158,54 @@ describe("signUp", () => {
 
     expect(result).toEqual({ success: false, error: "User already registered" });
   });
+
+  it("treats Supabase's obfuscated fake-user response (empty identities) as an already-registered email, not a fresh signup", async () => {
+    // Per @supabase/auth-js's own signUp() docs: when Confirm Email is on and
+    // signUp() is called for an existing CONFIRMED user, Supabase returns a
+    // fake user object with error: null instead of an error, to avoid email
+    // enumeration. An empty identities array is what a real new signup never
+    // has (it always gets exactly one identity for the provider just used).
+    mockAuth.signUp.mockResolvedValue({
+      data: { user: { id: "u1", email: "jane@example.com", identities: [] } },
+      error: null,
+    });
+
+    const result = await signUp({
+      username: "jdoe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      phone: "",
+      phoneCountryCode: "+1",
+      affiliation: "State University",
+      userType: "student",
+      educationLevel: "undergraduate",
+      password: "hunter2-hunter2",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("already registered");
+  });
+
+  it("treats a non-empty identities array as a genuine new signup", async () => {
+    mockAuth.signUp.mockResolvedValue({
+      data: { user: { id: "u1", email: "jane@example.com", identities: [{ id: "identity-1" }] } },
+      error: null,
+    });
+
+    const result = await signUp({
+      username: "jdoe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      phone: "",
+      phoneCountryCode: "+1",
+      affiliation: "State University",
+      userType: "student",
+      educationLevel: "undergraduate",
+      password: "hunter2-hunter2",
+    });
+
+    expect(result).toEqual({ success: true });
+  });
 });
 
 describe("signIn", () => {
@@ -534,10 +582,16 @@ describe("availability checks", () => {
     expect(result).toBe(false);
   });
 
-  it("checkUsernameAvailable handles RPC errors gracefully", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { message: "RPC error" } });
+  it("checkUsernameAvailable fails OPEN on an RPC error — e.g. the check_username_available migration isn't applied yet — rather than blocking every signup", async () => {
+    // This is the opposite of "fail safe" in the sense of rejecting the
+    // input: if this returned false here, a Supabase project missing this
+    // migration would show every username as "already taken," blocking
+    // signup entirely. Real duplicate-username enforcement is the
+    // database's own unique constraint, independent of this RPC — see
+    // availableOnRpcFailure()'s doc comment in supabaseAuthService.ts.
+    mockRpc.mockResolvedValue({ data: null, error: { message: "function check_username_available does not exist" } });
     const result = await checkUsernameAvailable("someuser");
-    expect(result).toBe(false);
+    expect(result).toBe(true);
   });
 
   it("checkEmailAvailable returns true when email is available", async () => {
@@ -553,6 +607,12 @@ describe("availability checks", () => {
     expect(result).toBe(false);
   });
 
+  it("checkEmailAvailable fails open on an RPC error, same reasoning as checkUsernameAvailable", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "function check_email_available does not exist" } });
+    const result = await checkEmailAvailable("someone@example.com");
+    expect(result).toBe(true);
+  });
+
   it("checkPhoneAvailable returns true when phone is available", async () => {
     mockRpc.mockResolvedValue({ data: true, error: null });
     const result = await checkPhoneAvailable("+15550000000");
@@ -566,10 +626,10 @@ describe("availability checks", () => {
     expect(result).toBe(false);
   });
 
-  it("checkPhoneAvailable handles RPC errors gracefully", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { message: "RPC error" } });
+  it("checkPhoneAvailable fails open on an RPC error, same reasoning as checkUsernameAvailable", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "function check_phone_available does not exist" } });
     const result = await checkPhoneAvailable("+15550100000");
-    expect(result).toBe(false);
+    expect(result).toBe(true);
   });
 });
 

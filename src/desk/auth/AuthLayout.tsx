@@ -59,8 +59,10 @@ export function Field({
   type = "text",
   value,
   onChange,
+  onBlur,
   autoComplete,
   hint,
+  error,
   autoFocus,
   required = true,
   disabled = false,
@@ -71,8 +73,12 @@ export function Field({
   type?: string;
   value: string;
   onChange: (value: string) => void;
+  /** Fired on blur — e.g. to trigger an async availability check without re-running it on every keystroke. */
+  onBlur?: () => void;
   autoComplete?: string;
   hint?: string;
+  /** A validation/availability problem, shown the same way PhoneField and FileField already show theirs. */
+  error?: string | null;
   autoFocus?: boolean;
   required?: boolean;
   disabled?: boolean;
@@ -81,6 +87,8 @@ export function Field({
 }) {
   const [visible, setVisible] = useState(false);
   const hintId = hint ? `${id}-hint` : undefined;
+  const errorId = error ? `${id}-error` : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   const resolvedType = showPasswordToggle ? (visible ? "text" : "password") : type;
   return (
     <div className="flex flex-col gap-1.5">
@@ -97,10 +105,11 @@ export function Field({
           disabled={disabled}
           autoComplete={autoComplete}
           autoFocus={autoFocus}
-          // Ties the hint to the input so it is read out with the field rather
-          // than floating unattached below it.
-          aria-describedby={hintId}
+          // Ties the hint/error to the input so it is read out with the field
+          // rather than floating unattached below it.
+          aria-describedby={describedBy}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           className={`w-full px-3 py-2 text-sm ${showPasswordToggle ? "pr-14" : ""}`}
         />
         {showPasswordToggle && (
@@ -116,6 +125,11 @@ export function Field({
       {hint && (
         <p id={hintId} className="text-xs text-[color:var(--text-muted)]">
           {hint}
+        </p>
+      )}
+      {error && (
+        <p id={errorId} role="alert" className="text-xs font-medium text-[color:var(--state-danger)]">
+          {error}
         </p>
       )}
     </div>
@@ -259,6 +273,7 @@ export function PhoneField({
   onCountryCodeChange,
   number,
   onNumberChange,
+  onBlur,
   required = true,
   error,
 }: {
@@ -267,6 +282,8 @@ export function PhoneField({
   onCountryCodeChange: (dialCode: string) => void;
   number: string;
   onNumberChange: (value: string) => void;
+  /** Fired on blur of the number input — e.g. to trigger an async availability check. */
+  onBlur?: () => void;
   required?: boolean;
   error?: string | null;
 }) {
@@ -304,6 +321,7 @@ export function PhoneField({
           required={required}
           placeholder="9851108291"
           onChange={(e) => onNumberChange(e.target.value)}
+          onBlur={onBlur}
           className="w-full px-3 py-2 text-sm"
         />
       </div>
@@ -324,12 +342,22 @@ export function AuthError({ children }: { children: ReactNode }) {
   );
 }
 
-/** Confirmations, e.g. "reset email sent". Same announcement treatment. */
+/**
+ * Confirmations, e.g. "reset email sent". Same announcement treatment as
+ * AuthError, but for a non-alarming message.
+ *
+ * Uses the brand accent's tinted surface (--accent-subtle/--accent-border),
+ * not --state-info/--state-info-subtle's generic blue: a flat sky-blue box
+ * here read as a different product bolted onto the page rather than part of
+ * Scholar Core, next to --accent-colored links and the wordmark right above
+ * it. --state-info-subtle is kept in index.css for any future genuinely
+ * neutral (non-brand) informational surface, just no longer used here.
+ */
 export function AuthNotice({ children }: { children: ReactNode }) {
   return (
     <p
       role="status"
-      className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--state-info-subtle)] px-3 py-2 text-sm text-[color:var(--state-info)]"
+      className="rounded-[var(--radius-md)] border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-3 py-2 text-sm text-[color:var(--accent)]"
     >
       {children}
     </p>
