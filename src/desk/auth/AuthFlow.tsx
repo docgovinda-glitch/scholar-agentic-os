@@ -29,6 +29,7 @@ import {
 } from "./authScreens";
 import { EDUCATION_LEVELS, USER_TYPES } from "../../config/accountSchema";
 import { getCaptchaConfig } from "../../services/captchaService";
+import ScholarCoreLanding from "../ScholarCoreLanding";
 
 /**
  * Desk's unauthenticated surface: sign in, register, recover a password.
@@ -44,7 +45,7 @@ import { getCaptchaConfig } from "../../services/captchaService";
  * so a successful sign-in needs no navigation of its own — pushing a route
  * here would race that subscription.
  */
-export default function AuthFlow({ initialScreen = "sign-in" }: { initialScreen?: AuthScreen } = {}) {
+export default function AuthFlow({ initialScreen = "landing" }: { initialScreen?: AuthScreen } = {}) {
   const [screen, setScreen] = useState<AuthScreen>(initialScreen);
 
   // Belt-and-suspenders: useDeskSession is the authoritative recovery-link
@@ -57,6 +58,13 @@ export default function AuthFlow({ initialScreen = "sign-in" }: { initialScreen?
   useEffect(() => onPasswordRecovery(() => setScreen("recover")), []);
 
   switch (screen) {
+    case "landing":
+      return (
+        <ScholarCoreLanding
+          onGetStarted={() => setScreen("sign-up")}
+          onSignIn={() => setScreen("sign-in")}
+        />
+      );
     case "sign-up":
       return <SignUpScreen onDone={() => setScreen("registered")} onBack={() => setScreen("sign-in")} />;
     case "forgot":

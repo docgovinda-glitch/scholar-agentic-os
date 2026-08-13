@@ -54,7 +54,7 @@ const SECTIONS: Array<{ id: SectionId; label: string; hint: string }> = [
   { id: "local", label: "Local AI", hint: "On your computer" },
   { id: "free", label: "Free AI", hint: "No cost to you" },
   { id: "byok", label: "Pro / BYOK", hint: "Your own keys" },
-  { id: "premium", label: "Premium", hint: "Provided by Scholar" },
+  { id: "premium", label: "Premium", hint: "Provided by Scholar Core" },
   { id: "models", label: "Models", hint: "Defaults and choices" },
   { id: "settings", label: "Settings", hint: "Routing and security" },
 ];
@@ -611,7 +611,7 @@ function PremiumSection({ access }: { access: ReturnType<typeof useAiAccess> }) 
 
   return (
     <div className="space-y-5">
-      <SectionHeading title="Premium" blurb="AI paid for by Scholar. You never enter a key — requests run on Scholar's own infrastructure." />
+      <SectionHeading title="Premium" blurb="AI paid for by Scholar Core. You never enter a key — requests run on Scholar Core's own infrastructure." />
 
       <section
         className={`rounded-[var(--radius-md)] border p-4 ${
@@ -625,8 +625,8 @@ function PremiumSection({ access }: { access: ReturnType<typeof useAiAccess> }) 
         </h3>
         <p className="mt-1 text-xs text-[color:var(--text-secondary)]">
           {access.premiumActive
-            ? "Nothing to configure. Scholar uses Premium automatically when it is the best available source for a task."
-            : "Your status is verified on Scholar's server on every request — this page cannot switch it on."}
+            ? "Nothing to configure. Scholar Core uses Premium automatically when it is the best available source for a task."
+            : "Your status is verified on Scholar Core's server on every request — this page cannot switch it on."}
         </p>
         {/* Told before it lapses rather than discovered by a failed request. */}
         {access.premiumActive && expiresInDays !== null && expiresInDays <= 14 && (
@@ -785,7 +785,7 @@ function ModelsSection({ access, onOpen }: { access: ReturnType<typeof useAiAcce
   const connected = access.connected;
   return (
     <div className="space-y-5">
-      <SectionHeading title="Models" blurb="The model each connected provider will use, and which provider Scholar prefers by default." />
+      <SectionHeading title="Models" blurb="The model each connected provider will use, and which provider Scholar Core prefers by default." />
 
       {connected.length === 0 ? (
         <p className="text-sm text-[color:var(--text-muted)]">Connect a provider first — there are no models to choose between yet.</p>
@@ -837,7 +837,7 @@ function SettingsSection({ access }: { access: ReturnType<typeof useAiAccess> })
 
   return (
     <div className="space-y-5">
-      <SectionHeading title="Settings" blurb="How Scholar chooses between what you have connected, and what leaves your machine." />
+      <SectionHeading title="Settings" blurb="How Scholar Core chooses between what you have connected, and what leaves your machine." />
 
       <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
         <label htmlFor="default-provider" className="text-sm font-semibold text-[color:var(--text-primary)]">
@@ -870,7 +870,7 @@ function SettingsSection({ access }: { access: ReturnType<typeof useAiAccess> })
           onChange={(e) => void access.setPreference("fallbackProvider", e.target.value)}
           className="mt-2 w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         >
-          <option value="">Let Scholar decide</option>
+          <option value="">Let Scholar Core decide</option>
           {connected.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -891,14 +891,14 @@ function SettingsSection({ access }: { access: ReturnType<typeof useAiAccess> })
           <span>
             Never send my writing to a cloud provider — use Local AI only.
             <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">
-              With this on, a task Scholar cannot run locally is refused rather than sent to the cloud.
+              With this on, a task Scholar Core cannot run locally is refused rather than sent to the cloud.
             </span>
           </span>
         </label>
         <ul className="mt-3 space-y-1 text-xs text-[color:var(--text-muted)]">
-          <li>· Your API keys are encrypted and stored on this device only — never on Scholar's servers.</li>
-          <li>· Premium uses Scholar's own keys, held server-side. They are never sent to your browser.</li>
-          <li>· Local runners receive your text directly from this device; it never reaches Scholar's servers.</li>
+          <li>· Your API keys are encrypted and stored on this device only — never on Scholar Core's servers.</li>
+          <li>· Premium uses Scholar Core's own keys, held server-side. They are never sent to your browser.</li>
+          <li>· Local runners receive your text directly from this device; it never reaches Scholar Core's servers.</li>
         </ul>
       </section>
     </div>
