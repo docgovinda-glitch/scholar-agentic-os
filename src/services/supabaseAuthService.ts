@@ -279,6 +279,51 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
   };
 }
 
+/**
+ * Check if a username is available (not already taken).
+ *
+ * Called during signup form validation to provide real-time feedback
+ * as the user types a username.
+ */
+export async function checkUsernameAvailable(username: string): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  const { data: isAvailable, error } = await supabase.rpc("check_username_available", {
+    lookup_username: username.trim(),
+  });
+  if (error) return false; // On error, assume not available (fail safe)
+  return isAvailable ?? false;
+}
+
+/**
+ * Check if an email is available (not already registered).
+ *
+ * Called during signup form validation to provide real-time feedback
+ * as the user enters an email address.
+ */
+export async function checkEmailAvailable(email: string): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  const { data: isAvailable, error } = await supabase.rpc("check_email_available", {
+    lookup_email: email.trim(),
+  });
+  if (error) return false; // On error, assume not available (fail safe)
+  return isAvailable ?? false;
+}
+
+/**
+ * Check if a phone number in E.164 format is available (not already registered).
+ *
+ * Called during signup form validation to provide real-time feedback
+ * as the user enters a phone number.
+ */
+export async function checkPhoneAvailable(phoneE164: string): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  const { data: isAvailable, error } = await supabase.rpc("check_phone_available", {
+    lookup_phone_e164: phoneE164.trim(),
+  });
+  if (error) return false; // On error, assume not available (fail safe)
+  return isAvailable ?? false;
+}
+
 
 export interface ProfileFields {
   username: string;

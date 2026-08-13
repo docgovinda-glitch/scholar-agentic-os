@@ -61,6 +61,9 @@ import {
   requestProfileUpdate,
   onPasswordRecovery,
   onGoogleSignIn,
+  checkUsernameAvailable,
+  checkEmailAvailable,
+  checkPhoneAvailable,
 } from "../supabaseAuthService";
 
 beforeEach(() => {
@@ -475,6 +478,59 @@ describe("requestProfileUpdate", () => {
     // Deterministic: hashing the same key again must produce the identical digest.
     const again = await requestProfileUpdate({ username: "jdoe", pendingPhone: "555-0100" });
     expect(again.keyHash).toBe(result.keyHash);
+  });
+});
+
+describe("availability checks", () => {
+  it("checkUsernameAvailable returns true when username is available", async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
+    const result = await checkUsernameAvailable("newuser");
+    expect(result).toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith("check_username_available", { lookup_username: "newuser" });
+  });
+
+  it("checkUsernameAvailable returns false when username is taken", async () => {
+    mockRpc.mockResolvedValue({ data: false, error: null });
+    const result = await checkUsernameAvailable("existinguser");
+    expect(result).toBe(false);
+  });
+
+  it("checkUsernameAvailable handles RPC errors gracefully", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "RPC error" } });
+    const result = await checkUsernameAvailable("someuser");
+    expect(result).toBe(false);
+  });
+
+  it("checkEmailAvailable returns true when email is available", async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
+    const result = await checkEmailAvailable("new@example.com");
+    expect(result).toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith("check_email_available", { lookup_email: "new@example.com" });
+  });
+
+  it("checkEmailAvailable returns false when email is taken", async () => {
+    mockRpc.mockResolvedValue({ data: false, error: null });
+    const result = await checkEmailAvailable("existing@example.com");
+    expect(result).toBe(false);
+  });
+
+  it("checkPhoneAvailable returns true when phone is available", async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
+    const result = await checkPhoneAvailable("+15550000000");
+    expect(result).toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith("check_phone_available", { lookup_phone_e164: "+15550000000" });
+  });
+
+  it("checkPhoneAvailable returns false when phone is taken", async () => {
+    mockRpc.mockResolvedValue({ data: false, error: null });
+    const result = await checkPhoneAvailable("+15559999999");
+    expect(result).toBe(false);
+  });
+
+  it("checkPhoneAvailable handles RPC errors gracefully", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "RPC error" } });
+    const result = await checkPhoneAvailable("+15550100000");
+    expect(result).toBe(false);
   });
 });
 
