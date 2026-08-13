@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { Option } from "../../config/accountSchema";
 import { COUNTRIES, type Country } from "../../config/countries";
+import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 
 /**
  * Shared chrome and controls for Desk's auth screens.
@@ -42,7 +43,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
 export function AuthHeading({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <header className="mb-7">
-      <p className="text-sm font-semibold tracking-tight text-[color:var(--text-primary)]">Scholar</p>
+      <ScholarCoreLogo size="sm" className="text-[color:var(--text-primary)]" />
       {/* h1 is the screen's own title, not the wordmark — a screen reader
           user navigating by heading should land on "Create your account",
           not on the product name repeated five times. */}
