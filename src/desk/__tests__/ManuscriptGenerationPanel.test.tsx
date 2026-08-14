@@ -136,6 +136,58 @@ describe("Desk — ManuscriptGenerationPanel", () => {
     expect(onInsert).toHaveBeenCalledWith([{ key: "introduction", title: "Introduction", text: "Text.", wordCount: 1, memory: "m", citedEvidenceIds: [], generatedAt: "now" }]);
   });
 
+  it("sends an expanded section's text to Studio when onSendToStudio is supplied", async () => {
+    const onSendToStudio = vi.fn();
+    mockFetch((url) => {
+      if (url.includes("/manuscript/job")) {
+        return {
+          status: 200,
+          body: {
+            state: "completed",
+            plan: [{ key: "introduction", title: "Introduction", guidance: "g", targetWords: 500 }],
+            sections: [{ key: "introduction", title: "Introduction", text: "Section prose.", wordCount: 2, memory: "m", citedEvidenceIds: [], generatedAt: "now" }],
+            totalWordTarget: 3000,
+            updatedAt: "now",
+          },
+        };
+      }
+      return { status: 500, body: {} };
+    });
+    render(<ManuscriptGenerationPanel projectId={PROJECT_ID} onSendToStudio={onSendToStudio} />);
+
+    // The button (and section text) only appear once the section is expanded.
+    const toggle = await screen.findByRole("button", { name: /Introduction/ });
+    expect(screen.queryByRole("button", { name: "Humanize in Studio" })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    await screen.findByText("Section prose.");
+    fireEvent.click(screen.getByRole("button", { name: "Humanize in Studio" }));
+
+    expect(onSendToStudio).toHaveBeenCalledWith("Section prose.");
+  });
+
+  it("does not render a Humanize-in-Studio button when onSendToStudio isn't supplied", async () => {
+    mockFetch((url) => {
+      if (url.includes("/manuscript/job")) {
+        return {
+          status: 200,
+          body: {
+            state: "completed",
+            plan: [{ key: "introduction", title: "Introduction", guidance: "g", targetWords: 500 }],
+            sections: [{ key: "introduction", title: "Introduction", text: "Section prose.", wordCount: 2, memory: "m", citedEvidenceIds: [], generatedAt: "now" }],
+            totalWordTarget: 3000,
+            updatedAt: "now",
+          },
+        };
+      }
+      return { status: 500, body: {} };
+    });
+    render(<ManuscriptGenerationPanel projectId={PROJECT_ID} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Introduction/ }));
+    await screen.findByText("Section prose.");
+    expect(screen.queryByRole("button", { name: "Humanize in Studio" })).not.toBeInTheDocument();
+  });
+
   it("runs a coherence check via the Premium tier and displays the resulting issues", async () => {
     const completedJob = {
       state: "completed",

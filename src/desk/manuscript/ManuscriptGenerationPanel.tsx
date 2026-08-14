@@ -125,11 +125,14 @@ export default function ManuscriptGenerationPanel({
   projectId,
   onOpenAiAccess,
   onInsertIntoDocument,
+  onSendToStudio,
 }: {
   projectId: string;
   onOpenAiAccess?: () => void;
   /** Converts every completed section into document blocks and saves them via the normal document-save path — a deliberate, visible action, never automatic. */
   onInsertIntoDocument?: (sections: GeneratedSection[]) => void;
+  /** Loads a section's text into the Studio panel's passage box for a "make it read naturally" pass — see StudioPanel's seedText/seedToken doc comment. */
+  onSendToStudio?: (text: string) => void;
 }) {
   const [job, setJob] = useState<GenerationJob | null | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -552,7 +555,20 @@ export default function ManuscriptGenerationPanel({
               <span className="text-xs text-[color:var(--text-muted)]">{s.wordCount.toLocaleString()} words</span>
             </button>
             <p className="mt-1 text-xs text-[color:var(--text-secondary)]">{s.memory}</p>
-            {expandedKey === s.key && <p className="mt-2 whitespace-pre-wrap text-sm text-[color:var(--text-primary)]">{s.text}</p>}
+            {expandedKey === s.key && (
+              <>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-[color:var(--text-primary)]">{s.text}</p>
+                {onSendToStudio && (
+                  <button
+                    type="button"
+                    onClick={() => onSendToStudio(s.text)}
+                    className="mt-2 rounded border border-[color:var(--border-default)] px-2 py-1 text-xs font-medium text-[color:var(--text-primary)] hover:border-[color:var(--border-strong)] cursor-pointer"
+                  >
+                    Humanize in Studio
+                  </button>
+                )}
+              </>
+            )}
           </li>
         ))}
       </ul>

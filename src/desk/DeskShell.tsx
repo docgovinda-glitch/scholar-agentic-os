@@ -64,6 +64,11 @@ export default function DeskShell({
   // picks it up — the two panels stay decoupled otherwise (see
   // EvidenceLedgerPanel's own comment on why it fetches its own claim list).
   const [claimsRefreshToken, setClaimsRefreshToken] = useState(0);
+  // Text most recently sent from a generated manuscript section into Studio
+  // ("Humanize in Studio") plus a bump counter — see StudioPanel's
+  // seedText/seedToken doc comment for why both are needed.
+  const [studioSeedText, setStudioSeedText] = useState<string | undefined>(undefined);
+  const [studioSeedToken, setStudioSeedToken] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -140,6 +145,12 @@ export default function DeskShell({
     setRubric(rub);
     setProject((p) => (p ? { ...p, gates: result.gates } : p));
     return { citedSourceIds: result.citedSourceIds, unresolvedIds: result.unresolvedIds };
+  }
+
+  /** Sends a generated section's text to the Studio panel for a "make it read naturally in the author's voice" pass — the researcher decides if/when to bring the refined result back into the document (see StudioPanel's doc comment). */
+  function handleSendToStudio(text: string) {
+    setStudioSeedText(text);
+    setStudioSeedToken((t) => t + 1);
   }
 
   function jumpToBlock(blockId: string) {
@@ -254,6 +265,7 @@ export default function DeskShell({
             <ManuscriptGenerationPanel
               projectId={projectId}
               onOpenAiAccess={onOpenAiAccess}
+              onSendToStudio={handleSendToStudio}
               onInsertIntoDocument={(sections) => {
                 const newBlocks = sectionsToBlocks(sections);
                 const merged: CanonicalDocument = document
@@ -301,6 +313,8 @@ export default function DeskShell({
           projectId={projectId}
           rubric={rubric}
           sessionId={`desk-${projectId}`}
+          studioSeedText={studioSeedText}
+          studioSeedToken={studioSeedToken}
           onChanged={(updated, newRubric) => {
             setProject(updated);
             setRubric(newRubric);

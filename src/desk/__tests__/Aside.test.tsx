@@ -21,7 +21,13 @@ const waiveFinding = vi.fn();
 vi.mock("../api", () => ({
   waiveFinding: (...a: unknown[]) => waiveFinding(...a),
 }));
-vi.mock("../regions/StudioPanel", () => ({ default: () => null }));
+const studioPanelSpy = vi.fn();
+vi.mock("../regions/StudioPanel", () => ({
+  default: (props: unknown) => {
+    studioPanelSpy(props);
+    return null;
+  },
+}));
 
 const { default: Aside } = await import("../regions/Aside");
 
@@ -58,6 +64,24 @@ afterEach(() => {
 
 const panel = (rub: ReturnType<typeof rubric> | null, onChanged = vi.fn()) =>
   render(<Aside projectId="proj-1" rubric={rub as never} sessionId="desk-proj-1" onChanged={onChanged} />);
+
+describe("Studio seed pass-through", () => {
+  it("forwards studioSeedText/studioSeedToken straight through to StudioPanel", () => {
+    render(
+      <Aside
+        projectId="proj-1"
+        rubric={null}
+        sessionId="desk-proj-1"
+        onChanged={vi.fn()}
+        studioSeedText="Generated section."
+        studioSeedToken={3}
+      />
+    );
+    expect(studioPanelSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "desk-proj-1", seedText: "Generated section.", seedToken: 3 })
+    );
+  });
+});
 
 describe("what a finding offers", () => {
   it("offers to waive a required failure", () => {
