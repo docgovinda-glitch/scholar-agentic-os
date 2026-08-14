@@ -107,12 +107,11 @@ const HARDWARE_NO_LOCAL = {
 
 const { default: DeskApp } = await import("../DeskApp");
 
-// DeskApp renders a <Routes> tree (Phase 2 of the routing migration) — it
-// needs a real Router ancestor, same as it gets from main.tsx in production.
-// BrowserRouter, not MemoryRouter: the still-unmigrated internal DeskRoutes()
-// (Phase 3's job) reads/writes window.location directly, so the router's
-// notion of the current URL has to be the same window.location this file's
-// tests already push state onto.
+// DeskApp renders a <Routes> tree — it needs a real Router ancestor, same as
+// it gets from main.tsx in production. BrowserRouter, not MemoryRouter: this
+// file sets up its starting scene with window.history.pushState() directly
+// (e.g. landing mid-onboarding on a project URL), so the router's notion of
+// the current URL has to be the same window.location these tests drive.
 function renderDeskApp() {
   return render(
     <BrowserRouter>
@@ -174,13 +173,13 @@ beforeEach(() => {
   mockFetchSequence([NO_PROJECTS]);
   // Deterministic starting URL for every test, not just a leftover from the
   // previous one's afterEach.
-  window.history.pushState({}, "", "/desk");
+  window.history.pushState({}, "", "/projects");
 });
 
 afterEach(() => {
   global.fetch = originalFetch;
   cleanup();
-  window.history.pushState({}, "", "/desk");
+  window.history.pushState({}, "", "/projects");
 });
 
 describe("the canonical first-login journey", () => {
@@ -260,7 +259,7 @@ describe("the canonical first-login journey", () => {
   });
 
   it("9. a direct project URL mid-onboarding still shows AI Access first, never the project underneath it", async () => {
-    window.history.pushState({}, "", "/desk?project=some-project");
+    window.history.pushState({}, "", "/projects/some-project");
     renderDeskApp();
     expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
   });

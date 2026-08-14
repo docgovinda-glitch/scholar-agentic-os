@@ -15,12 +15,11 @@ import "@testing-library/jest-dom/vitest";
 import { BrowserRouter } from "react-router-dom";
 import DeskApp from "../DeskApp";
 
-// DeskApp now renders a <Routes> tree (Phase 2 of the routing migration) —
-// it needs a real Router ancestor, same as it gets from main.tsx in
-// production. BrowserRouter, not MemoryRouter: the still-unmigrated internal
-// DeskRoutes() (Phase 3's job) reads/writes window.location directly via
-// readProjectIdFromUrl()/pushState, so the router's notion of the current URL
-// has to be the same window.location these tests already assert against.
+// DeskApp renders a <Routes> tree — it needs a real Router ancestor, same as
+// it gets from main.tsx in production. BrowserRouter, not MemoryRouter: these
+// tests set up their starting scene with window.history.pushState() directly
+// (e.g. landing on an already-open project), so the router's notion of the
+// current URL has to be the same window.location these tests drive.
 function renderDeskApp() {
   return render(
     <BrowserRouter>
@@ -113,15 +112,15 @@ const projectView = (projectId: string, over: Record<string, unknown> = {}) => (
 // Deterministic starting URL for every test, not just a leftover from the
 // previous one's afterEach — the first test in the file would otherwise start
 // at jsdom's default "/", which "/" now matches as an explicit PublicOnly
-// route and redirects away from before landing on DeskRoutes.
+// route and redirects away from before landing on the project list.
 beforeEach(() => {
-  window.history.pushState({}, "", "/desk");
+  window.history.pushState({}, "", "/projects");
 });
 
 afterEach(() => {
   global.fetch = originalFetch;
   cleanup();
-  window.history.pushState({}, "", "/desk");
+  window.history.pushState({}, "", "/projects");
 });
 
 describe("Desk — project list", () => {
@@ -150,7 +149,7 @@ describe("Desk — project list", () => {
     // real task, and it gates every later gate.
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
-    expect(window.location.search).toContain("project=proj-abc");
+    expect(window.location.pathname).toBe("/projects/proj-abc");
   });
 
   it("creates a project from a real output type and opens it", async () => {
@@ -170,13 +169,13 @@ describe("Desk — project list", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
-    expect(window.location.search).toContain("project=proj-new");
+    expect(window.location.pathname).toBe("/projects/proj-new");
   });
 });
 
 describe("Desk — project shell", () => {
   it("opens on Intake while G0 is outstanding — the first task gates the rest", async () => {
-    window.history.pushState({}, "", "/desk?project=proj-42");
+    window.history.pushState({}, "", "/projects/proj-42");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types\/OT-06$/, body: { id: "OT-06", label: "Journal Article", family: "article", intakeSchema: { required: [], recommended: [], optional: [] } } },
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
@@ -190,7 +189,7 @@ describe("Desk — project shell", () => {
   });
 
   it("reads ?project= from the URL and renders that project directly", async () => {
-    window.history.pushState({}, "", "/desk?project=proj-42");
+    window.history.pushState({}, "", "/projects/proj-42");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       {
@@ -211,7 +210,7 @@ describe("Desk — project shell", () => {
   });
 
   it("submits pasted plain text as a document and shows real Compliance findings back", async () => {
-    window.history.pushState({}, "", "/desk?project=proj-7");
+    window.history.pushState({}, "", "/projects/proj-7");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       {
@@ -261,7 +260,7 @@ describe("Desk — project shell", () => {
   });
 
   it("shows an honest error with a route back, not a dead end, when the project fetch fails", async () => {
-    window.history.pushState({}, "", "/desk?project=missing");
+    window.history.pushState({}, "", "/projects/missing");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [] } },
       { url: /\/api\/projects\/missing\/rubric$/, body: {}, status: 404 },
@@ -277,7 +276,7 @@ describe("Desk — project shell", () => {
   });
 
   it("surfaces an expired session as a session problem, not a project error", async () => {
-    window.history.pushState({}, "", "/desk?project=proj-9");
+    window.history.pushState({}, "", "/projects/proj-9");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [] } },
       { url: /\/api\/projects\/proj-9\/rubric$/, body: {}, status: 401 },
@@ -309,7 +308,7 @@ describe("Desk — account settings", () => {
   });
 
   it("opens from within a project and returns to it, not to the list", async () => {
-    window.history.pushState({}, "", "/desk?project=proj-42");
+    window.history.pushState({}, "", "/projects/proj-42");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
@@ -322,7 +321,7 @@ describe("Desk — account settings", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(await screen.findByText("Journal Article")).toBeInTheDocument();
-    expect(window.location.search).toContain("project=proj-42");
+    expect(window.location.pathname).toBe("/projects/proj-42");
   });
 });
 
