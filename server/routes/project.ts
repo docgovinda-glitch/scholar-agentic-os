@@ -530,16 +530,11 @@ async function runPremiumSectionGeneration(
 }
 
 /**
- * Runs the global coherence pass's Premium path. Deliberately simpler than
- * runPremiumSectionGeneration/runPremiumJournalExtraction's per-attempt
- * retry-across-resources loop: checkCoherence() itself already makes up to
- * three internal calls (one per dimension), and interleaving a second,
- * per-pass fallback-across-Premium-resources loop inside that would trade
- * a real amount of added complexity for a benefit (surviving one Premium
- * resource's outage mid-check) this feature does not yet need — a single
- * resolved resource for the whole multi-pass check, same entitlement/quota
- * enforcement as every other Premium path, is enough for now, and is
- * flagged here for whoever revisits it once it isn't.
+ * Runs the global coherence pass's Premium path — retries across every
+ * resolved Premium resource on failure, same reliable-fallback discipline
+ * as runPremiumSectionGeneration (a single resource's outage or
+ * misconfiguration no longer fails the whole check when another resource
+ * is available).
  */
 async function runPremiumCoherenceCheck(
   userId: string,
@@ -576,53 +571,61 @@ async function runPremiumCoherenceCheck(
   if (resources.length === 0) {
     return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
   }
-  const resource = resources[0];
-  const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-  if (!credential) {
-    await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-    return { ok: false, status: 502, error: `The "${resource.label}" Premium resource is not currently configured.` };
-  }
 
-  const model = resource.modelId || undefined;
-  const start = Date.now();
-  let result: Awaited<ReturnType<typeof checkCoherence>>;
-  try {
-    result = await checkCoherence({ sections, provider: resource.providerId, apiKey: credential, model, policy, dimensions });
-  } catch (err) {
-    if (err instanceof GatewayDenied) {
-      if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-      return { ok: false, status: 403, error: err.message };
+  let lastError = "No Premium resource is currently available.";
+
+  for (const resource of resources) {
+    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
+    if (!credential) {
+      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
+      continue;
     }
-    await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-    return { ok: false, status: 502, error: err instanceof Error ? err.message : "Unknown error" };
-  }
-  await recordProviderSuccess(resource.providerId, Date.now() - start);
 
-  // Real usage per pass isn't threaded back out of checkCoherence today, so
-  // the pre-check estimate is what gets charged — same honest fallback
-  // runPremiumRefine uses when a level's usage is unavailable.
-  const creditsUsed = preCheckAmount;
-  const requestId = crypto.randomUUID();
-  const deductResult = await deductCredits(
-    userId,
-    creditsUsed,
-    quota?.dailyCredits ?? null,
-    quota?.monthlyCredits ?? null,
-    "usage",
-    requestId,
-    `coherence check: ${resource.label}`,
-    quota?.weeklyCredits ?? null
-  );
-  if (deductResult !== "ok") {
-    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "coherence_check");
-    return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-  }
-  await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "coherence_check");
+    const model = resource.modelId || undefined;
+    const start = Date.now();
+    let result: Awaited<ReturnType<typeof checkCoherence>>;
+    try {
+      result = await checkCoherence({ sections, provider: resource.providerId, apiKey: credential, model, policy, dimensions });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
+        return { ok: false, status: 403, error: err.message };
+      }
+      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
+      lastError = err instanceof Error ? err.message : "Unknown error";
+      continue;
+    }
+    await recordProviderSuccess(resource.providerId, Date.now() - start);
 
-  return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+    // Real usage per pass isn't threaded back out of checkCoherence today, so
+    // the pre-check estimate is what gets charged — same honest fallback
+    // runPremiumRefine uses when a level's usage is unavailable.
+    const creditsUsed = preCheckAmount;
+    const requestId = crypto.randomUUID();
+    const deductResult = await deductCredits(
+      userId,
+      creditsUsed,
+      quota?.dailyCredits ?? null,
+      quota?.monthlyCredits ?? null,
+      "usage",
+      requestId,
+      `coherence check: ${resource.label}`,
+      quota?.weeklyCredits ?? null
+    );
+    if (deductResult !== "ok") {
+      await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "coherence_check");
+      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+    }
+    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "coherence_check");
+
+    return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+  }
+
+  return { ok: false, status: 502, error: lastError };
 }
 
-/** Runs one peer-review round's Premium path — same deliberate simplification as runPremiumCoherenceCheck (a single resolved resource for the whole multi-lens round, not a per-lens retry-across-resources loop); see that function's own comment. */
+/** Runs one peer-review round's Premium path — retries across every resolved Premium resource on failure, same reliable-fallback discipline as runPremiumSectionGeneration/runPremiumCoherenceCheck. */
 async function runPremiumPeerReview(
   userId: string,
   sections: GeneratedSection[],
@@ -660,50 +663,58 @@ async function runPremiumPeerReview(
   if (resources.length === 0) {
     return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
   }
-  const resource = resources[0];
-  const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-  if (!credential) {
-    await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-    return { ok: false, status: 502, error: `The "${resource.label}" Premium resource is not currently configured.` };
-  }
 
-  const model = resource.modelId || undefined;
-  const start = Date.now();
-  let result: Awaited<ReturnType<typeof runPeerReview>>;
-  try {
-    result = await runPeerReview({ sections, roundNumber, journalRequirements, provider: resource.providerId, apiKey: credential, model, policy, lenses });
-  } catch (err) {
-    if (err instanceof GatewayDenied) {
-      if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-      return { ok: false, status: 403, error: err.message };
+  let lastError = "No Premium resource is currently available.";
+
+  for (const resource of resources) {
+    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
+    if (!credential) {
+      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
+      continue;
     }
-    await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-    return { ok: false, status: 502, error: err instanceof Error ? err.message : "Unknown error" };
-  }
-  await recordProviderSuccess(resource.providerId, Date.now() - start);
 
-  const creditsUsed = preCheckAmount;
-  const requestId = crypto.randomUUID();
-  const deductResult = await deductCredits(
-    userId,
-    creditsUsed,
-    quota?.dailyCredits ?? null,
-    quota?.monthlyCredits ?? null,
-    "usage",
-    requestId,
-    `peer review: ${resource.label}`,
-    quota?.weeklyCredits ?? null
-  );
-  if (deductResult !== "ok") {
-    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "peer_review");
-    return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-  }
-  await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "peer_review");
+    const model = resource.modelId || undefined;
+    const start = Date.now();
+    let result: Awaited<ReturnType<typeof runPeerReview>>;
+    try {
+      result = await runPeerReview({ sections, roundNumber, journalRequirements, provider: resource.providerId, apiKey: credential, model, policy, lenses });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
+        return { ok: false, status: 403, error: err.message };
+      }
+      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
+      lastError = err instanceof Error ? err.message : "Unknown error";
+      continue;
+    }
+    await recordProviderSuccess(resource.providerId, Date.now() - start);
 
-  return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+    const creditsUsed = preCheckAmount;
+    const requestId = crypto.randomUUID();
+    const deductResult = await deductCredits(
+      userId,
+      creditsUsed,
+      quota?.dailyCredits ?? null,
+      quota?.monthlyCredits ?? null,
+      "usage",
+      requestId,
+      `peer review: ${resource.label}`,
+      quota?.weeklyCredits ?? null
+    );
+    if (deductResult !== "ok") {
+      await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "peer_review");
+      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+    }
+    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "peer_review");
+
+    return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+  }
+
+  return { ok: false, status: 502, error: lastError };
 }
 
-/** Runs cover letter generation's Premium path — a single bounded call, so this is simpler than runPremiumCoherenceCheck/runPremiumPeerReview's multi-pass credit estimate (no dimensions/lenses multiplier). */
+/** Runs cover letter generation's Premium path — retries across every resolved Premium resource on failure, same reliable-fallback discipline as runPremiumSectionGeneration. */
 async function runPremiumCoverLetter(
   userId: string,
   document: CanonicalDocument,
@@ -739,50 +750,58 @@ async function runPremiumCoverLetter(
   if (resources.length === 0) {
     return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
   }
-  const resource = resources[0];
-  const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-  if (!credential) {
-    await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-    return { ok: false, status: 502, error: `The "${resource.label}" Premium resource is not currently configured.` };
-  }
 
-  const model = resource.modelId || undefined;
-  const start = Date.now();
-  let result: Awaited<ReturnType<typeof generateCoverLetter>>;
-  try {
-    result = await generateCoverLetter({ document, journalRequirements, provider: resource.providerId, apiKey: credential, model, policy });
-  } catch (err) {
-    if (err instanceof GatewayDenied) {
-      if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-      return { ok: false, status: 403, error: err.message };
+  let lastError = "No Premium resource is currently available.";
+
+  for (const resource of resources) {
+    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
+    if (!credential) {
+      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
+      continue;
     }
-    await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-    return { ok: false, status: 502, error: err instanceof Error ? err.message : "Unknown error" };
-  }
-  await recordProviderSuccess(resource.providerId, Date.now() - start);
 
-  const creditsUsed = preCheckAmount;
-  const requestId = crypto.randomUUID();
-  const deductResult = await deductCredits(
-    userId,
-    creditsUsed,
-    quota?.dailyCredits ?? null,
-    quota?.monthlyCredits ?? null,
-    "usage",
-    requestId,
-    `cover letter: ${resource.label}`,
-    quota?.weeklyCredits ?? null
-  );
-  if (deductResult !== "ok") {
-    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "cover_letter");
-    return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-  }
-  await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "cover_letter");
+    const model = resource.modelId || undefined;
+    const start = Date.now();
+    let result: Awaited<ReturnType<typeof generateCoverLetter>>;
+    try {
+      result = await generateCoverLetter({ document, journalRequirements, provider: resource.providerId, apiKey: credential, model, policy });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
+        return { ok: false, status: 403, error: err.message };
+      }
+      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
+      lastError = err instanceof Error ? err.message : "Unknown error";
+      continue;
+    }
+    await recordProviderSuccess(resource.providerId, Date.now() - start);
 
-  return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+    const creditsUsed = preCheckAmount;
+    const requestId = crypto.randomUUID();
+    const deductResult = await deductCredits(
+      userId,
+      creditsUsed,
+      quota?.dailyCredits ?? null,
+      quota?.monthlyCredits ?? null,
+      "usage",
+      requestId,
+      `cover letter: ${resource.label}`,
+      quota?.weeklyCredits ?? null
+    );
+    if (deductResult !== "ok") {
+      await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "cover_letter");
+      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+    }
+    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "cover_letter");
+
+    return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+  }
+
+  return { ok: false, status: 502, error: lastError };
 }
 
-/** Runs anonymization-proposal generation's Premium path — same single-call shape as runPremiumCoverLetter. */
+/** Runs anonymization-proposal generation's Premium path — retries across every resolved Premium resource on failure, same reliable-fallback discipline as runPremiumSectionGeneration. */
 async function runPremiumAnonymization(
   userId: string,
   document: CanonicalDocument,
@@ -817,47 +836,55 @@ async function runPremiumAnonymization(
   if (resources.length === 0) {
     return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
   }
-  const resource = resources[0];
-  const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
-  if (!credential) {
-    await recordProviderFailure(resource.providerId, "No active platform credential configured.");
-    return { ok: false, status: 502, error: `The "${resource.label}" Premium resource is not currently configured.` };
-  }
 
-  const model = resource.modelId || undefined;
-  const start = Date.now();
-  let result: Awaited<ReturnType<typeof proposeAnonymization>>;
-  try {
-    result = await proposeAnonymization({ document, provider: resource.providerId, apiKey: credential, model, policy });
-  } catch (err) {
-    if (err instanceof GatewayDenied) {
-      if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
-      return { ok: false, status: 403, error: err.message };
+  let lastError = "No Premium resource is currently available.";
+
+  for (const resource of resources) {
+    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
+    if (!credential) {
+      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
+      continue;
     }
-    await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
-    return { ok: false, status: 502, error: err instanceof Error ? err.message : "Unknown error" };
-  }
-  await recordProviderSuccess(resource.providerId, Date.now() - start);
 
-  const creditsUsed = preCheckAmount;
-  const requestId = crypto.randomUUID();
-  const deductResult = await deductCredits(
-    userId,
-    creditsUsed,
-    quota?.dailyCredits ?? null,
-    quota?.monthlyCredits ?? null,
-    "usage",
-    requestId,
-    `anonymization proposal: ${resource.label}`,
-    quota?.weeklyCredits ?? null
-  );
-  if (deductResult !== "ok") {
-    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "anonymization_propose");
-    return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
-  }
-  await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "anonymization_propose");
+    const model = resource.modelId || undefined;
+    const start = Date.now();
+    let result: Awaited<ReturnType<typeof proposeAnonymization>>;
+    try {
+      result = await proposeAnonymization({ document, provider: resource.providerId, apiKey: credential, model, policy });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
+        return { ok: false, status: 403, error: err.message };
+      }
+      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
+      lastError = err instanceof Error ? err.message : "Unknown error";
+      continue;
+    }
+    await recordProviderSuccess(resource.providerId, Date.now() - start);
 
-  return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+    const creditsUsed = preCheckAmount;
+    const requestId = crypto.randomUUID();
+    const deductResult = await deductCredits(
+      userId,
+      creditsUsed,
+      quota?.dailyCredits ?? null,
+      quota?.monthlyCredits ?? null,
+      "usage",
+      requestId,
+      `anonymization proposal: ${resource.label}`,
+      quota?.weeklyCredits ?? null
+    );
+    if (deductResult !== "ok") {
+      await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "anonymization_propose");
+      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+    }
+    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "anonymization_propose");
+
+    return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+  }
+
+  return { ok: false, status: 502, error: lastError };
 }
 
 const SOURCE_TYPES = new Set(["scholarly", "official", "web", "media", "user_provided", "vault"]);
