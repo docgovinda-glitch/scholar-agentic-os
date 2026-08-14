@@ -66,6 +66,11 @@ create table if not exists public.projects (
   -- Orthogonal to the gate columns above — a project can be G6-signed-off
   -- with any number of submission attempts against different venues.
   submissions jsonb not null default '[]'::jsonb,
+  -- The target journal's captured requirements (domain/journal/types.ts,
+  -- gate G1). Nullable, unlike the columns above defaulting to an empty
+  -- container: "not yet captured" is a real, distinct state from "captured
+  -- but empty" for this one.
+  journal_requirements jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -100,6 +105,11 @@ end $$;
 -- no submission history yet is simply an empty list, exactly what new rows
 -- already default to.
 alter table public.projects add column if not exists submissions jsonb not null default '[]'::jsonb;
+
+-- Migration for databases created before journal_requirements existed.
+-- Nullable, no default: an existing row simply has no requirements captured
+-- yet, the same state a freshly created row starts in.
+alter table public.projects add column if not exists journal_requirements jsonb;
 
 -- Deny-all baseline for anon/authenticated (see the note at the top of this
 -- file). FORCE additionally applies RLS to the table's owner; roles with

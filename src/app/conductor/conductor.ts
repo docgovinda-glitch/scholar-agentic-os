@@ -6,15 +6,16 @@
  * Binds the pure gate state machine (domain/project/gates.ts) to the
  * modules already built that a gate's exit criteria can be computed from
  * today: Atlas for G0 (has every required intake field been answered, or
- * explicitly deferred), Atlas + the document for G3 (every required section
- * exists, every deferred G0 field resolved — see computeG3ExitCriteria's
- * own comment for what's deliberately not modeled), and the Rubric for G6
- * (are there any unresolved blocking or required compliance findings).
- * G1, G2, G4, G5, and G7 exit criteria are not wired to anything yet —
- * there is no requirement-extraction pipeline, sourcing pipeline, drafting
- * pipeline, review pipeline, or export pipeline built (see
- * docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3) — but the gate state
- * machine itself supports them identically once those modules exist:
+ * explicitly deferred), Atlas + journal requirements for G1 (is the target
+ * venue settled and its requirements captured — see computeG1ExitCriteria),
+ * Atlas + the document for G3 (every required section exists, every
+ * deferred G0 field resolved — see computeG3ExitCriteria's own comment for
+ * what's deliberately not modeled), and the Rubric for G6 (are there any
+ * unresolved blocking or required compliance findings). G2, G4, G5, and G7
+ * exit criteria are not wired to anything yet — there is no sourcing
+ * pipeline, drafting pipeline, review pipeline, or export pipeline built
+ * (see docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3) — but the gate
+ * state machine itself supports them identically once those modules exist:
  * `updateExitCriteria()` takes any `ExitCriterion[]`, computed however the
  * caller likes.
  *
@@ -48,6 +49,7 @@ import type { OutputTypeSpec, SectionSpec } from "../atlas/types";
 import { allIntakeFields } from "../atlas/proposals";
 import type { RubricReport } from "../rubric/rubric";
 import type { CanonicalDocument } from "../../domain/document/model";
+import type { JournalRequirements } from "../../domain/journal/types";
 
 export {
   GATE_ORDER,
@@ -78,6 +80,68 @@ export function computeG0ExitCriteria(
       blocking: true,
     };
   });
+}
+
+/**
+ * Compute G1's exit criteria from the intake answers G0 collected and the
+ * journal requirements captured so far (docs 30 §3 G1 "Exit": the target
+ * venue is settled and its structural/citation/declaration requirements are
+ * known — everything downstream, from the word-budget allocation to the
+ * compliance rubric's venue-specific gates, reads what's captured here
+ * rather than guessing at it).
+ *
+ * Scoped to `workflowVariant === "venue_targeted"` (today: Journal Article,
+ * Conference Paper, Review Article, Book/Monograph) — for every other
+ * output type, "Requirements" isn't a venue's requirements at all, and no
+ * pipeline for whatever it would mean there exists yet, so this returns no
+ * criteria for them, same as before this function existed (see this
+ * module's own header comment on what's still unwired). Journal Article is
+ * the only one of the four actually implemented against this right now.
+ *
+ * Deliberately small — one criterion per distinct fact that must be true,
+ * matching G0's "one criterion per required field" granularity rather than
+ * inventing a heavier rubric. The "target journal decided" criterion here
+ * and G3's "deferred field resolved" check on the same `target_journal`
+ * answer are independently checking the same underlying fact for two
+ * different gates — consistent with how G0 already checks "answered or
+ * provisional" on that field too.
+ */
+export function computeG1ExitCriteria(
+  spec: OutputTypeSpec,
+  answers: Record<string, string | "provisional">,
+  journalRequirements: JournalRequirements | undefined
+): ExitCriterion[] {
+  if (spec.workflowVariant !== "venue_targeted") return [];
+
+  const targetJournalField = spec.intakeSchema.required.find((f) => f.key === "target_journal");
+  const criteria: ExitCriterion[] = [];
+
+  if (targetJournalField) {
+    criteria.push({
+      id: "target-journal-decided",
+      description: `"${targetJournalField.label}" resolved from provisional to a real value`,
+      satisfied: answers.target_journal !== undefined && answers.target_journal !== "provisional",
+      blocking: true,
+    });
+  }
+
+  criteria.push({
+    id: "journal-requirements-captured",
+    description: "Journal's structural, citation-style, and declaration requirements captured",
+    satisfied: journalRequirements !== undefined,
+    blocking: true,
+  });
+
+  if (journalRequirements) {
+    criteria.push({
+      id: "citation-style-specified",
+      description: `Citation style specified for ${journalRequirements.journalName}`,
+      satisfied: journalRequirements.citationStyle !== undefined && journalRequirements.citationStyle.length > 0,
+      blocking: true,
+    });
+  }
+
+  return criteria;
 }
 
 /** Every field across all tiers that has an answer — informational, not gating (recommended/optional never block G0). */

@@ -17,6 +17,7 @@ import type { RubricReport } from "../rubric/rubric";
 import { emptyGraph } from "../../domain/claim/graph";
 import type { ClaimEvidenceGraph } from "../../domain/claim/types";
 import type { SubmissionRecord } from "../../domain/submission/types";
+import type { JournalRequirements } from "../../domain/journal/types";
 
 export interface ProjectRecord {
   projectId: string;
@@ -44,6 +45,8 @@ export interface ProjectRecord {
   waivers: Record<string, { reason: string; at: string }>;
   /** Post-G6 submission attempts against journals — see domain/submission/types.ts. Starts empty, same as claimGraph: always present, possibly with nothing in it yet. */
   submissions: SubmissionRecord[];
+  /** The target journal's captured structural/citation/declaration requirements (docs 30 §10, G1). Undefined until PUT .../journal-requirements — a real, distinct "not yet captured" state, not defaulted to an empty object, same as `document`. */
+  journalRequirements?: JournalRequirements;
 }
 
 const projects = new Map<string, ProjectRecord>();

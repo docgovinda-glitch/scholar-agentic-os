@@ -7,23 +7,23 @@
  * The second route built on the new architecture (after
  * server/routes/studio.ts). Exposes the Atlas catalog for intake-form
  * rendering, and the Conductor's gate state machine for a project bound to
- * one output type. G0 (from Atlas intake answers), G3 (from the Atlas
- * structure plus the document and intake answers — see
+ * one output type. G0 (from Atlas intake answers), G1 (from Atlas intake
+ * answers plus PUT .../journal-requirements — see computeG1ExitCriteria),
+ * G3 (from the Atlas structure plus the document and intake answers — see
  * computeG3ExitCriteria's own comment for what's deliberately not modeled),
  * and G6 (from the Rubric, once a document has been submitted via
  * PUT .../document) have real, computable exit-criteria sources through
- * this surface. G1, G2, G4, G5, and G7 have no requirement-extraction/
- * sourcing/drafting/review/export pipeline to compute criteria from yet
- * (docs 30 §10). The sign-off and invalidate endpoints below are
- * gate-agnostic — they will work for any gate the moment something else in
- * the system starts calling updateExitCriteria for it — but since G3's
- * entry prerequisites (G0, G2) and G6's (G1-G5) can't all be satisfied
- * without the missing pipelines, only G0 can reach an actual sign-off
- * end-to-end through this API today (G2 and G3 can if a caller manually
- * signs off G2 with an empty criteria list, same as this file's own tests
- * do — G2 has no compute function of its own yet). Computing G3 and G6
- * correctly now, ahead of the gates upstream of them existing, means
- * nothing changes here when those do.
+ * this surface. G2, G4, G5, and G7 have no sourcing/drafting/review/export
+ * pipeline to compute criteria from yet (docs 30 §10). The sign-off and
+ * invalidate endpoints below are gate-agnostic — they will work for any
+ * gate the moment something else in the system starts calling
+ * updateExitCriteria for it — but since G3's entry prerequisites (G0, G2)
+ * and G6's (G1-G5) can't all be satisfied without the missing pipelines,
+ * only G0 and G1 can reach an actual sign-off end-to-end through this API
+ * today (G2 and G3 can if a caller manually signs off G2 with an empty
+ * criteria list, same as this file's own tests do — G2 has no compute
+ * function of its own yet). Computing G3 and G6 correctly now, ahead of the
+ * gates upstream of them existing, means nothing changes here when those do.
  *
  * Persistence goes through src/services/store/projectStore.ts's
  * getProjectStore() — an in-memory Map when DATABASE_URL is unset (tests,
@@ -36,6 +36,7 @@ import express from "express";
 import { catalog } from "../../src/app/atlas/atlas.ts";
 import {
   computeG0ExitCriteria,
+  computeG1ExitCriteria,
   computeG3ExitCriteria,
   computeG6ExitCriteria,
   intakeCompleteness,
@@ -60,6 +61,7 @@ import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, Sup
 import { addSubmission, updateSubmission, deleteSubmission, SubmissionError } from "../../src/domain/submission/submissions.ts";
 import { SUBMISSION_STATUSES } from "../../src/domain/submission/types.ts";
 import type { SubmissionRecord, SubmissionStatus } from "../../src/domain/submission/types.ts";
+import type { JournalRequirements } from "../../src/domain/journal/types.ts";
 import { isOutputTypeEnabled } from "./outputTypeAccess.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
@@ -138,6 +140,29 @@ function isValidSubmissionPatch(value: unknown): value is Partial<Omit<Submissio
   return true;
 }
 
+/** Body of PUT .../journal-requirements: everything but the fields the server stamps (source/capturedAt/capturedBy). */
+function isValidJournalRequirementsInput(
+  value: unknown
+): value is Omit<JournalRequirements, "source" | "capturedAt" | "capturedBy"> {
+  if (typeof value !== "object" || value === null) return false;
+  const r = value as Record<string, unknown>;
+  if (typeof r.journalName !== "string" || r.journalName.trim().length === 0) return false;
+  if (!Array.isArray(r.requiredDeclarations) || !r.requiredDeclarations.every((d) => typeof d === "string")) return false;
+  if (r.wordLimit !== undefined) {
+    if (typeof r.wordLimit !== "object" || r.wordLimit === null) return false;
+    const w = r.wordLimit as Record<string, unknown>;
+    if (w.min !== undefined && typeof w.min !== "number") return false;
+    if (w.max !== undefined && typeof w.max !== "number") return false;
+  }
+  if (r.structureOverride !== undefined) {
+    if (!Array.isArray(r.structureOverride) || !r.structureOverride.every((s) => typeof s === "string")) return false;
+  }
+  if (r.citationStyle !== undefined && typeof r.citationStyle !== "string") return false;
+  if (r.articleType !== undefined && typeof r.articleType !== "string") return false;
+  if (r.notes !== undefined && typeof r.notes !== "string") return false;
+  return true;
+}
+
 function isValidBinding(value: unknown): value is ClaimEvidenceBinding {
   if (typeof value !== "object" || value === null) return false;
   const b = value as Record<string, unknown>;
@@ -171,6 +196,22 @@ function isValidBinding(value: unknown): value is ClaimEvidenceBinding {
  * signed off, same "invalidate first" discipline as every other
  * gate-touching endpoint.
  */
+/**
+ * Recompute G1's exit criteria (docs 30 §3 G1 "Exit") from the project's
+ * output type, its intake answers as they stand right now, and its journal
+ * requirements as they stand right now — called from both the intake and
+ * journal-requirements endpoints, since a G1 criterion can change from
+ * either side (target_journal resolving out of "provisional", or the
+ * requirements themselves being captured or edited). Throws
+ * GateTransitionError (via updateExitCriteria) if G1 is already signed off,
+ * same "invalidate first" discipline as every other gate-touching endpoint.
+ */
+function recomputeG1(record: ProjectRecord, answers: Record<string, string>, journalRequirements: JournalRequirements | undefined) {
+  const spec = catalog.getOrThrow(record.outputTypeId);
+  const criteria = computeG1ExitCriteria(spec, answers, journalRequirements);
+  return updateExitCriteria(record.gates, "G1", criteria);
+}
+
 function recomputeG3(record: ProjectRecord, document: CanonicalDocument | undefined, answers: Record<string, string>) {
   const spec = catalog.getOrThrow(record.outputTypeId);
   const criteria = computeG3ExitCriteria(spec, document ?? emptyDocument(record.projectId, spec.label), answers);
@@ -196,6 +237,7 @@ function projectView(record: ProjectRecord | undefined) {
     /** Fraction (0-1) of every intake field (required, recommended, and optional) that has an answer — informational, not gating (only required fields block G0). */
     intakeCompleteness: intakeCompleteness(spec, record.answers),
     hasDocument: record.document !== undefined,
+    hasJournalRequirements: record.journalRequirements !== undefined,
     gates: summarize(record.gates),
   };
 }
@@ -316,12 +358,14 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       });
     }
     const created = await store.create(outputTypeId, currentUserId(req));
-    // Compute G0's and G3's real exit criteria immediately from the (still
-    // empty) answers/document, rather than leaving domain/project/gates.ts's
-    // default empty exitCriteria in place — an empty criteria list is
-    // vacuously "ready" (isReadyToSignOff's `.every()` over zero items),
-    // which would let a caller sign off before anything was ever computed.
+    // Compute G0's, G1's, and G3's real exit criteria immediately from the
+    // (still empty) answers/journalRequirements/document, rather than
+    // leaving domain/project/gates.ts's default empty exitCriteria in place
+    // — an empty criteria list is vacuously "ready" (isReadyToSignOff's
+    // `.every()` over zero items), which would let a caller sign off before
+    // anything was ever computed.
     let gates = updateExitCriteria(created.gates, "G0", computeG0ExitCriteria(spec, created.answers));
+    gates = recomputeG1({ ...created, gates }, created.answers, created.journalRequirements);
     gates = recomputeG3({ ...created, gates }, undefined, created.answers);
     const record = await store.save({ ...created, gates });
     res.status(201).json(projectView(record));
@@ -376,9 +420,46 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
     try {
       let gates = updateExitCriteria(record.gates, "G0", criteria);
+      gates = recomputeG1({ ...record, gates }, nextAnswers, record.journalRequirements);
       gates = recomputeG3({ ...record, gates }, record.document, nextAnswers);
       const updated = await store.save({ ...record, answers: nextAnswers, gates });
       res.json(projectView(updated));
+    } catch (err) {
+      if (err instanceof GateTransitionError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
+  }));
+
+  /**
+   * Capture (or replace) the target journal's requirements and recompute
+   * G1's exit criteria against them (docs 30 §3 G1 "Exit"). Always stamps
+   * source: "manual" — this phase's only path; a later phase's AI-assisted
+   * extraction lands here too, but only once a user has confirmed it, never
+   * automatically. 409s if G1 is already signed off — invalidate it first,
+   * same discipline as every other gate-touching endpoint. Body: everything
+   * JournalRequirements needs except source/capturedAt/capturedBy, which
+   * the server assigns.
+   */
+  app.put("/api/projects/:id/journal-requirements", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!isValidJournalRequirementsInput(req.body)) {
+      return res.status(400).json({ error: "Invalid journal requirements payload." });
+    }
+
+    const journalRequirements: JournalRequirements = {
+      ...req.body,
+      source: "manual",
+      capturedAt: new Date().toISOString(),
+      capturedBy: currentUserId(req),
+    };
+
+    try {
+      const gates = recomputeG1(record, record.answers, journalRequirements);
+      const updated = await store.save({ ...record, journalRequirements, gates });
+      res.json({ journalRequirements: updated.journalRequirements, gates: summarize(updated.gates) });
     } catch (err) {
       if (err instanceof GateTransitionError) {
         return res.status(409).json({ error: err.message });
@@ -615,8 +696,9 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * Sign off a gate. Body: { actor }. 409s if the gate is not ready (a
    * blocking exit criterion is unsatisfied, or entry prerequisites are
    * unmet). The approved snapshot is what a later content change is
-   * detected against (docs 30 §2.2) — G0's is the intake answers, G3's is
-   * the document's block ids plus the intake answers, G6's is the Rubric
+   * detected against (docs 30 §2.2) — G0's is the intake answers, G1's is
+   * the intake answers plus the journal requirements, G3's is the
+   * document's block ids plus the intake answers, G6's is the Rubric
    * report; every other gate has no computed content yet (see this file's
    * module comment) so its snapshot is empty.
    */
@@ -634,11 +716,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const approvedSnapshot: unknown =
       req.params.gate === "G0"
         ? { answers: record.answers }
-        : req.params.gate === "G3"
-          ? { blockIds: record.document?.blocks.map((b) => b.id) ?? [], answers: record.answers }
-          : req.params.gate === "G6"
-            ? { rubricReport: record.rubricReport }
-            : {};
+        : req.params.gate === "G1"
+          ? { answers: record.answers, journalRequirements: record.journalRequirements }
+          : req.params.gate === "G3"
+            ? { blockIds: record.document?.blocks.map((b) => b.id) ?? [], answers: record.answers }
+            : req.params.gate === "G6"
+              ? { rubricReport: record.rubricReport }
+              : {};
 
     try {
       const gates = await signOff(record.gates, req.params.gate, actor, approvedSnapshot);

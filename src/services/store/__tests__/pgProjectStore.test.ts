@@ -129,4 +129,55 @@ describe("services/store: pgProjectStore", () => {
     expect(typeof documentParam).toBe("string");
     expect(JSON.parse(documentParam as string)).toEqual(record.document);
   });
+
+  it("journal_requirements round-trips: absent serializes to null, present serializes to JSON and get() rehydrates it", async () => {
+    const insertDb = fakeDb();
+    const insertStore = createPgProjectStore(insertDb);
+    const withoutRequirements: ProjectRecord = {
+      projectId: "proj-jr",
+      ownerId: "11111111-1111-4111-8111-111111111111",
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+    };
+    await insertStore.save(withoutRequirements);
+    expect(insertDb.calls[0].params?.[10]).toBeNull();
+
+    const journalRequirements: ProjectRecord["journalRequirements"] = {
+      journalName: "Water Research",
+      source: "manual",
+      citationStyle: "vancouver",
+      requiredDeclarations: ["funding"],
+      capturedAt: "2026-01-01T00:00:00.000Z",
+      capturedBy: "11111111-1111-4111-8111-111111111111",
+    };
+    const withDb = fakeDb();
+    const withStore = createPgProjectStore(withDb);
+    await withStore.save({ ...withoutRequirements, journalRequirements });
+    const param = withDb.calls[0].params?.[10];
+    expect(typeof param).toBe("string");
+    expect(JSON.parse(param as string)).toEqual(journalRequirements);
+
+    const getDb = fakeDb([
+      {
+        project_id: "proj-jr",
+        owner_id: "11111111-1111-4111-8111-111111111111",
+        output_type_id: "OT-10",
+        answers: {},
+        gates: {},
+        document: null,
+        rubric_report: null,
+        claim_graph: { claims: {}, evidence: {}, bindings: {} },
+        waivers: {},
+        submissions: [],
+        journal_requirements: journalRequirements,
+      },
+    ]);
+    const getStore = createPgProjectStore(getDb);
+    const fetched = await getStore.get("proj-jr");
+    expect(fetched?.journalRequirements).toEqual(journalRequirements);
+  });
 });

@@ -19,6 +19,7 @@ export interface ProjectView {
   answers: Record<string, string>;
   intakeCompleteness: number;
   hasDocument: boolean;
+  hasJournalRequirements: boolean;
   gates: GateSummary[];
 }
 

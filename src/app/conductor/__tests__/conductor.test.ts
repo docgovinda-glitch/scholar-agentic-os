@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeG0ExitCriteria,
+  computeG1ExitCriteria,
   computeG3ExitCriteria,
   computeG6ExitCriteria,
   intakeCompleteness,
@@ -13,6 +14,7 @@ import {
 } from "../conductor";
 import { signOffGate } from "../../../domain/project/gates";
 import type { ProjectGateState } from "../../../domain/project/gates";
+import type { JournalRequirements } from "../../../domain/journal/types";
 import { catalog } from "../../atlas/atlas";
 import { evaluateAgainstOutputType } from "../../rubric/rubric";
 import { emptyDocument } from "../../../domain/document/model";
@@ -66,6 +68,71 @@ describe("app/conductor: G0 bound to Atlas", () => {
     const total = assignment.intakeSchema.required.length + assignment.intakeSchema.recommended.length + assignment.intakeSchema.optional.length;
     const completeness = intakeCompleteness(assignment, { word_limit: "1500" });
     expect(completeness).toBeCloseTo(1 / total, 5);
+  });
+});
+
+describe("app/conductor: G1 bound to Atlas + journal requirements", () => {
+  const requirements: JournalRequirements = {
+    journalName: "Water Research",
+    source: "manual",
+    citationStyle: "vancouver",
+    requiredDeclarations: ["funding"],
+    capturedAt: "2026-01-01T00:00:00.000Z",
+    capturedBy: "amara",
+  };
+
+  it("returns no criteria at all for a non-venue_targeted type — G1 stays exactly as unwired as it already was for those", () => {
+    const assignment = catalog.getOrThrow("OT-01"); // workflowVariant: "short_form"
+    expect(computeG1ExitCriteria(assignment, {}, undefined)).toEqual([]);
+    expect(computeG1ExitCriteria(assignment, {}, requirements)).toEqual([]);
+  });
+
+  it("for a venue_targeted type (Journal Article), starts with target journal unresolved and requirements not captured", () => {
+    const journalArticle = catalog.getOrThrow("OT-10");
+    const criteria = computeG1ExitCriteria(journalArticle, {}, undefined);
+    expect(criteria.every((c) => c.blocking)).toBe(true);
+    expect(criteria.find((c) => c.id === "target-journal-decided")?.satisfied).toBe(false);
+    expect(criteria.find((c) => c.id === "journal-requirements-captured")?.satisfied).toBe(false);
+    // No citation-style criterion at all until requirements exist to check it against.
+    expect(criteria.find((c) => c.id === "citation-style-specified")).toBeUndefined();
+  });
+
+  it("target_journal resolving out of 'provisional' satisfies just that one criterion", () => {
+    const journalArticle = catalog.getOrThrow("OT-10");
+    const stillProvisional = computeG1ExitCriteria(journalArticle, { target_journal: "provisional" }, undefined);
+    expect(stillProvisional.find((c) => c.id === "target-journal-decided")?.satisfied).toBe(false);
+
+    const resolved = computeG1ExitCriteria(journalArticle, { target_journal: "Water Research" }, undefined);
+    expect(resolved.find((c) => c.id === "target-journal-decided")?.satisfied).toBe(true);
+    expect(resolved.find((c) => c.id === "journal-requirements-captured")?.satisfied).toBe(false);
+  });
+
+  it("captured requirements without a citation style leave that one criterion unsatisfied", () => {
+    const journalArticle = catalog.getOrThrow("OT-10");
+    const { citationStyle: _citationStyle, ...withoutStyle } = requirements;
+    const criteria = computeG1ExitCriteria(journalArticle, { target_journal: "Water Research" }, withoutStyle as JournalRequirements);
+    expect(criteria.find((c) => c.id === "journal-requirements-captured")?.satisfied).toBe(true);
+    expect(criteria.find((c) => c.id === "citation-style-specified")?.satisfied).toBe(false);
+  });
+
+  it("every criterion satisfied once target_journal is resolved and requirements (with a citation style) are captured", () => {
+    const journalArticle = catalog.getOrThrow("OT-10");
+    const criteria = computeG1ExitCriteria(journalArticle, { target_journal: "Water Research" }, requirements);
+    expect(criteria.every((c) => c.satisfied)).toBe(true);
+  });
+
+  it("end-to-end: G1 doesn't reach ready until G0 is signed off, even with every G1 criterion already satisfied", async () => {
+    const journalArticle = catalog.getOrThrow("OT-10");
+    const answers = { target_journal: "Water Research" };
+    let project = initialProjectGateState("p1");
+
+    project = updateExitCriteria(project, "G1", computeG1ExitCriteria(journalArticle, answers, requirements));
+    expect(project.gates.G1.status).not.toBe("ready"); // entry prerequisite (G0 signed off) unmet
+
+    project = updateExitCriteria(project, "G0", computeG0ExitCriteria(journalArticle, answers));
+    project = await signOff(project, "G0", "amara", { answers });
+    project = updateExitCriteria(project, "G1", computeG1ExitCriteria(journalArticle, answers, requirements));
+    expect(project.gates.G1.status).toBe("ready");
   });
 });
 

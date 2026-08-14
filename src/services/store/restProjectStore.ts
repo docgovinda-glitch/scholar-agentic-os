@@ -58,6 +58,7 @@ interface ProjectRow {
   claim_graph: ProjectRecord["claimGraph"];
   waivers: ProjectRecord["waivers"];
   submissions: ProjectRecord["submissions"];
+  journal_requirements: ProjectRecord["journalRequirements"] | null;
 }
 
 function rowToRecord(row: ProjectRow): ProjectRecord {
@@ -74,6 +75,7 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
     waivers: row.waivers,
     // Rows written before this column existed have it as SQL NULL.
     submissions: row.submissions ?? [],
+    journalRequirements: row.journal_requirements ?? undefined,
   };
 }
 
@@ -89,6 +91,7 @@ function recordToRow(record: ProjectRecord): ProjectRow {
     claim_graph: record.claimGraph,
     waivers: record.waivers,
     submissions: record.submissions,
+    journal_requirements: record.journalRequirements ?? null,
   };
 }
 

@@ -158,6 +158,22 @@ describe("restProjectStore: get", () => {
     expect(record?.submissions).toEqual([]);
   });
 
+  it("maps SQL NULL journal_requirements to undefined, and a present one through as-is", async () => {
+    const { s: withoutReqs } = store(() => ({ body: [row({ journal_requirements: null })] }));
+    expect((await withoutReqs.get("proj-abc"))?.journalRequirements).toBeUndefined();
+
+    const journalRequirements = {
+      journalName: "Water Research",
+      source: "manual" as const,
+      citationStyle: "vancouver",
+      requiredDeclarations: ["funding"],
+      capturedAt: "2026-01-01T00:00:00.000Z",
+      capturedBy: OWNER,
+    };
+    const { s: withReqs } = store(() => ({ body: [row({ journal_requirements: journalRequirements })] }));
+    expect((await withReqs.get("proj-abc"))?.journalRequirements).toEqual(journalRequirements);
+  });
+
   it("url-encodes the id rather than interpolating it raw", async () => {
     const { s, calls } = store(() => ({ body: [] }));
     await s.get("proj-a b&c");
@@ -204,6 +220,33 @@ describe("restProjectStore: save", () => {
     const body = calls[0].body as Record<string, unknown>;
     expect(body.document).toBeNull();
     expect(body.rubric_report).toBeNull();
+    expect(body.journal_requirements).toBeNull();
+  });
+
+  it("serialises a present journal_requirements through as-is", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    const journalRequirements = {
+      journalName: "Water Research",
+      source: "manual" as const,
+      citationStyle: "vancouver",
+      requiredDeclarations: ["funding"],
+      capturedAt: "2026-01-01T00:00:00.000Z",
+      capturedBy: OWNER,
+    };
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      journalRequirements,
+    });
+
+    const body = calls[0].body as Record<string, unknown>;
+    expect(body.journal_requirements).toEqual(journalRequirements);
   });
 });
 
