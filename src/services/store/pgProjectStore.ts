@@ -95,6 +95,7 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
     journalRequirements: (row.journal_requirements as ProjectRecord["journalRequirements"] | null) ?? undefined,
     // Rows written before this column existed have it as SQL NULL.
     evidenceLedger: (row.evidence_ledger as ProjectRecord["evidenceLedger"] | null) ?? emptyLedger(),
+    generationJob: (row.generation_job as ProjectRecord["generationJob"] | null) ?? undefined,
   };
 }
 
@@ -115,8 +116,8 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
       };
       await db.query(
         `insert into public.projects
-           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger)
-         values ($1, $2, $3, $4, $5, null, null, $6, $7, $8, null, $9)`,
+           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job)
+         values ($1, $2, $3, $4, $5, null, null, $6, $7, $8, null, $9, null)`,
         [
           record.projectId,
           record.ownerId,
@@ -141,8 +142,8 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
     async save(record: ProjectRecord): Promise<ProjectRecord> {
       await db.query(
         `insert into public.projects
-           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
+           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now())
          on conflict (project_id) do update set
            output_type_id = excluded.output_type_id,
            answers = excluded.answers,
@@ -154,6 +155,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
            submissions = excluded.submissions,
            journal_requirements = excluded.journal_requirements,
            evidence_ledger = excluded.evidence_ledger,
+           generation_job = excluded.generation_job,
            updated_at = now()`,
         [
           record.projectId,
@@ -168,6 +170,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
           JSON.stringify(record.submissions),
           record.journalRequirements ? JSON.stringify(record.journalRequirements) : null,
           JSON.stringify(record.evidenceLedger),
+          record.generationJob ? JSON.stringify(record.generationJob) : null,
         ]
       );
       return record;

@@ -84,6 +84,20 @@ import {
 } from "../../src/domain/evidence/stateMachine.ts";
 import type { DiscoveredSource, EvidenceLocator } from "../../src/domain/evidence/types.ts";
 import { discoverArxivSources, discoverWebSources } from "../src/discovery/discovery.ts";
+import { allocateWordBudget } from "../../src/domain/manuscript/wordBudget.ts";
+import type { SectionPlan } from "../../src/domain/manuscript/types.ts";
+import {
+  startJob,
+  nextSection as nextPlannedSection,
+  appendSection,
+  failJob,
+  resumeJob,
+  pauseJob,
+  GenerationJobError,
+} from "../../src/domain/manuscript/stateMachine.ts";
+import { generateSection } from "../../src/app/manuscript/generate.ts";
+import type { SectionContextPacket } from "../../src/app/manuscript/generate.ts";
+import { getPolicyForSession } from "../../src/app/studio/sessionPolicyStore.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
 
@@ -198,7 +212,7 @@ const DEDUCT_FAILURE_MESSAGES: Record<Exclude<DeductResult, "ok">, string> = {
   insufficient_balance: "You don't have enough Premium credits left for this request.",
 };
 
-interface JournalExtractionLedgerRow extends Record<string, unknown> {
+interface PremiumUsageLedgerRow extends Record<string, unknown> {
   user_id: string;
   provider_id: string;
   model_id: string;
@@ -211,24 +225,26 @@ interface JournalExtractionLedgerRow extends Record<string, unknown> {
   status: "success" | "quota_exhausted";
 }
 
-async function recordExtractionUsage(
+/** Shared audit-ledger writer for every Premium AI pipeline in this file (journal-requirements extraction, manuscript-section generation) — `taskType` is what keeps their usage rows distinguishable in ai_usage_ledger. */
+async function recordPremiumUsage(
   userId: string,
   providerId: string,
   modelId: string,
   usage: { inputTokensEstimate: number; outputTokensEstimate: number } | undefined,
   requestId: string,
   creditsCharged: number,
-  status: "success" | "quota_exhausted"
+  status: "success" | "quota_exhausted",
+  taskType: string
 ): Promise<void> {
   const config = getSupabaseRestConfig();
   if (!config) return;
-  const ledger = new SupabaseTable<JournalExtractionLedgerRow>(config, "ai_usage_ledger");
+  const ledger = new SupabaseTable<PremiumUsageLedgerRow>(config, "ai_usage_ledger");
   await ledger.insert({
     user_id: userId,
     provider_id: providerId,
     model_id: modelId,
     tier: "premium",
-    task_type: "journal_requirements_extraction",
+    task_type: taskType,
     input_tokens: usage?.inputTokensEstimate ?? null,
     output_tokens: usage?.outputTokensEstimate ?? null,
     scholar_credits_charged: creditsCharged,
@@ -335,11 +351,160 @@ async function runPremiumJournalExtraction(
     );
 
     if (deductResult !== "ok") {
-      await recordExtractionUsage(userId, resource.providerId, modelUsed, usage, requestId, 0, "quota_exhausted");
+      await recordPremiumUsage(userId, resource.providerId, modelUsed, usage, requestId, 0, "quota_exhausted", "journal_requirements_extraction");
       return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
     }
 
-    await recordExtractionUsage(userId, resource.providerId, modelUsed, usage, requestId, creditsUsed, "success");
+    await recordPremiumUsage(userId, resource.providerId, modelUsed, usage, requestId, creditsUsed, "success", "journal_requirements_extraction");
+
+    return {
+      ok: true,
+      result,
+      aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed },
+    };
+  }
+
+  return { ok: false, status: 502, error: lastError };
+}
+
+/**
+ * Builds one section's context packet (src/app/manuscript/generate.ts) from
+ * the project's own state: intake answers as the research context, the
+ * target journal's requirements if captured, every already-generated
+ * section's short memory (never full text — "Section Memory" per the
+ * spec), and ONLY evidence whose domain/evidence state is "citable". This
+ * last filter is the actual enforcement point for "no user approval, no
+ * citation" reaching the generation engine: nothing discovered, extracted,
+ * verified, or merely proposed ever appears in citableEvidence.
+ */
+function buildSectionContextPacket(record: ProjectRecord, section: SectionPlan): SectionContextPacket {
+  const researchContext = Object.entries(record.answers)
+    .filter(([, v]) => v !== "provisional" && v.trim().length > 0)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join("\n");
+
+  const citableEvidence = record.evidenceLedger.items
+    .filter((i) => i.state === "citable")
+    .map((i) => ({
+      id: i.id,
+      quote: i.quote ?? "",
+      sourceTitle: record.evidenceLedger.sources.find((s) => s.id === i.sourceId)?.title ?? i.sourceId,
+    }));
+
+  const priorSectionMemory = (record.generationJob?.sections ?? []).map((s) => ({ title: s.title, memory: s.memory }));
+
+  return {
+    researchContext,
+    journalRequirements: record.journalRequirements
+      ? { journalName: record.journalRequirements.journalName, citationStyle: record.journalRequirements.citationStyle }
+      : undefined,
+    section,
+    priorSectionMemory,
+    citableEvidence,
+  };
+}
+
+/**
+ * Runs one section's Premium generation — structurally identical to
+ * runPremiumJournalExtraction/runPremiumRefine (see those functions' own
+ * comments for the reasoning behind each step). Duplicated rather than
+ * shared for the same reason as the others: each pipeline has its own
+ * input/result shape and otherwise nothing in common worth factoring out.
+ */
+async function runPremiumSectionGeneration(
+  userId: string,
+  packet: SectionContextPacket,
+  policy: import("../../src/platform/warden/warden.ts").EgressPolicy
+): Promise<
+  | {
+      ok: true;
+      result: Awaited<ReturnType<typeof generateSection>>;
+      aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number };
+    }
+  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
+> {
+  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
+  if (!entitlementActive) {
+    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
+  }
+
+  const preCheckAmount = estimateMaxCreditsForInput(packet.researchContext + packet.section.guidance);
+  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
+  if (!perTask.allowed) {
+    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
+  }
+
+  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
+    return {
+      ok: false,
+      status: 402,
+      error:
+        premiumQuotaRemaining <= 0
+          ? "Your Premium quota for this period is exhausted."
+          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
+    };
+  }
+
+  const resources = await resolvePremiumResources(userId, "reasoning");
+  if (resources.length === 0) {
+    return {
+      ok: false,
+      status: 402,
+      error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator.",
+    };
+  }
+
+  let lastError = "No Premium resource is currently available.";
+
+  for (const resource of resources) {
+    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
+    if (!credential) {
+      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
+      continue;
+    }
+
+    const model = resource.modelId || undefined;
+    const start = Date.now();
+
+    let result: Awaited<ReturnType<typeof generateSection>>;
+    try {
+      result = await generateSection({ packet, provider: resource.providerId, apiKey: credential, model, policy });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) {
+          return { ok: false, status: 428, error: err.message, provider: resource.providerId };
+        }
+        return { ok: false, status: 403, error: err.message };
+      }
+      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
+      lastError = err instanceof Error ? err.message : "Unknown error";
+      continue;
+    }
+
+    await recordProviderSuccess(resource.providerId, Date.now() - start);
+
+    const usage = result.usage;
+    const modelUsed = model ?? usage.model;
+    const creditsUsed = creditsForUsage(usage.inputTokensEstimate, usage.outputTokensEstimate);
+    const requestId = crypto.randomUUID();
+    const deductResult = await deductCredits(
+      userId,
+      creditsUsed,
+      quota?.dailyCredits ?? null,
+      quota?.monthlyCredits ?? null,
+      "usage",
+      requestId,
+      `manuscript generation: ${resource.label} (${packet.section.key})`,
+      quota?.weeklyCredits ?? null
+    );
+
+    if (deductResult !== "ok") {
+      await recordPremiumUsage(userId, resource.providerId, modelUsed, usage, requestId, 0, "quota_exhausted", "manuscript_generation");
+      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+    }
+
+    await recordPremiumUsage(userId, resource.providerId, modelUsed, usage, requestId, creditsUsed, "success", "manuscript_generation");
 
     return {
       ok: true,
@@ -1226,6 +1391,175 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       if (err instanceof EvidenceStateError) {
         return res.status(err.message.includes("Unknown evidence") ? 404 : 409).json({ error: err.message });
       }
+      throw err;
+    }
+  }));
+
+  /**
+   * The long-form generation engine (domain/manuscript, src/app/manuscript/
+   * generate.ts). Never one giant model call: each request below generates
+   * at most ONE section, checkpointed immediately (store.save persists the
+   * updated job before the response returns), so the job is durably resumable
+   * across a refresh, a server restart, or a failed request — a caller just
+   * calls .../next-section again and it continues from job.sections.length,
+   * never replaying or re-charging for a section already completed.
+   */
+
+  /** The current generation job, if one has been started. 404s otherwise. */
+  app.get("/api/projects/:id/manuscript/job", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.generationJob) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no generation job started yet.` });
+    }
+    res.json(record.generationJob);
+  }));
+
+  /**
+   * Plan and start a new generation job from the project's output type
+   * (Atlas structure + word budget) and captured journal requirements
+   * (a venue-specific word limit overrides the catalog's generic one). Only
+   * the sections the catalog marks countsTowardWordcount are planned — see
+   * domain/manuscript/wordBudget.ts's own comment on why title/declarations/
+   * references/etc. are out of scope for this engine. 409s if a job already
+   * exists — there is no implicit reset; discarding a job with completed
+   * sections needs to be a deliberate, visible action, which this phase does
+   * not build a route for yet.
+   */
+  app.post("/api/projects/:id/manuscript/start", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (record.generationJob) {
+      return res.status(409).json({ error: "A generation job already exists for this project." });
+    }
+    const spec = catalog.getOrThrow(record.outputTypeId);
+    const plan = allocateWordBudget(spec.structure.sections, spec.budget, record.journalRequirements?.wordLimit?.max);
+    if (plan.length === 0) {
+      return res.status(400).json({ error: "This output type has no sections the generation engine can plan for." });
+    }
+    const totalWordTarget =
+      record.journalRequirements?.wordLimit?.max ??
+      spec.budget.totalWords.typical ??
+      Math.round((spec.budget.totalWords.min + spec.budget.totalWords.max) / 2);
+    const generationJob = startJob(plan, totalWordTarget);
+    const updated = await store.save({ ...record, generationJob });
+    res.status(201).json(updated.generationJob);
+  }));
+
+  /**
+   * Generate exactly the next planned section and append it to the job —
+   * the actual checkpoint. Body: { provider?, apiKey?, model?, useEngine? },
+   * same BYOK-vs-Premium shape as every other AI-backed route in this file.
+   * Drafting is content-bearing (platform/warden/classify.ts), so a BYOK
+   * call here goes through the same session-scoped consent flow Studio uses
+   * — POST /api/studio/consent with sessionId `manuscript:<projectId>`
+   * grants it, exactly the same generic mechanism, not a new one.
+   */
+  app.post("/api/projects/:id/manuscript/next-section", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.generationJob) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no generation job started yet.` });
+    }
+    if (record.generationJob.state === "completed") {
+      return res.status(409).json({ error: "This generation job already completed — nothing left to generate." });
+    }
+    const planned = nextPlannedSection(record.generationJob);
+    if (!planned) {
+      return res.status(409).json({ error: "Every planned section is already generated." });
+    }
+
+    const { provider, apiKey, model, useEngine } = req.body ?? {};
+    const packet = buildSectionContextPacket(record, planned);
+    const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
+    const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
+
+    async function checkpoint(generatedSection: Awaited<ReturnType<typeof generateSection>>["section"]) {
+      const generationJob = appendSection(record!.generationJob!, generatedSection);
+      return store.save({ ...record!, generationJob });
+    }
+
+    if (wantsPremium) {
+      const userId = currentUserId(req);
+      let outcome: Awaited<ReturnType<typeof runPremiumSectionGeneration>>;
+      try {
+        outcome = await runPremiumSectionGeneration(userId, packet, policy);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
+      }
+
+      if (!outcome.ok) {
+        if (outcome.status === 428) {
+          return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
+        }
+        if (outcome.status === 403) {
+          return res.status(403).json({ error: "denied", reason: outcome.error });
+        }
+        if (outcome.status === 502) {
+          const generationJob = failJob(record.generationJob, outcome.error);
+          await store.save({ ...record, generationJob });
+        }
+        return res.status(outcome.status).json({ error: outcome.error });
+      }
+      const updated = await checkpoint(outcome.result.section);
+      return res.json({ generationJob: updated.generationJob, aiSource: outcome.aiSource });
+    }
+
+    try {
+      const result = await generateSection({
+        packet,
+        provider: typeof provider === "string" ? provider : undefined,
+        apiKey: typeof apiKey === "string" ? apiKey : undefined,
+        model: typeof model === "string" ? model : undefined,
+        policy,
+      });
+      const updated = await checkpoint(result.section);
+      return res.json({ generationJob: updated.generationJob });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) {
+          return res.status(428).json({ error: "consent_required", reason: err.message, provider });
+        }
+        return res.status(403).json({ error: "denied", reason: err.message });
+      }
+      const message = err instanceof Error ? err.message : "Unknown error";
+      const generationJob = failJob(record.generationJob, message);
+      await store.save({ ...record, generationJob });
+      return res.status(500).json({ error: message });
+    }
+  }));
+
+  /** Pause a running job — a deliberate human-in-the-loop checkpoint, not an error state. */
+  app.post("/api/projects/:id/manuscript/pause", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.generationJob) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no generation job started yet.` });
+    }
+    try {
+      const generationJob = pauseJob(record.generationJob);
+      const updated = await store.save({ ...record, generationJob });
+      res.json(updated.generationJob);
+    } catch (err) {
+      if (err instanceof GenerationJobError) return res.status(409).json({ error: err.message });
+      throw err;
+    }
+  }));
+
+  /** Resume a paused or failed job — sets it back to "running"; the next actual generation happens via .../next-section, continuing from job.sections.length. */
+  app.post("/api/projects/:id/manuscript/resume", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.generationJob) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no generation job started yet.` });
+    }
+    try {
+      const generationJob = resumeJob(record.generationJob);
+      const updated = await store.save({ ...record, generationJob });
+      res.json(updated.generationJob);
+    } catch (err) {
+      if (err instanceof GenerationJobError) return res.status(409).json({ error: err.message });
       throw err;
     }
   }));

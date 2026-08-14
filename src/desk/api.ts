@@ -11,7 +11,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, DiscoveredSource, EvidenceConflict, EvidenceLedger, EvidenceLocator, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, SubmissionRecord, SupportStrength, VoiceProfile } from "./types";
+import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, DiscoveredSource, EvidenceConflict, EvidenceLedger, EvidenceLocator, GenerationJob, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, SubmissionRecord, SupportStrength, VoiceProfile } from "./types";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -442,6 +442,52 @@ export function rejectEvidenceItem(projectId: string, evidenceId: string, actor:
     "POST",
     { actor, reason }
   ).then((r) => json(r));
+}
+
+// ── Long-form generation engine (domain/manuscript) ─────────────────────
+
+/** Returns null (not an error) when no job has been started yet. */
+export async function getManuscriptJob(projectId: string): Promise<GenerationJob | null> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/job`);
+  if (res.status === 404) return null;
+  return json<GenerationJob>(res);
+}
+
+export function startManuscriptJob(projectId: string): Promise<GenerationJob> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/start`, "POST", {}).then((r) => json(r));
+}
+
+/** Generates and checkpoints exactly the next planned section. Same 428/403/402 error mapping as refinePassage()/extractJournalRequirements() — reuses the same three typed errors. */
+export async function generateNextSection(params: {
+  projectId: string;
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  useEngine?: "premium";
+}): Promise<{ generationJob: GenerationJob }> {
+  const { projectId, ...requestBody } = params;
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/next-section`, "POST", requestBody);
+  if (res.status === 428) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioConsentRequiredError(errBody.reason || "Consent required.", errBody.provider);
+  }
+  if (res.status === 403) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioDeniedError(errBody.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
+  }
+  return json<{ generationJob: GenerationJob }>(res);
+}
+
+export function pauseManuscriptJob(projectId: string): Promise<GenerationJob> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/pause`, "POST", {}).then((r) => json(r));
+}
+
+export function resumeManuscriptJob(projectId: string): Promise<GenerationJob> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/resume`, "POST", {}).then((r) => json(r));
 }
 
 export async function exportProject(projectId: string, format: "docx" | "odt" | "pdf"): Promise<Blob> {

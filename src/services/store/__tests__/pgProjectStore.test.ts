@@ -243,4 +243,49 @@ describe("services/store: pgProjectStore", () => {
     const fetched = await createPgProjectStore(getDb).get("proj-ev");
     expect(fetched?.evidenceLedger).toEqual(record.evidenceLedger);
   });
+
+  it("generation_job round-trips: absent serializes to null, present serializes to JSON and get() rehydrates it", async () => {
+    const generationJob: ProjectRecord["generationJob"] = {
+      state: "running",
+      plan: [{ key: "introduction", title: "Introduction", guidance: "g", targetWords: 500 }],
+      sections: [],
+      totalWordTarget: 6000,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const record: ProjectRecord = {
+      projectId: "proj-gen",
+      ownerId: "11111111-1111-4111-8111-111111111111",
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      generationJob,
+    };
+    const saveDb = fakeDb();
+    await createPgProjectStore(saveDb).save(record);
+    const param = saveDb.calls[0].params?.[12];
+    expect(typeof param).toBe("string");
+    expect(JSON.parse(param as string)).toEqual(generationJob);
+
+    const getDb = fakeDb([
+      {
+        project_id: "proj-gen",
+        owner_id: "11111111-1111-4111-8111-111111111111",
+        output_type_id: "OT-10",
+        answers: {},
+        gates: {},
+        document: null,
+        rubric_report: null,
+        claim_graph: { claims: {}, evidence: {}, bindings: {} },
+        waivers: {},
+        submissions: [],
+        generation_job: generationJob,
+      },
+    ]);
+    const fetched = await createPgProjectStore(getDb).get("proj-gen");
+    expect(fetched?.generationJob).toEqual(generationJob);
+  });
 });

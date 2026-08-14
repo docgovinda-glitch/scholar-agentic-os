@@ -75,6 +75,10 @@ create table if not exists public.projects (
   -- (domain/evidence/types.ts). Defaults to an empty ledger, same as
   -- claim_graph above — always present, possibly with nothing in it yet.
   evidence_ledger jsonb not null default '{"sources":[],"items":[]}'::jsonb,
+  -- The long-form generation engine's durable checkpoint
+  -- (domain/manuscript/types.ts). Nullable, same as journal_requirements:
+  -- "never started" is a real, distinct state, not an empty container.
+  generation_job jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -119,6 +123,10 @@ alter table public.projects add column if not exists journal_requirements jsonb;
 -- no-awkward-backfill case as submissions above: an existing project simply
 -- has an empty ledger, exactly what a new row already defaults to.
 alter table public.projects add column if not exists evidence_ledger jsonb not null default '{"sources":[],"items":[]}'::jsonb;
+
+-- Migration for databases created before generation_job existed. Nullable,
+-- no default — same "not yet captured" case as journal_requirements.
+alter table public.projects add column if not exists generation_job jsonb;
 
 -- Deny-all baseline for anon/authenticated (see the note at the top of this
 -- file). FORCE additionally applies RLS to the table's owner; roles with

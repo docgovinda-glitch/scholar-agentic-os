@@ -200,6 +200,37 @@ export interface EvidenceLedger {
   items: EvidenceItem[];
 }
 
+/** Mirrors src/domain/manuscript/types.ts. */
+export interface SectionPlan {
+  key: string;
+  title: string;
+  guidance: string;
+  targetWords: number;
+}
+
+export interface GeneratedSection {
+  key: string;
+  title: string;
+  text: string;
+  wordCount: number;
+  memory: string;
+  citedEvidenceIds: string[];
+  generatedAt: string;
+  usage?: { provider: string; model: string; inputTokensEstimate: number; outputTokensEstimate: number };
+}
+
+export type GenerationJobState = "not_started" | "running" | "paused" | "completed" | "failed";
+
+export interface GenerationJob {
+  state: GenerationJobState;
+  plan: SectionPlan[];
+  sections: GeneratedSection[];
+  totalWordTarget: number;
+  startedAt?: string;
+  updatedAt: string;
+  lastError?: string;
+}
+
 export interface StudioRefineResult {
   diff: RefinementDiff;
   voiceDrift?: VoiceDriftReport;

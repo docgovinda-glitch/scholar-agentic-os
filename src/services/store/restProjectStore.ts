@@ -61,6 +61,7 @@ interface ProjectRow {
   submissions: ProjectRecord["submissions"];
   journal_requirements: ProjectRecord["journalRequirements"] | null;
   evidence_ledger: ProjectRecord["evidenceLedger"] | null;
+  generation_job: ProjectRecord["generationJob"] | null;
 }
 
 function rowToRecord(row: ProjectRow): ProjectRecord {
@@ -80,6 +81,7 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
     journalRequirements: row.journal_requirements ?? undefined,
     // Rows written before this column existed have it as SQL NULL.
     evidenceLedger: row.evidence_ledger ?? emptyLedger(),
+    generationJob: row.generation_job ?? undefined,
   };
 }
 
@@ -97,6 +99,7 @@ function recordToRow(record: ProjectRecord): ProjectRow {
     submissions: record.submissions,
     journal_requirements: record.journalRequirements ?? null,
     evidence_ledger: record.evidenceLedger,
+    generation_job: record.generationJob ?? null,
   };
 }
 

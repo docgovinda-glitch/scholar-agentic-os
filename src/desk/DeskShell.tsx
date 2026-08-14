@@ -9,13 +9,15 @@ import IntakePanel from "./intake/IntakePanel";
 import GatesPanel from "./gates/GatesPanel";
 import ClaimsPanel from "./claims/ClaimsPanel";
 import EvidenceLedgerPanel from "./evidence/EvidenceLedgerPanel";
+import ManuscriptGenerationPanel from "./manuscript/ManuscriptGenerationPanel";
+import { sectionsToBlocks } from "./manuscript/sectionsToBlocks";
 import SubmissionsPanel from "./submissions/SubmissionsPanel";
 import JournalRequirementsPanel from "./journal/JournalRequirementsPanel";
 import { useDeskSession } from "./useDeskSession";
 import StatusBar from "./regions/StatusBar";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "./types";
 
-export type DeskShellView = "intake" | "requirements" | "document" | "evidence" | "progress" | "submissions";
+export type DeskShellView = "intake" | "requirements" | "document" | "evidence" | "manuscript" | "progress" | "submissions";
 
 /**
  * Region shell (docs 22 §2): Header / Rail / Primary / Aside / Status. The
@@ -175,7 +177,7 @@ export default function DeskShell({
         onOpenAiAccess={onOpenAiAccess}
       />
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
-        {(["intake", "requirements", "document", "evidence", "progress", "submissions"] as const).map((v) => (
+        {(["intake", "requirements", "document", "evidence", "manuscript", "progress", "submissions"] as const).map((v) => (
           <button
             key={v}
             type="button"
@@ -196,9 +198,11 @@ export default function DeskShell({
                   ? "Document"
                   : v === "evidence"
                     ? "Evidence"
-                    : v === "progress"
-                      ? "Progress"
-                      : "Submissions"}
+                    : v === "manuscript"
+                      ? "Manuscript"
+                      : v === "progress"
+                        ? "Progress"
+                        : "Submissions"}
           </button>
         ))}
       </nav>
@@ -232,6 +236,21 @@ export default function DeskShell({
                 // Absence means "no document to evaluate against yet", not
                 // "clear the existing report" — only overwrite when present.
                 if (newRubric) setRubric(newRubric);
+              }}
+            />
+          </div>
+        ) : view === "manuscript" ? (
+          <div className="flex-1 overflow-y-auto p-6">
+            <ManuscriptGenerationPanel
+              projectId={projectId}
+              onOpenAiAccess={onOpenAiAccess}
+              onInsertIntoDocument={(sections) => {
+                const newBlocks = sectionsToBlocks(sections);
+                const merged: CanonicalDocument = document
+                  ? { ...document, blocks: [...document.blocks, ...newBlocks] }
+                  : { id: projectId, title: project?.projectId ?? "Untitled", blocks: newBlocks };
+                handleSaveDocument(merged);
+                onViewChange("document");
               }}
             />
           </div>

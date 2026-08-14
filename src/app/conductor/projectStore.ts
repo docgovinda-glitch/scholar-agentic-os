@@ -20,6 +20,7 @@ import type { SubmissionRecord } from "../../domain/submission/types";
 import type { JournalRequirements } from "../../domain/journal/types";
 import { emptyLedger } from "../../domain/evidence/types";
 import type { EvidenceLedger } from "../../domain/evidence/types";
+import type { GenerationJob } from "../../domain/manuscript/types";
 
 export interface ProjectRecord {
   projectId: string;
@@ -51,6 +52,8 @@ export interface ProjectRecord {
   journalRequirements?: JournalRequirements;
   /** Discovered sources and their evidence-provenance state (domain/evidence). Starts empty, same as claimGraph: always present, possibly with nothing in it yet. */
   evidenceLedger: EvidenceLedger;
+  /** The long-form generation engine's durable checkpoint (domain/manuscript). Undefined until POST .../manuscript/start — a real, distinct "never started" state, same as journalRequirements. */
+  generationJob?: GenerationJob;
 }
 
 const projects = new Map<string, ProjectRecord>();

@@ -276,6 +276,47 @@ describe("restProjectStore: save", () => {
     const { s: getStore } = store(() => ({ body: [row()] }));
     expect((await getStore.get("proj-abc"))?.evidenceLedger).toEqual({ sources: [], items: [] });
   });
+
+  it("serialises the generation job as null when absent, and through as-is when present", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+    });
+    expect((calls[0].body as Record<string, unknown>).generation_job).toBeNull();
+
+    const generationJob: ProjectRecord["generationJob"] = {
+      state: "running",
+      plan: [{ key: "introduction", title: "Introduction", guidance: "g", targetWords: 500 }],
+      sections: [],
+      totalWordTarget: 6000,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const { s: s2, calls: calls2 } = store(() => ({ status: 204, body: null }));
+    await s2.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      generationJob,
+    });
+    expect((calls2[0].body as Record<string, unknown>).generation_job).toEqual(generationJob);
+
+    const { s: getStore } = store(() => ({ body: [row({ generation_job: generationJob })] }));
+    expect((await getStore.get("proj-abc"))?.generationJob).toEqual(generationJob);
+  });
 });
 
 describe("restProjectStore: listByOwner", () => {
