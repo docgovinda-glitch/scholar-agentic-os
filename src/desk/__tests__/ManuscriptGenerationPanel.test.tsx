@@ -227,4 +227,32 @@ describe("Desk — ManuscriptGenerationPanel", () => {
     expect(screen.getByText("Peer review (round 1)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run another round" })).toBeInTheDocument();
   });
+
+  it("drafts a cover letter via the Premium tier and displays it, then allows regenerating", async () => {
+    const completedJob = {
+      state: "completed",
+      plan: [{ key: "introduction", title: "Introduction", guidance: "g", targetWords: 500 }],
+      sections: [{ key: "introduction", title: "Introduction", text: "Text.", wordCount: 1, memory: "m", citedEvidenceIds: [], generatedAt: "now" }],
+      totalWordTarget: 3000,
+      updatedAt: "now",
+    };
+    mockFetch((url, method) => {
+      if (url.endsWith("/api/ai-access/route")) {
+        return { status: 200, body: { ok: true, choice: { tier: "premium", providerId: "premium", reasoning: "Premium is available." }, fallbacks: [] } };
+      }
+      if (url.includes("/cover-letter") && method === "POST") {
+        return { status: 200, body: { coverLetter: { text: "Dear Editor, we submit our manuscript.", journalName: "Water Research", generatedAt: "2026-01-01T00:00:00.000Z" } } };
+      }
+      if (url.includes("/cover-letter")) return { status: 404, body: {} };
+      if (url.includes("/manuscript/job")) return { status: 200, body: completedJob };
+      return { status: 500, body: {} };
+    });
+    render(<ManuscriptGenerationPanel projectId={PROJECT_ID} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Draft cover letter" }));
+
+    expect(await screen.findByText(/Dear Editor, we submit our manuscript\./)).toBeInTheDocument();
+    expect(screen.getByText(/For Water Research/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate" })).toBeInTheDocument();
+  });
 });

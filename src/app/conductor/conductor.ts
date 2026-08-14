@@ -10,12 +10,15 @@
  * venue settled and its requirements captured — see computeG1ExitCriteria),
  * Atlas + the document for G3 (every required section exists, every
  * deferred G0 field resolved — see computeG3ExitCriteria's own comment for
- * what's deliberately not modeled), and the Rubric for G6 (are there any
- * unresolved blocking or required compliance findings). G2, G4, G5, and G7
- * exit criteria are not wired to anything yet — there is no sourcing
- * pipeline, drafting pipeline, review pipeline, or export pipeline built
- * (see docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3) — but the gate
- * state machine itself supports them identically once those modules exist:
+ * what's deliberately not modeled), the project's peer-review history for
+ * G5 (see computeG5ExitCriteria), the Rubric for G6 (are there any
+ * unresolved blocking or required compliance findings), and the document
+ * plus that same Rubric report for G7 (pre-flight plus compliance — see
+ * computeG7ExitCriteria's own comment for what's deliberately not
+ * modeled). G2 and G4 exit criteria are not wired to anything yet — there
+ * is no sourcing or drafting-progress pipeline built (see
+ * docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3) — but the gate state
+ * machine itself supports them identically once those modules exist:
  * `updateExitCriteria()` takes any `ExitCriterion[]`, computed however the
  * caller likes.
  *
@@ -51,6 +54,7 @@ import type { RubricReport } from "../rubric/rubric";
 import type { CanonicalDocument } from "../../domain/document/model";
 import type { JournalRequirements } from "../../domain/journal/types";
 import type { PeerReviewHistory } from "../../domain/review/types";
+import { preflight } from "../export/export";
 
 export {
   GATE_ORDER,
@@ -266,6 +270,52 @@ export function computeG6ExitCriteria(report: RubricReport): ExitCriterion[] {
         blocking: true,
       };
     });
+}
+
+/**
+ * Compute G7's exit criteria (docs 30 §3 G7 "Export": "Pre-flight passes ·
+ * every blocking compliance finding resolved · required assets present ·
+ * output validates structurally") from the project's document and its most
+ * recent Rubric report — the export pipeline's first real compute function.
+ *
+ * Two of the four documented criteria are modeled here:
+ *   - "Pre-flight passes" reuses `app/export/export.ts`'s own `preflight()`
+ *     — the exact check a real export attempt runs first, so this reports
+ *     the same thing an export would find, not a separate approximation.
+ *   - "Every blocking compliance finding resolved" reads `report`, the same
+ *     Rubric evaluation G6 was computed from.
+ *
+ * NOT modeled, stated honestly rather than faked: "required assets present"
+ * (there is no figure/supplementary-file tracking model yet — nothing to
+ * check) and "output validates structurally" (that's `export.ts`'s own
+ * `verify()`, which runs against a rendered `Buffer` after a real render;
+ * running a full render speculatively just to populate a gate checkbox,
+ * before the user has actually asked to export, would be wasted work — the
+ * `/export` route already performs and enforces that check for real at
+ * export time). Same "leave uncompiled rather than force a false mapping"
+ * discipline as `computeG3ExitCriteria`'s own documented gap.
+ */
+export function computeG7ExitCriteria(document: CanonicalDocument | undefined, report: RubricReport | undefined): ExitCriterion[] {
+  if (!document) {
+    return [{ id: "export-preflight-passes", description: "A document has been submitted to run export pre-flight against", satisfied: false, blocking: true }];
+  }
+
+  const pf = preflight(document);
+  const preflightCriterion: ExitCriterion = {
+    id: "export-preflight-passes",
+    description: pf.isReady ? "Export pre-flight checks pass" : `Export pre-flight failed: ${pf.issues.join("; ")}`,
+    satisfied: pf.isReady,
+    blocking: true,
+  };
+
+  const complianceCriterion: ExitCriterion = {
+    id: "export-compliance-clear",
+    description: report ? "No unresolved blocking compliance findings" : "Compliance has not been evaluated yet",
+    satisfied: report !== undefined && report.blockingFailures.length === 0,
+    blocking: true,
+  };
+
+  return [preflightCriterion, complianceCriterion];
 }
 
 /** Update a gate's exit criteria from freshly computed values, deriving status. Throws if the gate is currently signed off — invalidate first. */

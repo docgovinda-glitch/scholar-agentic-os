@@ -339,6 +339,53 @@ describe("G3 (Structure gate), recomputed from both intake and document endpoint
   });
 });
 
+describe("G7 (Export gate), recomputed from the document endpoint alongside G6", () => {
+  beforeEach(() => {
+    __resetProjectStoreForTests();
+    __resetRateLimitStore();
+  });
+
+  it("right after project creation, G7 has no computed criteria yet, same as G6 before any document exists", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const g7 = created.body.gates.find((g: { gate: string }) => g.gate === "G7");
+    expect(g7.outstandingBlocking).toEqual([]);
+    expect(g7.status).toBe("not_started");
+  });
+
+  it("a compliant document clears both of G7's exit criteria", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const res = await request(app)
+      .put(`/api/projects/${created.body.projectId}/document`)
+      .send({ document: compliantOT01Document() });
+    const g7 = res.body.gates.find((g: { gate: string }) => g.gate === "G7");
+    expect(g7.outstandingBlocking).toEqual([]);
+  });
+
+  it("a document with unresolved blocking Rubric findings leaves G7's compliance criterion outstanding", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const incomplete = compliantOT01Document();
+    incomplete.blocks = incomplete.blocks.filter((b) => b.id !== "conclusion");
+    const res = await request(app)
+      .put(`/api/projects/${created.body.projectId}/document`)
+      .send({ document: incomplete });
+    const g7 = res.body.gates.find((g: { gate: string }) => g.gate === "G7");
+    expect(g7.outstandingBlocking.length).toBeGreaterThan(0);
+  });
+
+  it("waiving the sole blocking-Rubric-finding-causing issue also clears G7's compliance criterion", async () => {
+    const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
+    const projectId = created.body.projectId;
+    const overLength = await request(app).put(`/api/projects/${projectId}/document`).send({ document: overLengthOT01Document() });
+    expect(overLength.body.gates.find((g: { gate: string }) => g.gate === "G7").outstandingBlocking).toEqual([]);
+    // over-length trips a required (not blocking) rule, so G7 was already clear — waiving still recomputes it without error.
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/rubric/waive`)
+      .send({ ruleId: "OT-01-word-limit", reason: "Tutor granted an extension on length." });
+    const g7 = res.body.gates.find((g: { gate: string }) => g.gate === "G7");
+    expect(g7.outstandingBlocking).toEqual([]);
+  });
+});
+
 function overLengthOT01Document() {
   const doc = compliantOT01Document();
   doc.blocks = doc.blocks.map((b) => (b.id === "body" ? { ...b, text: words(4000) } : b));

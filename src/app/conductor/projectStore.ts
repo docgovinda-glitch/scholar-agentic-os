@@ -23,6 +23,8 @@ import type { EvidenceLedger } from "../../domain/evidence/types";
 import type { GenerationJob } from "../../domain/manuscript/types";
 import { emptyPeerReviewHistory } from "../../domain/review/types";
 import type { PeerReviewHistory } from "../../domain/review/types";
+import type { CoverLetter } from "../../domain/coverLetter/types";
+import type { AnonymizationReport } from "../../domain/anonymization/types";
 
 export interface ProjectRecord {
   projectId: string;
@@ -58,6 +60,12 @@ export interface ProjectRecord {
   generationJob?: GenerationJob;
   /** Every multi-lens peer review round run so far (domain/review) — versioned, never overwritten. Starts empty, same as claimGraph/evidenceLedger: always present, possibly with nothing in it yet. */
   peerReviewHistory: PeerReviewHistory;
+  /** The most recently generated cover letter (domain/coverLetter). Undefined until POST .../cover-letter — overwritten wholesale on each regeneration, same "not yet captured" distinctness as journalRequirements. */
+  coverLetter?: CoverLetter;
+  /** The most recent anonymization PROPOSAL report (domain/anonymization) — never auto-applied. Undefined until POST .../anonymization/propose. */
+  anonymizationReport?: AnonymizationReport;
+  /** The anonymized document produced by applying a human-accepted subset of anonymizationReport's proposals (POST .../anonymization/apply). A separate document from `document`, never overwrites it. */
+  anonymizedDocument?: CanonicalDocument;
 }
 
 const projects = new Map<string, ProjectRecord>();

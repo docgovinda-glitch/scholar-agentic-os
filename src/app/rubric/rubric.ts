@@ -18,9 +18,17 @@ import type { ClaimEvidenceGraph } from "../../domain/claim/types";
 import { evaluateRules } from "../../domain/compliance/evaluators";
 import type { Finding, Rule, RuleSeverity } from "../../domain/compliance/types";
 import type { OutputTypeSpec } from "../atlas/types";
+import type { JournalRequirements } from "../../domain/journal/types";
 import { compileRubricFromOutputType } from "./fromAtlas";
 
-export { compileWordLimitRule, compileStructuralRules, compileRubricFromOutputType } from "./fromAtlas";
+export {
+  compileWordLimitRule,
+  compileStructuralRules,
+  compileRubricFromOutputType,
+  compileSectionWordLimitGateRules,
+  compileDeclarationsPresentGateRules,
+  compileCitationStyleGateRules,
+} from "./fromAtlas";
 export type { Rule, Finding, RuleSeverity, RuleType, RuleScope, FindingStatus } from "../../domain/compliance/types";
 
 export interface RubricReport {
@@ -81,14 +89,18 @@ function bySeverity(findings: Finding[], severity: RuleSeverity, statuses: Findi
  * `claimGraph` is optional and only consulted by `claim_support` rules
  * (e.g. OT-08's contribution-claims gate, OT-20's every-claim-sourced
  * gate); omitting it reports those as `not_applicable`, never a false pass.
+ * `journalRequirements` is optional and only consulted by the venue-specific
+ * gates `compileRubricFromOutputType` compiles when it's supplied (e.g.
+ * OT-10's declarations_present and citation_style_exact).
  */
 export function evaluateAgainstOutputType(
   spec: OutputTypeSpec,
   doc: CanonicalDocument,
   extraRules: Rule[] = [],
-  claimGraph?: ClaimEvidenceGraph
+  claimGraph?: ClaimEvidenceGraph,
+  journalRequirements?: JournalRequirements
 ): RubricReport {
-  const rules = [...compileRubricFromOutputType(spec), ...extraRules];
+  const rules = [...compileRubricFromOutputType(spec, journalRequirements), ...extraRules];
   return buildReport(rules, doc, claimGraph);
 }
 

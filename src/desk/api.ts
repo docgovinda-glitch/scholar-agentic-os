@@ -11,7 +11,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, DiscoveredSource, EvidenceConflict, EvidenceLedger, EvidenceLocator, GateSummary, GenerationJob, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, PeerReviewHistory, ProjectView, ReviewLens, RubricReport, StudioRefineResult, SubmissionRecord, SupportStrength, VoiceProfile } from "./types";
+import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, CoverLetter, DiscoveredSource, EvidenceConflict, EvidenceLedger, EvidenceLocator, GateSummary, GenerationJob, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, PeerReviewHistory, ProjectView, ReviewLens, RubricReport, StudioRefineResult, SubmissionRecord, SupportStrength, VoiceProfile } from "./types";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -544,6 +544,43 @@ export function pauseManuscriptJob(projectId: string): Promise<GenerationJob> {
 
 export function resumeManuscriptJob(projectId: string): Promise<GenerationJob> {
   return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/resume`, "POST", {}).then((r) => json(r));
+}
+
+/** Returns null (not an error) when no cover letter has been generated yet. */
+export async function getCoverLetter(projectId: string): Promise<CoverLetter | null> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/cover-letter`);
+  if (res.status === 404) return null;
+  return json<CoverLetter>(res);
+}
+
+/**
+ * Generate (or regenerate) the project's cover letter from its document and
+ * captured journal requirements — one per project, overwritten on each
+ * call. 400s if either precondition is missing; the server's message names
+ * which. Same 428/403/402 error mapping as the other AI-backed routes.
+ */
+export async function generateCoverLetter(params: {
+  projectId: string;
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  useEngine?: "premium";
+}): Promise<{ coverLetter: CoverLetter }> {
+  const { projectId, ...requestBody } = params;
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/cover-letter`, "POST", requestBody);
+  if (res.status === 428) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioConsentRequiredError(errBody.reason || "Consent required.", errBody.provider);
+  }
+  if (res.status === 403) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioDeniedError(errBody.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
+  }
+  return json<{ coverLetter: CoverLetter }>(res);
 }
 
 export async function exportProject(projectId: string, format: "docx" | "odt" | "pdf"): Promise<Blob> {

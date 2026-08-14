@@ -347,4 +347,76 @@ describe("services/store: pgProjectStore", () => {
     const fetched = await createPgProjectStore(getDb).get("proj-review");
     expect(fetched?.peerReviewHistory).toEqual(peerReviewHistory);
   });
+
+  it("cover_letter/anonymization_report/anonymized_document round-trip: serialize to JSON on save, default to undefined when a row predates the columns, and rehydrate when present", async () => {
+    const coverLetter: ProjectRecord["coverLetter"] = { text: "Dear Editor,\n\n...", journalName: "Water Research", generatedAt: "2026-01-01T00:00:00.000Z" };
+    const anonymizationReport: ProjectRecord["anonymizationReport"] = {
+      proposals: [{ blockId: "acknowledgements", category: "acknowledgement", originalText: "Dr. Smith", replacementText: "[name removed]", reason: "Names a person." }],
+      checkedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const anonymizedDocument: ProjectRecord["anonymizedDocument"] = { id: "d1", title: "Paper", blocks: [{ id: "acknowledgements", kind: "paragraph", text: "We thank [name removed]." }] };
+    const record: ProjectRecord = {
+      projectId: "proj-anon",
+      ownerId: "11111111-1111-4111-8111-111111111111",
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      peerReviewHistory: { rounds: [] },
+      coverLetter,
+      anonymizationReport,
+      anonymizedDocument,
+    };
+    const saveDb = fakeDb();
+    await createPgProjectStore(saveDb).save(record);
+    const params = saveDb.calls[0].params;
+    expect(JSON.parse(params?.[14] as string)).toEqual(coverLetter);
+    expect(JSON.parse(params?.[15] as string)).toEqual(anonymizationReport);
+    expect(JSON.parse(params?.[16] as string)).toEqual(anonymizedDocument);
+
+    const staleRowDb = fakeDb([
+      {
+        project_id: "proj-old3",
+        owner_id: "11111111-1111-4111-8111-111111111111",
+        output_type_id: "OT-10",
+        answers: {},
+        gates: {},
+        document: null,
+        rubric_report: null,
+        claim_graph: { claims: {}, evidence: {}, bindings: {} },
+        waivers: {},
+        submissions: [],
+        // No cover_letter/anonymization_report/anonymized_document keys at all — a row from before the migration.
+      },
+    ]);
+    const staleFetched = await createPgProjectStore(staleRowDb).get("proj-old3");
+    expect(staleFetched?.coverLetter).toBeUndefined();
+    expect(staleFetched?.anonymizationReport).toBeUndefined();
+    expect(staleFetched?.anonymizedDocument).toBeUndefined();
+
+    const getDb = fakeDb([
+      {
+        project_id: "proj-anon",
+        owner_id: "11111111-1111-4111-8111-111111111111",
+        output_type_id: "OT-10",
+        answers: {},
+        gates: {},
+        document: null,
+        rubric_report: null,
+        claim_graph: { claims: {}, evidence: {}, bindings: {} },
+        waivers: {},
+        submissions: [],
+        cover_letter: coverLetter,
+        anonymization_report: anonymizationReport,
+        anonymized_document: anonymizedDocument,
+      },
+    ]);
+    const fetchedRecord = await createPgProjectStore(getDb).get("proj-anon");
+    expect(fetchedRecord?.coverLetter).toEqual(coverLetter);
+    expect(fetchedRecord?.anonymizationReport).toEqual(anonymizationReport);
+    expect(fetchedRecord?.anonymizedDocument).toEqual(anonymizedDocument);
+  });
 });

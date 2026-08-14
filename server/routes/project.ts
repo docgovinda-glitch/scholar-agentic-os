@@ -11,10 +11,13 @@
  * answers plus PUT .../journal-requirements — see computeG1ExitCriteria),
  * G3 (from the Atlas structure plus the document and intake answers — see
  * computeG3ExitCriteria's own comment for what's deliberately not modeled),
- * and G6 (from the Rubric, once a document has been submitted via
- * PUT .../document) have real, computable exit-criteria sources through
- * this surface. G2, G4, G5, and G7 have no sourcing/drafting/review/export
- * pipeline to compute criteria from yet (docs 30 §10). The sign-off and
+ * G6 (from the Rubric, once a document has been submitted via
+ * PUT .../document), G5 (from peer-review rounds — see
+ * POST .../manuscript/peer-review), and G7 (pre-flight plus the same
+ * Rubric report G6 reads — see computeG7ExitCriteria) have real, computable
+ * exit-criteria sources through this surface. G2 and G4 have no
+ * sourcing/drafting-progress pipeline to compute criteria from yet (docs 30
+ * §10). The sign-off and
  * invalidate endpoints below are gate-agnostic — they will work for any
  * gate the moment something else in the system starts calling
  * updateExitCriteria for it — but since G3's entry prerequisites (G0, G2)
@@ -40,6 +43,7 @@ import {
   computeG3ExitCriteria,
   computeG5ExitCriteria,
   computeG6ExitCriteria,
+  computeG7ExitCriteria,
   intakeCompleteness,
   updateExitCriteria,
   signOff,
@@ -105,6 +109,9 @@ import { runPeerReview } from "../../src/app/review/peerReview.ts";
 import type { ReviewLens } from "../../src/domain/review/types.ts";
 import { REVIEW_LENSES } from "../../src/domain/review/types.ts";
 import { getPolicyForSession } from "../../src/app/studio/sessionPolicyStore.ts";
+import { generateCoverLetter } from "../../src/app/coverLetter/generateCoverLetter.ts";
+import { proposeAnonymization } from "../../src/app/anonymization/proposeAnonymization.ts";
+import { applyAnonymization, AnonymizationApplyError } from "../../src/app/anonymization/applyAnonymization.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
 
@@ -697,6 +704,163 @@ async function runPremiumPeerReview(
   return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
 }
 
+/** Runs cover letter generation's Premium path — a single bounded call, so this is simpler than runPremiumCoherenceCheck/runPremiumPeerReview's multi-pass credit estimate (no dimensions/lenses multiplier). */
+async function runPremiumCoverLetter(
+  userId: string,
+  document: CanonicalDocument,
+  journalRequirements: JournalRequirements,
+  policy: import("../../src/platform/warden/warden.ts").EgressPolicy
+): Promise<
+  | { ok: true; result: Awaited<ReturnType<typeof generateCoverLetter>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
+  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
+> {
+  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
+  if (!entitlementActive) {
+    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
+  }
+
+  const combinedText = document.blocks.map((b) => b.text).join("\n");
+  const preCheckAmount = estimateMaxCreditsForInput(combinedText);
+  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
+  if (!perTask.allowed) {
+    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
+  }
+  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
+    return {
+      ok: false,
+      status: 402,
+      error:
+        premiumQuotaRemaining <= 0
+          ? "Your Premium quota for this period is exhausted."
+          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
+    };
+  }
+
+  const resources = await resolvePremiumResources(userId, "reasoning");
+  if (resources.length === 0) {
+    return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
+  }
+  const resource = resources[0];
+  const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
+  if (!credential) {
+    await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+    return { ok: false, status: 502, error: `The "${resource.label}" Premium resource is not currently configured.` };
+  }
+
+  const model = resource.modelId || undefined;
+  const start = Date.now();
+  let result: Awaited<ReturnType<typeof generateCoverLetter>>;
+  try {
+    result = await generateCoverLetter({ document, journalRequirements, provider: resource.providerId, apiKey: credential, model, policy });
+  } catch (err) {
+    if (err instanceof GatewayDenied) {
+      if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
+      return { ok: false, status: 403, error: err.message };
+    }
+    await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
+    return { ok: false, status: 502, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+  await recordProviderSuccess(resource.providerId, Date.now() - start);
+
+  const creditsUsed = preCheckAmount;
+  const requestId = crypto.randomUUID();
+  const deductResult = await deductCredits(
+    userId,
+    creditsUsed,
+    quota?.dailyCredits ?? null,
+    quota?.monthlyCredits ?? null,
+    "usage",
+    requestId,
+    `cover letter: ${resource.label}`,
+    quota?.weeklyCredits ?? null
+  );
+  if (deductResult !== "ok") {
+    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "cover_letter");
+    return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+  }
+  await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "cover_letter");
+
+  return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+}
+
+/** Runs anonymization-proposal generation's Premium path — same single-call shape as runPremiumCoverLetter. */
+async function runPremiumAnonymization(
+  userId: string,
+  document: CanonicalDocument,
+  policy: import("../../src/platform/warden/warden.ts").EgressPolicy
+): Promise<
+  | { ok: true; result: Awaited<ReturnType<typeof proposeAnonymization>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
+  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
+> {
+  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
+  if (!entitlementActive) {
+    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
+  }
+
+  const combinedText = document.blocks.map((b) => b.text).join("\n");
+  const preCheckAmount = estimateMaxCreditsForInput(combinedText);
+  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
+  if (!perTask.allowed) {
+    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
+  }
+  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
+    return {
+      ok: false,
+      status: 402,
+      error:
+        premiumQuotaRemaining <= 0
+          ? "Your Premium quota for this period is exhausted."
+          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
+    };
+  }
+
+  const resources = await resolvePremiumResources(userId, "reasoning");
+  if (resources.length === 0) {
+    return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
+  }
+  const resource = resources[0];
+  const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
+  if (!credential) {
+    await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+    return { ok: false, status: 502, error: `The "${resource.label}" Premium resource is not currently configured.` };
+  }
+
+  const model = resource.modelId || undefined;
+  const start = Date.now();
+  let result: Awaited<ReturnType<typeof proposeAnonymization>>;
+  try {
+    result = await proposeAnonymization({ document, provider: resource.providerId, apiKey: credential, model, policy });
+  } catch (err) {
+    if (err instanceof GatewayDenied) {
+      if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
+      return { ok: false, status: 403, error: err.message };
+    }
+    await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
+    return { ok: false, status: 502, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+  await recordProviderSuccess(resource.providerId, Date.now() - start);
+
+  const creditsUsed = preCheckAmount;
+  const requestId = crypto.randomUUID();
+  const deductResult = await deductCredits(
+    userId,
+    creditsUsed,
+    quota?.dailyCredits ?? null,
+    quota?.monthlyCredits ?? null,
+    "usage",
+    requestId,
+    `anonymization proposal: ${resource.label}`,
+    quota?.weeklyCredits ?? null
+  );
+  if (deductResult !== "ok") {
+    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "anonymization_propose");
+    return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+  }
+  await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "anonymization_propose");
+
+  return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+}
+
 const SOURCE_TYPES = new Set(["scholarly", "official", "web", "media", "user_provided", "vault"]);
 const AUTHORITY_TIERS = new Set(["A", "B", "C", "D"]);
 
@@ -782,12 +946,19 @@ function recomputeG3(record: ProjectRecord, document: CanonicalDocument | undefi
   return updateExitCriteria(record.gates, "G3", criteria);
 }
 
+/**
+ * Recompute G6's exit criteria, and — chained off the same freshly-built
+ * Rubric report — G7's (computeG7ExitCriteria reads the document plus this
+ * same report, so it always reflects what G6 just evaluated, not a stale
+ * copy). Throws GateTransitionError if either gate is already signed off,
+ * same "invalidate first" discipline as every other gate-touching route.
+ */
 function recomputeG6(record: ProjectRecord, document: CanonicalDocument) {
   const spec = catalog.getOrThrow(record.outputTypeId);
-  const rules = applyWaivers(compileRubricFromOutputType(spec), record.waivers);
+  const rules = applyWaivers(compileRubricFromOutputType(spec, record.journalRequirements), record.waivers);
   const rubricReport = buildReport(rules, document, record.claimGraph);
-  const criteria = computeG6ExitCriteria(rubricReport);
-  const gates = updateExitCriteria(record.gates, "G6", criteria);
+  const g6Gates = updateExitCriteria(record.gates, "G6", computeG6ExitCriteria(rubricReport));
+  const gates = updateExitCriteria(g6Gates, "G7", computeG7ExitCriteria(document, rubricReport));
   return { rubricReport, gates };
 }
 
@@ -1014,6 +1185,14 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * or missing `source` value stamps "manual". 409s if G1 is already signed
    * off — invalidate it first, same discipline as every other gate-touching
    * endpoint.
+   *
+   * Also recomputes G6/G7 when the project already has a document: three
+   * catalog quality gates (`declarationsPresentGate`, `citationStyleExactGate`,
+   * and the citation style default) read `journalRequirements` now, not just
+   * the document, so a re-targeted or corrected venue can change the Rubric
+   * without the document itself changing (docs 14 §14's `REQ-CMP-9` —
+   * re-targeting recompiles the Rubric, not the content). 409s if G6/G7 are
+   * already signed off, same discipline as the claim-graph routes give G6.
    */
   app.put("/api/projects/:id/journal-requirements", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
@@ -1031,9 +1210,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     };
 
     try {
-      const gates = recomputeG1(record, record.answers, journalRequirements);
-      const updated = await store.save({ ...record, journalRequirements, gates });
-      res.json({ journalRequirements: updated.journalRequirements, gates: summarize(updated.gates) });
+      const gatesAfterG1 = recomputeG1(record, record.answers, journalRequirements);
+      const recordAfterG1 = { ...record, journalRequirements, gates: gatesAfterG1 };
+      const { rubricReport, gates } = record.document
+        ? recomputeG6(recordAfterG1, record.document)
+        : { rubricReport: record.rubricReport, gates: gatesAfterG1 };
+      const updated = await store.save({ ...recordAfterG1, rubricReport, gates });
+      res.json({ journalRequirements: updated.journalRequirements, gates: summarize(updated.gates), ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
     } catch (err) {
       if (err instanceof GateTransitionError) {
         return res.status(409).json({ error: err.message });
@@ -1188,7 +1371,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
 
     const spec = catalog.getOrThrow(record.outputTypeId);
-    const rules = applyWaivers(compileRubricFromOutputType(spec), record.waivers);
+    const rules = applyWaivers(compileRubricFromOutputType(spec, record.journalRequirements), record.waivers);
     if (!rules.some((r) => r.id === ruleId)) {
       return res.status(404).json({ error: `No rule "${ruleId}" for this project's output type.` });
     }
@@ -1198,8 +1381,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       const newWaiver = waivedRules.find((r) => r.id === ruleId)!.waived!;
       const waivers = { ...record.waivers, [ruleId]: newWaiver };
       const rubricReport = buildReport(waivedRules, record.document, record.claimGraph);
-      const criteria = computeG6ExitCriteria(rubricReport);
-      const gates = updateExitCriteria(record.gates, "G6", criteria);
+      const g6Gates = updateExitCriteria(record.gates, "G6", computeG6ExitCriteria(rubricReport));
+      const gates = updateExitCriteria(g6Gates, "G7", computeG7ExitCriteria(record.document, rubricReport));
       const updated = await store.save({ ...record, waivers, rubricReport, gates });
       res.json({ ...projectView(updated), rubric: rubricReport });
     } catch (err) {
@@ -1902,14 +2085,199 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   }));
 
   /**
+   * Generate a cover letter (docs 33-EXPORT-ARCHITECTURE.md §7: "Cover
+   * letter | Journal submissions") from the project's document and its
+   * captured journal requirements. A single bounded model call, unlike the
+   * manuscript engine's per-section checkpointing — there is no
+   * cross-call state to persist. Overwrites any previous cover letter
+   * (domain/coverLetter — one per project, not a version history). Body:
+   * { provider?, apiKey?, model?, useEngine? }, same BYOK-vs-Premium shape
+   * and 428/403/402 status mapping as every other AI-backed route here.
+   */
+  app.post("/api/projects/:id/cover-letter", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.document) {
+      return res.status(400).json({ error: "Cannot generate a cover letter for a project with no document submitted yet." });
+    }
+    if (!record.journalRequirements) {
+      return res.status(400).json({ error: "Cannot generate a cover letter before journal requirements are captured (the target journal is what the letter is addressed to)." });
+    }
+    const { provider, apiKey, model, useEngine } = req.body ?? {};
+    const document = record.document;
+    const journalRequirements = record.journalRequirements;
+    const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
+    const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
+
+    if (wantsPremium) {
+      const userId = currentUserId(req);
+      let outcome: Awaited<ReturnType<typeof runPremiumCoverLetter>>;
+      try {
+        outcome = await runPremiumCoverLetter(userId, document, journalRequirements, policy);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
+      }
+      if (!outcome.ok) {
+        if (outcome.status === 428) return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
+        if (outcome.status === 403) return res.status(403).json({ error: "denied", reason: outcome.error });
+        return res.status(outcome.status).json({ error: outcome.error });
+      }
+      const updated = await store.save({ ...record, coverLetter: outcome.result.coverLetter });
+      return res.json({ coverLetter: updated.coverLetter, aiSource: outcome.aiSource });
+    }
+
+    try {
+      const { coverLetter } = await generateCoverLetter({
+        document,
+        journalRequirements,
+        provider: typeof provider === "string" ? provider : undefined,
+        apiKey: typeof apiKey === "string" ? apiKey : undefined,
+        model: typeof model === "string" ? model : undefined,
+        policy,
+      });
+      const updated = await store.save({ ...record, coverLetter });
+      return res.json({ coverLetter: updated.coverLetter });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
+        return res.status(403).json({ error: "denied", reason: err.message });
+      }
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return res.status(500).json({ error: message });
+    }
+  }));
+
+  /** The most recently generated cover letter. 404s if none has been generated yet. */
+  app.get("/api/projects/:id/cover-letter", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.coverLetter) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no cover letter generated yet.` });
+    }
+    res.json(record.coverLetter);
+  }));
+
+  /**
+   * Propose anonymization redactions (docs 33-EXPORT-ARCHITECTURE.md §7.1)
+   * over the project's document — author names/affiliations,
+   * acknowledgements, funding statements naming the team, and
+   * identity-revealing self-citations. Proposals only: nothing here is
+   * applied to any document. Overwrites any previous proposal report
+   * (domain/anonymization — one report per project, superseded on
+   * regeneration, same as coverLetter). Body: { provider?, apiKey?,
+   * model?, useEngine? }, same BYOK-vs-Premium shape as every other
+   * AI-backed route here.
+   */
+  app.post("/api/projects/:id/anonymization/propose", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.document) {
+      return res.status(400).json({ error: "Cannot propose anonymization for a project with no document submitted yet." });
+    }
+    const { provider, apiKey, model, useEngine } = req.body ?? {};
+    const document = record.document;
+    const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
+    const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
+
+    if (wantsPremium) {
+      const userId = currentUserId(req);
+      let outcome: Awaited<ReturnType<typeof runPremiumAnonymization>>;
+      try {
+        outcome = await runPremiumAnonymization(userId, document, policy);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
+      }
+      if (!outcome.ok) {
+        if (outcome.status === 428) return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
+        if (outcome.status === 403) return res.status(403).json({ error: "denied", reason: outcome.error });
+        return res.status(outcome.status).json({ error: outcome.error });
+      }
+      const updated = await store.save({ ...record, anonymizationReport: outcome.result });
+      return res.json({ anonymizationReport: updated.anonymizationReport, aiSource: outcome.aiSource });
+    }
+
+    try {
+      const anonymizationReport = await proposeAnonymization({
+        document,
+        provider: typeof provider === "string" ? provider : undefined,
+        apiKey: typeof apiKey === "string" ? apiKey : undefined,
+        model: typeof model === "string" ? model : undefined,
+        policy,
+      });
+      const updated = await store.save({ ...record, anonymizationReport });
+      return res.json({ anonymizationReport: updated.anonymizationReport });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
+        return res.status(403).json({ error: "denied", reason: err.message });
+      }
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return res.status(500).json({ error: message });
+    }
+  }));
+
+  /** The most recent anonymization proposal report and the anonymized document (if one has been produced), both null until they exist. */
+  app.get("/api/projects/:id/anonymization", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    res.json({ report: record.anonymizationReport ?? null, anonymizedDocument: record.anonymizedDocument ?? null });
+  }));
+
+  /**
+   * Apply a human-accepted subset of the most recent anonymization
+   * proposals (docs 33 §7.1: "Every change is shown for review before the
+   * anonymised file is produced") — deterministic, no model call. Body:
+   * { acceptedIndexes: number[] }, each an index into the most recent
+   * anonymizationReport.proposals. Writes the result to
+   * `anonymizedDocument`, a separate field from `document` — the source
+   * document is never overwritten by an anonymized copy. 409s if a
+   * proposal's original text is no longer present (the document changed
+   * since the proposal was generated — re-run propose first).
+   */
+  app.post("/api/projects/:id/anonymization/apply", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.document) {
+      return res.status(400).json({ error: "Cannot apply anonymization to a project with no document submitted yet." });
+    }
+    if (!record.anonymizationReport || record.anonymizationReport.proposals.length === 0) {
+      return res.status(400).json({ error: "No anonymization proposals to apply — run POST .../anonymization/propose first." });
+    }
+    const { acceptedIndexes } = req.body ?? {};
+    const proposals = record.anonymizationReport.proposals;
+    if (
+      !Array.isArray(acceptedIndexes) ||
+      acceptedIndexes.length === 0 ||
+      !acceptedIndexes.every((i) => typeof i === "number" && Number.isInteger(i) && i >= 0 && i < proposals.length)
+    ) {
+      return res.status(400).json({ error: `Missing or invalid field: acceptedIndexes (array of integers, each 0–${proposals.length - 1}).` });
+    }
+
+    const accepted = (acceptedIndexes as number[]).map((i) => proposals[i]);
+    try {
+      const anonymizedDocument = applyAnonymization(record.document, accepted);
+      const updated = await store.save({ ...record, anonymizedDocument });
+      res.json({ anonymizedDocument: updated.anonymizedDocument });
+    } catch (err) {
+      if (err instanceof AnonymizationApplyError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
+  }));
+
+  /**
    * Sign off a gate. Body: { actor }. 409s if the gate is not ready (a
    * blocking exit criterion is unsatisfied, or entry prerequisites are
    * unmet). The approved snapshot is what a later content change is
    * detected against (docs 30 §2.2) — G0's is the intake answers, G1's is
    * the intake answers plus the journal requirements, G3's is the
-   * document's block ids plus the intake answers, G6's is the Rubric
-   * report; every other gate has no computed content yet (see this file's
-   * module comment) so its snapshot is empty.
+   * document's block ids plus the intake answers, G5's is the peer-review
+   * history, G6's is the Rubric report, G7's is that same Rubric report
+   * plus the document's block ids; every other gate has no computed
+   * content yet (see this file's module comment) so its snapshot is empty.
    */
   app.post("/api/projects/:id/gates/:gate/signoff", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
@@ -1933,7 +2301,9 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
               ? { peerReviewHistory: record.peerReviewHistory }
               : req.params.gate === "G6"
                 ? { rubricReport: record.rubricReport }
-                : {};
+                : req.params.gate === "G7"
+                  ? { rubricReport: record.rubricReport, blockIds: record.document?.blocks.map((b) => b.id) ?? [] }
+                  : {};
 
     try {
       const gates = await signOff(record.gates, req.params.gate, actor, approvedSnapshot);

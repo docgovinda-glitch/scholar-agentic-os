@@ -16,8 +16,12 @@ import type { ExportFormat, ExportInput, ExportResult, ExportMetadata, Preflight
 /**
  * Stage 1: Pre-flight — validate the document is export-ready.
  * Checks: non-empty content, resolvable citations, no encoding issues.
+ *
+ * Exported so `app/conductor/conductor.ts`'s `computeG7ExitCriteria` can run
+ * this same cheap, pure check as one of G7's exit criteria without paying
+ * for a full render — docs 30 §3 G7 "Exit": "Pre-flight passes...".
  */
-function preflight(document: CanonicalDocument): PreflightReport {
+export function preflight(document: CanonicalDocument): PreflightReport {
   const issues: string[] = [];
   const warnings: string[] = [];
 

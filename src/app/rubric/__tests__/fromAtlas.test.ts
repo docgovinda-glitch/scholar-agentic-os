@@ -1,12 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { compileClaimSupportGateRules, compileMetadataGateRules, compilePositionInTextGateRules, compileReadabilityGateRules, compileRubricFromOutputType, compileStructuralRules, compileWordLimitRule } from "../fromAtlas";
+import {
+  compileCitationStyleGateRules,
+  compileClaimSupportGateRules,
+  compileDeclarationsPresentGateRules,
+  compileMetadataGateRules,
+  compilePositionInTextGateRules,
+  compileReadabilityGateRules,
+  compileRubricFromOutputType,
+  compileSectionWordLimitGateRules,
+  compileStructuralRules,
+  compileWordLimitRule,
+} from "../fromAtlas";
 import { buildReport } from "../rubric";
 import { catalog } from "../../atlas/atlas";
 import type { OutputTypeSpec } from "../../atlas/types";
 import { emptyDocument } from "../../../domain/document/model";
-import { setMetadata } from "../../../domain/document/ops";
+import { appendBlock, setMetadata } from "../../../domain/document/ops";
 import { emptyGraph, addClaim, bindEvidence } from "../../../domain/claim/graph";
 import type { ClaimEvidenceGraph } from "../../../domain/claim/types";
+import type { JournalRequirements } from "../../../domain/journal/types";
 
 describe("app/rubric: compiling rules from Atlas", () => {
   it("compiles a word-limit rule matching the type's budget", () => {
@@ -265,5 +277,138 @@ describe("app/rubric: compilePositionInTextGateRules against OT-20's real positi
     const rules = compileRubricFromOutputType(catalog.getOrThrow("OT-20"));
     expect(rules.some((r) => r.id === "OT-20-position-recommendation_in_first_200_words")).toBe(true);
     expect(rules.filter((r) => r.evaluator.kind === "readability")).toHaveLength(2);
+  });
+});
+
+function journalRequirements(overrides: Partial<JournalRequirements> = {}): JournalRequirements {
+  return {
+    journalName: "Water Research",
+    source: "manual",
+    citationStyle: "apa7",
+    requiredDeclarations: ["Conflict of Interest", "Data Availability"],
+    capturedAt: "2026-01-01T00:00:00.000Z",
+    capturedBy: "user-1",
+    ...overrides,
+  };
+}
+
+describe("app/rubric: compileSectionWordLimitGateRules against OT-10's real abstract_limit gate", () => {
+  it("compiles a section-scoped word_count rule reading min/max from the abstract's own wordBudget", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    const rules = compileSectionWordLimitGateRules(journal);
+    expect(rules).toHaveLength(1);
+    expect(rules[0].id).toBe("OT-10-section-word-limit-abstract_limit");
+    expect(rules[0].evaluator).toEqual({ kind: "word_count", params: { min: 150, max: 300, sectionKey: "abstract" } });
+    expect(rules[0].scope).toBe("section");
+    expect(rules[0].severity).toBe("blocking");
+  });
+
+  it("compiles no rule for a gate whose referenced section has no wordBudget", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    const spec: OutputTypeSpec = {
+      ...journal,
+      qualityGates: [{ id: "intro_limit", description: "Intro within limit", severity: "blocking", sectionWordLimitGate: { sectionKey: "introduction" } }],
+    };
+    expect(compileSectionWordLimitGateRules(spec)).toHaveLength(0);
+  });
+
+  it("compiles no rule for a gate that doesn't set sectionWordLimitGate", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    expect(compileSectionWordLimitGateRules(assignment)).toHaveLength(0);
+  });
+
+  it("is included in compileRubricFromOutputType's full compilation for OT-10, no journalRequirements needed", () => {
+    const rules = compileRubricFromOutputType(catalog.getOrThrow("OT-10"));
+    expect(rules.some((r) => r.id === "OT-10-section-word-limit-abstract_limit")).toBe(true);
+  });
+
+  it("evaluates correctly end-to-end against a real abstract block", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    const rules = compileSectionWordLimitGateRules(journal);
+    let doc = emptyDocument("d1", "Paper");
+    doc = appendBlock(doc, "abstract", "paragraph", "Too short.");
+    const report = buildReport(rules, doc);
+    expect(report.blockingFailures.some((f) => f.ruleId === "OT-10-section-word-limit-abstract_limit")).toBe(true);
+  });
+});
+
+describe("app/rubric: compileDeclarationsPresentGateRules against OT-10's real declarations_present gate", () => {
+  it("compiles zero rules until journalRequirements has been captured — never invents which declarations are required", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    expect(compileDeclarationsPresentGateRules(journal, undefined)).toHaveLength(0);
+  });
+
+  it("compiles zero rules when journalRequirements names no declarations", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    expect(compileDeclarationsPresentGateRules(journal, journalRequirements({ requiredDeclarations: [] }))).toHaveLength(0);
+  });
+
+  it("compiles one metadata_presence rule per declaration once requirements are captured", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    const rules = compileDeclarationsPresentGateRules(journal, journalRequirements());
+    expect(rules).toHaveLength(2);
+    expect(rules.every((r) => r.evaluator.kind === "metadata_presence")).toBe(true);
+    expect(rules.every((r) => r.severity === "blocking")).toBe(true);
+    expect(rules.map((r) => r.id)).toContain("OT-10-declaration-declarations_present-conflict-of-interest");
+  });
+
+  it("evaluates correctly end-to-end: fails until the declaration metadata is set, passes once it is", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    const req = journalRequirements({ requiredDeclarations: ["Conflict of Interest"] });
+    const rules = compileDeclarationsPresentGateRules(journal, req);
+    const doc = emptyDocument("d1", "Paper");
+    const before = buildReport(rules, doc);
+    expect(before.blockingFailures).toHaveLength(1);
+
+    const withDeclaration = setMetadata(doc, "declaration:conflict-of-interest", "The authors declare no conflict of interest.");
+    const after = buildReport(rules, withDeclaration);
+    expect(after.blockingFailures).toHaveLength(0);
+  });
+
+  it("compiles no rules for a gate that doesn't set declarationsPresentGate", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    expect(compileDeclarationsPresentGateRules(assignment, journalRequirements())).toHaveLength(0);
+  });
+
+  it("is included in compileRubricFromOutputType's full compilation for OT-10 only once journalRequirements is passed", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    expect(compileRubricFromOutputType(journal).some((r) => r.id.startsWith("OT-10-declaration-"))).toBe(false);
+    expect(compileRubricFromOutputType(journal, journalRequirements()).some((r) => r.id.startsWith("OT-10-declaration-"))).toBe(true);
+  });
+});
+
+describe("app/rubric: compileCitationStyleGateRules against OT-10's real citation_style_exact gate", () => {
+  it("falls back to the catalog's default citation style when no journalRequirements is captured", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    const rules = compileCitationStyleGateRules(journal, undefined);
+    expect(rules).toHaveLength(1);
+    expect(rules[0].evaluator).toEqual({ kind: "metadata_presence", params: { key: "citationStyle", expectedValue: journal.citation.defaultStyle } });
+  });
+
+  it("prefers the captured journal's citation style once requirements exist", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    const rules = compileCitationStyleGateRules(journal, journalRequirements({ citationStyle: "ieee" }));
+    expect(rules[0].evaluator).toEqual({ kind: "metadata_presence", params: { key: "citationStyle", expectedValue: "ieee" } });
+  });
+
+  it("compiles no rules for a gate that doesn't set citationStyleExactGate", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    expect(compileCitationStyleGateRules(assignment, undefined)).toHaveLength(0);
+  });
+
+  it("evaluates correctly end-to-end: fails on the wrong declared style, passes on an exact case-insensitive match", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    const rules = compileCitationStyleGateRules(journal, journalRequirements({ citationStyle: "ieee" }));
+    const wrongStyle = setMetadata(emptyDocument("d1", "Paper"), "citationStyle", "apa7");
+    expect(buildReport(rules, wrongStyle).blockingFailures).toHaveLength(1);
+
+    const rightStyle = setMetadata(emptyDocument("d1", "Paper"), "citationStyle", "IEEE");
+    expect(buildReport(rules, rightStyle).blockingFailures).toHaveLength(0);
+  });
+
+  it("is included in compileRubricFromOutputType's full compilation for OT-10 regardless of journalRequirements", () => {
+    const journal = catalog.getOrThrow("OT-10");
+    expect(compileRubricFromOutputType(journal).some((r) => r.id === "OT-10-citation-style-citation_style_exact")).toBe(true);
+    expect(compileRubricFromOutputType(journal, journalRequirements()).some((r) => r.id === "OT-10-citation-style-citation_style_exact")).toBe(true);
   });
 });

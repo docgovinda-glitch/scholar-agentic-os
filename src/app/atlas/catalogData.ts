@@ -1206,9 +1206,9 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
       ],
     },
     qualityGates: [
-      { id: "abstract_limit", description: "Abstract within the venue's word limit", severity: "blocking" },
-      { id: "declarations_present", description: "All required declarations present", severity: "blocking" },
-      { id: "citation_style_exact", description: "Reference style matches the venue exactly", severity: "blocking" },
+      { id: "abstract_limit", description: "Abstract within the venue's word limit", severity: "blocking", sectionWordLimitGate: { sectionKey: "abstract" } },
+      { id: "declarations_present", description: "All required declarations present", severity: "blocking", declarationsPresentGate: true },
+      { id: "citation_style_exact", description: "Reference style matches the venue exactly", severity: "blocking", citationStyleExactGate: true },
     ],
     workflowVariant: "venue_targeted",
     complianceProfile: "venue",

@@ -83,6 +83,18 @@ create table if not exists public.projects (
   -- Defaults to an empty history, same as claim_graph/evidence_ledger:
   -- always present, versioned — a round is appended, never overwritten.
   peer_review_history jsonb not null default '{"rounds":[]}'::jsonb,
+  -- The most recently generated cover letter (domain/coverLetter/types.ts).
+  -- Nullable, same "not yet captured" case as journal_requirements —
+  -- overwritten wholesale on each regeneration, no history kept.
+  cover_letter jsonb,
+  -- The most recent anonymization PROPOSAL report (domain/anonymization/
+  -- types.ts) — never auto-applied. Nullable, same "not yet run" case as
+  -- generation_job.
+  anonymization_report jsonb,
+  -- The anonymized document produced by applying a human-accepted subset of
+  -- anonymization_report's proposals. A separate column from document,
+  -- never overwrites it.
+  anonymized_document jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -136,6 +148,13 @@ alter table public.projects add column if not exists generation_job jsonb;
 -- no-awkward-backfill case as submissions/evidence_ledger: an existing
 -- project simply has no rounds yet, exactly what a new row already defaults to.
 alter table public.projects add column if not exists peer_review_history jsonb not null default '{"rounds":[]}'::jsonb;
+
+-- Migration for databases created before cover_letter/anonymization_report/
+-- anonymized_document existed. All three nullable, no default — same
+-- "not yet captured" case as journal_requirements/generation_job.
+alter table public.projects add column if not exists cover_letter jsonb;
+alter table public.projects add column if not exists anonymization_report jsonb;
+alter table public.projects add column if not exists anonymized_document jsonb;
 
 -- Deny-all baseline for anon/authenticated (see the note at the top of this
 -- file). FORCE additionally applies RLS to the table's owner; roles with

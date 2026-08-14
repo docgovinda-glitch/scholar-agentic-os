@@ -5,6 +5,7 @@ import {
   computeG3ExitCriteria,
   computeG5ExitCriteria,
   computeG6ExitCriteria,
+  computeG7ExitCriteria,
   intakeCompleteness,
   isSignoffStale,
   signOff,
@@ -294,6 +295,80 @@ describe("app/conductor: G6 bound to the Rubric", () => {
     });
     expect(criteria[0].blocking).toBe(false);
     expect(criteria[0].description).toContain("not yet automatically verified");
+  });
+});
+
+describe("app/conductor: G7 bound to export pre-flight and the Rubric", () => {
+  it("without a document, is unsatisfied and blocking", () => {
+    const criteria = computeG7ExitCriteria(undefined, undefined);
+    expect(criteria).toHaveLength(1);
+    expect(criteria[0].satisfied).toBe(false);
+    expect(criteria[0].blocking).toBe(true);
+  });
+
+  it("fails pre-flight for a document with no title and no content", () => {
+    const doc = { id: "d1", title: "", blocks: [] };
+    const criteria = computeG7ExitCriteria(doc, undefined);
+    const preflightCriterion = criteria.find((c) => c.id === "export-preflight-passes")!;
+    expect(preflightCriterion.satisfied).toBe(false);
+    expect(preflightCriterion.description).toContain("no title");
+  });
+
+  it("passes pre-flight for a real, non-empty document", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
+    let doc = emptyDocument("d1", "Test Assignment");
+    doc = appendBlock(doc, "title_page", "paragraph", "Title");
+    doc = appendBlock(doc, "introduction", "paragraph", words(150));
+    doc = appendBlock(doc, "body", "paragraph", words(900));
+    doc = appendBlock(doc, "conclusion", "paragraph", words(140));
+    doc = appendBlock(doc, "references", "paragraph", "Ref.");
+
+    const report = evaluateAgainstOutputType(assignment, doc);
+    const criteria = computeG7ExitCriteria(doc, report);
+    expect(criteria.find((c) => c.id === "export-preflight-passes")?.satisfied).toBe(true);
+    expect(criteria.find((c) => c.id === "export-compliance-clear")?.satisfied).toBe(true);
+  });
+
+  it("is unsatisfied on the compliance criterion while there are unresolved blocking Rubric findings", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const doc = emptyDocument("d1", "Test");
+    const withTitleBlock = { ...doc, blocks: [{ id: "b1", kind: "paragraph" as const, text: "Some content so pre-flight itself passes." }] };
+    const report = evaluateAgainstOutputType(assignment, withTitleBlock);
+    const criteria = computeG7ExitCriteria(withTitleBlock, report);
+    expect(criteria.find((c) => c.id === "export-compliance-clear")?.satisfied).toBe(false);
+  });
+
+  it("reports compliance as not yet satisfied, honestly, when no Rubric report has been computed", () => {
+    const doc = { id: "d1", title: "Test", blocks: [{ id: "b1", kind: "paragraph" as const, text: "Some content." }] };
+    const criteria = computeG7ExitCriteria(doc, undefined);
+    const complianceCriterion = criteria.find((c) => c.id === "export-compliance-clear")!;
+    expect(complianceCriterion.satisfied).toBe(false);
+    expect(complianceCriterion.description).toContain("not been evaluated");
+  });
+
+  it("end-to-end: G7 becomes ready once G6 is signed off and both criteria are satisfied", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
+    let doc = emptyDocument("d1", "Test");
+    doc = appendBlock(doc, "title_page", "paragraph", "Title");
+    doc = appendBlock(doc, "introduction", "paragraph", words(150));
+    doc = appendBlock(doc, "body", "paragraph", words(900));
+    doc = appendBlock(doc, "conclusion", "paragraph", words(140));
+    doc = appendBlock(doc, "references", "paragraph", "Ref.");
+    const report = evaluateAgainstOutputType(assignment, doc);
+
+    let project: ProjectGateState = initialProjectGateState("p1");
+    for (const gate of ["G0", "G1", "G2", "G3", "G4", "G5"] as const) {
+      project = updateExitCriteria(project, gate, [{ id: "x", description: "x", satisfied: true, blocking: true }]);
+      project = signOffGate(project, gate, "u", `hash-${gate}`);
+    }
+    project = updateExitCriteria(project, "G6", computeG6ExitCriteria(report));
+    project = signOffGate(project, "G6", "u", "hash-G6");
+    expect(project.gates.G7.entrySatisfied).toBe(true);
+
+    project = updateExitCriteria(project, "G7", computeG7ExitCriteria(doc, report));
+    expect(project.gates.G7.status).toBe("ready");
   });
 });
 

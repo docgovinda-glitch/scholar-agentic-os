@@ -3,7 +3,9 @@ import {
   StudioConsentRequiredError,
   StudioDeniedError,
   StudioNoAiSourceError,
+  generateCoverLetter as callGenerateCoverLetter,
   generateNextSection,
+  getCoverLetter,
   getManuscriptJob,
   getPeerReviewHistory,
   pauseManuscriptJob,
@@ -14,7 +16,7 @@ import {
 } from "../api";
 import { routeDecision } from "../aiAccess/aiAccessApi";
 import { readProviderKey } from "../../services/userAiSettings";
-import type { CoherenceDimension, GeneratedSection, GenerationJob, PeerReviewHistory, ReviewLens } from "../types";
+import type { CoherenceDimension, CoverLetter, GeneratedSection, GenerationJob, PeerReviewHistory, ReviewLens } from "../types";
 
 const DIMENSION_LABEL: Record<CoherenceDimension, string> = {
   terminology: "Terminology",
@@ -112,6 +114,13 @@ function runReview(projectId: string): Promise<PeerReviewHistory> {
   });
 }
 
+function runCoverLetter(projectId: string): Promise<CoverLetter> {
+  return walkRoutingCandidates(async (byok) => {
+    const { coverLetter } = await callGenerateCoverLetter({ projectId, ...byok });
+    return coverLetter;
+  });
+}
+
 export default function ManuscriptGenerationPanel({
   projectId,
   onOpenAiAccess,
@@ -132,6 +141,10 @@ export default function ManuscriptGenerationPanel({
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewNoAiSource, setReviewNoAiSource] = useState<string | null>(null);
+  const [coverLetter, setCoverLetter] = useState<CoverLetter | null>(null);
+  const [coverLetterBusy, setCoverLetterBusy] = useState(false);
+  const [coverLetterError, setCoverLetterError] = useState<string | null>(null);
+  const [coverLetterNoAiSource, setCoverLetterNoAiSource] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,10 +157,33 @@ export default function ManuscriptGenerationPanel({
     getPeerReviewHistory(projectId)
       .then((h) => !cancelled && setReviewHistory(h))
       .catch(() => !cancelled && setReviewHistory({ rounds: [] }));
+    // Best-effort, same convention as the peer review history load above —
+    // a failed fetch just means the cover letter section starts as if none
+    // had been generated yet.
+    getCoverLetter(projectId)
+      .then((c) => !cancelled && setCoverLetter(c))
+      .catch(() => !cancelled && setCoverLetter(null));
     return () => {
       cancelled = true;
     };
   }, [projectId]);
+
+  async function handleGenerateCoverLetter() {
+    setCoverLetterBusy(true);
+    setCoverLetterError(null);
+    setCoverLetterNoAiSource(null);
+    try {
+      setCoverLetter(await runCoverLetter(projectId));
+    } catch (e) {
+      if (e instanceof StudioNoAiSourceError) {
+        setCoverLetterNoAiSource(e.message);
+      } else {
+        setCoverLetterError((e as Error).message);
+      }
+    } finally {
+      setCoverLetterBusy(false);
+    }
+  }
 
   async function handleRunReview() {
     setReviewBusy(true);
@@ -430,6 +466,46 @@ export default function ManuscriptGenerationPanel({
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {job.state === "completed" && (
+        <div className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium text-[color:var(--text-primary)]">Cover letter</h4>
+            <button
+              type="button"
+              onClick={handleGenerateCoverLetter}
+              disabled={coverLetterBusy}
+              className="rounded border border-[color:var(--border-default)] px-2 py-1 text-xs font-medium hover:border-[color:var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
+            >
+              {coverLetterBusy ? "Drafting…" : coverLetter ? "Regenerate" : "Draft cover letter"}
+            </button>
+          </div>
+          {coverLetterError && <p role="alert" className="mt-2 text-xs text-[color:var(--state-danger)]">{coverLetterError}</p>}
+          {coverLetterNoAiSource && (
+            <div role="alert" className="mt-2 rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] p-3">
+              <p className="text-sm text-[color:var(--text-primary)]">Scholar Core needs at least one connected AI model to continue this stage.</p>
+              <p className="mt-1 text-xs text-[color:var(--text-secondary)]">{coverLetterNoAiSource}</p>
+              {onOpenAiAccess && (
+                <button
+                  type="button"
+                  onClick={onOpenAiAccess}
+                  className="mt-2 rounded-[var(--radius-md)] border border-[color:var(--border-default)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:border-[color:var(--border-strong)] cursor-pointer"
+                >
+                  Configure AI Access
+                </button>
+              )}
+            </div>
+          )}
+          {coverLetter && (
+            <div className="mt-2">
+              <p className="text-xs text-[color:var(--text-muted)]">
+                For {coverLetter.journalName} · {new Date(coverLetter.generatedAt).toLocaleString()}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-[color:var(--text-primary)]">{coverLetter.text}</p>
             </div>
           )}
         </div>

@@ -279,6 +279,13 @@ export interface PeerReviewHistory {
   rounds: ReviewRound[];
 }
 
+/** Mirrors src/domain/coverLetter/types.ts. */
+export interface CoverLetter {
+  text: string;
+  journalName: string;
+  generatedAt: string;
+}
+
 export interface StudioRefineResult {
   diff: RefinementDiff;
   voiceDrift?: VoiceDriftReport;
