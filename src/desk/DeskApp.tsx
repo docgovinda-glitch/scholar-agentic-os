@@ -1,8 +1,19 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams, useOutletContext } from "react-router-dom";
 import AccountSettingsScreen from "./account/AccountSettingsScreen";
 import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
-import DeskAuthGate from "./DeskAuthGate";
-import DeskShell from "./DeskShell";
+import { RequireAuth, PublicOnly, RequireRecovery } from "./DeskAuthGate";
+import {
+  LandingRoute,
+  SignInRoute,
+  SignUpRoute,
+  ForgotRoute,
+  RecoverRoute,
+  RegisteredRoute,
+  ResendVerificationRoute,
+  VerifyEmailRoute,
+} from "./auth/AuthFlow";
+import DeskShell, { type DeskShellView } from "./DeskShell";
 import ProjectListScreen from "./ProjectListScreen";
 import VaultSetupScreen from "./setup/VaultSetupScreen";
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
@@ -12,54 +23,49 @@ import VaultScreen from "./vault/VaultScreen";
 import DeskPocketMount from "./pocket/DeskPocketMount";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 
-function readProjectIdFromUrl(): string | null {
-  return new URLSearchParams(window.location.search).get("project");
+const SECTION_IDS: readonly SectionId[] = ["overview", "local", "free", "byok", "premium", "models", "settings"];
+
+function isSectionId(value: string | undefined): value is SectionId {
+  return SECTION_IDS.includes(value as SectionId);
+}
+
+const DESK_SHELL_VIEWS: readonly DeskShellView[] = ["intake", "document", "evidence", "progress", "submissions"];
+
+function isDeskShellView(value: string | undefined): value is DeskShellView {
+  return DESK_SHELL_VIEWS.includes(value as DeskShellView);
+}
+
+/** Where to return to when closing Settings/Vault/AI Access — passed as router state on the way in, since these overlays aren't meant to grow their own history entries. */
+interface CameFrom {
+  from?: string;
+}
+
+function returnTo(location: ReturnType<typeof useLocation>): string {
+  return (location.state as CameFrom | null)?.from ?? "/projects";
+}
+
+interface OnboardingContext {
+  /** True for exactly the render right after onboarding finished — see OnboardingGate's doc comment. */
+  justFinishedOnboarding: boolean;
+  clearJustFinishedOnboarding: () => void;
 }
 
 /**
- * Entry point for Desk — the client the product is consolidating onto
- * (docs 20/21/22).
- *
- * Two things changed when Desk was promoted from an orphaned demo to the
- * client that will replace src/App.tsx:
- *
- *  1. It renders behind DeskAuthGate. It previously mounted outside any auth
- *     provider, against endpoints that required none.
- *  2. Its entry surface is the user's own project list, not a bare create
- *     form. Reaching a project used to mean already knowing its id.
- *
- * Still no router library: Desk has two states — list and project — keyed off
- * one `?project=` param. `popstate` is handled so Back works, which was the
- * real gap; a router earns its place when there is a third destination.
+ * The forced interstitials between sign-in and the workspace (docs 25 §1):
+ * Login -> AI Access (if never configured) -> Knowledge Vault (offered once)
+ * -> everything else. Deliberately not routes of their own (see the plan's
+ * "left as state" list) — whatever URL under RequireAuth the visitor is
+ * headed to, these gate it exactly the same way DeskRoutes' early returns
+ * used to, before any of /projects, /settings, /vault, /ai-access existed as
+ * real destinations.
  */
-function DeskRoutes() {
+function OnboardingGate() {
   const session = useDeskSession();
   const userId = session.status === "signed-in" ? session.userId : null;
-  const device = useDeviceClass();
   const aiSetup = useAiSetupStatus(userId);
   // Gated on AI setup being finished so the two stages cannot render at once,
   // and so the Vault query does not run before it is reachable.
   const vaultSetup = useVaultSetupStatus(userId, aiSetup.status === "ready");
-  const [projectId, setProjectId] = useState<string | null>(readProjectIdFromUrl);
-  /**
-   * Revisiting Account Settings (profile/account fields — never AI
-   * configuration, see AccountSettingsScreen's own header comment). Not
-   * URL-addressed like `?project=` — there is nothing here worth bookmarking
-   * or reaching with Back, and closing it should return to exactly whatever
-   * was already on screen (list or project) rather than navigating anywhere.
-   */
-  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
-  /** Same reasoning as accountSettingsOpen — not URL-addressed, returns to exactly what was already on screen. */
-  const [vaultOpen, setVaultOpen] = useState(false);
-  /**
-   * Revisiting AI Access (Section 20) after onboarding — the SAME page the
-   * "needed" branch below renders for a first-time user, just in "manage"
-   * mode instead of "onboarding" mode. One page, one connection model, two
-   * entry points.
-   */
-  const [aiAccessOpen, setAiAccessOpen] = useState(false);
-  /** Which AiAccessPage section to land on next open — "premium" when reached via Account Settings' "Upgrade to Premium" / "Manage Premium Plan" button, "overview" otherwise. */
-  const [aiAccessSection, setAiAccessSection] = useState<SectionId>("overview");
   /**
    * Section 11: true for exactly the one transition out of the Knowledge
    * Vault stage (declined or completed) — Knowledge is always the last
@@ -70,38 +76,6 @@ function DeskRoutes() {
    */
   const [justFinishedOnboarding, setJustFinishedOnboarding] = useState(false);
 
-  // Keep component state and the URL in step when the user presses Back or
-  // Forward. Without this, going back from a project left the URL on the list
-  // while the shell stayed mounted.
-  useEffect(() => {
-    const onPopState = () => setProjectId(readProjectIdFromUrl());
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-
-  function open(id: string) {
-    const url = new URL(window.location.href);
-    url.searchParams.set("project", id);
-    window.history.pushState({}, "", url);
-    setProjectId(id);
-  }
-
-  function close() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("project");
-    window.history.pushState({}, "", url);
-    setProjectId(null);
-  }
-
-  // AI Access sits between signing in and the workspace (docs 25 §1):
-  // Login -> AI Access -> Knowledge Vault (optional) -> Workshop. It is
-  // skippable: skipping leaves the editor fully usable with the AI features
-  // inert, which is a real choice rather than a broken state. This is the
-  // SAME AiAccessPage the "AI Access" nav item opens later — "onboarding"
-  // mode only changes the header (Skip/Continue instead of Close) and adds
-  // the progress strip; the connection data and every section are identical,
-  // so there is exactly one AI-configuration surface, not two that could
-  // drift apart.
   if (aiSetup.status === "checking") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)]">
@@ -130,76 +104,162 @@ function DeskRoutes() {
     );
   }
 
-  // Account Settings (profile/account fields, never AI configuration) —
-  // full-screen overlay, same treatment as Vault/AI Access below.
-  if (accountSettingsOpen) {
-    return (
-      <AccountSettingsScreen
-        onClose={() => setAccountSettingsOpen(false)}
-        onManagePremium={() => {
-          setAiAccessSection("premium");
-          setAccountSettingsOpen(false);
-          setAiAccessOpen(true);
-        }}
-      />
-    );
-  }
+  const context: OnboardingContext = {
+    justFinishedOnboarding,
+    clearJustFinishedOnboarding: () => setJustFinishedOnboarding(false),
+  };
+  return <Outlet context={context} />;
+}
 
-  // AI Access (Section 20), revisited — "manage" mode (the default): every
-  // provider/model/Premium control a user needs, reached from the nav item
-  // rather than the onboarding gate above.
-  if (aiAccessOpen) {
-    return (
-      <AiAccessPage
-        onClose={() => setAiAccessOpen(false)}
-        initialSection={aiAccessSection}
-      />
-    );
-  }
+/**
+ * Pocket (docs 23) is a deliberately narrower companion — Approve/Read/Ask/
+ * Know, not a mobile port of intake forms or the editor — so it replaces the
+ * whole mobile experience (list and open project alike) rather than nesting
+ * inside DeskShell's desktop layout. Its own project-switching UI
+ * (ProjectsTab) stays local state, same as before this migration — only the
+ * outer list/project boundary now comes from the URL, the same one Desktop
+ * uses, rather than a separately-read source.
+ */
+function ProjectsIndexRoute() {
+  const navigate = useNavigate();
+  const session = useDeskSession();
+  const device = useDeviceClass();
+  const { justFinishedOnboarding, clearJustFinishedOnboarding } = useOutletContext<OnboardingContext>();
 
-  // A Vault is "your long-term library... across future projects" (docs 25
-  // §6.2) — a peer destination to a project, not something folded inside
-  // one, the same reasoning that already moved AI settings off PaperProject.
-  if (vaultOpen && userId) {
-    return <VaultScreen userId={userId} onClose={() => setVaultOpen(false)} />;
-  }
+  if (device.isMobile) return <DeskPocketMount projectId={null} />;
 
-  // Pocket (docs 23) is a deliberately narrower companion — Approve/Read/Ask/
-  // Know, not a mobile port of intake forms or the editor — so it replaces
-  // the whole mobile experience (list and open project alike) rather than
-  // nesting inside DeskShell's desktop layout.
-  if (device.isMobile) {
-    return <DeskPocketMount projectId={projectId} />;
-  }
-
-  if (!projectId) {
-    return (
-      <ProjectListScreen
-        onOpen={open}
-        userEmail={session.status === "signed-in" ? session.email : null}
-        onOpenAccountSettings={() => setAccountSettingsOpen(true)}
-        onOpenVault={() => setVaultOpen(true)}
-        onOpenAiAccess={() => setAiAccessOpen(true)}
-        showWelcome={justFinishedOnboarding}
-        onWelcomeSeen={() => setJustFinishedOnboarding(false)}
-      />
-    );
-  }
   return (
-    <DeskShell
-      projectId={projectId}
-      onClose={close}
-      onOpenAccountSettings={() => setAccountSettingsOpen(true)}
-      onOpenVault={() => setVaultOpen(true)}
-      onOpenAiAccess={() => setAiAccessOpen(true)}
+    <ProjectListScreen
+      onOpen={(id) => navigate(`/projects/${id}`)}
+      userEmail={session.status === "signed-in" ? session.email : null}
+      onOpenAccountSettings={() => navigate("/settings", { state: { from: "/projects" } })}
+      onOpenVault={() => navigate("/vault", { state: { from: "/projects" } })}
+      onOpenAiAccess={() => navigate("/ai-access", { state: { from: "/projects" } })}
+      showWelcome={justFinishedOnboarding}
+      onWelcomeSeen={clearJustFinishedOnboarding}
     />
   );
 }
 
+function ProjectRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const device = useDeviceClass();
+  const { projectId, view } = useParams<{ projectId: string; view?: string }>();
+  // Stable across renders unless projectId itself changes — DeskShell's
+  // load() takes a dependency on this, and a fresh identity every render
+  // would re-trigger its project fetch on every unrelated re-render.
+  const onViewChange = useCallback(
+    (next: DeskShellView, options?: { replace?: boolean }) => {
+      navigate(`/projects/${projectId}/${next}`, options);
+    },
+    [navigate, projectId]
+  );
+  // Guaranteed by the route pattern (":projectId" only matches with a value)
+  // — this is TypeScript narrowing, not a real fallback path.
+  if (!projectId) return <Navigate to="/projects" replace />;
+
+  if (device.isMobile) return <DeskPocketMount projectId={projectId} />;
+
+  return (
+    <DeskShell
+      projectId={projectId}
+      view={isDeskShellView(view) ? view : null}
+      onViewChange={onViewChange}
+      onClose={() => navigate("/projects")}
+      onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+      onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
+      onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
+    />
+  );
+}
+
+/** Profile/account fields — never AI configuration, see AccountSettingsScreen's own header comment. Not URL-addressed like a project — there is nothing here worth bookmarking or reaching with Back on its own, so closing it returns to wherever it was opened from, not to a fixed destination. */
+function SettingsRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  return (
+    <AccountSettingsScreen
+      onClose={() => navigate(returnTo(location))}
+      onManagePremium={() => navigate("/ai-access/premium", { replace: true })}
+    />
+  );
+}
+
+/** A Vault is "your long-term library... across future projects" (docs 25 §6.2) — a peer destination to a project, not something folded inside one. */
+function VaultRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const session = useDeskSession();
+  const userId = session.status === "signed-in" ? session.userId : null;
+  // Guaranteed by RequireAuth (this only renders signed-in) — narrowing only.
+  if (!userId) return null;
+  return <VaultScreen userId={userId} onClose={() => navigate(returnTo(location))} />;
+}
+
+/**
+ * AI Access (Section 20), revisited — "manage" mode (the default): every
+ * provider/model/Premium control a user needs, reached from a nav item
+ * rather than the onboarding gate in OnboardingGate. The SAME page that gate
+ * renders for a first-time user, just in "manage" instead of "onboarding"
+ * mode, so there is exactly one AI-configuration surface, not two that could
+ * drift apart.
+ */
+function AiAccessRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { section } = useParams<{ section?: string }>();
+  const activeSection = isSectionId(section) ? section : "overview";
+  return (
+    <AiAccessPage
+      onClose={() => navigate(returnTo(location))}
+      section={activeSection}
+      onSectionChange={(next) => navigate(next === "overview" ? "/ai-access" : `/ai-access/${next}`)}
+    />
+  );
+}
+
+/**
+ * Root route tree for everything except /admin/* (see main.tsx).
+ *
+ * Every screen Desk can show now has its own URL — Back/Forward/refresh/
+ * direct-link all work the way they would for any other web app. The public
+ * auth routes fix the originally reported bug (clicking "Get Started" used
+ * to change only in-memory state, invisible to Back/Forward/refresh); the
+ * authenticated ones below (project list, an open project, Settings, Vault,
+ * AI Access) retire the old `?project=` query param + manual pushState/
+ * popstate scheme in favor of real nested routes.
+ */
 export default function DeskApp() {
   return (
-    <DeskAuthGate>
-      <DeskRoutes />
-    </DeskAuthGate>
+    <Routes>
+      <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
+      <Route path="/signin" element={<PublicOnly><SignInRoute /></PublicOnly>} />
+      <Route path="/signup" element={<PublicOnly><SignUpRoute /></PublicOnly>} />
+      <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />
+      <Route path="/signup/resend" element={<PublicOnly><ResendVerificationRoute /></PublicOnly>} />
+      <Route path="/reset-password" element={<PublicOnly><ForgotRoute /></PublicOnly>} />
+      <Route
+        path="/reset-password/confirm"
+        element={
+          <RequireRecovery>
+            <RecoverRoute />
+          </RequireRecovery>
+        }
+      />
+      <Route path="/verify-email" element={<VerifyEmailRoute />} />
+      <Route path="/*" element={<RequireAuth />}>
+        <Route element={<OnboardingGate />}>
+          <Route path="projects" element={<ProjectsIndexRoute />} />
+          <Route path="projects/:projectId" element={<ProjectRoute />} />
+          <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
+          <Route path="settings" element={<SettingsRoute />} />
+          <Route path="vault" element={<VaultRoute />} />
+          <Route path="ai-access" element={<AiAccessRoute />} />
+          <Route path="ai-access/:section" element={<AiAccessRoute />} />
+          <Route path="*" element={<Navigate to="/projects" replace />} />
+        </Route>
+      </Route>
+    </Routes>
   );
 }

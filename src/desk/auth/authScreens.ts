@@ -8,30 +8,6 @@ import {
 import { DEFAULT_COUNTRY_ISO2, e164Problem, findCountry } from "../../config/countries";
 
 /**
- * The states Desk's unauthenticated surface can be in.
- *
- * Kept as data rather than scattered booleans because these are genuinely
- * exclusive — a user is on exactly one of them — and because one is reached
- * by an event rather than by clicking: "recover" is entered when Supabase parses
- * a recovery link out of the URL.
- */
-export type AuthScreen =
-  | "landing"
-  /** Initial landing page explaining Scholar Core. */
-  | "sign-in"
-  | "sign-up"
-  /** Requesting a reset email. */
-  | "forgot"
-  /** Setting a new password inside a recovery session. */
-  | "recover"
-  /** Registration submitted; email verification is on its way. */
-  | "registered"
-  /** Email verification link was clicked; email is now verified. */
-  | "email-verification-success"
-  /** Resending verification email. */
-  | "resend-verification";
-
-/**
  * Password rule, applied at the form so the failure is immediate rather than a
  * round trip. Supabase enforces its own minimum server-side; this must not be
  * weaker than that, and 8 is Supabase's default.

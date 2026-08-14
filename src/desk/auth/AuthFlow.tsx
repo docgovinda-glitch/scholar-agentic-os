@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
+import { Navigate, useNavigate, useLocation, type Location } from "react-router-dom";
 import {
-  onPasswordRecovery,
   sendPasswordResetEmail,
   signIn,
   signUp,
@@ -10,6 +10,8 @@ import {
   checkEmailAvailable,
   checkPhoneAvailable,
 } from "../../services/supabaseAuthService";
+import { useDeskSession } from "../useDeskSession";
+import { SessionBoundaryFallback } from "../DeskAuthGate";
 import CaptchaWidget from "./CaptchaWidget";
 import {
   AuthError,
@@ -28,7 +30,6 @@ import {
   SIGN_UP_FIELDS,
   passwordProblem,
   signUpProblem,
-  type AuthScreen,
   type SignUpFields,
 } from "./authScreens";
 import { EDUCATION_LEVELS, USER_TYPES, usernameProblem, emailProblem } from "../../config/accountSchema";
@@ -46,71 +47,119 @@ import ScholarCoreLanding from "../ScholarCoreLanding";
  * would reintroduce bugs someone already paid for. This file is screens only.
  *
  * Nothing here signs anyone in by itself. `useDeskSession` is subscribed to
- * Supabase's auth state and swaps the whole gate out when a session appears,
- * so a successful sign-in needs no navigation of its own — pushing a route
- * here would race that subscription.
+ * Supabase's auth state; a successful sign-in needs no navigation of its
+ * own here — PublicOnly (DeskAuthGate.tsx) is what notices the session flip
+ * to "signed-in" and redirects away, following ?redirect= if one is present.
+ *
+ * Each screen below used to be one branch of a single-component switch,
+ * reached only by changing in-memory state — the exact reason Back could
+ * skip the whole flow in one step (no URL ever changed). Each is now its own
+ * named export, mounted at its own route in DeskApp.tsx; the screens'
+ * internals (form state, validation, the actual signIn()/signUp() calls)
+ * are unchanged from before this file was split — only what supplies their
+ * navigation callbacks changed, from setScreen(...) to useNavigate().
  */
-export default function AuthFlow({
-  initialScreen = "landing",
-  verifiedEmail,
-  onEmailVerificationAcknowledged,
-}: {
-  initialScreen?: AuthScreen;
-  verifiedEmail?: string | null;
-  /**
-   * Called when the user dismisses the email-verification success screen.
-   * They already hold a valid session at that point (Supabase auto-signs in
-   * on verification) — this tells useDeskSession to drop its "email-verified"
-   * status back to "signed-in" so DeskAuthGate renders the real app, rather
-   * than making them re-enter credentials for a session they already have.
-   */
-  onEmailVerificationAcknowledged?: () => void;
-} = {}) {
-  const [screen, setScreen] = useState<AuthScreen>(initialScreen);
-  const [registeredEmail, setRegisteredEmail] = useState<string>("");
 
-  // Belt-and-suspenders: useDeskSession is the authoritative recovery-link
-  // detector now (it runs first, before this component even mounts, and
-  // passes the result down as `initialScreen`) — by the time this effect
-  // could run, Supabase has typically already consumed the one-time
-  // PASSWORD_RECOVERY event and stripped the URL's token fragment, so this
-  // rarely fires on its own. Left in case a recovery event ever arrives
-  // while this screen is already mounted rather than on a fresh page load.
-  useEffect(() => onPasswordRecovery(() => setScreen("recover")), []);
+function passedEmail(location: Location): string {
+  const state = location.state as { email?: string } | null;
+  return state?.email ?? "";
+}
 
-  switch (screen) {
-    case "landing":
-      return (
-        <ScholarCoreLanding
-          onGetStarted={() => setScreen("sign-up")}
-          onSignIn={() => setScreen("sign-in")}
-        />
-      );
-    case "sign-up":
-      return <SignUpScreen onDone={(email) => { setRegisteredEmail(email); setScreen("registered"); }} onBack={() => setScreen("sign-in")} />;
-    case "forgot":
-      return <ForgotScreen onBack={() => setScreen("sign-in")} />;
-    case "recover":
-      return <RecoverScreen onDone={() => setScreen("sign-in")} />;
-    case "registered":
-      return <RegisteredScreen email={registeredEmail} onBack={() => setScreen("sign-in")} onResend={() => setScreen("resend-verification")} />;
-    case "resend-verification":
-      return <ResendVerificationScreen email={registeredEmail} onBack={() => setScreen("registered")} />;
-    case "email-verification-success":
-      return (
-        <EmailVerificationSuccessScreen
-          email={verifiedEmail}
-          onContinue={onEmailVerificationAcknowledged ?? (() => setScreen("sign-in"))}
-        />
-      );
-    default:
-      return (
-        <SignInScreen
-          onRegister={() => setScreen("sign-up")}
-          onForgot={() => setScreen("forgot")}
-        />
-      );
+export function LandingRoute() {
+  const navigate = useNavigate();
+  return (
+    <ScholarCoreLanding
+      onGetStarted={() => navigate("/signup")}
+      onSignIn={() => navigate("/signin")}
+    />
+  );
+}
+
+export function SignInRoute() {
+  const navigate = useNavigate();
+  return (
+    <SignInScreen
+      onRegister={() => navigate("/signup")}
+      onForgot={() => navigate("/reset-password")}
+    />
+  );
+}
+
+export function SignUpRoute() {
+  const navigate = useNavigate();
+  return (
+    <SignUpScreen
+      onDone={(email) => navigate("/signup/check-email", { state: { email } })}
+      onBack={() => navigate("/signin")}
+    />
+  );
+}
+
+export function ForgotRoute() {
+  const navigate = useNavigate();
+  return <ForgotScreen onBack={() => navigate("/signin")} />;
+}
+
+/** /reset-password/confirm — only ever rendered while RequireRecovery confirms session.status === "recovery". */
+export function RecoverRoute() {
+  const navigate = useNavigate();
+  // Explicit navigation rather than relying purely on RequireRecovery's own
+  // redirect-once-status-changes: updatePassword() succeeding and
+  // useDeskSession's status actually flipping away from "recovery" are two
+  // separate async steps, and this keeps the same "always land on sign-in
+  // after a completed reset" behavior the screen already had, without a race
+  // where the guard hasn't re-evaluated yet.
+  return <RecoverScreen onDone={() => navigate("/signin", { replace: true })} />;
+}
+
+export function RegisteredRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const email = passedEmail(location);
+  return (
+    <RegisteredScreen
+      email={email}
+      onBack={() => navigate("/signin")}
+      onResend={() => navigate("/signup/resend", { state: { email } })}
+    />
+  );
+}
+
+export function ResendVerificationRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const email = passedEmail(location);
+  return <ResendVerificationScreen email={email} onBack={() => navigate("/signup/check-email", { state: { email } })} />;
+}
+
+/**
+ * /verify-email — self-guarding, like RequireAuth/PublicOnly/RequireRecovery
+ * in DeskAuthGate.tsx, but kept here rather than made a fourth generic
+ * wrapper there: it needs session.email and session.acknowledge() directly,
+ * not just a status check, so folding it into a "children" wrapper would
+ * just push those same reads back out to this file anyway.
+ */
+export function VerifyEmailRoute() {
+  const navigate = useNavigate();
+  const session = useDeskSession();
+
+  if (session.status === "loading") return <SessionBoundaryFallback status="loading" />;
+  if (session.status === "unconfigured") return <SessionBoundaryFallback status="unconfigured" />;
+  if (session.status !== "email-verified") {
+    return <Navigate to={session.status === "signed-in" ? "/projects" : "/signin"} replace />;
   }
+
+  function handleContinue() {
+    // Re-checked here rather than trusting the guard clause above: TypeScript
+    // does not carry that narrowing into a closure handed off as an event
+    // handler.
+    if (session.status === "email-verified") session.acknowledge();
+    // Explicit navigation rather than relying purely on this guard
+    // re-rendering after the status flips — same reasoning as RecoverRoute.
+    navigate("/projects", { replace: true });
+  }
+
+  return <EmailVerificationSuccessScreen email={session.email} onContinue={handleContinue} />;
 }
 
 function SignInScreen({
@@ -132,7 +181,7 @@ function SignInScreen({
     setError(null);
     try {
       const result = await signIn({ username: username.trim(), password, captchaToken: captchaToken || undefined });
-      if (result.success) return; // useDeskSession takes over from here.
+      if (result.success) return; // useDeskSession flips to "signed-in"; PublicOnly (DeskAuthGate.tsx) notices and navigates away.
 
       setError(result.error ?? "Could not sign you in.");
     } catch (e) {

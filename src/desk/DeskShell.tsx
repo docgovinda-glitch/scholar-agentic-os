@@ -13,6 +13,8 @@ import { useDeskSession } from "./useDeskSession";
 import StatusBar from "./regions/StatusBar";
 import type { CanonicalDocument, OutputTypeSummary, ProjectView, RubricReport } from "./types";
 
+export type DeskShellView = "intake" | "document" | "evidence" | "progress" | "submissions";
+
 /**
  * Region shell (docs 22 §2): Header / Rail / Primary / Aside / Status. The
  * Tray (Agents/Findings/Activity, docs 22 §3) isn't built in this first
@@ -23,12 +25,24 @@ import type { CanonicalDocument, OutputTypeSummary, ProjectView, RubricReport } 
  */
 export default function DeskShell({
   projectId,
+  view,
+  onViewChange,
   onClose,
   onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
 }: {
   projectId: string;
+  /**
+   * Which of the 5 in-project tabs is showing, driven by the URL
+   * (/projects/:projectId/:view) so each is directly linkable and
+   * Back/Forward move between them — DeskShell no longer owns this as local
+   * state. `null` means the URL didn't say (a bare /projects/:projectId
+   * link), so load() below decides once the project arrives and hands the
+   * decision back via onViewChange rather than picking silently.
+   */
+  view: DeskShellView | null;
+  onViewChange: (view: DeskShellView, options?: { replace?: boolean }) => void;
   onClose?: () => void;
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
@@ -41,24 +55,20 @@ export default function DeskShell({
   const [outputType, setOutputType] = useState<OutputTypeSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  /**
-   * Which of the two working surfaces is showing.
-   *
-   * Defaults to intake, and switches to the document once G0 is satisfied —
-   * because intake is genuinely the first task, and G0 gates every later gate.
-   * `null` means "not yet decided", so the choice is made from the loaded
-   * project rather than flashing the wrong surface first.
-   */
-  const [view, setView] = useState<"intake" | "document" | "evidence" | "progress" | "submissions" | null>(null);
 
   const load = useCallback(async () => {
     try {
       const [proj, rub, types] = await Promise.all([getProject(projectId), getRubric(projectId), listOutputTypes()]);
       setProject(proj);
-      // Land on whichever surface has the outstanding work. Only decided once,
-      // on load — re-deciding on every project update would yank the user out
-      // of intake the moment their last answer landed.
-      setView((current) => current ?? (proj.gates.find((g) => g.gate === "G0")?.status === "signed_off" ? "document" : "intake"));
+      // Land on whichever surface has the outstanding work — but only when
+      // the URL didn't already say. Reads `view` from this closure rather
+      // than as a dependency: load() itself only ever runs once per project
+      // (see the mount effect below), at which point `view` is exactly
+      // whatever the URL said on arrival; a later tab switch changes the
+      // `view` prop without re-running this decision.
+      if (view === null) {
+        onViewChange(proj.gates.find((g) => g.gate === "G0")?.status === "signed_off" ? "document" : "intake", { replace: true });
+      }
       setRubric(rub);
       setOutputType(types.items.find((t) => t.id === proj.outputTypeId) ?? null);
     } catch (e) {
@@ -68,7 +78,8 @@ export default function DeskShell({
           : (e as Error).message
       );
     }
-  }, [projectId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `view` deliberately excluded, see the comment above.
+  }, [projectId, onViewChange]);
 
   useEffect(() => {
     load();
@@ -139,7 +150,7 @@ export default function DeskShell({
           <button
             key={v}
             type="button"
-            onClick={() => setView(v)}
+            onClick={() => onViewChange(v)}
             aria-current={view === v ? "page" : undefined}
             className={[
               "-mb-px border-b-2 px-3 py-2 text-sm transition-colors duration-[var(--motion-fast)] cursor-pointer",

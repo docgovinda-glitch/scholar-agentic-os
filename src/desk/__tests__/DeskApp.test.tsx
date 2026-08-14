@@ -9,10 +9,24 @@
 // is tested in DeskAuthGate.test.tsx, and the server-side enforcement that
 // actually protects the data is in server/routes/__tests__/project.authz.test.ts.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import { BrowserRouter } from "react-router-dom";
 import DeskApp from "../DeskApp";
+
+// DeskApp renders a <Routes> tree — it needs a real Router ancestor, same as
+// it gets from main.tsx in production. BrowserRouter, not MemoryRouter: these
+// tests set up their starting scene with window.history.pushState() directly
+// (e.g. landing on an already-open project), so the router's notion of the
+// current URL has to be the same window.location these tests drive.
+function renderDeskApp() {
+  return render(
+    <BrowserRouter>
+      <DeskApp />
+    </BrowserRouter>
+  );
+}
 
 vi.mock("../useDeskSession", () => ({
   useDeskSession: () => ({ status: "signed-in", userId: "user-1", email: "scholar@example.com" }),
@@ -95,17 +109,25 @@ const projectView = (projectId: string, over: Record<string, unknown> = {}) => (
   ...over,
 });
 
+// Deterministic starting URL for every test, not just a leftover from the
+// previous one's afterEach — the first test in the file would otherwise start
+// at jsdom's default "/", which "/" now matches as an explicit PublicOnly
+// route and redirects away from before landing on the project list.
+beforeEach(() => {
+  window.history.pushState({}, "", "/projects");
+});
+
 afterEach(() => {
   global.fetch = originalFetch;
   cleanup();
-  window.history.pushState({}, "", "/desk");
+  window.history.pushState({}, "", "/projects");
 });
 
 describe("Desk — project list", () => {
   it("shows the empty state when the user has no projects yet", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText("No projects yet")).toBeInTheDocument();
   });
@@ -118,7 +140,7 @@ describe("Desk — project list", () => {
       { url: /\/api\/projects\/proj-abc\/rubric$/, body: {}, status: 404 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText(/50% of intake answered/)).toBeInTheDocument();
     fireEvent.click(screen.getByText("OT-06"));
@@ -127,7 +149,7 @@ describe("Desk — project list", () => {
     // real task, and it gates every later gate.
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
-    expect(window.location.search).toContain("project=proj-abc");
+    expect(window.location.pathname).toBe("/projects/proj-abc/document");
   });
 
   it("creates a project from a real output type and opens it", async () => {
@@ -139,7 +161,7 @@ describe("Desk — project list", () => {
       { url: /\/api\/projects\/proj-new\/rubric$/, body: {}, status: 404 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     fireEvent.click(await screen.findByText("Create your first project"));
     fireEvent.change(await screen.findByLabelText("Document type"), { target: { value: "OT-06" } });
@@ -147,13 +169,13 @@ describe("Desk — project list", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
-    expect(window.location.search).toContain("project=proj-new");
+    expect(window.location.pathname).toBe("/projects/proj-new/document");
   });
 });
 
 describe("Desk — project shell", () => {
   it("opens on Intake while G0 is outstanding — the first task gates the rest", async () => {
-    window.history.pushState({}, "", "/desk?project=proj-42");
+    window.history.pushState({}, "", "/projects/proj-42");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types\/OT-06$/, body: { id: "OT-06", label: "Journal Article", family: "article", intakeSchema: { required: [], recommended: [], optional: [] } } },
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
@@ -161,13 +183,39 @@ describe("Desk — project shell", () => {
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText(/About your journal article/i)).toBeInTheDocument();
   });
 
-  it("reads ?project= from the URL and renders that project directly", async () => {
-    window.history.pushState({}, "", "/desk?project=proj-42");
+  it("gives each tab its own URL, so Back steps back through tabs and refresh keeps you on the one you had open", async () => {
+    window.history.pushState({}, "", "/projects/proj-42");
+    mockFetchSequence([
+      { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
+      { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
+      { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
+    ]);
+
+    renderDeskApp();
+
+    // G0 isn't signed off in this fixture, so the shell auto-decides Intake
+    // and replaces the bare /projects/proj-42 URL with it — not a real
+    // navigation the user took, so it must not be a Back-able entry itself.
+    await waitFor(() => expect(window.location.pathname).toBe("/projects/proj-42/intake"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Document" }));
+    expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/projects/proj-42/document");
+
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe("/projects/proj-42/intake"));
+
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe("/projects"));
+  });
+
+  it("reads the project id from the URL and renders that project directly", async () => {
+    window.history.pushState({}, "", "/projects/proj-42");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       {
@@ -180,7 +228,7 @@ describe("Desk — project shell", () => {
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText("Journal Article")).toBeInTheDocument();
     expect(screen.getByText(/G0 Intake/)).toBeInTheDocument();
@@ -188,7 +236,7 @@ describe("Desk — project shell", () => {
   });
 
   it("submits pasted plain text as a document and shows real Compliance findings back", async () => {
-    window.history.pushState({}, "", "/desk?project=proj-7");
+    window.history.pushState({}, "", "/projects/proj-7");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       {
@@ -225,7 +273,7 @@ describe("Desk — project shell", () => {
       },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     const textarea = await screen.findByPlaceholderText(/Paste or type a draft/);
@@ -238,14 +286,14 @@ describe("Desk — project shell", () => {
   });
 
   it("shows an honest error with a route back, not a dead end, when the project fetch fails", async () => {
-    window.history.pushState({}, "", "/desk?project=missing");
+    window.history.pushState({}, "", "/projects/missing");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [] } },
       { url: /\/api\/projects\/missing\/rubric$/, body: {}, status: 404 },
       { url: /\/api\/projects\/missing$/, body: { error: 'No project "missing".' }, status: 404 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText('No project "missing".')).toBeInTheDocument();
     // A 404 here is also what another user's project looks like from outside,
@@ -254,14 +302,14 @@ describe("Desk — project shell", () => {
   });
 
   it("surfaces an expired session as a session problem, not a project error", async () => {
-    window.history.pushState({}, "", "/desk?project=proj-9");
+    window.history.pushState({}, "", "/projects/proj-9");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [] } },
       { url: /\/api\/projects\/proj-9\/rubric$/, body: {}, status: 401 },
       { url: /\/api\/projects\/proj-9$/, body: { error: "Invalid or expired token" }, status: 401 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText(/session has expired/i)).toBeInTheDocument();
   });
@@ -276,7 +324,7 @@ describe("Desk — project shell", () => {
 describe("Desk — account settings", () => {
   it("opens from the project list and returns to it", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
-    render(<DeskApp />);
+    renderDeskApp();
 
     fireEvent.click(await screen.findByRole("button", { name: /Account Settings/ }));
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
@@ -286,20 +334,22 @@ describe("Desk — account settings", () => {
   });
 
   it("opens from within a project and returns to it, not to the list", async () => {
-    window.history.pushState({}, "", "/desk?project=proj-42");
+    window.history.pushState({}, "", "/projects/proj-42");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
     ]);
-    render(<DeskApp />);
+    renderDeskApp();
 
     fireEvent.click(await screen.findByRole("button", { name: "Account Settings" }));
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(await screen.findByText("Journal Article")).toBeInTheDocument();
-    expect(window.location.search).toContain("project=proj-42");
+    // Not just the project — the exact tab it was opened from (Intake, here:
+    // G0 isn't signed off in this fixture, so that's the auto-decided tab).
+    expect(window.location.pathname).toBe("/projects/proj-42/intake");
   });
 });
 
@@ -309,14 +359,14 @@ describe("Desk — account settings", () => {
 describe("Desk — AI Access", () => {
   it("has no separate AI Settings nav item — AI Access is the only one", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
-    render(<DeskApp />);
+    renderDeskApp();
     await screen.findByRole("button", { name: /Manage AI/ });
     expect(screen.queryByRole("button", { name: /^AI Settings$/ })).not.toBeInTheDocument();
   });
 
   it("opens from the project list, in manage mode (no onboarding Skip/Continue), and returns to it", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
-    render(<DeskApp />);
+    renderDeskApp();
 
     fireEvent.click(await screen.findByRole("button", { name: /Manage AI/ }));
     expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
@@ -325,5 +375,22 @@ describe("Desk — AI Access", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(await screen.findByText("No projects yet")).toBeInTheDocument();
+  });
+
+  it("reflects the active section in the URL, so Back steps back through sections instead of leaving AI Access entirely", async () => {
+    mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
+    renderDeskApp();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Manage AI/ }));
+    await screen.findByRole("heading", { name: "AI Access" });
+    expect(window.location.pathname).toBe("/ai-access");
+
+    fireEvent.click(screen.getByRole("button", { name: "Local AI" }));
+    expect(await screen.findByRole("heading", { name: "Local AI" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/ai-access/local");
+
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe("/ai-access"));
+    expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
   });
 });

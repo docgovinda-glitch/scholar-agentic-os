@@ -109,6 +109,12 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
     password: input.password,
     options: {
       captchaToken: input.captchaToken,
+      // Sends the confirmation link to the app's own /verify-email route
+      // rather than the bare origin, so the URL itself (not just Supabase's
+      // type=signup query param) tells the app which screen to show — see
+      // useDeskSession.ts's isEmailVerificationUrl(), which still checks the
+      // param regardless of path, but the route now carries the meaning too.
+      emailRedirectTo: `${window.location.origin}/verify-email`,
       data: {
         username: input.username,
         full_name: input.fullName,
@@ -584,7 +590,12 @@ export async function sendPasswordResetEmail(email: string, captchaToken?: strin
   // /recover is covered by the same project-wide CAPTCHA setting as signup and
   // the password grant — see signIn()'s comment.
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin,
+    // Points at the app's own /reset-password/confirm route rather than the
+    // bare origin — Supabase's detectSessionInUrl parses its own type=
+    // recovery/token params from the query/hash regardless of path, so this
+    // is safe, and it means the URL itself (not just useDeskSession's type=
+    // sniffing) carries which screen to land on.
+    redirectTo: `${window.location.origin}/reset-password/confirm`,
     captchaToken,
   });
   if (error) {

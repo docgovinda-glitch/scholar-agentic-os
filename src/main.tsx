@@ -1,5 +1,6 @@
-import {StrictMode} from 'react';
-import {createRoot} from 'react-dom/client';
+import { StrictMode, lazy, Suspense } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import DeskApp from './desk/DeskApp.tsx';
 import './index.css';
 import { warmServer } from './services/serverWarmup';
@@ -15,9 +16,21 @@ import { warmServer } from './services/serverWarmup';
  *
  * /admin is the one other real destination: the Admin AI Infrastructure
  * panel's own dedicated page (src/admin/AdminApp.tsx), not a button
- * anywhere inside Desk — no user-facing link ever points at it. A router
- * library would be overkill for two possible roots; this is the same
- * lazy pathname check Desk itself used to live behind.
+ * anywhere inside Desk — no user-facing link ever points at it.
+ *
+ * A real router (react-router-dom) replaces what used to be a one-time,
+ * unlistened `window.location.pathname` check here — that worked for
+ * choosing between exactly two root trees, but every "page" inside each of
+ * those trees (the whole auth flow, Account Settings, AI Access, Vault, an
+ * open project, Admin's own tabs...) was still plain React state with no
+ * URL/History awareness, which is why Back could skip straight out of the
+ * app from the middle of, say, the signup flow. BrowserRouter here is the
+ * single routing mechanism for the whole app now — DeskApp and AdminApp
+ * both define their own nested <Routes> beneath the two top-level branches
+ * below, rather than each inventing separate navigation state.
+ *
+ * AdminApp's dynamic import() is preserved exactly (still its own code-split
+ * chunk) — only its trigger moved from an if/else to a <Route path="/admin/*">.
  */
 
 // Start waking the server before rendering, not after the first user action.
@@ -30,20 +43,26 @@ import { warmServer } from './services/serverWarmup';
 // to a state and never rejects, so nothing here can block or break rendering.
 void warmServer();
 
+const AdminApp = lazy(() => import('./admin/AdminApp.tsx'));
+
 const root = createRoot(document.getElementById('root')!);
 
-if (window.location.pathname.startsWith('/admin')) {
-  import('./admin/AdminApp.tsx').then(({ default: AdminApp }) => {
-    root.render(
-      <StrictMode>
-        <AdminApp />
-      </StrictMode>,
-    );
-  });
-} else {
-  root.render(
-    <StrictMode>
-      <DeskApp />
-    </StrictMode>,
-  );
-}
+root.render(
+  <StrictMode>
+    <BrowserRouter>
+      <Routes>
+        {/* fallback={null}: matches the prior behavior exactly — nothing
+            rendered until the lazy chunk resolves, not a spinner. */}
+        <Route
+          path="/admin/*"
+          element={
+            <Suspense fallback={null}>
+              <AdminApp />
+            </Suspense>
+          }
+        />
+        <Route path="/*" element={<DeskApp />} />
+      </Routes>
+    </BrowserRouter>
+  </StrictMode>,
+);

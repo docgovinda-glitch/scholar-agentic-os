@@ -120,6 +120,28 @@ describe("signUp", () => {
     expect(callArgs.options.data).not.toHaveProperty("authentic_id");
   });
 
+  it("sends the confirmation link to the app's own /verify-email route", async () => {
+    mockAuth.signUp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+
+    await signUp({
+      username: "jdoe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      phone: "5550100",
+      phoneCountryCode: "+1",
+      affiliation: "State University",
+      userType: "student",
+      educationLevel: "undergraduate",
+      password: "hunter2-hunter2",
+    });
+
+    expect(mockAuth.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({ emailRedirectTo: `${window.location.origin}/verify-email` }),
+      })
+    );
+  });
+
   it("allows affiliation to be sent as an empty string — Institution is optional", async () => {
     mockAuth.signUp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
 
@@ -475,7 +497,7 @@ describe("sendPasswordResetEmail", () => {
     const result = await sendPasswordResetEmail("jane@example.com");
     expect(result).toEqual({ success: true });
     expect(mockAuth.resetPasswordForEmail).toHaveBeenCalledWith("jane@example.com", {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/reset-password/confirm`,
     });
   });
 
