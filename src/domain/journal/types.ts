@@ -30,3 +30,36 @@ export interface JournalRequirements {
   capturedAt: string;
   capturedBy: string;
 }
+
+/**
+ * Minimum length of pasted author-guidelines text before AI extraction is
+ * even attempted. Asking a model to extract facts from too little text just
+ * invites it to fall back on generic academic-journal conventions instead
+ * of what this venue actually says — the "never invent requirements" rule
+ * has to hold at the input boundary, not just in the output.
+ */
+export const MIN_GUIDELINES_WORDS = 40;
+
+export function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * What AI extraction proposes from pasted/linked author-guidelines text —
+ * never saved directly as JournalRequirements (see that interface's own
+ * comment on `source`). Every field is either lifted from something the
+ * source text actually states or left absent; `unresolvedFields` names
+ * anything the extraction looked for but the text never stated, so the
+ * review UI can point out exactly what still needs the user's own judgement
+ * rather than silently leaving a gap they might not notice.
+ */
+export interface JournalRequirementsProposal {
+  journalName?: string;
+  wordLimit?: { min?: number; max?: number };
+  structureOverride?: string[];
+  citationStyle?: string;
+  requiredDeclarations: string[];
+  articleType?: string;
+  notes?: string;
+  unresolvedFields: string[];
+}

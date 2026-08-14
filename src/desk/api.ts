@@ -11,7 +11,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceConflict, InterventionLevel, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, SubmissionRecord, VoiceProfile } from "./types";
+import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceConflict, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, SubmissionRecord, VoiceProfile } from "./types";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -216,6 +216,25 @@ export function submitDocument(projectId: string, document: CanonicalDocument): 
   return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/document`, "PUT", { document }).then((r) => json(r));
 }
 
+/** Returns null (not an error) when no journal requirements have been captured yet — a normal, expected state before the first save. */
+export async function getJournalRequirements(projectId: string): Promise<JournalRequirements | null> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements`);
+  if (res.status === 404) return null;
+  return json<JournalRequirements>(res);
+}
+
+/**
+ * Save (or replace) the target journal's requirements. `source` defaults to
+ * "manual" server-side when omitted; pass "ai_extracted" only when this save
+ * follows a user-reviewed AI proposal from extractJournalRequirements().
+ */
+export function saveJournalRequirements(
+  projectId: string,
+  payload: Omit<JournalRequirements, "source" | "capturedAt" | "capturedBy"> & { source?: JournalRequirements["source"] }
+): Promise<{ journalRequirements: JournalRequirements; gates: ProjectView["gates"] }> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements`, "PUT", payload).then((r) => json(r));
+}
+
 /** Thrown when the Warden hasn't seen consent for this (session, provider) pair yet — recoverable by calling grantStudioConsent() then retrying. */
 export class StudioConsentRequiredError extends Error {
   readonly kind = "consent_required" as const;
@@ -281,6 +300,40 @@ export async function refinePassage(params: {
 
 export async function grantStudioConsent(sessionId: string, provider: string): Promise<void> {
   await authedJsonFetch("/api/studio/consent", "POST", { sessionId, provider }).then((r) => json(r));
+}
+
+/**
+ * Propose journal requirements from pasted author-guidelines text. Returns
+ * only a proposal for the caller to review — nothing is saved here; call
+ * saveJournalRequirements() with source: "ai_extracted" once the user
+ * confirms it. Same BYOK-vs-Premium shape and error-status mapping as
+ * refinePassage() above (428/403/402 map to the same three typed errors —
+ * their names are generic to any Warden/Premium-gated call, not
+ * Studio-specific, so this reuses them rather than defining duplicates).
+ */
+export async function extractJournalRequirements(params: {
+  projectId: string;
+  guidelinesText: string;
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  useEngine?: "premium";
+}): Promise<{ proposal: JournalRequirementsProposal }> {
+  const { projectId, ...requestBody } = params;
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements/extract`, "POST", requestBody);
+  if (res.status === 428) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioConsentRequiredError(errBody.reason || "Consent required.", errBody.provider);
+  }
+  if (res.status === 403) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioDeniedError(errBody.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
+  }
+  return json<{ proposal: JournalRequirementsProposal }>(res);
 }
 
 /** Every submission attempt recorded against the project, most-recent-first is the caller's job — the server returns them in storage order. */

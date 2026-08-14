@@ -125,6 +125,32 @@ export interface StudioAiSource {
   creditsUsed: number;
 }
 
+/** Mirrors src/domain/journal/types.ts's JournalRequirements. */
+export interface JournalRequirements {
+  journalName: string;
+  source: "manual" | "ai_extracted";
+  wordLimit?: { min?: number; max?: number };
+  structureOverride?: string[];
+  citationStyle?: string;
+  requiredDeclarations: string[];
+  articleType?: string;
+  notes?: string;
+  capturedAt: string;
+  capturedBy: string;
+}
+
+/** Mirrors src/domain/journal/types.ts's JournalRequirementsProposal — what AI extraction proposes, never itself saved. */
+export interface JournalRequirementsProposal {
+  journalName?: string;
+  wordLimit?: { min?: number; max?: number };
+  structureOverride?: string[];
+  citationStyle?: string;
+  requiredDeclarations: string[];
+  articleType?: string;
+  notes?: string;
+  unresolvedFields: string[];
+}
+
 export interface StudioRefineResult {
   diff: RefinementDiff;
   voiceDrift?: VoiceDriftReport;

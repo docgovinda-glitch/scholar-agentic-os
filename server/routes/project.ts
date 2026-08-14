@@ -61,8 +61,18 @@ import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, Sup
 import { addSubmission, updateSubmission, deleteSubmission, SubmissionError } from "../../src/domain/submission/submissions.ts";
 import { SUBMISSION_STATUSES } from "../../src/domain/submission/types.ts";
 import type { SubmissionRecord, SubmissionStatus } from "../../src/domain/submission/types.ts";
-import type { JournalRequirements } from "../../src/domain/journal/types.ts";
+import { countWords, MIN_GUIDELINES_WORDS } from "../../src/domain/journal/types.ts";
+import type { JournalRequirements, JournalRequirementsProposal } from "../../src/domain/journal/types.ts";
 import { isOutputTypeEnabled, MAINTENANCE_MESSAGE } from "./outputTypeAccess.ts";
+import { extractJournalRequirements, GatewayDenied } from "../../src/app/journal/extract.ts";
+import { assembleUserCandidates } from "../src/aiEngine/userRouter.ts";
+import { resolvePremiumResources } from "../src/aiEngine/adminRouter.ts";
+import { getDecryptedCredential } from "../src/aiEngine/credentialVault.ts";
+import { checkPerTaskLimit } from "../src/aiEngine/quotaEngine.ts";
+import { creditsForUsage, estimateMaxCreditsForInput } from "../src/aiEngine/creditPolicy.ts";
+import { deductCredits, type DeductResult } from "../src/aiEngine/creditEngine.ts";
+import { recordProviderFailure, recordProviderSuccess } from "../src/aiEngine/providerHealth.ts";
+import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
 
@@ -161,6 +171,173 @@ function isValidJournalRequirementsInput(
   if (r.articleType !== undefined && typeof r.articleType !== "string") return false;
   if (r.notes !== undefined && typeof r.notes !== "string") return false;
   return true;
+}
+
+/**
+ * Why a charge was refused, in the user's terms. Duplicated from
+ * server/routes/studio.ts's own DEDUCT_FAILURE_MESSAGES rather than shared:
+ * both are four short user-facing strings keyed to creditEngine's
+ * DeductResult union, studio.ts doesn't export it, and the two pipelines
+ * otherwise have nothing in common worth factoring out for this.
+ */
+const DEDUCT_FAILURE_MESSAGES: Record<Exclude<DeductResult, "ok">, string> = {
+  daily_limit_exceeded: "You've reached your daily Premium credit limit. It resets at the start of tomorrow (UTC).",
+  weekly_limit_exceeded: "You've reached your weekly Premium credit limit. It resets at the start of next week (UTC).",
+  monthly_limit_exceeded: "You've reached your monthly Premium credit limit. It resets at the start of next month (UTC).",
+  insufficient_balance: "You don't have enough Premium credits left for this request.",
+};
+
+interface JournalExtractionLedgerRow extends Record<string, unknown> {
+  user_id: string;
+  provider_id: string;
+  model_id: string;
+  tier: "premium";
+  task_type: string;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  scholar_credits_charged: number;
+  request_id: string;
+  status: "success" | "quota_exhausted";
+}
+
+async function recordExtractionUsage(
+  userId: string,
+  providerId: string,
+  modelId: string,
+  usage: { inputTokensEstimate: number; outputTokensEstimate: number } | undefined,
+  requestId: string,
+  creditsCharged: number,
+  status: "success" | "quota_exhausted"
+): Promise<void> {
+  const config = getSupabaseRestConfig();
+  if (!config) return;
+  const ledger = new SupabaseTable<JournalExtractionLedgerRow>(config, "ai_usage_ledger");
+  await ledger.insert({
+    user_id: userId,
+    provider_id: providerId,
+    model_id: modelId,
+    tier: "premium",
+    task_type: "journal_requirements_extraction",
+    input_tokens: usage?.inputTokensEstimate ?? null,
+    output_tokens: usage?.outputTokensEstimate ?? null,
+    scholar_credits_charged: creditsCharged,
+    request_id: requestId,
+    status,
+  });
+}
+
+/**
+ * Runs journal-requirements extraction's Premium path — structurally
+ * identical to server/routes/studio.ts's runPremiumRefine (see that
+ * function's own comment for the reasoning behind each step: independently
+ * re-deriving entitlement/quota server-side, retrying across Premium
+ * fallbacks, recording provider health before deducting credits so a
+ * Supabase blip during deduction can't retroactively mark a working
+ * provider down). Duplicated rather than imported since studio.ts's version
+ * is typed against StudioRefineInput/Result, not this feature's shape.
+ */
+async function runPremiumJournalExtraction(
+  userId: string,
+  extractInput: Omit<Parameters<typeof extractJournalRequirements>[0], "provider" | "apiKey" | "model">
+): Promise<
+  | {
+      ok: true;
+      result: Awaited<ReturnType<typeof extractJournalRequirements>>;
+      aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number };
+    }
+  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
+> {
+  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
+  if (!entitlementActive) {
+    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
+  }
+
+  const preCheckAmount = estimateMaxCreditsForInput(extractInput.guidelinesText);
+  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
+  if (!perTask.allowed) {
+    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
+  }
+
+  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
+    return {
+      ok: false,
+      status: 402,
+      error:
+        premiumQuotaRemaining <= 0
+          ? "Your Premium quota for this period is exhausted."
+          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
+    };
+  }
+
+  const resources = await resolvePremiumResources(userId, "reasoning");
+  if (resources.length === 0) {
+    return {
+      ok: false,
+      status: 402,
+      error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator.",
+    };
+  }
+
+  let lastError = "No Premium resource is currently available.";
+
+  for (const resource of resources) {
+    const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
+    if (!credential) {
+      await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+      lastError = `The "${resource.label}" Premium resource is not currently configured.`;
+      continue;
+    }
+
+    const model = resource.modelId || undefined;
+    const start = Date.now();
+
+    let result: Awaited<ReturnType<typeof extractJournalRequirements>>;
+    try {
+      result = await extractJournalRequirements({ ...extractInput, provider: resource.providerId, apiKey: credential, model });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) {
+          return { ok: false, status: 428, error: err.message, provider: resource.providerId };
+        }
+        return { ok: false, status: 403, error: err.message };
+      }
+      await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
+      lastError = err instanceof Error ? err.message : "Unknown error";
+      continue;
+    }
+
+    await recordProviderSuccess(resource.providerId, Date.now() - start);
+
+    const usage = result.usage;
+    const modelUsed = model ?? usage.model;
+    const creditsUsed = creditsForUsage(usage.inputTokensEstimate, usage.outputTokensEstimate);
+    const requestId = crypto.randomUUID();
+    const deductResult = await deductCredits(
+      userId,
+      creditsUsed,
+      quota?.dailyCredits ?? null,
+      quota?.monthlyCredits ?? null,
+      "usage",
+      requestId,
+      `journal requirements extraction: ${resource.label}`,
+      quota?.weeklyCredits ?? null
+    );
+
+    if (deductResult !== "ok") {
+      await recordExtractionUsage(userId, resource.providerId, modelUsed, usage, requestId, 0, "quota_exhausted");
+      return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+    }
+
+    await recordExtractionUsage(userId, resource.providerId, modelUsed, usage, requestId, creditsUsed, "success");
+
+    return {
+      ok: true,
+      result,
+      aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed },
+    };
+  }
+
+  return { ok: false, status: 502, error: lastError };
 }
 
 function isValidBinding(value: unknown): value is ClaimEvidenceBinding {
@@ -428,26 +605,40 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
   }));
 
+  /** The project's captured journal requirements. 404s if none have been captured yet. */
+  app.get("/api/projects/:id/journal-requirements", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.journalRequirements) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no journal requirements captured yet.` });
+    }
+    res.json(record.journalRequirements);
+  }));
+
   /**
    * Capture (or replace) the target journal's requirements and recompute
-   * G1's exit criteria against them (docs 30 §3 G1 "Exit"). Always stamps
-   * source: "manual" — this phase's only path; a later phase's AI-assisted
-   * extraction lands here too, but only once a user has confirmed it, never
-   * automatically. 409s if G1 is already signed off — invalidate it first,
-   * same discipline as every other gate-touching endpoint. Body: everything
-   * JournalRequirements needs except source/capturedAt/capturedBy, which
-   * the server assigns.
+   * G1's exit criteria against them (docs 30 §3 G1 "Exit"). Body: everything
+   * JournalRequirements needs except capturedAt/capturedBy, which the server
+   * always assigns, plus an optional `source`. `source: "ai_extracted"` is
+   * only ever set here because the CLIENT says this save follows a reviewed
+   * AI proposal (POST .../journal-requirements/extract) — the server never
+   * infers it, and either way this save only happens on an explicit user
+   * action, never automatically from the extraction call itself. Any other
+   * or missing `source` value stamps "manual". 409s if G1 is already signed
+   * off — invalidate it first, same discipline as every other gate-touching
+   * endpoint.
    */
   app.put("/api/projects/:id/journal-requirements", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
+    const requestedSource = (req.body as { source?: unknown } | undefined)?.source === "ai_extracted" ? "ai_extracted" : "manual";
     if (!isValidJournalRequirementsInput(req.body)) {
       return res.status(400).json({ error: "Invalid journal requirements payload." });
     }
 
     const journalRequirements: JournalRequirements = {
       ...req.body,
-      source: "manual",
+      source: requestedSource,
       capturedAt: new Date().toISOString(),
       capturedBy: currentUserId(req),
     };
@@ -461,6 +652,72 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
         return res.status(409).json({ error: err.message });
       }
       throw err;
+    }
+  }));
+
+  /**
+   * Propose a JournalRequirements from pasted author-guidelines text, via
+   * the platform/gateway AI pipeline (src/app/journal/extract.ts). Returns
+   * only a proposal — this endpoint never saves anything; the client must
+   * still call PUT .../journal-requirements (with source: "ai_extracted")
+   * once the user has reviewed it. Body:
+   * { guidelinesText, provider?, apiKey?, model?, useEngine? } — same
+   * BYOK-vs-Premium shape as POST /api/studio/refine (see that route's own
+   * comment for the two ways a model-backed call gets its provider).
+   */
+  app.post("/api/projects/:id/journal-requirements/extract", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { guidelinesText, provider, apiKey, model, useEngine } = req.body ?? {};
+
+    if (typeof guidelinesText !== "string" || countWords(guidelinesText) < MIN_GUIDELINES_WORDS) {
+      return res.status(400).json({
+        error: `Missing or too-short field: guidelinesText (paste at least ${MIN_GUIDELINES_WORDS} words of the journal's own author guidelines).`,
+      });
+    }
+
+    const baseInput = { guidelinesText, scopeId: record.projectId };
+    const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
+
+    if (wantsPremium) {
+      const userId = currentUserId(req);
+      let outcome: Awaited<ReturnType<typeof runPremiumJournalExtraction>>;
+      try {
+        outcome = await runPremiumJournalExtraction(userId, baseInput);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
+      }
+
+      if (!outcome.ok) {
+        if (outcome.status === 428) {
+          return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
+        }
+        if (outcome.status === 403) {
+          return res.status(403).json({ error: "denied", reason: outcome.error });
+        }
+        return res.status(outcome.status).json({ error: outcome.error });
+      }
+      return res.json({ proposal: outcome.result.proposal, aiSource: outcome.aiSource });
+    }
+
+    try {
+      const result = await extractJournalRequirements({
+        ...baseInput,
+        provider: typeof provider === "string" ? provider : undefined,
+        apiKey: typeof apiKey === "string" ? apiKey : undefined,
+        model: typeof model === "string" ? model : undefined,
+      });
+      return res.json({ proposal: result.proposal });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) {
+          return res.status(428).json({ error: "consent_required", reason: err.message, provider });
+        }
+        return res.status(403).json({ error: "denied", reason: err.message });
+      }
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return res.status(500).json({ error: message });
     }
   }));
 

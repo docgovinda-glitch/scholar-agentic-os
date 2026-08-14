@@ -29,7 +29,7 @@ function isSectionId(value: string | undefined): value is SectionId {
   return SECTION_IDS.includes(value as SectionId);
 }
 
-const DESK_SHELL_VIEWS: readonly DeskShellView[] = ["intake", "document", "evidence", "progress", "submissions"];
+const DESK_SHELL_VIEWS: readonly DeskShellView[] = ["intake", "requirements", "document", "evidence", "progress", "submissions"];
 
 function isDeskShellView(value: string | undefined): value is DeskShellView {
   return DESK_SHELL_VIEWS.includes(value as DeskShellView);

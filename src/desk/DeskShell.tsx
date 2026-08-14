@@ -9,11 +9,12 @@ import IntakePanel from "./intake/IntakePanel";
 import GatesPanel from "./gates/GatesPanel";
 import ClaimsPanel from "./claims/ClaimsPanel";
 import SubmissionsPanel from "./submissions/SubmissionsPanel";
+import JournalRequirementsPanel from "./journal/JournalRequirementsPanel";
 import { useDeskSession } from "./useDeskSession";
 import StatusBar from "./regions/StatusBar";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "./types";
 
-export type DeskShellView = "intake" | "document" | "evidence" | "progress" | "submissions";
+export type DeskShellView = "intake" | "requirements" | "document" | "evidence" | "progress" | "submissions";
 
 /**
  * Region shell (docs 22 §2): Header / Rail / Primary / Aside / Status. The
@@ -151,7 +152,7 @@ export default function DeskShell({
         onOpenAiAccess={onOpenAiAccess}
       />
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
-        {(["intake", "document", "evidence", "progress", "submissions"] as const).map((v) => (
+        {(["intake", "requirements", "document", "evidence", "progress", "submissions"] as const).map((v) => (
           <button
             key={v}
             type="button"
@@ -166,13 +167,15 @@ export default function DeskShell({
           >
             {v === "intake"
               ? "Intake"
-              : v === "document"
-                ? "Document"
-                : v === "evidence"
-                  ? "Evidence"
-                  : v === "progress"
-                    ? "Progress"
-                    : "Submissions"}
+              : v === "requirements"
+                ? "Requirements"
+                : v === "document"
+                  ? "Document"
+                  : v === "evidence"
+                    ? "Evidence"
+                    : v === "progress"
+                      ? "Progress"
+                      : "Submissions"}
           </button>
         ))}
       </nav>
@@ -206,6 +209,14 @@ export default function DeskShell({
               projectId={projectId}
               project={project}
               onSaved={(updated) => setProject(updated)}
+            />
+          </div>
+        ) : view === "requirements" ? (
+          <div className="flex-1 overflow-y-auto">
+            <JournalRequirementsPanel
+              projectId={projectId}
+              onSaved={(gates) => setProject((p) => (p ? { ...p, gates, hasJournalRequirements: true } : p))}
+              onOpenAiAccess={onOpenAiAccess}
             />
           </div>
         ) : view === "submissions" ? (
