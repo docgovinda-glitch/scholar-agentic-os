@@ -97,6 +97,7 @@ const OT = {
   family: "article",
   academicLevels: [],
   typicalDisciplines: [],
+  available: true,
 };
 
 const projectView = (projectId: string, over: Record<string, unknown> = {}) => ({

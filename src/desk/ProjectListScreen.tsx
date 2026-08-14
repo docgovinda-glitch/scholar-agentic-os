@@ -411,8 +411,8 @@ function ChooseOutputType({
               {groups.map(([family, items]) => (
                 <optgroup key={family} label={FAMILY_LABEL[family] ?? family}>
                   {items.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
+                    <option key={t.id} value={t.id} disabled={!t.available}>
+                      {t.available ? t.label : `${t.label} — Under maintenance`}
                     </option>
                   ))}
                 </optgroup>

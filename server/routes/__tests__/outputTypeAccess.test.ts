@@ -20,7 +20,7 @@ import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
-import { __setEnabledOutputTypesForTests, isOutputTypeEnabled } from "../outputTypeAccess.ts";
+import { __setEnabledOutputTypesForTests, isOutputTypeEnabled, MAINTENANCE_MESSAGE } from "../outputTypeAccess.ts";
 
 beforeEach(() => {
   __resetProjectStoreForTests();
@@ -47,11 +47,17 @@ describe("isOutputTypeEnabled", () => {
 });
 
 describe("GET /api/atlas/output-types", () => {
-  it("lists only Journal Article", async () => {
+  it("lists all 24 catalog entries, each marked with whether it can actually be created", async () => {
     const res = await request(app).get("/api/atlas/output-types");
     expect(res.status).toBe(200);
-    expect(res.body.items).toHaveLength(1);
-    expect(res.body.items[0].id).toBe("OT-10");
+    expect(res.body.items.length).toBeGreaterThanOrEqual(24);
+
+    const journalArticle = res.body.items.find((i: { id: string }) => i.id === "OT-10");
+    expect(journalArticle.available).toBe(true);
+
+    const others = res.body.items.filter((i: { id: string }) => i.id !== "OT-10");
+    expect(others.length).toBeGreaterThan(0);
+    expect(others.every((i: { available: boolean }) => i.available === false)).toBe(true);
   });
 });
 
@@ -70,10 +76,10 @@ describe("POST /api/projects", () => {
     expect(res.body.outputTypeId).toBe("OT-10");
   });
 
-  it("403s for a disabled type — distinct from 404 (the type exists, it just isn't offered)", async () => {
+  it("403s for a disabled type with the same common maintenance message every disabled type gets — distinct from 404 (the type exists, it just isn't offered)", async () => {
     const res = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
     expect(res.status).toBe(403);
-    expect(res.body.error).toMatch(/Journal Article/i);
+    expect(res.body.error).toBe(MAINTENANCE_MESSAGE);
   });
 
   it("still 404s for a genuinely unknown type", async () => {

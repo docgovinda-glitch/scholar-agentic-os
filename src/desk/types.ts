@@ -67,6 +67,8 @@ export interface OutputTypeSummary {
   family: string;
   academicLevels: string[];
   typicalDisciplines: string[];
+  /** Whether this type can actually be created right now — false for everything but Journal Article while that's Scholar Core's active scope. */
+  available: boolean;
 }
 
 export type InterventionLevel = "proofread" | "clarity" | "flow" | "register" | "rewrite";

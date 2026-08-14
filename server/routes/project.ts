@@ -62,7 +62,7 @@ import { addSubmission, updateSubmission, deleteSubmission, SubmissionError } fr
 import { SUBMISSION_STATUSES } from "../../src/domain/submission/types.ts";
 import type { SubmissionRecord, SubmissionStatus } from "../../src/domain/submission/types.ts";
 import type { JournalRequirements } from "../../src/domain/journal/types.ts";
-import { isOutputTypeEnabled } from "./outputTypeAccess.ts";
+import { isOutputTypeEnabled, MAINTENANCE_MESSAGE } from "./outputTypeAccess.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
 
@@ -310,24 +310,22 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   app.use("/api/projects", requireAuth);
 
   /**
-   * Summaries of every ENABLED catalog entry — the "choose an output type"
-   * list (docs 12 F-PRJ-1). Filtered through outputTypeAccess.ts: Scholar
-   * Core's active implementation scope is Journal Article only right now,
-   * though every other type stays fully defined in the catalog underneath
-   * this list (see that module's own comment for why).
+   * Summaries of every catalog entry — the "choose an output type" list
+   * (docs 12 F-PRJ-1). Every one of the 24 types is listed; `available`
+   * (via outputTypeAccess.ts) tells the client which it can actually
+   * create right now, so the picker can show the other 23 visibly
+   * disabled ("under maintenance") rather than making them disappear.
    */
   app.get("/api/atlas/output-types", projectLimit, (_req, res) => {
-    const items = catalog
-      .list()
-      .filter((s) => isOutputTypeEnabled(s.id))
-      .map((s) => ({
-        id: s.id,
-        label: s.label,
-        aliases: s.aliases,
-        family: s.family,
-        academicLevels: s.academicLevels,
-        typicalDisciplines: s.typicalDisciplines,
-      }));
+    const items = catalog.list().map((s) => ({
+      id: s.id,
+      label: s.label,
+      aliases: s.aliases,
+      family: s.family,
+      academicLevels: s.academicLevels,
+      typicalDisciplines: s.typicalDisciplines,
+      available: isOutputTypeEnabled(s.id),
+    }));
     res.json({ items });
   });
 
@@ -353,9 +351,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     if (!isOutputTypeEnabled(outputTypeId)) {
       // 403, not 404: the type genuinely exists in the catalog — it's just
       // not offered right now, a distinct condition from "doesn't exist".
-      return res.status(403).json({
-        error: `Creating a "${spec.label}" project is not available right now. Scholar Core currently supports Journal Article projects only.`,
-      });
+      return res.status(403).json({ error: MAINTENANCE_MESSAGE });
     }
     const created = await store.create(outputTypeId, currentUserId(req));
     // Compute G0's, G1's, and G3's real exit criteria immediately from the
