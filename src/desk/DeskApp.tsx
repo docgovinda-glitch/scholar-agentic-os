@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams, useOutletContext } from "react-router-dom";
 import AccountSettingsScreen from "./account/AccountSettingsScreen";
 import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
@@ -13,7 +13,7 @@ import {
   ResendVerificationRoute,
   VerifyEmailRoute,
 } from "./auth/AuthFlow";
-import DeskShell from "./DeskShell";
+import DeskShell, { type DeskShellView } from "./DeskShell";
 import ProjectListScreen from "./ProjectListScreen";
 import VaultSetupScreen from "./setup/VaultSetupScreen";
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
@@ -27,6 +27,12 @@ const SECTION_IDS: readonly SectionId[] = ["overview", "local", "free", "byok", 
 
 function isSectionId(value: string | undefined): value is SectionId {
   return SECTION_IDS.includes(value as SectionId);
+}
+
+const DESK_SHELL_VIEWS: readonly DeskShellView[] = ["intake", "document", "evidence", "progress", "submissions"];
+
+function isDeskShellView(value: string | undefined): value is DeskShellView {
+  return DESK_SHELL_VIEWS.includes(value as DeskShellView);
 }
 
 /** Where to return to when closing Settings/Vault/AI Access — passed as router state on the way in, since these overlays aren't meant to grow their own history entries. */
@@ -137,8 +143,18 @@ function ProjectsIndexRoute() {
 
 function ProjectRoute() {
   const navigate = useNavigate();
+  const location = useLocation();
   const device = useDeviceClass();
-  const { projectId } = useParams<{ projectId: string }>();
+  const { projectId, view } = useParams<{ projectId: string; view?: string }>();
+  // Stable across renders unless projectId itself changes — DeskShell's
+  // load() takes a dependency on this, and a fresh identity every render
+  // would re-trigger its project fetch on every unrelated re-render.
+  const onViewChange = useCallback(
+    (next: DeskShellView, options?: { replace?: boolean }) => {
+      navigate(`/projects/${projectId}/${next}`, options);
+    },
+    [navigate, projectId]
+  );
   // Guaranteed by the route pattern (":projectId" only matches with a value)
   // — this is TypeScript narrowing, not a real fallback path.
   if (!projectId) return <Navigate to="/projects" replace />;
@@ -148,10 +164,12 @@ function ProjectRoute() {
   return (
     <DeskShell
       projectId={projectId}
+      view={isDeskShellView(view) ? view : null}
+      onViewChange={onViewChange}
       onClose={() => navigate("/projects")}
-      onOpenAccountSettings={() => navigate("/settings", { state: { from: `/projects/${projectId}` } })}
-      onOpenVault={() => navigate("/vault", { state: { from: `/projects/${projectId}` } })}
-      onOpenAiAccess={() => navigate("/ai-access", { state: { from: `/projects/${projectId}` } })}
+      onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+      onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
+      onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
     />
   );
 }
@@ -234,6 +252,7 @@ export default function DeskApp() {
         <Route element={<OnboardingGate />}>
           <Route path="projects" element={<ProjectsIndexRoute />} />
           <Route path="projects/:projectId" element={<ProjectRoute />} />
+          <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
           <Route path="settings" element={<SettingsRoute />} />
           <Route path="vault" element={<VaultRoute />} />
           <Route path="ai-access" element={<AiAccessRoute />} />

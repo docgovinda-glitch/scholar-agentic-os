@@ -149,7 +149,7 @@ describe("Desk — project list", () => {
     // real task, and it gates every later gate.
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/projects/proj-abc");
+    expect(window.location.pathname).toBe("/projects/proj-abc/document");
   });
 
   it("creates a project from a real output type and opens it", async () => {
@@ -169,7 +169,7 @@ describe("Desk — project list", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/projects/proj-new");
+    expect(window.location.pathname).toBe("/projects/proj-new/document");
   });
 });
 
@@ -188,7 +188,33 @@ describe("Desk — project shell", () => {
     expect(await screen.findByText(/About your journal article/i)).toBeInTheDocument();
   });
 
-  it("reads ?project= from the URL and renders that project directly", async () => {
+  it("gives each tab its own URL, so Back steps back through tabs and refresh keeps you on the one you had open", async () => {
+    window.history.pushState({}, "", "/projects/proj-42");
+    mockFetchSequence([
+      { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
+      { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
+      { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
+    ]);
+
+    renderDeskApp();
+
+    // G0 isn't signed off in this fixture, so the shell auto-decides Intake
+    // and replaces the bare /projects/proj-42 URL with it — not a real
+    // navigation the user took, so it must not be a Back-able entry itself.
+    await waitFor(() => expect(window.location.pathname).toBe("/projects/proj-42/intake"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Document" }));
+    expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/projects/proj-42/document");
+
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe("/projects/proj-42/intake"));
+
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe("/projects"));
+  });
+
+  it("reads the project id from the URL and renders that project directly", async () => {
     window.history.pushState({}, "", "/projects/proj-42");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
@@ -321,7 +347,9 @@ describe("Desk — account settings", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(await screen.findByText("Journal Article")).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/projects/proj-42");
+    // Not just the project — the exact tab it was opened from (Intake, here:
+    // G0 isn't signed off in this fixture, so that's the auto-decided tab).
+    expect(window.location.pathname).toBe("/projects/proj-42/intake");
   });
 });
 
