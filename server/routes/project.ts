@@ -85,7 +85,7 @@ import {
 import type { DiscoveredSource, EvidenceLocator } from "../../src/domain/evidence/types.ts";
 import { discoverArxivSources, discoverWebSources } from "../src/discovery/discovery.ts";
 import { allocateWordBudget } from "../../src/domain/manuscript/wordBudget.ts";
-import type { SectionPlan } from "../../src/domain/manuscript/types.ts";
+import type { GeneratedSection, SectionPlan } from "../../src/domain/manuscript/types.ts";
 import {
   startJob,
   nextSection as nextPlannedSection,
@@ -97,6 +97,9 @@ import {
 } from "../../src/domain/manuscript/stateMachine.ts";
 import { generateSection } from "../../src/app/manuscript/generate.ts";
 import type { SectionContextPacket } from "../../src/app/manuscript/generate.ts";
+import { checkCoherence } from "../../src/app/coherence/checkCoherence.ts";
+import type { CoherenceDimension } from "../../src/domain/coherence/types.ts";
+import { COHERENCE_DIMENSIONS } from "../../src/domain/coherence/types.ts";
 import { getPolicyForSession } from "../../src/app/studio/sessionPolicyStore.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
@@ -514,6 +517,99 @@ async function runPremiumSectionGeneration(
   }
 
   return { ok: false, status: 502, error: lastError };
+}
+
+/**
+ * Runs the global coherence pass's Premium path. Deliberately simpler than
+ * runPremiumSectionGeneration/runPremiumJournalExtraction's per-attempt
+ * retry-across-resources loop: checkCoherence() itself already makes up to
+ * three internal calls (one per dimension), and interleaving a second,
+ * per-pass fallback-across-Premium-resources loop inside that would trade
+ * a real amount of added complexity for a benefit (surviving one Premium
+ * resource's outage mid-check) this feature does not yet need — a single
+ * resolved resource for the whole multi-pass check, same entitlement/quota
+ * enforcement as every other Premium path, is enough for now, and is
+ * flagged here for whoever revisits it once it isn't.
+ */
+async function runPremiumCoherenceCheck(
+  userId: string,
+  sections: GeneratedSection[],
+  dimensions: CoherenceDimension[] | undefined,
+  policy: import("../../src/platform/warden/warden.ts").EgressPolicy
+): Promise<
+  | { ok: true; result: Awaited<ReturnType<typeof checkCoherence>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
+  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
+> {
+  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
+  if (!entitlementActive) {
+    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
+  }
+
+  const combinedText = sections.map((s) => s.text).join("\n");
+  const preCheckAmount = estimateMaxCreditsForInput(combinedText) * (dimensions?.length ?? COHERENCE_DIMENSIONS.length);
+  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
+  if (!perTask.allowed) {
+    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
+  }
+  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
+    return {
+      ok: false,
+      status: 402,
+      error:
+        premiumQuotaRemaining <= 0
+          ? "Your Premium quota for this period is exhausted."
+          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
+    };
+  }
+
+  const resources = await resolvePremiumResources(userId, "reasoning");
+  if (resources.length === 0) {
+    return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
+  }
+  const resource = resources[0];
+  const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
+  if (!credential) {
+    await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+    return { ok: false, status: 502, error: `The "${resource.label}" Premium resource is not currently configured.` };
+  }
+
+  const model = resource.modelId || undefined;
+  const start = Date.now();
+  let result: Awaited<ReturnType<typeof checkCoherence>>;
+  try {
+    result = await checkCoherence({ sections, provider: resource.providerId, apiKey: credential, model, policy, dimensions });
+  } catch (err) {
+    if (err instanceof GatewayDenied) {
+      if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
+      return { ok: false, status: 403, error: err.message };
+    }
+    await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
+    return { ok: false, status: 502, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+  await recordProviderSuccess(resource.providerId, Date.now() - start);
+
+  // Real usage per pass isn't threaded back out of checkCoherence today, so
+  // the pre-check estimate is what gets charged — same honest fallback
+  // runPremiumRefine uses when a level's usage is unavailable.
+  const creditsUsed = preCheckAmount;
+  const requestId = crypto.randomUUID();
+  const deductResult = await deductCredits(
+    userId,
+    creditsUsed,
+    quota?.dailyCredits ?? null,
+    quota?.monthlyCredits ?? null,
+    "usage",
+    requestId,
+    `coherence check: ${resource.label}`,
+    quota?.weeklyCredits ?? null
+  );
+  if (deductResult !== "ok") {
+    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "coherence_check");
+    return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+  }
+  await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "coherence_check");
+
+  return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
 }
 
 const SOURCE_TYPES = new Set(["scholarly", "official", "web", "media", "user_provided", "vault"]);
@@ -1561,6 +1657,75 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     } catch (err) {
       if (err instanceof GenerationJobError) return res.status(409).json({ error: err.message });
       throw err;
+    }
+  }));
+
+  /**
+   * The global coherence pass (domain/coherence) over every section
+   * generated so far — multi-pass (up to 3 separate model calls, one per
+   * CoherenceDimension), never one call asked to judge the whole
+   * manuscript's consistency at once. Body:
+   * { provider?, apiKey?, model?, useEngine?, dimensions? }. `dimensions`
+   * lets a caller re-run just one failed pass instead of all three. Stores
+   * the result on the job (coherenceReport) so it survives a refresh, same
+   * as everything else this engine checkpoints.
+   */
+  app.post("/api/projects/:id/manuscript/coherence-check", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.generationJob) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no generation job started yet.` });
+    }
+    const { provider, apiKey, model, useEngine, dimensions } = req.body ?? {};
+    if (dimensions !== undefined && (!Array.isArray(dimensions) || !dimensions.every((d) => COHERENCE_DIMENSIONS.includes(d)))) {
+      return res.status(400).json({ error: `Invalid field: dimensions. Must be a subset of: ${COHERENCE_DIMENSIONS.join(", ")}` });
+    }
+
+    const sections = record.generationJob.sections;
+    const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
+    const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
+
+    async function saveReport(coherenceReport: Awaited<ReturnType<typeof checkCoherence>>) {
+      const generationJob = { ...record!.generationJob!, coherenceReport };
+      return store.save({ ...record!, generationJob });
+    }
+
+    if (wantsPremium) {
+      const userId = currentUserId(req);
+      let outcome: Awaited<ReturnType<typeof runPremiumCoherenceCheck>>;
+      try {
+        outcome = await runPremiumCoherenceCheck(userId, sections, dimensions, policy);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
+      }
+      if (!outcome.ok) {
+        if (outcome.status === 428) return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
+        if (outcome.status === 403) return res.status(403).json({ error: "denied", reason: outcome.error });
+        return res.status(outcome.status).json({ error: outcome.error });
+      }
+      const updated = await saveReport(outcome.result);
+      return res.json({ generationJob: updated.generationJob, aiSource: outcome.aiSource });
+    }
+
+    try {
+      const coherenceReport = await checkCoherence({
+        sections,
+        provider: typeof provider === "string" ? provider : undefined,
+        apiKey: typeof apiKey === "string" ? apiKey : undefined,
+        model: typeof model === "string" ? model : undefined,
+        policy,
+        dimensions,
+      });
+      const updated = await saveReport(coherenceReport);
+      return res.json({ generationJob: updated.generationJob });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
+        return res.status(403).json({ error: "denied", reason: err.message });
+      }
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return res.status(500).json({ error: message });
     }
   }));
 

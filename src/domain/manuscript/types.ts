@@ -12,6 +12,8 @@
  * sections actually completed (see stateMachine.ts's appendSection).
  */
 
+import type { CoherenceReport } from "../coherence/types";
+
 export interface SectionPlan {
   key: string;
   title: string;
@@ -47,4 +49,6 @@ export interface GenerationJob {
   startedAt?: string;
   updatedAt: string;
   lastError?: string;
+  /** The most recent global coherence pass over `sections` (domain/coherence) — undefined until POST .../manuscript/coherence-check has run at least once. Nested here, not a separate ProjectRecord field, since a coherence report is only ever meaningful against a specific job's sections. */
+  coherenceReport?: CoherenceReport;
 }

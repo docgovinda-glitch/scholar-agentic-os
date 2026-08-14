@@ -482,6 +482,31 @@ export async function generateNextSection(params: {
   return json<{ generationJob: GenerationJob }>(res);
 }
 
+/** Runs the multi-pass global coherence check over every section generated so far, and persists the report on the job. Same 428/403/402 error mapping as the other AI-backed routes. */
+export async function runCoherenceCheck(params: {
+  projectId: string;
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  useEngine?: "premium";
+}): Promise<{ generationJob: GenerationJob }> {
+  const { projectId, ...requestBody } = params;
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/coherence-check`, "POST", requestBody);
+  if (res.status === 428) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioConsentRequiredError(errBody.reason || "Consent required.", errBody.provider);
+  }
+  if (res.status === 403) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioDeniedError(errBody.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
+  }
+  return json<{ generationJob: GenerationJob }>(res);
+}
+
 export function pauseManuscriptJob(projectId: string): Promise<GenerationJob> {
   return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/pause`, "POST", {}).then((r) => json(r));
 }

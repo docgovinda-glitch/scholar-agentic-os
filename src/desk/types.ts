@@ -221,6 +221,24 @@ export interface GeneratedSection {
 
 export type GenerationJobState = "not_started" | "running" | "paused" | "completed" | "failed";
 
+/** Mirrors src/domain/coherence/types.ts. */
+export type CoherenceDimension = "terminology" | "argument_continuity" | "methodology";
+export type CoherenceSeverity = "minor" | "moderate" | "major";
+
+export interface CoherenceIssue {
+  dimension: CoherenceDimension;
+  description: string;
+  sectionKeys: string[];
+  severity: CoherenceSeverity;
+}
+
+export interface CoherenceReport {
+  issues: CoherenceIssue[];
+  passesRun: CoherenceDimension[];
+  passErrors: Partial<Record<CoherenceDimension, string>>;
+  checkedAt: string;
+}
+
 export interface GenerationJob {
   state: GenerationJobState;
   plan: SectionPlan[];
@@ -229,6 +247,7 @@ export interface GenerationJob {
   startedAt?: string;
   updatedAt: string;
   lastError?: string;
+  coherenceReport?: CoherenceReport;
 }
 
 export interface StudioRefineResult {

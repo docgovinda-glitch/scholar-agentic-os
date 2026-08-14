@@ -7,11 +7,18 @@ import {
   getManuscriptJob,
   pauseManuscriptJob,
   resumeManuscriptJob,
+  runCoherenceCheck,
   startManuscriptJob,
 } from "../api";
 import { routeDecision } from "../aiAccess/aiAccessApi";
 import { readProviderKey } from "../../services/userAiSettings";
-import type { GeneratedSection, GenerationJob } from "../types";
+import type { CoherenceDimension, GeneratedSection, GenerationJob } from "../types";
+
+const DIMENSION_LABEL: Record<CoherenceDimension, string> = {
+  terminology: "Terminology",
+  argument_continuity: "Argument continuity",
+  methodology: "Methodology",
+};
 
 /**
  * The long-form generation engine's UI: plan a job, generate one section at
@@ -31,7 +38,17 @@ const STATE_LABEL: Record<GenerationJob["state"], string> = {
 };
 
 /** Same routing/fallback walk as JournalRequirementsPanel's runExtraction — see that component's own comment for why "local" is skipped and why a consent/deny verdict stops the walk immediately rather than being treated as "this provider is down". */
-async function runGeneration(projectId: string): Promise<GenerationJob> {
+/**
+ * Walks the Scholar AI Engine's routing decision, trying each candidate in
+ * order — same discipline as JournalRequirementsPanel's runExtraction:
+ * "local" is skipped (no local-execution pipeline for either of this
+ * panel's calls), a consent/deny verdict stops the walk immediately since
+ * it's a privacy answer rather than "this provider is down", and every
+ * other failure just falls through to the next candidate.
+ */
+async function walkRoutingCandidates<T>(
+  call: (byok: { provider: string; apiKey: string; model?: string } | { useEngine: "premium" }) => Promise<T>
+): Promise<T> {
   const decision = await routeDecision("reasoning");
   if (!decision.ok) {
     throw new StudioNoAiSourceError(decision.reasoning);
@@ -44,8 +61,7 @@ async function runGeneration(projectId: string): Promise<GenerationJob> {
     if (choice.tier === "local") continue;
     try {
       if (choice.tier === "premium") {
-        const { generationJob } = await generateNextSection({ projectId, useEngine: "premium" });
-        return generationJob;
+        return await call({ useEngine: "premium" });
       }
       const apiKey = await readProviderKey(choice.providerId);
       if (!apiKey) {
@@ -54,14 +70,27 @@ async function runGeneration(projectId: string): Promise<GenerationJob> {
         );
         continue;
       }
-      const { generationJob } = await generateNextSection({ projectId, provider: choice.providerId, apiKey, model: choice.modelId });
-      return generationJob;
+      return await call({ provider: choice.providerId, apiKey, model: choice.modelId });
     } catch (e) {
       if (e instanceof StudioConsentRequiredError || e instanceof StudioDeniedError) throw e;
       lastError = e as Error;
     }
   }
   throw lastError;
+}
+
+function runGeneration(projectId: string): Promise<GenerationJob> {
+  return walkRoutingCandidates(async (byok) => {
+    const { generationJob } = await generateNextSection({ projectId, ...byok });
+    return generationJob;
+  });
+}
+
+function runCoherence(projectId: string): Promise<GenerationJob> {
+  return walkRoutingCandidates(async (byok) => {
+    const { generationJob } = await runCoherenceCheck({ projectId, ...byok });
+    return generationJob;
+  });
 }
 
 export default function ManuscriptGenerationPanel({
@@ -109,6 +138,23 @@ export default function ManuscriptGenerationPanel({
     setNoAiSource(null);
     try {
       setJob(await runGeneration(projectId));
+    } catch (e) {
+      if (e instanceof StudioNoAiSourceError) {
+        setNoAiSource(e.message);
+      } else {
+        setGenError((e as Error).message);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCoherenceCheck() {
+    setBusy(true);
+    setGenError(null);
+    setNoAiSource(null);
+    try {
+      setJob(await runCoherence(projectId));
     } catch (e) {
       if (e instanceof StudioNoAiSourceError) {
         setNoAiSource(e.message);
@@ -213,14 +259,64 @@ export default function ManuscriptGenerationPanel({
         </p>
       )}
 
-      {job.state === "completed" && onInsertIntoDocument && (
-        <button
-          type="button"
-          onClick={() => onInsertIntoDocument(job.sections)}
-          className="self-start rounded-[var(--radius-md)] border border-[color:var(--border-default)] px-3 py-2 text-sm font-medium text-[color:var(--text-primary)] hover:border-[color:var(--border-strong)] cursor-pointer"
-        >
-          Insert every section into the document
-        </button>
+      {job.state === "completed" && (
+        <div className="flex flex-wrap items-center gap-2">
+          {onInsertIntoDocument && (
+            <button
+              type="button"
+              onClick={() => onInsertIntoDocument(job.sections)}
+              className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] px-3 py-2 text-sm font-medium text-[color:var(--text-primary)] hover:border-[color:var(--border-strong)] cursor-pointer"
+            >
+              Insert every section into the document
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleCoherenceCheck}
+            disabled={busy}
+            className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] px-3 py-2 text-sm font-medium text-[color:var(--text-primary)] hover:border-[color:var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
+          >
+            {busy ? "Checking coherence…" : job.coherenceReport ? "Re-run coherence check" : "Run coherence check"}
+          </button>
+        </div>
+      )}
+
+      {job.coherenceReport && (
+        <div className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-3">
+          <p className="text-xs text-[color:var(--text-muted)]">
+            Coherence check ({job.coherenceReport.passesRun.map((d) => DIMENSION_LABEL[d]).join(", ") || "no passes completed"}) —{" "}
+            {new Date(job.coherenceReport.checkedAt).toLocaleString()}
+          </p>
+          {Object.entries(job.coherenceReport.passErrors).map(([dimension, error]) => (
+            <p key={dimension} role="alert" className="mt-1 text-xs text-[color:var(--state-danger)]">
+              {DIMENSION_LABEL[dimension as CoherenceDimension]} pass failed: {error}
+            </p>
+          ))}
+          {job.coherenceReport.issues.length === 0 ? (
+            <p className="mt-2 text-sm text-[color:var(--text-secondary)]">No cross-section issues found.</p>
+          ) : (
+            <ul className="mt-2 flex flex-col gap-2">
+              {job.coherenceReport.issues.map((issue, i) => (
+                <li key={i} className="text-sm text-[color:var(--text-primary)]">
+                  <span
+                    className={[
+                      "mr-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                      issue.severity === "major"
+                        ? "bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)]"
+                        : issue.severity === "moderate"
+                          ? "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
+                          : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]",
+                    ].join(" ")}
+                  >
+                    {DIMENSION_LABEL[issue.dimension]}
+                  </span>
+                  {issue.description}
+                  <span className="ml-1.5 text-xs text-[color:var(--text-muted)]">({issue.sectionKeys.join(", ")})</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {nextPlanned && job.state !== "completed" && (

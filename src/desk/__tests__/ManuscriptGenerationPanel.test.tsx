@@ -135,4 +135,49 @@ describe("Desk — ManuscriptGenerationPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Insert every section into the document" }));
     expect(onInsert).toHaveBeenCalledWith([{ key: "introduction", title: "Introduction", text: "Text.", wordCount: 1, memory: "m", citedEvidenceIds: [], generatedAt: "now" }]);
   });
+
+  it("runs a coherence check via the Premium tier and displays the resulting issues", async () => {
+    const completedJob = {
+      state: "completed",
+      plan: [
+        { key: "introduction", title: "Introduction", guidance: "g", targetWords: 500 },
+        { key: "methods", title: "Methods", guidance: "g", targetWords: 700 },
+      ],
+      sections: [
+        { key: "introduction", title: "Introduction", text: "Text.", wordCount: 1, memory: "m", citedEvidenceIds: [], generatedAt: "now" },
+        { key: "methods", title: "Methods", text: "Text.", wordCount: 1, memory: "m", citedEvidenceIds: [], generatedAt: "now" },
+      ],
+      totalWordTarget: 3000,
+      updatedAt: "now",
+    };
+    mockFetch((url) => {
+      if (url.endsWith("/api/ai-access/route")) {
+        return { status: 200, body: { ok: true, choice: { tier: "premium", providerId: "premium", reasoning: "Premium is available." }, fallbacks: [] } };
+      }
+      if (url.includes("/manuscript/coherence-check")) {
+        return {
+          status: 200,
+          body: {
+            generationJob: {
+              ...completedJob,
+              coherenceReport: {
+                issues: [{ dimension: "terminology", description: "Inconsistent headcount terms.", sectionKeys: ["introduction", "methods"], severity: "moderate" }],
+                passesRun: ["terminology", "argument_continuity", "methodology"],
+                passErrors: {},
+                checkedAt: "2026-01-01T00:00:00.000Z",
+              },
+            },
+          },
+        };
+      }
+      if (url.includes("/manuscript/job")) return { status: 200, body: completedJob };
+      return { status: 500, body: {} };
+    });
+    render(<ManuscriptGenerationPanel projectId={PROJECT_ID} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Run coherence check" }));
+
+    expect(await screen.findByText("Inconsistent headcount terms.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Re-run coherence check" })).toBeInTheDocument();
+  });
 });
