@@ -223,6 +223,20 @@ export function submitDocument(projectId: string, document: CanonicalDocument): 
   return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/document`, "PUT", { document }).then((r) => json(r));
 }
 
+/**
+ * Turn every `[ev-xxxx]` bracket-id currently in the document into a real
+ * in-text citation, and (re)build the References section — deterministic,
+ * no model call. `style` defaults server-side to the captured journal's
+ * citation style, falling back to the catalog default. A document with
+ * nothing left to resolve is a safe no-op (`citedSourceIds: []`).
+ */
+export function resolveCitations(
+  projectId: string,
+  style?: string
+): Promise<ProjectView & { rubric: RubricReport; citedSourceIds: string[]; unresolvedIds: string[] }> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/resolve-citations`, "POST", { style }).then((r) => json(r));
+}
+
 /** Returns null (not an error) when no journal requirements have been captured yet — a normal, expected state before the first save. */
 export async function getJournalRequirements(projectId: string): Promise<JournalRequirements | null> {
   const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements`);

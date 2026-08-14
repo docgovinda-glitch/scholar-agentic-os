@@ -110,6 +110,7 @@ import { getPolicyForSession } from "../../src/app/studio/sessionPolicyStore.ts"
 import { generateCoverLetter } from "../../src/app/coverLetter/generateCoverLetter.ts";
 import { proposeAnonymization } from "../../src/app/anonymization/proposeAnonymization.ts";
 import { applyAnonymization, AnonymizationApplyError } from "../../src/app/anonymization/applyAnonymization.ts";
+import { resolveCitations, isKnownCitationStyle, knownCitationStyleIds } from "../../src/app/citation/resolveCitations.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
 
@@ -2178,6 +2179,51 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json(record.peerReviewHistory);
+  }));
+
+  /**
+   * Resolve every `[ev-xxxx]` bracket-id currently in the document into a
+   * real in-text citation, and (re)build the "references" section from the
+   * same evidence — src/app/citation/resolveCitations.ts, closing the gap
+   * between the manuscript engine's citation convention and the seven real
+   * citation-compliance formatters (APA 7, MLA 9, Chicago author-date,
+   * Chicago Notes-Bibliography, Harvard, IEEE, Vancouver). Deterministic,
+   * no model call, so no BYOK/Premium split. Body: { style? } — defaults to
+   * the captured journal's citationStyle, falling back to the catalog's
+   * own default (same precedent as fromAtlas.ts's
+   * compileCitationStyleGateRules). 400s for an unrecognised style id. A
+   * document with no remaining bracket-ids is a safe no-op (returns
+   * citedSourceIds: [] unchanged) — see resolveCitations.ts's own comment
+   * for why this is deliberately a run-once-near-the-end action, not
+   * something to call after every section.
+   */
+  app.post("/api/projects/:id/manuscript/resolve-citations", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.document) {
+      return res.status(400).json({ error: "Cannot resolve citations for a project with no document submitted yet." });
+    }
+    const spec = catalog.getOrThrow(record.outputTypeId);
+    const { style } = req.body ?? {};
+    const styleId = typeof style === "string" && style.length > 0 ? style : (record.journalRequirements?.citationStyle ?? spec.citation.defaultStyle);
+    if (!isKnownCitationStyle(styleId)) {
+      return res.status(400).json({ error: `Unknown citation style "${styleId}". Known styles: ${knownCitationStyleIds().join(", ")}.` });
+    }
+
+    const { document, citedSourceIds, unresolvedIds } = resolveCitations(record.document, record.evidenceLedger, styleId);
+
+    try {
+      const { rubricReport, gates: gatesAfterG6 } = recomputeG6(record, document);
+      const gatesAfterG3 = recomputeG3({ ...record, gates: gatesAfterG6 }, document, record.answers);
+      const gates = recomputeG4({ ...record, gates: gatesAfterG3 }, document);
+      const updated = await store.save({ ...record, document, rubricReport, gates });
+      res.json({ ...projectView(updated), rubric: rubricReport, citedSourceIds, unresolvedIds });
+    } catch (err) {
+      if (err instanceof GateTransitionError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
   }));
 
   /**

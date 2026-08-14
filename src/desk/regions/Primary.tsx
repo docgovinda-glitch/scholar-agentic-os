@@ -3,6 +3,11 @@ import { exportProject } from "../api";
 import CanonicalDocumentEditor from "../editor/CanonicalDocumentEditor";
 import type { CanonicalDocument } from "../types";
 
+export interface ResolveCitationsOutcome {
+  citedSourceIds: string[];
+  unresolvedIds: string[];
+}
+
 /**
  * Region C (docs 22 §2/§4/§5). Now backed by the real editor
  * (editor/CanonicalDocumentEditor.tsx — "custom document model over a
@@ -20,16 +25,36 @@ export default function Primary({
   onSaveDocument,
   submitting,
   projectId,
+  onResolveCitations,
 }: {
   document: CanonicalDocument | null;
   onSubmitPlainText: (text: string) => void;
   onSaveDocument: (doc: CanonicalDocument) => void;
   submitting: boolean;
   projectId: string;
+  /** Deterministically turns every `[ev-xxxx]` bracket-id in the saved document into a real in-text citation and rebuilds the References section — src/app/citation/resolveCitations.ts. Optional so callers that don't wire it (e.g. tests) keep working. */
+  onResolveCitations?: () => Promise<ResolveCitationsOutcome>;
 }) {
   const [draft, setDraft] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [resolvingCitations, setResolvingCitations] = useState(false);
+  const [citationOutcome, setCitationOutcome] = useState<ResolveCitationsOutcome | null>(null);
+  const [citationError, setCitationError] = useState<string | null>(null);
+
+  async function handleResolveCitations() {
+    if (!onResolveCitations) return;
+    setResolvingCitations(true);
+    setCitationError(null);
+    setCitationOutcome(null);
+    try {
+      setCitationOutcome(await onResolveCitations());
+    } catch (err) {
+      setCitationError((err as Error).message);
+    } finally {
+      setResolvingCitations(false);
+    }
+  }
 
   async function handleExport(format: "docx" | "odt" | "pdf") {
     setExporting(true);
@@ -91,6 +116,39 @@ export default function Primary({
       <div className="flex-1 overflow-y-auto px-10 py-6 max-w-[75ch] mx-auto w-full">
         <CanonicalDocumentEditor document={document} onSave={onSaveDocument} saving={submitting} />
       </div>
+      {/* Citation resolution — turns approved-evidence bracket-ids into real
+          in-text citations and a rendered References section (docs
+          31-SUBMISSION-COMPLIANCE-ARCHITECTURE.md, src/app/citation/
+          resolveCitations.ts). Deterministic, run once near the end of
+          drafting, before export. */}
+      {onResolveCitations && (
+        <div className="border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-10 py-4">
+          <div className="max-w-[75ch] mx-auto">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleResolveCitations}
+                disabled={resolvingCitations}
+                className="px-3 py-1.5 rounded text-xs border border-[color:var(--color-border-subtle)] text-[color:var(--text-secondary)] disabled:opacity-40 hover:border-[color:var(--color-luminous-blue-dim)]"
+              >
+                {resolvingCitations ? "Resolving citations…" : "Resolve citations"}
+              </button>
+              <span className="text-xs text-[color:var(--text-muted)]">
+                Turns approved-evidence citation markers into real in-text citations and builds the References section.
+              </span>
+            </div>
+            {citationError && <p role="alert" className="mt-2 text-[10px] text-red-400">Error: {citationError}</p>}
+            {citationOutcome && (
+              <p className="mt-2 text-[10px] text-[color:var(--text-secondary)]">
+                {citationOutcome.citedSourceIds.length === 0
+                  ? "Nothing to resolve — no citation markers found."
+                  : `Resolved ${citationOutcome.citedSourceIds.length} source(s) into the References section.`}
+                {citationOutcome.unresolvedIds.length > 0 &&
+                  ` ${citationOutcome.unresolvedIds.length} marker(s) could not be resolved and were left as-is: ${citationOutcome.unresolvedIds.join(", ")}.`}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       {/* Export controls (docs 33-EXPORT-ARCHITECTURE.md) */}
       <div className="border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-10 py-4">
         <div className="max-w-[75ch] mx-auto">

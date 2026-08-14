@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getDocument, getOutputTypeSpec, getProject, getRubric, submitDocument, UnauthenticatedError } from "./api";
+import { getDocument, getOutputTypeSpec, getProject, getRubric, resolveCitations, submitDocument, UnauthenticatedError } from "./api";
 import { plainTextToDocument } from "./plainTextToDocument";
 import Header from "./regions/Header";
 import Rail from "./regions/Rail";
@@ -130,6 +130,16 @@ export default function DeskShell({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /** Deterministically resolve citation markers in the saved document (src/app/citation/resolveCitations.ts) — the route doesn't echo the document body back, so re-fetch it and the Rubric afterward, same as any other document-changing action here. */
+  async function handleResolveCitations() {
+    const result = await resolveCitations(projectId);
+    const [doc, rub] = await Promise.all([getDocument(projectId), getRubric(projectId)]);
+    setDocument(doc);
+    setRubric(rub);
+    setProject((p) => (p ? { ...p, gates: result.gates } : p));
+    return { citedSourceIds: result.citedSourceIds, unresolvedIds: result.unresolvedIds };
   }
 
   function jumpToBlock(blockId: string) {
@@ -283,6 +293,7 @@ export default function DeskShell({
               onSaveDocument={handleSaveDocument}
               submitting={submitting}
               projectId={projectId}
+              onResolveCitations={handleResolveCitations}
             />
           </>
         )}
