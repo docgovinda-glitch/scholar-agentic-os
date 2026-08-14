@@ -60,6 +60,7 @@ import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, Sup
 import { addSubmission, updateSubmission, deleteSubmission, SubmissionError } from "../../src/domain/submission/submissions.ts";
 import { SUBMISSION_STATUSES } from "../../src/domain/submission/types.ts";
 import type { SubmissionRecord, SubmissionStatus } from "../../src/domain/submission/types.ts";
+import { isOutputTypeEnabled } from "./outputTypeAccess.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
 
@@ -266,16 +267,25 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   // them, and the "choose what you are writing" screen reads them.
   app.use("/api/projects", requireAuth);
 
-  /** Summaries of every catalog entry — the "choose an output type" list (docs 12 F-PRJ-1). */
+  /**
+   * Summaries of every ENABLED catalog entry — the "choose an output type"
+   * list (docs 12 F-PRJ-1). Filtered through outputTypeAccess.ts: Scholar
+   * Core's active implementation scope is Journal Article only right now,
+   * though every other type stays fully defined in the catalog underneath
+   * this list (see that module's own comment for why).
+   */
   app.get("/api/atlas/output-types", projectLimit, (_req, res) => {
-    const items = catalog.list().map((s) => ({
-      id: s.id,
-      label: s.label,
-      aliases: s.aliases,
-      family: s.family,
-      academicLevels: s.academicLevels,
-      typicalDisciplines: s.typicalDisciplines,
-    }));
+    const items = catalog
+      .list()
+      .filter((s) => isOutputTypeEnabled(s.id))
+      .map((s) => ({
+        id: s.id,
+        label: s.label,
+        aliases: s.aliases,
+        family: s.family,
+        academicLevels: s.academicLevels,
+        typicalDisciplines: s.typicalDisciplines,
+      }));
     res.json({ items });
   });
 
@@ -297,6 +307,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const spec = catalog.get(outputTypeId);
     if (!spec) {
       return res.status(404).json({ error: `No output type "${outputTypeId}" in the catalog.` });
+    }
+    if (!isOutputTypeEnabled(outputTypeId)) {
+      // 403, not 404: the type genuinely exists in the catalog — it's just
+      // not offered right now, a distinct condition from "doesn't exist".
+      return res.status(403).json({
+        error: `Creating a "${spec.label}" project is not available right now. Scholar Core currently supports Journal Article projects only.`,
+      });
     }
     const created = await store.create(outputTypeId, currentUserId(req));
     // Compute G0's and G3's real exit criteria immediately from the (still

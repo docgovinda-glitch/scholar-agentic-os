@@ -218,6 +218,7 @@ describe("Desk — project shell", () => {
     window.history.pushState({}, "", "/projects/proj-42");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
+      { url: /\/api\/atlas\/output-types\/OT-06$/, body: { id: "OT-06", label: "Journal Article", family: "article", intakeSchema: { required: [], recommended: [], optional: [] } } },
       {
         url: /\/api\/projects\/proj-42$/,
         body: projectView("proj-42", {
@@ -337,6 +338,7 @@ describe("Desk — account settings", () => {
     window.history.pushState({}, "", "/projects/proj-42");
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
+      { url: /\/api\/atlas\/output-types\/OT-06$/, body: { id: "OT-06", label: "Journal Article", family: "article", intakeSchema: { required: [], recommended: [], optional: [] } } },
       { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
     ]);

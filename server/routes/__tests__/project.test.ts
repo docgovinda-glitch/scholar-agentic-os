@@ -16,6 +16,18 @@ import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
+import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";
+
+// This file exercises the generic Atlas/Conductor/Rubric engine across
+// several output types (OT-01, OT-04, ...) as neutral fixtures — it is not
+// testing those types as products. Scholar Core's real, product-facing
+// active scope (Journal Article only) is narrower; opt back into every type
+// here so this suite keeps proving the underlying engine still works for
+// all 24, which is exactly what it's for. The restriction itself has its
+// own dedicated tests in outputTypeAccess.test.ts.
+beforeEach(() => {
+  __setEnabledOutputTypesForTests("all");
+});
 
 interface IntakeFieldLike {
   key: string;

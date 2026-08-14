@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getProject, getRubric, listOutputTypes, submitDocument, UnauthenticatedError } from "./api";
+import { getOutputTypeSpec, getProject, getRubric, submitDocument, UnauthenticatedError } from "./api";
 import { plainTextToDocument } from "./plainTextToDocument";
 import Header from "./regions/Header";
 import Rail from "./regions/Rail";
@@ -11,7 +11,7 @@ import ClaimsPanel from "./claims/ClaimsPanel";
 import SubmissionsPanel from "./submissions/SubmissionsPanel";
 import { useDeskSession } from "./useDeskSession";
 import StatusBar from "./regions/StatusBar";
-import type { CanonicalDocument, OutputTypeSummary, ProjectView, RubricReport } from "./types";
+import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "./types";
 
 export type DeskShellView = "intake" | "document" | "evidence" | "progress" | "submissions";
 
@@ -52,13 +52,13 @@ export default function DeskShell({
   const [project, setProject] = useState<ProjectView | null>(null);
   const [document, setDocument] = useState<CanonicalDocument | null>(null);
   const [rubric, setRubric] = useState<RubricReport | null>(null);
-  const [outputType, setOutputType] = useState<OutputTypeSummary | null>(null);
+  const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [proj, rub, types] = await Promise.all([getProject(projectId), getRubric(projectId), listOutputTypes()]);
+      const [proj, rub] = await Promise.all([getProject(projectId), getRubric(projectId)]);
       setProject(proj);
       // Land on whichever surface has the outstanding work — but only when
       // the URL didn't already say. Reads `view` from this closure rather
@@ -70,7 +70,12 @@ export default function DeskShell({
         onViewChange(proj.gates.find((g) => g.gate === "G0")?.status === "signed_off" ? "document" : "intake", { replace: true });
       }
       setRubric(rub);
-      setOutputType(types.items.find((t) => t.id === proj.outputTypeId) ?? null);
+      // Resolved by id (unfiltered), not from the "choose a type" listing —
+      // that listing only offers Scholar Core's currently-active types, but
+      // a project created before that restriction (or of any other type,
+      // since the catalog itself still defines all 24) must still resolve
+      // its own spec correctly.
+      setOutputType(await getOutputTypeSpec(proj.outputTypeId).catch(() => null));
     } catch (e) {
       setError(
         e instanceof UnauthenticatedError
