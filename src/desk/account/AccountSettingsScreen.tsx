@@ -86,17 +86,21 @@ export default function AccountSettingsScreen({
       .catch(() => setIsPremium(false));
   }, []);
 
+  // Recomputed every render from live state, not a snapshot taken at the
+  // last click of Save — otherwise fixing the phone number after a failed
+  // save leaves the old "Enter a valid phone number" error sitting on
+  // screen, unrelated to what's now actually in the field, until the next
+  // save attempt overwrites it. Shown inline on PhoneField itself and used
+  // to gate the button below, not funneled through the generic saveError
+  // banner used for actual server-side failures.
   const phoneProblem = e164Problem(phoneCountryCode, phone);
 
   async function handleSaveProfile() {
+    if (phoneProblem) return; // belt-and-suspenders — the button is already disabled for this
     setSaving(true);
     setSaveError(null);
     setSaved(false);
     try {
-      if (phoneProblem) {
-        setSaveError(phoneProblem);
-        return;
-      }
       const result = await saveProfileFields({
         fullName: fullName.trim(),
         phone: phone.trim(),
@@ -202,6 +206,7 @@ export default function AccountSettingsScreen({
                 onCountryCodeChange={setPhoneCountryCode}
                 number={phone}
                 onNumberChange={setPhone}
+                error={phoneProblem}
               />
 
               <Field id="account-affiliation" label="Institution" value={affiliation} onChange={setAffiliation} required={false} />
@@ -229,7 +234,7 @@ export default function AccountSettingsScreen({
               <button
                 type="button"
                 onClick={() => void handleSaveProfile()}
-                disabled={saving}
+                disabled={saving || phoneProblem !== null}
                 className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] disabled:opacity-60"
               >
                 {saving ? "Saving…" : "Save changes"}
