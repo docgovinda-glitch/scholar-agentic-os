@@ -792,6 +792,21 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
   }));
 
+  /**
+   * The project's document body. 404s if none has been submitted yet.
+   * Needed to load an already-submitted document back into the editor
+   * (src/desk/editor/CanonicalDocumentEditor.tsx) after a page refresh —
+   * ProjectView only carries hasDocument: boolean, not the document itself.
+   */
+  app.get("/api/projects/:id/document", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.document) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no document submitted yet.` });
+    }
+    res.json(record.document);
+  }));
+
   /** The most recent Rubric evaluation of the project's document. 404s if no document has been submitted yet. */
   app.get("/api/projects/:id/rubric", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);

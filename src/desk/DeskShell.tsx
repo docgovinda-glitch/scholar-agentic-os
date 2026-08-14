@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getOutputTypeSpec, getProject, getRubric, submitDocument, UnauthenticatedError } from "./api";
+import { getDocument, getOutputTypeSpec, getProject, getRubric, submitDocument, UnauthenticatedError } from "./api";
 import { plainTextToDocument } from "./plainTextToDocument";
 import Header from "./regions/Header";
 import Rail from "./regions/Rail";
@@ -65,8 +65,9 @@ export default function DeskShell({
 
   const load = useCallback(async () => {
     try {
-      const [proj, rub] = await Promise.all([getProject(projectId), getRubric(projectId)]);
+      const [proj, rub, doc] = await Promise.all([getProject(projectId), getRubric(projectId), getDocument(projectId)]);
       setProject(proj);
+      setDocument(doc);
       // Land on whichever surface has the outstanding work — but only when
       // the URL didn't already say. Reads `view` from this closure rather
       // than as a dependency: load() itself only ever runs once per project
@@ -102,6 +103,22 @@ export default function DeskShell({
     setError(null);
     try {
       const doc = plainTextToDocument(projectId, project?.projectId ?? "Untitled", text);
+      const result = await submitDocument(projectId, doc);
+      setDocument(doc);
+      setProject(result);
+      setRubric(result.rubric);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  /** Save edits made in the real editor (editor/CanonicalDocumentEditor.tsx) — same PUT .../document route handleSubmitPlainText uses, just with a document the editor itself produced instead of one built from pasted plain text. */
+  async function handleSaveDocument(doc: CanonicalDocument) {
+    setSubmitting(true);
+    setError(null);
+    try {
       const result = await submitDocument(projectId, doc);
       setDocument(doc);
       setProject(result);
@@ -241,7 +258,13 @@ export default function DeskShell({
         ) : (
           <>
             <Rail document={document} outputTypeId={project.outputTypeId} onJumpToBlock={jumpToBlock} />
-            <Primary document={document} onSubmitPlainText={handleSubmitPlainText} submitting={submitting} projectId={projectId} />
+            <Primary
+              document={document}
+              onSubmitPlainText={handleSubmitPlainText}
+              onSaveDocument={handleSaveDocument}
+              submitting={submitting}
+              projectId={projectId}
+            />
           </>
         )}
         <Aside

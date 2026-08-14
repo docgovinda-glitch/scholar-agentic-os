@@ -546,3 +546,39 @@ button:disabled {
   }
   .hover-lift:hover { transform: none; }
 }
+
+/* Manuscript editor (src/desk/editor/CanonicalDocumentEditor.tsx) — matches
+   Primary.tsx's read-only BlockView styling as closely as Tailwind's utility
+   classes allow, scoped to TipTap's rendered ProseMirror content rather than
+   applied globally. */
+.tiptap-editor .ProseMirror {
+  outline: none;
+}
+.tiptap-editor h1 {
+  @apply text-2xl font-serif font-bold mt-6 mb-2 text-[color:var(--text-primary)];
+}
+.tiptap-editor h2 {
+  @apply text-xl font-serif font-bold mt-5 mb-2 text-[color:var(--text-primary)];
+}
+.tiptap-editor h3 {
+  @apply text-lg font-serif font-semibold mt-4 mb-1 text-[color:var(--text-primary)];
+}
+.tiptap-editor blockquote {
+  @apply border-l-2 border-[color:var(--color-luminous-blue-dim)] pl-4 italic text-[color:var(--text-secondary)] my-3;
+}
+.tiptap-editor ul {
+  @apply my-2 pl-0;
+}
+.tiptap-editor li {
+  @apply ml-5 list-disc text-[color:var(--text-secondary)];
+}
+.tiptap-editor p {
+  @apply text-[color:var(--text-secondary)] leading-relaxed my-2;
+}
+.tiptap-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

@@ -212,6 +212,13 @@ export async function getRubric(projectId: string): Promise<RubricReport | null>
   return json<RubricReport>(res);
 }
 
+/** Returns null (not an error) when no document has been submitted yet — same convention as getRubric(). */
+export async function getDocument(projectId: string): Promise<CanonicalDocument | null> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/document`);
+  if (res.status === 404) return null;
+  return json<CanonicalDocument>(res);
+}
+
 export function submitDocument(projectId: string, document: CanonicalDocument): Promise<ProjectView & { rubric: RubricReport }> {
   return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/document`, "PUT", { document }).then((r) => json(r));
 }

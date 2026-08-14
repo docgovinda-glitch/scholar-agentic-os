@@ -139,6 +139,7 @@ describe("Desk — project list", () => {
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       { url: /\/api\/projects\/proj-abc$/, body: projectView("proj-abc") },
       { url: /\/api\/projects\/proj-abc\/rubric$/, body: {}, status: 404 },
+      { url: /\/api\/projects\/proj-abc\/document$/, body: {}, status: 404 },
     ]);
 
     renderDeskApp();
@@ -160,6 +161,7 @@ describe("Desk — project list", () => {
       { url: /\/api\/projects$/, method: "POST", body: projectView("proj-new") },
       { url: /\/api\/projects\/proj-new$/, body: projectView("proj-new") },
       { url: /\/api\/projects\/proj-new\/rubric$/, body: {}, status: 404 },
+      { url: /\/api\/projects\/proj-new\/document$/, body: {}, status: 404 },
     ]);
 
     renderDeskApp();
@@ -182,6 +184,7 @@ describe("Desk — project shell", () => {
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
+      { url: /\/api\/projects\/proj-42\/document$/, body: {}, status: 404 },
     ]);
 
     renderDeskApp();
@@ -195,6 +198,7 @@ describe("Desk — project shell", () => {
       { url: /\/api\/atlas\/output-types$/, body: { items: [OT] } },
       { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
+      { url: /\/api\/projects\/proj-42\/document$/, body: {}, status: 404 },
     ]);
 
     renderDeskApp();
@@ -228,6 +232,7 @@ describe("Desk — project shell", () => {
         }),
       },
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
+      { url: /\/api\/projects\/proj-42\/document$/, body: {}, status: 404 },
     ]);
 
     renderDeskApp();
@@ -248,6 +253,7 @@ describe("Desk — project shell", () => {
         }),
       },
       { url: /\/api\/projects\/proj-7\/rubric$/, body: {}, status: 404 },
+      { url: /\/api\/projects\/proj-7\/document$/, body: {}, status: 404 },
       {
         url: /\/api\/projects\/proj-7\/document$/,
         method: "PUT",
@@ -292,6 +298,7 @@ describe("Desk — project shell", () => {
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [] } },
       { url: /\/api\/projects\/missing\/rubric$/, body: {}, status: 404 },
+      { url: /\/api\/projects\/missing\/document$/, body: {}, status: 404 },
       { url: /\/api\/projects\/missing$/, body: { error: 'No project "missing".' }, status: 404 },
     ]);
 
@@ -308,6 +315,7 @@ describe("Desk — project shell", () => {
     mockFetchSequence([
       { url: /\/api\/atlas\/output-types$/, body: { items: [] } },
       { url: /\/api\/projects\/proj-9\/rubric$/, body: {}, status: 401 },
+      { url: /\/api\/projects\/proj-9\/document$/, body: {}, status: 401 },
       { url: /\/api\/projects\/proj-9$/, body: { error: "Invalid or expired token" }, status: 401 },
     ]);
 
@@ -342,6 +350,7 @@ describe("Desk — account settings", () => {
       { url: /\/api\/atlas\/output-types\/OT-06$/, body: { id: "OT-06", label: "Journal Article", family: "article", intakeSchema: { required: [], recommended: [], optional: [] } } },
       { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
+      { url: /\/api\/projects\/proj-42\/document$/, body: {}, status: 404 },
     ]);
     renderDeskApp();
 
