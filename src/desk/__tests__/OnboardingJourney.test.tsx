@@ -21,6 +21,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import { BrowserRouter } from "react-router-dom";
 
 const USER = { id: "11111111-1111-4111-8111-111111111111", email: "scholar@example.com" };
 
@@ -106,6 +107,20 @@ const HARDWARE_NO_LOCAL = {
 
 const { default: DeskApp } = await import("../DeskApp");
 
+// DeskApp renders a <Routes> tree (Phase 2 of the routing migration) — it
+// needs a real Router ancestor, same as it gets from main.tsx in production.
+// BrowserRouter, not MemoryRouter: the still-unmigrated internal DeskRoutes()
+// (Phase 3's job) reads/writes window.location directly, so the router's
+// notion of the current URL has to be the same window.location this file's
+// tests already push state onto.
+function renderDeskApp() {
+  return render(
+    <BrowserRouter>
+      <DeskApp />
+    </BrowserRouter>
+  );
+}
+
 const NO_SERVER_SOURCE = { connections: [], entitlement: { status: "none", active: false }, quota: null, creditBalance: null };
 const ONE_CONNECTION_SOURCE = {
   connections: [{ provider_id: "groq", tier: "free", status: "connected", models_detected: 5 }],
@@ -157,6 +172,9 @@ beforeEach(() => {
   loadHardwareProfile.mockReset().mockResolvedValue(null);
   detectHardwareProfile.mockReset().mockResolvedValue(HARDWARE_NO_LOCAL);
   mockFetchSequence([NO_PROJECTS]);
+  // Deterministic starting URL for every test, not just a leftover from the
+  // previous one's afterEach.
+  window.history.pushState({}, "", "/desk");
 });
 
 afterEach(() => {
@@ -167,7 +185,7 @@ afterEach(() => {
 
 describe("the canonical first-login journey", () => {
   it("1. a brand-new user is taken to AI Access, not straight to the workspace", async () => {
-    render(<DeskApp />);
+    renderDeskApp();
     // AI Access's own h1, in onboarding mode — the same page the "AI Access"
     // nav item opens later, distinguished from a plain revisit by the
     // Skip/Continue header (asserted in test 3/4 below) rather than a
@@ -180,14 +198,14 @@ describe("the canonical first-login journey", () => {
     getAiAccessStatus.mockResolvedValue(ONE_CONNECTION_SOURCE);
     db.user_vaults = { label: "My Knowledge Vault", created_at: "2026-01-01T00:00:00.000Z" };
 
-    render(<DeskApp />);
+    renderDeskApp();
     expect(await screen.findByText("No projects yet")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "AI Access" })).not.toBeInTheDocument();
     expect(screen.queryByText(/long-term library/i)).not.toBeInTheDocument();
   });
 
   it("3. completing AI Access moves to Knowledge Setup next, not straight to the workspace", async () => {
-    render(<DeskApp />);
+    renderDeskApp();
     await screen.findByRole("heading", { name: "AI Access" });
 
     // Configure a provider — the same per-provider flow AiAccessPage.test.tsx
@@ -204,7 +222,7 @@ describe("the canonical first-login journey", () => {
   });
 
   it("4. skipping Knowledge moves to the workspace", async () => {
-    render(<DeskApp />);
+    renderDeskApp();
     fireEvent.click(await screen.findByRole("button", { name: /Skip for now/ }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
@@ -214,7 +232,7 @@ describe("the canonical first-login journey", () => {
   });
 
   it("5. completing Knowledge moves to the workspace, with a one-time welcome", async () => {
-    render(<DeskApp />);
+    renderDeskApp();
     fireEvent.click(await screen.findByRole("button", { name: /Skip for now/ }));
 
     fireEvent.click(await screen.findByRole("button", { name: /Create a Vault/ }));
@@ -236,14 +254,14 @@ describe("the canonical first-login journey", () => {
     getAiAccessStatus.mockResolvedValue(ONE_CONNECTION_SOURCE);
     // Knowledge genuinely undecided: no Vault, and no skip recorded.
 
-    render(<DeskApp />);
+    renderDeskApp();
     expect(await screen.findByText(/long-term library/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Connect an AI provider" })).not.toBeInTheDocument();
   });
 
   it("9. a direct project URL mid-onboarding still shows AI Access first, never the project underneath it", async () => {
     window.history.pushState({}, "", "/desk?project=some-project");
-    render(<DeskApp />);
+    renderDeskApp();
     expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
   });
 
@@ -251,11 +269,11 @@ describe("the canonical first-login journey", () => {
     getAiAccessStatus.mockResolvedValue(ONE_CONNECTION_SOURCE);
     db.user_vaults = { label: "My Knowledge Vault", created_at: "2026-01-01T00:00:00.000Z" };
 
-    const { unmount } = render(<DeskApp />);
+    const { unmount } = renderDeskApp();
     await screen.findByText("No projects yet");
     unmount();
 
-    render(<DeskApp />);
+    renderDeskApp();
     expect(await screen.findByText("No projects yet")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "AI Access" })).not.toBeInTheDocument();
     expect(screen.queryByText(/long-term library/i)).not.toBeInTheDocument();

@@ -9,10 +9,20 @@
 // client-side gate protects nothing on its own, which is why
 // server/routes/__tests__/project.authz.test.ts exists and why the
 // "unconfigured" case below still refuses to render children.
+//
+// DeskAuthGate.tsx used to be a single component that decided whether to
+// render its children at all, swapping in AuthFlow's internal switch for
+// every unauthenticated case. It is now a set of route guards (RequireAuth,
+// PublicOnly, RequireRecovery) with each real screen mounted at its own URL —
+// this file's TestApp mirrors DeskApp.tsx's actual route tree (minus the
+// workspace itself, which has its own dependency graph and its own tests) so
+// these tests exercise real navigation, not a simulated one.
 
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import { Routes, Route, useNavigate } from "react-router-dom";
+import { renderWithRouter, type RenderWithRouterOptions } from "../../testUtils/renderWithRouter";
 
 const useDeskSession = vi.fn();
 vi.mock("../useDeskSession", () => ({ useDeskSession: () => useDeskSession() }));
@@ -25,34 +35,84 @@ const resendVerificationEmail = vi.fn();
 const checkUsernameAvailable = vi.fn();
 const checkEmailAvailable = vi.fn();
 const checkPhoneAvailable = vi.fn();
-/** Captures the callback so a test can fire a recovery link's arrival. */
-let recoveryCallback: (() => void) | null = null;
-const onPasswordRecovery = vi.fn((cb: () => void) => {
-  recoveryCallback = cb;
-  return () => {};
-});
 
 vi.mock("../../services/supabaseAuthService", () => ({
   signIn: (...a: unknown[]) => signIn(...a),
   signUp: (...a: unknown[]) => signUp(...a),
   sendPasswordResetEmail: (...a: unknown[]) => sendPasswordResetEmail(...a),
   updatePassword: (...a: unknown[]) => updatePassword(...a),
-  onPasswordRecovery: (cb: () => void) => onPasswordRecovery(cb),
   resendVerificationEmail: (...a: unknown[]) => resendVerificationEmail(...a),
   checkUsernameAvailable: (...a: unknown[]) => checkUsernameAvailable(...a),
   checkEmailAvailable: (...a: unknown[]) => checkEmailAvailable(...a),
   checkPhoneAvailable: (...a: unknown[]) => checkPhoneAvailable(...a),
 }));
 
-const { default: DeskAuthGate } = await import("../DeskAuthGate");
+const { RequireAuth, PublicOnly, RequireRecovery } = await import("../DeskAuthGate");
+const {
+  LandingRoute,
+  SignInRoute,
+  SignUpRoute,
+  ForgotRoute,
+  RecoverRoute,
+  RegisteredRoute,
+  ResendVerificationRoute,
+  VerifyEmailRoute,
+} = await import("../auth/AuthFlow");
 
 const Protected = () => <p>Your work</p>;
-const gate = () =>
-  render(
-    <DeskAuthGate>
-      <Protected />
-    </DeskAuthGate>
+
+/**
+ * Test-only affordance for exercising real Back/Forward semantics —
+ * production has no such button; the browser chrome supplies this.
+ * navigate(-1)/navigate(1) drive the same history stack a real Back/Forward
+ * press would, whether that stack is window.history (BrowserRouter,
+ * production) or MemoryRouter's in-memory one (here).
+ */
+function BackForwardControls() {
+  const navigate = useNavigate();
+  return (
+    <div>
+      <button onClick={() => navigate(-1)}>Test Back</button>
+      <button onClick={() => navigate(1)}>Test Forward</button>
+    </div>
   );
+}
+
+/**
+ * Mirrors DeskApp.tsx's real route tree, with DeskRoutes (the full
+ * project-list/workspace app, its own dependency graph) swapped for a
+ * trivial Protected placeholder — this file exercises the auth boundary and
+ * screens, not the workspace behind it.
+ */
+function TestApp() {
+  return (
+    <>
+      <BackForwardControls />
+      <Routes>
+        <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
+        <Route path="/signin" element={<PublicOnly><SignInRoute /></PublicOnly>} />
+        <Route path="/signup" element={<PublicOnly><SignUpRoute /></PublicOnly>} />
+        <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />
+        <Route path="/signup/resend" element={<PublicOnly><ResendVerificationRoute /></PublicOnly>} />
+        <Route path="/reset-password" element={<PublicOnly><ForgotRoute /></PublicOnly>} />
+        <Route
+          path="/reset-password/confirm"
+          element={
+            <RequireRecovery>
+              <RecoverRoute />
+            </RequireRecovery>
+          }
+        />
+        <Route path="/verify-email" element={<VerifyEmailRoute />} />
+        <Route path="/*" element={<RequireAuth />}>
+          <Route path="*" element={<Protected />} />
+        </Route>
+      </Routes>
+    </>
+  );
+}
+
+const gate = (options?: RenderWithRouterOptions) => renderWithRouter(<TestApp />, options);
 
 beforeEach(() => {
   signIn.mockResolvedValue({ success: true });
@@ -66,7 +126,6 @@ beforeEach(() => {
   checkUsernameAvailable.mockResolvedValue(true);
   checkEmailAvailable.mockResolvedValue(true);
   checkPhoneAvailable.mockResolvedValue(true);
-  recoveryCallback = null;
 });
 
 afterEach(() => {
@@ -89,10 +148,11 @@ describe("DeskAuthGate", () => {
   });
 
   it("goes straight to the set-new-password screen on a recovery session, without waiting on AuthFlow's own detection", () => {
-    // useDeskSession's "recovery" status carries the AuthFlow needs directly
-    // (see its doc comment): by the time AuthFlow could mount and check for
-    // itself, Supabase has already consumed the one-time PASSWORD_RECOVERY
-    // event, so recoveryCallback is deliberately left unfired here.
+    // useDeskSession's "recovery" status carries everything AuthFlow needs
+    // directly (see its doc comment): by the time AuthFlow could mount and
+    // check for itself, Supabase has already consumed the one-time
+    // PASSWORD_RECOVERY event, so recoveryCallback is deliberately left
+    // unfired here.
     useDeskSession.mockReturnValue({ status: "recovery" });
     gate();
     expect(screen.getByText(/Set a new password/i)).toBeInTheDocument();
@@ -109,11 +169,11 @@ describe("DeskAuthGate", () => {
 
   it("calls acknowledge() when Continue is clicked, so the app can actually be reached", () => {
     // Regression test: acknowledge() must be wired all the way from
-    // useDeskSession through DeskAuthGate and AuthFlow to the success
-    // screen's button — a version of this that only changed AuthFlow's own
-    // local screen state would pass every other assertion here while still
-    // leaving the user permanently stuck, since useDeskSession's session
-    // status is what actually decides whether app content renders.
+    // useDeskSession through the /verify-email route to the success screen's
+    // button — a version of this that only changed local screen state would
+    // pass every other assertion here while still leaving the user
+    // permanently stuck, since useDeskSession's session status is what
+    // actually decides whether app content renders.
     const acknowledge = vi.fn();
     useDeskSession.mockReturnValue({ status: "email-verified", userId: "u1", email: "a@example.com", acknowledge });
     gate();
@@ -138,6 +198,49 @@ describe("DeskAuthGate", () => {
     // failure. It fails closed, and says why.
     expect(screen.queryByText("Your work")).not.toBeInTheDocument();
     expect(screen.getByText(/Sign-in is not configured/i)).toBeInTheDocument();
+  });
+});
+
+describe("browser history", () => {
+  beforeEach(() => useDeskSession.mockReturnValue({ status: "signed-out" }));
+
+  it("Homepage -> Signup -> Back -> Homepage -> Forward -> Signup: the exact sequence broken by the reported bug", async () => {
+    const locations: string[] = [];
+    gate({ onLocationChange: (loc) => locations.push(loc.pathname) });
+    expect(screen.getByRole("heading", { name: "SCHOLAR CORE" })).toBeInTheDocument();
+    expect(locations.at(-1)).toBe("/");
+
+    // Get Started must change the URL, not just what's on screen — this is
+    // the direct fix for the reported bug.
+    fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+    expect(await screen.findByRole("heading", { name: "Create your account" })).toBeInTheDocument();
+    expect(locations.at(-1)).toBe("/signup");
+
+    fireEvent.click(screen.getByRole("button", { name: "Test Back" }));
+    expect(await screen.findByRole("heading", { name: "SCHOLAR CORE" })).toBeInTheDocument();
+    expect(locations.at(-1)).toBe("/");
+
+    fireEvent.click(screen.getByRole("button", { name: "Test Forward" }));
+    expect(await screen.findByRole("heading", { name: "Create your account" })).toBeInTheDocument();
+    expect(locations.at(-1)).toBe("/signup");
+  });
+
+  it("refreshing on /signup lands back on /signup, not the homepage", () => {
+    gate({ initialEntries: ["/signup"] });
+    expect(screen.getByRole("heading", { name: "Create your account" })).toBeInTheDocument();
+  });
+
+  it("a signed-in visitor hitting /signup directly is redirected into the app, not shown a stale form", () => {
+    useDeskSession.mockReturnValue({ status: "signed-in", userId: "u1", email: "a@example.com" });
+    gate({ initialEntries: ["/signup"] });
+    expect(screen.getByText("Your work")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Create your account" })).not.toBeInTheDocument();
+  });
+
+  it("a signed-out visitor hitting a protected route directly is redirected to sign in, with a way back to it", async () => {
+    gate({ initialEntries: ["/some/protected/path"] });
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.queryByText("Your work")).not.toBeInTheDocument();
   });
 });
 
@@ -370,16 +473,11 @@ describe("registration", () => {
 });
 
 describe("password reset", () => {
-  beforeEach(() => useDeskSession.mockReturnValue({ status: "signed-out" }));
-
-  function navigateToForgotPassword() {
-    gate();
-    // Navigate through landing page to sign-in screen
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  }
-
   it("does not confirm whether an address has an account", async () => {
-    navigateToForgotPassword();
+    useDeskSession.mockReturnValue({ status: "signed-out" });
+    gate();
+    // Navigate through landing page to sign-in, then to Forgot password
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     fireEvent.click(screen.getByRole("button", { name: "Forgot your password?" }));
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "someone@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Send reset link" }));
@@ -389,41 +487,36 @@ describe("password reset", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(/If an account exists/i);
   });
 
-  it("switches to the set-new-password screen when a recovery link is detected", async () => {
-    navigateToForgotPassword();
-    expect(onPasswordRecovery).toHaveBeenCalled();
+  // How a visitor's session actually becomes "recovery" — Supabase's
+  // PASSWORD_RECOVERY event flipping useDeskSession's status (see its doc
+  // comment) — and how that redirects them here from wherever they were is
+  // covered by "goes straight to the set-new-password screen on a recovery
+  // session" above (RequireRecovery reads that status fresh on every render,
+  // the same as every other guard). These exercise the screen itself.
+  describe("once on the set-new-password screen", () => {
+    beforeEach(() => useDeskSession.mockReturnValue({ status: "recovery" }));
 
-    // The user arrived by clicking a link in their email, not by navigating
-    // here — so this is reached by event, never by a button.
-    recoveryCallback?.();
+    it("blocks submission while the two passwords differ", () => {
+      gate({ initialEntries: ["/reset-password/confirm"] });
 
-    expect(await screen.findByText(/Set a new password/i)).toBeInTheDocument();
-  });
+      fireEvent.change(screen.getByLabelText("New password"), { target: { value: "longenough1" } });
+      fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "longenough2" } });
 
-  it("blocks submission while the two passwords differ", async () => {
-    navigateToForgotPassword();
-    recoveryCallback?.();
-    await screen.findByText(/Set a new password/i);
+      expect(screen.getByRole("button", { name: "Save new password" })).toBeDisabled();
+      expect(screen.getByRole("alert")).toHaveTextContent(/do not match/i);
 
-    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "longenough1" } });
-    fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "longenough2" } });
+      fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "longenough1" } });
+      expect(screen.getByRole("button", { name: "Save new password" })).toBeEnabled();
+    });
 
-    expect(screen.getByRole("button", { name: "Save new password" })).toBeDisabled();
-    expect(screen.getByRole("alert")).toHaveTextContent(/do not match/i);
+    it("saves the new password through the auth service", async () => {
+      gate({ initialEntries: ["/reset-password/confirm"] });
 
-    fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "longenough1" } });
-    expect(screen.getByRole("button", { name: "Save new password" })).toBeEnabled();
-  });
+      fireEvent.change(screen.getByLabelText("New password"), { target: { value: "longenough1" } });
+      fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "longenough1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Save new password" }));
 
-  it("saves the new password through the auth service", async () => {
-    navigateToForgotPassword();
-    recoveryCallback?.();
-    await screen.findByText(/Set a new password/i);
-
-    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "longenough1" } });
-    fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "longenough1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save new password" }));
-
-    await waitFor(() => expect(updatePassword).toHaveBeenCalledWith("longenough1"));
+      await waitFor(() => expect(updatePassword).toHaveBeenCalledWith("longenough1"));
+    });
   });
 });

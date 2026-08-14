@@ -1,7 +1,18 @@
 import { useEffect, useState } from "react";
+import { Routes, Route } from "react-router-dom";
 import AccountSettingsScreen from "./account/AccountSettingsScreen";
 import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
-import DeskAuthGate from "./DeskAuthGate";
+import { RequireAuth, PublicOnly, RequireRecovery } from "./DeskAuthGate";
+import {
+  LandingRoute,
+  SignInRoute,
+  SignUpRoute,
+  ForgotRoute,
+  RecoverRoute,
+  RegisteredRoute,
+  ResendVerificationRoute,
+  VerifyEmailRoute,
+} from "./auth/AuthFlow";
 import DeskShell from "./DeskShell";
 import ProjectListScreen from "./ProjectListScreen";
 import VaultSetupScreen from "./setup/VaultSetupScreen";
@@ -196,10 +207,40 @@ function DeskRoutes() {
   );
 }
 
+/**
+ * Root route tree for everything except /admin/* (see main.tsx).
+ *
+ * The public auth routes each get their own path now — this is the direct
+ * fix for the reported bug (clicking "Get Started" used to change only
+ * in-memory state, invisible to Back/Forward/refresh; it now navigates to
+ * /signup for real). Everything past DeskRoutes is still the pre-migration
+ * conditional-state tree (project list, an open project, Account Settings,
+ * AI Access, Vault) — those become real routes in a later phase; for now
+ * they all live under the catch-all "/*" route, wrapped in RequireAuth so
+ * the authenticated/unauthenticated boundary itself is route-driven even
+ * before every screen inside it is.
+ */
 export default function DeskApp() {
   return (
-    <DeskAuthGate>
-      <DeskRoutes />
-    </DeskAuthGate>
+    <Routes>
+      <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
+      <Route path="/signin" element={<PublicOnly><SignInRoute /></PublicOnly>} />
+      <Route path="/signup" element={<PublicOnly><SignUpRoute /></PublicOnly>} />
+      <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />
+      <Route path="/signup/resend" element={<PublicOnly><ResendVerificationRoute /></PublicOnly>} />
+      <Route path="/reset-password" element={<PublicOnly><ForgotRoute /></PublicOnly>} />
+      <Route
+        path="/reset-password/confirm"
+        element={
+          <RequireRecovery>
+            <RecoverRoute />
+          </RequireRecovery>
+        }
+      />
+      <Route path="/verify-email" element={<VerifyEmailRoute />} />
+      <Route path="/*" element={<RequireAuth />}>
+        <Route path="*" element={<DeskRoutes />} />
+      </Route>
+    </Routes>
   );
 }

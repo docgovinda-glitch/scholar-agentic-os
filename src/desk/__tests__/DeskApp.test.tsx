@@ -9,10 +9,25 @@
 // is tested in DeskAuthGate.test.tsx, and the server-side enforcement that
 // actually protects the data is in server/routes/__tests__/project.authz.test.ts.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import { BrowserRouter } from "react-router-dom";
 import DeskApp from "../DeskApp";
+
+// DeskApp now renders a <Routes> tree (Phase 2 of the routing migration) —
+// it needs a real Router ancestor, same as it gets from main.tsx in
+// production. BrowserRouter, not MemoryRouter: the still-unmigrated internal
+// DeskRoutes() (Phase 3's job) reads/writes window.location directly via
+// readProjectIdFromUrl()/pushState, so the router's notion of the current URL
+// has to be the same window.location these tests already assert against.
+function renderDeskApp() {
+  return render(
+    <BrowserRouter>
+      <DeskApp />
+    </BrowserRouter>
+  );
+}
 
 vi.mock("../useDeskSession", () => ({
   useDeskSession: () => ({ status: "signed-in", userId: "user-1", email: "scholar@example.com" }),
@@ -95,6 +110,14 @@ const projectView = (projectId: string, over: Record<string, unknown> = {}) => (
   ...over,
 });
 
+// Deterministic starting URL for every test, not just a leftover from the
+// previous one's afterEach — the first test in the file would otherwise start
+// at jsdom's default "/", which "/" now matches as an explicit PublicOnly
+// route and redirects away from before landing on DeskRoutes.
+beforeEach(() => {
+  window.history.pushState({}, "", "/desk");
+});
+
 afterEach(() => {
   global.fetch = originalFetch;
   cleanup();
@@ -105,7 +128,7 @@ describe("Desk — project list", () => {
   it("shows the empty state when the user has no projects yet", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText("No projects yet")).toBeInTheDocument();
   });
@@ -118,7 +141,7 @@ describe("Desk — project list", () => {
       { url: /\/api\/projects\/proj-abc\/rubric$/, body: {}, status: 404 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText(/50% of intake answered/)).toBeInTheDocument();
     fireEvent.click(screen.getByText("OT-06"));
@@ -139,7 +162,7 @@ describe("Desk — project list", () => {
       { url: /\/api\/projects\/proj-new\/rubric$/, body: {}, status: 404 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     fireEvent.click(await screen.findByText("Create your first project"));
     fireEvent.change(await screen.findByLabelText("Document type"), { target: { value: "OT-06" } });
@@ -161,7 +184,7 @@ describe("Desk — project shell", () => {
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText(/About your journal article/i)).toBeInTheDocument();
   });
@@ -180,7 +203,7 @@ describe("Desk — project shell", () => {
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText("Journal Article")).toBeInTheDocument();
     expect(screen.getByText(/G0 Intake/)).toBeInTheDocument();
@@ -225,7 +248,7 @@ describe("Desk — project shell", () => {
       },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     const textarea = await screen.findByPlaceholderText(/Paste or type a draft/);
@@ -245,7 +268,7 @@ describe("Desk — project shell", () => {
       { url: /\/api\/projects\/missing$/, body: { error: 'No project "missing".' }, status: 404 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText('No project "missing".')).toBeInTheDocument();
     // A 404 here is also what another user's project looks like from outside,
@@ -261,7 +284,7 @@ describe("Desk — project shell", () => {
       { url: /\/api\/projects\/proj-9$/, body: { error: "Invalid or expired token" }, status: 401 },
     ]);
 
-    render(<DeskApp />);
+    renderDeskApp();
 
     expect(await screen.findByText(/session has expired/i)).toBeInTheDocument();
   });
@@ -276,7 +299,7 @@ describe("Desk — project shell", () => {
 describe("Desk — account settings", () => {
   it("opens from the project list and returns to it", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
-    render(<DeskApp />);
+    renderDeskApp();
 
     fireEvent.click(await screen.findByRole("button", { name: /Account Settings/ }));
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
@@ -292,7 +315,7 @@ describe("Desk — account settings", () => {
       { url: /\/api\/projects\/proj-42$/, body: projectView("proj-42") },
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
     ]);
-    render(<DeskApp />);
+    renderDeskApp();
 
     fireEvent.click(await screen.findByRole("button", { name: "Account Settings" }));
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
@@ -309,14 +332,14 @@ describe("Desk — account settings", () => {
 describe("Desk — AI Access", () => {
   it("has no separate AI Settings nav item — AI Access is the only one", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
-    render(<DeskApp />);
+    renderDeskApp();
     await screen.findByRole("button", { name: /Manage AI/ });
     expect(screen.queryByRole("button", { name: /^AI Settings$/ })).not.toBeInTheDocument();
   });
 
   it("opens from the project list, in manage mode (no onboarding Skip/Continue), and returns to it", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
-    render(<DeskApp />);
+    renderDeskApp();
 
     fireEvent.click(await screen.findByRole("button", { name: /Manage AI/ }));
     expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
