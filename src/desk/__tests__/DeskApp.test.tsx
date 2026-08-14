@@ -10,7 +10,7 @@
 // actually protects the data is in server/routes/__tests__/project.authz.test.ts.
 
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { BrowserRouter } from "react-router-dom";
 import DeskApp from "../DeskApp";
@@ -347,5 +347,22 @@ describe("Desk — AI Access", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(await screen.findByText("No projects yet")).toBeInTheDocument();
+  });
+
+  it("reflects the active section in the URL, so Back steps back through sections instead of leaving AI Access entirely", async () => {
+    mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
+    renderDeskApp();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Manage AI/ }));
+    await screen.findByRole("heading", { name: "AI Access" });
+    expect(window.location.pathname).toBe("/ai-access");
+
+    fireEvent.click(screen.getByRole("button", { name: "Local AI" }));
+    expect(await screen.findByRole("heading", { name: "Local AI" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/ai-access/local");
+
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe("/ai-access"));
+    expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
   });
 });

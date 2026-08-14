@@ -191,10 +191,12 @@ function AiAccessRoute() {
   const navigate = useNavigate();
   const location = useLocation();
   const { section } = useParams<{ section?: string }>();
+  const activeSection = isSectionId(section) ? section : "overview";
   return (
     <AiAccessPage
       onClose={() => navigate(returnTo(location))}
-      initialSection={isSectionId(section) ? section : "overview"}
+      section={activeSection}
+      onSectionChange={(next) => navigate(next === "overview" ? "/ai-access" : `/ai-access/${next}`)}
     />
   );
 }

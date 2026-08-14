@@ -65,6 +65,8 @@ export default function AiAccessPage({
   onContinue,
   onSkip,
   initialSection = "overview",
+  section: controlledSection,
+  onSectionChange,
 }: {
   /** Required in "manage" mode (the default). Unused in "onboarding" mode — there is nothing to "close" back to yet. */
   onClose?: () => void;
@@ -79,16 +81,27 @@ export default function AiAccessPage({
   onContinue?: () => void;
   /** Onboarding only: explicit "not now" — must survive a reload without re-asking (docs 25 §1.1). */
   onSkip?: () => void;
-  /** Which section to land on, e.g. "premium" when reached from Account Settings' "Upgrade to Premium" button. */
+  /** Uncontrolled starting section, e.g. "premium" from Account Settings' "Upgrade to Premium" button. Ignored once `section`/`onSectionChange` are given. */
   initialSection?: SectionId;
+  /**
+   * Controlled section — "manage" mode's route (/ai-access/:section) drives
+   * this so switching sections is real navigation, not just a repaint.
+   * Always pass this together with onSectionChange; "onboarding" mode omits
+   * both, since a forced interstitial has no URL of its own to sync (see the
+   * routing plan's "left as state" list).
+   */
+  section?: SectionId;
+  onSectionChange?: (section: SectionId) => void;
 }) {
   const access = useAiAccess();
-  const [section, setSection] = useState<SectionId>(initialSection);
+  const [internalSection, setInternalSection] = useState<SectionId>(initialSection);
+  const section = controlledSection ?? internalSection;
   /** Provider id whose detail pane is open, or null for the section's list. */
   const [openProvider, setOpenProvider] = useState<string | null>(null);
 
   function go(next: SectionId) {
-    setSection(next);
+    if (onSectionChange) onSectionChange(next);
+    else setInternalSection(next);
     setOpenProvider(null);
   }
 
