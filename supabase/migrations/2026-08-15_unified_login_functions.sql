@@ -56,30 +56,37 @@ language sql
 security definer set search_path = public
 stable
 as $$
+  -- Each branch is parenthesized: PostgreSQL requires that whenever a LIMIT
+  -- applies to one arm of a UNION rather than to the whole result — without
+  -- the parens this is a syntax error ("syntax error at or near 'union'"),
+  -- confirmed by actually running this migration against a live database
+  -- (it had never been applied or executed before, despite being marked
+  -- tested).
+
   -- Try username first (most specific)
-  select au.email, 'username'::text as found_by
+  (select au.email, 'username'::text as found_by
   from public.profiles p
   join auth.users au on au.id = p.id
   where p.username = lookup_identifier
-  limit 1
+  limit 1)
 
   union all
 
   -- Try email address (exact match in auth.users)
-  select au.email, 'email'::text as found_by
+  (select au.email, 'email'::text as found_by
   from auth.users au
   where au.email = lookup_identifier
-  limit 1
+  limit 1)
 
   union all
 
   -- Try phone_e164 (only if it looks like a phone in E.164 format)
-  select au.email, 'phone'::text as found_by
+  (select au.email, 'phone'::text as found_by
   from public.profiles p
   join auth.users au on au.id = p.id
   where p.phone_e164 = lookup_identifier
     and lookup_identifier like '+%'  -- E.164 format starts with +
-  limit 1
+  limit 1)
 $$;
 
 grant execute on function public.email_for_identifier(text) to anon, authenticated;

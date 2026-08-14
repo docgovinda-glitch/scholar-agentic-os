@@ -150,6 +150,33 @@ describe("AccountSettingsScreen — editing profile fields", () => {
     expect(await screen.findByText(/phone number is required/i)).toBeInTheDocument();
     expect(saveProfileFields).not.toHaveBeenCalled();
   });
+
+  it("disables Save changes while the phone number is invalid, live — not only after a click", async () => {
+    render(<AccountSettingsScreen onClose={() => {}} />);
+    await screen.findByLabelText("Full name");
+
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "" } });
+    expect(await screen.findByText(/phone number is required/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+  });
+
+  it("clears the invalid-phone error once the field is corrected, without requiring another click", async () => {
+    // Regression test: the error used to be a snapshot taken at the moment
+    // Save was clicked, so fixing the phone number afterward left the old
+    // error message on screen — describing a field that no longer matched
+    // what was actually typed — until the user clicked Save again.
+    render(<AccountSettingsScreen onClose={() => {}} />);
+    await screen.findByLabelText("Full name");
+
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText(/phone number is required/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "5550199" } });
+
+    expect(screen.queryByText(/phone number is required/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+  });
 });
 
 describe("AccountSettingsScreen — system-controlled fields", () => {

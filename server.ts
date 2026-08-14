@@ -177,6 +177,22 @@ const localRunnerSources = Array.from(
 // whatever is supplied, so leaving the key out silently reinstates it. Checked
 // against helmet directly — omitting keeps the directive in the header, null
 // removes it.
+// index.html's inline theme-flash-prevention <script> (the one wrapped in
+// try/catch, setting data-theme from localStorage before first paint) has no
+// nonce, so `script-src 'self'` alone silently blocks it in production —
+// confirmed live via a browser console CSP violation naming that exact line.
+// The dev server never catches this: CSP is skipped entirely below when
+// NODE_ENV !== "production", and helmet was previously only exercised there.
+// Fixed with a CSP hash source rather than 'unsafe-inline', which would
+// reopen script-src to any injected inline script, not just this one.
+// INLINE_THEME_SCRIPT_CSP_HASH must match this script's exact content
+// (including whitespace) or the browser silently drops it again with no
+// server-side signal — scripts/verify-csp-hash.mjs (run via `npm run lint`)
+// recomputes the hash from index.html on every check and fails loudly if
+// this constant is stale, so an edit to the script without updating the
+// hash here cannot pass CI silently.
+const INLINE_THEME_SCRIPT_CSP_HASH = "'sha256-fdWiXG9IH9DkiQztgeK3IRvKYOa43XqS9lf0tqCnU6E='";
+
 const supabaseOrigin = process.env.VITE_SUPABASE_URL ? new URL(process.env.VITE_SUPABASE_URL).origin : undefined;
 app.use(
   helmet({
@@ -202,7 +218,9 @@ app.use(
         // Turnstile's script tag at runtime and Turnstile renders its
         // challenge in an iframe — both are blocked by helmet's default
         // `'self'`-only script-src/frame-src without these two additions.
-        "script-src": ["'self'", "https://challenges.cloudflare.com"],
+        // The hash source allows exactly index.html's one inline script —
+        // see INLINE_THEME_SCRIPT_CSP_HASH above.
+        "script-src": ["'self'", "https://challenges.cloudflare.com", INLINE_THEME_SCRIPT_CSP_HASH],
         "frame-src": ["'self'", "https://challenges.cloudflare.com"],
         "form-action": ["'self'", ...(supabaseOrigin ? [supabaseOrigin] : [])],
       },
