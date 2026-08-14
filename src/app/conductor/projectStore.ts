@@ -18,6 +18,8 @@ import { emptyGraph } from "../../domain/claim/graph";
 import type { ClaimEvidenceGraph } from "../../domain/claim/types";
 import type { SubmissionRecord } from "../../domain/submission/types";
 import type { JournalRequirements } from "../../domain/journal/types";
+import { emptyLedger } from "../../domain/evidence/types";
+import type { EvidenceLedger } from "../../domain/evidence/types";
 
 export interface ProjectRecord {
   projectId: string;
@@ -47,6 +49,8 @@ export interface ProjectRecord {
   submissions: SubmissionRecord[];
   /** The target journal's captured structural/citation/declaration requirements (docs 30 §10, G1). Undefined until PUT .../journal-requirements — a real, distinct "not yet captured" state, not defaulted to an empty object, same as `document`. */
   journalRequirements?: JournalRequirements;
+  /** Discovered sources and their evidence-provenance state (domain/evidence). Starts empty, same as claimGraph: always present, possibly with nothing in it yet. */
+  evidenceLedger: EvidenceLedger;
 }
 
 const projects = new Map<string, ProjectRecord>();
@@ -88,6 +92,7 @@ export function createProject(outputTypeId: string, ownerId: string): ProjectRec
     claimGraph: emptyGraph(),
     waivers: {},
     submissions: [],
+    evidenceLedger: emptyLedger(),
   };
   projects.set(projectId, record);
   return record;

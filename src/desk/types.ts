@@ -151,6 +151,55 @@ export interface JournalRequirementsProposal {
   unresolvedFields: string[];
 }
 
+/** Mirrors src/domain/evidence/types.ts. */
+export type SourceType = "scholarly" | "official" | "web" | "media" | "user_provided" | "vault";
+export type AuthorityTier = "A" | "B" | "C" | "D";
+export type DiscoveryMethod = "arxiv" | "web_search" | "user_upload" | "vault" | "manual";
+
+export interface DiscoveredSource {
+  id: string;
+  title: string;
+  authors: string[];
+  url?: string;
+  doi?: string;
+  venue?: string;
+  year?: number;
+  sourceType: SourceType;
+  authorityTier: AuthorityTier;
+  discoveredVia: DiscoveryMethod;
+  discoveredAt: string;
+}
+
+export type EvidenceState = "discovered" | "extracted" | "verified" | "proposed" | "user_approved" | "citable";
+
+export interface EvidenceHistoryEntry {
+  state: EvidenceState;
+  at: string;
+  by?: string;
+}
+
+export interface EvidenceLocator {
+  page?: number;
+  paragraph?: number;
+  startOffset?: number;
+  endOffset?: number;
+}
+
+export interface EvidenceItem {
+  id: string;
+  sourceId: string;
+  state: EvidenceState;
+  quote?: string;
+  locator?: EvidenceLocator;
+  proposedClaimId?: string;
+  history: EvidenceHistoryEntry[];
+}
+
+export interface EvidenceLedger {
+  sources: DiscoveredSource[];
+  items: EvidenceItem[];
+}
+
 export interface StudioRefineResult {
   diff: RefinementDiff;
   voiceDrift?: VoiceDriftReport;

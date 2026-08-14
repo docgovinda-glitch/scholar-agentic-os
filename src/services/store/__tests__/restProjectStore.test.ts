@@ -122,6 +122,7 @@ describe("restProjectStore: empty response bodies", () => {
         claimGraph: {} as ProjectRecord["claimGraph"],
         waivers: {},
         submissions: [],
+        evidenceLedger: { sources: [], items: [] },
       })
     ).resolves.toBeDefined();
   });
@@ -194,6 +195,7 @@ describe("restProjectStore: save", () => {
       claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
       waivers: {},
       submissions: [],
+      evidenceLedger: { sources: [], items: [] },
     };
 
     await s.save(record);
@@ -215,6 +217,7 @@ describe("restProjectStore: save", () => {
       claimGraph: {} as ProjectRecord["claimGraph"],
       waivers: {},
       submissions: [],
+      evidenceLedger: { sources: [], items: [] },
     });
 
     const body = calls[0].body as Record<string, unknown>;
@@ -242,11 +245,36 @@ describe("restProjectStore: save", () => {
       claimGraph: {} as ProjectRecord["claimGraph"],
       waivers: {},
       submissions: [],
+      evidenceLedger: { sources: [], items: [] },
       journalRequirements,
     });
 
     const body = calls[0].body as Record<string, unknown>;
     expect(body.journal_requirements).toEqual(journalRequirements);
+  });
+
+  it("serialises the evidence ledger through as-is, and defaults a row missing the column to an empty ledger on get()", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    const evidenceLedger = {
+      sources: [{ id: "src-1", title: "A Paper", authors: ["A"], sourceType: "scholarly" as const, authorityTier: "B" as const, discoveredVia: "arxiv" as const, discoveredAt: "2026-01-01T00:00:00.000Z" }],
+      items: [],
+    };
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger,
+    });
+    const body = calls[0].body as Record<string, unknown>;
+    expect(body.evidence_ledger).toEqual(evidenceLedger);
+
+    const { s: getStore } = store(() => ({ body: [row()] }));
+    expect((await getStore.get("proj-abc"))?.evidenceLedger).toEqual({ sources: [], items: [] });
   });
 });
 

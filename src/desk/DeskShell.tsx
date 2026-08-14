@@ -8,6 +8,7 @@ import Aside from "./regions/Aside";
 import IntakePanel from "./intake/IntakePanel";
 import GatesPanel from "./gates/GatesPanel";
 import ClaimsPanel from "./claims/ClaimsPanel";
+import EvidenceLedgerPanel from "./evidence/EvidenceLedgerPanel";
 import SubmissionsPanel from "./submissions/SubmissionsPanel";
 import JournalRequirementsPanel from "./journal/JournalRequirementsPanel";
 import { useDeskSession } from "./useDeskSession";
@@ -56,6 +57,11 @@ export default function DeskShell({
   const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Bumped when an evidence approval creates a new Claim–Evidence binding,
+  // so ClaimsPanel (which only fetches its graph on mount) remounts and
+  // picks it up — the two panels stay decoupled otherwise (see
+  // EvidenceLedgerPanel's own comment on why it fetches its own claim list).
+  const [claimsRefreshToken, setClaimsRefreshToken] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -192,8 +198,17 @@ export default function DeskShell({
             />
           </div>
         ) : view === "evidence" ? (
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8">
+            <EvidenceLedgerPanel
+              projectId={projectId}
+              actor={session.status === "signed-in" ? (session.email ?? session.userId) : "unknown"}
+              onApproved={(newRubric) => {
+                setClaimsRefreshToken((t) => t + 1);
+                if (newRubric) setRubric(newRubric);
+              }}
+            />
             <ClaimsPanel
+              key={claimsRefreshToken}
               projectId={projectId}
               onChanged={(updated, newRubric) => {
                 setProject(updated);

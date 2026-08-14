@@ -73,6 +73,17 @@ import { creditsForUsage, estimateMaxCreditsForInput } from "../src/aiEngine/cre
 import { deductCredits, type DeductResult } from "../src/aiEngine/creditEngine.ts";
 import { recordProviderFailure, recordProviderSuccess } from "../src/aiEngine/providerHealth.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
+import {
+  discoverSource,
+  extractEvidence,
+  verifyEvidence,
+  proposeEvidence,
+  approveEvidence,
+  rejectEvidence,
+  EvidenceStateError,
+} from "../../src/domain/evidence/stateMachine.ts";
+import type { DiscoveredSource, EvidenceLocator } from "../../src/domain/evidence/types.ts";
+import { discoverArxivSources, discoverWebSources } from "../src/discovery/discovery.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
 
@@ -338,6 +349,36 @@ async function runPremiumJournalExtraction(
   }
 
   return { ok: false, status: 502, error: lastError };
+}
+
+const SOURCE_TYPES = new Set(["scholarly", "official", "web", "media", "user_provided", "vault"]);
+const AUTHORITY_TIERS = new Set(["A", "B", "C", "D"]);
+
+/** Body of POST .../evidence-ledger/sources: a manually-added, already-known source. */
+function isValidManualSource(
+  value: unknown
+): value is Omit<DiscoveredSource, "id" | "discoveredAt" | "discoveredVia"> {
+  if (typeof value !== "object" || value === null) return false;
+  const s = value as Record<string, unknown>;
+  if (typeof s.title !== "string" || s.title.trim().length === 0) return false;
+  if (!Array.isArray(s.authors) || !s.authors.every((a) => typeof a === "string")) return false;
+  if (typeof s.sourceType !== "string" || !SOURCE_TYPES.has(s.sourceType)) return false;
+  if (typeof s.authorityTier !== "string" || !AUTHORITY_TIERS.has(s.authorityTier)) return false;
+  if (s.url !== undefined && typeof s.url !== "string") return false;
+  if (s.doi !== undefined && typeof s.doi !== "string") return false;
+  if (s.venue !== undefined && typeof s.venue !== "string") return false;
+  if (s.year !== undefined && typeof s.year !== "number") return false;
+  return true;
+}
+
+function isValidLocator(value: unknown): value is EvidenceLocator {
+  if (value === undefined) return true;
+  if (typeof value !== "object" || value === null) return false;
+  const l = value as Record<string, unknown>;
+  for (const key of ["page", "paragraph", "startOffset", "endOffset"]) {
+    if (l[key] !== undefined && typeof l[key] !== "number") return false;
+  }
+  return true;
 }
 
 function isValidBinding(value: unknown): value is ClaimEvidenceBinding {
@@ -940,6 +981,235 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     } catch (err) {
       if (err instanceof GateTransitionError) {
         return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
+  }));
+
+  /**
+   * The Evidence Ledger (domain/evidence): sources discovered so far and
+   * every evidence item's provenance state (docs' DISCOVERED → EXTRACTED →
+   * VERIFIED → PROPOSED → USER APPROVED → CITABLE pipeline). Upstream of the
+   * Claim–Evidence Graph above — see approve() below for where the two meet.
+   */
+
+  app.get("/api/projects/:id/evidence-ledger", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    res.json(record.evidenceLedger);
+  }));
+
+  /** Manually add an already-known source (a user-provided document, a Vault item, anything not found via automated discovery). Body: everything DiscoveredSource needs except id/discoveredAt/discoveredVia, which the server assigns. */
+  app.post("/api/projects/:id/evidence-ledger/sources", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!isValidManualSource(req.body)) {
+      return res.status(400).json({
+        error: "Invalid source. Required: title (string), authors (string[]), sourceType (one of: " +
+          `${[...SOURCE_TYPES].join(", ")}), authorityTier (one of: ${[...AUTHORITY_TIERS].join(", ")}). Optional: url, doi, venue (strings), year (number).`,
+      });
+    }
+    const source: DiscoveredSource = { ...req.body, id: `src-${crypto.randomUUID()}`, discoveredVia: "manual", discoveredAt: new Date().toISOString() };
+    try {
+      const evidenceLedger = discoverSource(record.evidenceLedger, source);
+      const updated = await store.save({ ...record, evidenceLedger });
+      res.status(201).json(updated.evidenceLedger);
+    } catch (err) {
+      if (err instanceof EvidenceStateError) return res.status(409).json({ error: err.message });
+      throw err;
+    }
+  }));
+
+  /**
+   * Search for candidate sources via the arXiv or web-search proxies
+   * (server/src/discovery/discovery.ts). This only ever ADDS sources to the
+   * ledger — never creates an evidence item, never binds anything: "AI may
+   * research automatically" stops exactly here. Body: { query, via: "arxiv" | "web_search", domains? }.
+   * 502s (not a fabricated empty result) when the underlying proxy call
+   * itself fails — a real search failure must be visible, never silently
+   * presented as "nothing found".
+   */
+  app.post("/api/projects/:id/evidence-ledger/discover", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { query, via, domains } = req.body ?? {};
+    if (typeof query !== "string" || query.trim().length === 0) {
+      return res.status(400).json({ error: "Missing required field: query" });
+    }
+    if (via !== "arxiv" && via !== "web_search") {
+      return res.status(400).json({ error: 'Invalid field: via. Must be "arxiv" or "web_search".' });
+    }
+    if (domains !== undefined && (!Array.isArray(domains) || !domains.every((d) => typeof d === "string"))) {
+      return res.status(400).json({ error: "Invalid field: domains (string[])." });
+    }
+
+    let drafts: Awaited<ReturnType<typeof discoverArxivSources>>;
+    try {
+      drafts = via === "arxiv" ? await discoverArxivSources(query) : await discoverWebSources(query, domains);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return res.status(502).json({ error: `Discovery failed: ${message}` });
+    }
+
+    const now = new Date().toISOString();
+    let evidenceLedger = record.evidenceLedger;
+    const added: DiscoveredSource[] = [];
+    for (const draft of drafts) {
+      const source: DiscoveredSource = { ...draft, id: `src-${crypto.randomUUID()}`, discoveredAt: now };
+      evidenceLedger = discoverSource(evidenceLedger, source);
+      added.push(source);
+    }
+    const updated = await store.save({ ...record, evidenceLedger });
+    res.json({ added, evidenceLedger: updated.evidenceLedger });
+  }));
+
+  /**
+   * Pull a specific, located quote from an already-discovered source,
+   * creating a new evidence item in state "extracted". Body:
+   * { quote, locator? }. 404s if the source id is unknown, 400s on an
+   * empty quote.
+   */
+  app.post("/api/projects/:id/evidence-ledger/sources/:sourceId/extract", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { quote, locator } = req.body ?? {};
+    if (typeof quote !== "string" || quote.trim().length === 0) {
+      return res.status(400).json({ error: "Missing required field: quote" });
+    }
+    if (!isValidLocator(locator)) {
+      return res.status(400).json({ error: "Invalid field: locator ({page?, paragraph?, startOffset?, endOffset?}, all numbers)." });
+    }
+    try {
+      const evidenceLedger = extractEvidence(record.evidenceLedger, { id: `ev-${crypto.randomUUID()}`, sourceId: req.params.sourceId, quote, locator });
+      const updated = await store.save({ ...record, evidenceLedger });
+      res.status(201).json(updated.evidenceLedger);
+    } catch (err) {
+      if (err instanceof EvidenceStateError) {
+        return res.status(err.message.includes("Unknown source") ? 404 : 409).json({ error: err.message });
+      }
+      throw err;
+    }
+  }));
+
+  /** Attest that an extracted quote has been checked against the actual source. Body: { actor? }. */
+  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/verify", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { actor } = req.body ?? {};
+    try {
+      const evidenceLedger = verifyEvidence(record.evidenceLedger, req.params.evidenceId, typeof actor === "string" ? actor : undefined);
+      const updated = await store.save({ ...record, evidenceLedger });
+      res.json(updated.evidenceLedger);
+    } catch (err) {
+      if (err instanceof EvidenceStateError) {
+        return res.status(err.message.includes("Unknown evidence") ? 404 : 409).json({ error: err.message });
+      }
+      throw err;
+    }
+  }));
+
+  /** Propose binding this evidence to a specific claim — AI or a human may call this; it alone never makes evidence citable (see approve below). Body: { claimId, actor? }. */
+  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/propose", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { claimId, actor } = req.body ?? {};
+    if (typeof claimId !== "string" || claimId.length === 0) {
+      return res.status(400).json({ error: "Missing required field: claimId" });
+    }
+    if (!record.claimGraph.claims.some((c) => c.id === claimId)) {
+      return res.status(400).json({ error: `Cannot propose evidence against unknown claim "${claimId}".` });
+    }
+    try {
+      const evidenceLedger = proposeEvidence(record.evidenceLedger, req.params.evidenceId, claimId, typeof actor === "string" ? actor : undefined);
+      const updated = await store.save({ ...record, evidenceLedger });
+      res.json(updated.evidenceLedger);
+    } catch (err) {
+      if (err instanceof EvidenceStateError) {
+        return res.status(err.message.includes("Unknown evidence") ? 404 : 409).json({ error: err.message });
+      }
+      throw err;
+    }
+  }));
+
+  /**
+   * Approve a proposed binding — the ONLY route that can make evidence
+   * "citable" (docs' hard rule: no user approval, no citation). Atomically
+   * advances the ledger AND binds the evidence into the Claim–Evidence
+   * Graph via the existing bindEvidence() (same function the manual
+   * POST .../claims/:claimId/evidence route uses), so what the compliance
+   * Rubric and citation engine read from is the same fact this action just
+   * approved — not a second, disconnected record of it. Body:
+   * { actor, strength, rationale }. Recomputes G6 if a document already
+   * exists, same as every other claim-graph-touching route.
+   */
+  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/approve", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { actor, strength, rationale } = req.body ?? {};
+    if (typeof actor !== "string" || actor.length === 0) {
+      return res.status(400).json({ error: "Missing required field: actor" });
+    }
+    if (typeof strength !== "string" || !SUPPORT_STRENGTHS.has(strength as SupportStrength)) {
+      return res.status(400).json({ error: `Missing or invalid field: strength. Must be one of: ${[...SUPPORT_STRENGTHS].join(", ")}` });
+    }
+    if (typeof rationale !== "string" || rationale.trim().length === 0) {
+      return res.status(400).json({ error: "Missing required field: rationale" });
+    }
+
+    let evidenceLedger;
+    try {
+      evidenceLedger = approveEvidence(record.evidenceLedger, req.params.evidenceId, actor);
+    } catch (err) {
+      if (err instanceof EvidenceStateError) {
+        return res.status(err.message.includes("Unknown evidence") ? 404 : 409).json({ error: err.message });
+      }
+      throw err;
+    }
+
+    const item = evidenceLedger.items.find((i) => i.id === req.params.evidenceId)!;
+    const binding: ClaimEvidenceBinding = {
+      id: `binding-${crypto.randomUUID()}`,
+      claimId: item.proposedClaimId!,
+      evidence: [{ sourceId: item.sourceId, locator: item.locator ?? {}, quote: item.quote! }],
+      strength: strength as SupportStrength,
+      rationale,
+    };
+
+    try {
+      const claimGraph = bindEvidence(record.claimGraph, binding);
+      const recordWithLedger = { ...record, evidenceLedger };
+      const updated = record.document
+        ? await (async () => {
+            const { rubricReport, gates } = recomputeG6({ ...recordWithLedger, claimGraph }, record.document!);
+            return store.save({ ...recordWithLedger, claimGraph, rubricReport, gates });
+          })()
+        : await store.save({ ...recordWithLedger, claimGraph });
+      res.json({ evidenceLedger: updated.evidenceLedger, claimGraph: updated.claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
+    } catch (err) {
+      if (err instanceof ClaimGraphError) return res.status(409).json({ error: err.message });
+      if (err instanceof GateTransitionError) return res.status(409).json({ error: err.message });
+      throw err;
+    }
+  }));
+
+  /** Decline a proposed binding — returns the evidence to "verified" so it can be re-proposed against a different claim. Body: { actor, reason }. */
+  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/reject", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { actor, reason } = req.body ?? {};
+    if (typeof actor !== "string" || actor.length === 0) {
+      return res.status(400).json({ error: "Missing required field: actor" });
+    }
+    if (typeof reason !== "string" || reason.trim().length === 0) {
+      return res.status(400).json({ error: "Missing required field: reason" });
+    }
+    try {
+      const evidenceLedger = rejectEvidence(record.evidenceLedger, req.params.evidenceId, actor, reason);
+      const updated = await store.save({ ...record, evidenceLedger });
+      res.json(updated.evidenceLedger);
+    } catch (err) {
+      if (err instanceof EvidenceStateError) {
+        return res.status(err.message.includes("Unknown evidence") ? 404 : 409).json({ error: err.message });
       }
       throw err;
     }

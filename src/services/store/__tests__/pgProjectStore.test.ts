@@ -88,6 +88,7 @@ describe("services/store: pgProjectStore", () => {
       claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
       waivers: {},
       submissions: [],
+      evidenceLedger: { sources: [], items: [] },
     };
 
     const saved = await store.save(record);
@@ -122,6 +123,7 @@ describe("services/store: pgProjectStore", () => {
       claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
       waivers: {},
       submissions: [],
+      evidenceLedger: { sources: [], items: [] },
     };
 
     await store.save(record);
@@ -142,6 +144,7 @@ describe("services/store: pgProjectStore", () => {
       claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
       waivers: {},
       submissions: [],
+      evidenceLedger: { sources: [], items: [] },
     };
     await insertStore.save(withoutRequirements);
     expect(insertDb.calls[0].params?.[10]).toBeNull();
@@ -179,5 +182,65 @@ describe("services/store: pgProjectStore", () => {
     const getStore = createPgProjectStore(getDb);
     const fetched = await getStore.get("proj-jr");
     expect(fetched?.journalRequirements).toEqual(journalRequirements);
+  });
+
+  it("evidence_ledger round-trips: serializes to JSON on save, defaults to an empty ledger when a row predates the column, and rehydrates when present", async () => {
+    const record: ProjectRecord = {
+      projectId: "proj-ev",
+      ownerId: "11111111-1111-4111-8111-111111111111",
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: {
+        sources: [
+          { id: "src-1", title: "A Paper", authors: ["A"], sourceType: "scholarly", authorityTier: "B", discoveredVia: "arxiv", discoveredAt: "2026-01-01T00:00:00.000Z" },
+        ],
+        items: [],
+      },
+    };
+    const saveDb = fakeDb();
+    await createPgProjectStore(saveDb).save(record);
+    const param = saveDb.calls[0].params?.[11];
+    expect(typeof param).toBe("string");
+    expect(JSON.parse(param as string)).toEqual(record.evidenceLedger);
+
+    const staleRowDb = fakeDb([
+      {
+        project_id: "proj-old",
+        owner_id: "11111111-1111-4111-8111-111111111111",
+        output_type_id: "OT-10",
+        answers: {},
+        gates: {},
+        document: null,
+        rubric_report: null,
+        claim_graph: { claims: {}, evidence: {}, bindings: {} },
+        waivers: {},
+        submissions: [],
+        // No evidence_ledger key at all — a row from before the migration.
+      },
+    ]);
+    const staleFetched = await createPgProjectStore(staleRowDb).get("proj-old");
+    expect(staleFetched?.evidenceLedger).toEqual({ sources: [], items: [] });
+
+    const getDb = fakeDb([
+      {
+        project_id: "proj-ev",
+        owner_id: "11111111-1111-4111-8111-111111111111",
+        output_type_id: "OT-10",
+        answers: {},
+        gates: {},
+        document: null,
+        rubric_report: null,
+        claim_graph: { claims: {}, evidence: {}, bindings: {} },
+        waivers: {},
+        submissions: [],
+        evidence_ledger: record.evidenceLedger,
+      },
+    ]);
+    const fetched = await createPgProjectStore(getDb).get("proj-ev");
+    expect(fetched?.evidenceLedger).toEqual(record.evidenceLedger);
   });
 });

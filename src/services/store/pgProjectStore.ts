@@ -24,6 +24,7 @@
 import { Pool } from "pg";
 import { initialProjectGateState } from "../../domain/project/gates";
 import { emptyGraph } from "../../domain/claim/graph";
+import { emptyLedger } from "../../domain/evidence/types";
 import { generateProjectId } from "../../app/conductor/projectStore";
 import { SUPABASE_ROOT_CA } from "./supabaseRootCa";
 import type { ProjectRecord, ProjectStore } from "./types";
@@ -92,6 +93,8 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
     // Rows written before this column existed have it as SQL NULL.
     submissions: (row.submissions as ProjectRecord["submissions"] | null) ?? [],
     journalRequirements: (row.journal_requirements as ProjectRecord["journalRequirements"] | null) ?? undefined,
+    // Rows written before this column existed have it as SQL NULL.
+    evidenceLedger: (row.evidence_ledger as ProjectRecord["evidenceLedger"] | null) ?? emptyLedger(),
   };
 }
 
@@ -108,11 +111,12 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
         claimGraph: emptyGraph(),
         waivers: {},
         submissions: [],
+        evidenceLedger: emptyLedger(),
       };
       await db.query(
         `insert into public.projects
-           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements)
-         values ($1, $2, $3, $4, $5, null, null, $6, $7, $8, null)`,
+           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger)
+         values ($1, $2, $3, $4, $5, null, null, $6, $7, $8, null, $9)`,
         [
           record.projectId,
           record.ownerId,
@@ -122,6 +126,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
           JSON.stringify(record.claimGraph),
           JSON.stringify(record.waivers),
           JSON.stringify(record.submissions),
+          JSON.stringify(record.evidenceLedger),
         ]
       );
       return record;
@@ -136,8 +141,8 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
     async save(record: ProjectRecord): Promise<ProjectRecord> {
       await db.query(
         `insert into public.projects
-           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
          on conflict (project_id) do update set
            output_type_id = excluded.output_type_id,
            answers = excluded.answers,
@@ -148,6 +153,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
            waivers = excluded.waivers,
            submissions = excluded.submissions,
            journal_requirements = excluded.journal_requirements,
+           evidence_ledger = excluded.evidence_ledger,
            updated_at = now()`,
         [
           record.projectId,
@@ -161,6 +167,7 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
           JSON.stringify(record.waivers),
           JSON.stringify(record.submissions),
           record.journalRequirements ? JSON.stringify(record.journalRequirements) : null,
+          JSON.stringify(record.evidenceLedger),
         ]
       );
       return record;

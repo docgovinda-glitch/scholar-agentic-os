@@ -37,6 +37,7 @@
 
 import { initialProjectGateState } from "../../domain/project/gates";
 import { emptyGraph } from "../../domain/claim/graph";
+import { emptyLedger } from "../../domain/evidence/types";
 import { generateProjectId } from "../../app/conductor/projectStore";
 import type { ProjectRecord, ProjectStore } from "./types";
 
@@ -59,6 +60,7 @@ interface ProjectRow {
   waivers: ProjectRecord["waivers"];
   submissions: ProjectRecord["submissions"];
   journal_requirements: ProjectRecord["journalRequirements"] | null;
+  evidence_ledger: ProjectRecord["evidenceLedger"] | null;
 }
 
 function rowToRecord(row: ProjectRow): ProjectRecord {
@@ -76,6 +78,8 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
     // Rows written before this column existed have it as SQL NULL.
     submissions: row.submissions ?? [],
     journalRequirements: row.journal_requirements ?? undefined,
+    // Rows written before this column existed have it as SQL NULL.
+    evidenceLedger: row.evidence_ledger ?? emptyLedger(),
   };
 }
 
@@ -92,6 +96,7 @@ function recordToRow(record: ProjectRecord): ProjectRow {
     waivers: record.waivers,
     submissions: record.submissions,
     journal_requirements: record.journalRequirements ?? null,
+    evidence_ledger: record.evidenceLedger,
   };
 }
 
@@ -157,6 +162,7 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
         claimGraph: emptyGraph(),
         waivers: {},
         submissions: [],
+        evidenceLedger: emptyLedger(),
       };
 
       await request(base, {

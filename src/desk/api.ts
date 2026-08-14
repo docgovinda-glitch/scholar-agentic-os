@@ -11,7 +11,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceConflict, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, SubmissionRecord, VoiceProfile } from "./types";
+import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, DiscoveredSource, EvidenceConflict, EvidenceLedger, EvidenceLocator, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, SubmissionRecord, SupportStrength, VoiceProfile } from "./types";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -364,6 +364,77 @@ export function deleteSubmission(projectId: string, submissionId: string): Promi
   return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/submissions/${encodeURIComponent(submissionId)}`, {
     method: "DELETE",
   }).then((r) => json(r));
+}
+
+// ── Evidence Ledger (src/domain/evidence) ──────────────────────────────
+
+export function getEvidenceLedger(projectId: string): Promise<EvidenceLedger> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/evidence-ledger`).then((r) => json(r));
+}
+
+export function addManualSource(
+  projectId: string,
+  source: Omit<DiscoveredSource, "id" | "discoveredAt" | "discoveredVia">
+): Promise<EvidenceLedger> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/sources`, "POST", source).then((r) => json(r));
+}
+
+export function discoverSources(
+  projectId: string,
+  query: string,
+  via: "arxiv" | "web_search"
+): Promise<{ added: DiscoveredSource[]; evidenceLedger: EvidenceLedger }> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/discover`, "POST", { query, via }).then((r) => json(r));
+}
+
+export function extractEvidenceQuote(
+  projectId: string,
+  sourceId: string,
+  quote: string,
+  locator?: EvidenceLocator
+): Promise<EvidenceLedger> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/sources/${encodeURIComponent(sourceId)}/extract`,
+    "POST",
+    { quote, locator }
+  ).then((r) => json(r));
+}
+
+export function verifyEvidenceItem(projectId: string, evidenceId: string, actor: string): Promise<EvidenceLedger> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/items/${encodeURIComponent(evidenceId)}/verify`,
+    "POST",
+    { actor }
+  ).then((r) => json(r));
+}
+
+export function proposeEvidenceItem(projectId: string, evidenceId: string, claimId: string, actor: string): Promise<EvidenceLedger> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/items/${encodeURIComponent(evidenceId)}/propose`,
+    "POST",
+    { claimId, actor }
+  ).then((r) => json(r));
+}
+
+/** The only client call that can make evidence citable — bound atomically into the Claim–Evidence Graph server-side. */
+export function approveEvidenceItem(
+  projectId: string,
+  evidenceId: string,
+  params: { actor: string; strength: SupportStrength; rationale: string }
+): Promise<{ evidenceLedger: EvidenceLedger; claimGraph: ClaimEvidenceGraph; rubric?: RubricReport }> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/items/${encodeURIComponent(evidenceId)}/approve`,
+    "POST",
+    params
+  ).then((r) => json(r));
+}
+
+export function rejectEvidenceItem(projectId: string, evidenceId: string, actor: string, reason: string): Promise<EvidenceLedger> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/items/${encodeURIComponent(evidenceId)}/reject`,
+    "POST",
+    { actor, reason }
+  ).then((r) => json(r));
 }
 
 export async function exportProject(projectId: string, format: "docx" | "odt" | "pdf"): Promise<Blob> {

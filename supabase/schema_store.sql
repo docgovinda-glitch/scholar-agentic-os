@@ -71,6 +71,10 @@ create table if not exists public.projects (
   -- container: "not yet captured" is a real, distinct state from "captured
   -- but empty" for this one.
   journal_requirements jsonb,
+  -- Discovered sources and their evidence-provenance state
+  -- (domain/evidence/types.ts). Defaults to an empty ledger, same as
+  -- claim_graph above — always present, possibly with nothing in it yet.
+  evidence_ledger jsonb not null default '{"sources":[],"items":[]}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -110,6 +114,11 @@ alter table public.projects add column if not exists submissions jsonb not null 
 -- Nullable, no default: an existing row simply has no requirements captured
 -- yet, the same state a freshly created row starts in.
 alter table public.projects add column if not exists journal_requirements jsonb;
+
+-- Migration for databases created before evidence_ledger existed. Same
+-- no-awkward-backfill case as submissions above: an existing project simply
+-- has an empty ledger, exactly what a new row already defaults to.
+alter table public.projects add column if not exists evidence_ledger jsonb not null default '{"sources":[],"items":[]}'::jsonb;
 
 -- Deny-all baseline for anon/authenticated (see the note at the top of this
 -- file). FORCE additionally applies RLS to the table's owner; roles with
