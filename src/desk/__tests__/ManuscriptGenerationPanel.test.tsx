@@ -180,4 +180,51 @@ describe("Desk — ManuscriptGenerationPanel", () => {
     expect(await screen.findByText("Inconsistent headcount terms.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Re-run coherence check" })).toBeInTheDocument();
   });
+
+  it("runs a peer review round via the Premium tier and displays critical findings, then allows another round", async () => {
+    const completedJob = {
+      state: "completed",
+      plan: [{ key: "introduction", title: "Introduction", guidance: "g", targetWords: 500 }],
+      sections: [{ key: "introduction", title: "Introduction", text: "Text.", wordCount: 1, memory: "m", citedEvidenceIds: [], generatedAt: "now" }],
+      totalWordTarget: 3000,
+      updatedAt: "now",
+    };
+    mockFetch((url, method) => {
+      if (url.endsWith("/api/ai-access/route")) {
+        return { status: 200, body: { ok: true, choice: { tier: "premium", providerId: "premium", reasoning: "Premium is available." }, fallbacks: [] } };
+      }
+      if (url.includes("/manuscript/peer-review") && method === "POST") {
+        return {
+          status: 200,
+          body: {
+            peerReviewHistory: {
+              rounds: [
+                {
+                  roundNumber: 1,
+                  lensesRun: ["evidence"],
+                  lensErrors: {},
+                  createdAt: "now",
+                  lensReviews: [
+                    { lens: "evidence", findings: [{ summary: "Unsupported claim.", detail: "d", severity: "critical", sectionKeys: ["introduction"] }], overallAssessment: "Evidence is weak." },
+                  ],
+                },
+              ],
+            },
+            gates: [],
+          },
+        };
+      }
+      if (url.includes("/manuscript/peer-review")) return { status: 200, body: { rounds: [] } };
+      if (url.includes("/manuscript/job")) return { status: 200, body: completedJob };
+      return { status: 500, body: {} };
+    });
+    render(<ManuscriptGenerationPanel projectId={PROJECT_ID} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Run peer review" }));
+
+    expect(await screen.findByText("Unsupported claim.")).toBeInTheDocument();
+    expect(screen.getByText("Evidence is weak.")).toBeInTheDocument();
+    expect(screen.getByText("Peer review (round 1)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run another round" })).toBeInTheDocument();
+  });
 });

@@ -79,6 +79,10 @@ create table if not exists public.projects (
   -- (domain/manuscript/types.ts). Nullable, same as journal_requirements:
   -- "never started" is a real, distinct state, not an empty container.
   generation_job jsonb,
+  -- Every multi-lens peer review round run so far (domain/review/types.ts).
+  -- Defaults to an empty history, same as claim_graph/evidence_ledger:
+  -- always present, versioned — a round is appended, never overwritten.
+  peer_review_history jsonb not null default '{"rounds":[]}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -127,6 +131,11 @@ alter table public.projects add column if not exists evidence_ledger jsonb not n
 -- Migration for databases created before generation_job existed. Nullable,
 -- no default — same "not yet captured" case as journal_requirements.
 alter table public.projects add column if not exists generation_job jsonb;
+
+-- Migration for databases created before peer_review_history existed. Same
+-- no-awkward-backfill case as submissions/evidence_ledger: an existing
+-- project simply has no rounds yet, exactly what a new row already defaults to.
+alter table public.projects add column if not exists peer_review_history jsonb not null default '{"rounds":[]}'::jsonb;
 
 -- Deny-all baseline for anon/authenticated (see the note at the top of this
 -- file). FORCE additionally applies RLS to the table's owner; roles with

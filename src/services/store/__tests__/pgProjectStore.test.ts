@@ -288,4 +288,63 @@ describe("services/store: pgProjectStore", () => {
     const fetched = await createPgProjectStore(getDb).get("proj-gen");
     expect(fetched?.generationJob).toEqual(generationJob);
   });
+
+  it("peer_review_history round-trips: serializes to JSON on save, defaults to an empty history when a row predates the column, and rehydrates when present", async () => {
+    const peerReviewHistory: ProjectRecord["peerReviewHistory"] = {
+      rounds: [{ roundNumber: 1, lensReviews: [], lensesRun: [], lensErrors: {}, createdAt: "2026-01-01T00:00:00.000Z" }],
+    };
+    const record: ProjectRecord = {
+      projectId: "proj-review",
+      ownerId: "11111111-1111-4111-8111-111111111111",
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      peerReviewHistory,
+    };
+    const saveDb = fakeDb();
+    await createPgProjectStore(saveDb).save(record);
+    const param = saveDb.calls[0].params?.[13];
+    expect(typeof param).toBe("string");
+    expect(JSON.parse(param as string)).toEqual(peerReviewHistory);
+
+    const staleRowDb = fakeDb([
+      {
+        project_id: "proj-old2",
+        owner_id: "11111111-1111-4111-8111-111111111111",
+        output_type_id: "OT-10",
+        answers: {},
+        gates: {},
+        document: null,
+        rubric_report: null,
+        claim_graph: { claims: {}, evidence: {}, bindings: {} },
+        waivers: {},
+        submissions: [],
+        // No peer_review_history key at all — a row from before the migration.
+      },
+    ]);
+    const staleFetched = await createPgProjectStore(staleRowDb).get("proj-old2");
+    expect(staleFetched?.peerReviewHistory).toEqual({ rounds: [] });
+
+    const getDb = fakeDb([
+      {
+        project_id: "proj-review",
+        owner_id: "11111111-1111-4111-8111-111111111111",
+        output_type_id: "OT-10",
+        answers: {},
+        gates: {},
+        document: null,
+        rubric_report: null,
+        claim_graph: { claims: {}, evidence: {}, bindings: {} },
+        waivers: {},
+        submissions: [],
+        peer_review_history: peerReviewHistory,
+      },
+    ]);
+    const fetched = await createPgProjectStore(getDb).get("proj-review");
+    expect(fetched?.peerReviewHistory).toEqual(peerReviewHistory);
+  });
 });

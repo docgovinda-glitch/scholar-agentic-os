@@ -3,6 +3,7 @@ import {
   computeG0ExitCriteria,
   computeG1ExitCriteria,
   computeG3ExitCriteria,
+  computeG5ExitCriteria,
   computeG6ExitCriteria,
   intakeCompleteness,
   isSignoffStale,
@@ -15,6 +16,8 @@ import {
 import { signOffGate } from "../../../domain/project/gates";
 import type { ProjectGateState } from "../../../domain/project/gates";
 import type { JournalRequirements } from "../../../domain/journal/types";
+import { emptyPeerReviewHistory } from "../../../domain/review/types";
+import type { ReviewRound } from "../../../domain/review/types";
 import { catalog } from "../../atlas/atlas";
 import { evaluateAgainstOutputType } from "../../rubric/rubric";
 import { emptyDocument } from "../../../domain/document/model";
@@ -200,6 +203,44 @@ describe("app/conductor: G3 bound to Atlas + the document", () => {
     criteria = computeG3ExitCriteria(thesis, doc, { research_question: "A real question.", methodology_type: "theoretical" });
     project = updateExitCriteria(project, "G3", criteria);
     expect(project.gates.G3.status).toBe("ready");
+  });
+});
+
+describe("app/conductor: G5 bound to peer-review history", () => {
+  function round(overrides: Partial<ReviewRound> = {}): ReviewRound {
+    return { roundNumber: 1, lensReviews: [], lensesRun: [], lensErrors: {}, createdAt: "now", ...overrides };
+  }
+
+  it("is unsatisfied and blocking before any review round has run", () => {
+    const criteria = computeG5ExitCriteria(emptyPeerReviewHistory());
+    expect(criteria).toHaveLength(1);
+    expect(criteria[0].satisfied).toBe(false);
+    expect(criteria[0].blocking).toBe(true);
+  });
+
+  it("is satisfied once a round has run with no critical findings", () => {
+    const history = { rounds: [round({ lensReviews: [{ lens: "argument" as const, findings: [{ summary: "s", detail: "d", severity: "minor" as const, sectionKeys: ["introduction"] }], overallAssessment: "Solid overall." }] })] };
+    const criteria = computeG5ExitCriteria(history);
+    expect(criteria.every((c) => c.satisfied)).toBe(true);
+  });
+
+  it("is unsatisfied while the most recent round has an unresolved critical finding", () => {
+    const history = {
+      rounds: [round({ lensReviews: [{ lens: "evidence" as const, findings: [{ summary: "s", detail: "d", severity: "critical" as const, sectionKeys: ["results"] }], overallAssessment: "Serious problem." }] })],
+    };
+    const criteria = computeG5ExitCriteria(history);
+    expect(criteria.find((c) => c.id === "no-unresolved-critical-findings")?.satisfied).toBe(false);
+  });
+
+  it("only judges the MOST RECENT round — an earlier round's critical finding no longer blocks once a later round has none", () => {
+    const history = {
+      rounds: [
+        round({ roundNumber: 1, lensReviews: [{ lens: "evidence" as const, findings: [{ summary: "s", detail: "d", severity: "critical" as const, sectionKeys: ["results"] }], overallAssessment: "x" }] }),
+        round({ roundNumber: 2, lensReviews: [{ lens: "evidence" as const, findings: [], overallAssessment: "Addressed in revision." }] }),
+      ],
+    };
+    const criteria = computeG5ExitCriteria(history);
+    expect(criteria.every((c) => c.satisfied)).toBe(true);
   });
 });
 

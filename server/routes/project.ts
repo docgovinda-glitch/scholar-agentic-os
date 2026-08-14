@@ -38,6 +38,7 @@ import {
   computeG0ExitCriteria,
   computeG1ExitCriteria,
   computeG3ExitCriteria,
+  computeG5ExitCriteria,
   computeG6ExitCriteria,
   intakeCompleteness,
   updateExitCriteria,
@@ -100,6 +101,9 @@ import type { SectionContextPacket } from "../../src/app/manuscript/generate.ts"
 import { checkCoherence } from "../../src/app/coherence/checkCoherence.ts";
 import type { CoherenceDimension } from "../../src/domain/coherence/types.ts";
 import { COHERENCE_DIMENSIONS } from "../../src/domain/coherence/types.ts";
+import { runPeerReview } from "../../src/app/review/peerReview.ts";
+import type { ReviewLens } from "../../src/domain/review/types.ts";
+import { REVIEW_LENSES } from "../../src/domain/review/types.ts";
 import { getPolicyForSession } from "../../src/app/studio/sessionPolicyStore.ts";
 
 const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
@@ -608,6 +612,87 @@ async function runPremiumCoherenceCheck(
     return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
   }
   await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "coherence_check");
+
+  return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
+}
+
+/** Runs one peer-review round's Premium path — same deliberate simplification as runPremiumCoherenceCheck (a single resolved resource for the whole multi-lens round, not a per-lens retry-across-resources loop); see that function's own comment. */
+async function runPremiumPeerReview(
+  userId: string,
+  sections: GeneratedSection[],
+  roundNumber: number,
+  journalRequirements: { journalName: string } | undefined,
+  lenses: ReviewLens[] | undefined,
+  policy: import("../../src/platform/warden/warden.ts").EgressPolicy
+): Promise<
+  | { ok: true; result: Awaited<ReturnType<typeof runPeerReview>>; aiSource: { tier: "premium"; provider: string; model: string; creditsUsed: number } }
+  | { ok: false; status: 402 | 403 | 428 | 502; error: string; provider?: string }
+> {
+  const { premiumQuotaRemaining, entitlementActive, quota } = await assembleUserCandidates(userId);
+  if (!entitlementActive) {
+    return { ok: false, status: 402, error: "You don't have an active Premium subscription." };
+  }
+
+  const combinedText = sections.map((s) => s.text).join("\n");
+  const preCheckAmount = estimateMaxCreditsForInput(combinedText) * (lenses?.length ?? REVIEW_LENSES.length);
+  const perTask = quota ? checkPerTaskLimit(preCheckAmount, quota) : { allowed: true };
+  if (!perTask.allowed) {
+    return { ok: false, status: 402, error: perTask.reason ?? "This request is too large for your current plan." };
+  }
+  if (premiumQuotaRemaining !== null && premiumQuotaRemaining < preCheckAmount) {
+    return {
+      ok: false,
+      status: 402,
+      error:
+        premiumQuotaRemaining <= 0
+          ? "Your Premium quota for this period is exhausted."
+          : `This request needs about ${preCheckAmount} credits and you have ${premiumQuotaRemaining} left this period.`,
+    };
+  }
+
+  const resources = await resolvePremiumResources(userId, "reasoning");
+  if (resources.length === 0) {
+    return { ok: false, status: 402, error: "Your plan does not currently grant any Premium AI resources. Please contact the administrator." };
+  }
+  const resource = resources[0];
+  const credential = await getDecryptedCredential(resource.providerId, resource.credentialLabel).catch(() => null);
+  if (!credential) {
+    await recordProviderFailure(resource.providerId, "No active platform credential configured.");
+    return { ok: false, status: 502, error: `The "${resource.label}" Premium resource is not currently configured.` };
+  }
+
+  const model = resource.modelId || undefined;
+  const start = Date.now();
+  let result: Awaited<ReturnType<typeof runPeerReview>>;
+  try {
+    result = await runPeerReview({ sections, roundNumber, journalRequirements, provider: resource.providerId, apiKey: credential, model, policy, lenses });
+  } catch (err) {
+    if (err instanceof GatewayDenied) {
+      if (err.requiresConsent) return { ok: false, status: 428, error: err.message, provider: resource.providerId };
+      return { ok: false, status: 403, error: err.message };
+    }
+    await recordProviderFailure(resource.providerId, err instanceof Error ? err.message : "Unknown error");
+    return { ok: false, status: 502, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+  await recordProviderSuccess(resource.providerId, Date.now() - start);
+
+  const creditsUsed = preCheckAmount;
+  const requestId = crypto.randomUUID();
+  const deductResult = await deductCredits(
+    userId,
+    creditsUsed,
+    quota?.dailyCredits ?? null,
+    quota?.monthlyCredits ?? null,
+    "usage",
+    requestId,
+    `peer review: ${resource.label}`,
+    quota?.weeklyCredits ?? null
+  );
+  if (deductResult !== "ok") {
+    await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, 0, "quota_exhausted", "peer_review");
+    return { ok: false, status: 402, error: DEDUCT_FAILURE_MESSAGES[deductResult] };
+  }
+  await recordPremiumUsage(userId, resource.providerId, model ?? "", undefined, requestId, creditsUsed, "success", "peer_review");
 
   return { ok: true, result, aiSource: { tier: "premium", provider: resource.label, model: resource.label, creditsUsed } };
 }
@@ -1730,6 +1815,93 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   }));
 
   /**
+   * Multi-lens adversarial peer review (domain/review) over every section
+   * generated so far — up to seven separate model calls, one per
+   * ReviewLens, each instructed to be genuinely critical rather than
+   * praise-optimized. Body: { provider?, apiKey?, model?, useEngine?,
+   * lenses? }. Every call APPENDS a new round to peerReviewHistory.rounds —
+   * never overwrites a prior one, so an author can compare round N against
+   * round N-1 after revising. `lenses` lets a caller re-run just one failed
+   * lens as its own new round rather than the whole panel.
+   */
+  app.post("/api/projects/:id/manuscript/peer-review", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    if (!record.generationJob) {
+      return res.status(404).json({ error: `Project "${req.params.id}" has no generation job started yet.` });
+    }
+    const { provider, apiKey, model, useEngine, lenses } = req.body ?? {};
+    if (lenses !== undefined && (!Array.isArray(lenses) || !lenses.every((l) => REVIEW_LENSES.includes(l)))) {
+      return res.status(400).json({ error: `Invalid field: lenses. Must be a subset of: ${REVIEW_LENSES.join(", ")}` });
+    }
+
+    const sections = record.generationJob.sections;
+    const roundNumber = record.peerReviewHistory.rounds.length + 1;
+    const journalRequirements = record.journalRequirements ? { journalName: record.journalRequirements.journalName } : undefined;
+    const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
+    const policy = getPolicyForSession(`${currentUserId(req)}:manuscript:${record.projectId}`);
+
+    async function saveRound(round: Awaited<ReturnType<typeof runPeerReview>>) {
+      const peerReviewHistory = { rounds: [...record!.peerReviewHistory.rounds, round] };
+      const gates = updateExitCriteria(record!.gates, "G5", computeG5ExitCriteria(peerReviewHistory));
+      return store.save({ ...record!, peerReviewHistory, gates });
+    }
+
+    if (wantsPremium) {
+      const userId = currentUserId(req);
+      let outcome: Awaited<ReturnType<typeof runPremiumPeerReview>>;
+      try {
+        outcome = await runPremiumPeerReview(userId, sections, roundNumber, journalRequirements, lenses, policy);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        return res.status(503).json({ error: `Premium routing is unavailable right now: ${message}` });
+      }
+      if (!outcome.ok) {
+        if (outcome.status === 428) return res.status(428).json({ error: "consent_required", reason: outcome.error, provider: outcome.provider });
+        if (outcome.status === 403) return res.status(403).json({ error: "denied", reason: outcome.error });
+        return res.status(outcome.status).json({ error: outcome.error });
+      }
+      try {
+        const updated = await saveRound(outcome.result);
+        return res.json({ peerReviewHistory: updated.peerReviewHistory, gates: summarize(updated.gates), aiSource: outcome.aiSource });
+      } catch (err) {
+        if (err instanceof GateTransitionError) return res.status(409).json({ error: err.message });
+        throw err;
+      }
+    }
+
+    try {
+      const round = await runPeerReview({
+        sections,
+        roundNumber,
+        journalRequirements,
+        provider: typeof provider === "string" ? provider : undefined,
+        apiKey: typeof apiKey === "string" ? apiKey : undefined,
+        model: typeof model === "string" ? model : undefined,
+        policy,
+        lenses,
+      });
+      const updated = await saveRound(round);
+      return res.json({ peerReviewHistory: updated.peerReviewHistory, gates: summarize(updated.gates) });
+    } catch (err) {
+      if (err instanceof GatewayDenied) {
+        if (err.requiresConsent) return res.status(428).json({ error: "consent_required", reason: err.message, provider });
+        return res.status(403).json({ error: "denied", reason: err.message });
+      }
+      if (err instanceof GateTransitionError) return res.status(409).json({ error: err.message });
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return res.status(500).json({ error: message });
+    }
+  }));
+
+  /** Every peer review round run so far (domain/review), most recent last — versioned, never overwritten. */
+  app.get("/api/projects/:id/manuscript/peer-review", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    res.json(record.peerReviewHistory);
+  }));
+
+  /**
    * Sign off a gate. Body: { actor }. 409s if the gate is not ready (a
    * blocking exit criterion is unsatisfied, or entry prerequisites are
    * unmet). The approved snapshot is what a later content change is
@@ -1757,9 +1929,11 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
           ? { answers: record.answers, journalRequirements: record.journalRequirements }
           : req.params.gate === "G3"
             ? { blockIds: record.document?.blocks.map((b) => b.id) ?? [], answers: record.answers }
-            : req.params.gate === "G6"
-              ? { rubricReport: record.rubricReport }
-              : {};
+            : req.params.gate === "G5"
+              ? { peerReviewHistory: record.peerReviewHistory }
+              : req.params.gate === "G6"
+                ? { rubricReport: record.rubricReport }
+                : {};
 
     try {
       const gates = await signOff(record.gates, req.params.gate, actor, approvedSnapshot);

@@ -11,7 +11,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, DiscoveredSource, EvidenceConflict, EvidenceLedger, EvidenceLocator, GenerationJob, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, SubmissionRecord, SupportStrength, VoiceProfile } from "./types";
+import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, DiscoveredSource, EvidenceConflict, EvidenceLedger, EvidenceLocator, GateSummary, GenerationJob, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, PeerReviewHistory, ProjectView, ReviewLens, RubricReport, StudioRefineResult, SubmissionRecord, SupportStrength, VoiceProfile } from "./types";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -505,6 +505,37 @@ export async function runCoherenceCheck(params: {
     throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
   }
   return json<{ generationJob: GenerationJob }>(res);
+}
+
+/** Every peer review round run so far — versioned, never overwritten. */
+export function getPeerReviewHistory(projectId: string): Promise<PeerReviewHistory> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/peer-review`).then((r) => json(r));
+}
+
+/** Runs a new peer review round (all seven lenses by default) and appends it to the history. Same 428/403/402 error mapping as the other AI-backed routes. */
+export async function runPeerReview(params: {
+  projectId: string;
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  useEngine?: "premium";
+  lenses?: ReviewLens[];
+}): Promise<{ peerReviewHistory: PeerReviewHistory; gates: GateSummary[] }> {
+  const { projectId, ...requestBody } = params;
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/peer-review`, "POST", requestBody);
+  if (res.status === 428) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioConsentRequiredError(errBody.reason || "Consent required.", errBody.provider);
+  }
+  if (res.status === 403) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioDeniedError(errBody.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
+  }
+  return json<{ peerReviewHistory: PeerReviewHistory; gates: GateSummary[] }>(res);
 }
 
 export function pauseManuscriptJob(projectId: string): Promise<GenerationJob> {

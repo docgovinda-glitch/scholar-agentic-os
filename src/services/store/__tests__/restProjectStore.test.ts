@@ -317,6 +317,28 @@ describe("restProjectStore: save", () => {
     const { s: getStore } = store(() => ({ body: [row({ generation_job: generationJob })] }));
     expect((await getStore.get("proj-abc"))?.generationJob).toEqual(generationJob);
   });
+
+  it("serialises the peer review history through as-is, and defaults a row missing the column to an empty history on get()", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    const peerReviewHistory = { rounds: [{ roundNumber: 1, lensReviews: [], lensesRun: [], lensErrors: {}, createdAt: "2026-01-01T00:00:00.000Z" }] };
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      peerReviewHistory,
+    });
+    const body = calls[0].body as Record<string, unknown>;
+    expect(body.peer_review_history).toEqual(peerReviewHistory);
+
+    const { s: getStore } = store(() => ({ body: [row()] }));
+    expect((await getStore.get("proj-abc"))?.peerReviewHistory).toEqual({ rounds: [] });
+  });
 });
 
 describe("restProjectStore: listByOwner", () => {

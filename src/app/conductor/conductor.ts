@@ -50,6 +50,7 @@ import { allIntakeFields } from "../atlas/proposals";
 import type { RubricReport } from "../rubric/rubric";
 import type { CanonicalDocument } from "../../domain/document/model";
 import type { JournalRequirements } from "../../domain/journal/types";
+import type { PeerReviewHistory } from "../../domain/review/types";
 
 export {
   GATE_ORDER,
@@ -212,6 +213,34 @@ export function computeG3ExitCriteria(
     }));
 
   return [...sectionCriteria, ...deferredFieldCriteria];
+}
+
+/**
+ * Compute G5's exit criteria (docs 30 §3 G5 "Review") from the project's
+ * peer-review history (domain/review) — the multi-lens adversarial review's
+ * first real compute function, same additive pattern as every other gate.
+ * Two criteria: at least one review round has actually run, and the most
+ * recent round has no unresolved "critical"-severity finding. Earlier
+ * rounds' findings are not re-checked here — that is exactly what running a
+ * new round after a revision is for (a stale round is not this gate's
+ * concern; PeerReviewHistory only ever grows, so the record of what a
+ * critical finding used to say is never lost even once it stops blocking).
+ */
+export function computeG5ExitCriteria(history: PeerReviewHistory): ExitCriterion[] {
+  if (history.rounds.length === 0) {
+    return [{ id: "peer-review-round-completed", description: "At least one multi-lens peer review round has been run", satisfied: false, blocking: true }];
+  }
+  const latest = history.rounds[history.rounds.length - 1];
+  const criticalFindings = latest.lensReviews.flatMap((r) => r.findings).filter((f) => f.severity === "critical");
+  return [
+    { id: "peer-review-round-completed", description: "At least one multi-lens peer review round has been run", satisfied: true, blocking: true },
+    {
+      id: "no-unresolved-critical-findings",
+      description: `No unresolved "critical"-severity findings in the most recent review round (round ${latest.roundNumber})`,
+      satisfied: criticalFindings.length === 0,
+      blocking: true,
+    },
+  ];
 }
 
 /**

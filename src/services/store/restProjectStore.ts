@@ -38,6 +38,7 @@
 import { initialProjectGateState } from "../../domain/project/gates";
 import { emptyGraph } from "../../domain/claim/graph";
 import { emptyLedger } from "../../domain/evidence/types";
+import { emptyPeerReviewHistory } from "../../domain/review/types";
 import { generateProjectId } from "../../app/conductor/projectStore";
 import type { ProjectRecord, ProjectStore } from "./types";
 
@@ -62,6 +63,7 @@ interface ProjectRow {
   journal_requirements: ProjectRecord["journalRequirements"] | null;
   evidence_ledger: ProjectRecord["evidenceLedger"] | null;
   generation_job: ProjectRecord["generationJob"] | null;
+  peer_review_history: ProjectRecord["peerReviewHistory"] | null;
 }
 
 function rowToRecord(row: ProjectRow): ProjectRecord {
@@ -82,6 +84,7 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
     // Rows written before this column existed have it as SQL NULL.
     evidenceLedger: row.evidence_ledger ?? emptyLedger(),
     generationJob: row.generation_job ?? undefined,
+    peerReviewHistory: row.peer_review_history ?? emptyPeerReviewHistory(),
   };
 }
 
@@ -100,6 +103,7 @@ function recordToRow(record: ProjectRecord): ProjectRow {
     journal_requirements: record.journalRequirements ?? null,
     evidence_ledger: record.evidenceLedger,
     generation_job: record.generationJob ?? null,
+    peer_review_history: record.peerReviewHistory,
   };
 }
 
@@ -166,6 +170,7 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
         waivers: {},
         submissions: [],
         evidenceLedger: emptyLedger(),
+        peerReviewHistory: emptyPeerReviewHistory(),
       };
 
       await request(base, {

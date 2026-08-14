@@ -5,19 +5,31 @@ import {
   StudioNoAiSourceError,
   generateNextSection,
   getManuscriptJob,
+  getPeerReviewHistory,
   pauseManuscriptJob,
   resumeManuscriptJob,
   runCoherenceCheck,
+  runPeerReview as callPeerReview,
   startManuscriptJob,
 } from "../api";
 import { routeDecision } from "../aiAccess/aiAccessApi";
 import { readProviderKey } from "../../services/userAiSettings";
-import type { CoherenceDimension, GeneratedSection, GenerationJob } from "../types";
+import type { CoherenceDimension, GeneratedSection, GenerationJob, PeerReviewHistory, ReviewLens } from "../types";
 
 const DIMENSION_LABEL: Record<CoherenceDimension, string> = {
   terminology: "Terminology",
   argument_continuity: "Argument continuity",
   methodology: "Methodology",
+};
+
+const LENS_LABEL: Record<ReviewLens, string> = {
+  contribution: "Contribution",
+  literature: "Literature",
+  methodology: "Methodology",
+  evidence: "Evidence",
+  argument: "Argument",
+  citation: "Citation",
+  journal_fit: "Journal fit",
 };
 
 /**
@@ -93,6 +105,13 @@ function runCoherence(projectId: string): Promise<GenerationJob> {
   });
 }
 
+function runReview(projectId: string): Promise<PeerReviewHistory> {
+  return walkRoutingCandidates(async (byok) => {
+    const { peerReviewHistory } = await callPeerReview({ projectId, ...byok });
+    return peerReviewHistory;
+  });
+}
+
 export default function ManuscriptGenerationPanel({
   projectId,
   onOpenAiAccess,
@@ -109,16 +128,43 @@ export default function ManuscriptGenerationPanel({
   const [genError, setGenError] = useState<string | null>(null);
   const [noAiSource, setNoAiSource] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [reviewHistory, setReviewHistory] = useState<PeerReviewHistory | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewNoAiSource, setReviewNoAiSource] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     getManuscriptJob(projectId)
       .then((j) => !cancelled && setJob(j))
       .catch((e) => !cancelled && setLoadError((e as Error).message));
+    // Best-effort: a failed history load shouldn't block the rest of this
+    // panel from working — it just means the "Run peer review" section
+    // starts as if no round has run yet, same as a genuinely fresh project.
+    getPeerReviewHistory(projectId)
+      .then((h) => !cancelled && setReviewHistory(h))
+      .catch(() => !cancelled && setReviewHistory({ rounds: [] }));
     return () => {
       cancelled = true;
     };
   }, [projectId]);
+
+  async function handleRunReview() {
+    setReviewBusy(true);
+    setReviewError(null);
+    setReviewNoAiSource(null);
+    try {
+      setReviewHistory(await runReview(projectId));
+    } catch (e) {
+      if (e instanceof StudioNoAiSourceError) {
+        setReviewNoAiSource(e.message);
+      } else {
+        setReviewError((e as Error).message);
+      }
+    } finally {
+      setReviewBusy(false);
+    }
+  }
 
   async function handleStart() {
     setBusy(true);
@@ -315,6 +361,76 @@ export default function ManuscriptGenerationPanel({
                 </li>
               ))}
             </ul>
+          )}
+        </div>
+      )}
+
+      {job.state === "completed" && (
+        <div className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium text-[color:var(--text-primary)]">
+              Peer review {reviewHistory && reviewHistory.rounds.length > 0 && `(round ${reviewHistory.rounds.length})`}
+            </h4>
+            <button
+              type="button"
+              onClick={handleRunReview}
+              disabled={reviewBusy}
+              className="rounded border border-[color:var(--border-default)] px-2 py-1 text-xs font-medium hover:border-[color:var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
+            >
+              {reviewBusy ? "Reviewing…" : reviewHistory && reviewHistory.rounds.length > 0 ? "Run another round" : "Run peer review"}
+            </button>
+          </div>
+          {reviewError && <p role="alert" className="mt-2 text-xs text-[color:var(--state-danger)]">{reviewError}</p>}
+          {reviewNoAiSource && (
+            <div role="alert" className="mt-2 rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] p-3">
+              <p className="text-sm text-[color:var(--text-primary)]">Scholar Core needs at least one connected AI model to continue this stage.</p>
+              <p className="mt-1 text-xs text-[color:var(--text-secondary)]">{reviewNoAiSource}</p>
+              {onOpenAiAccess && (
+                <button
+                  type="button"
+                  onClick={onOpenAiAccess}
+                  className="mt-2 rounded-[var(--radius-md)] border border-[color:var(--border-default)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:border-[color:var(--border-strong)] cursor-pointer"
+                >
+                  Configure AI Access
+                </button>
+              )}
+            </div>
+          )}
+          {reviewHistory && reviewHistory.rounds.length > 0 && (
+            <div className="mt-2 flex flex-col gap-3">
+              {Object.entries(reviewHistory.rounds[reviewHistory.rounds.length - 1].lensErrors).map(([lens, error]) => (
+                <p key={lens} role="alert" className="text-xs text-[color:var(--state-danger)]">
+                  {LENS_LABEL[lens as ReviewLens]} lens failed: {error}
+                </p>
+              ))}
+              {reviewHistory.rounds[reviewHistory.rounds.length - 1].lensReviews.map((lensReview) => (
+                <div key={lensReview.lens}>
+                  <p className="text-xs font-medium text-[color:var(--text-primary)]">{LENS_LABEL[lensReview.lens]}</p>
+                  <p className="text-xs text-[color:var(--text-secondary)]">{lensReview.overallAssessment}</p>
+                  {lensReview.findings.length > 0 && (
+                    <ul className="mt-1 flex flex-col gap-1">
+                      {lensReview.findings.map((finding, i) => (
+                        <li key={i} className="text-xs text-[color:var(--text-primary)]">
+                          <span
+                            className={[
+                              "mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                              finding.severity === "critical" || finding.severity === "major"
+                                ? "bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)]"
+                                : finding.severity === "moderate"
+                                  ? "bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
+                                  : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]",
+                            ].join(" ")}
+                          >
+                            {finding.severity}
+                          </span>
+                          {finding.summary}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

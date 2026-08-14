@@ -21,6 +21,8 @@ import type { JournalRequirements } from "../../domain/journal/types";
 import { emptyLedger } from "../../domain/evidence/types";
 import type { EvidenceLedger } from "../../domain/evidence/types";
 import type { GenerationJob } from "../../domain/manuscript/types";
+import { emptyPeerReviewHistory } from "../../domain/review/types";
+import type { PeerReviewHistory } from "../../domain/review/types";
 
 export interface ProjectRecord {
   projectId: string;
@@ -54,6 +56,8 @@ export interface ProjectRecord {
   evidenceLedger: EvidenceLedger;
   /** The long-form generation engine's durable checkpoint (domain/manuscript). Undefined until POST .../manuscript/start — a real, distinct "never started" state, same as journalRequirements. */
   generationJob?: GenerationJob;
+  /** Every multi-lens peer review round run so far (domain/review) — versioned, never overwritten. Starts empty, same as claimGraph/evidenceLedger: always present, possibly with nothing in it yet. */
+  peerReviewHistory: PeerReviewHistory;
 }
 
 const projects = new Map<string, ProjectRecord>();
@@ -96,6 +100,7 @@ export function createProject(outputTypeId: string, ownerId: string): ProjectRec
     waivers: {},
     submissions: [],
     evidenceLedger: emptyLedger(),
+    peerReviewHistory: emptyPeerReviewHistory(),
   };
   projects.set(projectId, record);
   return record;

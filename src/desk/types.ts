@@ -250,6 +250,35 @@ export interface GenerationJob {
   coherenceReport?: CoherenceReport;
 }
 
+/** Mirrors src/domain/review/types.ts. */
+export type ReviewLens = "contribution" | "literature" | "methodology" | "evidence" | "argument" | "citation" | "journal_fit";
+export type FindingSeverity = "minor" | "moderate" | "major" | "critical";
+
+export interface ReviewFinding {
+  summary: string;
+  detail: string;
+  severity: FindingSeverity;
+  sectionKeys: string[];
+}
+
+export interface LensReview {
+  lens: ReviewLens;
+  findings: ReviewFinding[];
+  overallAssessment: string;
+}
+
+export interface ReviewRound {
+  roundNumber: number;
+  lensReviews: LensReview[];
+  lensesRun: ReviewLens[];
+  lensErrors: Partial<Record<ReviewLens, string>>;
+  createdAt: string;
+}
+
+export interface PeerReviewHistory {
+  rounds: ReviewRound[];
+}
+
 export interface StudioRefineResult {
   diff: RefinementDiff;
   voiceDrift?: VoiceDriftReport;
