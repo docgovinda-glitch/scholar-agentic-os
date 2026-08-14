@@ -49,7 +49,7 @@ import {
   type UserSearchResult,
 } from "../aiAccess/aiAccessApi";
 
-type Tab = "dashboard" | "providers" | "resources" | "premium" | "usage" | "budget" | "opportunities" | "users" | "admins" | "audit";
+export type Tab = "dashboard" | "providers" | "resources" | "premium" | "usage" | "budget" | "opportunities" | "users" | "admins" | "audit";
 
 const TABS: Array<{ id: Tab; label: string; requiredScope?: Scope }> = [
   { id: "dashboard", label: "Dashboard" },
@@ -63,6 +63,11 @@ const TABS: Array<{ id: Tab; label: string; requiredScope?: Scope }> = [
   { id: "admins", label: "Admins", requiredScope: "manage_admins" },
   { id: "audit", label: "Audit Logs" },
 ];
+
+/** Validates a URL's :tab segment — used by AdminApp.tsx's route, since the URL is attacker/typo-controlled and Tab is not a runtime type. */
+export function isAdminTab(value: string | undefined): value is Tab {
+  return TABS.some((t) => t.id === value);
+}
 
 /** Friendly, one-line description of what each scope actually unlocks — used by the Admins tab's grant/edit checkboxes. */
 export const SCOPE_LABELS: Record<Scope, string> = {
@@ -90,13 +95,25 @@ export interface AdminIdentity {
  * don't cover are hidden, not merely disabled — hiding is what actually
  * keeps a limited admin from seeing controls that would just 403 anyway.
  */
-export default function AdminPanel({ onClose, closeLabel = "Close", identity }: { onClose: () => void; closeLabel?: string; identity: AdminIdentity }) {
+export default function AdminPanel({
+  onClose,
+  closeLabel = "Close",
+  identity,
+  tab,
+  onTabChange,
+}: {
+  onClose: () => void;
+  closeLabel?: string;
+  identity: AdminIdentity;
+  /** Driven by the URL (/admin/:tab) in AdminApp.tsx, so each tab is directly linkable and Back/Forward move between them. */
+  tab: Tab;
+  onTabChange: (tab: Tab) => void;
+}) {
   const canSee = (id: Tab) => {
     const t = TABS.find((x) => x.id === id);
     return !t?.requiredScope || identity.isMainAdmin || identity.scopes.includes(t.requiredScope);
   };
   const visibleTabs = TABS.filter((t) => canSee(t.id));
-  const [tab, setTab] = useState<Tab>("dashboard");
 
   return (
     <div className="min-h-screen bg-[color:var(--surface-canvas)]">
@@ -112,7 +129,7 @@ export default function AdminPanel({ onClose, closeLabel = "Close", identity }: 
             <button
               key={t.id}
               type="button"
-              onClick={() => setTab(t.id)}
+              onClick={() => onTabChange(t.id)}
               className={`shrink-0 rounded-[var(--radius-sm)] px-3 py-1.5 text-sm ${
                 tab === t.id ? "bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] font-medium" : "text-[color:var(--text-secondary)]"
               }`}

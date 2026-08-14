@@ -10,10 +10,32 @@
 // for that component) — it's mocked to a shallow stub so this file stays
 // about AdminApp's own decisions.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import AdminApp from "../AdminApp";
+
+// AdminApp renders a <Routes> tree of its own, using paths ("/login",
+// "/:tab") and Navigate targets ("/admin/login", "/admin/dashboard") that
+// only resolve correctly nested under the same "/admin/*" parent route it
+// gets from main.tsx in production — so tests mount it the same way, rather
+// than bare, to exercise the real nesting rather than a simplified stand-in.
+// BrowserRouter, not MemoryRouter: the Back/Forward test below drives real
+// window.history, which only a real browser-backed router observes.
+function renderAdminApp() {
+  return render(
+    <BrowserRouter>
+      <Routes>
+        <Route path="/admin/*" element={<AdminApp />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+beforeEach(() => {
+  window.history.pushState({}, "", "/admin");
+});
 
 let sessionState: { session: { access_token: string } | null } = { session: null };
 const signOutMock = vi.fn(async () => {
@@ -41,24 +63,44 @@ vi.mock("../../desk/aiAccess/aiAccessApi", () => ({
 }));
 
 vi.mock("../../desk/admin/AdminPanel", () => ({
-  default: ({ onClose, closeLabel, identity }: { onClose: () => void; closeLabel: string; identity: { isMainAdmin: boolean; scopes: string[] } }) => (
+  default: ({
+    onClose,
+    closeLabel,
+    identity,
+    tab,
+    onTabChange,
+  }: {
+    onClose: () => void;
+    closeLabel: string;
+    identity: { isMainAdmin: boolean; scopes: string[] };
+    tab: string;
+    onTabChange: (tab: string) => void;
+  }) => (
     <div>
       <p>AI Infrastructure (stub)</p>
       <p>{identity.isMainAdmin ? "main admin" : `scopes: ${identity.scopes.join(",")}`}</p>
+      <p>Active tab: {tab}</p>
+      <button onClick={() => onTabChange("providers")}>Providers</button>
       <button onClick={onClose}>{closeLabel}</button>
     </div>
   ),
+  // Real validity check, not stubbed to always-true: AdminApp's own route
+  // guard (redirecting an unknown :tab to /admin/dashboard) is exactly what
+  // "renders the admin panel..." etc below rely on to reach the stub at all.
+  isAdminTab: (value: string | undefined) =>
+    ["dashboard", "providers", "resources", "premium", "usage", "budget", "opportunities", "users", "admins", "audit"].includes(value ?? ""),
 }));
 
 afterEach(() => {
   cleanup();
   sessionState = { session: null };
   vi.clearAllMocks();
+  window.history.pushState({}, "", "/admin");
 });
 
 describe("AdminApp", () => {
   it("shows a plain sign-in form when no session exists", async () => {
-    render(<AdminApp />);
+    renderAdminApp();
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.queryByText(/AI Infrastructure/)).not.toBeInTheDocument();
   });
@@ -67,7 +109,7 @@ describe("AdminApp", () => {
     sessionState = { session: { access_token: "t" } };
     whoAmIMock.mockResolvedValue({ isAdmin: false, isMainAdmin: false, scopes: [] });
 
-    render(<AdminApp />);
+    renderAdminApp();
 
     expect(await screen.findByText("404 — page not found.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sign in" })).not.toBeInTheDocument();
@@ -78,17 +120,32 @@ describe("AdminApp", () => {
     sessionState = { session: { access_token: "t" } };
     whoAmIMock.mockResolvedValue({ isAdmin: true, isMainAdmin: false, scopes: ["manage_premium", "manage_users"] });
 
-    render(<AdminApp />);
+    renderAdminApp();
 
     expect(await screen.findByText("AI Infrastructure (stub)")).toBeInTheDocument();
     expect(screen.getByText("scopes: manage_premium,manage_users")).toBeInTheDocument();
+  });
+
+  it("gives each admin tab its own URL, defaults to dashboard, and lets Back step back through tabs", async () => {
+    sessionState = { session: { access_token: "t" } };
+    whoAmIMock.mockResolvedValue({ isAdmin: true, isMainAdmin: true, scopes: [] });
+
+    renderAdminApp();
+
+    expect(await screen.findByText("Active tab: dashboard")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Providers" }));
+    expect(await screen.findByText("Active tab: providers")).toBeInTheDocument();
+
+    window.history.back();
+    await waitFor(() => expect(screen.getByText("Active tab: dashboard")).toBeInTheDocument());
   });
 
   it("marks the main admin distinctly", async () => {
     sessionState = { session: { access_token: "t" } };
     whoAmIMock.mockResolvedValue({ isAdmin: true, isMainAdmin: true, scopes: [] });
 
-    render(<AdminApp />);
+    renderAdminApp();
 
     expect(await screen.findByText("main admin")).toBeInTheDocument();
   });
@@ -96,7 +153,7 @@ describe("AdminApp", () => {
   it("a failed sign-in shows the error and never reaches the panel", async () => {
     signInMock.mockResolvedValue({ success: false, error: "Incorrect password credentials." });
 
-    render(<AdminApp />);
+    renderAdminApp();
     await screen.findByRole("heading", { name: "Sign in" });
 
     fireEvent.change(screen.getByPlaceholderText("Username"), { target: { value: "alice" } });
@@ -114,7 +171,7 @@ describe("AdminApp", () => {
     });
     whoAmIMock.mockResolvedValue({ isAdmin: true, isMainAdmin: false, scopes: ["manage_budget"] });
 
-    render(<AdminApp />);
+    renderAdminApp();
     await screen.findByRole("heading", { name: "Sign in" });
 
     fireEvent.change(screen.getByPlaceholderText("Username"), { target: { value: "alice" } });
@@ -128,7 +185,7 @@ describe("AdminApp", () => {
     sessionState = { session: { access_token: "t" } };
     whoAmIMock.mockResolvedValue({ isAdmin: true, isMainAdmin: false, scopes: [] });
 
-    render(<AdminApp />);
+    renderAdminApp();
     fireEvent.click(await screen.findByText("Sign out"));
 
     await waitFor(() => expect(signOutMock).toHaveBeenCalledOnce());

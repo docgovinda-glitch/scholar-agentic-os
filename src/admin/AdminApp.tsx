@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
 import { signIn } from "../services/supabaseAuthService";
 import { getAdminWhoAmI, type AdminWhoAmI } from "../desk/aiAccess/aiAccessApi";
-import AdminPanel from "../desk/admin/AdminPanel";
+import AdminPanel, { isAdminTab, type AdminIdentity } from "../desk/admin/AdminPanel";
 
 type Status = "loading" | "login" | "not-found" | "authorized";
 
@@ -26,14 +27,17 @@ type Status = "loading" | "login" | "not-found" | "authorized";
  * AdminPanel.tsx's own comment says it plainly: it's server/routes/
  * admin.ts's requireAdmin/requireScope checks that matter, not this
  * component being reachable.
+ *
+ * Mounted at /admin/* (see main.tsx), so every path below is written
+ * relative to that — matching what the panel's own 10 tabs need
+ * (/admin/:tab) and what a signed-out visitor needs (/admin/login), each
+ * directly linkable/refreshable rather than a plain state swap. Navigate
+ * targets are still written as fully absolute "/admin/..." strings, since
+ * a leading "/" there means the site root, not "relative to here".
  */
 export default function AdminApp() {
   const [status, setStatus] = useState<Status>("loading");
   const [who, setWho] = useState<AdminWhoAmI | null>(null);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   async function checkAdmin() {
     if (!isSupabaseConfigured()) {
@@ -54,23 +58,8 @@ export default function AdminApp() {
     void checkAdmin();
   }, []);
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    const result = await signIn({ username, password });
-    setBusy(false);
-    if (!result.success) {
-      setError(result.error ?? "Sign-in failed.");
-      return;
-    }
-    await checkAdmin();
-  }
-
   async function handleSignOut() {
     await getSupabaseClient().auth.signOut();
-    setUsername("");
-    setPassword("");
     setWho(null);
     setStatus("login");
   }
@@ -88,7 +77,56 @@ export default function AdminApp() {
   }
 
   if (status === "authorized" && who) {
-    return <AdminPanel onClose={handleSignOut} closeLabel="Sign out" identity={{ isMainAdmin: who.isMainAdmin, scopes: who.scopes }} />;
+    const identity: AdminIdentity = { isMainAdmin: who.isMainAdmin, scopes: who.scopes };
+    return (
+      <Routes>
+        <Route path="/:tab" element={<AdminPanelRoute onClose={handleSignOut} identity={identity} />} />
+        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={<AdminLoginScreen onSignedIn={checkAdmin} />} />
+      <Route path="*" element={<Navigate to="/admin/login" replace />} />
+    </Routes>
+  );
+}
+
+function AdminPanelRoute({ onClose, identity }: { onClose: () => void; identity: AdminIdentity }) {
+  const navigate = useNavigate();
+  const { tab } = useParams<{ tab: string }>();
+  if (!isAdminTab(tab)) return <Navigate to="/admin/dashboard" replace />;
+
+  return (
+    <AdminPanel
+      onClose={onClose}
+      closeLabel="Sign out"
+      identity={identity}
+      tab={tab}
+      onTabChange={(next) => navigate(`/admin/${next}`)}
+    />
+  );
+}
+
+function AdminLoginScreen({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleLogin(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const result = await signIn({ username, password });
+    setBusy(false);
+    if (!result.success) {
+      setError(result.error ?? "Sign-in failed.");
+      return;
+    }
+    await onSignedIn();
   }
 
   return (
