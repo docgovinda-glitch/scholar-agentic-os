@@ -95,6 +95,10 @@ create table if not exists public.projects (
   -- anonymization_report's proposals. A separate column from document,
   -- never overwrites it.
   anonymized_document jsonb,
+  -- Recorded explicit acceptance of a smaller-than-typical source corpus
+  -- (docs 30 §3 G2 "Exit"'s escape hatch). Nullable, no default — same
+  -- "not yet captured" case as journal_requirements.
+  source_count_override jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -155,6 +159,10 @@ alter table public.projects add column if not exists peer_review_history jsonb n
 alter table public.projects add column if not exists cover_letter jsonb;
 alter table public.projects add column if not exists anonymization_report jsonb;
 alter table public.projects add column if not exists anonymized_document jsonb;
+
+-- Migration for databases created before source_count_override existed.
+-- Nullable, no default — same "not yet captured" case as journal_requirements.
+alter table public.projects add column if not exists source_count_override jsonb;
 
 -- Deny-all baseline for anon/authenticated (see the note at the top of this
 -- file). FORCE additionally applies RLS to the table's owner; roles with

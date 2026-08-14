@@ -67,6 +67,7 @@ interface ProjectRow {
   cover_letter: ProjectRecord["coverLetter"] | null;
   anonymization_report: ProjectRecord["anonymizationReport"] | null;
   anonymized_document: ProjectRecord["anonymizedDocument"] | null;
+  source_count_override: ProjectRecord["sourceCountOverride"] | null;
 }
 
 function rowToRecord(row: ProjectRow): ProjectRecord {
@@ -91,6 +92,7 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
     coverLetter: row.cover_letter ?? undefined,
     anonymizationReport: row.anonymization_report ?? undefined,
     anonymizedDocument: row.anonymized_document ?? undefined,
+    sourceCountOverride: row.source_count_override ?? undefined,
   };
 }
 
@@ -113,6 +115,7 @@ function recordToRow(record: ProjectRecord): ProjectRow {
     cover_letter: record.coverLetter ?? null,
     anonymization_report: record.anonymizationReport ?? null,
     anonymized_document: record.anonymizedDocument ?? null,
+    source_count_override: record.sourceCountOverride ?? null,
   };
 }
 

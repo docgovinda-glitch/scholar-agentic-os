@@ -380,6 +380,32 @@ describe("restProjectStore: save", () => {
     expect(fetched2?.anonymizationReport).toEqual(anonymizationReport);
     expect(fetched2?.anonymizedDocument).toEqual(anonymizedDocument);
   });
+
+  it("serialises source_count_override through as-is, and defaults a row missing the column to undefined on get()", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    const sourceCountOverride = { reason: "Scoping review only.", acceptedBy: "u1", at: "2026-01-01T00:00:00.000Z" };
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      peerReviewHistory: { rounds: [] },
+      sourceCountOverride,
+    });
+    const body = calls[0].body as Record<string, unknown>;
+    expect(body.source_count_override).toEqual(sourceCountOverride);
+
+    const { s: getStore } = store(() => ({ body: [row()] }));
+    expect((await getStore.get("proj-abc"))?.sourceCountOverride).toBeUndefined();
+
+    const { s: getStore2 } = store(() => ({ body: [row({ source_count_override: sourceCountOverride })] }));
+    expect((await getStore2.get("proj-abc"))?.sourceCountOverride).toEqual(sourceCountOverride);
+  });
 });
 
 describe("restProjectStore: listByOwner", () => {

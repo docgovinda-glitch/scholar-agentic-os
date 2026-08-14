@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   computeG0ExitCriteria,
   computeG1ExitCriteria,
+  computeG2ExitCriteria,
   computeG3ExitCriteria,
+  computeG4ExitCriteria,
   computeG5ExitCriteria,
   computeG6ExitCriteria,
   computeG7ExitCriteria,
@@ -23,6 +25,9 @@ import { catalog } from "../../atlas/atlas";
 import { evaluateAgainstOutputType } from "../../rubric/rubric";
 import { emptyDocument } from "../../../domain/document/model";
 import { appendBlock } from "../../../domain/document/ops";
+import { emptyLedger } from "../../../domain/evidence/types";
+import type { EvidenceLedger, EvidenceItem, DiscoveredSource } from "../../../domain/evidence/types";
+import { emptyGraph, addClaim, bindEvidence, markClaimUnsupported } from "../../../domain/claim/graph";
 
 describe("app/conductor: G0 bound to Atlas", () => {
   it("computes one blocking criterion per required intake field", () => {
@@ -140,6 +145,66 @@ describe("app/conductor: G1 bound to Atlas + journal requirements", () => {
   });
 });
 
+function source(id: string, overrides: Partial<DiscoveredSource> = {}): DiscoveredSource {
+  return {
+    id,
+    title: `Source ${id}`,
+    authors: ["A. Author"],
+    sourceType: "scholarly",
+    authorityTier: "A",
+    discoveredVia: "manual",
+    discoveredAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function evidenceItem(id: string, sourceId: string, state: EvidenceItem["state"]): EvidenceItem {
+  return { id, sourceId, state, history: [{ state, at: "2026-01-01T00:00:00.000Z" }] };
+}
+
+describe("app/conductor: G2 bound to the evidence ledger", () => {
+  it("is unsatisfied on both criteria against an empty ledger, when the type requires more than zero sources", () => {
+    const thesis = catalog.getOrThrow("OT-07"); // requires 50 sources minimum
+    const criteria = computeG2ExitCriteria(thesis, emptyLedger(), undefined);
+    expect(criteria.find((c) => c.id === "corpus-meets-minimum")?.satisfied).toBe(false);
+    expect(criteria.find((c) => c.id === "no-unreviewed-candidates")?.satisfied).toBe(true); // vacuously — no items at all
+  });
+
+  it("corpus-meets-minimum is satisfied once enough sources are discovered", () => {
+    const assignment = catalog.getOrThrow("OT-01"); // small minimum, cheap to satisfy directly
+    const min = assignment.sources.targetCount.min;
+    const ledger: EvidenceLedger = { sources: Array.from({ length: min }, (_, i) => source(`s${i}`)), items: [] };
+    const criteria = computeG2ExitCriteria(assignment, ledger, undefined);
+    expect(criteria.find((c) => c.id === "corpus-meets-minimum")?.satisfied).toBe(true);
+  });
+
+  it("an explicit smaller-corpus override satisfies corpus-meets-minimum even with zero sources, and names the reason", () => {
+    const thesis = catalog.getOrThrow("OT-07");
+    const criteria = computeG2ExitCriteria(thesis, emptyLedger(), { reason: "Scoping review only." });
+    const criterion = criteria.find((c) => c.id === "corpus-meets-minimum")!;
+    expect(criterion.satisfied).toBe(true);
+    expect(criterion.description).toContain("Scoping review only.");
+  });
+
+  it("no-unreviewed-candidates is unsatisfied while an item sits in 'proposed', satisfied once it moves to 'citable'", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const proposedLedger: EvidenceLedger = { sources: [source("s1")], items: [evidenceItem("ev1", "s1", "proposed")] };
+    expect(computeG2ExitCriteria(assignment, proposedLedger, undefined).find((c) => c.id === "no-unreviewed-candidates")?.satisfied).toBe(false);
+
+    const citableLedger: EvidenceLedger = { sources: [source("s1")], items: [evidenceItem("ev1", "s1", "citable")] };
+    expect(computeG2ExitCriteria(assignment, citableLedger, undefined).find((c) => c.id === "no-unreviewed-candidates")?.satisfied).toBe(true);
+  });
+
+  it("items in earlier pipeline states (discovered/extracted/verified) don't count as 'unreviewed candidates blocking'", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const ledger: EvidenceLedger = {
+      sources: [source("s1")],
+      items: [evidenceItem("ev1", "s1", "discovered"), evidenceItem("ev2", "s1", "extracted"), evidenceItem("ev3", "s1", "verified")],
+    };
+    expect(computeG2ExitCriteria(assignment, ledger, undefined).find((c) => c.id === "no-unreviewed-candidates")?.satisfied).toBe(true);
+  });
+});
+
 describe("app/conductor: G3 bound to Atlas + the document", () => {
   it("computes one blocking criterion per required section, unsatisfied against an empty document", () => {
     const thesis = catalog.getOrThrow("OT-07");
@@ -190,13 +255,14 @@ describe("app/conductor: G3 bound to Atlas + the document", () => {
     project = updateExitCriteria(project, "G3", criteria);
     expect(project.gates.G3.status).not.toBe("ready"); // entry prerequisites unmet yet
 
-    // Sign off G0 (its own real exit criteria) and G2 (no compute function
-    // exists yet — see this module's comment — so an empty, vacuously-
-    // satisfied criteria list is what makes it reachable for this test).
+    // Sign off G0 and G2 (its own real exit criteria — an explicit
+    // smaller-corpus override, since adding OT-07's real 50-source minimum
+    // isn't this test's subject).
     project = updateExitCriteria(project, "G0", computeG0ExitCriteria(thesis, answers));
     project = await signOff(project, "G0", "amara", { answers });
-    project = updateExitCriteria(project, "G2", []);
-    project = await signOff(project, "G2", "amara", {});
+    const override = { reason: "Pilot literature scan only; full search deferred to G2's continuous phase." };
+    project = updateExitCriteria(project, "G2", computeG2ExitCriteria(thesis, emptyLedger(), override));
+    project = await signOff(project, "G2", "amara", { evidenceLedger: emptyLedger(), override });
 
     for (const section of thesis.structure.sections.filter((s) => s.required)) {
       doc = appendBlock(doc, section.key, "paragraph", "x");
@@ -204,6 +270,86 @@ describe("app/conductor: G3 bound to Atlas + the document", () => {
     criteria = computeG3ExitCriteria(thesis, doc, { research_question: "A real question.", methodology_type: "theoretical" });
     project = updateExitCriteria(project, "G3", criteria);
     expect(project.gates.G3.status).toBe("ready");
+  });
+});
+
+describe("app/conductor: G4 bound to the document + claim graph", () => {
+  it("computes one blocking criterion per required section, unsatisfied against an empty document", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const doc = emptyDocument("d1", "Test");
+    const criteria = computeG4ExitCriteria(assignment, doc, emptyGraph());
+    const sectionCriteria = criteria.filter((c) => c.id.startsWith("draft-section-"));
+    const requiredSectionCount = assignment.structure.sections.filter((s) => s.required).length;
+    expect(sectionCriteria).toHaveLength(requiredSectionCount);
+    expect(sectionCriteria.every((c) => c.blocking && !c.satisfied)).toBe(true);
+  });
+
+  it("a section existing but empty is STILL unsatisfied — G4 requires non-empty content, stricter than G3's existence-only check", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    let doc = emptyDocument("d1", "Test");
+    doc = appendBlock(doc, "introduction", "paragraph", "   "); // whitespace only
+    const criteria = computeG4ExitCriteria(assignment, doc, emptyGraph());
+    expect(criteria.find((c) => c.id === "draft-section-introduction")?.satisfied).toBe(false);
+  });
+
+  it("a section with real content is satisfied", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    let doc = emptyDocument("d1", "Test");
+    doc = appendBlock(doc, "introduction", "paragraph", "This assignment addresses X.");
+    const criteria = computeG4ExitCriteria(assignment, doc, emptyGraph());
+    expect(criteria.find((c) => c.id === "draft-section-introduction")?.satisfied).toBe(true);
+  });
+
+  it("an unbound, unmarked claim leaves the claims criterion unsatisfied", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const doc = emptyDocument("d1", "Test");
+    let graph = emptyGraph();
+    graph = addClaim(graph, { id: "c1", text: "Effect X was observed." });
+    const criteria = computeG4ExitCriteria(assignment, doc, graph);
+    const claimsCriterion = criteria.find((c) => c.id === "claims-bound-or-marked-unsupported")!;
+    expect(claimsCriterion.satisfied).toBe(false);
+    expect(claimsCriterion.description).toContain("c1");
+  });
+
+  it("a bound claim satisfies the claims criterion", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const doc = emptyDocument("d1", "Test");
+    let graph = emptyGraph();
+    graph = addClaim(graph, { id: "c1", text: "Effect X was observed." });
+    graph = bindEvidence(graph, { id: "b1", claimId: "c1", evidence: [{ sourceId: "s1", locator: {}, quote: "X was measured." }], strength: "strong", rationale: "Direct measurement." });
+    const criteria = computeG4ExitCriteria(assignment, doc, graph);
+    expect(criteria.find((c) => c.id === "claims-bound-or-marked-unsupported")?.satisfied).toBe(true);
+  });
+
+  it("a claim explicitly marked unsupported ALSO satisfies G4's claims criterion — the looser draft-stage bar", () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    const doc = emptyDocument("d1", "Test");
+    let graph = emptyGraph();
+    graph = addClaim(graph, { id: "c1", text: "This is a definitional statement." });
+    graph = markClaimUnsupported(graph, "c1", "Definitional, needs no citation.", "u1");
+    const criteria = computeG4ExitCriteria(assignment, doc, graph);
+    expect(criteria.find((c) => c.id === "claims-bound-or-marked-unsupported")?.satisfied).toBe(true);
+  });
+
+  it("end-to-end: G4 becomes ready once its entry prerequisites (G1, G2, G3) are signed off and every criterion is satisfied", async () => {
+    const assignment = catalog.getOrThrow("OT-01");
+    let doc = emptyDocument("d1", "Test");
+    for (const section of assignment.structure.sections.filter((s) => s.required)) {
+      doc = appendBlock(doc, section.key, "paragraph", "Real content for this section.");
+    }
+    let graph = emptyGraph();
+    graph = addClaim(graph, { id: "c1", text: "A claim." });
+    graph = markClaimUnsupported(graph, "c1", "No citation needed.", "u1");
+
+    let project: ProjectGateState = initialProjectGateState("p1");
+    for (const gate of ["G0", "G1", "G2", "G3"] as const) {
+      project = updateExitCriteria(project, gate, [{ id: "x", description: "x", satisfied: true, blocking: true }]);
+      project = await signOff(project, gate, "u", `hash-${gate}`);
+    }
+    expect(project.gates.G4.entrySatisfied).toBe(true);
+
+    project = updateExitCriteria(project, "G4", computeG4ExitCriteria(assignment, doc, graph));
+    expect(project.gates.G4.status).toBe("ready");
   });
 });
 

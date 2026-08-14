@@ -66,6 +66,8 @@ export interface ProjectRecord {
   anonymizationReport?: AnonymizationReport;
   /** The anonymized document produced by applying a human-accepted subset of anonymizationReport's proposals (POST .../anonymization/apply). A separate document from `document`, never overwrites it. */
   anonymizedDocument?: CanonicalDocument;
+  /** Recorded explicit acceptance of a smaller-than-typical source corpus (docs 30 §3 G2 "Exit"'s escape hatch) — undefined until POST .../gates/G2/accept-smaller-corpus, mirroring waivers' "reason required" discipline. */
+  sourceCountOverride?: { reason: string; acceptedBy: string; at: string };
 }
 
 const projects = new Map<string, ProjectRecord>();

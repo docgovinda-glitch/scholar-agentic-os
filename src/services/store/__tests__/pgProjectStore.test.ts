@@ -419,4 +419,58 @@ describe("services/store: pgProjectStore", () => {
     expect(fetchedRecord?.anonymizationReport).toEqual(anonymizationReport);
     expect(fetchedRecord?.anonymizedDocument).toEqual(anonymizedDocument);
   });
+
+  it("source_count_override round-trips: serializes to JSON on save, defaults to undefined when a row predates the column, and rehydrates when present", async () => {
+    const sourceCountOverride: ProjectRecord["sourceCountOverride"] = { reason: "Scoping review only.", acceptedBy: "u1", at: "2026-01-01T00:00:00.000Z" };
+    const record: ProjectRecord = {
+      projectId: "proj-g2",
+      ownerId: "11111111-1111-4111-8111-111111111111",
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      peerReviewHistory: { rounds: [] },
+      sourceCountOverride,
+    };
+    const saveDb = fakeDb();
+    await createPgProjectStore(saveDb).save(record);
+    expect(JSON.parse(saveDb.calls[0].params?.[17] as string)).toEqual(sourceCountOverride);
+
+    const staleRowDb = fakeDb([
+      {
+        project_id: "proj-old4",
+        owner_id: "11111111-1111-4111-8111-111111111111",
+        output_type_id: "OT-10",
+        answers: {},
+        gates: {},
+        document: null,
+        rubric_report: null,
+        claim_graph: { claims: {}, evidence: {}, bindings: {} },
+        waivers: {},
+        submissions: [],
+        // No source_count_override key at all — a row from before the migration.
+      },
+    ]);
+    expect((await createPgProjectStore(staleRowDb).get("proj-old4"))?.sourceCountOverride).toBeUndefined();
+
+    const getDb = fakeDb([
+      {
+        project_id: "proj-g2",
+        owner_id: "11111111-1111-4111-8111-111111111111",
+        output_type_id: "OT-10",
+        answers: {},
+        gates: {},
+        document: null,
+        rubric_report: null,
+        claim_graph: { claims: {}, evidence: {}, bindings: {} },
+        waivers: {},
+        submissions: [],
+        source_count_override: sourceCountOverride,
+      },
+    ]);
+    expect((await createPgProjectStore(getDb).get("proj-g2"))?.sourceCountOverride).toEqual(sourceCountOverride);
+  });
 });

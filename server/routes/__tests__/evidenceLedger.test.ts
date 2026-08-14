@@ -268,3 +268,58 @@ describe("POST .../evidence-ledger/items/:evidenceId/reject", () => {
     expect(res.status).toBe(400);
   });
 });
+
+function findGate(gates: Array<{ gate: string }>, id: string) {
+  return gates.find((g) => g.gate === id);
+}
+
+describe("G2 (Sources gate) recomputed from evidence-ledger routes", () => {
+  it("starts with both criteria outstanding (OT-10 requires 30 sources minimum)", async () => {
+    const projectId = await createProject();
+    const res = await request(app).get(`/api/projects/${projectId}`);
+    const g2 = findGate(res.body.gates, "G2");
+    expect(g2.outstandingBlocking.length).toBe(1); // corpus-meets-minimum; no-unreviewed-candidates is vacuously satisfied
+  });
+
+  it("adding a manual source recomputes G2 (visible via GET /api/projects/:id)", async () => {
+    const projectId = await createProject();
+    await addManualSource(projectId);
+    const res = await request(app).get(`/api/projects/${projectId}`);
+    const g2 = findGate(res.body.gates, "G2");
+    expect(g2.outstandingBlocking.length).toBe(1); // still short of 30, but the criterion recomputed (not stuck at creation-time state)
+  });
+
+  it("proposing evidence makes G2's no-unreviewed-candidates criterion outstanding, approving clears it", async () => {
+    const projectId = await createProject();
+    const { evidenceId } = await fullPipelineUpToProposed(projectId);
+
+    const afterPropose = await request(app).get(`/api/projects/${projectId}`);
+    expect(findGate(afterPropose.body.gates, "G2").outstandingBlocking.some((d: string) => d.includes("proposed"))).toBe(true);
+
+    const approveRes = await request(app)
+      .post(`/api/projects/${projectId}/evidence-ledger/items/${evidenceId}/approve`)
+      .send({ actor: "human-1", strength: "strong", rationale: "Directly supports the claim." });
+    expect(approveRes.status).toBe(200);
+    expect(findGate(approveRes.body.gates, "G2").outstandingBlocking.some((d: string) => d.includes("proposed"))).toBe(false);
+  });
+});
+
+describe("POST /api/projects/:id/gates/G2/accept-smaller-corpus", () => {
+  it("400s without a reason or an actor", async () => {
+    const projectId = await createProject();
+    const noReason = await request(app).post(`/api/projects/${projectId}/gates/G2/accept-smaller-corpus`).send({ actor: "u1" });
+    expect(noReason.status).toBe(400);
+    const noActor = await request(app).post(`/api/projects/${projectId}/gates/G2/accept-smaller-corpus`).send({ reason: "Scoping review only." });
+    expect(noActor.status).toBe(400);
+  });
+
+  it("satisfies G2's corpus-meets-minimum criterion even with zero sources, recording the reason", async () => {
+    const projectId = await createProject();
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/gates/G2/accept-smaller-corpus`)
+      .send({ reason: "Scoping review only; full search deferred.", actor: "u1" });
+    expect(res.status).toBe(200);
+    const g2 = findGate(res.body.gates, "G2");
+    expect(g2.outstandingBlocking).toEqual([]);
+  });
+});

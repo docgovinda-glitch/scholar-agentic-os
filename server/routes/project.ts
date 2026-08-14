@@ -7,26 +7,22 @@
  * The second route built on the new architecture (after
  * server/routes/studio.ts). Exposes the Atlas catalog for intake-form
  * rendering, and the Conductor's gate state machine for a project bound to
- * one output type. G0 (from Atlas intake answers), G1 (from Atlas intake
- * answers plus PUT .../journal-requirements — see computeG1ExitCriteria),
- * G3 (from the Atlas structure plus the document and intake answers — see
- * computeG3ExitCriteria's own comment for what's deliberately not modeled),
- * G6 (from the Rubric, once a document has been submitted via
- * PUT .../document), G5 (from peer-review rounds — see
- * POST .../manuscript/peer-review), and G7 (pre-flight plus the same
- * Rubric report G6 reads — see computeG7ExitCriteria) have real, computable
- * exit-criteria sources through this surface. G2 and G4 have no
- * sourcing/drafting-progress pipeline to compute criteria from yet (docs 30
- * §10). The sign-off and
- * invalidate endpoints below are gate-agnostic — they will work for any
- * gate the moment something else in the system starts calling
- * updateExitCriteria for it — but since G3's entry prerequisites (G0, G2)
- * and G6's (G1-G5) can't all be satisfied without the missing pipelines,
- * only G0 and G1 can reach an actual sign-off end-to-end through this API
- * today (G2 and G3 can if a caller manually signs off G2 with an empty
- * criteria list, same as this file's own tests do — G2 has no compute
- * function of its own yet). Computing G3 and G6 correctly now, ahead of the
- * gates upstream of them existing, means nothing changes here when those do.
+ * one output type. Every gate from G0 through G7 now has a real,
+ * computable exit-criteria source through this surface: G0 (Atlas intake
+ * answers), G1 (intake answers plus PUT .../journal-requirements), G2
+ * (the evidence ledger, recomputed on essentially every evidence-ledger
+ * route — see computeG2ExitCriteria), G3 (the Atlas structure plus the
+ * document and intake answers — see computeG3ExitCriteria's own comment
+ * for what's deliberately not modeled), G4 (the document plus the claim
+ * graph — see computeG4ExitCriteria's own comment for what's deliberately
+ * not modeled), G5 (peer-review rounds — see POST .../manuscript/
+ * peer-review), G6 (the Rubric, once a document has been submitted via
+ * PUT .../document), and G7 (pre-flight plus the same Rubric report G6
+ * reads — see computeG7ExitCriteria). The sign-off and invalidate
+ * endpoints below are gate-agnostic — `updateExitCriteria()` takes any
+ * `ExitCriterion[]`, computed however the caller likes — so a project can
+ * now sign off G0 through G7 end-to-end through this API alone, gated only
+ * by each gate's own real entry prerequisites and exit criteria.
  *
  * Persistence goes through src/services/store/projectStore.ts's
  * getProjectStore() — an in-memory Map when DATABASE_URL is unset (tests,
@@ -40,7 +36,9 @@ import { catalog } from "../../src/app/atlas/atlas.ts";
 import {
   computeG0ExitCriteria,
   computeG1ExitCriteria,
+  computeG2ExitCriteria,
   computeG3ExitCriteria,
+  computeG4ExitCriteria,
   computeG5ExitCriteria,
   computeG6ExitCriteria,
   computeG7ExitCriteria,
@@ -61,7 +59,7 @@ import type { ExportFormat } from "../../src/app/export/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
 import { emptyDocument } from "../../src/domain/document/model.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
-import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, ClaimGraphError } from "../../src/domain/claim/graph.ts";
+import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, markClaimUnsupported, ClaimGraphError } from "../../src/domain/claim/graph.ts";
 import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
 import { addSubmission, updateSubmission, deleteSubmission, SubmissionError } from "../../src/domain/submission/submissions.ts";
 import { SUBMISSION_STATUSES } from "../../src/domain/submission/types.ts";
@@ -947,6 +945,34 @@ function recomputeG3(record: ProjectRecord, document: CanonicalDocument | undefi
 }
 
 /**
+ * Recompute G2's exit criteria (docs 30 §3 G2 "Exit") from the project's
+ * evidence ledger as it stands right now, plus any recorded
+ * accept-smaller-corpus override. Called from every evidence-ledger-
+ * touching route — G2 is the one continuous gate (docs 30 §3), so
+ * recomputing liberally rather than trying to identify exactly which
+ * mutations could change the count is deliberate; this is a cheap, pure
+ * computation.
+ */
+function recomputeG2(record: ProjectRecord) {
+  const spec = catalog.getOrThrow(record.outputTypeId);
+  const criteria = computeG2ExitCriteria(spec, record.evidenceLedger, record.sourceCountOverride);
+  return updateExitCriteria(record.gates, "G2", criteria);
+}
+
+/**
+ * Recompute G4's exit criteria (docs 30 §3 G4 "Exit") from the project's
+ * document and Claim–Evidence Graph as they stand right now — called from
+ * the document endpoint and every claim-graph-touching route, since a G4
+ * criterion can change from either side (a section being filled in, or a
+ * claim being bound or marked explicitly unsupported).
+ */
+function recomputeG4(record: ProjectRecord, document: CanonicalDocument | undefined) {
+  const spec = catalog.getOrThrow(record.outputTypeId);
+  const criteria = computeG4ExitCriteria(spec, document ?? emptyDocument(record.projectId, spec.label), record.claimGraph);
+  return updateExitCriteria(record.gates, "G4", criteria);
+}
+
+/**
  * Recompute G6's exit criteria, and — chained off the same freshly-built
  * Rubric report — G7's (computeG7ExitCriteria reads the document plus this
  * same report, so it always reflects what G6 just evaluated, not a stale
@@ -1089,15 +1115,17 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(403).json({ error: MAINTENANCE_MESSAGE });
     }
     const created = await store.create(outputTypeId, currentUserId(req));
-    // Compute G0's, G1's, and G3's real exit criteria immediately from the
-    // (still empty) answers/journalRequirements/document, rather than
-    // leaving domain/project/gates.ts's default empty exitCriteria in place
-    // — an empty criteria list is vacuously "ready" (isReadyToSignOff's
-    // `.every()` over zero items), which would let a caller sign off before
-    // anything was ever computed.
+    // Compute every gate's real exit criteria immediately from the (still
+    // empty) answers/journalRequirements/document/evidenceLedger/claimGraph,
+    // rather than leaving domain/project/gates.ts's default empty
+    // exitCriteria in place — an empty criteria list is vacuously "ready"
+    // (isReadyToSignOff's `.every()` over zero items), which would let a
+    // caller sign off before anything was ever computed.
     let gates = updateExitCriteria(created.gates, "G0", computeG0ExitCriteria(spec, created.answers));
     gates = recomputeG1({ ...created, gates }, created.answers, created.journalRequirements);
+    gates = recomputeG2({ ...created, gates });
     gates = recomputeG3({ ...created, gates }, undefined, created.answers);
+    gates = recomputeG4({ ...created, gates }, undefined);
     const record = await store.save({ ...created, gates });
     res.status(201).json(projectView(record));
   }));
@@ -1310,7 +1338,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
     try {
       const { rubricReport, gates: gatesAfterG6 } = recomputeG6(record, document);
-      const gates = recomputeG3({ ...record, gates: gatesAfterG6 }, document, record.answers);
+      const gatesAfterG3 = recomputeG3({ ...record, gates: gatesAfterG6 }, document, record.answers);
+      const gates = recomputeG4({ ...record, gates: gatesAfterG3 }, document);
       const updated = await store.save({ ...record, document, rubricReport, gates });
       res.json({ ...projectView(updated), rubric: rubricReport });
     } catch (err) {
@@ -1406,9 +1435,11 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    */
   function saveClaimGraphChange(record: ProjectRecord, claimGraph: ClaimEvidenceGraph) {
     if (!record.document) {
-      return store.save({ ...record, claimGraph });
+      const gates = recomputeG4({ ...record, claimGraph }, undefined);
+      return store.save({ ...record, claimGraph, gates });
     }
-    const { rubricReport, gates } = recomputeG6({ ...record, claimGraph }, record.document);
+    const { rubricReport, gates: gatesAfterG6 } = recomputeG6({ ...record, claimGraph }, record.document);
+    const gates = recomputeG4({ ...record, claimGraph, gates: gatesAfterG6 }, record.document);
     return store.save({ ...record, claimGraph, rubricReport, gates });
   }
 
@@ -1466,6 +1497,40 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     } catch (err) {
       if (err instanceof ClaimGraphError) {
         return res.status(400).json({ error: err.message });
+      }
+      if (err instanceof GateTransitionError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
+  }));
+
+  /**
+   * Explicitly mark a claim as deliberately unsupported (docs 30 §3 G4
+   * "Exit"'s "or explicitly marked unsupported" escape hatch) — a
+   * DRAFT-STAGE acknowledgement only; it does NOT satisfy G6's compliance
+   * Rubric (see domain/claim/graph.ts's markClaimUnsupported /
+   * claimsNeedingResolution / unsupportedClaims doc comments for why).
+   * Body: { reason, actor }. 404s for an unknown claim id. Recomputes G4.
+   */
+  app.post("/api/projects/:id/claims/:claimId/mark-unsupported", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { reason, actor } = req.body ?? {};
+    if (typeof reason !== "string" || reason.trim().length === 0) {
+      return res.status(400).json({ error: "Missing required field: reason" });
+    }
+    if (typeof actor !== "string" || actor.length === 0) {
+      return res.status(400).json({ error: "Missing required field: actor" });
+    }
+    try {
+      const claimGraph = markClaimUnsupported(record.claimGraph, req.params.claimId, reason, actor);
+      const gates = recomputeG4({ ...record, claimGraph }, record.document);
+      const updated = await store.save({ ...record, claimGraph, gates });
+      res.json({ ...projectView(updated), claimGraph: updated.claimGraph });
+    } catch (err) {
+      if (err instanceof ClaimGraphError) {
+        return res.status(404).json({ error: err.message });
       }
       if (err instanceof GateTransitionError) {
         return res.status(409).json({ error: err.message });
@@ -1556,7 +1621,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const source: DiscoveredSource = { ...req.body, id: `src-${crypto.randomUUID()}`, discoveredVia: "manual", discoveredAt: new Date().toISOString() };
     try {
       const evidenceLedger = discoverSource(record.evidenceLedger, source);
-      const updated = await store.save({ ...record, evidenceLedger });
+      const gates = recomputeG2({ ...record, evidenceLedger });
+      const updated = await store.save({ ...record, evidenceLedger, gates });
       res.status(201).json(updated.evidenceLedger);
     } catch (err) {
       if (err instanceof EvidenceStateError) return res.status(409).json({ error: err.message });
@@ -1603,7 +1669,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       evidenceLedger = discoverSource(evidenceLedger, source);
       added.push(source);
     }
-    const updated = await store.save({ ...record, evidenceLedger });
+    const gates = recomputeG2({ ...record, evidenceLedger });
+    const updated = await store.save({ ...record, evidenceLedger, gates });
     res.json({ added, evidenceLedger: updated.evidenceLedger });
   }));
 
@@ -1625,7 +1692,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
     try {
       const evidenceLedger = extractEvidence(record.evidenceLedger, { id: `ev-${crypto.randomUUID()}`, sourceId: req.params.sourceId, quote, locator });
-      const updated = await store.save({ ...record, evidenceLedger });
+      const gates = recomputeG2({ ...record, evidenceLedger });
+      const updated = await store.save({ ...record, evidenceLedger, gates });
       res.status(201).json(updated.evidenceLedger);
     } catch (err) {
       if (err instanceof EvidenceStateError) {
@@ -1642,7 +1710,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     const { actor } = req.body ?? {};
     try {
       const evidenceLedger = verifyEvidence(record.evidenceLedger, req.params.evidenceId, typeof actor === "string" ? actor : undefined);
-      const updated = await store.save({ ...record, evidenceLedger });
+      const gates = recomputeG2({ ...record, evidenceLedger });
+      const updated = await store.save({ ...record, evidenceLedger, gates });
       res.json(updated.evidenceLedger);
     } catch (err) {
       if (err instanceof EvidenceStateError) {
@@ -1665,7 +1734,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
     try {
       const evidenceLedger = proposeEvidence(record.evidenceLedger, req.params.evidenceId, claimId, typeof actor === "string" ? actor : undefined);
-      const updated = await store.save({ ...record, evidenceLedger });
+      const gates = recomputeG2({ ...record, evidenceLedger });
+      const updated = await store.save({ ...record, evidenceLedger, gates });
       res.json(updated.evidenceLedger);
     } catch (err) {
       if (err instanceof EvidenceStateError) {
@@ -1722,13 +1792,15 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     try {
       const claimGraph = bindEvidence(record.claimGraph, binding);
       const recordWithLedger = { ...record, evidenceLedger };
+      const gatesAfterG2 = recomputeG2({ ...recordWithLedger, claimGraph });
       const updated = record.document
         ? await (async () => {
-            const { rubricReport, gates } = recomputeG6({ ...recordWithLedger, claimGraph }, record.document!);
+            const { rubricReport, gates: gatesAfterG6 } = recomputeG6({ ...recordWithLedger, claimGraph, gates: gatesAfterG2 }, record.document!);
+            const gates = recomputeG4({ ...recordWithLedger, claimGraph, gates: gatesAfterG6 }, record.document);
             return store.save({ ...recordWithLedger, claimGraph, rubricReport, gates });
           })()
-        : await store.save({ ...recordWithLedger, claimGraph });
-      res.json({ evidenceLedger: updated.evidenceLedger, claimGraph: updated.claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
+        : await store.save({ ...recordWithLedger, claimGraph, gates: recomputeG4({ ...recordWithLedger, claimGraph, gates: gatesAfterG2 }, undefined) });
+      res.json({ evidenceLedger: updated.evidenceLedger, claimGraph: updated.claimGraph, gates: summarize(updated.gates), ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
     } catch (err) {
       if (err instanceof ClaimGraphError) return res.status(409).json({ error: err.message });
       if (err instanceof GateTransitionError) return res.status(409).json({ error: err.message });
@@ -1749,7 +1821,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
     try {
       const evidenceLedger = rejectEvidence(record.evidenceLedger, req.params.evidenceId, actor, reason);
-      const updated = await store.save({ ...record, evidenceLedger });
+      const gates = recomputeG2({ ...record, evidenceLedger });
+      const updated = await store.save({ ...record, evidenceLedger, gates });
       res.json(updated.evidenceLedger);
     } catch (err) {
       if (err instanceof EvidenceStateError) {
@@ -1757,6 +1830,29 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       }
       throw err;
     }
+  }));
+
+  /**
+   * Explicitly accept a smaller-than-typical source corpus for G2 (docs 30
+   * §3 G2 "Exit"'s "or the user explicitly accepts a smaller corpus with a
+   * recorded reason" escape hatch) — mirrors app/rubric's `waiveRule`:
+   * a mandatory, recorded reason, never a silent bypass. Body:
+   * { reason, actor }. Recomputes G2 immediately.
+   */
+  app.post("/api/projects/:id/gates/G2/accept-smaller-corpus", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { reason, actor } = req.body ?? {};
+    if (typeof reason !== "string" || reason.trim().length === 0) {
+      return res.status(400).json({ error: "Missing required field: reason" });
+    }
+    if (typeof actor !== "string" || actor.length === 0) {
+      return res.status(400).json({ error: "Missing required field: actor" });
+    }
+    const sourceCountOverride = { reason, acceptedBy: actor, at: new Date().toISOString() };
+    const gates = recomputeG2({ ...record, sourceCountOverride });
+    const updated = await store.save({ ...record, sourceCountOverride, gates });
+    res.json(projectView(updated));
   }));
 
   /**
@@ -2273,11 +2369,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    * blocking exit criterion is unsatisfied, or entry prerequisites are
    * unmet). The approved snapshot is what a later content change is
    * detected against (docs 30 §2.2) — G0's is the intake answers, G1's is
-   * the intake answers plus the journal requirements, G3's is the
-   * document's block ids plus the intake answers, G5's is the peer-review
-   * history, G6's is the Rubric report, G7's is that same Rubric report
-   * plus the document's block ids; every other gate has no computed
-   * content yet (see this file's module comment) so its snapshot is empty.
+   * the intake answers plus the journal requirements, G2's is the evidence
+   * ledger plus any recorded smaller-corpus override, G3's is the
+   * document's block ids plus the intake answers, G4's is the document's
+   * block ids plus the claim graph, G5's is the peer-review history, G6's
+   * is the Rubric report, G7's is that same Rubric report plus the
+   * document's block ids; every gate now has real computed content to
+   * snapshot.
    */
   app.post("/api/projects/:id/gates/:gate/signoff", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
@@ -2295,15 +2393,19 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
         ? { answers: record.answers }
         : req.params.gate === "G1"
           ? { answers: record.answers, journalRequirements: record.journalRequirements }
-          : req.params.gate === "G3"
-            ? { blockIds: record.document?.blocks.map((b) => b.id) ?? [], answers: record.answers }
-            : req.params.gate === "G5"
-              ? { peerReviewHistory: record.peerReviewHistory }
-              : req.params.gate === "G6"
-                ? { rubricReport: record.rubricReport }
-                : req.params.gate === "G7"
-                  ? { rubricReport: record.rubricReport, blockIds: record.document?.blocks.map((b) => b.id) ?? [] }
-                  : {};
+          : req.params.gate === "G2"
+            ? { evidenceLedger: record.evidenceLedger, sourceCountOverride: record.sourceCountOverride }
+            : req.params.gate === "G3"
+              ? { blockIds: record.document?.blocks.map((b) => b.id) ?? [], answers: record.answers }
+              : req.params.gate === "G4"
+                ? { blockIds: record.document?.blocks.map((b) => b.id) ?? [], claimGraph: record.claimGraph }
+                : req.params.gate === "G5"
+                  ? { peerReviewHistory: record.peerReviewHistory }
+                  : req.params.gate === "G6"
+                    ? { rubricReport: record.rubricReport }
+                    : req.params.gate === "G7"
+                      ? { rubricReport: record.rubricReport, blockIds: record.document?.blocks.map((b) => b.id) ?? [] }
+                      : {};
 
     try {
       const gates = await signOff(record.gates, req.params.gate, actor, approvedSnapshot);

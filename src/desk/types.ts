@@ -385,6 +385,8 @@ export interface Claim {
   id: string;
   text: string;
   draftSpanId?: string;
+  /** Mirrors src/domain/claim/types.ts's Claim.explicitlyUnsupported. */
+  explicitlyUnsupported?: { reason: string; markedBy: string; at: string };
 }
 
 export type SupportStrength = "strong" | "moderate" | "weak" | "contradicts";

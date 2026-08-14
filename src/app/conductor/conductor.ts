@@ -10,17 +10,17 @@
  * venue settled and its requirements captured — see computeG1ExitCriteria),
  * Atlas + the document for G3 (every required section exists, every
  * deferred G0 field resolved — see computeG3ExitCriteria's own comment for
- * what's deliberately not modeled), the project's peer-review history for
- * G5 (see computeG5ExitCriteria), the Rubric for G6 (are there any
- * unresolved blocking or required compliance findings), and the document
- * plus that same Rubric report for G7 (pre-flight plus compliance — see
+ * what's deliberately not modeled), the evidence ledger for G2 (see
+ * computeG2ExitCriteria), the document plus the claim graph for G4 (see
+ * computeG4ExitCriteria's own comment for what's deliberately not
+ * modeled), the project's peer-review history for G5 (see
+ * computeG5ExitCriteria), the Rubric for G6 (are there any unresolved
+ * blocking or required compliance findings), and the document plus that
+ * same Rubric report for G7 (pre-flight plus compliance — see
  * computeG7ExitCriteria's own comment for what's deliberately not
- * modeled). G2 and G4 exit criteria are not wired to anything yet — there
- * is no sourcing or drafting-progress pipeline built (see
- * docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3) — but the gate state
- * machine itself supports them identically once those modules exist:
- * `updateExitCriteria()` takes any `ExitCriterion[]`, computed however the
- * caller likes.
+ * modeled). Every gate now has a real compute function; what's left is the
+ * server layer actually calling each one from the right mutation routes
+ * (server/routes/project.ts's own module comment tracks that).
  *
  * TRACKED GAP: per-chapter independent gating for `long_form_chaptered`
  * (docs 30 §3's "G3 runs per chapter") is not implemented. This module
@@ -55,6 +55,9 @@ import type { CanonicalDocument } from "../../domain/document/model";
 import type { JournalRequirements } from "../../domain/journal/types";
 import type { PeerReviewHistory } from "../../domain/review/types";
 import { preflight } from "../export/export";
+import type { EvidenceLedger } from "../../domain/evidence/types";
+import { claimsNeedingResolution } from "../../domain/claim/graph";
+import type { ClaimEvidenceGraph } from "../../domain/claim/types";
 
 export {
   GATE_ORDER,
@@ -162,6 +165,60 @@ function flattenSections(sections: SectionSpec[]): SectionSpec[] {
 }
 
 /**
+ * Compute G2's exit criteria (docs 30 §3 G2 "Exit": "Corpus meets the
+ * type's minimum source count, or the user explicitly accepts a smaller
+ * corpus with a recorded reason · zero unreviewed candidates blocking")
+ * from the catalog's own source-count target and the project's evidence
+ * ledger (domain/evidence). Both halves are modeled:
+ *
+ *   - "Corpus meets minimum … or explicitly accepted smaller" —
+ *     `evidenceLedger.sources.length >= spec.sources.targetCount.min`, OR
+ *     `override` is set (server/routes/project.ts's
+ *     POST .../gates/G2/accept-smaller-corpus, mirroring the Rubric's own
+ *     `waiveRule`'s "reason required" discipline).
+ *   - "Zero unreviewed candidates blocking" — no `EvidenceItem` is
+ *     currently in the "proposed" state, i.e. every item a human staged
+ *     against a claim has since been approved or declined
+ *     (domain/evidence's own state machine; `rejectEvidence` returns a
+ *     declined item to "verified", not a dead end, so there is no
+ *     separate "rejected and stuck" state to also check for).
+ *
+ * `G2` is the only continuous gate (docs 30 §3): unlike every other gate
+ * here, its criteria are meant to be recomputed on essentially every
+ * evidence-ledger mutation, not just a handful of milestone actions.
+ */
+export function computeG2ExitCriteria(
+  spec: OutputTypeSpec,
+  evidenceLedger: EvidenceLedger,
+  override: { reason: string } | undefined
+): ExitCriterion[] {
+  const sourceCount = evidenceLedger.sources.length;
+  const minCount = spec.sources.targetCount.min;
+  const corpusSufficient = sourceCount >= minCount || override !== undefined;
+  const unreviewed = evidenceLedger.items.filter((i) => i.state === "proposed");
+
+  return [
+    {
+      id: "corpus-meets-minimum",
+      description: override
+        ? `A smaller corpus than the typical minimum (${minCount} sources) was explicitly accepted: "${override.reason}"`
+        : `Corpus has at least ${minCount} sources (currently ${sourceCount})`,
+      satisfied: corpusSufficient,
+      blocking: true,
+    },
+    {
+      id: "no-unreviewed-candidates",
+      description:
+        unreviewed.length === 0
+          ? "No evidence item is awaiting an approve/reject decision"
+          : `${unreviewed.length} evidence item(s) are proposed against a claim but not yet approved or declined`,
+      satisfied: unreviewed.length === 0,
+      blocking: true,
+    },
+  ];
+}
+
+/**
  * Compute G3's exit criteria from an Atlas output type, the project's
  * document (however far structure has progressed — a required section can
  * exist as an empty stub at G3 time; G4 is what later requires it be
@@ -217,6 +274,67 @@ export function computeG3ExitCriteria(
     }));
 
   return [...sectionCriteria, ...deferredFieldCriteria];
+}
+
+/**
+ * Compute G4's exit criteria (docs 30 §3 G4 "Exit": "Every required
+ * section non-empty · no ai_generated_unreviewed spans in sections marked
+ * complete · every claim bound or explicitly marked unsupported") from an
+ * Atlas output type, the project's document, and its Claim–Evidence
+ * Graph.
+ *
+ * Two of the three are modeled here:
+ *   - "Every required section non-empty" — stricter than
+ *     computeG3ExitCriteria's own section check (existence only): this one
+ *     also requires non-empty text, the same bar app/rubric's
+ *     structural_presence Rubric rule applies.
+ *   - "Every claim bound or explicitly marked unsupported" — reads
+ *     `domain/claim/graph.ts`'s `claimsNeedingResolution`, the
+ *     deliberately looser draft-stage sibling of `unsupportedClaims`
+ *     (compiled into the Rubric's `claim_support` rule at G6) — see that
+ *     module's own comment for why an explicit "the author has
+ *     acknowledged no evidence exists" flag satisfies this gate but not
+ *     G6's compliance check.
+ *
+ * NOT modeled, stated honestly rather than faked: "no ai_generated_
+ * unreviewed spans in sections marked complete". There is no span-level
+ * content-provenance model in the Canonical Document (`domain/document`'s
+ * `Block` is `{id, kind, text}` — no per-span "AI-generated, not yet
+ * reviewed" attribute), so there is nothing yet to check. Same "leave
+ * uncompiled rather than force a false mapping" discipline as
+ * `computeG3ExitCriteria`'s own documented gap and `computeG7ExitCriteria`'s
+ * "required assets present".
+ */
+export function computeG4ExitCriteria(
+  spec: OutputTypeSpec,
+  document: CanonicalDocument,
+  claimGraph: ClaimEvidenceGraph
+): ExitCriterion[] {
+  const sectionCriteria: ExitCriterion[] = flattenSections(spec.structure.sections)
+    .filter((s) => s.required)
+    .map((section) => {
+      const block = document.blocks.find((b) => b.id === section.key);
+      const nonEmpty = block !== undefined && block.text.trim().length > 0;
+      return {
+        id: `draft-section-${section.key}`,
+        description: `"${section.title}" is drafted (present and non-empty)`,
+        satisfied: nonEmpty,
+        blocking: true,
+      };
+    });
+
+  const unresolved = claimsNeedingResolution(claimGraph);
+  const claimsCriterion: ExitCriterion = {
+    id: "claims-bound-or-marked-unsupported",
+    description:
+      unresolved.length === 0
+        ? "Every claim is bound to evidence or explicitly marked unsupported"
+        : `${unresolved.length} claim(s) are neither bound to evidence nor explicitly marked unsupported: ${unresolved.map((c) => c.id).join(", ")}`,
+    satisfied: unresolved.length === 0,
+    blocking: true,
+  };
+
+  return [...sectionCriteria, claimsCriterion];
 }
 
 /**
