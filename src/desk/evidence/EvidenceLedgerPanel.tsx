@@ -59,7 +59,7 @@ export default function EvidenceLedgerPanel({
   const [busy, setBusy] = useState(false);
 
   const [query, setQuery] = useState("");
-  const [via, setVia] = useState<"arxiv" | "web_search">("arxiv");
+  const [via, setVia] = useState<"arxiv" | "openalex" | "web_search">("openalex");
   const [manualTitle, setManualTitle] = useState("");
   const [showManual, setShowManual] = useState(false);
 
@@ -229,8 +229,9 @@ export default function EvidenceLedgerPanel({
             placeholder="Search topic…"
             className="min-w-[200px] flex-1 px-3 py-2 text-sm"
           />
-          <select aria-label="Discovery source" value={via} onChange={(e) => setVia(e.target.value as "arxiv" | "web_search")} className="px-2 py-2 text-sm">
-            <option value="arxiv">arXiv</option>
+          <select aria-label="Discovery source" value={via} onChange={(e) => setVia(e.target.value as "arxiv" | "openalex" | "web_search")} className="px-2 py-2 text-sm">
+            <option value="openalex">OpenAlex (all scholarly literature)</option>
+            <option value="arxiv">arXiv (preprints)</option>
             <option value="web_search">Web</option>
           </select>
           <button

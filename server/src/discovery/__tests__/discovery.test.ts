@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
 
-const { discoverArxivSources, discoverWebSources } = await import("../discovery");
+const { discoverArxivSources, discoverOpenAlexSources, discoverWebSources } = await import("../discovery");
 
 const originalFetch = global.fetch;
 afterEach(() => {
@@ -91,5 +91,69 @@ describe("discoverWebSources", () => {
     mockFetch(() => ({ status: 200, body: { results: [{ title: "Weird", url: "not-a-url", content: "", score: 0 }] } }));
     const drafts = await discoverWebSources("query");
     expect(drafts[0].authorityTier).toBe("D");
+  });
+});
+
+describe("discoverOpenAlexSources", () => {
+  it("maps OpenAlex works to source drafts, tiering a peer-reviewed journal article A and everything else B", async () => {
+    mockFetch((url) => {
+      expect(url).toContain("https://api.openalex.org/works?");
+      expect(url).toContain("search=things");
+      return {
+        status: 200,
+        body: {
+          results: [
+            {
+              id: "https://openalex.org/W1",
+              doi: "https://doi.org/10.1234/journal.5678",
+              title: "A Peer-Reviewed Study",
+              publication_year: 2023,
+              type: "article",
+              authorships: [{ author: { display_name: "A. One" } }, { author: { display_name: "B. Two" } }],
+              primary_location: { landing_page_url: "https://example.com/w1", source: { display_name: "Journal of Things", type: "journal" } },
+            },
+            {
+              id: "https://openalex.org/W2",
+              title: "A Preprint",
+              publication_year: 2024,
+              type: "preprint",
+              authorships: [],
+              primary_location: { source: { display_name: "A Repository", type: "repository" } },
+            },
+          ],
+        },
+      };
+    });
+
+    const drafts = await discoverOpenAlexSources("things");
+    expect(drafts).toHaveLength(2);
+    expect(drafts[0]).toMatchObject({
+      title: "A Peer-Reviewed Study",
+      authors: ["A. One", "B. Two"],
+      doi: "10.1234/journal.5678",
+      venue: "Journal of Things",
+      year: 2023,
+      sourceType: "scholarly",
+      authorityTier: "A",
+      discoveredVia: "openalex",
+    });
+    expect(drafts[1]).toMatchObject({ title: "A Preprint", authorityTier: "B", discoveredVia: "openalex" });
+    expect(drafts[1]).not.toHaveProperty("doi");
+  });
+
+  it("throws a real error rather than returning an empty list when OpenAlex itself fails", async () => {
+    mockFetch(() => ({ status: 500, body: { error: "internal" } }));
+    await expect(discoverOpenAlexSources("things")).rejects.toThrow(/OpenAlex 500/);
+  });
+
+  it("needs no Supabase configuration at all — it calls OpenAlex's public API directly", async () => {
+    const url = process.env.VITE_SUPABASE_URL;
+    delete process.env.VITE_SUPABASE_URL;
+    try {
+      mockFetch(() => ({ status: 200, body: { results: [] } }));
+      await expect(discoverOpenAlexSources("things")).resolves.toEqual([]);
+    } finally {
+      process.env.VITE_SUPABASE_URL = url;
+    }
   });
 });

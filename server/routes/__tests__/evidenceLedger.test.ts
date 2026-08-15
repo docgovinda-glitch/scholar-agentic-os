@@ -129,6 +129,34 @@ describe("POST /api/projects/:id/evidence-ledger/discover", () => {
     expect(res.body.evidenceLedger.items).toHaveLength(0);
   });
 
+  it("adds sources found via OpenAlex, which needs no Supabase proxy at all", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => "",
+      json: async () => ({
+        results: [
+          {
+            id: "https://openalex.org/W1",
+            doi: "https://doi.org/10.1234/x",
+            title: "An OpenAlex Paper",
+            publication_year: 2023,
+            type: "article",
+            authorships: [{ author: { display_name: "A. One" } }],
+            primary_location: { source: { display_name: "Journal of Things", type: "journal" } },
+          },
+        ],
+      }),
+    } as Response);
+    const projectId = await createProject();
+
+    const res = await request(app).post(`/api/projects/${projectId}/evidence-ledger/discover`).send({ query: "test topic", via: "openalex" });
+    expect(res.status).toBe(200);
+    expect(res.body.added).toHaveLength(1);
+    expect(res.body.added[0]).toMatchObject({ title: "An OpenAlex Paper", discoveredVia: "openalex", authorityTier: "A" });
+    expect(res.body.evidenceLedger.items).toHaveLength(0);
+  });
+
   it("502s with a real error, never a fabricated empty result, when the proxy call fails", async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => "boom", json: async () => ({}) } as Response);
     const projectId = await createProject();

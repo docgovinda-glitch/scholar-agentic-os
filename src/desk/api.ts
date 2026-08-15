@@ -403,7 +403,7 @@ export function addManualSource(
 export function discoverSources(
   projectId: string,
   query: string,
-  via: "arxiv" | "web_search"
+  via: "arxiv" | "openalex" | "web_search"
 ): Promise<{ added: DiscoveredSource[]; evidenceLedger: EvidenceLedger }> {
   return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/discover`, "POST", { query, via }).then((r) => json(r));
 }

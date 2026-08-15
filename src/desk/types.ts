@@ -154,7 +154,7 @@ export interface JournalRequirementsProposal {
 /** Mirrors src/domain/evidence/types.ts. */
 export type SourceType = "scholarly" | "official" | "web" | "media" | "user_provided" | "vault";
 export type AuthorityTier = "A" | "B" | "C" | "D";
-export type DiscoveryMethod = "arxiv" | "web_search" | "user_upload" | "vault" | "manual";
+export type DiscoveryMethod = "arxiv" | "web_search" | "openalex" | "user_upload" | "vault" | "manual";
 
 export interface DiscoveredSource {
   id: string;

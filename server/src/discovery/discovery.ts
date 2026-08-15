@@ -33,6 +33,24 @@ interface WebResult {
   score: number;
 }
 
+interface OpenAlexAuthorship {
+  author?: { display_name?: string };
+}
+
+interface OpenAlexWork {
+  id: string;
+  doi?: string;
+  title?: string;
+  display_name?: string;
+  publication_year?: number;
+  type?: string;
+  authorships?: OpenAlexAuthorship[];
+  primary_location?: {
+    landing_page_url?: string;
+    source?: { display_name?: string; type?: string };
+  };
+}
+
 export type DiscoveredSourceDraft = Omit<DiscoveredSource, "id" | "discoveredAt">;
 
 async function callProxy<T>(fn: "arxiv-proxy" | "search-proxy", body: unknown): Promise<T[]> {
@@ -95,4 +113,57 @@ export async function discoverWebSources(query: string, domains?: string[]): Pro
     discoveredVia: "web_search" as const,
     ...webDomainAuthority(r.url),
   }));
+}
+
+/**
+ * A peer-reviewed-journal article indexed by OpenAlex outranks a preprint or
+ * repository entry the same way arXiv's own preprints are tiered B above —
+ * "A" is only ever assigned when OpenAlex itself reports the work as a
+ * journal article (`type: "article"` in a `primary_location.source.type:
+ * "journal"`), never guessed from the query or title.
+ */
+function openAlexAuthority(work: OpenAlexWork): { sourceType: SourceType; authorityTier: AuthorityTier } {
+  if (work.type === "article" && work.primary_location?.source?.type === "journal") {
+    return { sourceType: "scholarly", authorityTier: "A" };
+  }
+  return { sourceType: "scholarly", authorityTier: "B" };
+}
+
+/**
+ * OpenAlex (https://openalex.org) — a free, fully open scholarly index of
+ * ~250M works across every discipline, not just arXiv's preprint corpus.
+ * Unlike arxiv-proxy/search-proxy, no Supabase Edge Function or API key is
+ * needed: OpenAlex's REST API is public. `OPENALEX_MAILTO`, if set, is sent
+ * per OpenAlex's own etiquette guidance for faster, more reliable service
+ * ("the polite pool") — never required.
+ */
+export async function discoverOpenAlexSources(query: string, maxResults = 10): Promise<DiscoveredSourceDraft[]> {
+  const params = new URLSearchParams({ search: query, "per-page": String(maxResults) });
+  const mailto = process.env.OPENALEX_MAILTO;
+  if (mailto) params.set("mailto", mailto);
+
+  let res: Response;
+  try {
+    res = await fetch(`https://api.openalex.org/works?${params.toString()}`);
+  } catch (err) {
+    throw new Error(`OpenAlex request failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (!res.ok) {
+    throw new Error(`OpenAlex ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
+  }
+  const parsed = (await res.json()) as { results?: OpenAlexWork[] };
+  return (parsed.results ?? []).map((w) => {
+    const doi = w.doi ? w.doi.replace(/^https?:\/\/doi\.org\//, "") : undefined;
+    const venue = w.primary_location?.source?.display_name;
+    return {
+      title: w.title || w.display_name || "Untitled",
+      authors: (w.authorships ?? []).map((a) => a.author?.display_name).filter((n): n is string => Boolean(n)),
+      url: w.doi ?? w.primary_location?.landing_page_url ?? w.id,
+      ...(doi ? { doi } : {}),
+      ...(venue ? { venue } : {}),
+      ...(w.publication_year ? { year: w.publication_year } : {}),
+      discoveredVia: "openalex" as const,
+      ...openAlexAuthority(w),
+    };
+  });
 }

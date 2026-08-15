@@ -66,12 +66,41 @@ describe("Desk — EvidenceLedgerPanel", () => {
     render(<EvidenceLedgerPanel projectId={PROJECT_ID} actor="u1" />);
 
     await screen.findByText("Sources (0)");
+    fireEvent.change(screen.getByLabelText("Discovery source"), { target: { value: "arxiv" } });
     fireEvent.change(screen.getByLabelText("Search query"), { target: { value: "test topic" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
 
     await screen.findByText("A Discovered Paper");
     expect(screen.getByText("Sources (1)")).toBeInTheDocument();
     expect(screen.getByText("No evidence extracted yet.")).toBeInTheDocument();
+  });
+
+  it("defaults to OpenAlex and discovers sources through it, sending via: openalex", async () => {
+    let capturedBody: Record<string, unknown> | null = null;
+    mockFetch((url, method, body) => {
+      if (url.endsWith("/claims") && method === "GET") return { status: 200, body: { claims: [], bindings: [] } };
+      if (url.includes("/evidence-ledger/discover")) {
+        capturedBody = body as Record<string, unknown>;
+        return {
+          status: 200,
+          body: {
+            added: [{ id: "src-2", title: "An OpenAlex Paper", authors: ["Y"], sourceType: "scholarly", authorityTier: "A", discoveredVia: "openalex", discoveredAt: "now" }],
+            evidenceLedger: { sources: [{ id: "src-2", title: "An OpenAlex Paper", authors: ["Y"], sourceType: "scholarly", authorityTier: "A", discoveredVia: "openalex", discoveredAt: "now" }], items: [] },
+          },
+        };
+      }
+      if (url.includes("/evidence-ledger")) return { status: 200, body: { sources: [], items: [] } };
+      return { status: 500, body: {} };
+    });
+    render(<EvidenceLedgerPanel projectId={PROJECT_ID} actor="u1" />);
+
+    await screen.findByText("Sources (0)");
+    expect(screen.getByLabelText("Discovery source")).toHaveValue("openalex");
+    fireEvent.change(screen.getByLabelText("Search query"), { target: { value: "test topic" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    await screen.findByText("An OpenAlex Paper");
+    expect(capturedBody).toMatchObject({ via: "openalex" });
   });
 
   it("extracts a quote from a source, creating an evidence item shown as 'Extracted'", async () => {

@@ -30,7 +30,7 @@ export type SourceType = "scholarly" | "official" | "web" | "media" | "user_prov
 /** A (never-invented) authority tier: A = primary/official/peer-reviewed, D = unverified/low-authority. Assigned from what discovery actually observed (a .gov domain, a preprint host, etc.), never guessed for a source discovery can't classify. */
 export type AuthorityTier = "A" | "B" | "C" | "D";
 
-export type DiscoveryMethod = "arxiv" | "web_search" | "user_upload" | "vault" | "manual";
+export type DiscoveryMethod = "arxiv" | "web_search" | "openalex" | "user_upload" | "vault" | "manual";
 
 export interface DiscoveredSource {
   id: string;

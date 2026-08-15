@@ -86,7 +86,7 @@ import {
   EvidenceStateError,
 } from "../../src/domain/evidence/stateMachine.ts";
 import type { DiscoveredSource, EvidenceLocator } from "../../src/domain/evidence/types.ts";
-import { discoverArxivSources, discoverWebSources } from "../src/discovery/discovery.ts";
+import { discoverArxivSources, discoverOpenAlexSources, discoverWebSources } from "../src/discovery/discovery.ts";
 import { allocateWordBudget } from "../../src/domain/manuscript/wordBudget.ts";
 import type { GeneratedSection, SectionPlan } from "../../src/domain/manuscript/types.ts";
 import {
@@ -1668,13 +1668,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   }));
 
   /**
-   * Search for candidate sources via the arXiv or web-search proxies
-   * (server/src/discovery/discovery.ts). This only ever ADDS sources to the
-   * ledger — never creates an evidence item, never binds anything: "AI may
-   * research automatically" stops exactly here. Body: { query, via: "arxiv" | "web_search", domains? }.
-   * 502s (not a fabricated empty result) when the underlying proxy call
-   * itself fails — a real search failure must be visible, never silently
-   * presented as "nothing found".
+   * Search for candidate sources via arXiv, OpenAlex, or the web-search
+   * proxy (server/src/discovery/discovery.ts). This only ever ADDS sources
+   * to the ledger — never creates an evidence item, never binds anything:
+   * "AI may research automatically" stops exactly here. Body: { query, via:
+   * "arxiv" | "openalex" | "web_search", domains? }. 502s (not a fabricated
+   * empty result) when the underlying call itself fails — a real search
+   * failure must be visible, never silently presented as "nothing found".
    */
   app.post("/api/projects/:id/evidence-ledger/discover", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
@@ -1683,8 +1683,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     if (typeof query !== "string" || query.trim().length === 0) {
       return res.status(400).json({ error: "Missing required field: query" });
     }
-    if (via !== "arxiv" && via !== "web_search") {
-      return res.status(400).json({ error: 'Invalid field: via. Must be "arxiv" or "web_search".' });
+    if (via !== "arxiv" && via !== "openalex" && via !== "web_search") {
+      return res.status(400).json({ error: 'Invalid field: via. Must be "arxiv", "openalex", or "web_search".' });
     }
     if (domains !== undefined && (!Array.isArray(domains) || !domains.every((d) => typeof d === "string"))) {
       return res.status(400).json({ error: "Invalid field: domains (string[])." });
@@ -1692,7 +1692,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
     let drafts: Awaited<ReturnType<typeof discoverArxivSources>>;
     try {
-      drafts = via === "arxiv" ? await discoverArxivSources(query) : await discoverWebSources(query, domains);
+      drafts = via === "arxiv" ? await discoverArxivSources(query) : via === "openalex" ? await discoverOpenAlexSources(query) : await discoverWebSources(query, domains);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       return res.status(502).json({ error: `Discovery failed: ${message}` });
