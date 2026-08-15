@@ -79,6 +79,37 @@ describe("Desk — StudioPanel", () => {
     expect(screen.getByText(/Plural agreement/)).toBeInTheDocument();
   });
 
+  it("seeds the passage box from seedText when seedToken changes, without fighting subsequent user edits", async () => {
+    const { rerender } = render(<StudioPanel sessionId="s1" seedText="Generated section text." seedToken={1} />);
+    expect(screen.getByPlaceholderText(/Paste a passage/)).toHaveValue("Generated section text.");
+
+    // User edits after the seed lands — a re-render with the SAME token must not clobber it.
+    fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "User's own edit." } });
+    rerender(<StudioPanel sessionId="s1" seedText="Generated section text." seedToken={1} />);
+    expect(screen.getByPlaceholderText(/Paste a passage/)).toHaveValue("User's own edit.");
+
+    // A NEW token (e.g. a second "Humanize in Studio" click) re-seeds, even with the same text.
+    rerender(<StudioPanel sessionId="s1" seedText="Generated section text." seedToken={2} />);
+    expect(screen.getByPlaceholderText(/Paste a passage/)).toHaveValue("Generated section text.");
+  });
+
+  it("clears a prior result/error/consent prompt when re-seeded", async () => {
+    mockFetch(() => ({ status: 403, body: { error: "denied", reason: "restricted content never egresses." } }));
+    const { rerender } = render(<StudioPanel sessionId="s1" seedToken={1} />);
+    fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Restricted text." } });
+    fireEvent.click(screen.getByText("Refine"));
+    expect(await screen.findByText(/Denied by privacy policy/)).toBeInTheDocument();
+
+    rerender(<StudioPanel sessionId="s1" seedText="Fresh section." seedToken={2} />);
+    expect(screen.queryByText(/Denied by privacy policy/)).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Paste a passage/)).toHaveValue("Fresh section.");
+  });
+
+  it("does not seed when seedToken is never supplied (no manuscript panel in play)", () => {
+    render(<StudioPanel sessionId="s1" />);
+    expect(screen.getByPlaceholderText(/Paste a passage/)).toHaveValue("");
+  });
+
   it("Level 2 (clarity) and above show provider/key fields in Advanced mode, gated until key is entered", async () => {
     render(<StudioPanel sessionId="s1" />);
 

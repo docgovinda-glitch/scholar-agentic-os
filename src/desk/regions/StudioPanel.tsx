@@ -93,12 +93,26 @@ const CATEGORY_COLOR = {
  * already-built server/routes/studio.ts — the same pipeline docs 32 describes
  * (deterministic mechanics for Level 1, platform/gateway + Warden for Levels 2-5).
  *
- * Passage selection isn't real yet: there's no click-to-select interaction in
- * Primary's read-only view (docs 22 §5.4's "Select text, ⌘I" needs the real
- * editor). The textarea below is the same kind of honest stopgap as
+ * Passage selection FROM THE DOCUMENT EDITOR isn't real yet: there's no
+ * click-to-select interaction in the TipTap-backed editor (docs 22 §5.4's
+ * "Select text, ⌘I"). Passage selection from freshly AI-GENERATED manuscript
+ * sections IS real, via `seedText`/`seedToken` below (ManuscriptGenerationPanel's
+ * "Humanize in Studio" action) — this is a "make the AI-drafted prose read
+ * naturally in the author's voice" pass, not AI-detection-evasion tooling.
+ * Absent a seed, the textarea remains the same honest stopgap as
  * plainTextToDocument.ts — paste a passage rather than select one in place.
  */
-export default function StudioPanel({ sessionId }: { sessionId: string }) {
+export default function StudioPanel({
+  sessionId,
+  seedText,
+  seedToken,
+}: {
+  sessionId: string;
+  /** Text to load into the passage box — e.g. a just-generated manuscript section. */
+  seedText?: string;
+  /** Bump this (e.g. a counter) to re-seed with the same text again; the panel only reacts to a CHANGE in this value, not to `seedText` alone, so typing in the box afterward isn't fought on every parent re-render. */
+  seedToken?: number;
+}) {
   const [level, setLevel] = useState<InterventionLevel>("proofread");
   /** Auto routes through the Scholar AI Engine (Priority 1); Advanced is the pre-existing manual provider+key override, kept for the case Auto has nothing usable. */
   const [mode, setMode] = useState<"auto" | "advanced">("auto");
@@ -148,6 +162,19 @@ export default function StudioPanel({ sessionId }: { sessionId: string }) {
       active = false;
     };
   }, []);
+
+  // Seed the passage box from a freshly generated manuscript section
+  // (ManuscriptGenerationPanel's "Humanize in Studio"). Reacts to a CHANGE in
+  // seedToken, not to seedText alone, so a parent re-render carrying the same
+  // token never clobbers text the user is actively editing.
+  useEffect(() => {
+    if (seedToken === undefined) return;
+    setText(seedText ?? "");
+    setResult(null);
+    setError(null);
+    setConsentNeeded(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts only to seedToken changes, per the comment above.
+  }, [seedToken]);
 
   const writingHistory = getWritingHistory(sessionId);
   const historySummary = summarizeWritingHistory(writingHistory);

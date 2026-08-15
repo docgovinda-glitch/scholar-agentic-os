@@ -25,10 +25,10 @@ vi.mock("../../services/supabaseClient", () => ({
 const { default: ProjectListScreen } = await import("../ProjectListScreen");
 
 const TYPES = [
-  { id: "OT-02", label: "Essay", aliases: [], family: "short_form", academicLevels: [], typicalDisciplines: [] },
-  { id: "OT-06", label: "Journal Article", aliases: [], family: "publication", academicLevels: [], typicalDisciplines: [] },
-  { id: "OT-09", label: "Doctoral Dissertation", aliases: [], family: "long_form", academicLevels: [], typicalDisciplines: [] },
-  { id: "OT-10", label: "Review Article", aliases: [], family: "publication", academicLevels: [], typicalDisciplines: [] },
+  { id: "OT-02", label: "Essay", aliases: [], family: "short_form", academicLevels: [], typicalDisciplines: [], available: false },
+  { id: "OT-06", label: "Journal Article", aliases: [], family: "publication", academicLevels: [], typicalDisciplines: [], available: true },
+  { id: "OT-09", label: "Doctoral Dissertation", aliases: [], family: "long_form", academicLevels: [], typicalDisciplines: [], available: false },
+  { id: "OT-10", label: "Review Article", aliases: [], family: "publication", academicLevels: [], typicalDisciplines: [], available: false },
 ];
 
 afterEach(() => {
@@ -54,7 +54,7 @@ describe("the document-type dropdown", () => {
     // Two Publications-family entries collapse into one group, not two.
     expect(groupLabels.filter((l) => l === "Publications")).toHaveLength(1);
     expect(within(select).getByRole("option", { name: "Journal Article" })).toBeInTheDocument();
-    expect(within(select).getByRole("option", { name: "Review Article" })).toBeInTheDocument();
+    expect(within(select).getByRole("option", { name: "Review Article — Under maintenance" })).toBeInTheDocument();
   });
 
   it("cannot continue before a type is chosen", async () => {
@@ -66,12 +66,23 @@ describe("the document-type dropdown", () => {
     await openChooser();
     createProject.mockResolvedValue({ projectId: "proj-1" });
 
-    fireEvent.change(screen.getByLabelText("Document type"), { target: { value: "OT-09" } });
+    fireEvent.change(screen.getByLabelText("Document type"), { target: { value: "OT-06" } });
     expect(createProject).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(createProject).toHaveBeenCalledWith("OT-09");
+    expect(createProject).toHaveBeenCalledWith("OT-06");
+  });
+
+  it("shows every type, but disables the ones under maintenance with a common message rather than hiding them", async () => {
+    await openChooser();
+
+    const select = screen.getByLabelText("Document type") as HTMLSelectElement;
+    const essay = within(select).getByRole("option", { name: "Essay — Under maintenance" }) as HTMLOptionElement;
+    expect(essay.disabled).toBe(true);
+
+    const journalArticle = within(select).getByRole("option", { name: "Journal Article" }) as HTMLOptionElement;
+    expect(journalArticle.disabled).toBe(false);
   });
 });
 

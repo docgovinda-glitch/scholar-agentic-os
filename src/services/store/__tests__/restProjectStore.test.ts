@@ -122,6 +122,7 @@ describe("restProjectStore: empty response bodies", () => {
         claimGraph: {} as ProjectRecord["claimGraph"],
         waivers: {},
         submissions: [],
+        evidenceLedger: { sources: [], items: [] },
       })
     ).resolves.toBeDefined();
   });
@@ -158,6 +159,22 @@ describe("restProjectStore: get", () => {
     expect(record?.submissions).toEqual([]);
   });
 
+  it("maps SQL NULL journal_requirements to undefined, and a present one through as-is", async () => {
+    const { s: withoutReqs } = store(() => ({ body: [row({ journal_requirements: null })] }));
+    expect((await withoutReqs.get("proj-abc"))?.journalRequirements).toBeUndefined();
+
+    const journalRequirements = {
+      journalName: "Water Research",
+      source: "manual" as const,
+      citationStyle: "vancouver",
+      requiredDeclarations: ["funding"],
+      capturedAt: "2026-01-01T00:00:00.000Z",
+      capturedBy: OWNER,
+    };
+    const { s: withReqs } = store(() => ({ body: [row({ journal_requirements: journalRequirements })] }));
+    expect((await withReqs.get("proj-abc"))?.journalRequirements).toEqual(journalRequirements);
+  });
+
   it("url-encodes the id rather than interpolating it raw", async () => {
     const { s, calls } = store(() => ({ body: [] }));
     await s.get("proj-a b&c");
@@ -178,6 +195,7 @@ describe("restProjectStore: save", () => {
       claimGraph: { claims: {}, evidence: {}, bindings: {} } as ProjectRecord["claimGraph"],
       waivers: {},
       submissions: [],
+      evidenceLedger: { sources: [], items: [] },
     };
 
     await s.save(record);
@@ -199,11 +217,194 @@ describe("restProjectStore: save", () => {
       claimGraph: {} as ProjectRecord["claimGraph"],
       waivers: {},
       submissions: [],
+      evidenceLedger: { sources: [], items: [] },
     });
 
     const body = calls[0].body as Record<string, unknown>;
     expect(body.document).toBeNull();
     expect(body.rubric_report).toBeNull();
+    expect(body.journal_requirements).toBeNull();
+  });
+
+  it("serialises a present journal_requirements through as-is", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    const journalRequirements = {
+      journalName: "Water Research",
+      source: "manual" as const,
+      citationStyle: "vancouver",
+      requiredDeclarations: ["funding"],
+      capturedAt: "2026-01-01T00:00:00.000Z",
+      capturedBy: OWNER,
+    };
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      journalRequirements,
+    });
+
+    const body = calls[0].body as Record<string, unknown>;
+    expect(body.journal_requirements).toEqual(journalRequirements);
+  });
+
+  it("serialises the evidence ledger through as-is, and defaults a row missing the column to an empty ledger on get()", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    const evidenceLedger = {
+      sources: [{ id: "src-1", title: "A Paper", authors: ["A"], sourceType: "scholarly" as const, authorityTier: "B" as const, discoveredVia: "arxiv" as const, discoveredAt: "2026-01-01T00:00:00.000Z" }],
+      items: [],
+    };
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger,
+    });
+    const body = calls[0].body as Record<string, unknown>;
+    expect(body.evidence_ledger).toEqual(evidenceLedger);
+
+    const { s: getStore } = store(() => ({ body: [row()] }));
+    expect((await getStore.get("proj-abc"))?.evidenceLedger).toEqual({ sources: [], items: [] });
+  });
+
+  it("serialises the generation job as null when absent, and through as-is when present", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+    });
+    expect((calls[0].body as Record<string, unknown>).generation_job).toBeNull();
+
+    const generationJob: ProjectRecord["generationJob"] = {
+      state: "running",
+      plan: [{ key: "introduction", title: "Introduction", guidance: "g", targetWords: 500 }],
+      sections: [],
+      totalWordTarget: 6000,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const { s: s2, calls: calls2 } = store(() => ({ status: 204, body: null }));
+    await s2.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      generationJob,
+    });
+    expect((calls2[0].body as Record<string, unknown>).generation_job).toEqual(generationJob);
+
+    const { s: getStore } = store(() => ({ body: [row({ generation_job: generationJob })] }));
+    expect((await getStore.get("proj-abc"))?.generationJob).toEqual(generationJob);
+  });
+
+  it("serialises the peer review history through as-is, and defaults a row missing the column to an empty history on get()", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    const peerReviewHistory = { rounds: [{ roundNumber: 1, lensReviews: [], lensesRun: [], lensErrors: {}, createdAt: "2026-01-01T00:00:00.000Z" }] };
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      peerReviewHistory,
+    });
+    const body = calls[0].body as Record<string, unknown>;
+    expect(body.peer_review_history).toEqual(peerReviewHistory);
+
+    const { s: getStore } = store(() => ({ body: [row()] }));
+    expect((await getStore.get("proj-abc"))?.peerReviewHistory).toEqual({ rounds: [] });
+  });
+
+  it("serialises cover_letter/anonymization_report/anonymized_document through as-is, and defaults a row missing the columns to undefined on get()", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    const coverLetter = { text: "Dear Editor,\n\n...", journalName: "Water Research", generatedAt: "2026-01-01T00:00:00.000Z" };
+    const anonymizationReport = {
+      proposals: [{ blockId: "acknowledgements", category: "acknowledgement", originalText: "Dr. Smith", replacementText: "[name removed]", reason: "Names a person." }],
+      checkedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const anonymizedDocument = { id: "d1", title: "Paper", blocks: [{ id: "acknowledgements", kind: "paragraph", text: "We thank [name removed]." }] };
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      peerReviewHistory: { rounds: [] },
+      coverLetter,
+      anonymizationReport,
+      anonymizedDocument,
+    });
+    const body = calls[0].body as Record<string, unknown>;
+    expect(body.cover_letter).toEqual(coverLetter);
+    expect(body.anonymization_report).toEqual(anonymizationReport);
+    expect(body.anonymized_document).toEqual(anonymizedDocument);
+
+    const { s: getStore } = store(() => ({ body: [row()] }));
+    const fetched = await getStore.get("proj-abc");
+    expect(fetched?.coverLetter).toBeUndefined();
+    expect(fetched?.anonymizationReport).toBeUndefined();
+    expect(fetched?.anonymizedDocument).toBeUndefined();
+
+    const { s: getStore2 } = store(() => ({ body: [row({ cover_letter: coverLetter, anonymization_report: anonymizationReport, anonymized_document: anonymizedDocument })] }));
+    const fetched2 = await getStore2.get("proj-abc");
+    expect(fetched2?.coverLetter).toEqual(coverLetter);
+    expect(fetched2?.anonymizationReport).toEqual(anonymizationReport);
+    expect(fetched2?.anonymizedDocument).toEqual(anonymizedDocument);
+  });
+
+  it("serialises source_count_override through as-is, and defaults a row missing the column to undefined on get()", async () => {
+    const { s, calls } = store(() => ({ status: 204, body: null }));
+    const sourceCountOverride = { reason: "Scoping review only.", acceptedBy: "u1", at: "2026-01-01T00:00:00.000Z" };
+    await s.save({
+      projectId: "p",
+      ownerId: OWNER,
+      outputTypeId: "OT-10",
+      answers: {},
+      gates: {} as ProjectRecord["gates"],
+      claimGraph: {} as ProjectRecord["claimGraph"],
+      waivers: {},
+      submissions: [],
+      evidenceLedger: { sources: [], items: [] },
+      peerReviewHistory: { rounds: [] },
+      sourceCountOverride,
+    });
+    const body = calls[0].body as Record<string, unknown>;
+    expect(body.source_count_override).toEqual(sourceCountOverride);
+
+    const { s: getStore } = store(() => ({ body: [row()] }));
+    expect((await getStore.get("proj-abc"))?.sourceCountOverride).toBeUndefined();
+
+    const { s: getStore2 } = store(() => ({ body: [row({ source_count_override: sourceCountOverride })] }));
+    expect((await getStore2.get("proj-abc"))?.sourceCountOverride).toEqual(sourceCountOverride);
   });
 });
 

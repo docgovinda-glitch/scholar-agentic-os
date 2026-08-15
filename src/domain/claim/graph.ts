@@ -52,10 +52,48 @@ export function removeSource(graph: ClaimEvidenceGraph, sourceId: string): Claim
   return { ...graph, bindings };
 }
 
-/** Claims with zero bindings — AG-13's `unsupported` output. */
+/**
+ * Mark a claim as explicitly, deliberately unsupported (docs 30 §3 G4
+ * "Exit"'s "or explicitly marked unsupported" escape hatch) — e.g. a
+ * definitional statement the author has decided needs no citation. Throws
+ * if the claim doesn't exist. Does not clear any existing binding; a claim
+ * can carry both a binding and this flag (the flag is simply moot once
+ * bound, same as a Rubric waiver being moot once its rule passes).
+ */
+export function markClaimUnsupported(graph: ClaimEvidenceGraph, claimId: string, reason: string, markedBy: string): ClaimEvidenceGraph {
+  if (!graph.claims.some((c) => c.id === claimId)) {
+    throw new ClaimGraphError(`Cannot mark unknown claim "${claimId}" as explicitly unsupported.`);
+  }
+  const at = new Date().toISOString();
+  return {
+    ...graph,
+    claims: graph.claims.map((c) => (c.id === claimId ? { ...c, explicitlyUnsupported: { reason, markedBy, at } } : c)),
+  };
+}
+
+/**
+ * Claims with zero bindings — AG-13's `unsupported` output. This is the
+ * COMPLIANCE-grade check (domain/compliance's claim_support evaluator uses
+ * it directly): a claim explicitly marked unsupported (see
+ * markClaimUnsupported) still counts as unsupported here, on purpose — a
+ * blocking journal-quality gate is not something an author's own
+ * draft-stage acknowledgement can satisfy. See claimsNeedingResolution
+ * below for G4's genuinely looser draft-stage bar.
+ */
 export function unsupportedClaims(graph: ClaimEvidenceGraph): Claim[] {
   const boundClaimIds = new Set(graph.bindings.map((b) => b.claimId));
   return graph.claims.filter((c) => !boundClaimIds.has(c.id));
+}
+
+/**
+ * Claims neither bound NOR explicitly marked unsupported — docs 30 §3 G4
+ * "Exit": "every claim bound or explicitly marked unsupported", a looser
+ * bar than unsupportedClaims() above on purpose (see that function's own
+ * comment for why the two must not be conflated).
+ */
+export function claimsNeedingResolution(graph: ClaimEvidenceGraph): Claim[] {
+  const boundClaimIds = new Set(graph.bindings.map((b) => b.claimId));
+  return graph.claims.filter((c) => !boundClaimIds.has(c.id) && !c.explicitlyUnsupported);
 }
 
 /** Every claim that has at least one binding citing evidence from `sourceId` — "which claims depend on source X" (docs 13). */

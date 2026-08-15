@@ -130,6 +130,39 @@ export interface QualityGateSpec {
    * `domain/compliance/types.ts`'s `PositionInTextParams` doc comment.
    */
   positionInTextGate?: { keywords: string[]; withinWords: number; sectionKey?: string };
+  /**
+   * Set when this gate is a "does one named section fit its own word
+   * budget" check — e.g. OT-10's abstract_limit gate, distinct from the
+   * document-wide `compileWordLimitRule`. When set,
+   * `app/rubric/fromAtlas.ts`'s `compileSectionWordLimitGateRules` compiles
+   * this into a `word_count` Rule scoped to `sectionKey`, reading its
+   * min/max from that section's own `SectionSpec.wordBudget` — no rule is
+   * produced if the referenced section has none set, rather than inventing
+   * a limit.
+   */
+  sectionWordLimitGate?: { sectionKey: string };
+  /**
+   * True when this gate is a "every declaration the venue requires is
+   * present" check — e.g. OT-10's declarations_present gate. When set,
+   * `app/rubric/fromAtlas.ts`'s `compileDeclarationsPresentGateRules`
+   * compiles one `metadata_presence` Rule per declaration named in the
+   * project's captured `JournalRequirements.requiredDeclarations`. Produces
+   * zero rules until requirements have actually been captured — this gate
+   * never invents which declarations a venue requires.
+   */
+  declarationsPresentGate?: boolean;
+  /**
+   * True when this gate is a "references use exactly the venue's citation
+   * style" check — e.g. OT-10's citation_style_exact gate. When set,
+   * `app/rubric/fromAtlas.ts`'s `compileCitationStyleGateRules` compiles a
+   * `metadata_presence` Rule with an exact-match `expectedValue`, read from
+   * the project's captured `JournalRequirements.citationStyle` where
+   * present, falling back to `citation.defaultStyle` otherwise (same
+   * "catalog default until a venue is captured" precedent as
+   * `compileWordLimitRule`). Checks that the declared style matches, not
+   * that every individual reference is correctly formatted in it.
+   */
+  citationStyleExactGate?: boolean;
 }
 
 export interface ExportDefaults {

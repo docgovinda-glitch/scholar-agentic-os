@@ -33,6 +33,17 @@ export interface Claim {
   text: string;
   /** Where in the draft this claim appears, if it has been placed yet. */
   draftSpanId?: string;
+  /**
+   * Set when a human has explicitly acknowledged this claim has no
+   * evidence binding and that is intentional — docs
+   * 30-ACADEMIC-WORKFLOW-ARCHITECTURE.md G4 "Exit": "every claim bound or
+   * explicitly marked unsupported". This is a DRAFT-STAGE bar only: the
+   * compliance Rubric's claim_support evaluator (domain/compliance) still
+   * treats such a claim as unsupported — see graph.ts's
+   * `claimsNeedingResolution` vs `unsupportedClaims` doc comments for why
+   * the two intentionally diverge.
+   */
+  explicitlyUnsupported?: { reason: string; markedBy: string; at: string };
 }
 
 /**

@@ -24,6 +24,8 @@
 import { Pool } from "pg";
 import { initialProjectGateState } from "../../domain/project/gates";
 import { emptyGraph } from "../../domain/claim/graph";
+import { emptyLedger } from "../../domain/evidence/types";
+import { emptyPeerReviewHistory } from "../../domain/review/types";
 import { generateProjectId } from "../../app/conductor/projectStore";
 import { SUPABASE_ROOT_CA } from "./supabaseRootCa";
 import type { ProjectRecord, ProjectStore } from "./types";
@@ -91,6 +93,15 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
     waivers: row.waivers as ProjectRecord["waivers"],
     // Rows written before this column existed have it as SQL NULL.
     submissions: (row.submissions as ProjectRecord["submissions"] | null) ?? [],
+    journalRequirements: (row.journal_requirements as ProjectRecord["journalRequirements"] | null) ?? undefined,
+    // Rows written before this column existed have it as SQL NULL.
+    evidenceLedger: (row.evidence_ledger as ProjectRecord["evidenceLedger"] | null) ?? emptyLedger(),
+    generationJob: (row.generation_job as ProjectRecord["generationJob"] | null) ?? undefined,
+    peerReviewHistory: (row.peer_review_history as ProjectRecord["peerReviewHistory"] | null) ?? emptyPeerReviewHistory(),
+    coverLetter: (row.cover_letter as ProjectRecord["coverLetter"] | null) ?? undefined,
+    anonymizationReport: (row.anonymization_report as ProjectRecord["anonymizationReport"] | null) ?? undefined,
+    anonymizedDocument: (row.anonymized_document as ProjectRecord["anonymizedDocument"] | null) ?? undefined,
+    sourceCountOverride: (row.source_count_override as ProjectRecord["sourceCountOverride"] | null) ?? undefined,
   };
 }
 
@@ -107,11 +118,13 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
         claimGraph: emptyGraph(),
         waivers: {},
         submissions: [],
+        evidenceLedger: emptyLedger(),
+        peerReviewHistory: emptyPeerReviewHistory(),
       };
       await db.query(
         `insert into public.projects
-           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions)
-         values ($1, $2, $3, $4, $5, null, null, $6, $7, $8)`,
+           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job, peer_review_history, cover_letter, anonymization_report, anonymized_document, source_count_override)
+         values ($1, $2, $3, $4, $5, null, null, $6, $7, $8, null, $9, null, $10, null, null, null, null)`,
         [
           record.projectId,
           record.ownerId,
@@ -121,6 +134,8 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
           JSON.stringify(record.claimGraph),
           JSON.stringify(record.waivers),
           JSON.stringify(record.submissions),
+          JSON.stringify(record.evidenceLedger),
+          JSON.stringify(record.peerReviewHistory),
         ]
       );
       return record;
@@ -135,8 +150,8 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
     async save(record: ProjectRecord): Promise<ProjectRecord> {
       await db.query(
         `insert into public.projects
-           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+           (project_id, owner_id, output_type_id, answers, gates, document, rubric_report, claim_graph, waivers, submissions, journal_requirements, evidence_ledger, generation_job, peer_review_history, cover_letter, anonymization_report, anonymized_document, source_count_override, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, now())
          on conflict (project_id) do update set
            output_type_id = excluded.output_type_id,
            answers = excluded.answers,
@@ -146,6 +161,14 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
            claim_graph = excluded.claim_graph,
            waivers = excluded.waivers,
            submissions = excluded.submissions,
+           journal_requirements = excluded.journal_requirements,
+           evidence_ledger = excluded.evidence_ledger,
+           generation_job = excluded.generation_job,
+           peer_review_history = excluded.peer_review_history,
+           cover_letter = excluded.cover_letter,
+           anonymization_report = excluded.anonymization_report,
+           anonymized_document = excluded.anonymized_document,
+           source_count_override = excluded.source_count_override,
            updated_at = now()`,
         [
           record.projectId,
@@ -158,6 +181,14 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
           JSON.stringify(record.claimGraph),
           JSON.stringify(record.waivers),
           JSON.stringify(record.submissions),
+          record.journalRequirements ? JSON.stringify(record.journalRequirements) : null,
+          JSON.stringify(record.evidenceLedger),
+          record.generationJob ? JSON.stringify(record.generationJob) : null,
+          JSON.stringify(record.peerReviewHistory),
+          record.coverLetter ? JSON.stringify(record.coverLetter) : null,
+          record.anonymizationReport ? JSON.stringify(record.anonymizationReport) : null,
+          record.anonymizedDocument ? JSON.stringify(record.anonymizedDocument) : null,
+          record.sourceCountOverride ? JSON.stringify(record.sourceCountOverride) : null,
         ]
       );
       return record;

@@ -152,6 +152,32 @@ describe("domain/compliance: word_count evaluator", () => {
     const finding = evaluateRule(rule, docWithWords(15));
     expect(finding.status).toBe("fail");
   });
+
+  it("with sectionKey set, counts only that section's words rather than the whole document", () => {
+    let doc = emptyDocument("d1", "Test");
+    doc = appendBlock(doc, "abstract", "paragraph", Array.from({ length: 5 }, () => "word").join(" "));
+    doc = appendBlock(doc, "introduction", "paragraph", Array.from({ length: 500 }, () => "word").join(" "));
+    const rule = wordCountRule({ evaluator: { kind: "word_count", params: { max: 10, sectionKey: "abstract" } } });
+    const finding = evaluateRule(rule, doc);
+    expect(finding.status).toBe("pass"); // only the 5-word abstract counts, not the 500-word introduction
+    expect(finding.actual).toBe("5");
+  });
+
+  it("with sectionKey set, fails against that section's own min/max", () => {
+    let doc = emptyDocument("d1", "Test");
+    doc = appendBlock(doc, "abstract", "paragraph", Array.from({ length: 400 }, () => "word").join(" "));
+    const rule = wordCountRule({ evaluator: { kind: "word_count", params: { max: 300, sectionKey: "abstract" } } });
+    const finding = evaluateRule(rule, doc);
+    expect(finding.status).toBe("fail");
+    expect(finding.location).toEqual({ sectionKey: "abstract" });
+  });
+
+  it("with sectionKey set, returns not_applicable for a missing section rather than a false pass", () => {
+    const doc = emptyDocument("d1", "Test");
+    const rule = wordCountRule({ evaluator: { kind: "word_count", params: { max: 300, sectionKey: "abstract" } } });
+    const finding = evaluateRule(rule, doc);
+    expect(finding.status).toBe("not_applicable");
+  });
 });
 
 describe("domain/compliance: structural_presence evaluator", () => {
@@ -231,6 +257,30 @@ describe("domain/compliance: metadata_presence evaluator", () => {
     const rule = metadataRule("ethics_approval", { severity: "required", waived: { reason: "supervisor approved", at: "now" } });
     const finding = evaluateRule(rule, emptyDocument("d1", "Test"));
     expect(finding.status).toBe("warn");
+  });
+
+  it("with expectedValue set, passes only on a case-insensitive exact match", () => {
+    const doc = setMetadata(emptyDocument("d1", "Test"), "citationStyle", "Vancouver");
+    const rule = metadataRule("citationStyle", { evaluator: { kind: "metadata_presence", params: { key: "citationStyle", expectedValue: "vancouver" } } });
+    const finding = evaluateRule(rule, doc);
+    expect(finding.status).toBe("pass");
+  });
+
+  it("with expectedValue set, fails when present but not an exact match", () => {
+    const doc = setMetadata(emptyDocument("d1", "Test"), "citationStyle", "apa7");
+    const rule = metadataRule("citationStyle", { evaluator: { kind: "metadata_presence", params: { key: "citationStyle", expectedValue: "vancouver" } } });
+    const finding = evaluateRule(rule, doc);
+    expect(finding.status).toBe("fail");
+    expect(finding.expected).toBe("vancouver");
+    expect(finding.actual).toBe("apa7");
+  });
+
+  it("with expectedValue set, still fails as missing (not a mismatch) when entirely absent", () => {
+    const doc = emptyDocument("d1", "Test");
+    const rule = metadataRule("citationStyle", { evaluator: { kind: "metadata_presence", params: { key: "citationStyle", expectedValue: "vancouver" } } });
+    const finding = evaluateRule(rule, doc);
+    expect(finding.status).toBe("fail");
+    expect(finding.message).toContain("missing");
   });
 });
 

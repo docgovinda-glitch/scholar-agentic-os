@@ -108,6 +108,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 const { app } = await import("../../../server.ts");
 const { __resetProjectStoreForTests } = await import("../../../src/app/conductor/projectStore.ts");
 const { __resetRateLimitStore } = await import("../../src/middleware/rateLimit.ts");
+const { __setEnabledOutputTypesForTests } = await import("../outputTypeAccess.ts");
 
 const asAlice = () => ({ Authorization: "Bearer alice-token" });
 const asBob = () => ({ Authorization: "Bearer bob-token" });
@@ -121,6 +122,9 @@ async function createProjectAs(headers: Record<string, string>): Promise<string>
 beforeEach(() => {
   __resetProjectStoreForTests();
   __resetRateLimitStore();
+  // This suite's subject is auth wiring, not which output types are active
+  // — OT-01 here is a neutral fixture. See outputTypeAccess.ts's own comment.
+  __setEnabledOutputTypesForTests("all");
   // The Data API stand-in is the store's backing table now; leaving rows
   // behind would let one test's project satisfy another's assertions.
   table.clear();

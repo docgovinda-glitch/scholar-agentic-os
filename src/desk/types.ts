@@ -19,6 +19,7 @@ export interface ProjectView {
   answers: Record<string, string>;
   intakeCompleteness: number;
   hasDocument: boolean;
+  hasJournalRequirements: boolean;
   gates: GateSummary[];
 }
 
@@ -66,6 +67,8 @@ export interface OutputTypeSummary {
   family: string;
   academicLevels: string[];
   typicalDisciplines: string[];
+  /** Whether this type can actually be created right now — false for everything but Journal Article while that's Scholar Core's active scope. */
+  available: boolean;
 }
 
 export type InterventionLevel = "proofread" | "clarity" | "flow" | "register" | "rewrite";
@@ -120,6 +123,168 @@ export interface StudioAiSource {
   provider: string;
   model: string;
   creditsUsed: number;
+}
+
+/** Mirrors src/domain/journal/types.ts's JournalRequirements. */
+export interface JournalRequirements {
+  journalName: string;
+  source: "manual" | "ai_extracted";
+  wordLimit?: { min?: number; max?: number };
+  structureOverride?: string[];
+  citationStyle?: string;
+  requiredDeclarations: string[];
+  articleType?: string;
+  notes?: string;
+  capturedAt: string;
+  capturedBy: string;
+}
+
+/** Mirrors src/domain/journal/types.ts's JournalRequirementsProposal — what AI extraction proposes, never itself saved. */
+export interface JournalRequirementsProposal {
+  journalName?: string;
+  wordLimit?: { min?: number; max?: number };
+  structureOverride?: string[];
+  citationStyle?: string;
+  requiredDeclarations: string[];
+  articleType?: string;
+  notes?: string;
+  unresolvedFields: string[];
+}
+
+/** Mirrors src/domain/evidence/types.ts. */
+export type SourceType = "scholarly" | "official" | "web" | "media" | "user_provided" | "vault";
+export type AuthorityTier = "A" | "B" | "C" | "D";
+export type DiscoveryMethod = "arxiv" | "web_search" | "openalex" | "user_upload" | "vault" | "manual";
+
+export interface DiscoveredSource {
+  id: string;
+  title: string;
+  authors: string[];
+  url?: string;
+  doi?: string;
+  venue?: string;
+  year?: number;
+  sourceType: SourceType;
+  authorityTier: AuthorityTier;
+  discoveredVia: DiscoveryMethod;
+  discoveredAt: string;
+  vaultItemId?: string;
+}
+
+export type EvidenceState = "discovered" | "extracted" | "verified" | "proposed" | "user_approved" | "citable";
+
+export interface EvidenceHistoryEntry {
+  state: EvidenceState;
+  at: string;
+  by?: string;
+}
+
+export interface EvidenceLocator {
+  page?: number;
+  paragraph?: number;
+  startOffset?: number;
+  endOffset?: number;
+}
+
+export interface EvidenceItem {
+  id: string;
+  sourceId: string;
+  state: EvidenceState;
+  quote?: string;
+  locator?: EvidenceLocator;
+  proposedClaimId?: string;
+  history: EvidenceHistoryEntry[];
+}
+
+export interface EvidenceLedger {
+  sources: DiscoveredSource[];
+  items: EvidenceItem[];
+}
+
+/** Mirrors src/domain/manuscript/types.ts. */
+export interface SectionPlan {
+  key: string;
+  title: string;
+  guidance: string;
+  targetWords: number;
+}
+
+export interface GeneratedSection {
+  key: string;
+  title: string;
+  text: string;
+  wordCount: number;
+  memory: string;
+  citedEvidenceIds: string[];
+  generatedAt: string;
+  usage?: { provider: string; model: string; inputTokensEstimate: number; outputTokensEstimate: number };
+}
+
+export type GenerationJobState = "not_started" | "running" | "paused" | "completed" | "failed";
+
+/** Mirrors src/domain/coherence/types.ts. */
+export type CoherenceDimension = "terminology" | "argument_continuity" | "methodology";
+export type CoherenceSeverity = "minor" | "moderate" | "major";
+
+export interface CoherenceIssue {
+  dimension: CoherenceDimension;
+  description: string;
+  sectionKeys: string[];
+  severity: CoherenceSeverity;
+}
+
+export interface CoherenceReport {
+  issues: CoherenceIssue[];
+  passesRun: CoherenceDimension[];
+  passErrors: Partial<Record<CoherenceDimension, string>>;
+  checkedAt: string;
+}
+
+export interface GenerationJob {
+  state: GenerationJobState;
+  plan: SectionPlan[];
+  sections: GeneratedSection[];
+  totalWordTarget: number;
+  startedAt?: string;
+  updatedAt: string;
+  lastError?: string;
+  coherenceReport?: CoherenceReport;
+}
+
+/** Mirrors src/domain/review/types.ts. */
+export type ReviewLens = "contribution" | "literature" | "methodology" | "evidence" | "argument" | "citation" | "journal_fit";
+export type FindingSeverity = "minor" | "moderate" | "major" | "critical";
+
+export interface ReviewFinding {
+  summary: string;
+  detail: string;
+  severity: FindingSeverity;
+  sectionKeys: string[];
+}
+
+export interface LensReview {
+  lens: ReviewLens;
+  findings: ReviewFinding[];
+  overallAssessment: string;
+}
+
+export interface ReviewRound {
+  roundNumber: number;
+  lensReviews: LensReview[];
+  lensesRun: ReviewLens[];
+  lensErrors: Partial<Record<ReviewLens, string>>;
+  createdAt: string;
+}
+
+export interface PeerReviewHistory {
+  rounds: ReviewRound[];
+}
+
+/** Mirrors src/domain/coverLetter/types.ts. */
+export interface CoverLetter {
+  text: string;
+  journalName: string;
+  generatedAt: string;
 }
 
 export interface StudioRefineResult {
@@ -221,6 +386,8 @@ export interface Claim {
   id: string;
   text: string;
   draftSpanId?: string;
+  /** Mirrors src/domain/claim/types.ts's Claim.explicitlyUnsupported. */
+  explicitlyUnsupported?: { reason: string; markedBy: string; at: string };
 }
 
 export type SupportStrength = "strong" | "moderate" | "weak" | "contradicts";

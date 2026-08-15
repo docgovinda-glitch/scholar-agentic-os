@@ -6,17 +6,21 @@
  * Binds the pure gate state machine (domain/project/gates.ts) to the
  * modules already built that a gate's exit criteria can be computed from
  * today: Atlas for G0 (has every required intake field been answered, or
- * explicitly deferred), Atlas + the document for G3 (every required section
- * exists, every deferred G0 field resolved — see computeG3ExitCriteria's
- * own comment for what's deliberately not modeled), and the Rubric for G6
- * (are there any unresolved blocking or required compliance findings).
- * G1, G2, G4, G5, and G7 exit criteria are not wired to anything yet —
- * there is no requirement-extraction pipeline, sourcing pipeline, drafting
- * pipeline, review pipeline, or export pipeline built (see
- * docs/01-product/13-MODULE-SPECIFICATIONS.md §8.3) — but the gate state
- * machine itself supports them identically once those modules exist:
- * `updateExitCriteria()` takes any `ExitCriterion[]`, computed however the
- * caller likes.
+ * explicitly deferred), Atlas + journal requirements for G1 (is the target
+ * venue settled and its requirements captured — see computeG1ExitCriteria),
+ * Atlas + the document for G3 (every required section exists, every
+ * deferred G0 field resolved — see computeG3ExitCriteria's own comment for
+ * what's deliberately not modeled), the evidence ledger for G2 (see
+ * computeG2ExitCriteria), the document plus the claim graph for G4 (see
+ * computeG4ExitCriteria's own comment for what's deliberately not
+ * modeled), the project's peer-review history for G5 (see
+ * computeG5ExitCriteria), the Rubric for G6 (are there any unresolved
+ * blocking or required compliance findings), and the document plus that
+ * same Rubric report for G7 (pre-flight plus compliance — see
+ * computeG7ExitCriteria's own comment for what's deliberately not
+ * modeled). Every gate now has a real compute function; what's left is the
+ * server layer actually calling each one from the right mutation routes
+ * (server/routes/project.ts's own module comment tracks that).
  *
  * TRACKED GAP: per-chapter independent gating for `long_form_chaptered`
  * (docs 30 §3's "G3 runs per chapter") is not implemented. This module
@@ -48,6 +52,12 @@ import type { OutputTypeSpec, SectionSpec } from "../atlas/types";
 import { allIntakeFields } from "../atlas/proposals";
 import type { RubricReport } from "../rubric/rubric";
 import type { CanonicalDocument } from "../../domain/document/model";
+import type { JournalRequirements } from "../../domain/journal/types";
+import type { PeerReviewHistory } from "../../domain/review/types";
+import { preflight } from "../export/export";
+import type { EvidenceLedger } from "../../domain/evidence/types";
+import { claimsNeedingResolution } from "../../domain/claim/graph";
+import type { ClaimEvidenceGraph } from "../../domain/claim/types";
 
 export {
   GATE_ORDER,
@@ -80,6 +90,68 @@ export function computeG0ExitCriteria(
   });
 }
 
+/**
+ * Compute G1's exit criteria from the intake answers G0 collected and the
+ * journal requirements captured so far (docs 30 §3 G1 "Exit": the target
+ * venue is settled and its structural/citation/declaration requirements are
+ * known — everything downstream, from the word-budget allocation to the
+ * compliance rubric's venue-specific gates, reads what's captured here
+ * rather than guessing at it).
+ *
+ * Scoped to `workflowVariant === "venue_targeted"` (today: Journal Article,
+ * Conference Paper, Review Article, Book/Monograph) — for every other
+ * output type, "Requirements" isn't a venue's requirements at all, and no
+ * pipeline for whatever it would mean there exists yet, so this returns no
+ * criteria for them, same as before this function existed (see this
+ * module's own header comment on what's still unwired). Journal Article is
+ * the only one of the four actually implemented against this right now.
+ *
+ * Deliberately small — one criterion per distinct fact that must be true,
+ * matching G0's "one criterion per required field" granularity rather than
+ * inventing a heavier rubric. The "target journal decided" criterion here
+ * and G3's "deferred field resolved" check on the same `target_journal`
+ * answer are independently checking the same underlying fact for two
+ * different gates — consistent with how G0 already checks "answered or
+ * provisional" on that field too.
+ */
+export function computeG1ExitCriteria(
+  spec: OutputTypeSpec,
+  answers: Record<string, string | "provisional">,
+  journalRequirements: JournalRequirements | undefined
+): ExitCriterion[] {
+  if (spec.workflowVariant !== "venue_targeted") return [];
+
+  const targetJournalField = spec.intakeSchema.required.find((f) => f.key === "target_journal");
+  const criteria: ExitCriterion[] = [];
+
+  if (targetJournalField) {
+    criteria.push({
+      id: "target-journal-decided",
+      description: `"${targetJournalField.label}" resolved from provisional to a real value`,
+      satisfied: answers.target_journal !== undefined && answers.target_journal !== "provisional",
+      blocking: true,
+    });
+  }
+
+  criteria.push({
+    id: "journal-requirements-captured",
+    description: "Journal's structural, citation-style, and declaration requirements captured",
+    satisfied: journalRequirements !== undefined,
+    blocking: true,
+  });
+
+  if (journalRequirements) {
+    criteria.push({
+      id: "citation-style-specified",
+      description: `Citation style specified for ${journalRequirements.journalName}`,
+      satisfied: journalRequirements.citationStyle !== undefined && journalRequirements.citationStyle.length > 0,
+      blocking: true,
+    });
+  }
+
+  return criteria;
+}
+
 /** Every field across all tiers that has an answer — informational, not gating (recommended/optional never block G0). */
 export function intakeCompleteness(spec: OutputTypeSpec, answers: Record<string, string | "provisional">): number {
   const fields = allIntakeFields(spec);
@@ -90,6 +162,60 @@ export function intakeCompleteness(spec: OutputTypeSpec, answers: Record<string,
 
 function flattenSections(sections: SectionSpec[]): SectionSpec[] {
   return sections.flatMap((s) => [s, ...(s.children ?? [])]);
+}
+
+/**
+ * Compute G2's exit criteria (docs 30 §3 G2 "Exit": "Corpus meets the
+ * type's minimum source count, or the user explicitly accepts a smaller
+ * corpus with a recorded reason · zero unreviewed candidates blocking")
+ * from the catalog's own source-count target and the project's evidence
+ * ledger (domain/evidence). Both halves are modeled:
+ *
+ *   - "Corpus meets minimum … or explicitly accepted smaller" —
+ *     `evidenceLedger.sources.length >= spec.sources.targetCount.min`, OR
+ *     `override` is set (server/routes/project.ts's
+ *     POST .../gates/G2/accept-smaller-corpus, mirroring the Rubric's own
+ *     `waiveRule`'s "reason required" discipline).
+ *   - "Zero unreviewed candidates blocking" — no `EvidenceItem` is
+ *     currently in the "proposed" state, i.e. every item a human staged
+ *     against a claim has since been approved or declined
+ *     (domain/evidence's own state machine; `rejectEvidence` returns a
+ *     declined item to "verified", not a dead end, so there is no
+ *     separate "rejected and stuck" state to also check for).
+ *
+ * `G2` is the only continuous gate (docs 30 §3): unlike every other gate
+ * here, its criteria are meant to be recomputed on essentially every
+ * evidence-ledger mutation, not just a handful of milestone actions.
+ */
+export function computeG2ExitCriteria(
+  spec: OutputTypeSpec,
+  evidenceLedger: EvidenceLedger,
+  override: { reason: string } | undefined
+): ExitCriterion[] {
+  const sourceCount = evidenceLedger.sources.length;
+  const minCount = spec.sources.targetCount.min;
+  const corpusSufficient = sourceCount >= minCount || override !== undefined;
+  const unreviewed = evidenceLedger.items.filter((i) => i.state === "proposed");
+
+  return [
+    {
+      id: "corpus-meets-minimum",
+      description: override
+        ? `A smaller corpus than the typical minimum (${minCount} sources) was explicitly accepted: "${override.reason}"`
+        : `Corpus has at least ${minCount} sources (currently ${sourceCount})`,
+      satisfied: corpusSufficient,
+      blocking: true,
+    },
+    {
+      id: "no-unreviewed-candidates",
+      description:
+        unreviewed.length === 0
+          ? "No evidence item is awaiting an approve/reject decision"
+          : `${unreviewed.length} evidence item(s) are proposed against a claim but not yet approved or declined`,
+      satisfied: unreviewed.length === 0,
+      blocking: true,
+    },
+  ];
 }
 
 /**
@@ -151,6 +277,95 @@ export function computeG3ExitCriteria(
 }
 
 /**
+ * Compute G4's exit criteria (docs 30 §3 G4 "Exit": "Every required
+ * section non-empty · no ai_generated_unreviewed spans in sections marked
+ * complete · every claim bound or explicitly marked unsupported") from an
+ * Atlas output type, the project's document, and its Claim–Evidence
+ * Graph.
+ *
+ * Two of the three are modeled here:
+ *   - "Every required section non-empty" — stricter than
+ *     computeG3ExitCriteria's own section check (existence only): this one
+ *     also requires non-empty text, the same bar app/rubric's
+ *     structural_presence Rubric rule applies.
+ *   - "Every claim bound or explicitly marked unsupported" — reads
+ *     `domain/claim/graph.ts`'s `claimsNeedingResolution`, the
+ *     deliberately looser draft-stage sibling of `unsupportedClaims`
+ *     (compiled into the Rubric's `claim_support` rule at G6) — see that
+ *     module's own comment for why an explicit "the author has
+ *     acknowledged no evidence exists" flag satisfies this gate but not
+ *     G6's compliance check.
+ *
+ * NOT modeled, stated honestly rather than faked: "no ai_generated_
+ * unreviewed spans in sections marked complete". There is no span-level
+ * content-provenance model in the Canonical Document (`domain/document`'s
+ * `Block` is `{id, kind, text}` — no per-span "AI-generated, not yet
+ * reviewed" attribute), so there is nothing yet to check. Same "leave
+ * uncompiled rather than force a false mapping" discipline as
+ * `computeG3ExitCriteria`'s own documented gap and `computeG7ExitCriteria`'s
+ * "required assets present".
+ */
+export function computeG4ExitCriteria(
+  spec: OutputTypeSpec,
+  document: CanonicalDocument,
+  claimGraph: ClaimEvidenceGraph
+): ExitCriterion[] {
+  const sectionCriteria: ExitCriterion[] = flattenSections(spec.structure.sections)
+    .filter((s) => s.required)
+    .map((section) => {
+      const block = document.blocks.find((b) => b.id === section.key);
+      const nonEmpty = block !== undefined && block.text.trim().length > 0;
+      return {
+        id: `draft-section-${section.key}`,
+        description: `"${section.title}" is drafted (present and non-empty)`,
+        satisfied: nonEmpty,
+        blocking: true,
+      };
+    });
+
+  const unresolved = claimsNeedingResolution(claimGraph);
+  const claimsCriterion: ExitCriterion = {
+    id: "claims-bound-or-marked-unsupported",
+    description:
+      unresolved.length === 0
+        ? "Every claim is bound to evidence or explicitly marked unsupported"
+        : `${unresolved.length} claim(s) are neither bound to evidence nor explicitly marked unsupported: ${unresolved.map((c) => c.id).join(", ")}`,
+    satisfied: unresolved.length === 0,
+    blocking: true,
+  };
+
+  return [...sectionCriteria, claimsCriterion];
+}
+
+/**
+ * Compute G5's exit criteria (docs 30 §3 G5 "Review") from the project's
+ * peer-review history (domain/review) — the multi-lens adversarial review's
+ * first real compute function, same additive pattern as every other gate.
+ * Two criteria: at least one review round has actually run, and the most
+ * recent round has no unresolved "critical"-severity finding. Earlier
+ * rounds' findings are not re-checked here — that is exactly what running a
+ * new round after a revision is for (a stale round is not this gate's
+ * concern; PeerReviewHistory only ever grows, so the record of what a
+ * critical finding used to say is never lost even once it stops blocking).
+ */
+export function computeG5ExitCriteria(history: PeerReviewHistory): ExitCriterion[] {
+  if (history.rounds.length === 0) {
+    return [{ id: "peer-review-round-completed", description: "At least one multi-lens peer review round has been run", satisfied: false, blocking: true }];
+  }
+  const latest = history.rounds[history.rounds.length - 1];
+  const criticalFindings = latest.lensReviews.flatMap((r) => r.findings).filter((f) => f.severity === "critical");
+  return [
+    { id: "peer-review-round-completed", description: "At least one multi-lens peer review round has been run", satisfied: true, blocking: true },
+    {
+      id: "no-unresolved-critical-findings",
+      description: `No unresolved "critical"-severity findings in the most recent review round (round ${latest.roundNumber})`,
+      satisfied: criticalFindings.length === 0,
+      blocking: true,
+    },
+  ];
+}
+
+/**
  * Compute G6's exit criteria from a Rubric report (docs 30 §3 G6 "Exit":
  * "Zero blocking findings · every required finding resolved or waived").
  * `not_applicable` findings (an evaluator that doesn't exist yet, per
@@ -173,6 +388,52 @@ export function computeG6ExitCriteria(report: RubricReport): ExitCriterion[] {
         blocking: true,
       };
     });
+}
+
+/**
+ * Compute G7's exit criteria (docs 30 §3 G7 "Export": "Pre-flight passes ·
+ * every blocking compliance finding resolved · required assets present ·
+ * output validates structurally") from the project's document and its most
+ * recent Rubric report — the export pipeline's first real compute function.
+ *
+ * Two of the four documented criteria are modeled here:
+ *   - "Pre-flight passes" reuses `app/export/export.ts`'s own `preflight()`
+ *     — the exact check a real export attempt runs first, so this reports
+ *     the same thing an export would find, not a separate approximation.
+ *   - "Every blocking compliance finding resolved" reads `report`, the same
+ *     Rubric evaluation G6 was computed from.
+ *
+ * NOT modeled, stated honestly rather than faked: "required assets present"
+ * (there is no figure/supplementary-file tracking model yet — nothing to
+ * check) and "output validates structurally" (that's `export.ts`'s own
+ * `verify()`, which runs against a rendered `Buffer` after a real render;
+ * running a full render speculatively just to populate a gate checkbox,
+ * before the user has actually asked to export, would be wasted work — the
+ * `/export` route already performs and enforces that check for real at
+ * export time). Same "leave uncompiled rather than force a false mapping"
+ * discipline as `computeG3ExitCriteria`'s own documented gap.
+ */
+export function computeG7ExitCriteria(document: CanonicalDocument | undefined, report: RubricReport | undefined): ExitCriterion[] {
+  if (!document) {
+    return [{ id: "export-preflight-passes", description: "A document has been submitted to run export pre-flight against", satisfied: false, blocking: true }];
+  }
+
+  const pf = preflight(document);
+  const preflightCriterion: ExitCriterion = {
+    id: "export-preflight-passes",
+    description: pf.isReady ? "Export pre-flight checks pass" : `Export pre-flight failed: ${pf.issues.join("; ")}`,
+    satisfied: pf.isReady,
+    blocking: true,
+  };
+
+  const complianceCriterion: ExitCriterion = {
+    id: "export-compliance-clear",
+    description: report ? "No unresolved blocking compliance findings" : "Compliance has not been evaluated yet",
+    satisfied: report !== undefined && report.blockingFailures.length === 0,
+    blocking: true,
+  };
+
+  return [preflightCriterion, complianceCriterion];
 }
 
 /** Update a gate's exit criteria from freshly computed values, deriving status. Throws if the gate is currently signed off — invalidate first. */

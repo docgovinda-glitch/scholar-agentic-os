@@ -22,10 +22,7 @@ function excludingSections(doc: CanonicalDocument, exclude: string[]): Canonical
   return { ...doc, blocks: doc.blocks.filter((b) => !exclude.includes(b.id)) };
 }
 
-function evaluateWordCount(rule: Rule, params: WordCountParams, doc: CanonicalDocument): Finding {
-  const scoped = excludingSections(doc, params.exclude ?? []);
-  const actual = wordCount(scoped);
-
+function wordCountFinding(rule: Rule, params: WordCountParams, actual: number, location?: { sectionKey?: string }): Finding {
   const overMax = params.max !== undefined && actual > params.max;
   const underMin = params.min !== undefined && actual < params.min;
 
@@ -34,6 +31,7 @@ function evaluateWordCount(rule: Rule, params: WordCountParams, doc: CanonicalDo
       ruleId: rule.id,
       status: "pass",
       severity: rule.severity,
+      location,
       actual: String(actual),
       message: `Word count (${actual}) is within limits.`,
     };
@@ -53,6 +51,7 @@ function evaluateWordCount(rule: Rule, params: WordCountParams, doc: CanonicalDo
     ruleId: rule.id,
     status: isEffectivelyWaived(rule) ? "warn" : "fail",
     severity: rule.severity,
+    location,
     actual: String(actual),
     expected,
     message: overMax
@@ -60,6 +59,28 @@ function evaluateWordCount(rule: Rule, params: WordCountParams, doc: CanonicalDo
       : `Below the minimum word count by ${shortfall} words (currently ${actual}, minimum ${params.min}).`,
     remedy: overMax ? `Reduce by approximately ${overage} words.` : `Add approximately ${shortfall} words.`,
   };
+}
+
+/** Scoped to `params.sectionKey` when set (one section's own word count, e.g. an abstract's limit) — otherwise the whole document minus `params.exclude`. */
+function evaluateWordCount(rule: Rule, params: WordCountParams, doc: CanonicalDocument): Finding {
+  if (params.sectionKey !== undefined) {
+    const block = doc.blocks.find((b) => b.id === params.sectionKey);
+    if (!block) {
+      return {
+        ruleId: rule.id,
+        status: "not_applicable",
+        severity: rule.severity,
+        location: { sectionKey: params.sectionKey },
+        message: `Section "${params.sectionKey}" is missing — nothing to count.`,
+      };
+    }
+    const trimmed = block.text.trim();
+    const actual = trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
+    return wordCountFinding(rule, params, actual, { sectionKey: params.sectionKey });
+  }
+
+  const scoped = excludingSections(doc, params.exclude ?? []);
+  return wordCountFinding(rule, params, wordCount(scoped));
 }
 
 function evaluateStructuralPresence(rule: Rule, params: StructuralPresenceParams, doc: CanonicalDocument): Finding {
@@ -112,6 +133,18 @@ function evaluateMetadataPresence(rule: Rule, params: MetadataPresenceParams, do
       severity: rule.severity,
       message: value === undefined ? `Required declaration "${params.key}" is missing.` : `Declaration "${params.key}" is present but too short.`,
       remedy: `Provide "${params.key}".`,
+    };
+  }
+
+  if (params.expectedValue !== undefined && value.trim().toLowerCase() !== params.expectedValue.trim().toLowerCase()) {
+    return {
+      ruleId: rule.id,
+      status: isEffectivelyWaived(rule) ? "warn" : "fail",
+      severity: rule.severity,
+      actual: value,
+      expected: params.expectedValue,
+      message: `"${params.key}" is "${value}", which does not exactly match the required "${params.expectedValue}".`,
+      remedy: `Set "${params.key}" to "${params.expectedValue}".`,
     };
   }
 

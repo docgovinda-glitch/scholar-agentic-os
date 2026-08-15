@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getProject, getRubric, listOutputTypes, submitDocument, UnauthenticatedError } from "./api";
+import { getDocument, getOutputTypeSpec, getProject, getRubric, resolveCitations, submitDocument, UnauthenticatedError } from "./api";
 import { plainTextToDocument } from "./plainTextToDocument";
 import Header from "./regions/Header";
 import Rail from "./regions/Rail";
@@ -8,12 +8,16 @@ import Aside from "./regions/Aside";
 import IntakePanel from "./intake/IntakePanel";
 import GatesPanel from "./gates/GatesPanel";
 import ClaimsPanel from "./claims/ClaimsPanel";
+import EvidenceLedgerPanel from "./evidence/EvidenceLedgerPanel";
+import ManuscriptGenerationPanel from "./manuscript/ManuscriptGenerationPanel";
+import { sectionsToBlocks } from "./manuscript/sectionsToBlocks";
 import SubmissionsPanel from "./submissions/SubmissionsPanel";
+import JournalRequirementsPanel from "./journal/JournalRequirementsPanel";
 import { useDeskSession } from "./useDeskSession";
 import StatusBar from "./regions/StatusBar";
-import type { CanonicalDocument, OutputTypeSummary, ProjectView, RubricReport } from "./types";
+import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "./types";
 
-export type DeskShellView = "intake" | "document" | "evidence" | "progress" | "submissions";
+export type DeskShellView = "intake" | "requirements" | "document" | "evidence" | "manuscript" | "progress" | "submissions";
 
 /**
  * Region shell (docs 22 §2): Header / Rail / Primary / Aside / Status. The
@@ -52,14 +56,25 @@ export default function DeskShell({
   const [project, setProject] = useState<ProjectView | null>(null);
   const [document, setDocument] = useState<CanonicalDocument | null>(null);
   const [rubric, setRubric] = useState<RubricReport | null>(null);
-  const [outputType, setOutputType] = useState<OutputTypeSummary | null>(null);
+  const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Bumped when an evidence approval creates a new Claim–Evidence binding,
+  // so ClaimsPanel (which only fetches its graph on mount) remounts and
+  // picks it up — the two panels stay decoupled otherwise (see
+  // EvidenceLedgerPanel's own comment on why it fetches its own claim list).
+  const [claimsRefreshToken, setClaimsRefreshToken] = useState(0);
+  // Text most recently sent from a generated manuscript section into Studio
+  // ("Humanize in Studio") plus a bump counter — see StudioPanel's
+  // seedText/seedToken doc comment for why both are needed.
+  const [studioSeedText, setStudioSeedText] = useState<string | undefined>(undefined);
+  const [studioSeedToken, setStudioSeedToken] = useState(0);
 
   const load = useCallback(async () => {
     try {
-      const [proj, rub, types] = await Promise.all([getProject(projectId), getRubric(projectId), listOutputTypes()]);
+      const [proj, rub, doc] = await Promise.all([getProject(projectId), getRubric(projectId), getDocument(projectId)]);
       setProject(proj);
+      setDocument(doc);
       // Land on whichever surface has the outstanding work — but only when
       // the URL didn't already say. Reads `view` from this closure rather
       // than as a dependency: load() itself only ever runs once per project
@@ -70,7 +85,12 @@ export default function DeskShell({
         onViewChange(proj.gates.find((g) => g.gate === "G0")?.status === "signed_off" ? "document" : "intake", { replace: true });
       }
       setRubric(rub);
-      setOutputType(types.items.find((t) => t.id === proj.outputTypeId) ?? null);
+      // Resolved by id (unfiltered), not from the "choose a type" listing —
+      // that listing only offers Scholar Core's currently-active types, but
+      // a project created before that restriction (or of any other type,
+      // since the catalog itself still defines all 24) must still resolve
+      // its own spec correctly.
+      setOutputType(await getOutputTypeSpec(proj.outputTypeId).catch(() => null));
     } catch (e) {
       setError(
         e instanceof UnauthenticatedError
@@ -99,6 +119,38 @@ export default function DeskShell({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /** Save edits made in the real editor (editor/CanonicalDocumentEditor.tsx) — same PUT .../document route handleSubmitPlainText uses, just with a document the editor itself produced instead of one built from pasted plain text. */
+  async function handleSaveDocument(doc: CanonicalDocument) {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await submitDocument(projectId, doc);
+      setDocument(doc);
+      setProject(result);
+      setRubric(result.rubric);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  /** Deterministically resolve citation markers in the saved document (src/app/citation/resolveCitations.ts) — the route doesn't echo the document body back, so re-fetch it and the Rubric afterward, same as any other document-changing action here. */
+  async function handleResolveCitations() {
+    const result = await resolveCitations(projectId);
+    const [doc, rub] = await Promise.all([getDocument(projectId), getRubric(projectId)]);
+    setDocument(doc);
+    setRubric(rub);
+    setProject((p) => (p ? { ...p, gates: result.gates } : p));
+    return { citedSourceIds: result.citedSourceIds, unresolvedIds: result.unresolvedIds };
+  }
+
+  /** Sends a generated section's text to the Studio panel for a "make it read naturally in the author's voice" pass — the researcher decides if/when to bring the refined result back into the document (see StudioPanel's doc comment). */
+  function handleSendToStudio(text: string) {
+    setStudioSeedText(text);
+    setStudioSeedToken((t) => t + 1);
   }
 
   function jumpToBlock(blockId: string) {
@@ -146,7 +198,7 @@ export default function DeskShell({
         onOpenAiAccess={onOpenAiAccess}
       />
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
-        {(["intake", "document", "evidence", "progress", "submissions"] as const).map((v) => (
+        {(["intake", "requirements", "document", "evidence", "manuscript", "progress", "submissions"] as const).map((v) => (
           <button
             key={v}
             type="button"
@@ -161,13 +213,17 @@ export default function DeskShell({
           >
             {v === "intake"
               ? "Intake"
-              : v === "document"
-                ? "Document"
-                : v === "evidence"
-                  ? "Evidence"
-                  : v === "progress"
-                    ? "Progress"
-                    : "Submissions"}
+              : v === "requirements"
+                ? "Requirements"
+                : v === "document"
+                  ? "Document"
+                  : v === "evidence"
+                    ? "Evidence"
+                    : v === "manuscript"
+                      ? "Manuscript"
+                      : v === "progress"
+                        ? "Progress"
+                        : "Submissions"}
           </button>
         ))}
       </nav>
@@ -184,14 +240,41 @@ export default function DeskShell({
             />
           </div>
         ) : view === "evidence" ? (
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8">
+            <EvidenceLedgerPanel
+              projectId={projectId}
+              actor={session.status === "signed-in" ? (session.email ?? session.userId) : "unknown"}
+              userId={session.status === "signed-in" ? session.userId : undefined}
+              onOpenVault={onOpenVault}
+              onApproved={(newRubric) => {
+                setClaimsRefreshToken((t) => t + 1);
+                if (newRubric) setRubric(newRubric);
+              }}
+            />
             <ClaimsPanel
+              key={claimsRefreshToken}
               projectId={projectId}
               onChanged={(updated, newRubric) => {
                 setProject(updated);
                 // Absence means "no document to evaluate against yet", not
                 // "clear the existing report" — only overwrite when present.
                 if (newRubric) setRubric(newRubric);
+              }}
+            />
+          </div>
+        ) : view === "manuscript" ? (
+          <div className="flex-1 overflow-y-auto p-6">
+            <ManuscriptGenerationPanel
+              projectId={projectId}
+              onOpenAiAccess={onOpenAiAccess}
+              onSendToStudio={handleSendToStudio}
+              onInsertIntoDocument={(sections) => {
+                const newBlocks = sectionsToBlocks(sections);
+                const merged: CanonicalDocument = document
+                  ? { ...document, blocks: [...document.blocks, ...newBlocks] }
+                  : { id: projectId, title: project?.projectId ?? "Untitled", blocks: newBlocks };
+                handleSaveDocument(merged);
+                onViewChange("document");
               }}
             />
           </div>
@@ -203,6 +286,14 @@ export default function DeskShell({
               onSaved={(updated) => setProject(updated)}
             />
           </div>
+        ) : view === "requirements" ? (
+          <div className="flex-1 overflow-y-auto">
+            <JournalRequirementsPanel
+              projectId={projectId}
+              onSaved={(gates) => setProject((p) => (p ? { ...p, gates, hasJournalRequirements: true } : p))}
+              onOpenAiAccess={onOpenAiAccess}
+            />
+          </div>
         ) : view === "submissions" ? (
           <div className="flex-1 overflow-y-auto">
             <SubmissionsPanel projectId={projectId} />
@@ -210,13 +301,22 @@ export default function DeskShell({
         ) : (
           <>
             <Rail document={document} outputTypeId={project.outputTypeId} onJumpToBlock={jumpToBlock} />
-            <Primary document={document} onSubmitPlainText={handleSubmitPlainText} submitting={submitting} projectId={projectId} />
+            <Primary
+              document={document}
+              onSubmitPlainText={handleSubmitPlainText}
+              onSaveDocument={handleSaveDocument}
+              submitting={submitting}
+              projectId={projectId}
+              onResolveCitations={handleResolveCitations}
+            />
           </>
         )}
         <Aside
           projectId={projectId}
           rubric={rubric}
           sessionId={`desk-${projectId}`}
+          studioSeedText={studioSeedText}
+          studioSeedToken={studioSeedToken}
           onChanged={(updated, newRubric) => {
             setProject(updated);
             setRubric(newRubric);

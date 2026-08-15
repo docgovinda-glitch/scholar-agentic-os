@@ -35,12 +35,51 @@
  * `compilePositionInTextGateRules` compiles gates that set
  * `positionInTextGate` into `position_in_text` rules — OT-20's
  * recommendation-in-first-200-words gate is the first real example.
+ *
+ * Three more compile functions read `JournalRequirements` (docs
+ * 30-ACADEMIC-WORKFLOW-ARCHITECTURE.md G1, `domain/journal/types.ts`) in
+ * addition to the catalog spec — the venue-specific values no Atlas entry
+ * alone can supply, first wired for OT-10's three previously-uncompiled
+ * gates:
+ *
+ * `compileSectionWordLimitGateRules` compiles gates that set
+ * `sectionWordLimitGate` into a `word_count` rule scoped to one section
+ * (e.g. OT-10's abstract_limit), reading min/max from that section's own
+ * catalog `wordBudget` — no venue input needed, same "catalog is
+ * authoritative for structure" precedent as `compileWordLimitRule`.
+ *
+ * `compileDeclarationsPresentGateRules` compiles gates that set
+ * `declarationsPresentGate` into one `metadata_presence` rule per
+ * declaration named in `journalRequirements.requiredDeclarations`.
+ * Produces zero rules until requirements are captured — never invents
+ * which declarations a venue requires.
+ *
+ * `compileCitationStyleGateRules` compiles gates that set
+ * `citationStyleExactGate` into an exact-match `metadata_presence` rule,
+ * preferring `journalRequirements.citationStyle` and falling back to the
+ * catalog's `citation.defaultStyle` — always produces a rule, same
+ * "catalog default until a venue is captured" precedent as
+ * `compileWordLimitRule`.
  */
 
-import type { OutputTypeSpec } from "../atlas/types";
+import type { OutputTypeSpec, SectionSpec } from "../atlas/types";
 import type { Rule } from "../../domain/compliance/types";
+import type { JournalRequirements } from "../../domain/journal/types";
 
 const NOW = () => new Date().toISOString();
+
+function flattenSections(sections: SectionSpec[]): SectionSpec[] {
+  return sections.flatMap((s) => [s, ...(s.children ?? [])]);
+}
+
+/** `conflict-of-interest` from "Conflict of Interest" — a stable, metadata-key-safe form of a free-text declaration name. */
+function slugifyDeclaration(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
 
 /**
  * Compile a document-scope word-limit rule from the type's budget. Sections
@@ -74,10 +113,7 @@ export function compileWordLimitRule(spec: OutputTypeSpec): Rule {
 
 /** Compile one structural-presence rule per required section. */
 export function compileStructuralRules(spec: OutputTypeSpec): Rule[] {
-  const flatten = (sections: OutputTypeSpec["structure"]["sections"]): OutputTypeSpec["structure"]["sections"] =>
-    sections.flatMap((s) => [s, ...(s.children ?? [])]);
-
-  return flatten(spec.structure.sections)
+  return flattenSections(spec.structure.sections)
     .filter((s) => s.required)
     .map((section) => ({
       id: `${spec.id}-section-${section.key}`,
@@ -228,8 +264,128 @@ export function compilePositionInTextGateRules(spec: OutputTypeSpec): Rule[] {
     }));
 }
 
-/** Compile every deterministic rule this module knows how to derive from an Atlas spec. */
-export function compileRubricFromOutputType(spec: OutputTypeSpec): Rule[] {
+/**
+ * Compile one section-scoped word-limit rule per quality gate that sets
+ * `sectionWordLimitGate` (`QualityGateSpec.sectionWordLimitGate`'s own doc
+ * comment). No rule is produced if the referenced section doesn't exist or
+ * has no `wordBudget` of its own — matching this file's "leave uncompiled
+ * rather than invent a limit" discipline.
+ */
+export function compileSectionWordLimitGateRules(spec: OutputTypeSpec): Rule[] {
+  const sections = flattenSections(spec.structure.sections);
+  return spec.qualityGates
+    .filter((gate) => gate.sectionWordLimitGate !== undefined)
+    .flatMap((gate): Rule[] => {
+      const { sectionKey } = gate.sectionWordLimitGate!;
+      const section = sections.find((s) => s.key === sectionKey);
+      if (!section || !section.wordBudget) return [];
+      return [
+        {
+          id: `${spec.id}-section-word-limit-${gate.id}`,
+          source: {
+            document: `Atlas catalog entry ${spec.id} v${spec.version}`,
+            locator: `structure.sections[key=${sectionKey}].wordBudget`,
+            quote: `${section.wordBudget.min}–${section.wordBudget.max} words`,
+            extractedAt: NOW(),
+            confidence: 1.0,
+          },
+          type: "quantitative",
+          scope: "section",
+          severity: gate.severity,
+          evaluator: { kind: "word_count", params: { min: section.wordBudget.min, max: section.wordBudget.max, sectionKey } },
+          message: gate.description,
+          remedy: `Adjust "${section.title}" to ${section.wordBudget.min}–${section.wordBudget.max} words.`,
+          autoFixable: false,
+          userModified: false,
+        },
+      ];
+    });
+}
+
+/**
+ * Compile one metadata-presence rule per declaration a quality gate that
+ * sets `declarationsPresentGate` requires (`QualityGateSpec.declarationsPresentGate`'s
+ * own doc comment). Returns `[]` — never a fabricated requirement — until
+ * `journalRequirements` has actually been captured, or if it names zero
+ * declarations.
+ */
+export function compileDeclarationsPresentGateRules(spec: OutputTypeSpec, journalRequirements: JournalRequirements | undefined): Rule[] {
+  if (!journalRequirements || journalRequirements.requiredDeclarations.length === 0) return [];
+
+  return spec.qualityGates
+    .filter((gate) => gate.declarationsPresentGate === true)
+    .flatMap((gate) =>
+      journalRequirements.requiredDeclarations.map((declaration) => ({
+        id: `${spec.id}-declaration-${gate.id}-${slugifyDeclaration(declaration)}`,
+        source: {
+          document: `Journal requirements captured for ${journalRequirements.journalName}`,
+          locator: "requiredDeclarations",
+          quote: declaration,
+          extractedAt: journalRequirements.capturedAt,
+          confidence: 1.0,
+        },
+        type: "metadata" as const,
+        scope: "metadata" as const,
+        severity: gate.severity,
+        evaluator: { kind: "metadata_presence" as const, params: { key: `declaration:${slugifyDeclaration(declaration)}` } },
+        message: `"${declaration}" is a declaration ${journalRequirements.journalName} requires.`,
+        remedy: `Provide the "${declaration}" declaration.`,
+        autoFixable: false,
+        userModified: false,
+      }))
+    );
+}
+
+/**
+ * Compile one exact-match citation-style rule per quality gate that sets
+ * `citationStyleExactGate` (`QualityGateSpec.citationStyleExactGate`'s own
+ * doc comment). Always produces a rule: `journalRequirements.citationStyle`
+ * where captured, otherwise the catalog's own `citation.defaultStyle`.
+ */
+export function compileCitationStyleGateRules(spec: OutputTypeSpec, journalRequirements: JournalRequirements | undefined): Rule[] {
+  return spec.qualityGates
+    .filter((gate) => gate.citationStyleExactGate === true)
+    .map((gate) => {
+      const requiredStyle = journalRequirements?.citationStyle ?? spec.citation.defaultStyle;
+      return {
+        id: `${spec.id}-citation-style-${gate.id}`,
+        source: journalRequirements
+          ? {
+              document: `Journal requirements captured for ${journalRequirements.journalName}`,
+              locator: "citationStyle",
+              quote: requiredStyle,
+              extractedAt: journalRequirements.capturedAt,
+              confidence: 1.0,
+            }
+          : {
+              document: `Atlas catalog entry ${spec.id} v${spec.version}`,
+              locator: "citation.defaultStyle",
+              quote: requiredStyle,
+              extractedAt: NOW(),
+              confidence: 1.0,
+            },
+        type: "bibliographic" as const,
+        scope: "metadata" as const,
+        severity: gate.severity,
+        evaluator: { kind: "metadata_presence" as const, params: { key: "citationStyle", expectedValue: requiredStyle } },
+        message: journalRequirements
+          ? `References must use ${requiredStyle} style, ${journalRequirements.journalName}'s required style.`
+          : `References must use ${requiredStyle} style, ${spec.label}'s default pending a captured venue style.`,
+        remedy: `Set the document's citation style metadata to "${requiredStyle}", and format every reference accordingly.`,
+        autoFixable: false,
+        userModified: false,
+      };
+    });
+}
+
+/**
+ * Compile every deterministic rule this module knows how to derive from an
+ * Atlas spec. `journalRequirements` is optional — supplying it additionally
+ * compiles the venue-specific gates (`compileDeclarationsPresentGateRules`,
+ * `compileCitationStyleGateRules`); omitting it compiles everything else
+ * exactly as before those gates existed.
+ */
+export function compileRubricFromOutputType(spec: OutputTypeSpec, journalRequirements?: JournalRequirements): Rule[] {
   return [
     compileWordLimitRule(spec),
     ...compileStructuralRules(spec),
@@ -237,5 +393,8 @@ export function compileRubricFromOutputType(spec: OutputTypeSpec): Rule[] {
     ...compileClaimSupportGateRules(spec),
     ...compileReadabilityGateRules(spec),
     ...compilePositionInTextGateRules(spec),
+    ...compileSectionWordLimitGateRules(spec),
+    ...compileDeclarationsPresentGateRules(spec, journalRequirements),
+    ...compileCitationStyleGateRules(spec, journalRequirements),
   ];
 }

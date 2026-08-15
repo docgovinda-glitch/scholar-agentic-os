@@ -11,7 +11,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceConflict, InterventionLevel, OutputTypeSpec, OutputTypeSummary, ProjectView, RubricReport, StudioRefineResult, SubmissionRecord, VoiceProfile } from "./types";
+import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, CoverLetter, DiscoveredSource, EvidenceConflict, EvidenceLedger, EvidenceLocator, GateSummary, GenerationJob, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, PeerReviewHistory, ProjectView, ReviewLens, RubricReport, StudioRefineResult, SubmissionRecord, SupportStrength, VoiceProfile } from "./types";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -212,8 +212,48 @@ export async function getRubric(projectId: string): Promise<RubricReport | null>
   return json<RubricReport>(res);
 }
 
+/** Returns null (not an error) when no document has been submitted yet — same convention as getRubric(). */
+export async function getDocument(projectId: string): Promise<CanonicalDocument | null> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/document`);
+  if (res.status === 404) return null;
+  return json<CanonicalDocument>(res);
+}
+
 export function submitDocument(projectId: string, document: CanonicalDocument): Promise<ProjectView & { rubric: RubricReport }> {
   return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/document`, "PUT", { document }).then((r) => json(r));
+}
+
+/**
+ * Turn every `[ev-xxxx]` bracket-id currently in the document into a real
+ * in-text citation, and (re)build the References section — deterministic,
+ * no model call. `style` defaults server-side to the captured journal's
+ * citation style, falling back to the catalog default. A document with
+ * nothing left to resolve is a safe no-op (`citedSourceIds: []`).
+ */
+export function resolveCitations(
+  projectId: string,
+  style?: string
+): Promise<ProjectView & { rubric: RubricReport; citedSourceIds: string[]; unresolvedIds: string[] }> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/resolve-citations`, "POST", { style }).then((r) => json(r));
+}
+
+/** Returns null (not an error) when no journal requirements have been captured yet — a normal, expected state before the first save. */
+export async function getJournalRequirements(projectId: string): Promise<JournalRequirements | null> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements`);
+  if (res.status === 404) return null;
+  return json<JournalRequirements>(res);
+}
+
+/**
+ * Save (or replace) the target journal's requirements. `source` defaults to
+ * "manual" server-side when omitted; pass "ai_extracted" only when this save
+ * follows a user-reviewed AI proposal from extractJournalRequirements().
+ */
+export function saveJournalRequirements(
+  projectId: string,
+  payload: Omit<JournalRequirements, "source" | "capturedAt" | "capturedBy"> & { source?: JournalRequirements["source"] }
+): Promise<{ journalRequirements: JournalRequirements; gates: ProjectView["gates"] }> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements`, "PUT", payload).then((r) => json(r));
 }
 
 /** Thrown when the Warden hasn't seen consent for this (session, provider) pair yet — recoverable by calling grantStudioConsent() then retrying. */
@@ -283,6 +323,40 @@ export async function grantStudioConsent(sessionId: string, provider: string): P
   await authedJsonFetch("/api/studio/consent", "POST", { sessionId, provider }).then((r) => json(r));
 }
 
+/**
+ * Propose journal requirements from pasted author-guidelines text. Returns
+ * only a proposal for the caller to review — nothing is saved here; call
+ * saveJournalRequirements() with source: "ai_extracted" once the user
+ * confirms it. Same BYOK-vs-Premium shape and error-status mapping as
+ * refinePassage() above (428/403/402 map to the same three typed errors —
+ * their names are generic to any Warden/Premium-gated call, not
+ * Studio-specific, so this reuses them rather than defining duplicates).
+ */
+export async function extractJournalRequirements(params: {
+  projectId: string;
+  guidelinesText: string;
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  useEngine?: "premium";
+}): Promise<{ proposal: JournalRequirementsProposal }> {
+  const { projectId, ...requestBody } = params;
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements/extract`, "POST", requestBody);
+  if (res.status === 428) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioConsentRequiredError(errBody.reason || "Consent required.", errBody.provider);
+  }
+  if (res.status === 403) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioDeniedError(errBody.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
+  }
+  return json<{ proposal: JournalRequirementsProposal }>(res);
+}
+
 /** Every submission attempt recorded against the project, most-recent-first is the caller's job — the server returns them in storage order. */
 export function listSubmissions(projectId: string): Promise<{ submissions: SubmissionRecord[] }> {
   return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/submissions`).then((r) => json(r));
@@ -311,6 +385,216 @@ export function deleteSubmission(projectId: string, submissionId: string): Promi
   return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/submissions/${encodeURIComponent(submissionId)}`, {
     method: "DELETE",
   }).then((r) => json(r));
+}
+
+// ── Evidence Ledger (src/domain/evidence) ──────────────────────────────
+
+export function getEvidenceLedger(projectId: string): Promise<EvidenceLedger> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/evidence-ledger`).then((r) => json(r));
+}
+
+export function addManualSource(
+  projectId: string,
+  source: Omit<DiscoveredSource, "id" | "discoveredAt" | "discoveredVia"> & { discoveredVia?: "manual" | "vault"; vaultItemId?: string }
+): Promise<EvidenceLedger> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/sources`, "POST", source).then((r) => json(r));
+}
+
+export function discoverSources(
+  projectId: string,
+  query: string,
+  via: "arxiv" | "openalex" | "web_search"
+): Promise<{ added: DiscoveredSource[]; evidenceLedger: EvidenceLedger }> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/discover`, "POST", { query, via }).then((r) => json(r));
+}
+
+export function extractEvidenceQuote(
+  projectId: string,
+  sourceId: string,
+  quote: string,
+  locator?: EvidenceLocator
+): Promise<EvidenceLedger> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/sources/${encodeURIComponent(sourceId)}/extract`,
+    "POST",
+    { quote, locator }
+  ).then((r) => json(r));
+}
+
+export function verifyEvidenceItem(projectId: string, evidenceId: string, actor: string): Promise<EvidenceLedger> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/items/${encodeURIComponent(evidenceId)}/verify`,
+    "POST",
+    { actor }
+  ).then((r) => json(r));
+}
+
+export function proposeEvidenceItem(projectId: string, evidenceId: string, claimId: string, actor: string): Promise<EvidenceLedger> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/items/${encodeURIComponent(evidenceId)}/propose`,
+    "POST",
+    { claimId, actor }
+  ).then((r) => json(r));
+}
+
+/** The only client call that can make evidence citable — bound atomically into the Claim–Evidence Graph server-side. */
+export function approveEvidenceItem(
+  projectId: string,
+  evidenceId: string,
+  params: { actor: string; strength: SupportStrength; rationale: string }
+): Promise<{ evidenceLedger: EvidenceLedger; claimGraph: ClaimEvidenceGraph; rubric?: RubricReport }> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/items/${encodeURIComponent(evidenceId)}/approve`,
+    "POST",
+    params
+  ).then((r) => json(r));
+}
+
+export function rejectEvidenceItem(projectId: string, evidenceId: string, actor: string, reason: string): Promise<EvidenceLedger> {
+  return authedJsonFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/items/${encodeURIComponent(evidenceId)}/reject`,
+    "POST",
+    { actor, reason }
+  ).then((r) => json(r));
+}
+
+// ── Long-form generation engine (domain/manuscript) ─────────────────────
+
+/** Returns null (not an error) when no job has been started yet. */
+export async function getManuscriptJob(projectId: string): Promise<GenerationJob | null> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/job`);
+  if (res.status === 404) return null;
+  return json<GenerationJob>(res);
+}
+
+export function startManuscriptJob(projectId: string): Promise<GenerationJob> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/start`, "POST", {}).then((r) => json(r));
+}
+
+/** Generates and checkpoints exactly the next planned section. Same 428/403/402 error mapping as refinePassage()/extractJournalRequirements() — reuses the same three typed errors. */
+export async function generateNextSection(params: {
+  projectId: string;
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  useEngine?: "premium";
+}): Promise<{ generationJob: GenerationJob }> {
+  const { projectId, ...requestBody } = params;
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/next-section`, "POST", requestBody);
+  if (res.status === 428) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioConsentRequiredError(errBody.reason || "Consent required.", errBody.provider);
+  }
+  if (res.status === 403) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioDeniedError(errBody.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
+  }
+  return json<{ generationJob: GenerationJob }>(res);
+}
+
+/** Runs the multi-pass global coherence check over every section generated so far, and persists the report on the job. Same 428/403/402 error mapping as the other AI-backed routes. */
+export async function runCoherenceCheck(params: {
+  projectId: string;
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  useEngine?: "premium";
+}): Promise<{ generationJob: GenerationJob }> {
+  const { projectId, ...requestBody } = params;
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/coherence-check`, "POST", requestBody);
+  if (res.status === 428) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioConsentRequiredError(errBody.reason || "Consent required.", errBody.provider);
+  }
+  if (res.status === 403) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioDeniedError(errBody.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
+  }
+  return json<{ generationJob: GenerationJob }>(res);
+}
+
+/** Every peer review round run so far — versioned, never overwritten. */
+export function getPeerReviewHistory(projectId: string): Promise<PeerReviewHistory> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/peer-review`).then((r) => json(r));
+}
+
+/** Runs a new peer review round (all seven lenses by default) and appends it to the history. Same 428/403/402 error mapping as the other AI-backed routes. */
+export async function runPeerReview(params: {
+  projectId: string;
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  useEngine?: "premium";
+  lenses?: ReviewLens[];
+}): Promise<{ peerReviewHistory: PeerReviewHistory; gates: GateSummary[] }> {
+  const { projectId, ...requestBody } = params;
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/peer-review`, "POST", requestBody);
+  if (res.status === 428) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioConsentRequiredError(errBody.reason || "Consent required.", errBody.provider);
+  }
+  if (res.status === 403) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioDeniedError(errBody.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
+  }
+  return json<{ peerReviewHistory: PeerReviewHistory; gates: GateSummary[] }>(res);
+}
+
+export function pauseManuscriptJob(projectId: string): Promise<GenerationJob> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/pause`, "POST", {}).then((r) => json(r));
+}
+
+export function resumeManuscriptJob(projectId: string): Promise<GenerationJob> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/manuscript/resume`, "POST", {}).then((r) => json(r));
+}
+
+/** Returns null (not an error) when no cover letter has been generated yet. */
+export async function getCoverLetter(projectId: string): Promise<CoverLetter | null> {
+  const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/cover-letter`);
+  if (res.status === 404) return null;
+  return json<CoverLetter>(res);
+}
+
+/**
+ * Generate (or regenerate) the project's cover letter from its document and
+ * captured journal requirements — one per project, overwritten on each
+ * call. 400s if either precondition is missing; the server's message names
+ * which. Same 428/403/402 error mapping as the other AI-backed routes.
+ */
+export async function generateCoverLetter(params: {
+  projectId: string;
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  useEngine?: "premium";
+}): Promise<{ coverLetter: CoverLetter }> {
+  const { projectId, ...requestBody } = params;
+  const res = await authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/cover-letter`, "POST", requestBody);
+  if (res.status === 428) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioConsentRequiredError(errBody.reason || "Consent required.", errBody.provider);
+  }
+  if (res.status === 403) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioDeniedError(errBody.reason || "Denied by privacy policy.");
+  }
+  if (res.status === 402) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new StudioNoAiSourceError(errBody.error || "No AI source is currently available.");
+  }
+  return json<{ coverLetter: CoverLetter }>(res);
 }
 
 export async function exportProject(projectId: string, format: "docx" | "odt" | "pdf"): Promise<Blob> {

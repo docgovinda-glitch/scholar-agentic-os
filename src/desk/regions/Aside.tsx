@@ -115,11 +115,16 @@ export default function Aside({
   rubric,
   sessionId,
   onChanged,
+  studioSeedText,
+  studioSeedToken,
 }: {
   projectId: string;
   rubric: RubricReport | null;
   sessionId: string;
   onChanged: (updated: ProjectView, rubric: RubricReport) => void;
+  /** Passed straight through to StudioPanel's seedText — see there for what these do. */
+  studioSeedText?: string;
+  studioSeedToken?: number;
 }) {
   const unresolved = rubric?.findings.filter((f) => f.status === "fail" || f.status === "warn") ?? [];
   const [waiving, setWaiving] = useState<{ ruleId: string; reason: string } | null>(null);
@@ -143,7 +148,7 @@ export default function Aside({
 
   return (
     <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]">
-      <StudioPanel sessionId={sessionId} />
+      <StudioPanel sessionId={sessionId} seedText={studioSeedText} seedToken={studioSeedToken} />
       <div className="flex flex-col">
         <div className="border-b border-[color:var(--border-subtle)] px-3 py-2 text-xs text-[color:var(--text-secondary)]">
           Compliance {unresolved.length > 0 && <span className="text-[color:var(--state-warning)]">· {unresolved.length}</span>}

@@ -31,8 +31,10 @@ export type EvaluatorKind = "word_count" | "structural_presence" | "metadata_pre
 export interface WordCountParams {
   max?: number;
   min?: number;
-  /** Section keys to exclude from the count (e.g. references, appendices). */
+  /** Section keys to exclude from the count (e.g. references, appendices). Ignored when `sectionKey` is set. */
   exclude?: string[];
+  /** If set, count only this one section's words instead of the whole document — e.g. OT-10's abstract_limit gate, which has its own min/max distinct from the document total. */
+  sectionKey?: string;
 }
 
 export interface StructuralPresenceParams {
@@ -46,6 +48,8 @@ export interface MetadataPresenceParams {
   key: string;
   /** A present-but-blank value still fails this check, same guarantee as structural_presence for sections. */
   minLength?: number;
+  /** If set, the value must case-insensitively equal this exact string, not merely be present — e.g. OT-10's citation_style_exact gate. */
+  expectedValue?: string;
 }
 
 /**

@@ -1,49 +1,60 @@
 import { useState } from "react";
 import { exportProject } from "../api";
-import type { Block, CanonicalDocument } from "../types";
+import CanonicalDocumentEditor from "../editor/CanonicalDocumentEditor";
+import type { CanonicalDocument } from "../types";
 
-function BlockView({ block }: { block: Block }) {
-  const text = block.text || " ";
-  switch (block.kind) {
-    case "heading1":
-      return <h1 id={block.id} className="text-2xl font-serif font-bold mt-6 mb-2 text-[color:var(--text-primary)]">{text}</h1>;
-    case "heading2":
-      return <h2 id={block.id} className="text-xl font-serif font-bold mt-5 mb-2 text-[color:var(--text-primary)]">{text}</h2>;
-    case "heading3":
-      return <h3 id={block.id} className="text-lg font-serif font-semibold mt-4 mb-1 text-[color:var(--text-primary)]">{text}</h3>;
-    case "quote":
-      return <blockquote id={block.id} className="border-l-2 border-[color:var(--color-luminous-blue-dim)] pl-4 italic text-[color:var(--text-secondary)] my-3">{text}</blockquote>;
-    case "list-item":
-      return <li id={block.id} className="ml-5 list-disc text-[color:var(--text-secondary)]">{text}</li>;
-    default:
-      return <p id={block.id} className="text-[color:var(--text-secondary)] leading-relaxed my-2">{text}</p>;
-  }
+export interface ResolveCitationsOutcome {
+  citedSourceIds: string[];
+  unresolvedIds: string[];
 }
 
 /**
- * Region C (docs 22 §2/§4/§5). Read-only for now — the real editor ("Custom
- * document model over a proven text engine", 22 §12) is a distinct,
- * substantial build this first slice deliberately does not attempt.
+ * Region C (docs 22 §2/§4/§5). Now backed by the real editor
+ * (editor/CanonicalDocumentEditor.tsx — "custom document model over a
+ * proven text engine" per docs 22 §12) once a document exists.
  *
  * The plain-text submission form below (shown only when there's no document
- * yet) is an honest stopgap, not a preview of the editor: it exists so this
- * screen has something real to show in Outline/Primary/Compliance rather
- * than being permanently empty. See plainTextToDocument.ts's doc comment.
+ * yet) stays as the bootstrap path — pasting an existing draft to get
+ * something into the Canonical Document Model in one step is a genuinely
+ * useful action distinct from typing from scratch, not a placeholder for
+ * the editor. See plainTextToDocument.ts's doc comment.
  */
 export default function Primary({
   document,
   onSubmitPlainText,
+  onSaveDocument,
   submitting,
   projectId,
+  onResolveCitations,
 }: {
   document: CanonicalDocument | null;
   onSubmitPlainText: (text: string) => void;
+  onSaveDocument: (doc: CanonicalDocument) => void;
   submitting: boolean;
   projectId: string;
+  /** Deterministically turns every `[ev-xxxx]` bracket-id in the saved document into a real in-text citation and rebuilds the References section — src/app/citation/resolveCitations.ts. Optional so callers that don't wire it (e.g. tests) keep working. */
+  onResolveCitations?: () => Promise<ResolveCitationsOutcome>;
 }) {
   const [draft, setDraft] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [resolvingCitations, setResolvingCitations] = useState(false);
+  const [citationOutcome, setCitationOutcome] = useState<ResolveCitationsOutcome | null>(null);
+  const [citationError, setCitationError] = useState<string | null>(null);
+
+  async function handleResolveCitations() {
+    if (!onResolveCitations) return;
+    setResolvingCitations(true);
+    setCitationError(null);
+    setCitationOutcome(null);
+    try {
+      setCitationOutcome(await onResolveCitations());
+    } catch (err) {
+      setCitationError((err as Error).message);
+    } finally {
+      setResolvingCitations(false);
+    }
+  }
 
   async function handleExport(format: "docx" | "odt" | "pdf") {
     setExporting(true);
@@ -71,8 +82,8 @@ export default function Primary({
         <div className="max-w-lg w-full text-center">
           <h2 className="text-sm text-[color:var(--text-secondary)] mb-2">No document submitted yet</h2>
           <p className="text-xs text-[color:var(--text-muted)] mb-4">
-            The real editor isn't built yet. Paste plain text below (blank lines separate paragraphs) to see the
-            Outline and Compliance panels work against a real document.
+            Paste an existing draft below (blank lines separate paragraphs) to start from it, or leave this blank and
+            use the editor once you submit — either way you can keep editing afterward.
           </p>
           {/* index.css's global form-control override forces a white background
               on any textarea/input/select via !important, unless it carries
@@ -103,10 +114,41 @@ export default function Primary({
   return (
     <div className="flex-1 flex flex-col">
       <div className="flex-1 overflow-y-auto px-10 py-6 max-w-[75ch] mx-auto w-full">
-        {document.blocks.map((b) => (
-          <BlockView key={b.id} block={b} />
-        ))}
+        <CanonicalDocumentEditor document={document} onSave={onSaveDocument} saving={submitting} />
       </div>
+      {/* Citation resolution — turns approved-evidence bracket-ids into real
+          in-text citations and a rendered References section (docs
+          31-SUBMISSION-COMPLIANCE-ARCHITECTURE.md, src/app/citation/
+          resolveCitations.ts). Deterministic, run once near the end of
+          drafting, before export. */}
+      {onResolveCitations && (
+        <div className="border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-10 py-4">
+          <div className="max-w-[75ch] mx-auto">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleResolveCitations}
+                disabled={resolvingCitations}
+                className="px-3 py-1.5 rounded text-xs border border-[color:var(--color-border-subtle)] text-[color:var(--text-secondary)] disabled:opacity-40 hover:border-[color:var(--color-luminous-blue-dim)]"
+              >
+                {resolvingCitations ? "Resolving citations…" : "Resolve citations"}
+              </button>
+              <span className="text-xs text-[color:var(--text-muted)]">
+                Turns approved-evidence citation markers into real in-text citations and builds the References section.
+              </span>
+            </div>
+            {citationError && <p role="alert" className="mt-2 text-[10px] text-red-400">Error: {citationError}</p>}
+            {citationOutcome && (
+              <p className="mt-2 text-[10px] text-[color:var(--text-secondary)]">
+                {citationOutcome.citedSourceIds.length === 0
+                  ? "Nothing to resolve — no citation markers found."
+                  : `Resolved ${citationOutcome.citedSourceIds.length} source(s) into the References section.`}
+                {citationOutcome.unresolvedIds.length > 0 &&
+                  ` ${citationOutcome.unresolvedIds.length} marker(s) could not be resolved and were left as-is: ${citationOutcome.unresolvedIds.join(", ")}.`}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       {/* Export controls (docs 33-EXPORT-ARCHITECTURE.md) */}
       <div className="border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-10 py-4">
         <div className="max-w-[75ch] mx-auto">

@@ -66,6 +66,39 @@ create table if not exists public.projects (
   -- Orthogonal to the gate columns above — a project can be G6-signed-off
   -- with any number of submission attempts against different venues.
   submissions jsonb not null default '[]'::jsonb,
+  -- The target journal's captured requirements (domain/journal/types.ts,
+  -- gate G1). Nullable, unlike the columns above defaulting to an empty
+  -- container: "not yet captured" is a real, distinct state from "captured
+  -- but empty" for this one.
+  journal_requirements jsonb,
+  -- Discovered sources and their evidence-provenance state
+  -- (domain/evidence/types.ts). Defaults to an empty ledger, same as
+  -- claim_graph above — always present, possibly with nothing in it yet.
+  evidence_ledger jsonb not null default '{"sources":[],"items":[]}'::jsonb,
+  -- The long-form generation engine's durable checkpoint
+  -- (domain/manuscript/types.ts). Nullable, same as journal_requirements:
+  -- "never started" is a real, distinct state, not an empty container.
+  generation_job jsonb,
+  -- Every multi-lens peer review round run so far (domain/review/types.ts).
+  -- Defaults to an empty history, same as claim_graph/evidence_ledger:
+  -- always present, versioned — a round is appended, never overwritten.
+  peer_review_history jsonb not null default '{"rounds":[]}'::jsonb,
+  -- The most recently generated cover letter (domain/coverLetter/types.ts).
+  -- Nullable, same "not yet captured" case as journal_requirements —
+  -- overwritten wholesale on each regeneration, no history kept.
+  cover_letter jsonb,
+  -- The most recent anonymization PROPOSAL report (domain/anonymization/
+  -- types.ts) — never auto-applied. Nullable, same "not yet run" case as
+  -- generation_job.
+  anonymization_report jsonb,
+  -- The anonymized document produced by applying a human-accepted subset of
+  -- anonymization_report's proposals. A separate column from document,
+  -- never overwrites it.
+  anonymized_document jsonb,
+  -- Recorded explicit acceptance of a smaller-than-typical source corpus
+  -- (docs 30 §3 G2 "Exit"'s escape hatch). Nullable, no default — same
+  -- "not yet captured" case as journal_requirements.
+  source_count_override jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -100,6 +133,36 @@ end $$;
 -- no submission history yet is simply an empty list, exactly what new rows
 -- already default to.
 alter table public.projects add column if not exists submissions jsonb not null default '[]'::jsonb;
+
+-- Migration for databases created before journal_requirements existed.
+-- Nullable, no default: an existing row simply has no requirements captured
+-- yet, the same state a freshly created row starts in.
+alter table public.projects add column if not exists journal_requirements jsonb;
+
+-- Migration for databases created before evidence_ledger existed. Same
+-- no-awkward-backfill case as submissions above: an existing project simply
+-- has an empty ledger, exactly what a new row already defaults to.
+alter table public.projects add column if not exists evidence_ledger jsonb not null default '{"sources":[],"items":[]}'::jsonb;
+
+-- Migration for databases created before generation_job existed. Nullable,
+-- no default — same "not yet captured" case as journal_requirements.
+alter table public.projects add column if not exists generation_job jsonb;
+
+-- Migration for databases created before peer_review_history existed. Same
+-- no-awkward-backfill case as submissions/evidence_ledger: an existing
+-- project simply has no rounds yet, exactly what a new row already defaults to.
+alter table public.projects add column if not exists peer_review_history jsonb not null default '{"rounds":[]}'::jsonb;
+
+-- Migration for databases created before cover_letter/anonymization_report/
+-- anonymized_document existed. All three nullable, no default — same
+-- "not yet captured" case as journal_requirements/generation_job.
+alter table public.projects add column if not exists cover_letter jsonb;
+alter table public.projects add column if not exists anonymization_report jsonb;
+alter table public.projects add column if not exists anonymized_document jsonb;
+
+-- Migration for databases created before source_count_override existed.
+-- Nullable, no default — same "not yet captured" case as journal_requirements.
+alter table public.projects add column if not exists source_count_override jsonb;
 
 -- Deny-all baseline for anon/authenticated (see the note at the top of this
 -- file). FORCE additionally applies RLS to the table's owner; roles with

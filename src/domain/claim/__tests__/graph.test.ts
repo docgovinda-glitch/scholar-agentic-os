@@ -7,6 +7,8 @@ import {
   unsupportedClaims,
   claimsDependingOnSource,
   findConflicts,
+  markClaimUnsupported,
+  claimsNeedingResolution,
   ClaimGraphError,
 } from "../graph";
 import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan } from "../types";
@@ -89,6 +91,71 @@ describe("domain/claim/graph: unsupportedClaims", () => {
     graph = addClaim(graph, claim("c2"));
     graph = bindEvidence(graph, binding("b1", "c1", "strong", [span("s1")]));
     expect(unsupportedClaims(graph).map((c) => c.id)).toEqual(["c2"]);
+  });
+});
+
+describe("domain/claim/graph: markClaimUnsupported", () => {
+  it("throws for an unknown claim", () => {
+    const graph = emptyGraph();
+    expect(() => markClaimUnsupported(graph, "no-such-claim", "definitional statement", "u1")).toThrow(ClaimGraphError);
+  });
+
+  it("records the reason, marker, and a timestamp", () => {
+    let graph = emptyGraph();
+    graph = addClaim(graph, claim("c1"));
+    graph = markClaimUnsupported(graph, "c1", "This is a definitional statement, not an empirical claim.", "u1");
+    const marked = graph.claims.find((c) => c.id === "c1")!;
+    expect(marked.explicitlyUnsupported?.reason).toBe("This is a definitional statement, not an empirical claim.");
+    expect(marked.explicitlyUnsupported?.markedBy).toBe("u1");
+    expect(typeof marked.explicitlyUnsupported?.at).toBe("string");
+  });
+
+  it("does not touch any other claim", () => {
+    let graph = emptyGraph();
+    graph = addClaim(graph, claim("c1"));
+    graph = addClaim(graph, claim("c2"));
+    graph = markClaimUnsupported(graph, "c1", "reason", "u1");
+    expect(graph.claims.find((c) => c.id === "c2")!.explicitlyUnsupported).toBeUndefined();
+  });
+
+  it("a claim explicitly marked unsupported is STILL reported by unsupportedClaims — the compliance-grade check is not satisfied by this flag", () => {
+    let graph = emptyGraph();
+    graph = addClaim(graph, claim("c1"));
+    graph = markClaimUnsupported(graph, "c1", "reason", "u1");
+    expect(unsupportedClaims(graph).map((c) => c.id)).toEqual(["c1"]);
+  });
+});
+
+describe("domain/claim/graph: claimsNeedingResolution (G4's looser draft-stage bar)", () => {
+  it("an unbound, unmarked claim needs resolution", () => {
+    let graph = emptyGraph();
+    graph = addClaim(graph, claim("c1"));
+    expect(claimsNeedingResolution(graph).map((c) => c.id)).toEqual(["c1"]);
+  });
+
+  it("a bound claim does not need resolution", () => {
+    let graph = emptyGraph();
+    graph = addClaim(graph, claim("c1"));
+    graph = bindEvidence(graph, binding("b1", "c1", "strong", [span("s1")]));
+    expect(claimsNeedingResolution(graph)).toHaveLength(0);
+  });
+
+  it("a claim explicitly marked unsupported does not need resolution, unlike unsupportedClaims' stricter check", () => {
+    let graph = emptyGraph();
+    graph = addClaim(graph, claim("c1"));
+    graph = markClaimUnsupported(graph, "c1", "Definitional, needs no citation.", "u1");
+    expect(claimsNeedingResolution(graph)).toHaveLength(0);
+    expect(unsupportedClaims(graph)).toHaveLength(1); // the compliance-grade check still flags it
+  });
+
+  it("multiple claims: only the unresolved ones are reported", () => {
+    let graph = emptyGraph();
+    graph = addClaim(graph, claim("c1"));
+    graph = addClaim(graph, claim("c2"));
+    graph = addClaim(graph, claim("c3"));
+    graph = bindEvidence(graph, binding("b1", "c1", "strong", [span("s1")]));
+    graph = markClaimUnsupported(graph, "c2", "reason", "u1");
+    expect(claimsNeedingResolution(graph).map((c) => c.id)).toEqual(["c3"]);
   });
 });
 

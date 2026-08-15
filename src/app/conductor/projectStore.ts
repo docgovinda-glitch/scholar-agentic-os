@@ -17,6 +17,14 @@ import type { RubricReport } from "../rubric/rubric";
 import { emptyGraph } from "../../domain/claim/graph";
 import type { ClaimEvidenceGraph } from "../../domain/claim/types";
 import type { SubmissionRecord } from "../../domain/submission/types";
+import type { JournalRequirements } from "../../domain/journal/types";
+import { emptyLedger } from "../../domain/evidence/types";
+import type { EvidenceLedger } from "../../domain/evidence/types";
+import type { GenerationJob } from "../../domain/manuscript/types";
+import { emptyPeerReviewHistory } from "../../domain/review/types";
+import type { PeerReviewHistory } from "../../domain/review/types";
+import type { CoverLetter } from "../../domain/coverLetter/types";
+import type { AnonymizationReport } from "../../domain/anonymization/types";
 
 export interface ProjectRecord {
   projectId: string;
@@ -44,6 +52,22 @@ export interface ProjectRecord {
   waivers: Record<string, { reason: string; at: string }>;
   /** Post-G6 submission attempts against journals — see domain/submission/types.ts. Starts empty, same as claimGraph: always present, possibly with nothing in it yet. */
   submissions: SubmissionRecord[];
+  /** The target journal's captured structural/citation/declaration requirements (docs 30 §10, G1). Undefined until PUT .../journal-requirements — a real, distinct "not yet captured" state, not defaulted to an empty object, same as `document`. */
+  journalRequirements?: JournalRequirements;
+  /** Discovered sources and their evidence-provenance state (domain/evidence). Starts empty, same as claimGraph: always present, possibly with nothing in it yet. */
+  evidenceLedger: EvidenceLedger;
+  /** The long-form generation engine's durable checkpoint (domain/manuscript). Undefined until POST .../manuscript/start — a real, distinct "never started" state, same as journalRequirements. */
+  generationJob?: GenerationJob;
+  /** Every multi-lens peer review round run so far (domain/review) — versioned, never overwritten. Starts empty, same as claimGraph/evidenceLedger: always present, possibly with nothing in it yet. */
+  peerReviewHistory: PeerReviewHistory;
+  /** The most recently generated cover letter (domain/coverLetter). Undefined until POST .../cover-letter — overwritten wholesale on each regeneration, same "not yet captured" distinctness as journalRequirements. */
+  coverLetter?: CoverLetter;
+  /** The most recent anonymization PROPOSAL report (domain/anonymization) — never auto-applied. Undefined until POST .../anonymization/propose. */
+  anonymizationReport?: AnonymizationReport;
+  /** The anonymized document produced by applying a human-accepted subset of anonymizationReport's proposals (POST .../anonymization/apply). A separate document from `document`, never overwrites it. */
+  anonymizedDocument?: CanonicalDocument;
+  /** Recorded explicit acceptance of a smaller-than-typical source corpus (docs 30 §3 G2 "Exit"'s escape hatch) — undefined until POST .../gates/G2/accept-smaller-corpus, mirroring waivers' "reason required" discipline. */
+  sourceCountOverride?: { reason: string; acceptedBy: string; at: string };
 }
 
 const projects = new Map<string, ProjectRecord>();
@@ -85,6 +109,8 @@ export function createProject(outputTypeId: string, ownerId: string): ProjectRec
     claimGraph: emptyGraph(),
     waivers: {},
     submissions: [],
+    evidenceLedger: emptyLedger(),
+    peerReviewHistory: emptyPeerReviewHistory(),
   };
   projects.set(projectId, record);
   return record;

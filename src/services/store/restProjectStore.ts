@@ -37,6 +37,8 @@
 
 import { initialProjectGateState } from "../../domain/project/gates";
 import { emptyGraph } from "../../domain/claim/graph";
+import { emptyLedger } from "../../domain/evidence/types";
+import { emptyPeerReviewHistory } from "../../domain/review/types";
 import { generateProjectId } from "../../app/conductor/projectStore";
 import type { ProjectRecord, ProjectStore } from "./types";
 
@@ -58,6 +60,14 @@ interface ProjectRow {
   claim_graph: ProjectRecord["claimGraph"];
   waivers: ProjectRecord["waivers"];
   submissions: ProjectRecord["submissions"];
+  journal_requirements: ProjectRecord["journalRequirements"] | null;
+  evidence_ledger: ProjectRecord["evidenceLedger"] | null;
+  generation_job: ProjectRecord["generationJob"] | null;
+  peer_review_history: ProjectRecord["peerReviewHistory"] | null;
+  cover_letter: ProjectRecord["coverLetter"] | null;
+  anonymization_report: ProjectRecord["anonymizationReport"] | null;
+  anonymized_document: ProjectRecord["anonymizedDocument"] | null;
+  source_count_override: ProjectRecord["sourceCountOverride"] | null;
 }
 
 function rowToRecord(row: ProjectRow): ProjectRecord {
@@ -74,6 +84,15 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
     waivers: row.waivers,
     // Rows written before this column existed have it as SQL NULL.
     submissions: row.submissions ?? [],
+    journalRequirements: row.journal_requirements ?? undefined,
+    // Rows written before this column existed have it as SQL NULL.
+    evidenceLedger: row.evidence_ledger ?? emptyLedger(),
+    generationJob: row.generation_job ?? undefined,
+    peerReviewHistory: row.peer_review_history ?? emptyPeerReviewHistory(),
+    coverLetter: row.cover_letter ?? undefined,
+    anonymizationReport: row.anonymization_report ?? undefined,
+    anonymizedDocument: row.anonymized_document ?? undefined,
+    sourceCountOverride: row.source_count_override ?? undefined,
   };
 }
 
@@ -89,6 +108,14 @@ function recordToRow(record: ProjectRecord): ProjectRow {
     claim_graph: record.claimGraph,
     waivers: record.waivers,
     submissions: record.submissions,
+    journal_requirements: record.journalRequirements ?? null,
+    evidence_ledger: record.evidenceLedger,
+    generation_job: record.generationJob ?? null,
+    peer_review_history: record.peerReviewHistory,
+    cover_letter: record.coverLetter ?? null,
+    anonymization_report: record.anonymizationReport ?? null,
+    anonymized_document: record.anonymizedDocument ?? null,
+    source_count_override: record.sourceCountOverride ?? null,
   };
 }
 
@@ -154,6 +181,8 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
         claimGraph: emptyGraph(),
         waivers: {},
         submissions: [],
+        evidenceLedger: emptyLedger(),
+        peerReviewHistory: emptyPeerReviewHistory(),
       };
 
       await request(base, {
