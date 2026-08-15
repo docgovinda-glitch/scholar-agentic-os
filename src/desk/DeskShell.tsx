@@ -244,6 +244,8 @@ export default function DeskShell({
             <EvidenceLedgerPanel
               projectId={projectId}
               actor={session.status === "signed-in" ? (session.email ?? session.userId) : "unknown"}
+              userId={session.status === "signed-in" ? session.userId : undefined}
+              onOpenVault={onOpenVault}
               onApproved={(newRubric) => {
                 setClaimsRefreshToken((t) => t + 1);
                 if (newRubric) setRubric(newRubric);

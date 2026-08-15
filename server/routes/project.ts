@@ -890,10 +890,12 @@ async function runPremiumAnonymization(
 const SOURCE_TYPES = new Set(["scholarly", "official", "web", "media", "user_provided", "vault"]);
 const AUTHORITY_TIERS = new Set(["A", "B", "C", "D"]);
 
-/** Body of POST .../evidence-ledger/sources: a manually-added, already-known source. */
+const MANUAL_DISCOVERY_METHODS = new Set(["manual", "vault"]);
+
+/** Body of POST .../evidence-ledger/sources: a manually-added, already-known source — "manually added" covers both a user typing in a source by hand and a source the user pulled from their own Knowledge Vault (discoveredVia: "vault"), since the server never receives Vault contents either way. */
 function isValidManualSource(
   value: unknown
-): value is Omit<DiscoveredSource, "id" | "discoveredAt" | "discoveredVia"> {
+): value is Omit<DiscoveredSource, "id" | "discoveredAt" | "discoveredVia"> & { discoveredVia?: "manual" | "vault"; vaultItemId?: string } {
   if (typeof value !== "object" || value === null) return false;
   const s = value as Record<string, unknown>;
   if (typeof s.title !== "string" || s.title.trim().length === 0) return false;
@@ -904,6 +906,8 @@ function isValidManualSource(
   if (s.doi !== undefined && typeof s.doi !== "string") return false;
   if (s.venue !== undefined && typeof s.venue !== "string") return false;
   if (s.year !== undefined && typeof s.year !== "number") return false;
+  if (s.discoveredVia !== undefined && (typeof s.discoveredVia !== "string" || !MANUAL_DISCOVERY_METHODS.has(s.discoveredVia))) return false;
+  if (s.vaultItemId !== undefined && typeof s.vaultItemId !== "string") return false;
   return true;
 }
 
@@ -1646,7 +1650,12 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
           `${[...SOURCE_TYPES].join(", ")}), authorityTier (one of: ${[...AUTHORITY_TIERS].join(", ")}). Optional: url, doi, venue (strings), year (number).`,
       });
     }
-    const source: DiscoveredSource = { ...req.body, id: `src-${crypto.randomUUID()}`, discoveredVia: "manual", discoveredAt: new Date().toISOString() };
+    const source: DiscoveredSource = {
+      ...req.body,
+      id: `src-${crypto.randomUUID()}`,
+      discoveredVia: req.body.discoveredVia ?? "manual",
+      discoveredAt: new Date().toISOString(),
+    };
     try {
       const evidenceLedger = discoverSource(record.evidenceLedger, source);
       const gates = recomputeG2({ ...record, evidenceLedger });

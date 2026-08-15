@@ -395,7 +395,7 @@ export function getEvidenceLedger(projectId: string): Promise<EvidenceLedger> {
 
 export function addManualSource(
   projectId: string,
-  source: Omit<DiscoveredSource, "id" | "discoveredAt" | "discoveredVia">
+  source: Omit<DiscoveredSource, "id" | "discoveredAt" | "discoveredVia"> & { discoveredVia?: "manual" | "vault"; vaultItemId?: string }
 ): Promise<EvidenceLedger> {
   return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/evidence-ledger/sources`, "POST", source).then((r) => json(r));
 }

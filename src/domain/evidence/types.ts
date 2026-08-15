@@ -44,6 +44,8 @@ export interface DiscoveredSource {
   authorityTier: AuthorityTier;
   discoveredVia: DiscoveryMethod;
   discoveredAt: string;
+  /** The Knowledge Vault item this source was pulled from, present only when discoveredVia is "vault" — traceability back to the researcher's own saved item, never resolved server-side (the Vault's contents are client-side encrypted; the server never sees them). */
+  vaultItemId?: string;
 }
 
 export type EvidenceState = "discovered" | "extracted" | "verified" | "proposed" | "user_approved" | "citable";

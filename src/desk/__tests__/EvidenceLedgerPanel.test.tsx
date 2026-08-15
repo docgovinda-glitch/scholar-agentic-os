@@ -3,6 +3,14 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import EvidenceLedgerPanel from "../evidence/EvidenceLedgerPanel";
+import * as vaultContents from "../../services/vaultContents";
+
+vi.mock("../../services/vaultContents", () => ({
+  isVaultUnlocked: vi.fn(() => true),
+  listVaultItems: vi.fn(),
+  searchVaultItems: (items: Array<{ title: string }>, q: string) =>
+    q.trim() ? items.filter((i) => i.title.toLowerCase().includes(q.toLowerCase())) : items,
+}));
 
 const originalFetch = global.fetch;
 
@@ -120,5 +128,78 @@ describe("Desk — EvidenceLedgerPanel", () => {
 
     await waitFor(() => expect(onApproved).toHaveBeenCalled());
     expect(await screen.findByText("Citable")).toBeInTheDocument();
+  });
+
+  describe("Add from my Vault", () => {
+    afterEach(() => vi.mocked(vaultContents.listVaultItems).mockReset());
+
+    it("does not offer the Vault picker without a userId (no session yet)", async () => {
+      mockFetch((url) => {
+        if (url.includes("/evidence-ledger") && !url.includes("claims")) return { status: 200, body: { sources: [], items: [] } };
+        if (url.includes("/claims")) return { status: 200, body: { claims: [], bindings: [] } };
+        return { status: 500, body: {} };
+      });
+      render(<EvidenceLedgerPanel projectId={PROJECT_ID} actor="u1" />);
+      await screen.findByText("Sources (0)");
+      expect(screen.queryByRole("button", { name: "Add from my Vault" })).not.toBeInTheDocument();
+    });
+
+    it("shows a locked message with an Open Vault action when the Vault hasn't been unlocked", async () => {
+      vi.mocked(vaultContents.isVaultUnlocked).mockReturnValue(false);
+      const onOpenVault = vi.fn();
+      mockFetch((url) => {
+        if (url.includes("/evidence-ledger") && !url.includes("claims")) return { status: 200, body: { sources: [], items: [] } };
+        if (url.includes("/claims")) return { status: 200, body: { claims: [], bindings: [] } };
+        return { status: 500, body: {} };
+      });
+      render(<EvidenceLedgerPanel projectId={PROJECT_ID} actor="u1" userId="user-1" onOpenVault={onOpenVault} />);
+      await screen.findByText("Sources (0)");
+
+      fireEvent.click(screen.getByRole("button", { name: "Add from my Vault" }));
+      expect(await screen.findByText(/Your Vault is locked/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Open Vault" }));
+      expect(onOpenVault).toHaveBeenCalled();
+      vi.mocked(vaultContents.isVaultUnlocked).mockReturnValue(true);
+    });
+
+    it("lists unlocked Vault items, searches them, and adds one as a source tagged discoveredVia: vault", async () => {
+      vi.mocked(vaultContents.isVaultUnlocked).mockReturnValue(true);
+      vi.mocked(vaultContents.listVaultItems).mockResolvedValue([
+        { id: "vault-1", title: "My Saved Note", content: "Some saved content.", citation: "Author (2024)", createdAt: "now" },
+        { id: "vault-2", title: "Another Item", content: "Other content.", createdAt: "now" },
+      ]);
+      let capturedBody: Record<string, unknown> | null = null;
+      mockFetch((url, method, body) => {
+        if (url.endsWith("/claims") && method === "GET") return { status: 200, body: { claims: [], bindings: [] } };
+        if (url.includes("/evidence-ledger/sources") && method === "POST") {
+          capturedBody = body as Record<string, unknown>;
+          return {
+            status: 201,
+            body: {
+              sources: [{ id: "src-vault-1", title: "My Saved Note", authors: [], sourceType: "vault", authorityTier: "D", discoveredVia: "vault", vaultItemId: "vault-1", discoveredAt: "now" }],
+              items: [],
+            },
+          };
+        }
+        if (url.includes("/evidence-ledger")) return { status: 200, body: { sources: [], items: [] } };
+        return { status: 500, body: {} };
+      });
+      render(<EvidenceLedgerPanel projectId={PROJECT_ID} actor="u1" userId="user-1" />);
+      await screen.findByText("Sources (0)");
+
+      fireEvent.click(screen.getByRole("button", { name: "Add from my Vault" }));
+      await screen.findByText("My Saved Note");
+      expect(screen.getByText("Another Item")).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText("Search your Vault"), { target: { value: "Saved" } });
+      expect(screen.queryByText("Another Item")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+      await waitFor(() => expect(capturedBody).not.toBeNull());
+      expect(capturedBody).toMatchObject({ title: "My Saved Note", sourceType: "vault", discoveredVia: "vault", vaultItemId: "vault-1" });
+      expect(await screen.findByText("Added")).toBeInTheDocument();
+      expect(screen.getByText("Sources (1)")).toBeInTheDocument();
+    });
   });
 });

@@ -168,6 +168,7 @@ export interface DiscoveredSource {
   authorityTier: AuthorityTier;
   discoveredVia: DiscoveryMethod;
   discoveredAt: string;
+  vaultItemId?: string;
 }
 
 export type EvidenceState = "discovered" | "extracted" | "verified" | "proposed" | "user_approved" | "citable";

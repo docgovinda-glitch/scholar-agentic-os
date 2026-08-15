@@ -10,6 +10,7 @@ import {
   rejectEvidenceItem,
   verifyEvidenceItem,
 } from "../api";
+import { isVaultUnlocked, listVaultItems, searchVaultItems, type VaultItem } from "../../services/vaultContents";
 import type { Claim, DiscoveredSource, EvidenceItem, EvidenceLedger, EvidenceState, RubricReport, SupportStrength } from "../types";
 
 /**
@@ -35,12 +36,18 @@ const STRENGTHS: SupportStrength[] = ["strong", "moderate", "weak", "contradicts
 export default function EvidenceLedgerPanel({
   projectId,
   actor,
+  userId,
   onApproved,
+  onOpenVault,
 }: {
   projectId: string;
   actor: string;
+  /** Needed to read the signed-in user's own Knowledge Vault (services/vaultContents.ts, keyed per-user) for the "Browse my Vault" picker below. Absent (e.g. no session yet) just hides that picker rather than erroring. */
+  userId?: string;
   /** Called after a successful approve() — a claim binding was just added and, if the project already has a document, the Rubric was recomputed against it. The parent decides what else needs refreshing (e.g. re-rendering ClaimsPanel, gate state). */
   onApproved?: (rubric?: RubricReport) => void;
+  /** Opens the Vault screen so the user can unlock it — offered when the picker below finds the Vault locked. */
+  onOpenVault?: () => void;
 }) {
   const [ledger, setLedger] = useState<EvidenceLedger | null>(null);
   // Fetched independently from ClaimsPanel's own copy of the graph, on
@@ -55,6 +62,17 @@ export default function EvidenceLedgerPanel({
   const [via, setVia] = useState<"arxiv" | "web_search">("arxiv");
   const [manualTitle, setManualTitle] = useState("");
   const [showManual, setShowManual] = useState(false);
+
+  // Vault picker: pulls from the same client-side-decrypted item list
+  // VaultScreen itself reads (services/vaultContents.ts) — the server never
+  // sees Vault contents, so this list is fetched fresh here rather than
+  // coming from any project-scoped state.
+  const [showVaultPicker, setShowVaultPicker] = useState(false);
+  const [vaultItems, setVaultItems] = useState<VaultItem[] | null>(null);
+  const [vaultQuery, setVaultQuery] = useState("");
+  const [vaultLocked, setVaultLocked] = useState(false);
+  const [vaultError, setVaultError] = useState<string | null>(null);
+  const [addedVaultItemIds, setAddedVaultItemIds] = useState<Set<string>>(new Set());
 
   const [extractingSourceId, setExtractingSourceId] = useState<string | null>(null);
   const [quoteDraft, setQuoteDraft] = useState("");
@@ -110,6 +128,31 @@ export default function EvidenceLedgerPanel({
         setLedger(l);
         setManualTitle("");
         setShowManual(false);
+      }
+    );
+  }
+
+  function handleToggleVaultPicker() {
+    const opening = !showVaultPicker;
+    setShowVaultPicker(opening);
+    if (!opening || !userId || vaultItems !== null) return;
+    if (!isVaultUnlocked()) {
+      setVaultLocked(true);
+      return;
+    }
+    setVaultLocked(false);
+    setVaultError(null);
+    listVaultItems(userId)
+      .then(setVaultItems)
+      .catch((e) => setVaultError((e as Error).message));
+  }
+
+  function handleAddFromVault(item: VaultItem) {
+    run(
+      () => addManualSource(projectId, { title: item.title, authors: [], sourceType: "vault", authorityTier: "D", discoveredVia: "vault", vaultItemId: item.id }),
+      (l) => {
+        setLedger(l);
+        setAddedVaultItemIds((prev) => new Set(prev).add(item.id));
       }
     );
   }
@@ -200,6 +243,11 @@ export default function EvidenceLedgerPanel({
           <button type="button" onClick={() => setShowManual((v) => !v)} className="text-xs text-[color:var(--accent)] hover:text-[color:var(--accent-hover)] cursor-pointer">
             {showManual ? "Cancel" : "Add a known source manually"}
           </button>
+          {userId && (
+            <button type="button" onClick={handleToggleVaultPicker} className="text-xs text-[color:var(--accent)] hover:text-[color:var(--accent-hover)] cursor-pointer">
+              {showVaultPicker ? "Cancel" : "Add from my Vault"}
+            </button>
+          )}
         </form>
 
         {showManual && (
@@ -216,6 +264,60 @@ export default function EvidenceLedgerPanel({
               Add
             </button>
           </form>
+        )}
+
+        {showVaultPicker && (
+          <div className="mt-2 rounded-[var(--radius-md)] border border-[color:var(--border-default)] p-3">
+            {vaultLocked ? (
+              <div>
+                <p className="text-xs text-[color:var(--text-secondary)]">Your Vault is locked. Unlock it, then come back here.</p>
+                {onOpenVault && (
+                  <button type="button" onClick={onOpenVault} className="mt-1.5 text-xs text-[color:var(--accent)] hover:text-[color:var(--accent-hover)] cursor-pointer">
+                    Open Vault
+                  </button>
+                )}
+              </div>
+            ) : vaultError ? (
+              <p role="alert" className="text-xs text-[color:var(--state-danger)]">{vaultError}</p>
+            ) : vaultItems === null ? (
+              <p className="text-xs text-[color:var(--text-muted)]">Loading your Vault…</p>
+            ) : vaultItems.length === 0 ? (
+              <p className="text-xs text-[color:var(--text-muted)]">Your Vault is empty.</p>
+            ) : (
+              <>
+                <input
+                  aria-label="Search your Vault"
+                  type="text"
+                  value={vaultQuery}
+                  onChange={(e) => setVaultQuery(e.target.value)}
+                  placeholder="Search your Vault…"
+                  className="w-full px-3 py-2 text-sm"
+                />
+                <ul className="mt-2 flex max-h-64 flex-col gap-1.5 overflow-y-auto">
+                  {searchVaultItems(vaultItems, vaultQuery).map((item) => (
+                    <li key={item.id} className="flex items-center justify-between gap-2 rounded border border-[color:var(--border-subtle)] px-2 py-1.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs text-[color:var(--text-primary)]">{item.title}</p>
+                        {item.citation && <p className="truncate text-[10px] text-[color:var(--text-muted)]">{item.citation}</p>}
+                      </div>
+                      {addedVaultItemIds.has(item.id) ? (
+                        <span className="shrink-0 text-[10px] text-[color:var(--state-success)]">Added</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleAddFromVault(item)}
+                          disabled={busy}
+                          className="shrink-0 rounded border border-[color:var(--border-default)] px-2 py-1 text-[10px] cursor-pointer"
+                        >
+                          Add
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
         )}
 
         {error && <p role="alert" className="mt-2 text-xs text-[color:var(--state-danger)]">{error}</p>}

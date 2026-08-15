@@ -78,6 +78,25 @@ describe("POST /api/projects/:id/evidence-ledger/sources — manual add", () => 
     expect(res.body.sources[0].discoveredVia).toBe("manual");
     expect(res.body.sources[0].id).toMatch(/^src-/);
   });
+
+  it("accepts an explicit discoveredVia: vault, with a vaultItemId for traceability back to the Knowledge Vault item — the server never sees Vault contents, only this pointer", async () => {
+    const projectId = await createProject();
+    const res = await addManualSource(projectId, {
+      sourceType: "vault",
+      authorityTier: "D",
+      discoveredVia: "vault",
+      vaultItemId: "vault-item-123",
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.sources[0].discoveredVia).toBe("vault");
+    expect(res.body.sources[0].vaultItemId).toBe("vault-item-123");
+  });
+
+  it("400s on a discoveredVia value other than manual/vault — the server assigns every other method itself (arxiv, web_search never arrive via this route)", async () => {
+    const projectId = await createProject();
+    const res = await addManualSource(projectId, { discoveredVia: "arxiv" });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("POST /api/projects/:id/evidence-ledger/discover", () => {
