@@ -190,6 +190,33 @@ describe("POST /api/projects/:id/manuscript/next-section — BYOK path", () => {
     expect(capturedPrompt).toContain("X was observed in 40% of cases.");
     expect(res.body.generationJob.sections[0].citedEvidenceIds).toEqual([evidenceId]);
   });
+
+  it("two overlapping requests for the same project each generate a DIFFERENT section rather than one clobbering the other's checkpoint", async () => {
+    const projectId = await createProject();
+    await request(app).post(`/api/projects/${projectId}/manuscript/start`).send({});
+    await grantConsent(projectId, "openai");
+
+    // A single shared mock, since both concurrent requests hit the same
+    // global.fetch — the section's actual TITLE comes from the server-
+    // computed context packet (see generate.ts:178's `key: input.packet.
+    // section.key`), not from this response body, so one canned body is
+    // enough to prove which two DISTINCT sections actually got checkpointed.
+    global.fetch = vi.fn().mockResolvedValue(sectionResponse("Section text.", "Section memory.", []));
+
+    const [first, second] = await Promise.all([
+      request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" }),
+      request(app).post(`/api/projects/${projectId}/manuscript/next-section`).send({ provider: "openai", apiKey: "sk-test" }),
+    ]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    // Without withProjectLock serializing + re-reading, both requests would
+    // independently see sections.length === 0, both generate "introduction",
+    // and the loser's store.save would be silently overwritten — leaving
+    // exactly ONE section despite two successful-looking 200 responses and
+    // two real (paid) AI calls. Two DISTINCT keys is the actual proof.
+    expect(second.body.generationJob.sections.map((s: { key: string }) => s.key)).toEqual(["introduction", "methods"]);
+  });
 });
 
 describe("POST /api/projects/:id/manuscript/next-section — Premium path", () => {
