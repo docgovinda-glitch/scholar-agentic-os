@@ -38,13 +38,13 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 /** GET/DELETE with credentials attached. */
-async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
+export async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const headers = { ...(init.headers as Record<string, string> | undefined), ...(await authHeaders()) };
   return fetch(input, { ...init, headers });
 }
 
 /** POST/PUT/PATCH with a JSON body. */
-function authedJsonFetch(input: string, method: string, body: unknown): Promise<Response> {
+export function authedJsonFetch(input: string, method: string, body: unknown): Promise<Response> {
   return authedFetch(input, {
     method,
     headers: { "Content-Type": "application/json" },

@@ -8,6 +8,7 @@ import StageNavigation from "./StageNavigation";
 import ContextPanel from "./ContextPanel";
 import DefinitionStage from "./stages/DefinitionStage";
 import PlaceholderStage from "./stages/PlaceholderStage";
+import LiteratureStage from "./stages/LiteratureStage";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 
 /**
@@ -214,6 +215,8 @@ function renderStage(
           onSaved={(updated) => setProject(updated)}
         />
       );
+    case "literature":
+      return <LiteratureStage stage={stage} projectId={projectId} />;
     default:
       return <PlaceholderStage stage={stage} />;
   }

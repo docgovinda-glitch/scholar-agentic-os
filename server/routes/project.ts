@@ -58,6 +58,9 @@ import type { ProjectRecord } from "../../src/services/store/types.ts";
 import { exportDocument } from "../../src/app/export/export.ts";
 import type { ExportFormat } from "../../src/app/export/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
+
+import { agenticRouter } from "./project/agentic.js";
+
 import { emptyDocument } from "../../src/domain/document/model.ts";
 import { registerSubmissionsRoutes } from "./project/submissions.ts";
 import { registerClaimsRoutes } from "./project/claims.ts";
@@ -2081,5 +2084,8 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
   }));
 
+
+  // Mount the new 25-stage agentic pipeline router
+  app.use("/api/projects/:id/agent", agenticRouter);
 
 }
