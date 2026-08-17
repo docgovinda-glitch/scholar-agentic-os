@@ -1,6 +1,7 @@
 import express from "express";
 import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
 import { buildReport, compileRubricFromOutputType } from "../../../src/app/rubric/rubric.ts";
+import { catalog } from "../../../src/app/atlas/atlas.ts";
 
 /**
  * Exposes a dedicated pipeline for checking a manuscript against known Journal
@@ -27,10 +28,10 @@ export function registerJournalComplianceRoutes(app: express.Express, projectLim
     }
 
     // Compile rules based on output type and venue requirements
-    const rules = compileRubricFromOutputType(record.outputTypeSpec, record.journalRequirements);
+    const rules = compileRubricFromOutputType(catalog.getOrThrow(record.outputTypeId), record.journalRequirements);
     
     // Evaluate the document against the compiled rubric
-    const report = buildReport(record.document, rules, record.answers);
+    const report = buildReport(rules, record.document);
     
     res.json({ report });
   }));

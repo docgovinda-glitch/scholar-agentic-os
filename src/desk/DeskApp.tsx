@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams, useOutletContext } from "react-router-dom";
 import AccountSettingsScreen from "./account/AccountSettingsScreen";
 import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
@@ -14,6 +14,10 @@ import {
   VerifyEmailRoute,
 } from "./auth/AuthFlow";
 import DeskShell, { type DeskShellView } from "./DeskShell";
+import ResearchWorkspace from "./workspace/ResearchWorkspace";
+import type { ResearchStage } from "./workspace/types";
+import { RESEARCH_STAGES } from "./workspace/types";
+import { getProject } from "./api";
 import ProjectListScreen from "./ProjectListScreen";
 import VaultSetupScreen from "./setup/VaultSetupScreen";
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
@@ -29,10 +33,14 @@ function isSectionId(value: string | undefined): value is SectionId {
   return SECTION_IDS.includes(value as SectionId);
 }
 
-const DESK_SHELL_VIEWS: readonly DeskShellView[] = ["intake", "requirements", "document", "evidence", "manuscript", "progress", "submissions"];
+const DESK_SHELL_VIEWS: readonly DeskShellView[] = ["definition", "requirements", "document", "evidence", "manuscript", "progress", "submissions"];
 
 function isDeskShellView(value: string | undefined): value is DeskShellView {
   return DESK_SHELL_VIEWS.includes(value as DeskShellView);
+}
+
+function isResearchStage(value: string | undefined): value is ResearchStage {
+  return RESEARCH_STAGES.some((s) => s.id === value);
 }
 
 /** Where to return to when closing Settings/Vault/AI Access — passed as router state on the way in, since these overlays aren't meant to grow their own history entries. */
@@ -146,26 +154,85 @@ function ProjectRoute() {
   const location = useLocation();
   const device = useDeviceClass();
   const { projectId, view } = useParams<{ projectId: string; view?: string }>();
-  // Stable across renders unless projectId itself changes — DeskShell's
-  // load() takes a dependency on this, and a fresh identity every render
-  // would re-trigger its project fetch on every unrelated re-render.
-  const onViewChange = useCallback(
+  const [outputTypeId, setOutputTypeId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (projectId) {
+      getProject(projectId)
+        .then((p) => {
+          if (active) setOutputTypeId(p.outputTypeId);
+        })
+        .catch((e) => {
+          if (active) setError(e.message);
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
+
+  const onDeskShellViewChange = useCallback(
     (next: DeskShellView, options?: { replace?: boolean }) => {
       navigate(`/projects/${projectId}/${next}`, options);
     },
     [navigate, projectId]
   );
+
+  const onResearchStageChange = useCallback(
+    (next: ResearchStage, options?: { replace?: boolean }) => {
+      navigate(`/projects/${projectId}/${next}`, options);
+    },
+    [navigate, projectId]
+  );
+
   // Guaranteed by the route pattern (":projectId" only matches with a value)
   // — this is TypeScript narrowing, not a real fallback path.
   if (!projectId) return <Navigate to="/projects" replace />;
 
   if (device.isMobile) return <DeskPocketMount projectId={projectId} />;
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)]">
+        <div className="text-sm text-[color:var(--state-danger)] font-medium p-4 border border-[color:var(--state-danger)] rounded-md bg-[color:var(--state-danger-subtle)]">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!outputTypeId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)]">
+        <div className="flex items-center gap-3">
+          <div className="spinner" />
+          <span className="text-sm text-[color:var(--text-muted)] font-medium">Loading project...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (outputTypeId === "OT-10") {
+    return (
+      <ResearchWorkspace
+        projectId={projectId}
+        initialStage={isResearchStage(view) ? view : null}
+        onStageChange={onResearchStageChange}
+        onClose={() => navigate("/projects")}
+        onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+        onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
+        onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
+      />
+    );
+  }
+
   return (
     <DeskShell
       projectId={projectId}
       view={isDeskShellView(view) ? view : null}
-      onViewChange={onViewChange}
+      onViewChange={onDeskShellViewChange}
       onClose={() => navigate("/projects")}
       onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
       onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
