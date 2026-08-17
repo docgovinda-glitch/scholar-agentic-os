@@ -11,6 +11,10 @@ import PlaceholderStage from "./stages/PlaceholderStage";
 import LiteratureStage from "./stages/LiteratureStage";
 import GapIdentificationStage from "./stages/GapIdentificationStage";
 import TitleSelectionStage from "./stages/TitleSelectionStage";
+import TitleLockStage from "./stages/TitleLockStage";
+import VaultSourcesStage from "./stages/VaultSourcesStage";
+import AdditionalDataStage from "./stages/AdditionalDataStage";
+import EvidenceExtractionStage from "./stages/EvidenceExtractionStage";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 
 /**
@@ -223,6 +227,14 @@ function renderStage(
       return <GapIdentificationStage stage={stage} projectId={projectId} />;
     case "title_selection":
       return <TitleSelectionStage stage={stage} projectId={projectId} />;
+    case "title_lock":
+      return <TitleLockStage stage={stage} projectId={projectId} />;
+    case "vault_sources":
+      return <VaultSourcesStage stage={stage} projectId={projectId} />;
+    case "additional_data":
+      return <AdditionalDataStage stage={stage} projectId={projectId} />;
+    case "evidence_extraction":
+      return <EvidenceExtractionStage stage={stage} projectId={projectId} />;
     default:
       return <PlaceholderStage stage={stage} />;
   }

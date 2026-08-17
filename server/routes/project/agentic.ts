@@ -142,4 +142,84 @@ router.post("/titles", async (req: express.Request<{ id: string }>, res) => {
   res.json({ ok: true, data: proposedTitles });
 });
 
+// POST /api/projects/:id/agent/vault-sources
+router.post("/vault-sources", async (req: express.Request<{ id: string }>, res) => {
+  const projectId = req.params.id;
+  if (!projectId) return res.status(400).json({ error: "Missing project ID" });
+
+  const project = await getProjectStore().get(projectId);
+  if (!project) return res.status(404).json({ error: "Project not found" });
+
+  await new Promise((resolve) => setTimeout(resolve, 3800));
+
+  const discoveredSources = [
+    {
+      id: "source-001",
+      title: "Impact of AI Coding Assistants on Developer Well-being",
+      author: "Chen et al.",
+      year: 2024,
+      relevance_score: 95,
+      type: "PDF Document"
+    },
+    {
+      id: "source-002",
+      title: "The Epistemological Boundary of Algorithmic Code Review",
+      author: "Smith & Zhao",
+      year: 2025,
+      relevance_score: 89,
+      type: "Journal Article"
+    },
+    {
+      id: "source-003",
+      title: "Measuring Semantic Drift in Large Language Models",
+      author: "O'Connor",
+      year: 2023,
+      relevance_score: 82,
+      type: "Conference Proceeding"
+    }
+  ];
+
+  res.json({ ok: true, data: discoveredSources });
+});
+
+// POST /api/projects/:id/agent/evidence-extraction
+router.post("/evidence-extraction", async (req: express.Request<{ id: string }>, res) => {
+  const projectId = req.params.id;
+  if (!projectId) return res.status(400).json({ error: "Missing project ID" });
+
+  const project = await getProjectStore().get(projectId);
+  if (!project) return res.status(404).json({ error: "Project not found" });
+
+  await new Promise((resolve) => setTimeout(resolve, 5500));
+
+  const extractedEvidence = [
+    {
+      id: "ev-001",
+      quote: "Developers utilizing LLM-based tools reported a 42% reduction in cognitive load during routine qualitative coding tasks.",
+      source: "Chen et al., 2024 (p. 14)",
+      claim_type: "Empirical Support",
+      strength: "Strong",
+      tags: ["cognitive load", "efficiency"]
+    },
+    {
+      id: "ev-002",
+      quote: "However, relying heavily on algorithmic peer review introduces a 'semantic homogeneity' that stifles novel methodological approaches.",
+      source: "Smith & Zhao, 2025 (p. 211)",
+      claim_type: "Counter-Evidence",
+      strength: "Moderate",
+      tags: ["bias", "methodology"]
+    },
+    {
+      id: "ev-003",
+      quote: "Semantic drift over a 12-month period was statistically significant (p < 0.01) when models were not anchored to grounded theoretical frameworks.",
+      source: "O'Connor, 2023 (p. 5)",
+      claim_type: "Statistical",
+      strength: "Strong",
+      tags: ["semantic drift", "longitudinal"]
+    }
+  ];
+
+  res.json({ ok: true, data: extractedEvidence });
+});
+
 export { router as agenticRouter };
