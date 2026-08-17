@@ -62,6 +62,7 @@ import { emptyDocument } from "../../src/domain/document/model.ts";
 import { registerSubmissionsRoutes } from "./project/submissions.ts";
 import { registerClaimsRoutes } from "./project/claims.ts";
 import { registerEvidenceRoutes } from "./project/evidence.ts";
+import { registerJournalComplianceRoutes } from "./project/journal_compliance.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
 import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, markClaimUnsupported, ClaimGraphError } from "../../src/domain/claim/graph.ts";
 import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
@@ -1016,9 +1017,10 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   // and overwrite anyone else's by walking the id space, and drive the
   app.use("/api/projects", requireAuth);
 
-  registerSubmissionsRoutes(app, projectLimit);
   registerClaimsRoutes(app, projectLimit);
   registerEvidenceRoutes(app, projectLimit);
+  registerSubmissionsRoutes(app, projectLimit);
+  registerJournalComplianceRoutes(app, projectLimit);
   // model-backed export path. The Atlas catalog routes below are deliberately
   // left public: they are a static list of output types with no user data in
   // them, and the "choose what you are writing" screen reads them.

@@ -1,0 +1,37 @@
+import express from "express";
+import { asyncRoute, loadOwnedProject, getSharedStore } from "../project.ts";
+import { buildReport, compileRubricFromOutputType } from "../../../src/app/rubric/rubric.ts";
+
+/**
+ * Exposes a dedicated pipeline for checking a manuscript against known Journal
+ * Guidelines (word limits, section requirements, citation styles) that were 
+ * captured during Phase 1. 
+ */
+export function registerJournalComplianceRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
+  const store = getSharedStore();
+
+  app.get("/api/projects/:id/journal-compliance-report", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+
+    if (!record.journalRequirements) {
+      return res.status(400).json({
+        error: "Project has no journal requirements captured.",
+      });
+    }
+
+    if (!record.document) {
+      return res.status(400).json({
+        error: "Project has no document to evaluate.",
+      });
+    }
+
+    // Compile rules based on output type and venue requirements
+    const rules = compileRubricFromOutputType(record.outputTypeSpec, record.journalRequirements);
+    
+    // Evaluate the document against the compiled rubric
+    const report = buildReport(record.document, rules, record.answers);
+    
+    res.json({ report });
+  }));
+}
