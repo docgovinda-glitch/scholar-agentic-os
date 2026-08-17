@@ -9,6 +9,8 @@ import ContextPanel from "./ContextPanel";
 import DefinitionStage from "./stages/DefinitionStage";
 import PlaceholderStage from "./stages/PlaceholderStage";
 import LiteratureStage from "./stages/LiteratureStage";
+import GapIdentificationStage from "./stages/GapIdentificationStage";
+import TitleSelectionStage from "./stages/TitleSelectionStage";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 
 /**
@@ -217,6 +219,10 @@ function renderStage(
       );
     case "literature":
       return <LiteratureStage stage={stage} projectId={projectId} />;
+    case "gap_identification":
+      return <GapIdentificationStage stage={stage} projectId={projectId} />;
+    case "title_selection":
+      return <TitleSelectionStage stage={stage} projectId={projectId} />;
     default:
       return <PlaceholderStage stage={stage} />;
   }

@@ -68,4 +68,78 @@ router.post("/literature", async (req: express.Request<{ id: string }>, res) => 
   });
 });
 
+// POST /api/projects/:id/agent/gaps
+router.post("/gaps", async (req: express.Request<{ id: string }>, res) => {
+  const projectId = req.params.id;
+  if (!projectId) return res.status(400).json({ error: "Missing project ID" });
+
+  const project = await getProjectStore().get(projectId);
+  if (!project) return res.status(404).json({ error: "Project not found" });
+
+  await new Promise((resolve) => setTimeout(resolve, 3500));
+
+  const identifiedGaps = [
+    {
+      id: "gap-001",
+      gap_type: "empirical",
+      description: "Lack of longitudinal studies assessing the long-term impact of multi-agent LLM systems on qualitative coding fatigue.",
+      importance_score: 92,
+      status: "identified"
+    },
+    {
+      id: "gap-002",
+      gap_type: "theoretical",
+      description: "Absence of a unified epistemological framework defining the boundary between 'assisted review' and 'artificial peer review'.",
+      importance_score: 85,
+      status: "identified"
+    },
+    {
+      id: "gap-003",
+      gap_type: "methodological",
+      description: "Current methods rely heavily on self-reported developer metrics rather than standardized semantic-drift benchmarking in PKM systems.",
+      importance_score: 78,
+      status: "identified"
+    }
+  ];
+
+  res.json({ ok: true, data: identifiedGaps });
+});
+
+// POST /api/projects/:id/agent/titles
+router.post("/titles", async (req: express.Request<{ id: string }>, res) => {
+  const projectId = req.params.id;
+  if (!projectId) return res.status(400).json({ error: "Missing project ID" });
+
+  const project = await getProjectStore().get(projectId);
+  if (!project) return res.status(404).json({ error: "Project not found" });
+
+  await new Promise((resolve) => setTimeout(resolve, 4000));
+
+  const proposedTitles = [
+    {
+      id: "title-001",
+      title_text: "Beyond the Copilot",
+      subtitle_text: "A Longitudinal Analysis of Multi-Agent Systems on Researcher Fatigue in Qualitative Coding",
+      rationale: "Positions the research dynamically while clearly stating the empirical methodology and target outcome.",
+      status: "proposed"
+    },
+    {
+      id: "title-002",
+      title_text: "The Epistemology of Artificial Peer Review",
+      subtitle_text: "Defining Boundaries and Evaluating Bias in Automated Academic Critique",
+      rationale: "Strong, academically rigorous title that directly addresses the theoretical gap identified in the literature.",
+      status: "proposed"
+    },
+    {
+      id: "title-003",
+      title_text: "Measuring Semantic Drift in Vector-Backed Knowledge Vaults",
+      subtitle_text: "Towards a Standardized Methodological Framework",
+      rationale: "Highly descriptive and technical, perfect for a methodology-focused journal.",
+      status: "proposed"
+    }
+  ];
+
+  res.json({ ok: true, data: proposedTitles });
+});
+
 export { router as agenticRouter };
