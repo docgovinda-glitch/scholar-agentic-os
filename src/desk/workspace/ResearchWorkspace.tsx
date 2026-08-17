@@ -220,48 +220,60 @@ function renderStage(
 }
 
 function computeStageStatuses(project: ProjectView | null): Record<ResearchStage, StageStatus> {
-  if (!project) {
-    return {
-      definition: "active",
-      literature: "locked",
-      gap: "locked",
-      evidence: "locked",
-      analysis: "locked",
-      journal: "locked",
-      draft: "locked",
-      review: "locked",
-      revision: "locked",
-      final: "locked",
-    };
-  }
+  const allLocked: Record<ResearchStage, StageStatus> = {
+    definition: "active",
+    literature: "locked", gap_identification: "locked", gap_selection: "locked", title_selection: "locked", title_lock: "locked",
+    vault_sources: "locked", source_approval_vault: "locked", additional_data: "locked", evidence_extraction: "locked", external_research: "locked", source_approval_external: "locked", evidence_analysis: "locked", manual_review: "locked",
+    journal_discovery: "locked", journal_requirements: "locked", draft: "locked", citation_audit: "locked", originality_check: "locked", draft_preview: "locked",
+    peer_review: "locked", revision: "locked",
+    final_editor: "locked", publication_readiness: "locked", export: "locked",
+  };
 
-  const g0 = project.gates.find((g) => g.gate === "G0");
-  const g1 = project.gates.find((g) => g.gate === "G1");
-  const g2 = project.gates.find((g) => g.gate === "G2");
-  const g3 = project.gates.find((g) => g.gate === "G3");
-  const g4 = project.gates.find((g) => g.gate === "G4");
-  const g5 = project.gates.find((g) => g.gate === "G5");
-  const g6 = project.gates.find((g) => g.gate === "G6");
+  if (!project) return allLocked;
 
-  const g0Done = g0?.status === "signed_off";
-  const g1Done = g1?.status === "signed_off";
-  const g2Done = g2?.status === "signed_off";
-  const g5Done = g5?.status === "signed_off";
-  const g6Done = g6?.status === "signed_off";
+  const g0Done = project.gates.some((g) => g.gate === "G0" && g.status === "signed_off");
+  const g1Done = project.gates.some((g) => g.gate === "G1" && g.status === "signed_off");
+  const g2Done = project.gates.some((g) => g.gate === "G2" && g.status === "signed_off");
+  const g5Done = project.gates.some((g) => g.gate === "G5" && g.status === "signed_off");
+  const g6Done = project.gates.some((g) => g.gate === "G6" && g.status === "signed_off");
 
-  // Warning-gated approach: downstream stages are "available" (clickable with
-  // warning) once previous stages have some progress, and "completed" when
-  // their gate is signed off. Only stages with zero foundation are "locked".
+  // Phase 1 is always available, progressively unlocked.
+  // We'll mark completed stages if the gate is done, else available.
+  const p1 = g0Done ? "completed" : "available";
+  const p2 = g0Done ? (g2Done ? "completed" : "available") : "locked";
+  const p3 = g2Done ? "available" : "locked"; // Need evidence to draft
+  const p4 = project.hasDocument ? (g5Done ? "completed" : "available") : "locked";
+  const p5 = g5Done ? (g6Done ? "completed" : "available") : "locked";
+
   return {
     definition: g0Done ? "completed" : "active",
-    literature: g0Done ? "available" : "available",  // always accessible, shows warning if definition incomplete
-    gap: g0Done ? "available" : "available",
-    evidence: g0Done ? (g2Done ? "completed" : "available") : "available",
-    analysis: g2Done ? "available" : "available",
-    journal: g0Done ? (g1Done ? "completed" : "available") : "available",
-    draft: g1Done && g2Done ? "available" : "available",
-    review: project.hasDocument ? (g5Done ? "completed" : "available") : "locked",
-    revision: g5Done ? "available" : "locked",
-    final: g6Done ? "completed" : (project.hasDocument ? "available" : "locked"),
+    literature: p1,
+    gap_identification: p1,
+    gap_selection: p1,
+    title_selection: p1,
+    title_lock: p1,
+    
+    vault_sources: p2,
+    source_approval_vault: p2,
+    additional_data: p2,
+    evidence_extraction: p2,
+    external_research: p2,
+    source_approval_external: p2,
+    evidence_analysis: p2,
+    manual_review: p2,
+    
+    journal_discovery: p3,
+    journal_requirements: g1Done ? "completed" : p3,
+    draft: p3,
+    citation_audit: p3,
+    originality_check: p3,
+    draft_preview: p3,
+    
+    peer_review: p4,
+    revision: p4,
+    
+    final_editor: p5,
+    publication_readiness: g6Done ? "completed" : p5,
+    export: g6Done ? "available" : "locked",
   };
 }

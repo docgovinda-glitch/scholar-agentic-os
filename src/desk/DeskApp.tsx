@@ -16,7 +16,7 @@ import {
 import DeskShell, { type DeskShellView } from "./DeskShell";
 import ResearchWorkspace from "./workspace/ResearchWorkspace";
 import type { ResearchStage } from "./workspace/types";
-import { RESEARCH_STAGES } from "./workspace/types";
+import { STAGE_MAP } from "./workspace/types";
 import { getProject } from "./api";
 import ProjectListScreen from "./ProjectListScreen";
 import VaultSetupScreen from "./setup/VaultSetupScreen";
@@ -40,7 +40,7 @@ function isDeskShellView(value: string | undefined): value is DeskShellView {
 }
 
 function isResearchStage(value: string | undefined): value is ResearchStage {
-  return RESEARCH_STAGES.some((s) => s.id === value);
+  return !!value && STAGE_MAP.has(value as ResearchStage);
 }
 
 /** Where to return to when closing Settings/Vault/AI Access — passed as router state on the way in, since these overlays aren't meant to grow their own history entries. */

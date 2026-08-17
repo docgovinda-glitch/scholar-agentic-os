@@ -1,147 +1,106 @@
+import { useState, useEffect } from "react";
 import type { ResearchStage } from "../types";
-import { RESEARCH_STAGES } from "../types";
+import { STAGE_MAP } from "../types";
+import AgentTerminal, { LogEntry } from "../AgentTerminal";
 
-/**
- * PlaceholderStage — temporary component for research stages that haven't
- * been fully implemented yet (Literature through Final).
- *
- * Shows the stage name, description, and what will be built in future phases.
- * This ensures the full navigation works immediately while features are
- * delivered incrementally.
- */
 export default function PlaceholderStage({ stage }: { stage: ResearchStage }) {
-  const def = RESEARCH_STAGES.find((s) => s.id === stage);
-  if (!def) return null;
+  const def = STAGE_MAP.get(stage);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const phaseInfo = STAGE_PHASES[stage];
+  // Simulate an agent processing when the stage is opened
+  useEffect(() => {
+    setLogs([]);
+    setIsProcessing(true);
+    
+    let timer1: NodeJS.Timeout;
+    let timer2: NodeJS.Timeout;
+    let timer3: NodeJS.Timeout;
+
+    // A tiny simulation of agent activity
+    timer1 = setTimeout(() => {
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + "1",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "info",
+          message: `Initializing agent context for stage: ${def?.label}`,
+        },
+      ]);
+    }, 1000);
+
+    timer2 = setTimeout(() => {
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + "2",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "action",
+          message: `Fetching relevant documents from knowledge vault...`,
+        },
+      ]);
+    }, 2500);
+
+    timer3 = setTimeout(() => {
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + "3",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "warning",
+          message: `This stage is not fully implemented in the backend yet. Awaiting developer integration.`,
+        },
+      ]);
+      setIsProcessing(false);
+    }, 4000);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+    };
+  }, [stage, def?.label]);
+
+  if (!def) return <div>Unknown stage</div>;
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-16 text-center animate-fade-in">
-        {/* Stage icon */}
-        <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center">
-          <svg className="w-10 h-10 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={def.icon} />
-          </svg>
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="p-8 pb-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-muted)]">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={def.icon} />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+              {def.number}. {def.label}
+            </h2>
+            <p className="text-sm text-[color:var(--text-secondary)]">
+              {def.description}
+            </p>
+          </div>
         </div>
+      </div>
 
-        <h2 className="text-2xl font-bold tracking-tight text-[color:var(--text-primary)] mb-2">
-          {def.label}
-        </h2>
-        <p className="text-base text-[color:var(--text-secondary)] mb-8 max-w-md mx-auto leading-relaxed">
-          {def.description}
-        </p>
+      <div className="px-8 pb-8 flex-1 overflow-y-auto space-y-6">
+        <AgentTerminal 
+          logs={logs} 
+          isProcessing={isProcessing} 
+          agentName={`${def.shortLabel} Agent`}
+        />
 
-        {/* Phase info */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[color:var(--state-info)]/20 bg-[color:var(--state-info-subtle)] text-sm font-medium text-[color:var(--state-info)]">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <div className="bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-[var(--radius-lg)] p-6 text-center">
+          <svg className="w-12 h-12 text-[color:var(--text-muted)] mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
           </svg>
-          Planned for {phaseInfo.phase}
-        </div>
-
-        {/* Upcoming features */}
-        <div className="mt-10 text-left max-w-lg mx-auto">
-          <h3 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 uppercase tracking-wider">
-            What's Coming
-          </h3>
-          <ul className="space-y-3">
-            {phaseInfo.features.map((feature, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm text-[color:var(--text-secondary)]">
-                <div className="w-5 h-5 mt-0.5 shrink-0 rounded-full bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex items-center justify-center">
-                  <span className="text-[10px] font-bold text-[color:var(--text-muted)]">{i + 1}</span>
-                </div>
-                {feature}
-              </li>
-            ))}
-          </ul>
+          <h3 className="text-lg font-semibold text-[color:var(--text-primary)] mb-2">Stage Under Construction</h3>
+          <p className="text-sm text-[color:var(--text-secondary)] max-w-md mx-auto mb-6">
+            The 25-stage agentic pipeline UI is now mapped. This specific component is awaiting its specialized AI integration and form elements.
+          </p>
         </div>
       </div>
     </div>
   );
 }
-
-const STAGE_PHASES: Record<ResearchStage, { phase: string; features: string[] }> = {
-  definition: { phase: "Phase 1", features: [] },
-  literature: {
-    phase: "Phase 2",
-    features: [
-      "AI-powered scholarly literature search (Google Scholar, arXiv, OpenAlex)",
-      "Source discovery with authority scoring",
-      "Major author and theory identification",
-      "Source approval queue with ✓ Approve / ✕ Reject controls",
-    ],
-  },
-  gap: {
-    phase: "Phase 2",
-    features: [
-      "Structured research gap identification (knowledge, empirical, theoretical, etc.)",
-      "Gap confidence scoring with supporting evidence",
-      "Interactive gap selection and research question refinement",
-      "AI-generated title options based on selected gap",
-    ],
-  },
-  evidence: {
-    phase: "Phase 3",
-    features: [
-      "Knowledge Vault integration for existing sources",
-      "Universal file ingestion (PDF, Word, Excel, URLs, YouTube)",
-      "AI evidence extraction with exact provenance tracking",
-      "Batch approval interface with filtering and selection",
-    ],
-  },
-  analysis: {
-    phase: "Phase 3",
-    features: [
-      "Evidence Matrix builder with thematic clustering",
-      "Contradiction detection and resolution",
-      "AI Research Analysis Chat for deep exploration",
-      "Manual annotation and researcher conclusions",
-    ],
-  },
-  journal: {
-    phase: "Phase 3",
-    features: [
-      "AI Journal Discovery Agent with transparent scoring",
-      "Journal comparison by scope, metrics, and requirements",
-      "Automated author guideline extraction",
-      "Editable journal requirement workspace",
-    ],
-  },
-  draft: {
-    phase: "Phase 4",
-    features: [
-      "Section-by-section manuscript generation with evidence citation",
-      "Real-time citation integrity verification",
-      "Writing quality engine for academic tone and clarity",
-      "Coherence analysis across sections",
-    ],
-  },
-  review: {
-    phase: "Phase 4",
-    features: [
-      "7-lens AI peer review (contribution, literature, methodology, evidence, argument, citation, journal fit)",
-      "Severity-rated findings with specific locations",
-      "Round-based review history",
-      "Review comparison across rounds",
-    ],
-  },
-  revision: {
-    phase: "Phase 4",
-    features: [
-      "Reviewer comment → manuscript location mapping",
-      "AI-suggested revisions with accept/reject/modify controls",
-      "Side-by-side diff with previous versions",
-      "Version history preservation",
-    ],
-  },
-  final: {
-    phase: "Phase 5",
-    features: [
-      "Full document editor with page view and tracked changes",
-      "Publication readiness gate (research integrity, citations, originality, compliance)",
-      "Plagiarism and text-overlap analysis",
-      "Word (.docx) and PDF export with journal formatting",
-    ],
-  },
-};
