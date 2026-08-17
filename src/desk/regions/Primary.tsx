@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { exportProject } from "../api";
 import CanonicalDocumentEditor from "../editor/CanonicalDocumentEditor";
-import type { CanonicalDocument } from "../types";
+import CitationIntegrityReport from "../journal/CitationIntegrityReport";
+import type { CanonicalDocument, ProjectView } from "../types";
 
 export interface ResolveCitationsOutcome {
   citedSourceIds: string[];
@@ -26,6 +27,7 @@ export default function Primary({
   submitting,
   projectId,
   onResolveCitations,
+  project,
 }: {
   document: CanonicalDocument | null;
   onSubmitPlainText: (text: string) => void;
@@ -34,6 +36,7 @@ export default function Primary({
   projectId: string;
   /** Deterministically turns every `[ev-xxxx]` bracket-id in the saved document into a real in-text citation and rebuilds the References section — src/app/citation/resolveCitations.ts. Optional so callers that don't wire it (e.g. tests) keep working. */
   onResolveCitations?: () => Promise<ResolveCitationsOutcome>;
+  project?: ProjectView;
 }) {
   const [draft, setDraft] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -78,34 +81,33 @@ export default function Primary({
 
   if (!document || document.blocks.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="max-w-lg w-full text-center">
-          <h2 className="text-sm text-[color:var(--text-secondary)] mb-2">No document submitted yet</h2>
-          <p className="text-xs text-[color:var(--text-muted)] mb-4">
-            Paste an existing draft below (blank lines separate paragraphs) to start from it, or leave this blank and
-            use the editor once you submit — either way you can keep editing afterward.
-          </p>
-          {/* index.css's global form-control override forces a white background
-              on any textarea/input/select via !important, unless it carries
-              border-0 + bg-transparent — the styling below moves to this
-              wrapper div instead, same pattern src/components/AIControlCenter.tsx
-              already uses. */}
-          <div className="w-full rounded-lg bg-[color:var(--color-navy-2)] border border-[color:var(--color-border-subtle)]">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              rows={10}
-              className="border-0 bg-transparent w-full text-[color:var(--text-primary)] text-sm p-3 font-serif focus:outline-none"
-              placeholder={"# Paste or type a draft here.\n\nSeparate paragraphs with a blank line."}
-            />
+      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50 dark:bg-slate-950/50">
+        <div className="max-w-2xl w-full text-center">
+          <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-gray-200 dark:border-slate-800 rounded-3xl p-10 shadow-2xl shadow-indigo-500/5">
+            <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 mb-3">
+              Draft your Manuscript
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-8 max-w-lg mx-auto">
+              Paste an existing draft below (blank lines separate paragraphs) to start from it, or leave this blank and
+              use the editor once you submit.
+            </p>
+            <div className="w-full rounded-2xl bg-white/50 dark:bg-black/20 backdrop-blur-sm border border-gray-200 dark:border-gray-800 overflow-hidden shadow-inner transition-all focus-within:ring-2 focus-within:ring-indigo-500/50">
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={12}
+                className="w-full bg-transparent border-0 text-gray-800 dark:text-gray-200 text-base p-6 font-serif leading-relaxed focus:outline-none focus:ring-0 placeholder-gray-400/70"
+                placeholder={"# Paste or type a draft here.\n\nSeparate paragraphs with a blank line."}
+              />
+            </div>
+            <button
+              onClick={() => onSubmitPlainText(draft)}
+              disabled={submitting}
+              className="mt-8 w-full sm:w-auto px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium text-sm shadow-lg shadow-indigo-500/25 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? "Submitting…" : "Initialize Manuscript"}
+            </button>
           </div>
-          <button
-            onClick={() => onSubmitPlainText(draft)}
-            disabled={submitting || draft.trim().length === 0}
-            className="mt-3 px-4 py-2 rounded-lg bg-[color:var(--color-luminous-blue-dim)] text-white text-xs disabled:opacity-40"
-          >
-            {submitting ? "Submitting…" : "Submit document"}
-          </button>
         </div>
       </div>
     );
@@ -117,10 +119,7 @@ export default function Primary({
         <CanonicalDocumentEditor document={document} onSave={onSaveDocument} saving={submitting} />
       </div>
       {/* Citation resolution — turns approved-evidence bracket-ids into real
-          in-text citations and a rendered References section (docs
-          31-SUBMISSION-COMPLIANCE-ARCHITECTURE.md, src/app/citation/
-          resolveCitations.ts). Deterministic, run once near the end of
-          drafting, before export. */}
+          in-text citations and a rendered References section. Deterministic, run once near the end of drafting, before export. */}
       {onResolveCitations && (
         <div className="border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-10 py-4">
           <div className="max-w-[75ch] mx-auto">
@@ -149,6 +148,8 @@ export default function Primary({
           </div>
         </div>
       )}
+      {/* Citation integrity report */}
+      {project && <CitationIntegrityReport document={document} project={project} />}
       {/* Export controls (docs 33-EXPORT-ARCHITECTURE.md) */}
       <div className="border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-10 py-4">
         <div className="max-w-[75ch] mx-auto">

@@ -52,12 +52,16 @@ import {
 } from "../../src/app/conductor/conductor.ts";
 import type { GateId } from "../../src/app/conductor/conductor.ts";
 import { getProjectStore } from "../../src/services/store/projectStore.ts";
+import type { ProjectStore } from "../../src/services/store/types.ts";
 import { requireAuth } from "../src/middleware/auth.ts";
 import type { ProjectRecord } from "../../src/services/store/types.ts";
 import { exportDocument } from "../../src/app/export/export.ts";
 import type { ExportFormat } from "../../src/app/export/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
 import { emptyDocument } from "../../src/domain/document/model.ts";
+import { registerSubmissionsRoutes } from "./project/submissions.ts";
+import { registerClaimsRoutes } from "./project/claims.ts";
+import { registerEvidenceRoutes } from "./project/evidence.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
 import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, markClaimUnsupported, ClaimGraphError } from "../../src/domain/claim/graph.ts";
 import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
@@ -76,17 +80,6 @@ import { creditsForUsage, estimateMaxCreditsForInput } from "../src/aiEngine/cre
 import { deductCredits, type DeductResult } from "../src/aiEngine/creditEngine.ts";
 import { recordProviderFailure, recordProviderSuccess } from "../src/aiEngine/providerHealth.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
-import {
-  discoverSource,
-  extractEvidence,
-  verifyEvidence,
-  proposeEvidence,
-  approveEvidence,
-  rejectEvidence,
-  EvidenceStateError,
-} from "../../src/domain/evidence/stateMachine.ts";
-import type { DiscoveredSource, EvidenceLocator } from "../../src/domain/evidence/types.ts";
-import { discoverArxivSources, discoverOpenAlexSources, discoverWebSources } from "../src/discovery/discovery.ts";
 import { allocateWordBudget } from "../../src/domain/manuscript/wordBudget.ts";
 import type { GeneratedSection, SectionPlan } from "../../src/domain/manuscript/types.ts";
 import {
@@ -113,103 +106,47 @@ import { applyAnonymization, AnonymizationApplyError } from "../../src/app/anony
 import { resolveCitations, isKnownCitationStyle, knownCitationStyleIds } from "../../src/app/citation/resolveCitations.ts";
 import { withProjectLock } from "../src/concurrency/projectLock.ts";
 
-const BLOCK_KINDS = new Set(["paragraph", "heading1", "heading2", "heading3", "quote", "list-item"]);
+import { BlockSchema, CanonicalDocumentSchema, GateIdSchema, ClaimSchema, EvidenceSpanSchema, SubmissionStatusSchema, NewSubmissionSchema, SubmissionPatchSchema, JournalRequirementsInputSchema, ManualSourceSchema, EvidenceLocatorSchema, ClaimEvidenceBindingSchema } from "../../src/domain/schemas/projectSchemas.ts";
 
 function isValidBlock(value: unknown): value is Block {
-  if (typeof value !== "object" || value === null) return false;
-  const b = value as Record<string, unknown>;
-  return typeof b.id === "string" && typeof b.kind === "string" && BLOCK_KINDS.has(b.kind) && typeof b.text === "string";
+  return BlockSchema.safeParse(value).success;
 }
 
 function isValidDocument(value: unknown): value is CanonicalDocument {
-  if (typeof value !== "object" || value === null) return false;
-  const d = value as Record<string, unknown>;
-  if (typeof d.id !== "string" || typeof d.title !== "string" || !Array.isArray(d.blocks)) return false;
-  if (!d.blocks.every(isValidBlock)) return false;
-  if (d.metadata !== undefined) {
-    if (typeof d.metadata !== "object" || d.metadata === null) return false;
-    if (!Object.values(d.metadata as Record<string, unknown>).every((v) => typeof v === "string")) return false;
-  }
-  return true;
+  return CanonicalDocumentSchema.safeParse(value).success;
 }
 
 function isGateId(value: unknown): value is GateId {
-  return typeof value === "string" && (GATE_ORDER as string[]).includes(value);
+  return GateIdSchema.safeParse(value).success;
 }
 
-function isValidClaim(value: unknown): value is Claim {
-  if (typeof value !== "object" || value === null) return false;
-  const c = value as Record<string, unknown>;
-  if (typeof c.id !== "string" || typeof c.text !== "string") return false;
-  if (c.draftSpanId !== undefined && typeof c.draftSpanId !== "string") return false;
-  return true;
-}
 
-const SUPPORT_STRENGTHS = new Set(["strong", "moderate", "weak", "contradicts"]);
+
+
 
 function isValidEvidenceSpan(value: unknown): value is EvidenceSpan {
-  if (typeof value !== "object" || value === null) return false;
-  const e = value as Record<string, unknown>;
-  if (typeof e.sourceId !== "string" || typeof e.quote !== "string") return false;
-  if (typeof e.locator !== "object" || e.locator === null) return false;
-  const l = e.locator as Record<string, unknown>;
-  for (const key of ["page", "paragraph", "startOffset", "endOffset"]) {
-    if (l[key] !== undefined && typeof l[key] !== "number") return false;
-  }
-  return true;
+  return EvidenceSpanSchema.safeParse(value).success;
 }
 
 function isSubmissionStatus(value: unknown): value is SubmissionStatus {
-  return typeof value === "string" && (SUBMISSION_STATUSES as string[]).includes(value);
+  return SubmissionStatusSchema.safeParse(value).success;
 }
 
 /** Body of POST .../submissions: everything but the id and statusUpdatedAt, which the server assigns. */
 function isValidNewSubmission(value: unknown): value is Omit<SubmissionRecord, "id" | "statusUpdatedAt"> {
-  if (typeof value !== "object" || value === null) return false;
-  const s = value as Record<string, unknown>;
-  if (typeof s.journalName !== "string" || s.journalName.trim().length === 0) return false;
-  if (typeof s.submittedAt !== "string" || s.submittedAt.length === 0) return false;
-  if (!isSubmissionStatus(s.status)) return false;
-  if (s.journalUrl !== undefined && typeof s.journalUrl !== "string") return false;
-  if (s.journalSubmissionId !== undefined && typeof s.journalSubmissionId !== "string") return false;
-  if (s.notes !== undefined && typeof s.notes !== "string") return false;
-  return true;
+  return NewSubmissionSchema.safeParse(value).success;
 }
 
 /** Body of PATCH .../submissions/:id: any subset of the mutable fields. */
 function isValidSubmissionPatch(value: unknown): value is Partial<Omit<SubmissionRecord, "id" | "statusUpdatedAt">> {
-  if (typeof value !== "object" || value === null) return false;
-  const s = value as Record<string, unknown>;
-  if (s.journalName !== undefined && (typeof s.journalName !== "string" || s.journalName.trim().length === 0)) return false;
-  if (s.submittedAt !== undefined && (typeof s.submittedAt !== "string" || s.submittedAt.length === 0)) return false;
-  if (s.status !== undefined && !isSubmissionStatus(s.status)) return false;
-  if (s.journalUrl !== undefined && typeof s.journalUrl !== "string") return false;
-  if (s.journalSubmissionId !== undefined && typeof s.journalSubmissionId !== "string") return false;
-  if (s.notes !== undefined && typeof s.notes !== "string") return false;
-  return true;
+  return SubmissionPatchSchema.safeParse(value).success;
 }
 
 /** Body of PUT .../journal-requirements: everything but the fields the server stamps (source/capturedAt/capturedBy). */
 function isValidJournalRequirementsInput(
   value: unknown
 ): value is Omit<JournalRequirements, "source" | "capturedAt" | "capturedBy"> {
-  if (typeof value !== "object" || value === null) return false;
-  const r = value as Record<string, unknown>;
-  if (typeof r.journalName !== "string" || r.journalName.trim().length === 0) return false;
-  if (!Array.isArray(r.requiredDeclarations) || !r.requiredDeclarations.every((d) => typeof d === "string")) return false;
-  if (r.wordLimit !== undefined) {
-    if (typeof r.wordLimit !== "object" || r.wordLimit === null) return false;
-    const w = r.wordLimit as Record<string, unknown>;
-    if (w.min !== undefined && typeof w.min !== "number") return false;
-    if (w.max !== undefined && typeof w.max !== "number") return false;
-  }
-  if (r.structureOverride !== undefined) {
-    if (!Array.isArray(r.structureOverride) || !r.structureOverride.every((s) => typeof s === "string")) return false;
-  }
-  if (r.citationStyle !== undefined && typeof r.citationStyle !== "string") return false;
-  if (r.articleType !== undefined && typeof r.articleType !== "string") return false;
-  if (r.notes !== undefined && typeof r.notes !== "string") return false;
-  return true;
+  return JournalRequirementsInputSchema.safeParse(value).success;
 }
 
 /**
@@ -888,48 +825,9 @@ async function runPremiumAnonymization(
   return { ok: false, status: 502, error: lastError };
 }
 
-const SOURCE_TYPES = new Set(["scholarly", "official", "web", "media", "user_provided", "vault"]);
-const AUTHORITY_TIERS = new Set(["A", "B", "C", "D"]);
 
-const MANUAL_DISCOVERY_METHODS = new Set(["manual", "vault"]);
 
-/** Body of POST .../evidence-ledger/sources: a manually-added, already-known source — "manually added" covers both a user typing in a source by hand and a source the user pulled from their own Knowledge Vault (discoveredVia: "vault"), since the server never receives Vault contents either way. */
-function isValidManualSource(
-  value: unknown
-): value is Omit<DiscoveredSource, "id" | "discoveredAt" | "discoveredVia"> & { discoveredVia?: "manual" | "vault"; vaultItemId?: string } {
-  if (typeof value !== "object" || value === null) return false;
-  const s = value as Record<string, unknown>;
-  if (typeof s.title !== "string" || s.title.trim().length === 0) return false;
-  if (!Array.isArray(s.authors) || !s.authors.every((a) => typeof a === "string")) return false;
-  if (typeof s.sourceType !== "string" || !SOURCE_TYPES.has(s.sourceType)) return false;
-  if (typeof s.authorityTier !== "string" || !AUTHORITY_TIERS.has(s.authorityTier)) return false;
-  if (s.url !== undefined && typeof s.url !== "string") return false;
-  if (s.doi !== undefined && typeof s.doi !== "string") return false;
-  if (s.venue !== undefined && typeof s.venue !== "string") return false;
-  if (s.year !== undefined && typeof s.year !== "number") return false;
-  if (s.discoveredVia !== undefined && (typeof s.discoveredVia !== "string" || !MANUAL_DISCOVERY_METHODS.has(s.discoveredVia))) return false;
-  if (s.vaultItemId !== undefined && typeof s.vaultItemId !== "string") return false;
-  return true;
-}
 
-function isValidLocator(value: unknown): value is EvidenceLocator {
-  if (value === undefined) return true;
-  if (typeof value !== "object" || value === null) return false;
-  const l = value as Record<string, unknown>;
-  for (const key of ["page", "paragraph", "startOffset", "endOffset"]) {
-    if (l[key] !== undefined && typeof l[key] !== "number") return false;
-  }
-  return true;
-}
-
-function isValidBinding(value: unknown): value is ClaimEvidenceBinding {
-  if (typeof value !== "object" || value === null) return false;
-  const b = value as Record<string, unknown>;
-  if (typeof b.id !== "string" || typeof b.claimId !== "string" || typeof b.rationale !== "string") return false;
-  if (typeof b.strength !== "string" || !SUPPORT_STRENGTHS.has(b.strength as SupportStrength)) return false;
-  if (!Array.isArray(b.evidence) || !b.evidence.every(isValidEvidenceSpan)) return false;
-  return true;
-}
 
 /**
  * Recompute the Rubric report and G6 exit criteria from a project's
@@ -986,7 +884,7 @@ function recomputeG3(record: ProjectRecord, document: CanonicalDocument | undefi
  * mutations could change the count is deliberate; this is a cheap, pure
  * computation.
  */
-function recomputeG2(record: ProjectRecord) {
+export function recomputeG2(record: ProjectRecord) {
   const spec = catalog.getOrThrow(record.outputTypeId);
   const criteria = computeG2ExitCriteria(spec, record.evidenceLedger, record.sourceCountOverride);
   return updateExitCriteria(record.gates, "G2", criteria);
@@ -999,7 +897,7 @@ function recomputeG2(record: ProjectRecord) {
  * criterion can change from either side (a section being filled in, or a
  * claim being bound or marked explicitly unsupported).
  */
-function recomputeG4(record: ProjectRecord, document: CanonicalDocument | undefined) {
+export function recomputeG4(record: ProjectRecord, document: CanonicalDocument | undefined) {
   const spec = catalog.getOrThrow(record.outputTypeId);
   const criteria = computeG4ExitCriteria(spec, document ?? emptyDocument(record.projectId, spec.label), record.claimGraph);
   return updateExitCriteria(record.gates, "G4", criteria);
@@ -1012,7 +910,7 @@ function recomputeG4(record: ProjectRecord, document: CanonicalDocument | undefi
  * copy). Throws GateTransitionError if either gate is already signed off,
  * same "invalidate first" discipline as every other gate-touching route.
  */
-function recomputeG6(record: ProjectRecord, document: CanonicalDocument) {
+export function recomputeG6(record: ProjectRecord, document: CanonicalDocument) {
   const spec = catalog.getOrThrow(record.outputTypeId);
   const rules = applyWaivers(compileRubricFromOutputType(spec, record.journalRequirements), record.waivers);
   const rubricReport = buildReport(rules, document, record.claimGraph);
@@ -1021,7 +919,7 @@ function recomputeG6(record: ProjectRecord, document: CanonicalDocument) {
   return { rubricReport, gates };
 }
 
-function projectView(record: ProjectRecord | undefined) {
+export function projectView(record: ProjectRecord | undefined) {
   if (!record) return undefined;
   const spec = catalog.getOrThrow(record.outputTypeId);
   return {
@@ -1037,7 +935,17 @@ function projectView(record: ProjectRecord | undefined) {
 }
 
 /** The authenticated Supabase user attached by requireAuth. */
-function currentUserId(req: express.Request): string {
+export function saveClaimGraphChange(store: ProjectStore, record: ProjectRecord, claimGraph: ClaimEvidenceGraph) {
+  if (!record.document) {
+    const gates = recomputeG4({ ...record, claimGraph }, undefined);
+    return store.save({ ...record, claimGraph, gates });
+  }
+  const { rubricReport, gates: gatesAfterG6 } = recomputeG6({ ...record, claimGraph }, record.document);
+  const gates = recomputeG4({ ...record, claimGraph, gates: gatesAfterG6 }, record.document);
+  return store.save({ ...record, claimGraph, rubricReport, gates });
+}
+
+export function currentUserId(req: express.Request): string {
   return (req as express.Request & { user?: { id: string } }).user!.id;
 }
 
@@ -1054,7 +962,7 @@ function currentUserId(req: express.Request): string {
  * from outside. That mattered more than usual here, because these ids used to
  * be sequential — see generateProjectId.
  */
-async function loadOwnedProject(
+export async function loadOwnedProject(
   store: { get(id: string): Promise<ProjectRecord | undefined> },
   req: express.Request,
   res: express.Response
@@ -1077,7 +985,7 @@ async function loadOwnedProject(
  * one database connection failure returned 502 for every route in the service,
  * including ones that never touch the database.
  */
-function asyncRoute(
+export function asyncRoute(
   handler: (req: express.Request, res: express.Response) => Promise<unknown>
 ): express.RequestHandler {
   return (req, res, next) => {
@@ -1090,14 +998,27 @@ function asyncRoute(
   };
 }
 
+let storeInstance: ReturnType<typeof getProjectStore> | null = null;
+export function getSharedStore() {
+  if (!storeInstance) {
+    storeInstance = getProjectStore();
+  }
+  return storeInstance;
+}
+
 export function registerProjectRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
-  const store = getProjectStore();
+  const store = getSharedStore();
 
   // Everything under /api/projects requires a verified Supabase session.
   //
   // Previously nothing here did. Combined with projects having no owner and
   // sequential ids, any unauthenticated caller could create projects, read
   // and overwrite anyone else's by walking the id space, and drive the
+  app.use("/api/projects", requireAuth);
+
+  registerSubmissionsRoutes(app, projectLimit);
+  registerClaimsRoutes(app, projectLimit);
+  registerEvidenceRoutes(app, projectLimit);
   // model-backed export path. The Atlas catalog routes below are deliberately
   // left public: they are a static list of output types with no user data in
   // them, and the "choose what you are writing" screen reads them.
@@ -1458,440 +1379,9 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
   }));
 
-  /**
-   * Save a claim-graph change, then — if the project already has a
-   * document — recompute G6 against it, since four catalog gates
-   * (`usesClaimGraph`) depend on the graph, not just the document. Returns
-   * the saved record. Throws GateTransitionError if G6 is already signed
-   * off, same "invalidate first" guarantee as every other Rubric-relevant
-   * change.
-   */
-  function saveClaimGraphChange(record: ProjectRecord, claimGraph: ClaimEvidenceGraph) {
-    if (!record.document) {
-      const gates = recomputeG4({ ...record, claimGraph }, undefined);
-      return store.save({ ...record, claimGraph, gates });
-    }
-    const { rubricReport, gates: gatesAfterG6 } = recomputeG6({ ...record, claimGraph }, record.document);
-    const gates = recomputeG4({ ...record, claimGraph, gates: gatesAfterG6 }, record.document);
-    return store.save({ ...record, claimGraph, rubricReport, gates });
-  }
 
-  /**
-   * Add a claim to the project's Claim–Evidence Graph. Body:
-   * { claim: Claim }. 409s if the claim id is already used. If the project
-   * already has a document, recomputes G6 (four catalog gates check the
-   * claim graph, not the document — see fromAtlas.ts's
-   * compileClaimSupportGateRules) — 409s if G6 is already signed off.
-   */
-  app.post("/api/projects/:id/claims", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { claim } = req.body ?? {};
-    if (!isValidClaim(claim)) {
-      return res.status(400).json({ error: "Missing or malformed required field: claim ({id, text, draftSpanId?})." });
-    }
-    try {
-      const claimGraph = addClaim(record.claimGraph, claim);
-      const updated = await saveClaimGraphChange(record, claimGraph);
-      res.status(201).json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
-    } catch (err) {
-      if (err instanceof ClaimGraphError) {
-        return res.status(409).json({ error: err.message });
-      }
-      if (err instanceof GateTransitionError) {
-        return res.status(409).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
 
-  /**
-   * Bind evidence to a claim. Body: { binding: ClaimEvidenceBinding }.
-   * 400s if the claim doesn't exist, the binding id is already used, or the
-   * binding has no evidence spans — a binding asserting support without a
-   * real located quote is exactly what domain/claim's bindEvidence refuses
-   * (AG-13's "never invents a locator" QA checkpoint). Recomputes G6 if a
-   * document already exists — this is exactly the action that turns a
-   * failing claim_support finding into a passing one.
-   */
-  app.post("/api/projects/:id/claims/:claimId/evidence", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { binding } = req.body ?? {};
-    if (!isValidBinding(binding) || binding.claimId !== req.params.claimId) {
-      return res.status(400).json({
-        error: "Missing or malformed required field: binding ({id, claimId, evidence[]: {sourceId, locator, quote}, strength, rationale}); binding.claimId must match the URL.",
-      });
-    }
-    try {
-      const claimGraph = bindEvidence(record.claimGraph, binding);
-      const updated = await saveClaimGraphChange(record, claimGraph);
-      res.status(201).json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
-    } catch (err) {
-      if (err instanceof ClaimGraphError) {
-        return res.status(400).json({ error: err.message });
-      }
-      if (err instanceof GateTransitionError) {
-        return res.status(409).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
 
-  /**
-   * Explicitly mark a claim as deliberately unsupported (docs 30 §3 G4
-   * "Exit"'s "or explicitly marked unsupported" escape hatch) — a
-   * DRAFT-STAGE acknowledgement only; it does NOT satisfy G6's compliance
-   * Rubric (see domain/claim/graph.ts's markClaimUnsupported /
-   * claimsNeedingResolution / unsupportedClaims doc comments for why).
-   * Body: { reason, actor }. 404s for an unknown claim id. Recomputes G4.
-   */
-  app.post("/api/projects/:id/claims/:claimId/mark-unsupported", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { reason, actor } = req.body ?? {};
-    if (typeof reason !== "string" || reason.trim().length === 0) {
-      return res.status(400).json({ error: "Missing required field: reason" });
-    }
-    if (typeof actor !== "string" || actor.length === 0) {
-      return res.status(400).json({ error: "Missing required field: actor" });
-    }
-    try {
-      const claimGraph = markClaimUnsupported(record.claimGraph, req.params.claimId, reason, actor);
-      const gates = recomputeG4({ ...record, claimGraph }, record.document);
-      const updated = await store.save({ ...record, claimGraph, gates });
-      res.json({ ...projectView(updated), claimGraph: updated.claimGraph });
-    } catch (err) {
-      if (err instanceof ClaimGraphError) {
-        return res.status(404).json({ error: err.message });
-      }
-      if (err instanceof GateTransitionError) {
-        return res.status(409).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
-
-  /** The project's full Claim–Evidence Graph. */
-  app.get("/api/projects/:id/claims", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    res.json(record.claimGraph);
-  }));
-
-  /** Claims with zero evidence bindings — domain/claim's unsupportedClaims(), AG-13's "unsupported" output. */
-  app.get("/api/projects/:id/claims/unsupported", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    res.json({ claims: unsupportedClaims(record.claimGraph) });
-  }));
-
-  /** Claims with both a supporting and a contradicting binding, surfaced for a human to resolve (never auto-resolved). */
-  app.get("/api/projects/:id/claims/conflicts", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    res.json({ conflicts: findConflicts(record.claimGraph) });
-  }));
-
-  /**
-   * Every claim with at least one evidence binding citing `sourceId` —
-   * domain/claim's claimsDependingOnSource(), "which claims depend on
-   * source X" (docs 13). Useful before retracting a source: this is what
-   * `DELETE .../sources/:sourceId` is about to affect.
-   */
-  app.get("/api/projects/:id/sources/:sourceId/claims", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    res.json({ claims: claimsDependingOnSource(record.claimGraph, req.params.sourceId) });
-  }));
-
-  /**
-   * Remove a source from the Claim–Evidence Graph: every binding loses any
-   * evidence spans pointing at it, and any binding left with zero evidence
-   * is dropped entirely (domain/claim's removeSource — mirrors a source
-   * being un-approved or retracted after claims were already bound to it).
-   * Recomputes G6 if a document already exists — a retracted source can
-   * turn a passing claim_support finding into a failing one.
-   */
-  app.delete("/api/projects/:id/sources/:sourceId", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const claimGraph = removeSource(record.claimGraph, req.params.sourceId);
-    try {
-      const updated = await saveClaimGraphChange(record, claimGraph);
-      res.json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
-    } catch (err) {
-      if (err instanceof GateTransitionError) {
-        return res.status(409).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
-
-  /**
-   * The Evidence Ledger (domain/evidence): sources discovered so far and
-   * every evidence item's provenance state (docs' DISCOVERED → EXTRACTED →
-   * VERIFIED → PROPOSED → USER APPROVED → CITABLE pipeline). Upstream of the
-   * Claim–Evidence Graph above — see approve() below for where the two meet.
-   */
-
-  app.get("/api/projects/:id/evidence-ledger", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    res.json(record.evidenceLedger);
-  }));
-
-  /** Manually add an already-known source (a user-provided document, a Vault item, anything not found via automated discovery). Body: everything DiscoveredSource needs except id/discoveredAt/discoveredVia, which the server assigns. */
-  app.post("/api/projects/:id/evidence-ledger/sources", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    if (!isValidManualSource(req.body)) {
-      return res.status(400).json({
-        error: "Invalid source. Required: title (string), authors (string[]), sourceType (one of: " +
-          `${[...SOURCE_TYPES].join(", ")}), authorityTier (one of: ${[...AUTHORITY_TIERS].join(", ")}). Optional: url, doi, venue (strings), year (number).`,
-      });
-    }
-    const source: DiscoveredSource = {
-      ...req.body,
-      id: `src-${crypto.randomUUID()}`,
-      discoveredVia: req.body.discoveredVia ?? "manual",
-      discoveredAt: new Date().toISOString(),
-    };
-    try {
-      const evidenceLedger = discoverSource(record.evidenceLedger, source);
-      const gates = recomputeG2({ ...record, evidenceLedger });
-      const updated = await store.save({ ...record, evidenceLedger, gates });
-      res.status(201).json(updated.evidenceLedger);
-    } catch (err) {
-      if (err instanceof EvidenceStateError) return res.status(409).json({ error: err.message });
-      throw err;
-    }
-  }));
-
-  /**
-   * Search for candidate sources via arXiv, OpenAlex, or the web-search
-   * proxy (server/src/discovery/discovery.ts). This only ever ADDS sources
-   * to the ledger — never creates an evidence item, never binds anything:
-   * "AI may research automatically" stops exactly here. Body: { query, via:
-   * "arxiv" | "openalex" | "web_search", domains? }. 502s (not a fabricated
-   * empty result) when the underlying call itself fails — a real search
-   * failure must be visible, never silently presented as "nothing found".
-   */
-  app.post("/api/projects/:id/evidence-ledger/discover", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { query, via, domains } = req.body ?? {};
-    if (typeof query !== "string" || query.trim().length === 0) {
-      return res.status(400).json({ error: "Missing required field: query" });
-    }
-    if (via !== "arxiv" && via !== "openalex" && via !== "web_search") {
-      return res.status(400).json({ error: 'Invalid field: via. Must be "arxiv", "openalex", or "web_search".' });
-    }
-    if (domains !== undefined && (!Array.isArray(domains) || !domains.every((d) => typeof d === "string"))) {
-      return res.status(400).json({ error: "Invalid field: domains (string[])." });
-    }
-
-    let drafts: Awaited<ReturnType<typeof discoverArxivSources>>;
-    try {
-      drafts = via === "arxiv" ? await discoverArxivSources(query) : via === "openalex" ? await discoverOpenAlexSources(query) : await discoverWebSources(query, domains);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      return res.status(502).json({ error: `Discovery failed: ${message}` });
-    }
-
-    const now = new Date().toISOString();
-    let evidenceLedger = record.evidenceLedger;
-    const added: DiscoveredSource[] = [];
-    for (const draft of drafts) {
-      const source: DiscoveredSource = { ...draft, id: `src-${crypto.randomUUID()}`, discoveredAt: now };
-      evidenceLedger = discoverSource(evidenceLedger, source);
-      added.push(source);
-    }
-    const gates = recomputeG2({ ...record, evidenceLedger });
-    const updated = await store.save({ ...record, evidenceLedger, gates });
-    res.json({ added, evidenceLedger: updated.evidenceLedger });
-  }));
-
-  /**
-   * Pull a specific, located quote from an already-discovered source,
-   * creating a new evidence item in state "extracted". Body:
-   * { quote, locator? }. 404s if the source id is unknown, 400s on an
-   * empty quote.
-   */
-  app.post("/api/projects/:id/evidence-ledger/sources/:sourceId/extract", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { quote, locator } = req.body ?? {};
-    if (typeof quote !== "string" || quote.trim().length === 0) {
-      return res.status(400).json({ error: "Missing required field: quote" });
-    }
-    if (!isValidLocator(locator)) {
-      return res.status(400).json({ error: "Invalid field: locator ({page?, paragraph?, startOffset?, endOffset?}, all numbers)." });
-    }
-    try {
-      const evidenceLedger = extractEvidence(record.evidenceLedger, { id: `ev-${crypto.randomUUID()}`, sourceId: req.params.sourceId, quote, locator });
-      const gates = recomputeG2({ ...record, evidenceLedger });
-      const updated = await store.save({ ...record, evidenceLedger, gates });
-      res.status(201).json(updated.evidenceLedger);
-    } catch (err) {
-      if (err instanceof EvidenceStateError) {
-        return res.status(err.message.includes("Unknown source") ? 404 : 409).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
-
-  /** Attest that an extracted quote has been checked against the actual source. Body: { actor? }. */
-  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/verify", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { actor } = req.body ?? {};
-    try {
-      const evidenceLedger = verifyEvidence(record.evidenceLedger, req.params.evidenceId, typeof actor === "string" ? actor : undefined);
-      const gates = recomputeG2({ ...record, evidenceLedger });
-      const updated = await store.save({ ...record, evidenceLedger, gates });
-      res.json(updated.evidenceLedger);
-    } catch (err) {
-      if (err instanceof EvidenceStateError) {
-        return res.status(err.message.includes("Unknown evidence") ? 404 : 409).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
-
-  /** Propose binding this evidence to a specific claim — AI or a human may call this; it alone never makes evidence citable (see approve below). Body: { claimId, actor? }. */
-  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/propose", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { claimId, actor } = req.body ?? {};
-    if (typeof claimId !== "string" || claimId.length === 0) {
-      return res.status(400).json({ error: "Missing required field: claimId" });
-    }
-    if (!record.claimGraph.claims.some((c) => c.id === claimId)) {
-      return res.status(400).json({ error: `Cannot propose evidence against unknown claim "${claimId}".` });
-    }
-    try {
-      const evidenceLedger = proposeEvidence(record.evidenceLedger, req.params.evidenceId, claimId, typeof actor === "string" ? actor : undefined);
-      const gates = recomputeG2({ ...record, evidenceLedger });
-      const updated = await store.save({ ...record, evidenceLedger, gates });
-      res.json(updated.evidenceLedger);
-    } catch (err) {
-      if (err instanceof EvidenceStateError) {
-        return res.status(err.message.includes("Unknown evidence") ? 404 : 409).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
-
-  /**
-   * Approve a proposed binding — the ONLY route that can make evidence
-   * "citable" (docs' hard rule: no user approval, no citation). Atomically
-   * advances the ledger AND binds the evidence into the Claim–Evidence
-   * Graph via the existing bindEvidence() (same function the manual
-   * POST .../claims/:claimId/evidence route uses), so what the compliance
-   * Rubric and citation engine read from is the same fact this action just
-   * approved — not a second, disconnected record of it. Body:
-   * { actor, strength, rationale }. Recomputes G6 if a document already
-   * exists, same as every other claim-graph-touching route.
-   */
-  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/approve", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { actor, strength, rationale } = req.body ?? {};
-    if (typeof actor !== "string" || actor.length === 0) {
-      return res.status(400).json({ error: "Missing required field: actor" });
-    }
-    if (typeof strength !== "string" || !SUPPORT_STRENGTHS.has(strength as SupportStrength)) {
-      return res.status(400).json({ error: `Missing or invalid field: strength. Must be one of: ${[...SUPPORT_STRENGTHS].join(", ")}` });
-    }
-    if (typeof rationale !== "string" || rationale.trim().length === 0) {
-      return res.status(400).json({ error: "Missing required field: rationale" });
-    }
-
-    let evidenceLedger;
-    try {
-      evidenceLedger = approveEvidence(record.evidenceLedger, req.params.evidenceId, actor);
-    } catch (err) {
-      if (err instanceof EvidenceStateError) {
-        return res.status(err.message.includes("Unknown evidence") ? 404 : 409).json({ error: err.message });
-      }
-      throw err;
-    }
-
-    const item = evidenceLedger.items.find((i) => i.id === req.params.evidenceId)!;
-    const binding: ClaimEvidenceBinding = {
-      id: `binding-${crypto.randomUUID()}`,
-      claimId: item.proposedClaimId!,
-      evidence: [{ sourceId: item.sourceId, locator: item.locator ?? {}, quote: item.quote! }],
-      strength: strength as SupportStrength,
-      rationale,
-    };
-
-    try {
-      const claimGraph = bindEvidence(record.claimGraph, binding);
-      const recordWithLedger = { ...record, evidenceLedger };
-      const gatesAfterG2 = recomputeG2({ ...recordWithLedger, claimGraph });
-      const updated = record.document
-        ? await (async () => {
-            const { rubricReport, gates: gatesAfterG6 } = recomputeG6({ ...recordWithLedger, claimGraph, gates: gatesAfterG2 }, record.document!);
-            const gates = recomputeG4({ ...recordWithLedger, claimGraph, gates: gatesAfterG6 }, record.document);
-            return store.save({ ...recordWithLedger, claimGraph, rubricReport, gates });
-          })()
-        : await store.save({ ...recordWithLedger, claimGraph, gates: recomputeG4({ ...recordWithLedger, claimGraph, gates: gatesAfterG2 }, undefined) });
-      res.json({ evidenceLedger: updated.evidenceLedger, claimGraph: updated.claimGraph, gates: summarize(updated.gates), ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
-    } catch (err) {
-      if (err instanceof ClaimGraphError) return res.status(409).json({ error: err.message });
-      if (err instanceof GateTransitionError) return res.status(409).json({ error: err.message });
-      throw err;
-    }
-  }));
-
-  /** Decline a proposed binding — returns the evidence to "verified" so it can be re-proposed against a different claim. Body: { actor, reason }. */
-  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/reject", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { actor, reason } = req.body ?? {};
-    if (typeof actor !== "string" || actor.length === 0) {
-      return res.status(400).json({ error: "Missing required field: actor" });
-    }
-    if (typeof reason !== "string" || reason.trim().length === 0) {
-      return res.status(400).json({ error: "Missing required field: reason" });
-    }
-    try {
-      const evidenceLedger = rejectEvidence(record.evidenceLedger, req.params.evidenceId, actor, reason);
-      const gates = recomputeG2({ ...record, evidenceLedger });
-      const updated = await store.save({ ...record, evidenceLedger, gates });
-      res.json(updated.evidenceLedger);
-    } catch (err) {
-      if (err instanceof EvidenceStateError) {
-        return res.status(err.message.includes("Unknown evidence") ? 404 : 409).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
-
-  /**
-   * Explicitly accept a smaller-than-typical source corpus for G2 (docs 30
-   * §3 G2 "Exit"'s "or the user explicitly accepts a smaller corpus with a
-   * recorded reason" escape hatch) — mirrors app/rubric's `waiveRule`:
-   * a mandatory, recorded reason, never a silent bypass. Body:
-   * { reason, actor }. Recomputes G2 immediately.
-   */
-  app.post("/api/projects/:id/gates/G2/accept-smaller-corpus", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { reason, actor } = req.body ?? {};
-    if (typeof reason !== "string" || reason.trim().length === 0) {
-      return res.status(400).json({ error: "Missing required field: reason" });
-    }
-    if (typeof actor !== "string" || actor.length === 0) {
-      return res.status(400).json({ error: "Missing required field: actor" });
-    }
-    const sourceCountOverride = { reason, acceptedBy: actor, at: new Date().toISOString() };
-    const gates = recomputeG2({ ...record, sourceCountOverride });
-    const updated = await store.save({ ...record, sourceCountOverride, gates });
-    res.json(projectView(updated));
-  }));
 
   /**
    * The long-form generation engine (domain/manuscript, src/app/manuscript/
@@ -2589,74 +2079,5 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     }
   }));
 
-  /**
-   * Post-G6 submission tracking (docs/domain/submission/types.ts) — orthogonal
-   * to the gate machinery above; a project can carry any number of submission
-   * attempts against different journals regardless of gate state.
-   */
 
-  /** Every submission attempt recorded against the project. */
-  app.get("/api/projects/:id/submissions", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    res.json({ submissions: record.submissions });
-  }));
-
-  /**
-   * Record a new submission attempt. Body: everything on SubmissionRecord
-   * except `id` and `statusUpdatedAt`, both assigned here.
-   */
-  app.post("/api/projects/:id/submissions", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    if (!isValidNewSubmission(req.body)) {
-      return res.status(400).json({
-        error:
-          "Missing or malformed submission. Required: journalName (string), submittedAt (string), status (one of: " +
-          `${SUBMISSION_STATUSES.join(", ")}). Optional: journalUrl, journalSubmissionId, notes (strings).`,
-      });
-    }
-    const now = new Date().toISOString();
-    const submission: SubmissionRecord = { ...req.body, id: `sub-${crypto.randomUUID()}`, statusUpdatedAt: now };
-    const submissions = addSubmission(record.submissions, submission);
-    const updated = await store.save({ ...record, submissions });
-    res.status(201).json({ submissions: updated.submissions });
-  }));
-
-  /** Patch a submission's fields. Body: any subset of the mutable SubmissionRecord fields. */
-  app.patch("/api/projects/:id/submissions/:submissionId", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    if (!isValidSubmissionPatch(req.body)) {
-      return res.status(400).json({
-        error: `Malformed submission patch. Allowed fields: journalName, journalUrl, submittedAt, status (one of: ${SUBMISSION_STATUSES.join(", ")}), journalSubmissionId, notes.`,
-      });
-    }
-    try {
-      const submissions = updateSubmission(record.submissions, req.params.submissionId, req.body, new Date().toISOString());
-      const updated = await store.save({ ...record, submissions });
-      res.json({ submissions: updated.submissions });
-    } catch (err) {
-      if (err instanceof SubmissionError) {
-        return res.status(404).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
-
-  /** Delete a submission record. */
-  app.delete("/api/projects/:id/submissions/:submissionId", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    try {
-      const submissions = deleteSubmission(record.submissions, req.params.submissionId);
-      const updated = await store.save({ ...record, submissions });
-      res.json({ submissions: updated.submissions });
-    } catch (err) {
-      if (err instanceof SubmissionError) {
-        return res.status(404).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
 }

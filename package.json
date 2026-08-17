@@ -31,6 +31,7 @@
     "docx": "^9.7.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "express-async-errors": "^3.1.1",
     "helmet": "^8.3.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.546.0",
@@ -43,7 +44,8 @@
     "react-dom": "^19.0.1",
     "react-router-dom": "^7.18.2",
     "uuid": "^14.0.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.14",

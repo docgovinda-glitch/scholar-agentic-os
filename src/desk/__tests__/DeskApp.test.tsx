@@ -286,7 +286,7 @@ describe("Desk — project shell", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
     const textarea = await screen.findByPlaceholderText(/Paste or type a draft/);
     fireEvent.change(textarea, { target: { value: "First paragraph.\n\nSecond paragraph." } });
-    fireEvent.click(screen.getByText("Submit document"));
+    fireEvent.click(screen.getByText("Initialize Manuscript"));
 
     expect(await screen.findByText("Below the minimum word count.")).toBeInTheDocument();
     expect(screen.getByText("First paragraph.")).toBeInTheDocument();
@@ -361,7 +361,7 @@ describe("Desk — account settings", () => {
     expect(await screen.findByText("Journal Article")).toBeInTheDocument();
     // Not just the project — the exact tab it was opened from (Intake, here:
     // G0 isn't signed off in this fixture, so that's the auto-decided tab).
-    expect(window.location.pathname).toBe("/projects/proj-42/intake");
+    expect(window.location.pathname).toBe("/projects/proj-42/definition");
   });
 });
 

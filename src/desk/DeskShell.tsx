@@ -6,6 +6,7 @@ import Rail from "./regions/Rail";
 import Primary from "./regions/Primary";
 import Aside from "./regions/Aside";
 import IntakePanel from "./intake/IntakePanel";
+import ResearchDefinitionPanel from "./journal/ResearchDefinitionPanel";
 import GatesPanel from "./gates/GatesPanel";
 import ClaimsPanel from "./claims/ClaimsPanel";
 import EvidenceLedgerPanel from "./evidence/EvidenceLedgerPanel";
@@ -17,7 +18,7 @@ import { useDeskSession } from "./useDeskSession";
 import StatusBar from "./regions/StatusBar";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "./types";
 
-export type DeskShellView = "intake" | "requirements" | "document" | "evidence" | "manuscript" | "progress" | "submissions";
+export type DeskShellView = "definition" | "requirements" | "document" | "evidence" | "manuscript" | "progress" | "submissions";
 
 /**
  * Region shell (docs 22 §2): Header / Rail / Primary / Aside / Status. The
@@ -64,11 +65,6 @@ export default function DeskShell({
   // picks it up — the two panels stay decoupled otherwise (see
   // EvidenceLedgerPanel's own comment on why it fetches its own claim list).
   const [claimsRefreshToken, setClaimsRefreshToken] = useState(0);
-  // Text most recently sent from a generated manuscript section into Studio
-  // ("Humanize in Studio") plus a bump counter — see StudioPanel's
-  // seedText/seedToken doc comment for why both are needed.
-  const [studioSeedText, setStudioSeedText] = useState<string | undefined>(undefined);
-  const [studioSeedToken, setStudioSeedToken] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -82,7 +78,7 @@ export default function DeskShell({
       // whatever the URL said on arrival; a later tab switch changes the
       // `view` prop without re-running this decision.
       if (view === null) {
-        onViewChange(proj.gates.find((g) => g.gate === "G0")?.status === "signed_off" ? "document" : "intake", { replace: true });
+        onViewChange(proj.gates.find((g) => g.gate === "G0")?.status === "signed_off" ? "document" : "definition", { replace: true });
       }
       setRubric(rub);
       // Resolved by id (unfiltered), not from the "choose a type" listing —
@@ -147,12 +143,6 @@ export default function DeskShell({
     return { citedSourceIds: result.citedSourceIds, unresolvedIds: result.unresolvedIds };
   }
 
-  /** Sends a generated section's text to the Studio panel for a "make it read naturally in the author's voice" pass — the researcher decides if/when to bring the refined result back into the document (see StudioPanel's doc comment). */
-  function handleSendToStudio(text: string) {
-    setStudioSeedText(text);
-    setStudioSeedToken((t) => t + 1);
-  }
-
   function jumpToBlock(blockId: string) {
     globalThis.document?.getElementById(blockId)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -198,7 +188,7 @@ export default function DeskShell({
         onOpenAiAccess={onOpenAiAccess}
       />
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
-        {(["intake", "requirements", "document", "evidence", "manuscript", "progress", "submissions"] as const).map((v) => (
+        {(["definition", "requirements", "document", "evidence", "manuscript", "progress", "submissions"] as const).map((v) => (
           <button
             key={v}
             type="button"
@@ -211,8 +201,8 @@ export default function DeskShell({
                 : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]",
             ].join(" ")}
           >
-            {v === "intake"
-              ? "Intake"
+            {v === "definition"
+              ? "Definition"
               : v === "requirements"
                 ? "Requirements"
                 : v === "document"
@@ -267,7 +257,6 @@ export default function DeskShell({
             <ManuscriptGenerationPanel
               projectId={projectId}
               onOpenAiAccess={onOpenAiAccess}
-              onSendToStudio={handleSendToStudio}
               onInsertIntoDocument={(sections) => {
                 const newBlocks = sectionsToBlocks(sections);
                 const merged: CanonicalDocument = document
@@ -278,9 +267,9 @@ export default function DeskShell({
               }}
             />
           </div>
-        ) : view === "intake" ? (
-          <div className="flex-1 overflow-y-auto">
-            <IntakePanel
+        ) : view === "definition" ? (
+          <div className="flex-1 overflow-y-auto bg-[color:var(--surface-canvas)]">
+            <ResearchDefinitionPanel
               projectId={projectId}
               project={project}
               onSaved={(updated) => setProject(updated)}
@@ -307,6 +296,7 @@ export default function DeskShell({
               onSaveDocument={handleSaveDocument}
               submitting={submitting}
               projectId={projectId}
+              project={project}
               onResolveCitations={handleResolveCitations}
             />
           </>
@@ -315,8 +305,6 @@ export default function DeskShell({
           projectId={projectId}
           rubric={rubric}
           sessionId={`desk-${projectId}`}
-          studioSeedText={studioSeedText}
-          studioSeedToken={studioSeedToken}
           onChanged={(updated, newRubric) => {
             setProject(updated);
             setRubric(newRubric);

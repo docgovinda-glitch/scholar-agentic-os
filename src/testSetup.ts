@@ -17,3 +17,16 @@ import { cleanup } from "@testing-library/react";
 afterEach(() => {
   cleanup();
 });
+
+// Polyfill localStorage for jsdom environments where it is missing
+if (typeof globalThis !== "undefined" && !globalThis.localStorage) {
+  let storage: Record<string, string> = {};
+  (globalThis as any).localStorage = {
+    getItem: (key: string) => storage[key] ?? null,
+    setItem: (key: string, value: string) => { storage[key] = value; },
+    removeItem: (key: string) => { delete storage[key]; },
+    clear: () => { storage = {}; },
+    get length() { return Object.keys(storage).length; },
+    key: (index: number) => Object.keys(storage)[index] ?? null
+  };
+}

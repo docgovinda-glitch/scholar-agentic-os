@@ -5,7 +5,9 @@ import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
+import "express-async-errors";
 import { rateLimit } from "./server/src/middleware/rateLimit.ts";
+import { errorHandler } from "./server/src/middleware/errorHandler.ts";
 import { PDFParser } from "./src/document_intelligence/parser/parsers/pdfParser.ts";
 import { DOCXParser } from "./src/document_intelligence/parser/parsers/docxParser.ts";
 import { TXTParser } from "./src/document_intelligence/parser/parsers/txtParser.ts";
@@ -415,6 +417,8 @@ registerStudioRoutes(app, studioLimit);
 registerProjectRoutes(app, projectLimit);
 registerAiAccessRoutes(app);
 
+// Global Error Handler (must be registered after all routes)
+app.use(errorHandler);
 
 // ==========================================
 // VITE MIDDLEWARE SETUP
