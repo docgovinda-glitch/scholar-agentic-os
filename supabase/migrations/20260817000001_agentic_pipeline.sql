@@ -4,7 +4,7 @@
 -- 1. project_research_gaps
 CREATE TABLE IF NOT EXISTS project_research_gaps (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
     gap_type TEXT NOT NULL, -- 'empirical', 'theoretical', 'methodological', 'knowledge'
     description TEXT NOT NULL,
     importance_score INTEGER,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS project_research_gaps (
 -- 2. project_titles
 CREATE TABLE IF NOT EXISTS project_titles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
     title_text TEXT NOT NULL,
     subtitle_text TEXT,
     rationale TEXT,
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS project_titles (
 -- 3. project_journal_candidates
 CREATE TABLE IF NOT EXISTS project_journal_candidates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
     journal_name TEXT NOT NULL,
     publisher TEXT,
     impact_factor NUMERIC,
