@@ -1,8 +1,9 @@
 import { useState } from "react";
+import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedFetch, saveIntakeAnswers } from "../../api";
 
 interface EvidenceItem {
   id: string;
@@ -16,9 +17,13 @@ interface EvidenceItem {
 export default function EvidenceExtractionStage({
   stage,
   projectId,
+  project,
+  onSaved,
 }: {
   stage: ResearchStage;
   projectId: string;
+  project: ProjectView;
+  onSaved: (updated: ProjectView) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -68,6 +73,19 @@ export default function EvidenceExtractionStage({
 
       const { data } = await response.json();
       setResults(data);
+      
+      // Auto-save the results to project answers
+      try {
+        const newAnswers = {
+          ...project.answers,
+          extracted_evidence: JSON.stringify(data),
+        };
+        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+        onSaved(updatedProject);
+      } catch (saveErr) {
+        console.error("Failed to save extracted evidence", saveErr);
+      }
+
       setLogs((prev) => [
         ...prev,
         {

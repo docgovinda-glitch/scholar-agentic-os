@@ -1,8 +1,9 @@
 import { useState } from "react";
+import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedFetch, saveIntakeAnswers } from "../../api";
 
 interface ArgumentMatrixRow {
   id: string;
@@ -18,9 +19,13 @@ interface ArgumentMatrixRow {
 export default function EvidenceAnalysisStage({
   stage,
   projectId,
+  project,
+  onSaved,
 }: {
   stage: ResearchStage;
   projectId: string;
+  project: ProjectView;
+  onSaved: (updated: ProjectView) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -70,6 +75,19 @@ export default function EvidenceAnalysisStage({
 
       const { data } = await response.json();
       setResults(data);
+      
+      // Auto-save the results to project answers
+      try {
+        const newAnswers = {
+          ...project.answers,
+          evidence_clusters: JSON.stringify(data),
+        };
+        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+        onSaved(updatedProject);
+      } catch (saveErr) {
+        console.error("Failed to save evidence clusters", saveErr);
+      }
+
       setLogs((prev) => [
         ...prev,
         {

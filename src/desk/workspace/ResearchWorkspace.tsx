@@ -289,7 +289,14 @@ function renderStage(
     case "additional_data":
       return <AdditionalDataStage stage={stage} projectId={projectId} />;
     case "evidence_extraction":
-      return <EvidenceExtractionStage stage={stage} projectId={projectId} />;
+      return (
+        <EvidenceExtractionStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "external_research":
       return (
         <ExternalResearchStage
@@ -309,9 +316,23 @@ function renderStage(
         />
       );
     case "evidence_analysis":
-      return <EvidenceAnalysisStage stage={stage} projectId={projectId} />;
+      return (
+        <EvidenceAnalysisStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "manual_review":
-      return <ManualReviewStage stage={stage} projectId={projectId} />;
+      return (
+        <ManualReviewStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "journal_discovery":
       return <JournalDiscoveryStage stage={stage} projectId={projectId} />;
     case "journal_requirements":

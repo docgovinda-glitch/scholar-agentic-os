@@ -1,13 +1,43 @@
+import { useState } from "react";
+import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
+import { saveIntakeAnswers } from "../../api";
 
 export default function ManualReviewStage({
   stage,
+  projectId,
+  project,
+  onSaved,
 }: {
   stage: ResearchStage;
   projectId: string;
+  project: ProjectView;
+  onSaved: (updated: ProjectView) => void;
 }) {
   const def = STAGE_MAP.get(stage);
+  
+  const [synthesis, setSynthesis] = useState(project.answers?.["manual_synthesis"] || "");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleConfirm = async () => {
+    setIsSaving(true);
+    setError(null);
+    try {
+      const newAnswers = {
+        ...project.answers,
+        manual_synthesis: synthesis,
+        phase_3_signed_off: "true"
+      };
+      const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+      onSaved(updatedProject);
+    } catch (err: any) {
+      setError(err.message || "Failed to save synthesis.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (!def) return <div>Unknown stage</div>;
 
@@ -77,15 +107,40 @@ export default function ManualReviewStage({
               </ul>
             </div>
             
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+                {error}
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl p-6 mb-8 text-left border border-orange-100 shadow-sm">
+              <h4 className="font-bold text-gray-900 mb-4 text-lg border-b border-gray-100 pb-2">Manual Synthesis (Optional)</h4>
+              <p className="text-sm text-gray-600 mb-4">
+                Add your own conclusions, overarching themes, or specific instructions that the Drafting AI should keep in mind.
+              </p>
+              <textarea
+                value={synthesis}
+                onChange={(e) => setSynthesis(e.target.value)}
+                className="w-full h-32 p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none text-gray-800"
+                placeholder="E.g., Make sure to emphasize the limitations of the methodology in the discussion section..."
+              />
+            </div>
+            
             <p className="text-sm font-bold text-orange-800 uppercase tracking-widest mb-6">
               Next Phase: Journal Discovery & AI Drafting
             </p>
             
-            <button className="px-10 py-5 rounded-2xl bg-orange-600 text-white font-black text-xl shadow-lg hover:bg-orange-700 hover:-translate-y-1 hover:shadow-xl transition-all flex items-center justify-center gap-3 w-full max-w-lg mx-auto">
-              Confirm Framework & Proceed
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
+            <button 
+              onClick={handleConfirm}
+              disabled={isSaving || project.answers?.["phase_3_signed_off"] === "true"}
+              className="px-10 py-5 rounded-2xl bg-orange-600 text-white font-black text-xl shadow-lg hover:bg-orange-700 hover:-translate-y-1 hover:shadow-xl transition-all flex items-center justify-center gap-3 w-full max-w-lg mx-auto disabled:opacity-50"
+            >
+              {isSaving ? "Saving..." : project.answers?.["phase_3_signed_off"] === "true" ? "Framework Confirmed" : "Confirm Framework & Proceed"}
+              {!isSaving && project.answers?.["phase_3_signed_off"] !== "true" && (
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              )}
             </button>
           </div>
         </div>
