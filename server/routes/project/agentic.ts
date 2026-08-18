@@ -1,7 +1,7 @@
 import express from "express";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 import { callOpenRouterJSON } from "../../utils/llm.ts";
-import { getSupabaseRestConfig, SupabaseTable } from "../../../src/supabaseRest.ts";
+import { getSupabaseRestConfig, SupabaseTable } from "../../src/supabaseRest.ts";
 
 const router = express.Router({ mergeParams: true });
 
