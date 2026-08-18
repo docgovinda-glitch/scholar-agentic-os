@@ -54,6 +54,7 @@ interface ProjectRow {
   owner_id: string;
   output_type_id: string;
   answers: ProjectRecord["answers"];
+  authors: ProjectRecord["authors"];
   gates: ProjectRecord["gates"];
   document: ProjectRecord["document"] | null;
   rubric_report: ProjectRecord["rubricReport"] | null;
@@ -76,6 +77,7 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
     ownerId: row.owner_id,
     outputTypeId: row.output_type_id,
     answers: row.answers,
+    authors: row.authors || [],
     gates: row.gates,
     // PostgREST returns SQL NULL as JSON null; ProjectRecord uses undefined.
     document: row.document ?? undefined,
@@ -102,6 +104,7 @@ function recordToRow(record: ProjectRecord): ProjectRow {
     owner_id: record.ownerId,
     output_type_id: record.outputTypeId,
     answers: record.answers,
+    authors: record.authors || [],
     gates: record.gates,
     document: record.document ?? null,
     rubric_report: record.rubricReport ?? null,

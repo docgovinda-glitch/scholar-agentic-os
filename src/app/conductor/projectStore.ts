@@ -26,6 +26,20 @@ import type { PeerReviewHistory } from "../../domain/review/types";
 import type { CoverLetter } from "../../domain/coverLetter/types";
 import type { AnonymizationReport } from "../../domain/anonymization/types";
 
+export interface Author {
+  id: string;
+  title?: string;
+  firstName: string;
+  middleName?: string;
+  surname: string;
+  orcid?: string;
+  email: string;
+  affiliation?: string;
+  position?: string;
+  isCorresponding: boolean;
+  creditRoles: string[];
+}
+
 export interface ProjectRecord {
   projectId: string;
   /**
@@ -41,6 +55,7 @@ export interface ProjectRecord {
   outputTypeId: string;
   /** Intake answers so far, keyed by IntakeField.key. "provisional" is a valid value (docs 14 §5.2). */
   answers: Record<string, string>;
+  authors: Author[];
   gates: ProjectGateState;
   /** The project's document body, once one has been submitted (server/routes/project.ts's PUT .../document). Undefined until then — G6 has nothing to evaluate before this exists. */
   document?: CanonicalDocument;
@@ -105,6 +120,7 @@ export function createProject(outputTypeId: string, ownerId: string): ProjectRec
     ownerId,
     outputTypeId,
     answers: {},
+    authors: [],
     gates: initialProjectGateState(projectId),
     claimGraph: emptyGraph(),
     waivers: {},

@@ -11,7 +11,33 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import type { CanonicalDocument, Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, CoverLetter, DiscoveredSource, EvidenceConflict, EvidenceLedger, EvidenceLocator, GateSummary, GenerationJob, InterventionLevel, JournalRequirements, JournalRequirementsProposal, OutputTypeSpec, OutputTypeSummary, PeerReviewHistory, ProjectView, ReviewLens, RubricReport, StudioRefineResult, SubmissionRecord, SupportStrength, VoiceProfile } from "./types";
+import type {
+  Author,
+  CanonicalDocument,
+  Claim,
+  ClaimEvidenceBinding,
+  ClaimEvidenceGraph,
+  CoverLetter,
+  DiscoveredSource,
+  EvidenceConflict,
+  EvidenceLedger,
+  EvidenceLocator,
+  GateSummary,
+  GenerationJob,
+  InterventionLevel,
+  JournalRequirements,
+  JournalRequirementsProposal,
+  OutputTypeSpec,
+  OutputTypeSummary,
+  PeerReviewHistory,
+  ProjectView,
+  ReviewLens,
+  RubricReport,
+  StudioRefineResult,
+  SubmissionRecord,
+  SupportStrength,
+  VoiceProfile,
+} from "./types";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -109,6 +135,10 @@ export function saveIntakeAnswers(
   return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/intake`, "PATCH", { answers }).then((r) =>
     json(r)
   );
+}
+
+export function saveAuthors(projectId: string, authors: Author[]): Promise<ProjectView> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/authors`, "PUT", { authors }).then((r) => json(r));
 }
 
 /**

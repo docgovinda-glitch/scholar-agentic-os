@@ -13,10 +13,25 @@ export interface GateSummary {
   outstandingBlocking: string[];
 }
 
+export interface Author {
+  id: string;
+  title?: string;
+  firstName: string;
+  middleName?: string;
+  surname: string;
+  orcid?: string;
+  email: string;
+  affiliation?: string;
+  position?: string;
+  isCorresponding: boolean;
+  creditRoles: string[];
+}
+
 export interface ProjectView {
   projectId: string;
   outputTypeId: string;
   answers: Record<string, string>;
+  authors: Author[];
   intakeCompleteness: number;
   hasDocument: boolean;
   hasJournalRequirements: boolean;

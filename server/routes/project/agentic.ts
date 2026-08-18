@@ -24,47 +24,66 @@ router.post("/literature", async (req: express.Request<{ id: string }>, res) => 
   // Simulate LLM / Omni Router processing delay (3 seconds)
   await new Promise((resolve) => setTimeout(resolve, 3000));
 
-  // Generate mocked "Knowledge Vault" and "External" results
   // In a real implementation, this would call Studio/OmniRouter with project.answers context
+  const workingTitle = project.answers["working_title"] || "Untitled Research";
+  
+  // MOCKED SEMANTIC DISCOVERY LOGIC:
+  // 1. Analyze Working Title for primary intent, domain, and methodology hints.
+  // 2. Generate controlled semantic search variants.
+  // 3. Rank vault and external literature based on direct relevance to these variants.
+  
+  const semanticVariants = [
+    `"${workingTitle}" OR related core concepts`,
+    `Methodological approaches similar to "${workingTitle}"`,
+    `Empirical studies addressing "${workingTitle}"`
+  ];
+
+  console.log(`[Agentic Discovery] Extracting semantic intent from: "${workingTitle}"`);
+  console.log(`[Agentic Discovery] Generated search variants:`, semanticVariants);
+
   const discoveredLiterature = [
     {
       id: "lit-001",
-      title: "Agentic Workflows in Qualitative Analysis",
+      title: `Contextualizing ${workingTitle}: A review`,
       authors: ["Smith, J.", "Doe, A."],
       year: 2025,
-      journal: "Journal of Human-Computer Interaction",
+      journal: "Journal of Advanced Research",
       source: "vault",
       relevanceScore: 95,
-      themes: ["AI alignment", "qualitative coding", "agentic UX"],
-      abstract: "This paper explores the usage of multi-agent LLM systems in qualitative coding workflows, discovering a 40% reduction in manual effort without loss of rigorous coding schemas.",
+      themes: ["core concepts", "semantic match"],
+      abstract: `This paper explores the exact semantic core of the working title "${workingTitle}", finding a 40% correlation in past literature.`,
     },
     {
       id: "lit-002",
-      title: "The Epistemology of Artificial Peer Review",
+      title: `Methodologies for ${workingTitle.split(" ")[0] || "Research"}`,
       authors: ["Chen, M."],
       year: 2026,
-      journal: "AI Ethics & Society",
+      journal: "Methodology Review",
       source: "external",
       relevanceScore: 88,
-      themes: ["peer review", "academic integrity", "AI epistemology"],
-      abstract: "Analyzes the epistemological bounds of having artificial intelligence conduct peer review on academic manuscripts. Concludes that while fact-checking is robust, subjective theoretical novelty remains challenging.",
+      themes: ["methodology", "empirical"],
+      abstract: `Analyzes the methodological bounds of the topics surrounding "${workingTitle}". Concludes that objective semantic frameworks are best.`,
     },
     {
       id: "lit-003",
-      title: "Vector Databases in Personal Knowledge Management",
+      title: "Foundational Theories in the Field",
       authors: ["Gonzalez, R.", "Kim, T."],
       year: 2024,
       journal: "Information Systems Research",
       source: "vault",
       relevanceScore: 82,
-      themes: ["knowledge vault", "vector indexing", "PKM"],
-      abstract: "A comprehensive review of vector embeddings applied to personal knowledge management (PKM) systems, highlighting retrieval-augmented generation (RAG) limitations.",
+      themes: ["theoretical framework", "background"],
+      abstract: `A comprehensive review of the background concepts that often inform studies similar to "${workingTitle}".`,
     }
   ];
 
   res.json({
     ok: true,
     data: discoveredLiterature,
+    meta: {
+      intentSignal: workingTitle,
+      searchVariants: semanticVariants
+    }
   });
 });
 

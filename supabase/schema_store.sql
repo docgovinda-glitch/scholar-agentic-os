@@ -62,6 +62,7 @@ create table if not exists public.projects (
   rubric_report jsonb,
   claim_graph jsonb not null default '{}'::jsonb,
   waivers jsonb not null default '{}'::jsonb,
+  authors jsonb not null default '[]'::jsonb,
   -- Post-G6 submission attempts against journals (domain/submission/types.ts).
   -- Orthogonal to the gate columns above — a project can be G6-signed-off
   -- with any number of submission attempts against different venues.
@@ -133,6 +134,9 @@ end $$;
 -- no submission history yet is simply an empty list, exactly what new rows
 -- already default to.
 alter table public.projects add column if not exists submissions jsonb not null default '[]'::jsonb;
+
+-- Migration for databases created before authors existed.
+alter table public.projects add column if not exists authors jsonb not null default '[]'::jsonb;
 
 -- Migration for databases created before journal_requirements existed.
 -- Nullable, no default: an existing row simply has no requirements captured

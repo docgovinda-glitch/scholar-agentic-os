@@ -930,6 +930,7 @@ export function projectView(record: ProjectRecord | undefined) {
     projectId: record.projectId,
     outputTypeId: record.outputTypeId,
     answers: record.answers,
+    authors: record.authors || [],
     /** Fraction (0-1) of every intake field (required, recommended, and optional) that has an answer — informational, not gating (only required fields block G0). */
     intakeCompleteness: intakeCompleteness(spec, record.answers),
     hasDocument: record.document !== undefined,
@@ -1155,6 +1156,27 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       }
       throw err;
     }
+  }));
+
+  /**
+   * Update the structured authors array for the project.
+   */
+  app.put("/api/projects/:id/authors", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { authors } = req.body ?? {};
+    if (!Array.isArray(authors)) {
+      return res.status(400).json({ error: "Missing required field: authors (array)" });
+    }
+
+    // Validation
+    const corresponding = authors.filter((a: any) => a.isCorresponding);
+    if (corresponding.length > 1) {
+      return res.status(400).json({ error: "Exactly one author can be designated as the corresponding author." });
+    }
+
+    const updated = await store.save({ ...record, authors });
+    res.json(projectView(updated));
   }));
 
   /** The project's captured journal requirements. 404s if none have been captured yet. */

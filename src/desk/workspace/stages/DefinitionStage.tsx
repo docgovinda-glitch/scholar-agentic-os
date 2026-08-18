@@ -1,18 +1,26 @@
 import { useEffect, useState } from "react";
-import { getOutputTypeSpec, saveIntakeAnswers } from "../../api";
-import type { OutputTypeSpec, ProjectView } from "../../types";
+import { getOutputTypeSpec, saveIntakeAnswers, saveAuthors } from "../../api";
+import type { OutputTypeSpec, ProjectView, Author } from "../../types";
+
+const ARTICLE_TYPES = [
+  "Original Research",
+  "Review Article",
+  "Case Report",
+  "Methodology / Methods",
+  "Perspective / Opinion",
+  "Other"
+];
+
+const CREDIT_ROLES = [
+  "Conceptualization", "Data curation", "Formal analysis", "Funding acquisition",
+  "Investigation", "Methodology", "Project administration", "Resources",
+  "Software", "Supervision", "Validation", "Visualization", "Writing – original draft",
+  "Writing – review & editing"
+];
 
 /**
  * DefinitionStage — the first stage of the research workspace.
- *
- * Collects a comprehensive research definition including:
- * - Author Information (author, co-authors, affiliations)
- * - Research Definition (title, objectives, questions, methodology, etc.)
- * - Research Governance (ethics, funding, conflicts of interest)
- *
- * Uses the Atlas intake schema as the base and extends it with the
- * additional fields specified in the master prompt. All fields are saved
- * via the existing intake API and fed into the gate state machine (G0).
+ * Redesigned for Journal Article workspace.
  */
 export default function DefinitionStage({
   projectId,
@@ -25,10 +33,11 @@ export default function DefinitionStage({
 }) {
   const [spec, setSpec] = useState<OutputTypeSpec | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>(project.answers ?? {});
+  const [authors, setAuthors] = useState<Author[]>(project.authors ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
-  const [activeSection, setActiveSection] = useState<"author" | "research" | "governance">("author");
+  const [activeSection, setActiveSection] = useState<"research" | "author" | "governance">("research");
 
   useEffect(() => {
     let active = true;
@@ -43,12 +52,49 @@ export default function DefinitionStage({
     setSavedAt(null);
   }
 
+  function updateAuthor(id: string, updates: Partial<Author>) {
+    setAuthors(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+    setSavedAt(null);
+  }
+
+  function addAuthor() {
+    const newAuthor: Author = {
+      id: "auth-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      firstName: "",
+      surname: "",
+      email: "",
+      isCorresponding: authors.length === 0,
+      creditRoles: []
+    };
+    setAuthors(prev => [...prev, newAuthor]);
+    setSavedAt(null);
+  }
+
+  function removeAuthor(id: string) {
+    setAuthors(prev => prev.filter(a => a.id !== id));
+    setSavedAt(null);
+  }
+
+  function moveAuthor(index: number, direction: -1 | 1) {
+    if (index + direction < 0 || index + direction >= authors.length) return;
+    setAuthors(prev => {
+      const copy = [...prev];
+      const temp = copy[index];
+      copy[index] = copy[index + direction];
+      copy[index + direction] = temp;
+      return copy;
+    });
+    setSavedAt(null);
+  }
+
   async function handleSave() {
     setBusy(true);
     setError(null);
     try {
-      const updated = await saveIntakeAnswers(projectId, answers);
-      onSaved(updated);
+      const updatedAnswers = await saveIntakeAnswers(projectId, answers);
+      const updatedAuthors = await saveAuthors(projectId, authors);
+      // Merging state
+      onSaved({ ...updatedAnswers, authors: updatedAuthors.authors });
       setSavedAt(Date.now());
     } catch (e) {
       setError((e as Error).message);
@@ -57,64 +103,52 @@ export default function DefinitionStage({
     }
   }
 
-  // Extended author/governance fields beyond what Atlas knows about
-  const authorFields = [
-    { key: "author_name", label: "Lead Author Name", placeholder: "Dr. Jane Smith", required: true },
-    { key: "author_email", label: "Contact Email", placeholder: "jane.smith@university.edu", required: true },
-    { key: "author_affiliation", label: "Institutional Affiliation", placeholder: "Department of Computer Science, University of Example", required: true },
-    { key: "author_position", label: "Position / Title", placeholder: "Associate Professor", required: false },
-    { key: "co_authors", label: "Co-Authors", placeholder: "Name 1 (Affiliation)\nName 2 (Affiliation)", required: false, multiline: true },
-    { key: "corresponding_author", label: "Corresponding Author", placeholder: "Same as lead author, or specify another", required: false },
-  ];
-
-  const governanceFields = [
-    { key: "ethical_approval", label: "Ethical Approval", placeholder: "IRB/Ethics committee approval number, or 'Not applicable'", required: false },
-    { key: "human_subjects", label: "Human / Animal Subjects", placeholder: "Describe participant information, or 'Not applicable'", required: false },
-    { key: "funding", label: "Funding Sources", placeholder: "Grant numbers and funding agencies, or 'No external funding'", required: false },
-    { key: "conflicts_of_interest", label: "Conflicts of Interest", placeholder: "Declare any conflicts, or 'None declared'", required: false },
-    { key: "data_availability", label: "Data Availability / Restrictions", placeholder: "Data sharing policy and any restrictions", required: false },
-    { key: "consent_requirements", label: "Consent Requirements", placeholder: "Informed consent procedures, or 'Not applicable'", required: false },
-  ];
-
-  // Research fields come from Atlas intake schema + our extensions
+  // Research Definition fields
   const researchFields = spec
     ? [
-        ...spec.intakeSchema.required.map((f) => ({ ...f, required: true, multiline: true })),
+        { key: "working_title", label: "Working Title", placeholder: "Primary research-intent signal...", required: true, multiline: false },
+        { key: "article_type", label: "Article Type", placeholder: "Select or specify...", required: true, multiline: false },
+        { key: "research_area", label: "Research Area / Domain", placeholder: "e.g., Machine Learning, Public Health...", required: true, multiline: false },
+        ...spec.intakeSchema.required.filter(f => !["working_title", "article_type", "research_area"].includes(f.key)).map((f) => ({ ...f, required: true, multiline: true })),
         ...spec.intakeSchema.recommended.map((f) => ({ ...f, required: false, multiline: true })),
-        // Additional fields beyond Atlas
-        ...[
-          { key: "research_area", label: "Research Area / Domain", placeholder: "e.g., Machine Learning, Public Health, Comparative Literature", required: true, multiline: false, guidance: null, allowsProvisional: true },
-          { key: "study_design", label: "Study Design / Type", placeholder: "e.g., Systematic review, Cross-sectional study, Qualitative analysis", required: false, multiline: false, guidance: null, allowsProvisional: true },
-          { key: "target_population", label: "Target Population / Sample / Data", placeholder: "Describe the population, dataset, or sample you are studying", required: false, multiline: true, guidance: null, allowsProvisional: true },
-          { key: "geographic_context", label: "Geographic / Study Context", placeholder: "e.g., Sub-Saharan Africa, OECD countries, Online communities", required: false, multiline: false, guidance: null, allowsProvisional: true },
-          { key: "theoretical_framework", label: "Theoretical Framework", placeholder: "Name the theory or theories guiding this research, if known", required: false, multiline: true, guidance: null, allowsProvisional: true },
-          { key: "expected_contribution", label: "Expected Contribution / Significance", placeholder: "What will this research add to the field?", required: false, multiline: true, guidance: null, allowsProvisional: true },
-          { key: "keywords", label: "Keywords", placeholder: "Keyword 1, Keyword 2, Keyword 3, ...", required: false, multiline: false, guidance: null, allowsProvisional: true },
-        ].filter((f) => !spec.intakeSchema.required.some((r) => r.key === f.key) && !spec.intakeSchema.recommended.some((r) => r.key === f.key)),
+        { key: "study_design", label: "Study Design / Type", placeholder: "e.g., Systematic review, Cross-sectional study, Qualitative analysis", required: false, multiline: false },
+        { key: "target_population", label: "Target Population / Sample / Data", placeholder: "Describe the population, dataset, or sample you are studying", required: false, multiline: true },
+        { key: "theoretical_framework", label: "Theoretical Framework", placeholder: "Name the theory or theories guiding this research, if known", required: false, multiline: true },
+        { key: "target_journal", label: "Target Journal", placeholder: "Optional target journal", required: false, multiline: false },
+        { key: "author_guidelines", label: "Author Guidelines", placeholder: "URL or brief notes", required: false, multiline: true },
+        { key: "expected_contribution", label: "Expected Contribution / Significance", placeholder: "What will this research add to the field?", required: false, multiline: true },
       ]
     : [];
 
+  const governanceFields = [
+    { key: "human_subjects", label: "Does this research involve Human or Animal Subjects?", placeholder: "Yes / No", required: true },
+    ...(answers.human_subjects?.toLowerCase().includes("yes") ? [
+      { key: "ethical_approval", label: "Ethical Approval", placeholder: "IRB/Ethics committee approval number", required: true },
+      { key: "consent_requirements", label: "Consent Requirements", placeholder: "Informed consent procedures", required: true }
+    ] : []),
+    { key: "funding", label: "Funding Sources", placeholder: "Grant numbers and funding agencies, or 'No external funding'", required: false },
+    { key: "conflicts_of_interest", label: "Conflicts of Interest", placeholder: "Declare any conflicts, or 'None declared'", required: false },
+    { key: "data_availability", label: "Data Availability / Restrictions", placeholder: "Data sharing policy and any restrictions", required: false },
+  ];
+
   const sections = [
-    { id: "author" as const, label: "Author Information", count: authorFields.length },
     { id: "research" as const, label: "Research Definition", count: researchFields.length },
+    { id: "author" as const, label: "Author Information", count: authors.length },
     { id: "governance" as const, label: "Research Governance", count: governanceFields.length },
   ];
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-4xl mx-auto px-6 py-8 animate-fade-in">
-        {/* Stage header */}
         <header className="mb-8">
           <h2 className="text-2xl font-bold tracking-tight text-[color:var(--text-primary)] mb-2">
             Research Definition
           </h2>
           <p className="text-sm text-[color:var(--text-secondary)] leading-relaxed max-w-2xl">
-            Define the boundaries and goals of your journal article. These parameters will guide all downstream AI agents 
-            — from literature review through manuscript generation. Be as specific as possible.
+            Define the boundaries and goals of your journal article. These parameters will guide all downstream AI agents.
           </p>
         </header>
 
-        {/* Error banner */}
         {error && (
           <div className="mb-6 rounded-[var(--radius-md)] border border-[color:var(--state-danger)]/30 bg-[color:var(--state-danger-subtle)] px-4 py-3 text-sm text-[color:var(--state-danger)] flex items-center gap-2">
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -124,7 +158,6 @@ export default function DefinitionStage({
           </div>
         )}
 
-        {/* Section tabs */}
         <div className="flex gap-1 mb-8 border-b border-[color:var(--border-subtle)]">
           {sections.map((section) => (
             <button
@@ -138,36 +171,58 @@ export default function DefinitionStage({
                   : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:border-[color:var(--border-default)]",
               ].join(" ")}
             >
-              {section.label}
+              {section.label} {section.id === "author" && `(${section.count})`}
             </button>
           ))}
         </div>
 
-        {/* Form fields */}
-        {activeSection === "author" && (
-          <FieldGroup
-            fields={authorFields}
-            answers={answers}
-            onUpdate={updateAnswer}
-          />
-        )}
-
         {activeSection === "research" && (
           spec ? (
             <div className="space-y-5">
-              {researchFields.map((field) => (
-                <FormField
-                  key={field.key}
-                  fieldKey={field.key}
-                  label={field.label}
-                  placeholder={"placeholder" in field ? (field as any).placeholder : ""}
-                  required={field.required}
-                  multiline={field.multiline}
-                  value={answers[field.key] || ""}
-                  onChange={(val) => updateAnswer(field.key, val)}
-                  guidance={field.guidance && typeof field.guidance === "object" ? field.guidance as { whatItIs: string; whyItMatters: string; example: string; defaultWithRationale: string } : undefined}
-                />
-              ))}
+              {researchFields.map((field) => {
+                if (field.key === "article_type") {
+                  return (
+                    <div key={field.key} className="group rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5 transition-all duration-200">
+                      <label className="text-sm font-semibold text-[color:var(--text-primary)] flex items-center gap-2 mb-3">
+                        {field.label}
+                        {field.required && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">Required</span>}
+                      </label>
+                      <select
+                        value={ARTICLE_TYPES.includes(answers[field.key]) ? answers[field.key] : answers[field.key] ? "Other" : ""}
+                        onChange={(e) => updateAnswer(field.key, e.target.value === "Other" ? "" : e.target.value)}
+                        className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded p-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--accent)] mb-2"
+                      >
+                        <option value="" disabled>Select article type...</option>
+                        {ARTICLE_TYPES.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                        <option value="Other">Other (Specify)</option>
+                      </select>
+                      {(!ARTICLE_TYPES.includes(answers[field.key]) && answers[field.key] !== undefined) && (
+                        <input
+                          type="text"
+                          value={answers[field.key] || ""}
+                          onChange={(e) => updateAnswer(field.key, e.target.value)}
+                          placeholder="Specify custom article type"
+                          className="w-full bg-transparent border-0 p-0 text-sm text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:ring-0 outline-none"
+                        />
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <FormField
+                    key={field.key}
+                    fieldKey={field.key}
+                    label={field.label}
+                    placeholder={field.placeholder}
+                    required={field.required}
+                    multiline={field.multiline}
+                    value={answers[field.key] || ""}
+                    onChange={(val) => updateAnswer(field.key, val)}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="flex items-center gap-3 text-sm text-[color:var(--text-muted)]">
@@ -177,15 +232,138 @@ export default function DefinitionStage({
           )
         )}
 
-        {activeSection === "governance" && (
-          <FieldGroup
-            fields={governanceFields}
-            answers={answers}
-            onUpdate={updateAnswer}
-          />
+        {activeSection === "author" && (
+          <div className="space-y-6">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={addAuthor}
+                className="text-sm font-semibold text-[color:var(--accent)] hover:text-[color:var(--accent-hover)] transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Author
+              </button>
+            </div>
+            {authors.length === 0 ? (
+              <p className="text-sm text-[color:var(--text-muted)] text-center py-8">No authors added yet.</p>
+            ) : (
+              authors.map((author, index) => (
+                <div key={author.id} className="rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5 relative">
+                  <div className="absolute top-4 right-4 flex gap-2">
+                    <button onClick={() => moveAuthor(index, -1)} disabled={index === 0} className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] disabled:opacity-30 cursor-pointer">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                    </button>
+                    <button onClick={() => moveAuthor(index, 1)} disabled={index === authors.length - 1} className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] disabled:opacity-30 cursor-pointer">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <button onClick={() => removeAuthor(author.id)} className="text-[color:var(--text-muted)] hover:text-[color:var(--state-danger)] ml-2 cursor-pointer">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">Title (Opt)</label>
+                      <input type="text" value={author.title || ""} onChange={e => updateAuthor(author.id, { title: e.target.value })} placeholder="Dr., Prof." className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">First Name *</label>
+                      <input type="text" value={author.firstName} onChange={e => updateAuthor(author.id, { firstName: e.target.value })} placeholder="Jane" className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">Middle Name</label>
+                      <input type="text" value={author.middleName || ""} onChange={e => updateAuthor(author.id, { middleName: e.target.value })} placeholder="" className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">Surname *</label>
+                      <input type="text" value={author.surname} onChange={e => updateAuthor(author.id, { surname: e.target.value })} placeholder="Smith" className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">Email *</label>
+                      <input type="email" value={author.email} onChange={e => updateAuthor(author.id, { email: e.target.value })} placeholder="jane.smith@example.com" className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">ORCID iD</label>
+                      <input type="text" value={author.orcid || ""} onChange={e => updateAuthor(author.id, { orcid: e.target.value })} placeholder="0000-0000-0000-0000" className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">Affiliation</label>
+                      <input type="text" value={author.affiliation || ""} onChange={e => updateAuthor(author.id, { affiliation: e.target.value })} placeholder="University of Example" className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">Position / Title</label>
+                      <input type="text" value={author.position || ""} onChange={e => updateAuthor(author.id, { position: e.target.value })} placeholder="Associate Professor" className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded px-2 py-1.5 text-sm" />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 mb-4">
+                    <input
+                      type="checkbox"
+                      id={`corr-${author.id}`}
+                      checked={author.isCorresponding}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        if (checked) {
+                          setAuthors(prev => prev.map(a => a.id === author.id ? { ...a, isCorresponding: true } : { ...a, isCorresponding: false }));
+                        } else {
+                          updateAuthor(author.id, { isCorresponding: false });
+                        }
+                      }}
+                      className="rounded border-[color:var(--border-default)] text-[color:var(--accent)] focus:ring-[color:var(--accent)]"
+                    />
+                    <label htmlFor={`corr-${author.id}`} className="text-sm text-[color:var(--text-primary)] cursor-pointer">
+                      Corresponding Author
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-2">CRediT Roles</label>
+                    <div className="flex flex-wrap gap-2">
+                      {CREDIT_ROLES.map(role => (
+                        <button
+                          key={role}
+                          onClick={() => {
+                            const active = author.creditRoles.includes(role);
+                            updateAuthor(author.id, {
+                              creditRoles: active ? author.creditRoles.filter(r => r !== role) : [...author.creditRoles, role]
+                            });
+                          }}
+                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors cursor-pointer ${
+                            author.creditRoles.includes(role)
+                              ? "bg-[color:var(--accent-subtle)] border-[color:var(--accent)] text-[color:var(--accent)]"
+                              : "bg-[color:var(--surface-base)] border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:border-[color:var(--border-hover)]"
+                          }`}
+                        >
+                          {role}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         )}
 
-        {/* Save bar */}
+        {activeSection === "governance" && (
+          <div className="space-y-5">
+            {governanceFields.map((field) => (
+              <FormField
+                key={field.key}
+                fieldKey={field.key}
+                label={field.label}
+                placeholder={field.placeholder}
+                required={field.required}
+                multiline={false}
+                value={answers[field.key] || ""}
+                onChange={(val) => updateAnswer(field.key, val)}
+              />
+            ))}
+          </div>
+        )}
+
         <div className="mt-10 flex items-center justify-between border-t border-[color:var(--border-subtle)] pt-6">
           <div className="text-xs text-[color:var(--text-muted)]">
             {savedAt && (
@@ -223,33 +401,6 @@ export default function DefinitionStage({
   );
 }
 
-function FieldGroup({
-  fields,
-  answers,
-  onUpdate,
-}: {
-  fields: { key: string; label: string; placeholder: string; required: boolean; multiline?: boolean }[];
-  answers: Record<string, string>;
-  onUpdate: (key: string, value: string) => void;
-}) {
-  return (
-    <div className="space-y-5">
-      {fields.map((field) => (
-        <FormField
-          key={field.key}
-          fieldKey={field.key}
-          label={field.label}
-          placeholder={field.placeholder}
-          required={field.required}
-          multiline={field.multiline}
-          value={answers[field.key] || ""}
-          onChange={(val) => onUpdate(field.key, val)}
-        />
-      ))}
-    </div>
-  );
-}
-
 function FormField({
   fieldKey,
   label,
@@ -258,7 +409,6 @@ function FormField({
   multiline,
   value,
   onChange,
-  guidance,
 }: {
   fieldKey: string;
   label: string;
@@ -267,10 +417,7 @@ function FormField({
   multiline?: boolean;
   value: string;
   onChange: (value: string) => void;
-  guidance?: { whatItIs: string; whyItMatters: string; example: string; defaultWithRationale: string };
 }) {
-  const [showGuidance, setShowGuidance] = useState(false);
-
   return (
     <div className="group rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5 transition-all duration-200 hover:border-[color:var(--border-default)] focus-within:border-[color:var(--accent)] focus-within:shadow-sm">
       <div className="flex items-center justify-between mb-3">
@@ -278,28 +425,7 @@ function FormField({
           {label}
           {required && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">Required</span>}
         </label>
-        {guidance && (
-          <button
-            type="button"
-            onClick={() => setShowGuidance(!showGuidance)}
-            className="text-xs text-[color:var(--accent)] hover:text-[color:var(--accent-hover)] transition-colors cursor-pointer flex items-center gap-1"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {showGuidance ? "Hide guide" : "What is this?"}
-          </button>
-        )}
       </div>
-
-      {showGuidance && guidance && (
-        <div className="mb-3 rounded-[var(--radius-md)] bg-[color:var(--state-info-subtle)] border border-[color:var(--state-info)]/20 p-3 text-xs text-[color:var(--text-secondary)] space-y-1.5 animate-fade-in">
-          <p><strong className="text-[color:var(--text-primary)]">What it is:</strong> {guidance.whatItIs}</p>
-          <p><strong className="text-[color:var(--text-primary)]">Why it matters:</strong> {guidance.whyItMatters}</p>
-          <p><strong className="text-[color:var(--text-primary)]">Example:</strong> {guidance.example}</p>
-        </div>
-      )}
-
       {multiline ? (
         <textarea
           id={fieldKey}
