@@ -1,8 +1,9 @@
 import { useState } from "react";
+import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedFetch, saveIntakeAnswers } from "../../api";
 
 interface VaultSource {
   id: string;
@@ -16,9 +17,13 @@ interface VaultSource {
 export default function VaultSourcesStage({
   stage,
   projectId,
+  project,
+  onSaved,
 }: {
   stage: ResearchStage;
   projectId: string;
+  project: ProjectView;
+  onSaved: (updated: ProjectView) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -67,13 +72,26 @@ export default function VaultSourcesStage({
 
       const { data } = await response.json();
       setResults(data);
+      
+      // Auto-save the results to pending vault sources
+      try {
+        const newAnswers = {
+          ...project.answers,
+          pending_vault_sources: JSON.stringify(data),
+        };
+        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+        onSaved(updatedProject);
+      } catch (saveErr) {
+        console.error("Failed to save pending vault sources", saveErr);
+      }
+
       setLogs((prev) => [
         ...prev,
         {
           id: Date.now().toString() + "done",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
           level: "success",
-          message: `Scan complete. Found ${data.length} highly relevant primary sources.`,
+          message: `Scan complete. Found ${data.length} highly relevant primary sources and queued them for approval.`,
         },
       ]);
     } catch (err: any) {
@@ -190,12 +208,18 @@ export default function VaultSourcesStage({
                         {item.relevance_score}%
                       </div>
                     </div>
-                    <button className="px-4 py-2 rounded-lg bg-[color:var(--surface-sunken)] text-[color:var(--accent)] font-semibold border border-[color:var(--border-subtle)] hover:bg-[color:var(--accent-subtle)] transition-colors">
-                      Include
-                    </button>
                   </div>
                 </div>
               ))}
+            </div>
+            
+            <div className="mt-8 flex justify-end">
+              <button className="px-6 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md flex items-center gap-2 hover:bg-[color:var(--accent-hover)] transition-colors">
+                Proceed to Vault Approval
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </button>
             </div>
           </div>
         )}

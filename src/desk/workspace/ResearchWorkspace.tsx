@@ -269,17 +269,45 @@ function renderStage(
         />
       );
     case "vault_sources":
-      return <VaultSourcesStage stage={stage} projectId={projectId} />;
+      return (
+        <VaultSourcesStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "source_approval_vault":
-      return <SourceApprovalStage stage={stage} projectId={projectId} />;
+      return (
+        <SourceApprovalStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "additional_data":
       return <AdditionalDataStage stage={stage} projectId={projectId} />;
     case "evidence_extraction":
       return <EvidenceExtractionStage stage={stage} projectId={projectId} />;
     case "external_research":
-      return <ExternalResearchStage stage={stage} projectId={projectId} />;
+      return (
+        <ExternalResearchStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "source_approval_external":
-      return <SourceApprovalStage stage={stage} projectId={projectId} />;
+      return (
+        <SourceApprovalStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "evidence_analysis":
       return <EvidenceAnalysisStage stage={stage} projectId={projectId} />;
     case "manual_review":
