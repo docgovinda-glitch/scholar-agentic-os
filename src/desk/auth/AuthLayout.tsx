@@ -319,7 +319,7 @@ export function PhoneField({
           inputMode="numeric"
           value={number}
           required={required}
-          placeholder="9851108291"
+          placeholder="e.g., 5551234567"
           onChange={(e) => onNumberChange(e.target.value)}
           onBlur={onBlur}
           className="w-full px-3 py-2 text-sm"
