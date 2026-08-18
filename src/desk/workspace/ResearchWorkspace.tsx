@@ -19,6 +19,17 @@ import ExternalResearchStage from "./stages/ExternalResearchStage";
 import SourceApprovalStage from "./stages/SourceApprovalStage";
 import EvidenceAnalysisStage from "./stages/EvidenceAnalysisStage";
 import ManualReviewStage from "./stages/ManualReviewStage";
+import JournalDiscoveryStage from "./stages/JournalDiscoveryStage";
+import JournalRequirementsStage from "./stages/JournalRequirementsStage";
+import DraftStage from "./stages/DraftStage";
+import CitationAuditStage from "./stages/CitationAuditStage";
+import OriginalityCheckStage from "./stages/OriginalityCheckStage";
+import DraftPreviewStage from "./stages/DraftPreviewStage";
+import PeerReviewStage from "./stages/PeerReviewStage";
+import RevisionStage from "./stages/RevisionStage";
+import FinalEditorStage from "./stages/FinalEditorStage";
+import PublicationReadinessStage from "./stages/PublicationReadinessStage";
+import ExportStage from "./stages/ExportStage";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 
 /**
@@ -247,6 +258,28 @@ function renderStage(
       return <EvidenceAnalysisStage stage={stage} projectId={projectId} />;
     case "manual_review":
       return <ManualReviewStage stage={stage} projectId={projectId} />;
+    case "journal_discovery":
+      return <JournalDiscoveryStage stage={stage} projectId={projectId} />;
+    case "journal_requirements":
+      return <JournalRequirementsStage stage={stage} projectId={projectId} />;
+    case "draft":
+      return <DraftStage stage={stage} projectId={projectId} />;
+    case "citation_audit":
+      return <CitationAuditStage stage={stage} projectId={projectId} />;
+    case "originality_check":
+      return <OriginalityCheckStage stage={stage} projectId={projectId} />;
+    case "draft_preview":
+      return <DraftPreviewStage stage={stage} projectId={projectId} />;
+    case "peer_review":
+      return <PeerReviewStage stage={stage} projectId={projectId} />;
+    case "revision":
+      return <RevisionStage stage={stage} projectId={projectId} />;
+    case "final_editor":
+      return <FinalEditorStage stage={stage} projectId={projectId} />;
+    case "publication_readiness":
+      return <PublicationReadinessStage stage={stage} projectId={projectId} />;
+    case "export":
+      return <ExportStage stage={stage} projectId={projectId} />;
     default:
       return <PlaceholderStage stage={stage} />;
   }
