@@ -1,15 +1,20 @@
 import { useState } from "react";
+import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedFetch, saveIntakeAnswers } from "../../api";
 
 export default function PeerReviewStage({
   stage,
   projectId,
+  project,
+  onSaved,
 }: {
   stage: ResearchStage;
   projectId: string;
+  project: ProjectView;
+  onSaved: (updated: ProjectView) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -55,13 +60,25 @@ export default function PeerReviewStage({
 
       const { data } = await response.json();
       setResults(data);
+
+      try {
+        const newAnswers = {
+          ...project.answers,
+          peer_review_critique: JSON.stringify(data),
+        };
+        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+        onSaved(updatedProject);
+      } catch (saveErr) {
+        console.error("Failed to save peer review critique", saveErr);
+      }
+
       setLogs((prev) => [
         ...prev,
         {
           id: Date.now().toString() + "done",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
           level: "success",
-          message: `Peer review complete. 3 major revisions suggested.`.replace("{count}", data?.length || 0),
+          message: `Peer review complete. 3 major revisions suggested.`,
         },
       ]);
     } catch (err: any) {

@@ -352,7 +352,14 @@ function renderStage(
         />
       );
     case "draft":
-      return <DraftStage stage={stage} projectId={projectId} />;
+      return (
+        <DraftStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "citation_audit":
       return <CitationAuditStage stage={stage} projectId={projectId} />;
     case "originality_check":
@@ -360,11 +367,32 @@ function renderStage(
     case "draft_preview":
       return <DraftPreviewStage stage={stage} projectId={projectId} />;
     case "peer_review":
-      return <PeerReviewStage stage={stage} projectId={projectId} />;
+      return (
+        <PeerReviewStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "revision":
-      return <RevisionStage stage={stage} projectId={projectId} />;
+      return (
+        <RevisionStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "final_editor":
-      return <FinalEditorStage stage={stage} projectId={projectId} />;
+      return (
+        <FinalEditorStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "publication_readiness":
       return <PublicationReadinessStage stage={stage} projectId={projectId} />;
     case "export":
