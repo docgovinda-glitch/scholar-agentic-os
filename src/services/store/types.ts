@@ -31,4 +31,5 @@ export interface ProjectStore {
   save(record: ProjectRecord): Promise<ProjectRecord>;
   /** Owner-scoped listing — the only way to enumerate projects. */
   listByOwner(ownerId: string): Promise<ProjectRecord[]>;
+  delete(projectId: string): Promise<void>;
 }

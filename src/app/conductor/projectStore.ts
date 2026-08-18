@@ -125,6 +125,10 @@ export function saveProject(record: ProjectRecord): ProjectRecord {
   return record;
 }
 
+export function deleteProject(projectId: string): void {
+  projects.delete(projectId);
+}
+
 /** Owner-scoped listing. Filtering here rather than at the call site keeps
  *  "which projects exist for this user" a single question the store answers,
  *  so no caller can accidentally enumerate the whole map. */

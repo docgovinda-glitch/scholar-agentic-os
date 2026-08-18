@@ -24,6 +24,10 @@ function inMemoryAsStore(): ProjectStore {
     get: (projectId) => Promise.resolve(inMemory.getProject(projectId)),
     save: (record) => Promise.resolve(inMemory.saveProject(record)),
     listByOwner: (ownerId) => Promise.resolve(inMemory.listProjectsByOwner(ownerId)),
+    delete: (projectId) => {
+      inMemory.deleteProject(projectId);
+      return Promise.resolve();
+    },
   };
 }
 

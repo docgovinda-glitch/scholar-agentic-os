@@ -201,5 +201,9 @@ export function createPgProjectStore(db: PgQueryable): ProjectStore {
       );
       return result.rows.map(rowToRecord);
     },
+
+    async delete(projectId: string): Promise<void> {
+      await db.query(`delete from public.projects where project_id = $1`, [projectId]);
+    },
   };
 }

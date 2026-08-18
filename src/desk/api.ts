@@ -79,6 +79,12 @@ export function listProjects(): Promise<{ items: ProjectView[] }> {
   return authedFetch("/api/projects").then((r) => json(r));
 }
 
+export function deleteProject(projectId: string): Promise<void> {
+  return authedFetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+    method: "DELETE",
+  }).then((r) => json(r));
+}
+
 /**
  * The full Atlas spec for one output type — this is where `intakeSchema`
  * lives. `listOutputTypes()` deliberately returns summaries only, so the

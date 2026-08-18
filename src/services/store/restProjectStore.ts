@@ -220,5 +220,11 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
       )) as ProjectRow[];
       return (rows ?? []).map(rowToRecord);
     },
+
+    async delete(projectId: string): Promise<void> {
+      await request(`${base}?project_id=eq.${encodeURIComponent(projectId)}`, {
+        method: "DELETE",
+      });
+    },
   };
 }

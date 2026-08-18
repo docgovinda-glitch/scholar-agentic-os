@@ -1111,6 +1111,13 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     res.json(projectView(record));
   }));
 
+  app.delete("/api/projects/:id", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    await store.delete(record.projectId);
+    res.json({});
+  }));
+
   /**
    * Submit or update intake answers, recomputing G0's exit criteria
    * (docs 14 §5.2's per-field allowsProvisional contract, via

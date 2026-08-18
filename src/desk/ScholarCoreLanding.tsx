@@ -182,7 +182,7 @@ export default function ScholarCoreLanding({
                 { step: "01", title: "Definition", desc: "Set your research objectives and constraints. The agent aligns to your goal." },
                 { step: "02", title: "Extraction", desc: "Data Miner AI fetches and parses relevant academic sources into your secure Vault." },
                 { step: "03", title: "Synthesis", desc: "Cross-reference vault evidence with external literature to build a theoretical framework." },
-                { step: "04", title: "Review", desc: "Generate compliant manuscripts mapped perfectly to journal requirements." }
+                { step: "04", title: "Review", desc: "Generate compliant manuscripts mapped perfectly to your chosen format (from 24+ templates, including grants, reports, and books)." }
               ].map((item, i) => (
                 <div key={i} className="group relative p-8 rounded-[2rem] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] hover:bg-[color:var(--surface-hover)] transition-all duration-300 overflow-hidden hover:-translate-y-2 hover:shadow-lg">
                   <div className="absolute top-0 left-0 w-full h-1 bg-[color:var(--accent)] opacity-50 group-hover:opacity-100 transition-opacity"></div>
@@ -271,7 +271,7 @@ export default function ScholarCoreLanding({
               Ready to elevate <br/> your research?
             </h2>
             <p className="text-2xl text-[color:var(--text-secondary)] mb-12 font-light max-w-2xl mx-auto">
-              Join thousands of researchers organizing their knowledge and accelerating publication with Scholar Core.
+              Join thousands of researchers organizing their knowledge and accelerating publication across 24+ specialized academic and professional formats with Scholar Core.
             </p>
             <button
               onClick={onGetStarted}
