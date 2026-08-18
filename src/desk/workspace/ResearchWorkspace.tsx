@@ -251,11 +251,27 @@ function renderStage(
         />
       );
     case "title_selection":
-      return <TitleSelectionStage stage={stage} projectId={projectId} />;
+      return (
+        <TitleSelectionStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "title_lock":
-      return <TitleLockStage stage={stage} projectId={projectId} />;
+      return (
+        <TitleLockStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "vault_sources":
       return <VaultSourcesStage stage={stage} projectId={projectId} />;
+    case "source_approval_vault":
+      return <SourceApprovalStage stage={stage} projectId={projectId} />;
     case "additional_data":
       return <AdditionalDataStage stage={stage} projectId={projectId} />;
     case "evidence_extraction":

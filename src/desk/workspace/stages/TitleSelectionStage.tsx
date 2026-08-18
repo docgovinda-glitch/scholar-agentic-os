@@ -1,8 +1,9 @@
 import { useState } from "react";
+import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedFetch, saveIntakeAnswers } from "../../api";
 
 interface TitleItem {
   id: string;
@@ -15,15 +16,22 @@ interface TitleItem {
 export default function TitleSelectionStage({
   stage,
   projectId,
+  project,
+  onSaved,
 }: {
   stage: ResearchStage;
   projectId: string;
+  project: ProjectView;
+  onSaved: (updated: ProjectView) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<TitleItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const selectedTitle = project.answers?.["working_title"];
 
   const startGeneration = async () => {
     setIsProcessing(true);
@@ -90,6 +98,29 @@ export default function TitleSelectionStage({
     } finally {
       clearInterval(logInterval);
       setIsProcessing(false);
+    }
+  };
+
+  const handleSelectTitle = async (item: TitleItem) => {
+    setIsSaving(true);
+    setError(null);
+    try {
+      const fullTitle = item.subtitle_text 
+        ? `${item.title_text}: ${item.subtitle_text}` 
+        : item.title_text;
+      
+      const newAnswers = {
+        ...project.answers,
+        working_title: fullTitle,
+        title_rationale: item.rationale,
+      };
+      
+      const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+      onSaved(updatedProject);
+    } catch (err: any) {
+      setError(err.message || "Failed to save title selection.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -163,9 +194,15 @@ export default function TitleSelectionStage({
             </h3>
             
             <div className="space-y-6">
-              {results.map((item) => (
-                <div key={item.id} className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow relative group">
-                  <div className="p-8">
+              {results.map((item) => {
+                const fullTitle = item.subtitle_text 
+                  ? `${item.title_text}: ${item.subtitle_text}` 
+                  : item.title_text;
+                const isSelected = selectedTitle === fullTitle;
+
+                return (
+                  <div key={item.id} className={`bg-[color:var(--surface-raised)] border ${isSelected ? "border-[color:var(--accent)] ring-1 ring-[color:var(--accent)]" : "border-[color:var(--border-subtle)]"} rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow relative group`}>
+                    <div className="p-8">
                     <h4 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2 font-serif">
                       {item.title_text}
                     </h4>
@@ -192,14 +229,22 @@ export default function TitleSelectionStage({
                   
                   <div className="bg-[color:var(--surface-sunken)] border-t border-[color:var(--border-subtle)] px-8 py-4 flex justify-between items-center">
                     <span className="text-xs font-semibold text-[color:var(--text-muted)] uppercase tracking-wider">
-                      Status: {item.status}
+                      Status: {isSelected ? "Selected" : item.status}
                     </span>
-                    <button className="px-6 py-2 rounded-lg bg-[color:var(--accent)] text-white font-semibold hover:bg-[color:var(--accent-hover)] transition-colors shadow-sm">
-                      Lock Title
+                    <button 
+                      onClick={() => handleSelectTitle(item)}
+                      disabled={isSaving}
+                      className={`px-6 py-2 rounded-lg font-semibold transition-colors shadow-sm disabled:opacity-50 ${
+                        isSelected
+                          ? "bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)]"
+                          : "bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] border border-[color:var(--border-subtle)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                      }`}
+                    >
+                      {isSaving && isSelected ? "Locking..." : isSelected ? "Title Locked" : "Lock Title"}
                     </button>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}

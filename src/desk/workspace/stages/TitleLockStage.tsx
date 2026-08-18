@@ -1,13 +1,50 @@
+import { useState, useEffect } from "react";
+import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
+import { saveIntakeAnswers } from "../../api";
 
 export default function TitleLockStage({
   stage,
+  projectId,
+  project,
+  onSaved,
 }: {
   stage: ResearchStage;
   projectId: string;
+  project: ProjectView;
+  onSaved: (updated: ProjectView) => void;
 }) {
   const def = STAGE_MAP.get(stage);
+  
+  const initialTitle = project.answers?.["working_title"] || "";
+  const [title, setTitle] = useState(initialTitle);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Sync if it changes externally
+  useEffect(() => {
+    setTitle(project.answers?.["working_title"] || "");
+  }, [project.answers?.["working_title"]]);
+
+  const handleLockTitle = async () => {
+    setIsSaving(true);
+    setError(null);
+    try {
+      const newAnswers = {
+        ...project.answers,
+        working_title: title,
+        title_locked: "true",
+      };
+      
+      const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+      onSaved(updatedProject);
+    } catch (err: any) {
+      setError(err.message || "Failed to lock title.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (!def) return <div>Unknown stage</div>;
 
@@ -39,23 +76,57 @@ export default function TitleLockStage({
             </svg>
           </div>
           
-          <h3 className="text-3xl font-bold text-[color:var(--text-primary)] mb-4 font-serif">
-            Beyond the Copilot: A Longitudinal Analysis of Multi-Agent Systems
-          </h3>
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+              {error}
+            </div>
+          )}
           
-          <div className="inline-block px-4 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-semibold mb-8 border border-blue-200">
-            Addressing: Empirical Gap
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-[color:var(--text-secondary)] mb-2 uppercase tracking-wider text-left">
+              Final Working Title
+            </label>
+            <textarea
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full text-2xl font-bold text-[color:var(--text-primary)] font-serif bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)] resize-none"
+              rows={3}
+              placeholder="Enter your final working title..."
+            />
           </div>
+          
+          {project.answers?.["selected_gap_type"] && (
+            <div className="inline-block px-4 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-semibold mb-8 border border-blue-200 uppercase tracking-wide">
+              Addressing: {project.answers["selected_gap_type"]} Gap
+            </div>
+          )}
           
           <p className="text-[color:var(--text-secondary)] mb-8 text-lg">
             You are about to lock this title and gap into the project definition. Once locked, the Phase 2 extraction agents will use this as their absolute ground truth.
           </p>
           
-          <button className="w-full py-4 rounded-xl bg-[color:var(--text-primary)] text-[color:var(--surface-canvas)] font-bold text-lg hover:bg-black transition-colors shadow-md flex items-center justify-center gap-2">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            Lock Title & Proceed to Phase 2
+          <button 
+            onClick={handleLockTitle}
+            disabled={isSaving || !title.trim() || project.answers?.["title_locked"] === "true"}
+            className="w-full py-4 rounded-xl bg-[color:var(--text-primary)] text-[color:var(--surface-canvas)] font-bold text-lg hover:bg-black transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isSaving ? (
+              <span className="flex items-center gap-2">
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Locking...
+              </span>
+            ) : project.answers?.["title_locked"] === "true" ? (
+              "Title is Locked"
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Lock Title & Proceed to Phase 2
+              </>
+            )}
           </button>
         </div>
       </div>
