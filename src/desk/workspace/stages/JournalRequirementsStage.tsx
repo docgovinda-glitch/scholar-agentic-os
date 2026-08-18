@@ -1,21 +1,28 @@
 import { useState } from "react";
+import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedFetch, saveIntakeAnswers } from "../../api";
 
 export default function JournalRequirementsStage({
   stage,
   projectId,
+  project,
+  onSaved,
 }: {
   stage: ResearchStage;
   projectId: string;
+  project: ProjectView;
+  onSaved: (updated: ProjectView) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const selectedJournal = project.answers?.["target_journal"] || "your selected journal";
 
   const startAgent = async () => {
     setIsProcessing(true);
@@ -55,13 +62,25 @@ export default function JournalRequirementsStage({
 
       const { data } = await response.json();
       setResults(data);
+
+      try {
+        const newAnswers = {
+          ...project.answers,
+          journal_constraints: JSON.stringify(data),
+        };
+        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+        onSaved(updatedProject);
+      } catch (saveErr) {
+        console.error("Failed to save journal constraints", saveErr);
+      }
+
       setLogs((prev) => [
         ...prev,
         {
           id: Date.now().toString() + "done",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
           level: "success",
-          message: `Requirements extracted successfully.`.replace("{count}", data?.length || 0),
+          message: `Requirements extracted successfully for ${selectedJournal}.`,
         },
       ]);
     } catch (err: any) {
@@ -142,14 +161,44 @@ export default function JournalRequirementsStage({
         )}
 
         {results && (
-          <div className="max-w-4xl mx-auto animate-fade-in p-6 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl">
-             <h3 className="text-xl font-bold text-green-600 mb-4 flex items-center gap-2">
-               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-               Stage Complete
-             </h3>
-             <pre className="text-sm bg-[color:var(--surface-sunken)] p-4 rounded-lg overflow-x-auto text-[color:var(--text-secondary)] whitespace-pre-wrap font-mono">
-               {JSON.stringify(results, null, 2)}
-             </pre>
+          <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
+             <div className="p-6 bg-[color:var(--surface-raised)] border border-green-200 rounded-xl shadow-sm">
+               <h3 className="text-xl font-bold text-green-700 mb-4 flex items-center gap-2">
+                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                 Constraints Locked: {selectedJournal}
+               </h3>
+               
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="p-4 bg-white rounded-lg border border-[color:var(--border-subtle)]">
+                   <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-1">Word Limit</div>
+                   <div className="text-lg font-bold text-[color:var(--text-primary)]">{results.max_words || "8,000"} words</div>
+                 </div>
+                 <div className="p-4 bg-white rounded-lg border border-[color:var(--border-subtle)]">
+                   <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-1">Citation Style</div>
+                   <div className="text-lg font-bold text-[color:var(--text-primary)]">{results.citation_style || "APA 7th"}</div>
+                 </div>
+               </div>
+
+               <div className="mt-4 p-4 bg-white rounded-lg border border-[color:var(--border-subtle)]">
+                 <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-2">Required Sections</div>
+                 <div className="flex flex-wrap gap-2">
+                   {(results.required_sections || ["Abstract", "Introduction", "Methods", "Results", "Discussion", "Conclusion"]).map((sec: string) => (
+                     <span key={sec} className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full text-sm font-semibold">
+                       {sec}
+                     </span>
+                   ))}
+                 </div>
+               </div>
+               
+               <div className="mt-8 text-center">
+                 <button className="px-6 py-3 rounded-xl bg-[color:var(--text-primary)] text-[color:var(--surface-canvas)] font-bold shadow-md flex items-center justify-center gap-2 hover:bg-black transition-colors w-full sm:w-auto mx-auto">
+                   Proceed to AI Drafting
+                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                   </svg>
+                 </button>
+               </div>
+             </div>
           </div>
         )}
 
@@ -162,7 +211,7 @@ export default function JournalRequirementsStage({
             </div>
             <h3 className="text-lg font-bold text-[color:var(--text-primary)]">Ready to Extract Rules</h3>
             <p className="text-[color:var(--text-secondary)] max-w-md mx-auto mt-2">
-              The agent will read the author guidelines for your selected journal and build a strict enforcement matrix for drafting.
+              The agent will read the author guidelines for <span className="font-bold text-[color:var(--text-primary)]">{selectedJournal}</span> and build a strict enforcement matrix for drafting.
             </p>
           </div>
         )}

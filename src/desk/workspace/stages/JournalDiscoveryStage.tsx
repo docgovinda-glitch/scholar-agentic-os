@@ -1,21 +1,29 @@
 import { useState } from "react";
+import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedFetch, saveIntakeAnswers } from "../../api";
 
 export default function JournalDiscoveryStage({
   stage,
   projectId,
+  project,
+  onSaved,
 }: {
   stage: ResearchStage;
   projectId: string;
+  project: ProjectView;
+  onSaved: (updated: ProjectView) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<any | null>(null);
+  const [results, setResults] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const selectedJournal = project.answers?.["target_journal"];
 
   const startAgent = async () => {
     setIsProcessing(true);
@@ -81,6 +89,23 @@ export default function JournalDiscoveryStage({
     }
   };
 
+  const handleSelectJournal = async (journal: any) => {
+    setIsSaving(true);
+    setError(null);
+    try {
+      const newAnswers = {
+        ...project.answers,
+        target_journal: journal.title,
+      };
+      const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+      onSaved(updatedProject);
+    } catch (err: any) {
+      setError(err.message || "Failed to save journal selection.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!def) return <div>Unknown stage</div>;
 
   return (
@@ -142,14 +167,58 @@ export default function JournalDiscoveryStage({
         )}
 
         {results && (
-          <div className="max-w-4xl mx-auto animate-fade-in p-6 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl">
+          <div className="max-w-5xl mx-auto animate-fade-in">
              <h3 className="text-xl font-bold text-green-600 mb-4 flex items-center gap-2">
                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                Stage Complete
              </h3>
-             <pre className="text-sm bg-[color:var(--surface-sunken)] p-4 rounded-lg overflow-x-auto text-[color:var(--text-secondary)] whitespace-pre-wrap font-mono">
-               {JSON.stringify(results, null, 2)}
-             </pre>
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              {results.map((item: any) => {
+                const isSelected = selectedJournal === item.title;
+                return (
+                  <div key={item.id} className={`bg-[color:var(--surface-raised)] border ${isSelected ? "border-[color:var(--accent)] ring-1 ring-[color:var(--accent)]" : "border-[color:var(--border-subtle)]"} rounded-xl p-6 flex flex-col group hover:border-[color:var(--accent)] transition-colors relative`}>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="bg-[color:var(--surface-sunken)] px-3 py-1 rounded border border-[color:var(--border-subtle)] font-mono text-sm font-bold text-[color:var(--text-secondary)]">
+                        IF: {item.impact_factor}
+                      </div>
+                      <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded text-xs font-bold uppercase tracking-wider">
+                        {item.match_score}% Match
+                      </div>
+                    </div>
+                    
+                    <h4 className="text-xl font-bold text-[color:var(--text-primary)] mb-2 font-serif">
+                      {item.title}
+                    </h4>
+                    
+                    <div className="flex gap-2 flex-wrap mb-6">
+                      <span className="text-xs font-semibold px-2 py-1 rounded bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)]">
+                        {item.publisher}
+                      </span>
+                      <span className="text-xs font-semibold px-2 py-1 rounded bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)]">
+                        SJR: {item.sjr_quartile}
+                      </span>
+                      <span className="text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800 border border-green-200">
+                        {item.open_access ? "Open Access" : "Subscription"}
+                      </span>
+                    </div>
+                    
+                    <div className="mt-auto pt-4 border-t border-[color:var(--border-subtle)]">
+                      <button 
+                        onClick={() => handleSelectJournal(item)}
+                        disabled={isSaving}
+                        className={`w-full py-3 rounded-lg font-bold transition-colors disabled:opacity-50 ${
+                          isSelected 
+                            ? "bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)]" 
+                            : "bg-[color:var(--text-primary)] text-[color:var(--surface-canvas)] hover:bg-black shadow-md"
+                        }`}
+                      >
+                        {isSaving && isSelected ? "Selecting..." : isSelected ? "Target Selected" : "Target this Journal"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

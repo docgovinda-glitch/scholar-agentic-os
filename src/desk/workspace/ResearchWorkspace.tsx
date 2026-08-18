@@ -334,9 +334,23 @@ function renderStage(
         />
       );
     case "journal_discovery":
-      return <JournalDiscoveryStage stage={stage} projectId={projectId} />;
+      return (
+        <JournalDiscoveryStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "journal_requirements":
-      return <JournalRequirementsStage stage={stage} projectId={projectId} />;
+      return (
+        <JournalRequirementsStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "draft":
       return <DraftStage stage={stage} projectId={projectId} />;
     case "citation_audit":
