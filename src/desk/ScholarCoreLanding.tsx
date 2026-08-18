@@ -159,6 +159,10 @@ export default function ScholarCoreLanding({
                     <div className="h-3 w-3/4 bg-[color:var(--border-strong)] rounded-full mb-3"></div>
                     <div className="h-3 w-1/2 bg-[color:var(--border-subtle)] rounded-full"></div>
                   </div>
+                  <div className="p-5 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] opacity-40">
+                    <div className="h-3 w-5/6 bg-[color:var(--border-strong)] rounded-full mb-3"></div>
+                    <div className="h-3 w-2/3 bg-[color:var(--border-subtle)] rounded-full"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -245,6 +249,8 @@ export default function ScholarCoreLanding({
                        { w: "w-full", c: "bg-[color:var(--state-success-subtle)] border-[color:var(--state-success)]" },
                        { w: "w-11/12", c: "bg-[color:var(--state-info-subtle)] border-[color:var(--state-info)]" },
                        { w: "w-4/5", c: "bg-[color:var(--state-warning-subtle)] border-[color:var(--state-warning)]" },
+                       { w: "w-full", c: "bg-[color:var(--surface-sunken)] border-[color:var(--border-strong)]" },
+                       { w: "w-[95%]", c: "bg-[color:var(--surface-inset)] border-[color:var(--border-subtle)] opacity-50" },
                      ].map((bar, i) => (
                        <div key={i} className={`h-16 ${bar.w} ${bar.c} border rounded-xl p-4 flex items-center justify-between relative overflow-hidden group`}>
                          <div className="h-3 w-1/2 bg-[color:var(--surface-raised)] rounded-full mix-blend-overlay"></div>
