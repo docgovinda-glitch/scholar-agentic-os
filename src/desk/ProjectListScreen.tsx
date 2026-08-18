@@ -31,9 +31,18 @@ export default function ProjectListScreen({
   const [choosing, setChoosing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     if (showWelcome) onWelcomeSeen?.();
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const load = useCallback(() => {
@@ -64,96 +73,86 @@ export default function ProjectListScreen({
   }
 
   return (
-    <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-[#050505] text-white relative overflow-hidden font-sans selection:bg-indigo-500/30">
       
       {/* Dynamic Background Effects */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] opacity-20 pointer-events-none" 
-           style={{ background: 'radial-gradient(ellipse at top, var(--accent) 0%, transparent 70%)', filter: 'blur(100px)' }} />
+      <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-20%] left-[-10%] w-[40%] h-[60%] bg-purple-600/10 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LCAyNTUsIDI1NSwgMC4wNSkiLz48L3N2Zz4=')] opacity-30 pointer-events-none" />
 
-      {/* Header with SCHOLAR CORE branding and navigation */}
-      <header className="relative z-10 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)]/80 backdrop-blur-md sticky top-0">
-        <div className="mx-auto max-w-6xl px-6 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <ScholarCoreLogo size="md" withText className="text-[color:var(--text-primary)]" />
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-              {userEmail && (
-                <span className="truncate text-sm text-[color:var(--text-muted)] hidden sm:block font-medium" title={userEmail}>
-                  {userEmail}
-                </span>
-              )}
+      {/* Header */}
+      <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[#0A0A0A]/80 backdrop-blur-xl border-b border-white/10 shadow-2xl py-3' : 'bg-transparent py-6'}`}>
+        <div className="mx-auto max-w-7xl px-6 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg">
+              <span className="text-white font-bold text-xl font-serif">S</span>
+              <div className="absolute inset-0 rounded-xl ring-1 ring-white/20"></div>
+            </div>
+            <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
+              Scholar Core
+            </span>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            {userEmail && (
+              <span className="truncate text-sm text-white/50 hidden sm:block font-medium px-4 py-1.5 rounded-full bg-white/5 border border-white/5">
+                {userEmail}
+              </span>
+            )}
+            <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-full p-1">
               {onOpenVault && (
-                <button
-                  type="button"
-                  onClick={onOpenVault}
-                  className="shrink-0 rounded-full px-4 py-2 text-sm font-medium text-[color:var(--text-secondary)] transition-all duration-300 hover:bg-[color:var(--surface-raised)] hover:text-[color:var(--text-primary)] hover:shadow-sm cursor-pointer border border-transparent hover:border-[color:var(--border-subtle)]"
-                >
+                <button onClick={onOpenVault} className="px-4 py-1.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">
                   Knowledge
                 </button>
               )}
               {onOpenAiAccess && (
-                <button
-                  type="button"
-                  onClick={onOpenAiAccess}
-                  className="shrink-0 rounded-full px-4 py-2 text-sm font-medium text-[color:var(--text-secondary)] transition-all duration-300 hover:bg-[color:var(--surface-raised)] hover:text-[color:var(--text-primary)] hover:shadow-sm cursor-pointer border border-transparent hover:border-[color:var(--border-subtle)]"
-                >
-                  AI
+                <button onClick={onOpenAiAccess} className="px-4 py-1.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">
+                  Agents
                 </button>
               )}
               {onOpenAccountSettings && (
-                <button
-                  type="button"
-                  onClick={onOpenAccountSettings}
-                  className="shrink-0 rounded-full px-4 py-2 text-sm font-medium text-[color:var(--text-secondary)] transition-all duration-300 hover:bg-[color:var(--surface-raised)] hover:text-[color:var(--text-primary)] hover:shadow-sm cursor-pointer border border-transparent hover:border-[color:var(--border-subtle)]"
-                >
-                  Account
+                <button onClick={onOpenAccountSettings} className="px-4 py-1.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">
+                  Settings
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => getSupabaseClient().auth.signOut()}
-                className="shrink-0 rounded-full px-4 py-2 text-sm font-medium text-[color:var(--state-danger)] transition-all duration-300 hover:bg-[color:var(--state-danger-subtle)] cursor-pointer"
-              >
-                Sign out
-              </button>
             </div>
+            <button
+              onClick={() => getSupabaseClient().auth.signOut()}
+              className="ml-2 rounded-full w-10 h-10 flex items-center justify-center bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors border border-red-500/20"
+              title="Sign out"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-5xl px-6 py-12 animate-fade-in">
+      <main className="relative z-10 mx-auto max-w-7xl px-6 pt-36 pb-24 animate-fade-in">
         {welcomeVisible && (
-          <div
-            role="status"
-            className="mb-10 flex items-center justify-between gap-4 rounded-[var(--radius-lg)] border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)]/50 backdrop-blur-md px-6 py-4 shadow-sm"
-          >
-            <div>
-              <p className="text-base font-semibold text-[color:var(--text-primary)] flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[color:var(--state-success)] animate-pulse" />
-                Welcome to Scholar Core
-              </p>
-              <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                Your research command center is ready. Start a new project or explore your research tools.
-              </p>
+          <div className="mb-12 flex items-center justify-between gap-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 backdrop-blur-md px-6 py-5 shadow-lg shadow-indigo-500/5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                 <svg className="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-white">Welcome to your Command Center</p>
+                <p className="text-white/60 text-sm mt-1">Initialize a new project or explore your agentic tools.</p>
+              </div>
             </div>
             <button
-              type="button"
               onClick={() => setWelcomeVisible(false)}
-              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer transition-colors"
+              className="text-white/40 hover:text-white transition-colors"
             >
-              Dismiss
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
         )}
 
         {error && (
-          <div
-            role="alert"
-            className="mb-10 rounded-[var(--radius-lg)] border border-[color:var(--state-danger)]/30 bg-[color:var(--state-danger-subtle)]/80 backdrop-blur-md px-5 py-4 text-sm font-medium text-[color:var(--state-danger)] shadow-sm flex items-center gap-3"
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="mb-12 rounded-2xl border border-red-500/30 bg-red-500/10 backdrop-blur-md px-6 py-5 text-red-400 shadow-lg flex items-center gap-4">
+            <svg className="w-6 h-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            {error}
+            <span className="font-medium">{error}</span>
           </div>
         )}
 
@@ -166,97 +165,84 @@ export default function ProjectListScreen({
           />
         ) : (
           <>
-            {/* What is Scholar Core section */}
-            <section className="mb-16">
-              <h1 className="text-3xl font-bold tracking-tight mb-2">Command Center</h1>
-              <p className="text-base text-[color:var(--text-secondary)] mb-8">
-                Connect research, knowledge, and creation in one workspace. Use the tools below to organize your research.
-              </p>
+            {/* Command Center Widgets */}
+            <section className="mb-20">
+              <div className="flex items-end justify-between mb-8">
+                <div>
+                  <h1 className="text-4xl font-black tracking-tight mb-2 text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70">Workspace Modules</h1>
+                  <p className="text-white/50 text-lg">Your agentic tools and active research environments.</p>
+                </div>
+              </div>
               
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <CapabilityCard
-                  icon={
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  }
+                  icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                   title="Projects"
-                  desc="Create and work on research projects, theses, essays, and articles."
-                  action="See projects below"
+                  desc="Active research workflows and manuscripts."
+                  action="Scroll to View"
+                  color="from-indigo-500/20 to-blue-500/20"
+                  iconColor="text-blue-400"
                 />
                 <CapabilityCard
-                  icon={
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                  }
+                  icon="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
                   title="Knowledge Vault"
-                  desc="Store, organize, and access all your verified research materials."
+                  desc="Your verified central library of PDFs and evidence."
                   action="Open Vault"
                   onClick={onOpenVault}
+                  color="from-emerald-500/20 to-teal-500/20"
+                  iconColor="text-emerald-400"
                 />
                 <CapabilityCard
-                  icon={
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  }
-                  title="AI Assistance"
-                  desc="Configure intelligent agents to analyze and summarize information."
+                  icon="M13 10V3L4 14h7v7l9-11h-7z"
+                  title="AI Agents"
+                  desc="Configure extraction and synthesis models."
                   action="Manage AI"
                   onClick={onOpenAiAccess}
+                  color="from-purple-500/20 to-pink-500/20"
+                  iconColor="text-purple-400"
                 />
                 <CapabilityCard
-                  icon={
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  }
+                  icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
                   title="Settings"
-                  desc="Manage your account, profile, subscription, and preferences."
-                  action="Account Settings"
+                  desc="Account, subscription, and system preferences."
+                  action="Configure"
                   onClick={onOpenAccountSettings}
+                  color="from-slate-500/20 to-gray-500/20"
+                  iconColor="text-slate-400"
                 />
               </div>
             </section>
 
-            {/* Projects section */}
-            <div className="mb-8 flex items-center justify-between gap-4 border-b border-[color:var(--border-subtle)] pb-4">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight text-[color:var(--text-primary)]">
-                  Your Projects
-                </h2>
-                <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                  Everything you are working on, most recent first.
-                </p>
-              </div>
+            {/* Projects Section */}
+            <div className="mb-8 flex items-center justify-between gap-4 border-b border-white/10 pb-6">
+              <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+                <div className="w-2 h-8 bg-indigo-500 rounded-full"></div>
+                Active Workflows
+              </h2>
               <button
-                type="button"
                 onClick={() => setChoosing(true)}
-                className="shrink-0 rounded-full bg-[color:var(--accent-solid)] px-6 py-2.5 text-sm font-semibold text-[color:var(--text-inverse)] transition-all duration-300 hover:bg-[color:var(--accent-hover)] hover:scale-105 hover:shadow-[0_0_15px_var(--accent)] cursor-pointer flex items-center gap-2"
+                className="group relative px-6 py-3 rounded-xl font-bold overflow-hidden shadow-lg"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                </svg>
-                New project
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 transition-transform group-hover:scale-105"></div>
+                <span className="relative flex items-center gap-2 text-white">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                  Initialize Project
+                </span>
               </button>
             </div>
 
             {projects === null ? (
-              <div className="flex justify-center items-center py-20">
-                 <div className="spinner" />
+              <div className="flex justify-center items-center py-32">
+                 <div className="w-12 h-12 border-4 border-white/10 border-t-indigo-500 rounded-full animate-spin"></div>
               </div>
             ) : projects.length === 0 ? (
               <EmptyState onStart={() => setChoosing(true)} />
             ) : (
-              <ul className="grid gap-4">
+              <div className="grid md:grid-cols-2 gap-6">
                 {projects.map((p) => (
-                  <li key={p.projectId} className="animate-fade-in">
-                    <ProjectRow project={p} onOpen={() => onOpen(p.projectId)} />
-                  </li>
+                  <ProjectCard key={p.projectId} project={p} onOpen={() => onOpen(p.projectId)} />
                 ))}
-              </ul>
+              </div>
             )}
           </>
         )}
@@ -271,73 +257,83 @@ function CapabilityCard({
   desc,
   action,
   onClick,
+  color,
+  iconColor,
 }: {
-  icon: React.ReactNode;
+  icon: string;
   title: string;
   desc: string;
   action: string;
   onClick?: () => void;
+  color: string;
+  iconColor: string;
 }) {
   return (
-    <div className="group relative p-6 rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]/80 backdrop-blur-sm transition-all duration-300 hover:border-[color:var(--accent)] hover:shadow-lg hover:-translate-y-1 flex flex-col h-full">
-      <div className="text-[color:var(--accent)] mb-4 w-12 h-12 rounded-[var(--radius-md)] bg-[color:var(--accent-subtle)] flex items-center justify-center border border-[color:var(--accent-border)] group-hover:scale-110 transition-transform duration-300">
-        {icon}
+    <div className="group relative p-8 rounded-3xl border border-white/5 bg-[#0A0A0A]/50 backdrop-blur-xl transition-all duration-300 hover:border-white/10 hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)] flex flex-col h-full overflow-hidden">
+      <div className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br ${color} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}></div>
+      <div className={`w-14 h-14 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center mb-6 relative z-10 group-hover:bg-white/10 transition-colors`}>
+        <svg className={`w-7 h-7 ${iconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
+        </svg>
       </div>
-      <h3 className="font-bold text-lg mb-2">{title}</h3>
-      <p className="text-sm text-[color:var(--text-secondary)] mb-6 flex-grow leading-relaxed">{desc}</p>
+      <h3 className="font-bold text-2xl mb-3 text-white/90 relative z-10">{title}</h3>
+      <p className="text-white/50 mb-8 flex-grow leading-relaxed relative z-10">{desc}</p>
       
-      {onClick ? (
-        <button
-          onClick={onClick}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--accent)] hover:text-[color:var(--accent-hover)] transition-colors cursor-pointer mt-auto"
-        >
-          {action}
-          <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-          </svg>
-        </button>
-      ) : (
-        <p className="inline-flex items-center gap-1 text-sm font-medium text-[color:var(--text-muted)] mt-auto">
-          {action}
-        </p>
-      )}
+      <div className="mt-auto relative z-10 pt-4 border-t border-white/5">
+        {onClick ? (
+          <button
+            onClick={onClick}
+            className={`inline-flex items-center justify-between w-full font-bold ${iconColor} hover:text-white transition-colors cursor-pointer`}
+          >
+            {action}
+            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/20 group-hover:translate-x-1 transition-all">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+            </div>
+          </button>
+        ) : (
+          <p className="inline-flex items-center text-sm font-medium text-white/30">
+            {action}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
 
-function ProjectRow({ project, onOpen }: { project: ProjectView; onOpen: () => void }) {
+function ProjectCard({ project, onOpen }: { project: ProjectView; onOpen: () => void }) {
   const percent = Math.round(project.intakeCompleteness * 100);
   const signedOff = project.gates.filter((g) => g.status === "signed_off").length;
 
   return (
     <button
-      type="button"
       onClick={onOpen}
-      className="group w-full rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]/60 backdrop-blur-sm p-5 text-left transition-all duration-300 hover:border-[color:var(--accent)] hover:shadow-md cursor-pointer relative overflow-hidden"
+      className="group text-left p-8 rounded-[2rem] border border-white/5 bg-[#0A0A0A]/50 hover:bg-[#111111]/80 backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-[0_10px_30px_rgba(99,102,241,0.1)] relative overflow-hidden flex flex-col"
     >
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[color:var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-[40px] rounded-full group-hover:bg-indigo-500/20 transition-colors"></div>
       
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-bold text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors">
-          {project.outputTypeId.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-        </h3>
-        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${project.hasDocument ? 'bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)] border border-[color:var(--state-success)]/20' : 'bg-[color:var(--surface-sunken)] text-[color:var(--text-muted)] border border-[color:var(--border-subtle)]'}`}>
-          {project.hasDocument ? "Draft in progress" : "No draft yet"}
+      <div className="flex items-start justify-between mb-6 relative z-10">
+        <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/70 group-hover:text-indigo-400 group-hover:border-indigo-500/30 transition-all">
+           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+        </div>
+        <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${project.hasDocument ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-white/5 text-white/40 border border-white/10'}`}>
+          {project.hasDocument ? "Drafting" : "Extraction"}
         </span>
       </div>
+
+      <h3 className="text-2xl font-bold text-white mb-2 relative z-10 group-hover:text-indigo-100 transition-colors">
+        {project.outputTypeId.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+      </h3>
+      <p className="text-sm text-white/40 mb-8 relative z-10">
+        {signedOff} of {project.gates.length} approval gates passed
+      </p>
       
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-           <div className="w-16 h-1.5 rounded-full bg-[color:var(--surface-sunken)] overflow-hidden">
-             <div className="h-full bg-[color:var(--accent)] transition-all duration-500" style={{ width: `${percent}%` }} />
-           </div>
-           <span className="text-xs font-medium text-[color:var(--text-secondary)]">{percent}% of intake</span>
+      <div className="mt-auto relative z-10 bg-white/5 p-4 rounded-xl border border-white/5">
+        <div className="flex justify-between text-xs font-bold text-white/60 mb-2">
+           <span>Pipeline Completeness</span>
+           <span className="text-indigo-400">{percent}%</span>
         </div>
-        <div className="flex items-center gap-2 text-xs font-medium text-[color:var(--text-secondary)]">
-           <svg className="w-3.5 h-3.5 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-           </svg>
-           {signedOff} of {project.gates.length} gates passed
+        <div className="w-full h-2 rounded-full bg-black/50 overflow-hidden border border-white/5">
+          <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700 ease-out" style={{ width: `${percent}%` }} />
         </div>
       </div>
     </button>
@@ -346,26 +342,22 @@ function ProjectRow({ project, onOpen }: { project: ProjectView; onOpen: () => v
 
 function EmptyState({ onStart }: { onStart: () => void }) {
   return (
-    <div className="rounded-[var(--radius-lg)] border-2 border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-raised)]/30 backdrop-blur-sm px-6 py-16 text-center transition-all hover:border-[color:var(--accent)]/50 hover:bg-[color:var(--surface-raised)]/50">
-      <div className="w-16 h-16 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] flex items-center justify-center mx-auto mb-6">
-         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    <div className="rounded-[2rem] border border-dashed border-white/10 bg-[#0A0A0A]/30 backdrop-blur-sm px-6 py-24 text-center transition-all hover:border-indigo-500/30 hover:bg-[#0A0A0A]/60 flex flex-col items-center">
+      <div className="w-20 h-20 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-8 border border-indigo-500/20">
+         <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
          </svg>
       </div>
-      <h3 className="text-xl font-bold text-[color:var(--text-primary)] mb-2">No projects yet</h3>
-      <p className="mx-auto max-w-md text-sm text-[color:var(--text-secondary)] mb-8 leading-relaxed">
-        Start with what you're working on — a thesis, essay, article, proposal, or professional document. Scholar Core
-        builds the structure and research workflow around it.
+      <h3 className="text-3xl font-bold text-white mb-4">Initialize your first project</h3>
+      <p className="max-w-md text-lg text-white/40 mb-10 leading-relaxed">
+        Start a new thesis, manuscript, or research proposal. The agents are ready to assist.
       </p>
       <button
-        type="button"
         onClick={onStart}
-        className="rounded-full bg-[color:var(--accent-solid)] px-6 py-3 text-sm font-bold text-[color:var(--text-inverse)] transition-all duration-300 hover:bg-[color:var(--accent-hover)] hover:shadow-[0_0_15px_var(--accent)] hover:scale-105 cursor-pointer inline-flex items-center gap-2"
+        className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-4 text-lg font-bold text-white transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(99,102,241,0.5)] flex items-center gap-3"
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-        </svg>
-        Create your first project
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+        New Project
       </button>
     </div>
   );
@@ -405,83 +397,74 @@ function ChooseOutputType({
   }, [types]);
 
   return (
-    <div className="max-w-2xl mx-auto py-10 animate-fade-in">
+    <div className="max-w-3xl mx-auto py-10 animate-fade-in">
       <button
-        type="button"
         onClick={onCancel}
-        className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--accent)] transition-colors duration-300 hover:text-[color:var(--accent-hover)] cursor-pointer bg-[color:var(--accent-subtle)] px-4 py-2 rounded-full border border-[color:var(--accent-border)]"
+        className="mb-10 inline-flex items-center gap-2 text-sm font-bold text-white/50 hover:text-white transition-colors px-4 py-2 rounded-full bg-white/5 border border-white/5"
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
-        Back to command center
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+        Return to Command Center
       </button>
       
-      <div className="mb-10">
-        <h2 className="text-3xl font-bold tracking-tight text-[color:var(--text-primary)] mb-3">
-          What are you producing?
+      <div className="mb-12">
+        <h2 className="text-4xl font-black tracking-tight text-white mb-4">
+          Select Output Format
         </h2>
-        <p className="text-base text-[color:var(--text-secondary)]">
-          This sets the structure, the intake questions, and the formatting rules. You can change it later.
+        <p className="text-xl text-white/50">
+          This initializes the specific agentic workflow, constraints, and journal requirements for your project.
         </p>
       </div>
 
       {!types ? (
-        <div className="flex items-center gap-3 text-sm text-[color:var(--text-muted)] font-medium">
-          <div className="spinner !w-5 !h-5 !border-2" />
-          Loading output types…
+        <div className="flex items-center justify-center py-20">
+          <div className="w-12 h-12 border-4 border-white/10 border-t-indigo-500 rounded-full animate-spin"></div>
         </div>
       ) : (
-        <div className="rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]/80 backdrop-blur-sm p-8 shadow-lg">
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-2">
-              <label htmlFor="output-type" className="text-sm font-bold text-[color:var(--text-primary)]">
-                Select a document format
+        <div className="rounded-[2rem] border border-white/10 bg-[#0A0A0A]/80 backdrop-blur-2xl p-10 shadow-[0_20px_40px_rgba(0,0,0,0.6)]">
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-4">
+              <label htmlFor="output-type" className="text-sm font-bold text-white/70 uppercase tracking-widest">
+                Target Publication Type
               </label>
               <div className="relative">
                 <select
                   id="output-type"
                   value={selected}
                   onChange={(e) => setSelected(e.target.value)}
-                  className="w-full appearance-none rounded-[var(--radius-md)] border-2 border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-4 py-3.5 text-base font-medium text-[color:var(--text-primary)] outline-none transition-all focus:border-[color:var(--accent)] focus:ring-4 focus:ring-[color:var(--accent-subtle)]"
+                  className="w-full appearance-none rounded-2xl border border-white/10 bg-white/5 px-6 py-5 text-lg font-bold text-white outline-none transition-all focus:border-indigo-500 focus:bg-white/10"
                 >
-                  <option value="" disabled>
-                    Choose a document type…
+                  <option value="" disabled className="bg-[#050505] text-white/50">
+                    Choose a format...
                   </option>
                   {groups.map(([family, items]) => (
-                    <optgroup key={family} label={FAMILY_LABEL[family] ?? family} className="font-bold text-[color:var(--text-muted)]">
+                    <optgroup key={family} label={FAMILY_LABEL[family] ?? family} className="bg-[#0A0A0A] text-indigo-400 font-bold p-2">
                       {items.map((t) => (
-                        <option key={t.id} value={t.id} disabled={!t.available} className="font-medium text-[color:var(--text-primary)]">
-                          {t.available ? t.label : `${t.label} — Under maintenance`}
+                        <option key={t.id} value={t.id} disabled={!t.available} className="bg-[#050505] text-white py-2">
+                          {t.available ? t.label : `${t.label} (Maintenance)`}
                         </option>
                       ))}
                     </optgroup>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[color:var(--text-secondary)]">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-6 text-white/50">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                 </div>
               </div>
             </div>
             <button
-              type="button"
               onClick={() => onPick(selected)}
               disabled={!selected || creating}
-              className="w-full sm:w-auto self-end rounded-full bg-[color:var(--accent-solid)] px-8 py-3.5 text-base font-bold text-[color:var(--text-inverse)] transition-all duration-300 hover:bg-[color:var(--accent-hover)] hover:shadow-[0_0_15px_var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none cursor-pointer flex items-center justify-center gap-2"
+              className="w-full sm:w-auto self-end rounded-xl bg-indigo-600 px-10 py-5 text-lg font-bold text-white transition-all hover:bg-indigo-500 hover:shadow-[0_0_20px_rgba(99,102,241,0.6)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
             >
               {creating ? (
                 <>
-                  <div className="spinner !w-4 !h-4 !border-2 !border-t-transparent !border-white" />
-                  Creating workspace…
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Initializing Agents...
                 </>
               ) : (
                 <>
-                  Initialize Project
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
+                  Boot Workspace
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                 </>
               )}
             </button>

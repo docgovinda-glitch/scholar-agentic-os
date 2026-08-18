@@ -296,4 +296,119 @@ router.post("/evidence-analysis", async (req: express.Request<{ id: string }>, r
   res.json({ ok: true, data: analysisMatrix });
 });
 
+// POST /api/projects/:id/agent/journal-discovery
+router.post("/journal-discovery", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  res.json({ ok: true, data: [
+    { title: "Journal of Agentic Workflows", matchScore: 98, impactFactor: 4.5, openAccess: true },
+    { title: "AI in Empirical Research", matchScore: 92, impactFactor: 3.8, openAccess: false }
+  ]});
+});
+
+// POST /api/projects/:id/agent/journal-requirements
+router.post("/journal-requirements", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 3500));
+  res.json({ ok: true, data: {
+    wordLimit: 8000,
+    citationStyle: "APA 7th",
+    requiredSections: ["Abstract", "Introduction", "Methodology", "Results", "Discussion", "Conclusion"],
+    formatting: "Double-spaced, Times New Roman 12pt"
+  }});
+});
+
+// POST /api/projects/:id/agent/draft
+router.post("/draft", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 6000));
+  res.json({ ok: true, data: [
+    { section: "Introduction", status: "Drafted", length: 1200 },
+    { section: "Methodology", status: "Drafted", length: 1500 },
+    { section: "Results", status: "Drafted", length: 2000 },
+    { section: "Conclusion", status: "Drafted", length: 800 }
+  ]});
+});
+
+// POST /api/projects/:id/agent/citation-audit
+router.post("/citation-audit", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 4000));
+  res.json({ ok: true, data: {
+    totalCitations: 45,
+    verifiedFromVault: 45,
+    hallucinated: 0,
+    status: "PASS"
+  }});
+});
+
+// POST /api/projects/:id/agent/originality-check
+router.post("/originality-check", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 4500));
+  res.json({ ok: true, data: {
+    overlapPercentage: 2,
+    selfPlagiarism: 0,
+    status: "PASS",
+    details: "Minor overlap detected in methodology boilerplate, within acceptable journal limits."
+  }});
+});
+
+// POST /api/projects/:id/agent/draft-preview
+router.post("/draft-preview", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  res.json({ ok: true, data: {
+    content: "The compiled draft preview would be displayed here for the user to read.",
+    pages: 18,
+    status: "Ready"
+  }});
+});
+
+// POST /api/projects/:id/agent/peer-review
+router.post("/peer-review", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+  res.json({ ok: true, data: [
+    { lens: "Methodological Rigor", feedback: "Strong methodology. Consider elaborating on qualitative coding schema definitions.", severity: "Minor" },
+    { lens: "Logical Flow", feedback: "Transition between Literature Review and Methodology is slightly abrupt.", severity: "Moderate" },
+    { lens: "Empirical Support", feedback: "Excellent use of vault evidence to support primary claims.", severity: "Positive" }
+  ]});
+});
+
+// POST /api/projects/:id/agent/revision
+router.post("/revision", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 4500));
+  res.json({ ok: true, data: {
+    revisionsMade: 3,
+    sectionsUpdated: ["Literature Review", "Methodology"],
+    status: "Complete"
+  }});
+});
+
+// POST /api/projects/:id/agent/final-editor
+router.post("/final-editor", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  res.json({ ok: true, data: {
+    editorState: "Loaded",
+    status: "Ready for manual edits"
+  }});
+});
+
+// POST /api/projects/:id/agent/publication-readiness
+router.post("/publication-readiness", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  res.json({ ok: true, data: {
+    checks: [
+      { rule: "Word Count < 8000", passed: true, detail: "7,850 words" },
+      { rule: "Citation Format APA 7th", passed: true, detail: "All 45 citations compliant" },
+      { rule: "No Hallucinations", passed: true, detail: "100% Provenance verified" }
+    ],
+    overallStatus: "CERTIFIED_READY"
+  }});
+});
+
+// POST /api/projects/:id/agent/export
+router.post("/export", async (req: express.Request<{ id: string }>, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 3500));
+  res.json({ ok: true, data: {
+    pdfUrl: "/downloads/project_final.pdf",
+    docxUrl: "/downloads/project_final.docx",
+    status: "Export Complete"
+  }});
+});
+
 export { router as agenticRouter };
