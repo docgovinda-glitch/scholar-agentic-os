@@ -10,6 +10,7 @@ import DefinitionStage from "./stages/DefinitionStage";
 import PlaceholderStage from "./stages/PlaceholderStage";
 import LiteratureStage from "./stages/LiteratureStage";
 import GapIdentificationStage from "./stages/GapIdentificationStage";
+import GapSelectionStage from "./stages/GapSelectionStage";
 import TitleSelectionStage from "./stages/TitleSelectionStage";
 import TitleLockStage from "./stages/TitleLockStage";
 import VaultSourcesStage from "./stages/VaultSourcesStage";
@@ -240,6 +241,15 @@ function renderStage(
       return <LiteratureStage stage={stage} projectId={projectId} />;
     case "gap_identification":
       return <GapIdentificationStage stage={stage} projectId={projectId} />;
+    case "gap_selection":
+      return (
+        <GapSelectionStage
+          stage={stage}
+          projectId={projectId}
+          project={project}
+          onSaved={(updated) => setProject(updated)}
+        />
+      );
     case "title_selection":
       return <TitleSelectionStage stage={stage} projectId={projectId} />;
     case "title_lock":
