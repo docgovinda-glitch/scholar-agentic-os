@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
-import { saveIntakeAnswers } from "../../api";
-
+import { authedFetch } from "../../api";
 export default function FinalEditorStage({
   stage,
   projectId,
@@ -21,33 +20,40 @@ export default function FinalEditorStage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = project.answers?.["manuscript_draft"];
-      if (raw) {
-        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-        // In a real app this would reconstruct the sections into a single markdown string
-        // For now, we'll just join the sections if it's an array
-        if (Array.isArray(parsed)) {
-          setContent(parsed.map(s => `## ${s.section}\n\n${s.content}`).join("\n\n"));
-        } else {
-          setContent(JSON.stringify(parsed, null, 2));
+    let isMounted = true;
+    const fetchDraft = async () => {
+      try {
+        const response = await authedFetch(`/api/projects/${projectId}/agent/manuscript`);
+        if (response.ok) {
+          const { data } = await response.json();
+          if (isMounted && data && Array.isArray(data)) {
+            setContent(data.map((s: any) => `## ${s.section_name}\n\n${s.content}`).join("\n\n"));
+          }
         }
+      } catch (e) {
+        console.error("Failed to load manuscript", e);
       }
-    } catch (e) {
-      setContent(project.answers?.["manuscript_draft"] || "");
-    }
-  }, [project.answers]);
+    };
+    fetchDraft();
+    return () => { isMounted = false; };
+  }, [projectId]);
 
   const handleSave = async () => {
     setIsSaving(true);
     setError(null);
     try {
-      const newAnswers = {
-        ...project.answers,
-        manuscript_draft: content,
-      };
-      const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-      onSaved(updatedProject);
+      // Call the newly implemented PUT route to persist manual editor changes
+      const response = await authedFetch(`/api/projects/${projectId}/agent/manuscript`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          section_name: "Full Manuscript",
+          content: content,
+          status: "Edited"
+        })
+      });
+      if (!response.ok) throw new Error("Failed to save changes to database");
+      onSaved({ ...project });
     } catch (err: any) {
       setError(err.message || "Failed to save final draft.");
     } finally {

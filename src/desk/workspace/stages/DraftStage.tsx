@@ -3,7 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch, saveIntakeAnswers } from "../../api";
+import { authedFetch } from "../../api";
 
 export default function DraftStage({
   stage,
@@ -62,14 +62,11 @@ export default function DraftStage({
       setResults(data);
 
       try {
-        const newAnswers = {
-          ...project.answers,
-          manuscript_draft: JSON.stringify(data),
-        };
-        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-        onSaved(updatedProject);
+        // Backend now handles saving to the relational tables directly!
+        // We just notify the parent that the project has new state.
+        onSaved({ ...project });
       } catch (saveErr) {
-        console.error("Failed to save manuscript draft", saveErr);
+        console.error("Failed to update project view", saveErr);
       }
 
       setLogs((prev) => [

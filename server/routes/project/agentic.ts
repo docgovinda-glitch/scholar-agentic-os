@@ -1,6 +1,7 @@
 import express from "express";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 import { callOpenRouterJSON } from "../../utils/llm.ts";
+import { getSupabaseRestConfig, SupabaseTable } from "../../../src/supabaseRest.ts";
 
 const router = express.Router({ mergeParams: true });
 
@@ -30,7 +31,8 @@ router.post("/literature", async (req: express.Request<{ id: string }>, res) => 
 
   try {
     const systemPrompt = `You are an expert academic literature discovery agent.
-Based on the provided research context, working title, and research area, generate a realistic list of 6 discovered literature sources.
+CRITICAL INSTRUCTION: You MUST closely analyze the exact "Working Title" and "Research Area" provided. The literature you discover MUST be highly specific and directly related to the keywords in the title.
+Based on the provided research context, working title, and research area, generate a comprehensive and realistic list of EXACTLY 15 discovered literature sources. This must be an extensive literature review.
 Return ONLY valid JSON in this exact format:
 {
   "data": [
@@ -50,7 +52,8 @@ Return ONLY valid JSON in this exact format:
     "intentSignal": "...",
     "searchVariants": ["...", "..."]
   }
-}`;
+}
+CRITICAL INSTRUCTION: Generate exactly 15 highly relevant sources. Do not hallucinate irrelevant topics.`;
     const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}`;
     const result = await callOpenRouterJSON(systemPrompt, userPrompt);
     res.json({ ok: true, data: result.data, meta: result.meta });
@@ -67,7 +70,8 @@ router.post("/gaps", async (req: express.Request<{ id: string }>, res) => {
 
   try {
     const systemPrompt = `You are an expert academic gap analysis agent.
-Based on the provided research context, identify exactly 3 distinct research gaps (empirical, theoretical, methodological).
+CRITICAL INSTRUCTION: The gaps you identify MUST be explicitly and directly related to the user's "Working Title" and "Research Area". Do not generate generic gaps. Tie the gap precisely to the specific context provided.
+Based on the provided research context, identify exactly 5 distinct, highly-specific research gaps (e.g. empirical, theoretical, methodological) that the working title aims to solve.
 Return ONLY valid JSON in this exact format:
 {
   "data": [
@@ -79,8 +83,32 @@ Return ONLY valid JSON in this exact format:
       "status": "identified"
     }
   ]
-}`;
-    const result = await callOpenRouterJSON(systemPrompt, `Context: ${context}`);
+}
+Make sure every single gap explicitly mentions concepts from the working title.`;
+    const workingTitle = project.answers["working_title"] || "Untitled Research";
+    const researchArea = project.answers["research_area"] || "the field";
+    const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}`;
+    const result = await callOpenRouterJSON(systemPrompt, userPrompt);
+    
+    // Insert into Supabase
+    const config = getSupabaseRestConfig();
+    if (config && result.data && Array.isArray(result.data)) {
+      const table = new SupabaseTable(config, "project_evidence");
+      for (const ev of result.data) {
+        await table.request("", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: project.projectId,
+            quote: ev.quote || "",
+            claim_type: ev.claim_type || "",
+            strength: ev.strength || "",
+            tags: ev.tags || []
+          })
+        });
+      }
+    }
+    
     res.json({ ok: true, data: result.data });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -109,6 +137,49 @@ Return ONLY valid JSON in this exact format:
   ]
 }`;
     const result = await callOpenRouterJSON(systemPrompt, `Context: ${context}`);
+    
+    // Insert into Supabase
+    const config = getSupabaseRestConfig();
+    if (config && result.data && Array.isArray(result.data)) {
+      
+    const table = new SupabaseTable(config, "manuscript_sections");
+    const vTable = new SupabaseTable(config, "manuscript_versions");
+    
+    // First, save the old versions
+    try {
+      const oldSections = await table.request(`?project_id=eq.${project.projectId}`);
+      if (Array.isArray(oldSections)) {
+        for (const old of oldSections) {
+          await vTable.request("", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              project_id: project.projectId,
+              section_name: old.section_name,
+              content: old.content
+            })
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to snapshot manuscript versions", e);
+    }
+
+      for (const sec of result.data) {
+        await table.request("", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates" },
+          body: JSON.stringify({
+            project_id: project.projectId,
+            section_name: sec.section,
+            content: sec.content || "",
+            status: sec.status || "Drafted",
+            word_count: sec.length || 0
+          })
+        });
+      }
+    }
+    
     res.json({ ok: true, data: result.data });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -138,6 +209,25 @@ Return ONLY valid JSON in this exact format:
   ]
 }`;
     const result = await callOpenRouterJSON(systemPrompt, `Context: ${context}`);
+    
+    // Insert into Supabase
+    const config = getSupabaseRestConfig();
+    if (config && result.data && Array.isArray(result.data)) {
+      const table = new SupabaseTable(config, "peer_review_critiques");
+      for (const crit of result.data) {
+        await table.request("", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: project.projectId,
+            lens: crit.lens,
+            feedback: crit.feedback,
+            severity: crit.severity || "Moderate"
+          })
+        });
+      }
+    }
+    
     res.json({ ok: true, data: result.data });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -167,6 +257,49 @@ Return ONLY valid JSON in this exact format:
   ]
 }`;
     const result = await callOpenRouterJSON(systemPrompt, `Context: ${context}`);
+    
+    // Update into Supabase
+    const config = getSupabaseRestConfig();
+    if (config && result.data && Array.isArray(result.data)) {
+      
+    const table = new SupabaseTable(config, "manuscript_sections");
+    const vTable = new SupabaseTable(config, "manuscript_versions");
+    
+    // First, save the old versions
+    try {
+      const oldSections = await table.request(`?project_id=eq.${project.projectId}`);
+      if (Array.isArray(oldSections)) {
+        for (const old of oldSections) {
+          await vTable.request("", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              project_id: project.projectId,
+              section_name: old.section_name,
+              content: old.content
+            })
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to snapshot manuscript versions", e);
+    }
+
+      for (const sec of result.data) {
+        await table.request("", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates" },
+          body: JSON.stringify({
+            project_id: project.projectId,
+            section_name: sec.section,
+            content: sec.content || "",
+            status: sec.status || "Revised",
+            word_count: sec.length || 0
+          })
+        });
+      }
+    }
+    
     res.json({ ok: true, data: result.data });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -373,3 +506,165 @@ router.post("/export", async (req: express.Request<{ id: string }>, res) => {
 });
 
 export { router as agenticRouter };
+
+
+// ---------------------------------------------------------
+
+// ---------------------------------------------------------
+// PUT endpoints for human editor overrides
+// ---------------------------------------------------------
+
+router.put("/manuscript", async (req, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const config = getSupabaseRestConfig();
+  if (!config) return res.status(500).json({ error: "Supabase not configured" });
+
+  try {
+    
+    const table = new SupabaseTable(config, "manuscript_sections");
+    const vTable = new SupabaseTable(config, "manuscript_versions");
+    
+    // First, save the old versions
+    try {
+      const oldSections = await table.request(`?project_id=eq.${project.projectId}`);
+      if (Array.isArray(oldSections)) {
+        for (const old of oldSections) {
+          await vTable.request("", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              project_id: project.projectId,
+              section_name: old.section_name,
+              content: old.content
+            })
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to snapshot manuscript versions", e);
+    }
+
+    const updates = Array.isArray(req.body) ? req.body : [req.body];
+    for (const sec of updates) {
+      await table.request("", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates" },
+        body: JSON.stringify({
+          project_id: project.projectId,
+          section_name: sec.section_name,
+          content: sec.content,
+          status: sec.status || "Edited",
+          word_count: sec.content.split(/\s+/).length
+        })
+      });
+    }
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put("/evidence", async (req, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const config = getSupabaseRestConfig();
+  if (!config) return res.status(500).json({ error: "Supabase not configured" });
+
+  try {
+    const table = new SupabaseTable(config, "project_evidence");
+    // Implementation for explicit evidence update if needed
+    // ...
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put("/critiques/:critiqueId/waive", async (req, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const config = getSupabaseRestConfig();
+  if (!config) return res.status(500).json({ error: "Supabase not configured" });
+
+  try {
+    const table = new SupabaseTable(config, "peer_review_critiques");
+    await table.request(`?id=eq.${req.params.critiqueId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ waived: true })
+    });
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------
+// GET endpoints for fetching relational data
+// ---------------------------------------------------------
+
+router.get("/manuscript", async (req, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const config = getSupabaseRestConfig();
+  if (!config) return res.json({ ok: true, data: [] });
+  try {
+    
+    const table = new SupabaseTable(config, "manuscript_sections");
+    const vTable = new SupabaseTable(config, "manuscript_versions");
+    
+    // First, save the old versions
+    try {
+      const oldSections = await table.request(`?project_id=eq.${project.projectId}`);
+      if (Array.isArray(oldSections)) {
+        for (const old of oldSections) {
+          await vTable.request("", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              project_id: project.projectId,
+              section_name: old.section_name,
+              content: old.content
+            })
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to snapshot manuscript versions", e);
+    }
+
+    const data = await table.request(`?project_id=eq.${project.projectId}`);
+    res.json({ ok: true, data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/evidence", async (req, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const config = getSupabaseRestConfig();
+  if (!config) return res.json({ ok: true, data: [] });
+  try {
+    const table = new SupabaseTable(config, "project_evidence");
+    const data = await table.request(`?project_id=eq.${project.projectId}`);
+    res.json({ ok: true, data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/critiques", async (req, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const config = getSupabaseRestConfig();
+  if (!config) return res.json({ ok: true, data: [] });
+  try {
+    const table = new SupabaseTable(config, "peer_review_critiques");
+    const data = await table.request(`?project_id=eq.${project.projectId}`);
+    res.json({ ok: true, data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
