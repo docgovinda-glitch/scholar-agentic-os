@@ -48,6 +48,8 @@ export class UnauthenticatedError extends Error {
   }
 }
 
+import { originalFetch } from "./originalFetch";
+
 /**
  * Authorization header for the current Supabase session.
  *
@@ -66,7 +68,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 /** GET/DELETE with credentials attached. */
 export async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const headers = { ...(init.headers as Record<string, string> | undefined), ...(await authHeaders()) };
-  return fetch(input, { ...init, headers });
+  return originalFetch(input, { ...init, headers });
 }
 
 /** POST/PUT/PATCH with a JSON body. */
@@ -93,7 +95,7 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export function listOutputTypes(): Promise<{ items: OutputTypeSummary[] }> {
-  return fetch("/api/atlas/output-types").then((r) => json(r));
+  return originalFetch("/api/atlas/output-types").then((r) => json(r));
 }
 
 export function createProject(outputTypeId: string): Promise<ProjectView> {
