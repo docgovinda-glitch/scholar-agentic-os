@@ -15,6 +15,10 @@ import TitleLockStage from "./stages/TitleLockStage";
 import VaultSourcesStage from "./stages/VaultSourcesStage";
 import AdditionalDataStage from "./stages/AdditionalDataStage";
 import EvidenceExtractionStage from "./stages/EvidenceExtractionStage";
+import ExternalResearchStage from "./stages/ExternalResearchStage";
+import SourceApprovalStage from "./stages/SourceApprovalStage";
+import EvidenceAnalysisStage from "./stages/EvidenceAnalysisStage";
+import ManualReviewStage from "./stages/ManualReviewStage";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 
 /**
@@ -235,6 +239,14 @@ function renderStage(
       return <AdditionalDataStage stage={stage} projectId={projectId} />;
     case "evidence_extraction":
       return <EvidenceExtractionStage stage={stage} projectId={projectId} />;
+    case "external_research":
+      return <ExternalResearchStage stage={stage} projectId={projectId} />;
+    case "source_approval_external":
+      return <SourceApprovalStage stage={stage} projectId={projectId} />;
+    case "evidence_analysis":
+      return <EvidenceAnalysisStage stage={stage} projectId={projectId} />;
+    case "manual_review":
+      return <ManualReviewStage stage={stage} projectId={projectId} />;
     default:
       return <PlaceholderStage stage={stage} />;
   }

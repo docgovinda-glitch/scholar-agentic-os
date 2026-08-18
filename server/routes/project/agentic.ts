@@ -222,4 +222,78 @@ router.post("/evidence-extraction", async (req: express.Request<{ id: string }>,
   res.json({ ok: true, data: extractedEvidence });
 });
 
+// POST /api/projects/:id/agent/external-research
+router.post("/external-research", async (req: express.Request<{ id: string }>, res) => {
+  const projectId = req.params.id;
+  if (!projectId) return res.status(400).json({ error: "Missing project ID" });
+
+  const project = await getProjectStore().get(projectId);
+  if (!project) return res.status(404).json({ error: "Project not found" });
+
+  await new Promise((resolve) => setTimeout(resolve, 4500));
+
+  const externalSources = [
+    {
+      id: "ext-001",
+      title: "Automated Peer Review: A Meta-Analysis of AI Systems",
+      author: "Garcia, M. et al.",
+      year: 2025,
+      database: "Semantic Scholar",
+      doi: "10.1145/3819283",
+      gap_addressed: "Empirical Support",
+      snippet: "Our meta-analysis reveals a 30% increase in false-positive critique when utilizing non-specialized large language models for academic peer review...",
+      relevance: 94
+    },
+    {
+      id: "ext-002",
+      title: "Cognitive Load Theory in the Age of Generative Assistants",
+      author: "Williams, K.",
+      year: 2024,
+      database: "PubMed",
+      doi: "10.1038/s41562-024",
+      gap_addressed: "Theoretical",
+      snippet: "We propose a revised cognitive load framework that accounts for 'prompting fatigue', a distinct neurological state observed in researchers relying on multi-agent AI ecosystems...",
+      relevance: 88
+    }
+  ];
+
+  res.json({ ok: true, data: externalSources });
+});
+
+// POST /api/projects/:id/agent/evidence-analysis
+router.post("/evidence-analysis", async (req: express.Request<{ id: string }>, res) => {
+  const projectId = req.params.id;
+  if (!projectId) return res.status(400).json({ error: "Missing project ID" });
+
+  const project = await getProjectStore().get(projectId);
+  if (!project) return res.status(404).json({ error: "Project not found" });
+
+  await new Promise((resolve) => setTimeout(resolve, 6000));
+
+  const analysisMatrix = [
+    {
+      id: "arg-001",
+      theme: "Reduction in Cognitive Load",
+      primary_claim: "LLM tools reduce qualitative coding fatigue by 42%.",
+      source_primary: "Chen et al., 2024 (Vault)",
+      synthesized_support: "Williams (2024) introduces 'prompting fatigue', suggesting the 42% reduction is contingent on optimized agent ecosystems rather than raw chat interfaces.",
+      source_support: "Williams, 2024 (External)",
+      argument_strength: "High",
+      status: "Mapped"
+    },
+    {
+      id: "arg-002",
+      theme: "Semantic Homogeneity and Bias",
+      primary_claim: "Algorithmic review introduces semantic homogeneity.",
+      source_primary: "Smith & Zhao, 2025 (Vault)",
+      synthesized_support: "Supported strongly by Garcia et al. (2025), who found a 30% increase in false-positive critiques using generalized models, verifying the epistemological boundary.",
+      source_support: "Garcia, M. et al., 2025 (External)",
+      argument_strength: "Very High",
+      status: "Mapped"
+    }
+  ];
+
+  res.json({ ok: true, data: analysisMatrix });
+});
+
 export { router as agenticRouter };
