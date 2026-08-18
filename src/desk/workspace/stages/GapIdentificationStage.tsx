@@ -92,6 +92,14 @@ export default function GapIdentificationStage({
     }
   };
 
+  const handleSelectGap = (id: string) => {
+    if (!results) return;
+    setResults(results.map(item => ({
+      ...item,
+      status: item.id === id ? "selected" : "identified"
+    })));
+  };
+
   const getGapTypeColor = (type: GapItem["gap_type"]) => {
     switch (type) {
       case "empirical":
@@ -176,7 +184,7 @@ export default function GapIdentificationStage({
             
             <div className="space-y-4">
               {results.map((item) => (
-                <div key={item.id} className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow relative group flex flex-col md:flex-row gap-6 items-start md:items-center">
+                <div key={item.id} className={`bg-[color:var(--surface-raised)] border ${item.status === "selected" ? "border-[color:var(--accent)] ring-1 ring-[color:var(--accent)]" : "border-[color:var(--border-subtle)]"} rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow relative group flex flex-col md:flex-row gap-6 items-start md:items-center`}>
                   
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-3">
@@ -194,8 +202,24 @@ export default function GapIdentificationStage({
                   </div>
                   
                   <div className="w-full md:w-auto shrink-0 border-t md:border-t-0 md:border-l border-[color:var(--border-subtle)] pt-4 md:pt-0 md:pl-6 flex md:flex-col items-center justify-end gap-3">
-                    <button className="flex-1 md:flex-none px-6 py-2 rounded-lg bg-[color:var(--surface-sunken)] text-[color:var(--text-primary)] font-semibold border border-[color:var(--border-subtle)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] transition-colors">
-                      Select Gap
+                    <button 
+                      onClick={() => handleSelectGap(item.id)}
+                      className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-semibold border transition-colors ${
+                        item.status === "selected"
+                          ? "bg-[color:var(--accent)] text-white border-[color:var(--accent)]"
+                          : "bg-[color:var(--surface-sunken)] text-[color:var(--text-primary)] border-[color:var(--border-subtle)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+                      }`}
+                    >
+                      {item.status === "selected" ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Selected
+                        </span>
+                      ) : (
+                        "Select Gap"
+                      )}
                     </button>
                     <button className="px-4 py-2 text-[color:var(--text-muted)] hover:text-red-600 transition-colors">
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
