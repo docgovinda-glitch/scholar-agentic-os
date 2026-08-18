@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedJsonFetch } from "../../api";
 
 interface GapItem {
   id: string;
@@ -56,9 +56,7 @@ export default function GapIdentificationStage({
     }, 900);
 
     try {
-      const response = await authedFetch(`/api/projects/${projectId}/agent/gaps`, {
-        method: "POST",
-      });
+      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/gaps`, "POST", {});
 
       if (!response.ok) {
         throw new Error("Agent encountered an error during gap identification.");

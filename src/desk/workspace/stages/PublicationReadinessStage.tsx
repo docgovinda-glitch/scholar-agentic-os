@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedJsonFetch } from "../../api";
 
 export default function PublicationReadinessStage({
   stage,
@@ -45,9 +45,7 @@ export default function PublicationReadinessStage({
     }, 900);
 
     try {
-      const response = await authedFetch(`/api/projects/${projectId}/agent/publication-readiness`, {
-        method: "POST",
-      });
+      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/publication-readiness`, "POST", {});
 
       if (!response.ok) {
         throw new Error("Agent encountered an error.");

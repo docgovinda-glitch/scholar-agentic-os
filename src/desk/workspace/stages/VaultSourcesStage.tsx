@@ -3,7 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch, saveIntakeAnswers } from "../../api";
+import { authedJsonFetch, saveIntakeAnswers } from "../../api";
 
 interface VaultSource {
   id: string;
@@ -62,9 +62,7 @@ export default function VaultSourcesStage({
     }, 800);
 
     try {
-      const response = await authedFetch(`/api/projects/${projectId}/agent/vault-sources`, {
-        method: "POST",
-      });
+      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/vault-sources`, "POST", {});
 
       if (!response.ok) {
         throw new Error("Agent encountered an error scanning the vault.");

@@ -3,7 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedJsonFetch } from "../../api";
 
 export default function DraftStage({
   stage,
@@ -50,9 +50,7 @@ export default function DraftStage({
     }, 900);
 
     try {
-      const response = await authedFetch(`/api/projects/${projectId}/agent/draft`, {
-        method: "POST",
-      });
+      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/draft`, "POST", {});
 
       if (!response.ok) {
         throw new Error("Agent encountered an error.");

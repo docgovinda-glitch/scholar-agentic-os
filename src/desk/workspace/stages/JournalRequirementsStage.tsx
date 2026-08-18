@@ -3,7 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch, saveIntakeAnswers } from "../../api";
+import { authedJsonFetch, saveIntakeAnswers } from "../../api";
 
 export default function JournalRequirementsStage({
   stage,
@@ -52,9 +52,7 @@ export default function JournalRequirementsStage({
     }, 900);
 
     try {
-      const response = await authedFetch(`/api/projects/${projectId}/agent/journal-requirements`, {
-        method: "POST",
-      });
+      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/journal-requirements`, "POST", {});
 
       if (!response.ok) {
         throw new Error("Agent encountered an error.");

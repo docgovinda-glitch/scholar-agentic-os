@@ -3,7 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedJsonFetch } from "../../api";
 import { useEffect } from "react";
 
 export default function PeerReviewStage({
@@ -26,7 +26,7 @@ export default function PeerReviewStage({
 
   const fetchCritiques = async () => {
     try {
-      const response = await authedFetch(`/api/projects/${projectId}/agent/critiques`);
+      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/critiques`);
       if (response.ok) {
         const { data } = await response.json();
         setResults(data);
@@ -82,9 +82,7 @@ export default function PeerReviewStage({
     }, 900);
 
     try {
-      const response = await authedFetch(`/api/projects/${projectId}/agent/peer-review`, {
-        method: "POST",
-      });
+      const response = await authedFetch(`/api/projects/${projectId}/agent/peer-review`, "POST", {});
 
       if (!response.ok) {
         throw new Error("Agent encountered an error.");

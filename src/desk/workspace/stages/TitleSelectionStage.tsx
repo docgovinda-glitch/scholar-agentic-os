@@ -3,7 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch, saveIntakeAnswers } from "../../api";
+import { authedJsonFetch, saveIntakeAnswers } from "../../api";
 
 interface TitleItem {
   id: string;
@@ -65,9 +65,7 @@ export default function TitleSelectionStage({
     }, 850);
 
     try {
-      const response = await authedFetch(`/api/projects/${projectId}/agent/titles`, {
-        method: "POST",
-      });
+      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/titles`, "POST", {});
 
       if (!response.ok) {
         throw new Error("Agent encountered an error during title generation.");

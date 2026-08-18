@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api";
+import { authedJsonFetch } from "../../api";
 
 export default function CitationAuditStage({
   stage,
@@ -45,9 +45,7 @@ export default function CitationAuditStage({
     }, 900);
 
     try {
-      const response = await authedFetch(`/api/projects/${projectId}/agent/citation-audit`, {
-        method: "POST",
-      });
+      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/citation-audit`, "POST", {});
 
       if (!response.ok) {
         throw new Error("Agent encountered an error.");

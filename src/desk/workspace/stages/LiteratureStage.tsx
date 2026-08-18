@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedFetch } from "../../api"; // Using existing fetch wrapper
+import { authedJsonFetch } from "../../api"; // Using existing fetch wrapper
 
 interface LiteratureItem {
   id: string;
@@ -61,9 +61,7 @@ export default function LiteratureStage({
     }, 800);
 
     try {
-      const response = await authedFetch(`/api/projects/${projectId}/agent/literature`, {
-        method: "POST",
-      });
+      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/literature`, "POST", {});
 
       if (!response.ok) {
         throw new Error("Agent encountered an error during discovery.");
