@@ -26,25 +26,19 @@ router.post("/literature", async (req: express.Request<{ id: string }>, res) => 
 
   // In a real implementation, this would call Studio/OmniRouter with project.answers context
   const workingTitle = project.answers["working_title"] || "Untitled Research";
+  const researchArea = project.answers["research_area"] || "the field";
   
   // MOCKED SEMANTIC DISCOVERY LOGIC:
-  // 1. Analyze Working Title for primary intent, domain, and methodology hints.
-  // 2. Generate controlled semantic search variants.
-  // 3. Rank vault and external literature based on direct relevance to these variants.
-  
   const semanticVariants = [
     `"${workingTitle}" OR related core concepts`,
     `Methodological approaches similar to "${workingTitle}"`,
     `Empirical studies addressing "${workingTitle}"`
   ];
 
-  console.log(`[Agentic Discovery] Extracting semantic intent from: "${workingTitle}"`);
-  console.log(`[Agentic Discovery] Generated search variants:`, semanticVariants);
-
   const discoveredLiterature = [
     {
       id: "lit-001",
-      title: `Contextualizing ${workingTitle}: A review`,
+      title: `Contextualizing ${workingTitle}: A review of ${researchArea}`,
       authors: ["Smith, J.", "Doe, A."],
       year: 2025,
       journal: "Journal of Advanced Research",
@@ -55,7 +49,7 @@ router.post("/literature", async (req: express.Request<{ id: string }>, res) => 
     },
     {
       id: "lit-002",
-      title: `Methodologies for ${workingTitle.split(" ")[0] || "Research"}`,
+      title: `Methodologies for ${workingTitle.split(" ")[0] || "Research"} in ${researchArea}`,
       authors: ["Chen, M."],
       year: 2026,
       journal: "Methodology Review",
@@ -66,7 +60,7 @@ router.post("/literature", async (req: express.Request<{ id: string }>, res) => 
     },
     {
       id: "lit-003",
-      title: "Foundational Theories in the Field",
+      title: `Foundational Theories of ${workingTitle}`,
       authors: ["Gonzalez, R.", "Kim, T."],
       year: 2024,
       journal: "Information Systems Research",
@@ -74,8 +68,44 @@ router.post("/literature", async (req: express.Request<{ id: string }>, res) => 
       relevanceScore: 82,
       themes: ["theoretical framework", "background"],
       abstract: `A comprehensive review of the background concepts that often inform studies similar to "${workingTitle}".`,
+    },
+    {
+      id: "lit-004",
+      title: `Empirical Evidence for ${workingTitle}: A Meta-Analysis`,
+      authors: ["Lee, S.", "Patel, N."],
+      year: 2023,
+      journal: `International Journal of ${researchArea || "Research"}`,
+      source: "external",
+      relevanceScore: 91,
+      themes: ["empirical", "meta-analysis"],
+      abstract: `This meta-analysis aggregates data from 45 studies related to "${workingTitle}", highlighting key trends and future directions.`,
+    },
+    {
+      id: "lit-005",
+      title: `The Future of ${workingTitle} and Its Impact`,
+      authors: ["Garcia, L.", "Nguyen, H."],
+      year: 2026,
+      journal: "Future Tech & Society",
+      source: "vault",
+      relevanceScore: 85,
+      themes: ["future impact", "societal implications"],
+      abstract: `Discusses the potential long-term implications of advancements in "${workingTitle}" on the broader society and industry.`,
+    },
+    {
+      id: "lit-006",
+      title: `Challenges in Implementing ${workingTitle} Solutions`,
+      authors: ["Wright, E.", "Adams, P."],
+      year: 2025,
+      journal: "Journal of Applied Innovation",
+      source: "external",
+      relevanceScore: 79,
+      themes: ["challenges", "implementation"],
+      abstract: `Identifies the core challenges and barriers when applying "${workingTitle}" methodologies in practical real-world scenarios.`,
     }
   ];
+
+  console.log(`[Agentic Discovery] Extracting semantic intent from: "${workingTitle}"`);
+  console.log(`[Agentic Discovery] Generated search variants:`, semanticVariants);
 
   res.json({
     ok: true,
@@ -97,25 +127,28 @@ router.post("/gaps", async (req: express.Request<{ id: string }>, res) => {
 
   await new Promise((resolve) => setTimeout(resolve, 3500));
 
+  const workingTitle = project.answers["working_title"] || "Untitled Research";
+  const researchArea = project.answers["research_area"] || "the field";
+
   const identifiedGaps = [
     {
       id: "gap-001",
       gap_type: "empirical",
-      description: "Lack of longitudinal studies assessing the long-term impact of multi-agent LLM systems on qualitative coding fatigue.",
+      description: `Lack of longitudinal studies assessing the long-term impact of ${workingTitle} within the context of ${researchArea}.`,
       importance_score: 92,
       status: "identified"
     },
     {
       id: "gap-002",
       gap_type: "theoretical",
-      description: "Absence of a unified epistemological framework defining the boundary between 'assisted review' and 'artificial peer review'.",
+      description: `Absence of a unified epistemological framework defining the boundary between established ${researchArea} theories and ${workingTitle}.`,
       importance_score: 85,
       status: "identified"
     },
     {
       id: "gap-003",
       gap_type: "methodological",
-      description: "Current methods rely heavily on self-reported developer metrics rather than standardized semantic-drift benchmarking in PKM systems.",
+      description: `Current methods in ${researchArea} rely heavily on self-reported metrics rather than standardized benchmarking for ${workingTitle}.`,
       importance_score: 78,
       status: "identified"
     }
@@ -171,10 +204,13 @@ router.post("/vault-sources", async (req: express.Request<{ id: string }>, res) 
 
   await new Promise((resolve) => setTimeout(resolve, 3800));
 
+  const workingTitle = project.answers["working_title"] || "Untitled Research";
+  const researchArea = project.answers["research_area"] || "the field";
+
   const discoveredSources = [
     {
       id: "source-001",
-      title: "Impact of AI Coding Assistants on Developer Well-being",
+      title: `Impact of ${workingTitle} on ${researchArea} Well-being`,
       author: "Chen et al.",
       year: 2024,
       relevance_score: 95,
@@ -182,7 +218,7 @@ router.post("/vault-sources", async (req: express.Request<{ id: string }>, res) 
     },
     {
       id: "source-002",
-      title: "The Epistemological Boundary of Algorithmic Code Review",
+      title: `The Epistemological Boundary of ${workingTitle}`,
       author: "Smith & Zhao",
       year: 2025,
       relevance_score: 89,
@@ -190,11 +226,27 @@ router.post("/vault-sources", async (req: express.Request<{ id: string }>, res) 
     },
     {
       id: "source-003",
-      title: "Measuring Semantic Drift in Large Language Models",
+      title: `Measuring Semantic Drift in ${workingTitle}`,
       author: "O'Connor",
       year: 2023,
       relevance_score: 82,
       type: "Conference Proceeding"
+    },
+    {
+      id: "source-004",
+      title: `A Review of ${workingTitle} and Its Applications in ${researchArea}`,
+      author: "Kim & Park",
+      year: 2026,
+      relevance_score: 91,
+      type: "Journal Article"
+    },
+    {
+      id: "source-005",
+      title: `Understanding ${researchArea} through the lens of ${workingTitle}`,
+      author: "Davis et al.",
+      year: 2024,
+      relevance_score: 87,
+      type: "PDF Document"
     }
   ];
 
@@ -211,18 +263,21 @@ router.post("/evidence-extraction", async (req: express.Request<{ id: string }>,
 
   await new Promise((resolve) => setTimeout(resolve, 5500));
 
+  const workingTitle = project.answers["working_title"] || "Untitled Research";
+  const researchArea = project.answers["research_area"] || "the field";
+
   const extractedEvidence = [
     {
       id: "ev-001",
-      quote: "Developers utilizing LLM-based tools reported a 42% reduction in cognitive load during routine qualitative coding tasks.",
+      quote: `Researchers investigating ${workingTitle} observed a 42% increase in efficiency when applying standard protocols within ${researchArea}.`,
       source: "Chen et al., 2024 (p. 14)",
       claim_type: "Empirical Support",
       strength: "Strong",
-      tags: ["cognitive load", "efficiency"]
+      tags: ["efficiency", "protocols"]
     },
     {
       id: "ev-002",
-      quote: "However, relying heavily on algorithmic peer review introduces a 'semantic homogeneity' that stifles novel methodological approaches.",
+      quote: `However, relying heavily on traditional approaches for ${workingTitle} introduces a 'methodological homogeneity' that stifles novel breakthroughs.`,
       source: "Smith & Zhao, 2025 (p. 211)",
       claim_type: "Counter-Evidence",
       strength: "Moderate",
@@ -230,11 +285,19 @@ router.post("/evidence-extraction", async (req: express.Request<{ id: string }>,
     },
     {
       id: "ev-003",
-      quote: "Semantic drift over a 12-month period was statistically significant (p < 0.01) when models were not anchored to grounded theoretical frameworks.",
+      quote: `Semantic drift over a 12-month period was statistically significant (p < 0.01) when models related to ${workingTitle} were not anchored to grounded theoretical frameworks.`,
       source: "O'Connor, 2023 (p. 5)",
       claim_type: "Statistical",
       strength: "Strong",
       tags: ["semantic drift", "longitudinal"]
+    },
+    {
+      id: "ev-004",
+      quote: `Recent meta-analyses suggest that the core tenets of ${workingTitle} are consistently verified across different sub-disciplines of ${researchArea}.`,
+      source: "Garcia et al., 2026 (p. 88)",
+      claim_type: "Meta-Analysis",
+      strength: "Very Strong",
+      tags: ["verification", "cross-disciplinary"]
     }
   ];
 
@@ -251,28 +314,42 @@ router.post("/external-research", async (req: express.Request<{ id: string }>, r
 
   await new Promise((resolve) => setTimeout(resolve, 4500));
 
+  const workingTitle = project.answers["working_title"] || "Untitled Research";
+  const researchArea = project.answers["research_area"] || "the field";
+
   const externalSources = [
     {
       id: "ext-001",
-      title: "Automated Peer Review: A Meta-Analysis of AI Systems",
+      title: `${workingTitle}: A Meta-Analysis of Current Systems`,
       author: "Garcia, M. et al.",
       year: 2025,
       database: "Semantic Scholar",
       doi: "10.1145/3819283",
       gap_addressed: "Empirical Support",
-      snippet: "Our meta-analysis reveals a 30% increase in false-positive critique when utilizing non-specialized large language models for academic peer review...",
+      snippet: `Our meta-analysis reveals a 30% variation in outcomes when applying generalized frameworks to ${workingTitle} within ${researchArea}...`,
       relevance: 94
     },
     {
       id: "ext-002",
-      title: "Cognitive Load Theory in the Age of Generative Assistants",
+      title: `Cognitive Theory in the Context of ${workingTitle}`,
       author: "Williams, K.",
       year: 2024,
       database: "PubMed",
       doi: "10.1038/s41562-024",
       gap_addressed: "Theoretical",
-      snippet: "We propose a revised cognitive load framework that accounts for 'prompting fatigue', a distinct neurological state observed in researchers relying on multi-agent AI ecosystems...",
+      snippet: `We propose a revised cognitive load framework that accounts for distinct neurological states observed in researchers focusing on ${workingTitle}...`,
       relevance: 88
+    },
+    {
+      id: "ext-003",
+      title: `Methodological Innovations in ${researchArea}`,
+      author: "Lee, J.",
+      year: 2026,
+      database: "IEEE Xplore",
+      doi: "10.1109/MIE.2026.112",
+      gap_addressed: "Methodological",
+      snippet: `This paper introduces a novel metric for assessing the validity of empirical findings in studies related to ${workingTitle}, standardizing...`,
+      relevance: 91
     }
   ];
 
@@ -289,23 +366,26 @@ router.post("/evidence-analysis", async (req: express.Request<{ id: string }>, r
 
   await new Promise((resolve) => setTimeout(resolve, 6000));
 
+  const workingTitle = project.answers["working_title"] || "Untitled Research";
+  const researchArea = project.answers["research_area"] || "the field";
+
   const analysisMatrix = [
     {
       id: "arg-001",
-      theme: "Reduction in Cognitive Load",
-      primary_claim: "LLM tools reduce qualitative coding fatigue by 42%.",
+      theme: "Efficiency and Protocol Optimization",
+      primary_claim: `Applying standardized protocols to ${workingTitle} increases efficiency by 42%.`,
       source_primary: "Chen et al., 2024 (Vault)",
-      synthesized_support: "Williams (2024) introduces 'prompting fatigue', suggesting the 42% reduction is contingent on optimized agent ecosystems rather than raw chat interfaces.",
+      synthesized_support: `Williams (2024) expands on this, suggesting the 42% reduction is contingent on the proper theoretical grounding in ${researchArea}.`,
       source_support: "Williams, 2024 (External)",
       argument_strength: "High",
       status: "Mapped"
     },
     {
       id: "arg-002",
-      theme: "Semantic Homogeneity and Bias",
-      primary_claim: "Algorithmic review introduces semantic homogeneity.",
+      theme: "Methodological Homogeneity and Bias",
+      primary_claim: `Traditional approaches to ${workingTitle} introduce methodological homogeneity.`,
       source_primary: "Smith & Zhao, 2025 (Vault)",
-      synthesized_support: "Supported strongly by Garcia et al. (2025), who found a 30% increase in false-positive critiques using generalized models, verifying the epistemological boundary.",
+      synthesized_support: `Supported strongly by Garcia et al. (2025), who found a 30% variation in outcomes using generalized frameworks within ${researchArea}.`,
       source_support: "Garcia, M. et al., 2025 (External)",
       argument_strength: "Very High",
       status: "Mapped"
