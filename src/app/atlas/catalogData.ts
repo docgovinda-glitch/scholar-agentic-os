@@ -1148,11 +1148,12 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
     sources: { targetCount: { min: 30, typical: 50 }, recencyExpectation: "majority within 10 years", typeMix: { peer_reviewed: 0.85, other: 0.15 } },
     citation: { defaultStyle: "vancouver", commonStyles: ["vancouver", "apa7", "ieee"] },
     intakeSchema: {
-      required: [
+      required: [],
+      recommended: [
         {
           key: "target_journal",
           label: "Target journal",
-          tier: "required",
+          tier: "recommended",
           guidance: {
             whatItIs: "The journal you intend to submit to.",
             whyItMatters: "It drives the entire compliance Rubric — word limit, structure, citation style, and required declarations all come from it.",
@@ -1161,8 +1162,6 @@ const OUTPUT_TYPES: OutputTypeSpec[] = [
           },
           allowsProvisional: true,
         },
-      ],
-      recommended: [
         {
           key: "author_guidelines",
           label: "Author guidelines",

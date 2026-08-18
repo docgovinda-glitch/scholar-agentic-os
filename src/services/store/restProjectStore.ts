@@ -75,10 +75,10 @@ function rowToRecord(row: ProjectRow): ProjectRecord {
   return {
     projectId: row.project_id,
     ownerId: row.owner_id,
-    outputTypeId: row.output_type_id,
-    answers: row.answers,
-    authors: row.authors || [],
-    gates: row.gates,
+    outputTypeId: row.output_type_id as string,
+    answers: row.answers as ProjectRecord["answers"],
+    authors: (row.authors as ProjectRecord["authors"] | null) ?? [],
+    gates: row.gates as ProjectRecord["gates"],
     // PostgREST returns SQL NULL as JSON null; ProjectRecord uses undefined.
     document: row.document ?? undefined,
     rubricReport: row.rubric_report ?? undefined,
@@ -180,6 +180,7 @@ export function createRestProjectStore(config: RestStoreConfig): ProjectStore {
         ownerId,
         outputTypeId,
         answers: {},
+        authors: [],
         gates: initialProjectGateState(projectId),
         claimGraph: emptyGraph(),
         waivers: {},

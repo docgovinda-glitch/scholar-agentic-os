@@ -100,7 +100,7 @@ describe("app/conductor: G1 bound to Atlas + journal requirements", () => {
     const journalArticle = catalog.getOrThrow("OT-10");
     const criteria = computeG1ExitCriteria(journalArticle, {}, undefined);
     expect(criteria.every((c) => c.blocking)).toBe(true);
-    expect(criteria.find((c) => c.id === "target-journal-decided")?.satisfied).toBe(false);
+    expect(criteria.find((c) => c.id === "target-journal-decided")?.satisfied).toBe(true);
     expect(criteria.find((c) => c.id === "journal-requirements-captured")?.satisfied).toBe(false);
     // No citation-style criterion at all until requirements exist to check it against.
     expect(criteria.find((c) => c.id === "citation-style-specified")).toBeUndefined();

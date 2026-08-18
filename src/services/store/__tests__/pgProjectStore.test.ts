@@ -94,8 +94,8 @@ describe("services/store: pgProjectStore", () => {
     const saved = await store.save(record);
     expect(saved).toBe(record);
     expect(db.calls[0].text).toMatch(/on conflict \(project_id\) do update/i);
-    expect(db.calls[0].params?.[5]).toBeNull(); // document
-    expect(db.calls[0].params?.[6]).toBeNull(); // rubric_report
+    expect(db.calls[0].params?.[6]).toBeNull(); // document
+    expect(db.calls[0].params?.[7]).toBeNull(); // rubric_report
   });
 
   it("listByOwner() scopes the query to the owner in SQL, not in memory", async () => {
@@ -127,7 +127,7 @@ describe("services/store: pgProjectStore", () => {
     };
 
     await store.save(record);
-    const documentParam = db.calls[0].params?.[5];
+    const documentParam = db.calls[0].params?.[6];
     expect(typeof documentParam).toBe("string");
     expect(JSON.parse(documentParam as string)).toEqual(record.document);
   });
@@ -147,7 +147,7 @@ describe("services/store: pgProjectStore", () => {
       evidenceLedger: { sources: [], items: [] },
     };
     await insertStore.save(withoutRequirements);
-    expect(insertDb.calls[0].params?.[10]).toBeNull();
+    expect(insertDb.calls[0].params?.[11]).toBeNull();
 
     const journalRequirements: ProjectRecord["journalRequirements"] = {
       journalName: "Water Research",
@@ -160,9 +160,9 @@ describe("services/store: pgProjectStore", () => {
     const withDb = fakeDb();
     const withStore = createPgProjectStore(withDb);
     await withStore.save({ ...withoutRequirements, journalRequirements });
-    const param = withDb.calls[0].params?.[10];
-    expect(typeof param).toBe("string");
-    expect(JSON.parse(param as string)).toEqual(journalRequirements);
+    const updateParam = withDb.calls[0].params?.[11];
+    expect(typeof updateParam).toBe("string");
+    expect(JSON.parse(updateParam as string)).toEqual(journalRequirements);
 
     const getDb = fakeDb([
       {
@@ -203,7 +203,7 @@ describe("services/store: pgProjectStore", () => {
     };
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
-    const param = saveDb.calls[0].params?.[11];
+    const param = saveDb.calls[0].params?.[12];
     expect(typeof param).toBe("string");
     expect(JSON.parse(param as string)).toEqual(record.evidenceLedger);
 
@@ -266,7 +266,7 @@ describe("services/store: pgProjectStore", () => {
     };
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
-    const param = saveDb.calls[0].params?.[12];
+    const param = saveDb.calls[0].params?.[13];
     expect(typeof param).toBe("string");
     expect(JSON.parse(param as string)).toEqual(generationJob);
 
@@ -307,7 +307,7 @@ describe("services/store: pgProjectStore", () => {
     };
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
-    const param = saveDb.calls[0].params?.[13];
+    const param = saveDb.calls[0].params?.[14];
     expect(typeof param).toBe("string");
     expect(JSON.parse(param as string)).toEqual(peerReviewHistory);
 
@@ -373,9 +373,9 @@ describe("services/store: pgProjectStore", () => {
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
     const params = saveDb.calls[0].params;
-    expect(JSON.parse(params?.[14] as string)).toEqual(coverLetter);
-    expect(JSON.parse(params?.[15] as string)).toEqual(anonymizationReport);
-    expect(JSON.parse(params?.[16] as string)).toEqual(anonymizedDocument);
+    expect(JSON.parse(params?.[15] as string)).toEqual(coverLetter);
+    expect(JSON.parse(params?.[16] as string)).toEqual(anonymizationReport);
+    expect(JSON.parse(params?.[17] as string)).toEqual(anonymizedDocument);
 
     const staleRowDb = fakeDb([
       {
@@ -437,7 +437,7 @@ describe("services/store: pgProjectStore", () => {
     };
     const saveDb = fakeDb();
     await createPgProjectStore(saveDb).save(record);
-    expect(JSON.parse(saveDb.calls[0].params?.[17] as string)).toEqual(sourceCountOverride);
+    expect(JSON.parse(saveDb.calls[0].params?.[18] as string)).toEqual(record.sourceCountOverride);
 
     const staleRowDb = fakeDb([
       {

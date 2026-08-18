@@ -86,6 +86,7 @@ function rowToRecord(row: Record<string, unknown>): ProjectRecord {
     ownerId: row.owner_id as string,
     outputTypeId: row.output_type_id as string,
     answers: row.answers as ProjectRecord["answers"],
+    authors: (row.authors as ProjectRecord["authors"] | null) ?? [],
     gates: row.gates as ProjectRecord["gates"],
     document: (row.document as ProjectRecord["document"] | null) ?? undefined,
     rubricReport: (row.rubric_report as ProjectRecord["rubricReport"] | null) ?? undefined,

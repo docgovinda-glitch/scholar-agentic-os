@@ -121,14 +121,14 @@ export function computeG1ExitCriteria(
 ): ExitCriterion[] {
   if (spec.workflowVariant !== "venue_targeted") return [];
 
-  const targetJournalField = spec.intakeSchema.required.find((f) => f.key === "target_journal");
+  const targetJournalField = [...spec.intakeSchema.required, ...spec.intakeSchema.recommended].find((f) => f.key === "target_journal");
   const criteria: ExitCriterion[] = [];
 
   if (targetJournalField) {
     criteria.push({
       id: "target-journal-decided",
-      description: `"${targetJournalField.label}" resolved from provisional to a real value`,
-      satisfied: answers.target_journal !== undefined && answers.target_journal !== "provisional",
+      description: `"${targetJournalField.label}" resolved from provisional to a real value (or left empty)`,
+      satisfied: answers.target_journal !== "provisional",
       blocking: true,
     });
   }

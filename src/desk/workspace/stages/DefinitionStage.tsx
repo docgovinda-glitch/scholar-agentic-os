@@ -8,6 +8,38 @@ const ARTICLE_TYPES = [
   "Case Report",
   "Methodology / Methods",
   "Perspective / Opinion",
+  "Systematic Review",
+  "Scoping Review",
+  "Meta-analysis",
+  "Brief Report",
+  "Short Communication",
+  "Protocol",
+  "Commentary",
+  "Editorial",
+  "Letter",
+  "Other"
+];
+
+const STUDY_DESIGN_TYPES = [
+  "Experimental",
+  "Randomized Controlled Trial",
+  "Observational",
+  "Cross-sectional",
+  "Cohort",
+  "Case-control",
+  "Longitudinal",
+  "Qualitative",
+  "Quantitative",
+  "Mixed Methods",
+  "Systematic Review",
+  "Scoping Review",
+  "Meta-analysis",
+  "Case Study",
+  "Methodological / Methods Research",
+  "Computational / Simulation",
+  "Secondary Data Analysis",
+  "Theoretical / Conceptual",
+  "Protocol",
   "Other"
 ];
 
@@ -103,20 +135,26 @@ export default function DefinitionStage({
     }
   }
 
+  const EXPLICIT_FIELDS = [
+    "working_title", "article_type", "research_area", "study_design", 
+    "target_journal", "author_guidelines", "target_population", 
+    "theoretical_framework", "expected_contribution"
+  ];
+
   // Research Definition fields
   const researchFields = spec
     ? [
         { key: "working_title", label: "Working Title", placeholder: "Primary research-intent signal...", required: true, multiline: false },
-        { key: "article_type", label: "Article Type", placeholder: "Select or specify...", required: true, multiline: false },
         { key: "research_area", label: "Research Area / Domain", placeholder: "e.g., Machine Learning, Public Health...", required: true, multiline: false },
-        ...spec.intakeSchema.required.filter(f => !["working_title", "article_type", "research_area"].includes(f.key)).map((f) => ({ ...f, required: true, multiline: true })),
-        ...spec.intakeSchema.recommended.map((f) => ({ ...f, required: false, multiline: true })),
-        { key: "study_design", label: "Study Design / Type", placeholder: "e.g., Systematic review, Cross-sectional study, Qualitative analysis", required: false, multiline: false },
-        { key: "target_population", label: "Target Population / Sample / Data", placeholder: "Describe the population, dataset, or sample you are studying", required: false, multiline: true },
-        { key: "theoretical_framework", label: "Theoretical Framework", placeholder: "Name the theory or theories guiding this research, if known", required: false, multiline: true },
-        { key: "target_journal", label: "Target Journal", placeholder: "Optional target journal", required: false, multiline: false },
-        { key: "author_guidelines", label: "Author Guidelines", placeholder: "URL or brief notes", required: false, multiline: true },
-        { key: "expected_contribution", label: "Expected Contribution / Significance", placeholder: "What will this research add to the field?", required: false, multiline: true },
+        { key: "article_type", label: "Article Type", placeholder: "Select or specify...", required: true, multiline: false },
+        { key: "study_design", label: "Study Design / Type", placeholder: "Select or specify...", required: false, multiline: false },
+        { key: "target_journal", label: "Target Journal (Optional)", placeholder: "Optional target journal", required: false, multiline: false },
+        { key: "author_guidelines", label: "Author Guidelines (Optional)", placeholder: "URL or brief notes", required: false, multiline: true },
+        { key: "target_population", label: "Target Population / Sample / Data (Optional)", placeholder: "Describe the population, dataset, or sample you are studying", required: false, multiline: true },
+        { key: "theoretical_framework", label: "Theoretical Framework (Optional)", placeholder: "Name the theory or theories guiding this research, if known", required: false, multiline: true },
+        { key: "expected_contribution", label: "Expected Contribution / Significance (Optional)", placeholder: "What will this research add to the field?", required: false, multiline: true },
+        ...spec.intakeSchema.required.filter(f => !EXPLICIT_FIELDS.includes(f.key)).map((f) => ({ ...f, required: true, multiline: true, placeholder: f.guidance?.example || "" })),
+        ...spec.intakeSchema.recommended.filter(f => !EXPLICIT_FIELDS.includes(f.key)).map((f) => ({ ...f, required: false, multiline: true, placeholder: f.guidance?.example || "" })),
       ]
     : [];
 
@@ -180,7 +218,9 @@ export default function DefinitionStage({
           spec ? (
             <div className="space-y-5">
               {researchFields.map((field) => {
-                if (field.key === "article_type") {
+                if (field.key === "article_type" || field.key === "study_design") {
+                  const optionsList = field.key === "article_type" ? ARTICLE_TYPES : STUDY_DESIGN_TYPES;
+                  const displayLabel = field.key === "article_type" ? "article type" : "study design / type";
                   return (
                     <div key={field.key} className="group rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5 transition-all duration-200">
                       <label className="text-sm font-semibold text-[color:var(--text-primary)] flex items-center gap-2 mb-3">
@@ -188,22 +228,22 @@ export default function DefinitionStage({
                         {field.required && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">Required</span>}
                       </label>
                       <select
-                        value={ARTICLE_TYPES.includes(answers[field.key]) ? answers[field.key] : answers[field.key] ? "Other" : ""}
+                        value={optionsList.includes(answers[field.key]) ? answers[field.key] : answers[field.key] ? "Other" : ""}
                         onChange={(e) => updateAnswer(field.key, e.target.value === "Other" ? "" : e.target.value)}
                         className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded p-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--accent)] mb-2"
                       >
-                        <option value="" disabled>Select article type...</option>
-                        {ARTICLE_TYPES.map(type => (
+                        <option value="" disabled>Select {displayLabel}...</option>
+                        {optionsList.map(type => (
                           <option key={type} value={type}>{type}</option>
                         ))}
                         <option value="Other">Other (Specify)</option>
                       </select>
-                      {(!ARTICLE_TYPES.includes(answers[field.key]) && answers[field.key] !== undefined) && (
+                      {(!optionsList.includes(answers[field.key]) && answers[field.key] !== undefined) && (
                         <input
                           type="text"
                           value={answers[field.key] || ""}
                           onChange={(e) => updateAnswer(field.key, e.target.value)}
-                          placeholder="Specify custom article type"
+                          placeholder={`Specify custom ${displayLabel}`}
                           className="w-full bg-transparent border-0 p-0 text-sm text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:ring-0 outline-none"
                         />
                       )}
