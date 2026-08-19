@@ -67,11 +67,11 @@ export default function EvidenceAnalysisStage({
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/evidence-analysis`, "POST", {});
 
+      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error("Agent encountered an error synthesizing evidence.");
+        throw new Error(resJson.error || "Agent encountered an error synthesizing evidence.");
       }
-
-      const { data } = await response.json();
+      const { data } = resJson;
       setResults(data);
       
       // Auto-save the results to project answers

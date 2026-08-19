@@ -64,11 +64,11 @@ export default function VaultSourcesStage({
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/vault-sources`, "POST", {});
 
+      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error("Agent encountered an error scanning the vault.");
+        throw new Error(resJson.error || "Agent encountered an error scanning the vault.");
       }
-
-      const { data } = await response.json();
+      const { data } = resJson;
       setResults(data);
       
       // Auto-save the results to pending vault sources

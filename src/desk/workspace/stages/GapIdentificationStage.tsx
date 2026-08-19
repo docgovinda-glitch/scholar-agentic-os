@@ -58,11 +58,11 @@ export default function GapIdentificationStage({
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/gaps`, "POST", {});
 
+      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error("Agent encountered an error during gap identification.");
+        throw new Error(resJson.error || "Agent encountered an error during gap identification.");
       }
-
-      const { data } = await response.json();
+      const { data } = resJson;
       setResults(data);
       setLogs((prev) => [
         ...prev,

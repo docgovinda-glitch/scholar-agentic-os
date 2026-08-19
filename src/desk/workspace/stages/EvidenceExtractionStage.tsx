@@ -65,11 +65,11 @@ export default function EvidenceExtractionStage({
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/evidence-extraction`, "POST", {});
 
+      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error("Agent encountered an error during evidence extraction.");
+        throw new Error(resJson.error || "Agent encountered an error during evidence extraction.");
       }
-
-      const { data } = await response.json();
+      const { data } = resJson;
       setResults(data);
       
       // Auto-save the results to project answers

@@ -68,11 +68,11 @@ export default function ExternalResearchStage({
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/external-research`, "POST", {});
 
+      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error("Agent encountered an error searching external databases.");
+        throw new Error(resJson.error || "Agent encountered an error searching external databases.");
       }
-
-      const { data } = await response.json();
+      const { data } = resJson;
       setResults(data);
       
       // Auto-save the results to pending external sources

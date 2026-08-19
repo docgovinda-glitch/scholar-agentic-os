@@ -67,11 +67,11 @@ export default function TitleSelectionStage({
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/titles`, "POST", {});
 
+      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error("Agent encountered an error during title generation.");
+        throw new Error(resJson.error || "Agent encountered an error during title generation.");
       }
-
-      const { data } = await response.json();
+      const { data } = resJson;
       setResults(data);
       setLogs((prev) => [
         ...prev,

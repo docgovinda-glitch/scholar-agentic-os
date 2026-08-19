@@ -47,11 +47,11 @@ export default function PublicationReadinessStage({
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/publication-readiness`, "POST", {});
 
+      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error("Agent encountered an error.");
+        throw new Error(resJson.error || "Agent encountered an error.");
       }
-
-      const { data } = await response.json();
+      const { data } = resJson;
       setResults(data);
       setLogs((prev) => [
         ...prev,

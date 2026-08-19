@@ -63,11 +63,11 @@ export default function LiteratureStage({
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/literature`, "POST", { trigger: "discovery" });
 
+      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error("Agent encountered an error during discovery.");
+        throw new Error(resJson.error || "Agent encountered an error during discovery.");
       }
-
-      const { data } = await response.json();
+      const { data } = resJson;
       setResults(data);
       setLogs((prev) => [
         ...prev,

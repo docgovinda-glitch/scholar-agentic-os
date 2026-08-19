@@ -55,11 +55,11 @@ export default function JournalDiscoveryStage({
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/journal-discovery`, "POST", {});
 
+      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error("Agent encountered an error.");
+        throw new Error(resJson.error || "Agent encountered an error.");
       }
-
-      const { data } = await response.json();
+      const { data } = resJson;
       setResults(data);
       setLogs((prev) => [
         ...prev,

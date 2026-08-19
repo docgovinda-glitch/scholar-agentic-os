@@ -37,10 +37,11 @@ export default function GapSelectionStage({
     setIsLoading(true);
     setError(null);
 
-    authedFetch(`/api/projects/${projectId}/agent/gaps`, { method: "POST" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to load identified gaps.");
-        return res.json();
+    authedJsonFetch(`/api/projects/${projectId}/agent/gaps`, "POST", {})
+      .then(async (res) => {
+        const resJson = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(resJson.error || "Failed to load identified gaps.");
+        return resJson;
       })
       .then((data) => {
         if (active) {

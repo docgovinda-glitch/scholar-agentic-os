@@ -84,11 +84,11 @@ export default function PeerReviewStage({
     try {
       const response = await authedFetch(`/api/projects/${projectId}/agent/peer-review`, "POST", {});
 
+      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error("Agent encountered an error.");
+        throw new Error(resJson.error || "Agent encountered an error.");
       }
-
-      const { data } = await response.json();
+      const { data } = resJson;
       setResults(data);
       onSaved({ ...project });
       fetchCritiques();
