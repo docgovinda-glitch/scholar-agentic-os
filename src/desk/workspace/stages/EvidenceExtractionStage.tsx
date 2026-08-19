@@ -19,11 +19,13 @@ export default function EvidenceExtractionStage({
   projectId,
   project,
   onSaved,
+  onAdvance,
 }: {
   stage: ResearchStage;
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
+  onAdvance?: () => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -90,9 +92,17 @@ export default function EvidenceExtractionStage({
           id: Date.now().toString() + "done",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
           level: "success",
-          message: `Extraction complete. Mined ${data.length} citable evidence blocks.`,
+          message: `Extraction complete. Mined ${data.length} citable evidence blocks. Packaging into Evidence Matrix...`,
         },
       ]);
+      
+      // Auto-advance after a short delay
+      setTimeout(() => {
+        if (onAdvance) {
+          onAdvance();
+        }
+      }, 2500);
+
     } catch (err: any) {
       setError(err.message);
       setLogs((prev) => [
@@ -139,27 +149,29 @@ export default function EvidenceExtractionStage({
             </p>
           </div>
         </div>
-        <button
-          onClick={startExtraction}
-          disabled={isProcessing}
-          className="px-6 py-2 rounded-full bg-[color:var(--accent)] text-white font-semibold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2"
-        >
-          {isProcessing ? (
-            <>
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Extracting Evidence...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Extract Evidence
-            </>
-          )}
-        </button>
+        {!results && !isProcessing && (
+          <button
+            onClick={startExtraction}
+            disabled={isProcessing}
+            className="px-6 py-2 rounded-full bg-[color:var(--accent)] text-white font-semibold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Initialize Miner Agent
+          </button>
+        )}
+        {(results || isProcessing) && (
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-3 w-3">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isProcessing ? 'bg-indigo-400' : 'bg-green-400'}`}></span>
+              <span className={`relative inline-flex rounded-full h-3 w-3 ${isProcessing ? 'bg-indigo-500' : 'bg-green-500'}`}></span>
+            </span>
+            <span className="text-sm font-mono font-bold uppercase tracking-widest text-[color:var(--text-muted)]">
+              {isProcessing ? "Mining Approved Documents..." : "Extraction Complete"}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 space-y-8">

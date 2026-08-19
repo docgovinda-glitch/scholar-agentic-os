@@ -18,11 +18,13 @@ export default function GapSelectionStage({
   projectId,
   project,
   onSaved,
+  onAdvance,
 }: {
   stage: ResearchStage;
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
+  onAdvance?: () => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [gaps, setGaps] = useState<GapItem[] | null>(null);
@@ -75,6 +77,9 @@ export default function GapSelectionStage({
       
       const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
       onSaved(updatedProject);
+      if (onAdvance) {
+        onAdvance();
+      }
     } catch (err: any) {
       setError(err.message || "Failed to save gap selection.");
     } finally {

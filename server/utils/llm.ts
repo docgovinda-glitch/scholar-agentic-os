@@ -7,7 +7,7 @@ dotenv.config();
  * Primary: OpenRouter (if OPENROUTER_API_KEY is set)
  * Fallback: Google Gemini (if GEMINI_API_KEY is set)
  */
-export async function callOpenRouterJSON(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto"): Promise<any> {
+export async function callOpenRouterJSON(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning"): Promise<any> {
   if (req.body && req.body.llmResult) {
     let content = req.body.llmResult;
     if (typeof content === "object" && typeof content.text === "string") {
@@ -26,7 +26,7 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
     return content;
   }
 
-  res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt });
+  res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
   throw new Error("RequireFrontendLLMException");
 
   const openRouterKey = process.env.OPENROUTER_API_KEY;
@@ -96,4 +96,39 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
   } else {
     throw new Error("API_KEYS_MISSING: You must configure either OPENROUTER_API_KEY or GEMINI_API_KEY in the environment.");
   }
+}
+
+export async function callOpenRouterText(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning"): Promise<string> {
+  if (req.body && req.body.llmResult) {
+    let content = req.body.llmResult;
+    if (typeof content === "object" && typeof content.text === "string") {
+      content = content.text;
+    }
+    return content;
+  }
+
+  res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+  throw new Error("RequireFrontendLLMException");
+}
+
+export async function generateGeminiEmbedding(text: string): Promise<number[]> {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) throw new Error("GEMINI_API_KEY is required for embeddings");
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${geminiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "models/text-embedding-004",
+      content: { parts: [{ text }] }
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini Embedding API error: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data.embedding.values;
 }

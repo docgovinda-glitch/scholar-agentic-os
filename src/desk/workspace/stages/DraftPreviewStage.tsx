@@ -7,9 +7,11 @@ import { authedJsonFetch } from "../../api";
 export default function DraftPreviewStage({
   stage,
   projectId,
+  onAdvance,
 }: {
   stage: ResearchStage;
   projectId: string;
+  onAdvance?: () => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -140,14 +142,65 @@ export default function DraftPreviewStage({
         )}
 
         {results && (
-          <div className="max-w-4xl mx-auto animate-fade-in p-6 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl">
-             <h3 className="text-xl font-bold text-green-600 mb-4 flex items-center gap-2">
-               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-               Stage Complete
-             </h3>
-             <pre className="text-sm bg-[color:var(--surface-sunken)] p-4 rounded-lg overflow-x-auto text-[color:var(--text-secondary)] whitespace-pre-wrap font-mono">
-               {JSON.stringify(results, null, 2)}
-             </pre>
+          <div className="max-w-7xl mx-auto animate-fade-in flex flex-col md:flex-row gap-6 h-full min-h-[600px]">
+             
+             {/* Left Column: Navigator */}
+             <div className="w-full md:w-64 shrink-0 flex flex-col gap-4">
+               <div className="bg-[color:var(--surface-raised)] rounded-xl p-4 border border-[color:var(--border-subtle)] shadow-sm sticky top-0">
+                 <h3 className="font-bold text-[color:var(--text-primary)] mb-4 flex items-center gap-2">
+                   <svg className="w-5 h-5 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                   </svg>
+                   Draft Structure
+                 </h3>
+                 <ul className="space-y-2 text-sm">
+                   <li className="p-2 bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-semibold rounded-lg cursor-pointer">Abstract</li>
+                   <li className="p-2 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-sunken)] rounded-lg cursor-pointer transition-colors">1. Introduction</li>
+                   <li className="p-2 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-sunken)] rounded-lg cursor-pointer transition-colors">2. Background</li>
+                   <li className="p-2 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-sunken)] rounded-lg cursor-pointer transition-colors">3. Methodology</li>
+                   <li className="p-2 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-sunken)] rounded-lg cursor-pointer transition-colors">4. Results</li>
+                   <li className="p-2 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-sunken)] rounded-lg cursor-pointer transition-colors">5. Discussion</li>
+                   <li className="p-2 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-sunken)] rounded-lg cursor-pointer transition-colors">6. Conclusion</li>
+                   <li className="p-2 text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-sunken)] rounded-lg cursor-pointer transition-colors">References</li>
+                 </ul>
+               </div>
+             </div>
+
+             {/* Right Column: Manuscript */}
+             <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-[color:var(--border-subtle)] shadow-md overflow-hidden relative">
+               <div className="flex items-center justify-between p-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)]">
+                 <h3 className="font-bold text-[color:var(--text-primary)] flex items-center gap-2">
+                   <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                   </svg>
+                   Rendering Engine Active
+                 </h3>
+                 <span className="text-sm font-bold bg-green-100 text-green-800 px-3 py-1 rounded-full">{results?.pages || 0} Pages</span>
+               </div>
+               
+               <div className="flex-1 overflow-y-auto p-8 md:p-12">
+                 <div className="prose prose-indigo max-w-none prose-headings:font-bold prose-h2:border-b prose-h2:pb-2">
+                   {(results?.content || "").split('\\n').map((line: string, i: number) => {
+                     if (line.startsWith('## ')) return <h2 key={i} className="text-2xl mt-8 mb-4">{line.substring(3)}</h2>;
+                     if (line.startsWith('# ')) return <h1 key={i} className="text-3xl mb-6">{line.substring(2)}</h1>;
+                     return <p key={i} className="mb-4 text-gray-800 leading-relaxed text-lg">{line}</p>;
+                   })}
+                 </div>
+               </div>
+
+               {/* Sticky Action Bar */}
+               <div className="p-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]">
+                 <button 
+                   onClick={() => onAdvance?.()}
+                   className="w-full px-6 py-4 rounded-xl bg-[color:var(--accent)] text-white font-black shadow-lg hover:bg-[color:var(--accent-hover)] transition-colors flex items-center justify-center gap-3 text-lg"
+                 >
+                   Lock Draft & Advance to Peer Review
+                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                   </svg>
+                 </button>
+               </div>
+             </div>
           </div>
         )}
 

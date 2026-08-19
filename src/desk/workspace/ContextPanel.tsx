@@ -1,6 +1,8 @@
-import { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import type { ResearchStage } from "./types";
 import { STAGE_MAP } from "./types";
+import { useResearchWorkspace } from "./ResearchContext";
+import { sendCopilotMessage } from "../api";
 
 interface AgentInfo {
   name: string;
@@ -200,8 +202,39 @@ export default function ContextPanel({
   isOpen: boolean;
   onToggle: () => void;
 }) {
+  const { projectId, currentStage: globalStage } = useResearchWorkspace();
   const agent = AGENT_CONFIGS[currentStage];
   const stageDef = STAGE_MAP.get(currentStage);
+
+  const [history, setHistory] = useState<Array<{ role: "user" | "copilot"; content: string }>>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const endOfMessagesRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [history, isTyping]);
+
+  const handleSend = async (messageText?: string) => {
+    const text = messageText || inputValue;
+    if (!text.trim() || isTyping) return;
+
+    setInputValue("");
+    const newHistory = [...history, { role: "user" as const, content: text }];
+    setHistory(newHistory);
+    setIsTyping(true);
+
+    try {
+      const res = await sendCopilotMessage(projectId, currentStage, text, history);
+      if (res.ok) {
+        setHistory([...newHistory, { role: "copilot", content: res.response }]);
+      }
+    } catch (err: any) {
+      setHistory([...newHistory, { role: "copilot", content: `**Error**: ${err.message || "Failed to connect to Copilot."}` }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
 
   return (
     <>
@@ -243,55 +276,100 @@ export default function ContextPanel({
           </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Quick Actions */}
-          <div>
-            <h4 className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider mb-3">
-              Suggested Actions
-            </h4>
-            <div className="space-y-2">
-              {agent.quickActions.map((action, idx) => (
-                <button
-                  key={idx}
-                  className="w-full flex items-center justify-between p-3 rounded-[var(--radius-md)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] transition-colors text-left group"
-                >
-                  <span className="text-sm font-medium">{action}</span>
-                  <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+          {history.length === 0 ? (
+            <>
+              {/* Quick Actions */}
+              <div>
+                <h4 className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider mb-3">
+                  Suggested Actions
+                </h4>
+                <div className="space-y-2">
+                  {agent.quickActions.map((action, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSend(action)}
+                      className="w-full flex items-center justify-between p-3 rounded-[var(--radius-md)] bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] transition-colors text-left group cursor-pointer"
+                    >
+                      <span className="text-sm font-medium">{action}</span>
+                      <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {/* Current Stage Context Info */}
-          <div className="bg-[color:var(--surface-raised)] rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] p-4 text-sm">
-            <div className="flex items-center gap-2 mb-2 text-[color:var(--text-primary)] font-semibold">
-              <svg className="w-4 h-4 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Stage Context
+              {/* Current Stage Context Info */}
+              <div className="bg-[color:var(--surface-raised)] rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] p-4 text-sm">
+                <div className="flex items-center gap-2 mb-2 text-[color:var(--text-primary)] font-semibold">
+                  <svg className="w-4 h-4 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Stage Context
+                </div>
+                <p className="text-[color:var(--text-secondary)]">
+                  You are currently working in <strong className="text-[color:var(--text-primary)]">{stageDef?.label || agent.role}</strong>. Any documents or data you upload here will be scoped to this stage's processing parameters.
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {history.map((msg, idx) => (
+                <div key={idx} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                  <div className={`text-[10px] uppercase font-bold tracking-wider mb-1 text-[color:var(--text-muted)]`}>
+                    {msg.role === "user" ? "You" : agent.name}
+                  </div>
+                  <div className={`text-sm p-3 rounded-lg max-w-[90%] whitespace-pre-wrap leading-relaxed ${
+                    msg.role === "user" 
+                      ? "bg-[color:var(--accent)] text-white rounded-tr-none" 
+                      : "bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-tl-none text-[color:var(--text-primary)]"
+                  }`}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {isTyping && (
+                <div className="flex flex-col items-start">
+                  <div className="text-[10px] uppercase font-bold tracking-wider mb-1 text-[color:var(--text-muted)]">
+                    {agent.name}
+                  </div>
+                  <div className="bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-lg rounded-tl-none p-3 flex gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--text-muted)] animate-bounce" style={{animationDelay: "0ms"}}></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--text-muted)] animate-bounce" style={{animationDelay: "150ms"}}></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--text-muted)] animate-bounce" style={{animationDelay: "300ms"}}></div>
+                  </div>
+                </div>
+              )}
+              <div ref={endOfMessagesRef} />
             </div>
-            <p className="text-[color:var(--text-secondary)]">
-              You are currently working in <strong className="text-[color:var(--text-primary)]">{stageDef?.label || agent.role}</strong>. Any documents or data you upload here will be scoped to this stage's processing parameters.
-            </p>
-          </div>
+          )}
         </div>
 
-        {/* Chat Input Stub */}
-        <div className="p-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]">
-          <div className="relative">
+        {/* Chat Input */}
+        <div className="p-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shrink-0">
+          <form 
+            onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+            className="relative"
+          >
             <input
               type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              disabled={isTyping}
               placeholder={`Ask ${agent.name} a question...`}
-              className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-full pl-4 pr-10 py-2 text-sm text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-none focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] transition-shadow"
+              className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-full pl-4 pr-10 py-2 text-sm text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-none focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)] transition-shadow disabled:opacity-50"
             />
-            <button className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[color:var(--accent)] text-white flex items-center justify-center hover:bg-[color:var(--accent-hover)] transition-colors">
+            <button 
+              type="submit"
+              disabled={!inputValue.trim() || isTyping}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[color:var(--accent)] text-white flex items-center justify-center hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors cursor-pointer"
+            >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" />
               </svg>
             </button>
-          </div>
+          </form>
         </div>
       </aside>
     </>

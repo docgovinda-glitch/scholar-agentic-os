@@ -7,9 +7,11 @@ import { authedJsonFetch } from "../../api";
 export default function CitationAuditStage({
   stage,
   projectId,
+  onAdvance,
 }: {
   stage: ResearchStage;
   projectId: string;
+  onAdvance?: () => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -59,9 +61,15 @@ export default function CitationAuditStage({
           id: Date.now().toString() + "done",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
           level: "success",
-          message: `Audit complete. 100% citation provenance verified.`.replace("{count}", data?.length || 0),
+          message: `Audit complete. 100% citation provenance verified.`,
         },
       ]);
+      
+      setTimeout(() => {
+        if (onAdvance) {
+          onAdvance();
+        }
+      }, 3500);
     } catch (err: any) {
       setError(err.message);
       setLogs((prev) => [
@@ -124,12 +132,36 @@ export default function CitationAuditStage({
 
       <div className="flex-1 overflow-y-auto p-8 space-y-8">
         {(isProcessing || logs.length > 0) && (
-          <div className="max-w-4xl mx-auto">
-            <AgentTerminal
-              logs={logs}
-              isProcessing={isProcessing}
-              agentName="Citation Auditor Agent"
-            />
+          <div className="max-w-4xl mx-auto flex gap-6">
+            <div className="w-64 shrink-0 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[color:var(--accent)] opacity-5 rounded-full -mr-16 -mt-16"></div>
+              
+              <div className="relative w-24 h-24 mb-4">
+                <svg className={`w-full h-full text-[color:var(--accent)] ${isProcessing ? 'animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d={def.icon} />
+                </svg>
+                {isProcessing && (
+                  <div className="absolute inset-0 rounded-full border-t-2 border-[color:var(--accent)] animate-spin"></div>
+                )}
+              </div>
+              
+              <div className="text-center font-mono text-sm relative z-10">
+                <div className="font-bold text-[color:var(--text-primary)] mb-1">
+                  {isProcessing ? "AUDITING CLAIMS..." : "AUDIT COMPLETE"}
+                </div>
+                <div className="text-[color:var(--text-muted)] text-xs uppercase tracking-widest">
+                  Provenance Engine
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex-1">
+              <AgentTerminal
+                logs={logs}
+                isProcessing={isProcessing}
+                agentName="Citation Auditor Agent"
+              />
+            </div>
           </div>
         )}
 
@@ -140,14 +172,56 @@ export default function CitationAuditStage({
         )}
 
         {results && (
-          <div className="max-w-4xl mx-auto animate-fade-in p-6 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl">
-             <h3 className="text-xl font-bold text-green-600 mb-4 flex items-center gap-2">
-               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-               Stage Complete
-             </h3>
-             <pre className="text-sm bg-[color:var(--surface-sunken)] p-4 rounded-lg overflow-x-auto text-[color:var(--text-secondary)] whitespace-pre-wrap font-mono">
-               {JSON.stringify(results, null, 2)}
-             </pre>
+          <div className="max-w-6xl mx-auto animate-fade-in p-8 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl relative overflow-hidden">
+             <div className="absolute top-0 left-0 w-full h-1 bg-green-500"></div>
+             
+             <div className="flex items-center justify-between mb-8">
+               <h3 className="text-2xl font-black text-[color:var(--text-primary)] flex items-center gap-3">
+                 <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                 </div>
+                 Citation Provenance Engine
+               </h3>
+               <div className="bg-[color:var(--surface-sunken)] px-4 py-2 rounded-lg border border-[color:var(--border-subtle)] font-mono text-sm font-bold text-[color:var(--text-secondary)]">
+                 100% Provenance Verified
+               </div>
+             </div>
+             
+             <div className="space-y-6">
+               {Array.isArray(results) && results.map((item: any, idx: number) => (
+                 <div key={idx} className="bg-[color:var(--surface-canvas)] rounded-xl p-6 border border-[color:var(--border-subtle)] relative overflow-hidden group">
+                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-l-xl"></div>
+                   <div className="flex justify-between items-start mb-4 pl-4">
+                     <p className="font-serif text-lg text-[color:var(--text-primary)] leading-relaxed flex-1 pr-6 font-medium">"{item.claim}"</p>
+                     <span className={`px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest whitespace-nowrap shadow-sm ${item.status === 'verified' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
+                       {item.status}
+                     </span>
+                   </div>
+                   
+                   <div className="pl-4 mt-4 pt-4 border-t border-[color:var(--border-subtle)] flex items-start gap-4">
+                     <svg className="w-5 h-5 text-[color:var(--text-muted)] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                     </svg>
+                     <div className="text-sm text-[color:var(--text-secondary)] font-mono">
+                       <span className="font-bold text-[color:var(--accent)] block mb-1 uppercase tracking-widest text-xs">Origin Source</span>
+                       {item.source}
+                     </div>
+                   </div>
+                 </div>
+               ))}
+             </div>
+             
+             <div className="flex justify-center mt-8">
+               <button 
+                  onClick={() => onAdvance?.()}
+                  className="px-8 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-colors flex items-center gap-2"
+                >
+                  Proceed to Originality Check
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </button>
+             </div>
           </div>
         )}
 

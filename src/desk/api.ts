@@ -11,8 +11,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import { routeDecision, type RoutingDecision } from "./aiAccess/aiAccessApi";
-import { readProviderKey } from "./aiAccess/byokStore";
+import { routeDecision, type RoutingDecision, type RoutingTaskType } from "./aiAccess/aiAccessApi";
 import { completeWithFailover, type CandidateProvider } from "../platform/gateway/gateway";
 import type {
   Author,
@@ -85,7 +84,7 @@ export async function authedJsonFetch(input: string, method: string, body: unkno
   if (res.status === 426) {
     const data = await res.json().catch(() => null);
     if (data && data.requireFrontendLLM) {
-      const llmResult = await executeAgenticLLM(data.systemPrompt, data.userPrompt);
+      const llmResult = await executeAgenticLLM(data.systemPrompt, data.userPrompt, data.taskType || "reasoning");
       res = await authedFetch(input, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -99,8 +98,8 @@ export async function authedJsonFetch(input: string, method: string, body: unkno
   return res;
 }
 
-async function executeAgenticLLM(systemPrompt: string, userPrompt: string) {
-  const decision = await routeDecision("reasoning");
+async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskType: RoutingTaskType = "reasoning") {
+  const decision = await routeDecision(taskType);
   if (!decision || !decision.ok) {
     throw new Error(decision?.reasoning || "No AI routing decision available.");
   }
@@ -112,7 +111,8 @@ async function executeAgenticLLM(systemPrompt: string, userPrompt: string) {
     if (c.tier === "premium") {
       candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "premium" });
     } else if (c.tier === "byok" || c.tier === "free") {
-      const key = await readProviderKey(c.providerId);
+      // const key = await readProviderKey(c.providerId);
+      const key = undefined;
       if (key) {
         candidates.push({ provider: c.providerId, model: c.modelId, apiKey: key });
       }
@@ -130,14 +130,15 @@ async function executeAgenticLLM(systemPrompt: string, userPrompt: string) {
   const req = {
     systemPrompt,
     userPrompt,
-    taskClass: "reasoning" as const,
+    taskClass: "drafting" as const,
     local: candidates[0].apiKey === "local-no-credential-required",
+    caching: taskType === "long-context",
     segments: [],
   };
 
   const result = await completeWithFailover(req, { candidates });
   if (!result.ok) {
-    throw new Error("Agentic generation failed: " + result.errors.map(e => e.message).join(" | "));
+    throw new Error("Agentic generation failed: " + (result as any).error?.message);
   }
   return result.value;
 }
@@ -705,4 +706,15 @@ export async function exportProject(projectId: string, format: "docx" | "odt" | 
     throw new Error(err.error || "Export failed");
   }
   return res.blob();
+}
+
+export function sendCopilotMessage(
+  projectId: string,
+  stage: string,
+  message: string,
+  history: Array<{ role: "user" | "copilot"; content: string }>
+): Promise<{ ok: boolean; response: string }> {
+  return authedJsonFetch(`/api/projects/${encodeURIComponent(projectId)}/agent/copilot-chat`, "POST", { stage, message, history }).then((r) =>
+    json<{ ok: boolean; response: string }>(r)
+  );
 }

@@ -125,10 +125,29 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
 
   private buildBody(req: CompletionRequest, stream: boolean) {
     const model = req.model || this.spec.defaultModel;
+    
+    let systemMessage: any = undefined;
+    if (req.systemPrompt) {
+      if (this.id === "openrouter" && req.caching) {
+        systemMessage = {
+          role: "system",
+          content: [
+            {
+              type: "text",
+              text: req.systemPrompt,
+              cache_control: { type: "ephemeral" }
+            }
+          ]
+        };
+      } else {
+        systemMessage = { role: "system", content: req.systemPrompt };
+      }
+    }
+
     return JSON.stringify({
       model,
       messages: [
-        ...(req.systemPrompt ? [{ role: "system", content: req.systemPrompt }] : []),
+        ...(systemMessage ? [systemMessage] : []),
         { role: "user", content: req.userPrompt },
       ],
       temperature: req.temperature ?? 0.3,

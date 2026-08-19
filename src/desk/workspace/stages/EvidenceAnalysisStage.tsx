@@ -21,11 +21,13 @@ export default function EvidenceAnalysisStage({
   projectId,
   project,
   onSaved,
+  onAdvance,
 }: {
   stage: ResearchStage;
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
+  onAdvance?: () => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -95,6 +97,12 @@ export default function EvidenceAnalysisStage({
           message: `Synthesis complete. Generated ${data.length} core theoretical arguments.`,
         },
       ]);
+      
+      setTimeout(() => {
+        if (onAdvance) {
+          onAdvance();
+        }
+      }, 3000);
     } catch (err: any) {
       setError(err.message);
       setLogs((prev) => [
@@ -141,27 +149,29 @@ export default function EvidenceAnalysisStage({
             </p>
           </div>
         </div>
-        <button
-          onClick={startAnalysis}
-          disabled={isProcessing}
-          className="px-6 py-2 rounded-full bg-[color:var(--accent)] text-white font-semibold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2"
-        >
-          {isProcessing ? (
-            <>
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Synthesizing Evidence...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              Synthesize Evidence Matrix
-            </>
-          )}
-        </button>
+        {!results && !isProcessing && (
+          <button
+            onClick={startAnalysis}
+            disabled={isProcessing}
+            className="px-6 py-2 rounded-full bg-[color:var(--accent)] text-white font-semibold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            Synthesize Evidence Matrix
+          </button>
+        )}
+        {(results || isProcessing) && (
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-3 w-3">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isProcessing ? 'bg-indigo-400' : 'bg-green-400'}`}></span>
+              <span className={`relative inline-flex rounded-full h-3 w-3 ${isProcessing ? 'bg-indigo-500' : 'bg-green-500'}`}></span>
+            </span>
+            <span className="text-sm font-mono font-bold uppercase tracking-widest text-[color:var(--text-muted)]">
+              {isProcessing ? "Synthesizer Agent Running..." : "Matrix Synthesis Complete"}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 space-y-8">

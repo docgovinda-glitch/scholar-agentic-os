@@ -36,6 +36,8 @@ export interface CompletionRequest {
   scopeId?: string;
   /** True when `provider` is a local runtime — passed straight through to the Warden (see platform/warden/types.ts's EgressRequest.local). */
   local?: boolean;
+  /** True when Universal Context Caching is requested. */
+  caching?: boolean;
 }
 
 export interface CompletionResult {

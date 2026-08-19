@@ -1,12 +1,12 @@
 import express from "express";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON } from "../../utils/llm.ts";
+import { callOpenRouterJSON, callOpenRouterText } from "../../utils/llm.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../../src/supabaseRest.ts";
 
 const router = express.Router({ mergeParams: true });
 
 // Helper to get project safely
-async function getProjectSafe(req: express.Request<{ id: string }>, res: express.Response) {
+async function getProjectSafe(req: express.Request<any>, res: express.Response) {
   const projectId = req.params.id;
   if (!projectId) {
     res.status(400).json({ error: "Missing project ID" });
@@ -55,7 +55,7 @@ Return ONLY valid JSON in this exact format:
 }
 CRITICAL INSTRUCTION: Generate exactly 15 highly relevant sources. Do not hallucinate irrelevant topics.`;
     const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, userPrompt);
+    const result = await callOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "simple");
     res.json({ ok: true, data: result.data, meta: result.meta });
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
@@ -89,7 +89,7 @@ Make sure every single gap explicitly mentions concepts from the working title.`
     const workingTitle = project.answers["working_title"] || "Untitled Research";
     const researchArea = project.answers["research_area"] || "the field";
     const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, userPrompt);
+    const result = await callOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "simple");
     
     // Insert into Supabase
     const config = getSupabaseRestConfig();
@@ -138,7 +138,7 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "simple");
     
     // Insert into Supabase
     const config = getSupabaseRestConfig();
@@ -260,7 +260,41 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    let ragContext = "";
+    try {
+      const { generateGeminiEmbedding } = await import("../../utils/llm.js");
+      const query = project.answers["core_problem"] || project.answers["working_title"] || "academic evidence extraction";
+      const embedding = await generateGeminiEmbedding(query);
+      
+      const config = getSupabaseRestConfig();
+      if (config) {
+        const response = await fetch(`${config.supabaseUrl}/rest/v1/rpc/match_project_evidence`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": config.serviceRoleKey,
+            "Authorization": `Bearer ${config.serviceRoleKey}`
+          },
+          body: JSON.stringify({
+            query_embedding: embedding,
+            match_threshold: 0.3,
+            match_count: 5,
+            p_id: project.projectId
+          })
+        });
+        if (response.ok) {
+          const matches = await response.json();
+          if (Array.isArray(matches) && matches.length > 0) {
+            ragContext = matches.map((m: any) => `Source: ${m.source || "Unknown"}\nQuote: ${m.quote}`).join("\n\n---\n\n");
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Vectorized RAG failed, falling back to full context", e);
+    }
+
+    const finalContext = ragContext ? `Top Matched Vault Sources:\n\n${ragContext}` : `Context: ${context}`;
+    const result = await callOpenRouterJSON(req, res, systemPrompt, finalContext);
     
     // Update into Supabase
     const config = getSupabaseRestConfig();
@@ -407,16 +441,17 @@ router.post("/journal-requirements", async (req: express.Request<{ id: string }>
 
   try {
     const systemPrompt = `You are an expert academic journal analysis agent.
-Based on the provided research context and selected journal (if any), extract/generate realistic author guidelines.
+Your goal is to perform Rubric Distillation. Distill the massive, verbose author guidelines into a dense, strict JSON ruleset. This will strip out thousands of words of fluff and save tokens in future compliance checks.
 Return ONLY valid JSON in this exact format:
 {
   "data": {
-    "max_words": "8,000",
-    "citation_style": "...",
-    "required_sections": ["...", "..."]
+    "max_words": "8000",
+    "citation_style": "APA 7th Edition",
+    "required_sections": ["Introduction", "Methods", "Results", "Discussion", "Conclusion"],
+    "formatting_rules": ["Double spaced", "12pt Times New Roman"]
   }
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "simple");
     res.json({ ok: true, data: result.data });
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
@@ -442,7 +477,7 @@ Return ONLY valid JSON in this exact format:
     { "section": "Conclusion", "status": "Drafted", "length": 800, "content": "..." }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "long-context");
     res.json({ ok: true, data: result.data });
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
@@ -465,7 +500,7 @@ Return ONLY valid JSON in this exact format:
     { "lens": "Methodological Rigor", "feedback": "...", "severity": "Moderate" }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "long-context");
     res.json({ ok: true, data: result.data });
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
@@ -482,14 +517,76 @@ router.post("/revision", async (req: express.Request<{ id: string }>, res) => {
   try {
     const systemPrompt = `You are an expert academic editor.
 Apply revisions to the manuscript based on the peer review critiques provided in the research context.
+Instead of rewriting the entire manuscript, you MUST output a JSON array of exact text replacements (patches). This saves output tokens and processing time.
 Return ONLY valid JSON in this exact format:
 {
   "data": [
-    { "section": "Introduction", "status": "Revised", "length": 1250, "content": "..." },
-    { "section": "Methodology", "status": "Revised", "length": 1600, "content": "..." },
-    { "section": "Results", "status": "Revised", "length": 2000, "content": "..." },
-    { "section": "Conclusion", "status": "Revised", "length": 800, "content": "..." }
+    { "section": "Introduction", "find": "exact old sentence or paragraph to replace", "replace": "the new revised text" },
+    { "section": "Methodology", "find": "exact old sentence or paragraph to replace", "replace": "the new revised text" }
   ]
+}`;
+    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "reasoning");
+    res.json({ ok: true, data: result.data });
+  } catch (err: any) {
+    if (err.message === "RequireFrontendLLMException") return;
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:id/agent/citation-audit
+router.post("/citation-audit", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const context = JSON.stringify(project.answers);
+
+  try {
+    const systemPrompt = `You are an expert academic citation auditor.
+Audit the citations in the provided research context, ensuring claims are backed by the provided vault sources.
+Identify 5 specific claims and determine if they are verified or flagged.
+Return ONLY valid JSON in this exact format:
+{
+  "data": [
+    {
+      "id": "cit-xyz",
+      "claim": "...",
+      "source": "...",
+      "status": "verified"
+    }
+  ]
+}
+Use 'verified' or 'flagged' for the status.`;
+    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    res.json({ ok: true, data: result.data });
+  } catch (err: any) {
+    if (err.message === "RequireFrontendLLMException") return;
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:id/agent/originality-check
+router.post("/originality-check", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const context = JSON.stringify(project.answers);
+
+  try {
+    const systemPrompt = `You are an expert academic originality checker.
+Check the manuscript drafts in the context for potential plagiarism, structural overlap, or cliché phrasing.
+Calculate an overall originality score (0-100) and flag up to 3 specific sections if needed.
+Return ONLY valid JSON in this exact format:
+{
+  "data": {
+    "score": 94,
+    "flags": [
+      {
+        "id": "flag-xyz",
+        "section": "Introduction",
+        "issue": "Structural overlap",
+        "snippet": "...",
+        "suggestion": "..."
+      }
+    ]
+  }
 }`;
     const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
     res.json({ ok: true, data: result.data });
@@ -505,8 +602,27 @@ router.post("/final-editor", async (req: express.Request<{ id: string }>, res) =
   res.json({ ok: true, data: { editorState: "Loaded", status: "Ready for manual edits" }});
 });
 router.post("/draft-preview", async (req: express.Request<{ id: string }>, res) => {
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-  res.json({ ok: true, data: { content: "Draft ready", pages: 18, status: "Ready" }});
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  const config = getSupabaseRestConfig();
+  if (!config) return res.status(500).json({ error: "Supabase not configured" });
+
+  try {
+    const table = new SupabaseTable(config, "manuscript_sections");
+    const data = await table.request(`?project_id=eq.${project.projectId}`);
+    
+    let content = "Draft not generated yet.";
+    let pages = 0;
+    if (Array.isArray(data) && data.length > 0) {
+      content = data.map(s => `## ${s.section_name}\n\n${s.content}`).join("\n\n");
+      pages = Math.ceil(content.split(/\s+/).length / 250); // ~250 words per page
+    }
+    
+    res.json({ ok: true, data: { content, pages, status: "Ready" }});
+  } catch (err: any) {
+    if (err.message === "RequireFrontendLLMException") return;
+    res.status(500).json({ error: err.message });
+  }
 });
 router.post("/publication-readiness", async (req: express.Request<{ id: string }>, res) => {
   await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -515,6 +631,71 @@ router.post("/publication-readiness", async (req: express.Request<{ id: string }
 router.post("/export", async (req: express.Request<{ id: string }>, res) => {
   await new Promise((resolve) => setTimeout(resolve, 3500));
   res.json({ ok: true, data: { pdfUrl: "/downloads/project_final.pdf", docxUrl: "/downloads/project_final.docx", status: "Export Complete" }});
+});
+
+// POST /api/projects/:id/agent/copilot-chat
+router.post("/copilot-chat", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+  
+  const { stage, message, history = [] } = req.body;
+  if (!message) {
+    return res.status(400).json({ error: "Message is required." });
+  }
+
+  // 1. Stage-Scoped Context Engine
+  let scopedContext: Record<string, any> = {};
+  
+  if (stage === "definition" || stage === "literature" || stage === "gap_identification" || stage === "gap_selection" || stage === "title_selection" || stage === "title_lock") {
+    // Early stages: only need answers
+    scopedContext = {
+      core_problem: project.answers["core_problem"],
+      literature_review: project.answers["literature_review"],
+      gap_identified: project.answers["gap_identified"],
+      gap_selected: project.answers["gap_selected"],
+      working_title: project.answers["working_title"] || project.answers["title"]
+    };
+  } else if (stage === "vault_sources" || stage === "source_approval_vault" || stage === "evidence_extraction" || stage === "external_research" || stage === "evidence_analysis" || stage === "manual_review") {
+    // Evidence stages: include claim graph, but omit massive document
+    scopedContext = {
+      working_title: project.answers["working_title"] || project.answers["title"],
+      claim_graph: project.claimGraph,
+      evidence_ledger: project.evidenceLedger
+    };
+  } else {
+    // Late stages (Drafting, Editing, Publishing): include document structure/abstract, but maybe omit full heavy manuscript body to save tokens, or include it if strictly needed.
+    scopedContext = {
+      working_title: project.answers["working_title"] || project.answers["title"],
+      document_structure: project.document ? "Blocks count: " + project.document.blocks.length : "None yet",
+      rubric_report: project.rubricReport ? { readyForG6: project.rubricReport.readyForG6, summary: "Truncated for context" } : null
+    };
+  }
+
+  try {
+    const systemPrompt = `You are a helpful AI Copilot integrated into a research workspace. 
+The user is currently on the stage: "${stage}".
+Here is the context of their project for this stage:
+${JSON.stringify(scopedContext)}
+
+Answer the user's question concisely. Be highly academic and professional. Use markdown formatting.`;
+
+    // Construct the user prompt including history
+    let userPrompt = "";
+    if (history.length > 0) {
+      userPrompt += "Conversation History:\n";
+      for (const msg of history) {
+        userPrompt += `${msg.role === "user" ? "User" : "Copilot"}: ${msg.content}\n`;
+      }
+      userPrompt += "\nNew Message from User:\n";
+    }
+    userPrompt += message;
+
+    const result = await callOpenRouterText(req, res, systemPrompt, userPrompt);
+    res.json({ ok: true, response: result });
+  } catch (err: any) {
+    if (err.message === "RequireFrontendLLMException") return;
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export { router as agenticRouter };

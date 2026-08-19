@@ -19,11 +19,13 @@ export default function VaultSourcesStage({
   projectId,
   project,
   onSaved,
+  onAdvance,
 }: {
   stage: ResearchStage;
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
+  onAdvance?: () => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -89,9 +91,17 @@ export default function VaultSourcesStage({
           id: Date.now().toString() + "done",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
           level: "success",
-          message: `Scan complete. Found ${data.length} highly relevant primary sources and queued them for approval.`,
+          message: `Scan complete. Found ${data.length} highly relevant primary sources. Preparing for approval triage...`,
         },
       ]);
+      
+      // Auto-advance after a short delay
+      setTimeout(() => {
+        if (onAdvance) {
+          onAdvance();
+        }
+      }, 2500);
+
     } catch (err: any) {
       setError(err.message);
       setLogs((prev) => [
@@ -129,27 +139,29 @@ export default function VaultSourcesStage({
             </p>
           </div>
         </div>
-        <button
-          onClick={startScan}
-          disabled={isProcessing}
-          className="px-6 py-2 rounded-full bg-[color:var(--accent)] text-white font-semibold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2"
-        >
-          {isProcessing ? (
-            <>
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Scanning Vault...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              Scan Knowledge Vault
-            </>
-          )}
-        </button>
+        {!results && !isProcessing && (
+          <button
+            onClick={startScan}
+            disabled={isProcessing}
+            className="px-6 py-2 rounded-full bg-[color:var(--accent)] text-white font-semibold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Initialize Radar Scan
+          </button>
+        )}
+        {(results || isProcessing) && (
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-3 w-3">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isProcessing ? 'bg-amber-400' : 'bg-green-400'}`}></span>
+              <span className={`relative inline-flex rounded-full h-3 w-3 ${isProcessing ? 'bg-amber-500' : 'bg-green-500'}`}></span>
+            </span>
+            <span className="text-sm font-mono font-bold uppercase tracking-widest text-[color:var(--text-muted)]">
+              {isProcessing ? "Scanning Network..." : "Scan Complete"}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 space-y-8">
@@ -178,42 +190,47 @@ export default function VaultSourcesStage({
               Discovered Primary Sources
             </h3>
             
-            <div className="space-y-4">
-              {results.map((item) => (
-                <div key={item.id} className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl p-5 flex items-center justify-between group hover:border-[color:var(--accent)] transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[color:var(--surface-sunken)] rounded-lg flex items-center justify-center text-[color:var(--text-muted)]">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-[color:var(--text-primary)] text-lg">
-                        {item.title}
-                      </h4>
-                      <p className="text-sm text-[color:var(--text-secondary)]">
-                        {item.author} • {item.year} • <span className="text-[color:var(--text-muted)]">{item.type}</span>
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-1">
-                        Relevance
-                      </div>
-                      <div className="font-mono font-bold text-green-600 text-lg">
-                        {item.relevance_score}%
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl overflow-hidden shadow-xl">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-[color:var(--surface-sunken)] text-[color:var(--text-muted)] font-mono text-xs uppercase tracking-wider border-b border-[color:var(--border-subtle)]">
+                  <tr>
+                    <th className="px-6 py-3 font-semibold">Source Title</th>
+                    <th className="px-6 py-3 font-semibold w-48">Author & Year</th>
+                    <th className="px-6 py-3 font-semibold w-32">Type</th>
+                    <th className="px-6 py-3 font-semibold w-24 text-right">Match</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[color:var(--border-subtle)]">
+                  {results.map((item) => (
+                    <tr key={item.id} className="hover:bg-[color:var(--surface-hover)] transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-[color:var(--text-primary)] mb-0.5">{item.title}</div>
+                      </td>
+                      <td className="px-6 py-4 text-[color:var(--text-secondary)]">
+                        {item.author} ({item.year})
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)]">
+                          {item.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="font-mono font-bold text-green-500">
+                          {item.relevance_score}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
             
             <div className="mt-8 flex justify-end">
-              <button className="px-6 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md flex items-center gap-2 hover:bg-[color:var(--accent-hover)] transition-colors">
-                Proceed to Vault Approval
+              <button 
+                onClick={() => onAdvance?.()}
+                className="px-6 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md flex items-center gap-2 hover:bg-[color:var(--accent-hover)] transition-colors"
+              >
+                Proceed to Vault Approval Triage
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>

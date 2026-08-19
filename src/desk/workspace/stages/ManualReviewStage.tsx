@@ -9,11 +9,13 @@ export default function ManualReviewStage({
   projectId,
   project,
   onSaved,
+  onAdvance,
 }: {
   stage: ResearchStage;
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
+  onAdvance?: () => void;
 }) {
   const def = STAGE_MAP.get(stage);
   
@@ -32,6 +34,9 @@ export default function ManualReviewStage({
       };
       const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
       onSaved(updatedProject);
+      if (onAdvance) {
+        onAdvance();
+      }
     } catch (err: any) {
       setError(err.message || "Failed to save synthesis.");
     } finally {
@@ -63,85 +68,89 @@ export default function ManualReviewStage({
 
       <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center justify-center">
         <div className="max-w-3xl w-full">
-          <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-3xl p-12 text-center shadow-xl">
+          <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-3xl p-12 text-center shadow-2xl relative overflow-hidden">
+            {/* Decorative Grid */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
             
-            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-md border border-orange-100">
-              <svg className="w-12 h-12 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-            
-            <h3 className="text-4xl font-black text-gray-900 mb-4 tracking-tight">
-              Phase 3 Sign-Off
-            </h3>
-            
-            <p className="text-xl text-gray-700 mb-8 max-w-2xl mx-auto leading-relaxed">
-              You have successfully combined your Knowledge Vault evidence with External Literature to build a rigorous theoretical framework.
-            </p>
-
-            <div className="bg-white rounded-2xl p-6 mb-10 text-left border border-orange-100 shadow-sm">
-              <h4 className="font-bold text-gray-900 mb-4 text-lg border-b border-gray-100 pb-2">Readiness Checklist</h4>
-              <ul className="space-y-4">
-                <li className="flex items-start gap-3">
-                  <div className="mt-1 text-green-500">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="font-bold text-gray-900">External Sources Approved</span>
-                    <p className="text-sm text-gray-600">All external web citations have been verified by you.</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="mt-1 text-green-500">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="font-bold text-gray-900">Evidence Matrix Synthesized</span>
-                    <p className="text-sm text-gray-600">Core arguments logically bridge vault data and external literature.</p>
-                  </div>
-                </li>
-              </ul>
-            </div>
-            
-            {error && (
-              <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
-                {error}
-              </div>
-            )}
-
-            <div className="bg-white rounded-2xl p-6 mb-8 text-left border border-orange-100 shadow-sm">
-              <h4 className="font-bold text-gray-900 mb-4 text-lg border-b border-gray-100 pb-2">Manual Synthesis (Optional)</h4>
-              <p className="text-sm text-gray-600 mb-4">
-                Add your own conclusions, overarching themes, or specific instructions that the Drafting AI should keep in mind.
-              </p>
-              <textarea
-                value={synthesis}
-                onChange={(e) => setSynthesis(e.target.value)}
-                className="w-full h-32 p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none text-gray-800"
-                placeholder="E.g., Make sure to emphasize the limitations of the methodology in the discussion section..."
-              />
-            </div>
-            
-            <p className="text-sm font-bold text-orange-800 uppercase tracking-widest mb-6">
-              Next Phase: Journal Discovery & AI Drafting
-            </p>
-            
-            <button 
-              onClick={handleConfirm}
-              disabled={isSaving || project.answers?.["phase_3_signed_off"] === "true"}
-              className="px-10 py-5 rounded-2xl bg-orange-600 text-white font-black text-xl shadow-lg hover:bg-orange-700 hover:-translate-y-1 hover:shadow-xl transition-all flex items-center justify-center gap-3 w-full max-w-lg mx-auto disabled:opacity-50"
-            >
-              {isSaving ? "Saving..." : project.answers?.["phase_3_signed_off"] === "true" ? "Framework Confirmed" : "Confirm Framework & Proceed"}
-              {!isSaving && project.answers?.["phase_3_signed_off"] !== "true" && (
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            <div className="relative z-10">
+              <div className="w-24 h-24 bg-[color:var(--accent-subtle)] rounded-full flex items-center justify-center mx-auto mb-6 shadow-md border border-[color:var(--accent-border)]">
+                <svg className="w-12 h-12 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
+              </div>
+              
+              <h3 className="text-4xl font-black text-[color:var(--text-primary)] mb-4 tracking-tight">
+                Evidence Framework Locked
+              </h3>
+              
+              <p className="text-xl text-[color:var(--text-secondary)] mb-8 max-w-2xl mx-auto leading-relaxed">
+                You have successfully combined your Knowledge Vault evidence with External Literature to build a rigorous theoretical framework.
+              </p>
+
+              <div className="bg-[color:var(--surface-sunken)] rounded-2xl p-6 mb-10 text-left border border-[color:var(--border-subtle)] shadow-sm">
+                <h4 className="font-bold text-[color:var(--text-primary)] mb-4 text-lg border-b border-[color:var(--border-subtle)] pb-2">Phase 2: Readiness Checklist</h4>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <div className="mt-1 text-green-500">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <span className="font-bold text-[color:var(--text-primary)]">External Sources Approved</span>
+                      <p className="text-sm text-[color:var(--text-secondary)]">All external web citations have been explicitly verified.</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="mt-1 text-green-500">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <span className="font-bold text-[color:var(--text-primary)]">Evidence Matrix Synthesized</span>
+                      <p className="text-sm text-[color:var(--text-secondary)]">Core arguments logically bridge vault data and external literature.</p>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+              
+              {error && (
+                <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+                  {error}
+                </div>
               )}
-            </button>
+
+              <div className="bg-[color:var(--surface-sunken)] rounded-2xl p-6 mb-8 text-left border border-[color:var(--border-subtle)] shadow-sm">
+                <h4 className="font-bold text-[color:var(--text-primary)] mb-4 text-lg border-b border-[color:var(--border-subtle)] pb-2">Manual Synthesis Checkpoint (Optional)</h4>
+                <p className="text-sm text-[color:var(--text-secondary)] mb-4">
+                  Add your own conclusions, overarching themes, or specific instructions that the AI Drafter should keep in mind during Phase 3.
+                </p>
+                <textarea
+                  value={synthesis}
+                  onChange={(e) => setSynthesis(e.target.value)}
+                  className="w-full h-32 p-4 bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)] resize-none text-[color:var(--text-primary)] transition-shadow"
+                  placeholder="E.g., Make sure to emphasize the limitations of the methodology in the discussion section..."
+                />
+              </div>
+              
+              <p className="text-sm font-bold text-[color:var(--text-muted)] uppercase tracking-widest mb-6">
+                Next Phase: Journal Discovery & AI Drafting
+              </p>
+              
+              <button 
+                onClick={handleConfirm}
+                disabled={isSaving}
+                className="px-10 py-5 rounded-2xl bg-[color:var(--accent)] text-white font-black text-xl shadow-lg hover:bg-[color:var(--accent-hover)] hover:-translate-y-1 hover:shadow-xl transition-all flex items-center justify-center gap-3 w-full max-w-lg mx-auto disabled:opacity-50"
+              >
+                {isSaving ? "Locking Matrix..." : "Confirm Framework & Advance to Phase 3"}
+                {!isSaving && (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

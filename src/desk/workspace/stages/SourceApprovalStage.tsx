@@ -9,11 +9,13 @@ export default function SourceApprovalStage({
   projectId,
   project,
   onSaved,
+  onAdvance,
 }: {
   stage: ResearchStage;
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
+  onAdvance?: () => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const isVault = stage === "source_approval_vault";
@@ -128,34 +130,39 @@ export default function SourceApprovalStage({
                       : "All sources have been reviewed!"}
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
                     {pendingToReview.map((source: any) => (
-                      <div key={source.id} className="flex flex-col gap-3 p-4 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg">
+                      <div key={source.id} className="flex flex-col gap-3 p-5 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl hover:border-[color:var(--accent)] transition-colors">
                         <div className="flex items-start justify-between">
                           <span className="text-sm font-semibold text-[color:var(--text-primary)] pr-4">
                             {source.title}
                           </span>
-                          <span className="text-xs font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded shrink-0">
-                            Pending Approval
+                          <span className="font-mono font-bold text-green-500 shrink-0 text-xs bg-[color:var(--surface-sunken)] px-2 py-1 rounded">
+                            {source.relevance_score || source.relevance}% Match
                           </span>
                         </div>
                         <div className="text-xs text-[color:var(--text-secondary)]">
                           {source.author} • {source.year}
                         </div>
-                        <div className="flex justify-end gap-2 mt-2">
+                        {source.snippet && (
+                          <div className="text-xs text-[color:var(--text-muted)] line-clamp-2 mt-2">
+                            "{source.snippet}"
+                          </div>
+                        )}
+                        <div className="flex justify-end gap-3 mt-auto pt-4 border-t border-[color:var(--border-subtle)]">
                           <button 
                             onClick={() => handleReject(source.id)}
                             disabled={isSaving}
-                            className="px-3 py-1.5 rounded-md text-xs font-bold bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:text-red-600 hover:border-red-200 transition-colors"
+                            className="px-4 py-2 rounded-lg text-xs font-bold bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
                           >
-                            Reject
+                            Discard
                           </button>
                           <button 
                             onClick={() => handleApprove(source)}
                             disabled={isSaving}
-                            className="px-3 py-1.5 rounded-md text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                            className="px-4 py-2 rounded-lg text-xs font-bold bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm"
                           >
-                            Approve
+                            Approve Source
                           </button>
                         </div>
                       </div>
@@ -192,6 +199,26 @@ export default function SourceApprovalStage({
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="sticky bottom-0 bg-[color:var(--surface-raised)]/90 backdrop-blur-md border-t border-[color:var(--border-subtle)] px-8 py-5 flex items-center justify-between z-20">
+        <div className="flex items-center gap-4 text-sm font-medium text-[color:var(--text-secondary)]">
+          <svg className="w-5 h-5 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          {approvedSources.length} sources approved for Phase 2 Extraction.
+        </div>
+        <button
+          type="button"
+          onClick={() => onAdvance?.()}
+          disabled={pendingToReview.length > 0}
+          className="rounded-full bg-[color:var(--accent)] px-8 py-3 text-sm font-black text-white hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] focus:ring-offset-2 disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
+        >
+          Lock Approved Sources & Proceed
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
     </div>
   );

@@ -1,105 +1,37 @@
-import { useCallback, useEffect, useState } from "react";
-import { getDocument, getOutputTypeSpec, getProject, getRubric } from "../api";
-import { UnauthenticatedError } from "../api";
-import { useDeskSession } from "../useDeskSession";
-import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../types";
-import type { ResearchStage, StageStatus } from "./types";
+import React, { Suspense, useState } from "react";
+import type { ResearchStage } from "./types";
 import StageNavigation from "./StageNavigation";
 import ContextPanel from "./ContextPanel";
-import DefinitionStage from "./stages/DefinitionStage";
-import PlaceholderStage from "./stages/PlaceholderStage";
-import LiteratureStage from "./stages/LiteratureStage";
-import GapIdentificationStage from "./stages/GapIdentificationStage";
-import GapSelectionStage from "./stages/GapSelectionStage";
-import TitleSelectionStage from "./stages/TitleSelectionStage";
-import TitleLockStage from "./stages/TitleLockStage";
-import VaultSourcesStage from "./stages/VaultSourcesStage";
-import AdditionalDataStage from "./stages/AdditionalDataStage";
-import EvidenceExtractionStage from "./stages/EvidenceExtractionStage";
-import ExternalResearchStage from "./stages/ExternalResearchStage";
-import SourceApprovalStage from "./stages/SourceApprovalStage";
-import EvidenceAnalysisStage from "./stages/EvidenceAnalysisStage";
-import ManualReviewStage from "./stages/ManualReviewStage";
-import JournalDiscoveryStage from "./stages/JournalDiscoveryStage";
-import JournalRequirementsStage from "./stages/JournalRequirementsStage";
-import DraftStage from "./stages/DraftStage";
-import CitationAuditStage from "./stages/CitationAuditStage";
-import OriginalityCheckStage from "./stages/OriginalityCheckStage";
-import DraftPreviewStage from "./stages/DraftPreviewStage";
-import PeerReviewStage from "./stages/PeerReviewStage";
-import RevisionStage from "./stages/RevisionStage";
-import FinalEditorStage from "./stages/FinalEditorStage";
-import PublicationReadinessStage from "./stages/PublicationReadinessStage";
-import ExportStage from "./stages/ExportStage";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
+import { ResearchProvider, useResearchWorkspace } from "./ResearchContext";
+import { StageRegistry } from "./StageRegistry";
+import PlaceholderStage from "./stages/PlaceholderStage";
 
-/**
- * ResearchWorkspace — the top-level shell for Journal Article projects.
- *
- * Replaces DeskShell for OT-10 (Journal Article) projects with a proper
- * 10-stage research pipeline workspace using a 3-zone layout:
- *   Left: StageNavigation (persistent pipeline rail)
- *   Center: Current stage content (forms, editor, evidence queue, etc.)
- *   Right: ContextPanel (dynamic AI agent for the current stage)
- *
- * Non-journal-article projects continue to use DeskShell unchanged.
- */
-export default function ResearchWorkspace({
-  projectId,
-  initialStage,
-  onStageChange,
+function ResearchWorkspaceInner({
   onClose,
   onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
 }: {
-  projectId: string;
-  initialStage: ResearchStage | null;
-  onStageChange: (stage: ResearchStage, options?: { replace?: boolean }) => void;
   onClose?: () => void;
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
 }) {
-  const session = useDeskSession();
-  const [project, setProject] = useState<ProjectView | null>(null);
-  const [document, setDocument] = useState<CanonicalDocument | null>(null);
-  const [rubric, setRubric] = useState<RubricReport | null>(null);
-  const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    projectId,
+    project,
+    outputType,
+    currentStage,
+    stageStatuses,
+    setProject,
+    setStage,
+    advanceStage,
+    error,
+    isLoading,
+  } = useResearchWorkspace();
+
   const [contextPanelOpen, setContextPanelOpen] = useState(true);
-
-  const currentStage = initialStage ?? "definition";
-
-  const load = useCallback(async () => {
-    try {
-      const [proj, rub, doc] = await Promise.all([
-        getProject(projectId),
-        getRubric(projectId),
-        getDocument(projectId),
-      ]);
-      setProject(proj);
-      setDocument(doc);
-      setRubric(rub);
-      setOutputType(await getOutputTypeSpec(proj.outputTypeId).catch(() => null));
-
-      if (initialStage === null) {
-        // Land on the first incomplete stage
-        onStageChange("definition", { replace: true });
-      }
-    } catch (e) {
-      setError(
-        e instanceof UnauthenticatedError
-          ? "Your session has expired. Sign in again to continue."
-          : (e as Error).message
-      );
-    }
-  }, [projectId, onStageChange, initialStage]);
-
-  useEffect(() => { load(); }, [load]);
-
-  // Compute stage statuses from project state
-  const stageStatuses = computeStageStatuses(project);
 
   if (error) {
     return (
@@ -123,7 +55,7 @@ export default function ResearchWorkspace({
     );
   }
 
-  if (!project) {
+  if (isLoading || !project) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)]">
         <div className="flex items-center gap-3">
@@ -133,6 +65,8 @@ export default function ResearchWorkspace({
       </div>
     );
   }
+
+  const ActiveStageComponent = (StageRegistry[currentStage] || PlaceholderStage) as any;
 
   return (
     <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
@@ -165,6 +99,28 @@ export default function ResearchWorkspace({
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-4 px-4 py-1.5 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-lg mr-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Active Model</span>
+                <span className="text-[11px] font-semibold text-[color:var(--text-primary)] flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Gemini 1.5 Pro
+                </span>
+              </div>
+              <div className="w-px h-6 bg-[color:var(--border-subtle)]"></div>
+              <div className="flex flex-col min-w-[100px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Context</span>
+                  <span className="text-[9px] font-mono text-[color:var(--text-secondary)]">32k / 1M</span>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <div className="w-full h-1.5 bg-[color:var(--surface-canvas)] rounded-full overflow-hidden border border-[color:var(--border-subtle)]">
+                    <div className="h-full bg-indigo-500 w-[3%] rounded-full"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {onOpenVault && (
               <button type="button" onClick={onOpenVault} className="shrink-0 rounded-full px-3 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer">
                 Vault
@@ -190,12 +146,24 @@ export default function ResearchWorkspace({
         <StageNavigation
           currentStage={currentStage}
           stageStatuses={stageStatuses}
-          onStageChange={(stage) => onStageChange(stage)}
+          onStageChange={setStage}
         />
 
         {/* Center: Current Stage Content */}
         <div className="flex-1 flex flex-col min-w-0 bg-[color:var(--surface-canvas)]">
-          {renderStage(currentStage, projectId, project, setProject)}
+          <Suspense fallback={
+            <div className="flex-1 flex items-center justify-center">
+              <div className="spinner" />
+            </div>
+          }>
+            <ActiveStageComponent 
+              stage={currentStage} 
+              projectId={projectId} 
+              project={project} 
+              onSaved={setProject} 
+              onAdvance={advanceStage} 
+            />
+          </Suspense>
         </div>
 
         {/* Right: Context Panel */}
@@ -222,241 +190,35 @@ export default function ResearchWorkspace({
   );
 }
 
-function renderStage(
-  stage: ResearchStage,
-  projectId: string,
-  project: ProjectView,
-  setProject: (p: ProjectView) => void,
-) {
-  switch (stage) {
-    case "definition":
-      return (
-        <DefinitionStage
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "literature":
-      return <LiteratureStage stage={stage} projectId={projectId} />;
-    case "gap_identification":
-      return <GapIdentificationStage stage={stage} projectId={projectId} />;
-    case "gap_selection":
-      return (
-        <GapSelectionStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "title_selection":
-      return (
-        <TitleSelectionStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "title_lock":
-      return (
-        <TitleLockStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "vault_sources":
-      return (
-        <VaultSourcesStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "source_approval_vault":
-      return (
-        <SourceApprovalStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "additional_data":
-      return <AdditionalDataStage stage={stage} projectId={projectId} />;
-    case "evidence_extraction":
-      return (
-        <EvidenceExtractionStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "external_research":
-      return (
-        <ExternalResearchStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "source_approval_external":
-      return (
-        <SourceApprovalStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "evidence_analysis":
-      return (
-        <EvidenceAnalysisStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "manual_review":
-      return (
-        <ManualReviewStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "journal_discovery":
-      return (
-        <JournalDiscoveryStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "journal_requirements":
-      return (
-        <JournalRequirementsStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "draft":
-      return (
-        <DraftStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "citation_audit":
-      return <CitationAuditStage stage={stage} projectId={projectId} />;
-    case "originality_check":
-      return <OriginalityCheckStage stage={stage} projectId={projectId} />;
-    case "draft_preview":
-      return <DraftPreviewStage stage={stage} projectId={projectId} />;
-    case "peer_review":
-      return (
-        <PeerReviewStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "revision":
-      return (
-        <RevisionStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "final_editor":
-      return (
-        <FinalEditorStage
-          stage={stage}
-          projectId={projectId}
-          project={project}
-          onSaved={(updated) => setProject(updated)}
-        />
-      );
-    case "publication_readiness":
-      return <PublicationReadinessStage stage={stage} projectId={projectId} />;
-    case "export":
-      return <ExportStage stage={stage} projectId={projectId} />;
-    default:
-      return <PlaceholderStage stage={stage} />;
-  }
-}
-
-function computeStageStatuses(project: ProjectView | null): Record<ResearchStage, StageStatus> {
-  const allLocked: Record<ResearchStage, StageStatus> = {
-    definition: "active",
-    literature: "locked", gap_identification: "locked", gap_selection: "locked", title_selection: "locked", title_lock: "locked",
-    vault_sources: "locked", source_approval_vault: "locked", additional_data: "locked", evidence_extraction: "locked", external_research: "locked", source_approval_external: "locked", evidence_analysis: "locked", manual_review: "locked",
-    journal_discovery: "locked", journal_requirements: "locked", draft: "locked", citation_audit: "locked", originality_check: "locked", draft_preview: "locked",
-    peer_review: "locked", revision: "locked",
-    final_editor: "locked", publication_readiness: "locked", export: "locked",
-  };
-
-  if (!project) return allLocked;
-
-  const g0Done = project.gates.some((g) => g.gate === "G0" && g.status === "signed_off");
-  const g1Done = project.gates.some((g) => g.gate === "G1" && g.status === "signed_off");
-  const g2Done = project.gates.some((g) => g.gate === "G2" && g.status === "signed_off");
-  const g5Done = project.gates.some((g) => g.gate === "G5" && g.status === "signed_off");
-  const g6Done = project.gates.some((g) => g.gate === "G6" && g.status === "signed_off");
-
-  // Phase 1 is always available, progressively unlocked.
-  // We'll mark completed stages if the gate is done, else available.
-  const p1 = g0Done ? "completed" : "available";
-  const p2 = g0Done ? (g2Done ? "completed" : "available") : "locked";
-  const p3 = g2Done ? "available" : "locked"; // Need evidence to draft
-  const p4 = project.hasDocument ? (g5Done ? "completed" : "available") : "locked";
-  const p5 = g5Done ? (g6Done ? "completed" : "available") : "locked";
-
-  return {
-    definition: g0Done ? "completed" : "active",
-    literature: p1,
-    gap_identification: p1,
-    gap_selection: p1,
-    title_selection: p1,
-    title_lock: p1,
-    
-    vault_sources: p2,
-    source_approval_vault: p2,
-    additional_data: p2,
-    evidence_extraction: p2,
-    external_research: p2,
-    source_approval_external: p2,
-    evidence_analysis: p2,
-    manual_review: p2,
-    
-    journal_discovery: p3,
-    journal_requirements: g1Done ? "completed" : p3,
-    draft: p3,
-    citation_audit: p3,
-    originality_check: p3,
-    draft_preview: p3,
-    
-    peer_review: p4,
-    revision: p4,
-    
-    final_editor: p5,
-    publication_readiness: g6Done ? "completed" : p5,
-    export: g6Done ? "available" : "locked",
-  };
+export default function ResearchWorkspace({
+  projectId,
+  initialStage,
+  onStageChange,
+  onClose,
+  onOpenAccountSettings,
+  onOpenVault,
+  onOpenAiAccess,
+}: {
+  projectId: string;
+  initialStage: ResearchStage | null;
+  onStageChange: (stage: ResearchStage, options?: { replace?: boolean }) => void;
+  onClose?: () => void;
+  onOpenAccountSettings?: () => void;
+  onOpenVault?: () => void;
+  onOpenAiAccess?: () => void;
+}) {
+  return (
+    <ResearchProvider 
+      projectId={projectId} 
+      initialStage={initialStage} 
+      onStageChangeCallback={onStageChange}
+    >
+      <ResearchWorkspaceInner 
+        onClose={onClose}
+        onOpenAccountSettings={onOpenAccountSettings}
+        onOpenVault={onOpenVault}
+        onOpenAiAccess={onOpenAiAccess}
+      />
+    </ResearchProvider>
+  );
 }

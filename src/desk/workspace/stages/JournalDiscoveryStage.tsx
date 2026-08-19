@@ -10,11 +10,13 @@ export default function JournalDiscoveryStage({
   projectId,
   project,
   onSaved,
+  onAdvance,
 }: {
   stage: ResearchStage;
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
+  onAdvance?: () => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -97,6 +99,9 @@ export default function JournalDiscoveryStage({
       };
       const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
       onSaved(updatedProject);
+      if (onAdvance) {
+        onAdvance();
+      }
     } catch (err: any) {
       setError(err.message || "Failed to save journal selection.");
     } finally {
@@ -129,32 +134,45 @@ export default function JournalDiscoveryStage({
           disabled={isProcessing}
           className="px-6 py-2 rounded-full bg-[color:var(--accent)] text-white font-semibold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2 cursor-pointer"
         >
-          {isProcessing ? (
-            <>
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Searching Journals...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Find Target Journals
-            </>
-          )}
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Initialize Radar Scan
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 space-y-8">
         {(isProcessing || logs.length > 0) && (
-          <div className="max-w-4xl mx-auto">
-            <AgentTerminal
-              logs={logs}
-              isProcessing={isProcessing}
-              agentName="Journal Discovery Agent"
-            />
+          <div className="max-w-4xl mx-auto flex gap-6">
+            <div className="w-64 shrink-0 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl p-4 flex flex-col items-center justify-center">
+              <div className="relative w-32 h-32 mb-4">
+                <div className={`absolute inset-0 rounded-full border-2 border-[color:var(--accent-subtle)] ${isProcessing ? 'animate-ping' : ''}`}></div>
+                <div className="absolute inset-2 rounded-full border border-[color:var(--accent-border)]"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <svg className={`w-12 h-12 text-[color:var(--accent)] ${isProcessing ? 'animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={def.icon} />
+                  </svg>
+                </div>
+                {isProcessing && (
+                  <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,transparent_70%,var(--accent)_100%)] animate-spin opacity-20"></div>
+                )}
+              </div>
+              <div className="text-center font-mono text-sm">
+                <div className="font-bold text-[color:var(--text-primary)] mb-1">
+                  {isProcessing ? "SCANNING DB..." : "SCAN COMPLETE"}
+                </div>
+                <div className="text-[color:var(--text-muted)] text-xs uppercase tracking-widest">
+                  Target Match System
+                </div>
+              </div>
+            </div>
+            <div className="flex-1">
+              <AgentTerminal
+                logs={logs}
+                isProcessing={isProcessing}
+                agentName="Journal Discovery Agent"
+              />
+            </div>
           </div>
         )}
 
