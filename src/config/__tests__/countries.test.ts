@@ -18,7 +18,7 @@ describe("COUNTRIES", () => {
 
 describe("normalizeE164", () => {
   it("combines dial code and local digits", () => {
-    expect(normalizeE164("+977", "9851108291")).toBe("+9779851108291");
+    expect(normalizeE164("+977", "9841234567")).toBe("+9779841234567");
   });
 
   it("strips non-digit characters from the local number", () => {
@@ -37,11 +37,11 @@ describe("normalizeE164", () => {
 
 describe("isValidE164", () => {
   it("accepts a well-formed E.164 number", () => {
-    expect(isValidE164("+9779851108291")).toBe(true);
+    expect(isValidE164("+9779841234567")).toBe(true);
   });
 
   it("rejects missing +, non-digits, and out-of-range lengths", () => {
-    expect(isValidE164("9779851108291")).toBe(false);
+    expect(isValidE164("9779841234567")).toBe(false);
     expect(isValidE164("+977abc")).toBe(false);
     expect(isValidE164("+0123456")).toBe(false); // leading 0 after + not allowed
     expect(isValidE164("+1")).toBe(false); // too short
@@ -58,6 +58,6 @@ describe("e164Problem", () => {
   });
 
   it("accepts a valid combination", () => {
-    expect(e164Problem("+977", "9851108291")).toBeNull();
+    expect(e164Problem("+977", "9841234567")).toBeNull();
   });
 });

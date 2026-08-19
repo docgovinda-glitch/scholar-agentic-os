@@ -7,7 +7,28 @@ dotenv.config();
  * Primary: OpenRouter (if OPENROUTER_API_KEY is set)
  * Fallback: Google Gemini (if GEMINI_API_KEY is set)
  */
-export async function callOpenRouterJSON(systemPrompt: string, userPrompt: string, model: string = "openrouter/auto"): Promise<any> {
+export async function callOpenRouterJSON(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto"): Promise<any> {
+  if (req.body && req.body.llmResult) {
+    let content = req.body.llmResult;
+    if (typeof content === "object" && typeof content.text === "string") {
+      content = content.text;
+    }
+    
+    // Gemini sometimes wraps JSON in markdown fences
+    if (typeof content === "string") {
+      content = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+      try {
+        return JSON.parse(content);
+      } catch (err) {
+        throw new Error("Invalid JSON returned by LLM");
+      }
+    }
+    return content;
+  }
+
+  res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt });
+  throw new Error("RequireFrontendLLMException");
+
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
 

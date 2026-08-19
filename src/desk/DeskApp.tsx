@@ -27,6 +27,8 @@ import VaultScreen from "./vault/VaultScreen";
 import DeskPocketMount from "./pocket/DeskPocketMount";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 
+import { AiStatusIndicator } from "./regions/AiStatusIndicator";
+
 const SECTION_IDS: readonly SectionId[] = ["overview", "local", "free", "byok", "premium", "models", "settings"];
 
 function isSectionId(value: string | undefined): value is SectionId {
@@ -299,34 +301,39 @@ function AiAccessRoute() {
  */
 export default function DeskApp() {
   return (
-    <Routes>
-      <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
-      <Route path="/signin" element={<PublicOnly><SignInRoute /></PublicOnly>} />
-      <Route path="/signup" element={<PublicOnly><SignUpRoute /></PublicOnly>} />
-      <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />
-      <Route path="/signup/resend" element={<PublicOnly><ResendVerificationRoute /></PublicOnly>} />
-      <Route path="/reset-password" element={<PublicOnly><ForgotRoute /></PublicOnly>} />
-      <Route
-        path="/reset-password/confirm"
-        element={
-          <RequireRecovery>
-            <RecoverRoute />
-          </RequireRecovery>
-        }
-      />
-      <Route path="/verify-email" element={<VerifyEmailRoute />} />
-      <Route path="/*" element={<RequireAuth />}>
-        <Route element={<OnboardingGate />}>
-          <Route path="projects" element={<ProjectsIndexRoute />} />
-          <Route path="projects/:projectId" element={<ProjectRoute />} />
-          <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
-          <Route path="settings" element={<SettingsRoute />} />
-          <Route path="vault" element={<VaultRoute />} />
-          <Route path="ai-access" element={<AiAccessRoute />} />
-          <Route path="ai-access/:section" element={<AiAccessRoute />} />
-          <Route path="*" element={<Navigate to="/projects" replace />} />
+    <>
+      <Routes>
+        <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
+        <Route path="/signin" element={<PublicOnly><SignInRoute /></PublicOnly>} />
+        <Route path="/signup" element={<PublicOnly><SignUpRoute /></PublicOnly>} />
+        <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />
+        <Route path="/signup/resend" element={<PublicOnly><ResendVerificationRoute /></PublicOnly>} />
+        <Route path="/reset-password" element={<PublicOnly><ForgotRoute /></PublicOnly>} />
+        <Route
+          path="/reset-password/confirm"
+          element={
+            <RequireRecovery>
+              <RecoverRoute />
+            </RequireRecovery>
+          }
+        />
+        <Route path="/verify-email" element={<VerifyEmailRoute />} />
+        <Route path="/*" element={<RequireAuth />}>
+          <Route element={<OnboardingGate />}>
+            <Route path="projects" element={<ProjectsIndexRoute />} />
+            <Route path="projects/:projectId" element={<ProjectRoute />} />
+            <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
+            <Route path="settings" element={<SettingsRoute />} />
+            <Route path="vault" element={<VaultRoute />} />
+            <Route path="ai-access" element={<AiAccessRoute />} />
+            <Route path="ai-access/:section" element={<AiAccessRoute />} />
+            <Route path="*" element={<Navigate to="/projects" replace />} />
+          </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
+      <div className="fixed bottom-4 left-4 z-50">
+        <AiStatusIndicator />
+      </div>
+    </>
   );
 }

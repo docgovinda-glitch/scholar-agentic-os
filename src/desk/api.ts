@@ -11,6 +11,9 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
+import { routeDecision, type RoutingDecision } from "./aiAccess/aiAccessApi";
+import { readProviderKey } from "./aiAccess/byokStore";
+import { completeWithFailover, type CandidateProvider } from "../platform/gateway/gateway";
 import type {
   Author,
   CanonicalDocument,
@@ -72,12 +75,71 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
 }
 
 /** POST/PUT/PATCH with a JSON body. */
-export function authedJsonFetch(input: string, method: string, body: unknown): Promise<Response> {
-  return authedFetch(input, {
+export async function authedJsonFetch(input: string, method: string, body: unknown): Promise<Response> {
+  let res = await authedFetch(input, {
     method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
+  if (res.status === 426) {
+    const data = await res.json().catch(() => null);
+    if (data && data.requireFrontendLLM) {
+      const llmResult = await executeAgenticLLM(data.systemPrompt, data.userPrompt);
+      res = await authedFetch(input, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...((body as any) || {}), llmResult }),
+      });
+    } else {
+      // Re-create the response since we consumed it
+      res = new Response(JSON.stringify(data), { status: 426, headers: res.headers });
+    }
+  }
+  return res;
+}
+
+async function executeAgenticLLM(systemPrompt: string, userPrompt: string) {
+  const decision = await routeDecision("reasoning");
+  if (!decision || !decision.ok) {
+    throw new Error(decision?.reasoning || "No AI routing decision available.");
+  }
+
+  const choices = [decision.choice, ...decision.fallbacks];
+  const candidates: CandidateProvider[] = [];
+
+  for (const c of choices) {
+    if (c.tier === "premium") {
+      candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "premium" });
+    } else if (c.tier === "byok" || c.tier === "free") {
+      const key = await readProviderKey(c.providerId);
+      if (key) {
+        candidates.push({ provider: c.providerId, model: c.modelId, apiKey: key });
+      }
+    } else if (c.tier === "local") {
+      // For local, we push a special flag. Our loop will attempt it.
+      candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "local-no-credential-required" });
+    }
+  }
+
+  if (candidates.length === 0) {
+    throw new Error("No connected AI providers are available for this task.");
+  }
+
+  // Use completeWithFailover from the gateway
+  const req = {
+    systemPrompt,
+    userPrompt,
+    taskClass: "reasoning" as const,
+    local: candidates[0].apiKey === "local-no-credential-required",
+    segments: [],
+  };
+
+  const result = await completeWithFailover(req, { candidates });
+  if (!result.ok) {
+    throw new Error("Agentic generation failed: " + result.errors.map(e => e.message).join(" | "));
+  }
+  return result.value;
 }
 
 async function json<T>(res: Response): Promise<T> {
