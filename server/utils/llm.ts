@@ -189,15 +189,19 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
     const decoder = new TextDecoder("utf-8");
     let fullContent = "";
 
+    let buffer = "";
     if (reader) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true });
         
-        // OpenRouter SSE chunks
-        const lines = chunk.split("\n").filter(line => line.trim() !== "");
-        for (const line of lines) {
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line) continue;
           if (line === "data: [DONE]") continue;
           if (line.startsWith("data: ")) {
             try {
@@ -220,7 +224,7 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
       const parsed = JSON.parse(fullContent);
       return parsed;
     } catch (err) {
-      sendEvent("error", { message: "Invalid JSON returned by LLM" });
+      throw new Error("Invalid JSON returned by LLM");
     }
     
   } else if (geminiKey) {
@@ -230,7 +234,7 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
       const resultJSON = await callOpenRouterJSON(req, res, systemPrompt, userPrompt, model, taskType);
       return resultJSON;
     } catch(err: any) {
-      sendEvent("error", { message: err.message });
+      throw err;
     }
   }
 }
@@ -279,8 +283,7 @@ export async function streamOpenRouterText(req: any, res: any, systemPrompt: str
     });
 
     if (!response.ok) {
-      sendEvent("error", { message: `OpenRouter API error: ${response.status}` });
-      return;
+      throw new Error(`OpenRouter API error: ${response.status}`);
     }
 
     sendEvent("log", { message: "> Awaiting tokens..." });
@@ -289,15 +292,19 @@ export async function streamOpenRouterText(req: any, res: any, systemPrompt: str
     const decoder = new TextDecoder("utf-8");
     let fullContent = "";
 
+    let buffer = "";
     if (reader) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true });
         
-        // OpenRouter SSE chunks
-        const lines = chunk.split("\n").filter(line => line.trim() !== "");
-        for (const line of lines) {
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line) continue;
           if (line === "data: [DONE]") continue;
           if (line.startsWith("data: ")) {
             try {
@@ -324,7 +331,7 @@ export async function streamOpenRouterText(req: any, res: any, systemPrompt: str
       const resultText = await callOpenRouterText(req, res, systemPrompt, userPrompt, model, taskType);
       return resultText;
     } catch(err: any) {
-      sendEvent("error", { message: err.message });
+      throw err;
     }
   }
 }
