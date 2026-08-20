@@ -5,18 +5,18 @@ CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
 ALTER TABLE public.project_evidence ADD COLUMN IF NOT EXISTS embedding extensions.vector(768);
 
 -- Create an index for vector similarity search (cosine distance)
-CREATE INDEX ON public.project_evidence USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX ON public.project_evidence USING hnsw (embedding extensions.vector_cosine_ops);
 
 -- Setup a generic search function for RAG
 CREATE OR REPLACE FUNCTION match_project_evidence(
   query_embedding extensions.vector(768),
   match_threshold float,
   match_count int,
-  p_id uuid
+  p_id text
 )
 RETURNS TABLE (
   id uuid,
-  project_id uuid,
+  project_id text,
   quote text,
   claim_type text,
   strength text,
@@ -32,10 +32,10 @@ AS $$
     project_evidence.claim_type,
     project_evidence.strength,
     project_evidence.tags,
-    1 - (project_evidence.embedding <=> query_embedding) AS similarity
+    1 - (project_evidence.embedding OPERATOR(extensions.<=>) query_embedding) AS similarity
   FROM public.project_evidence
   WHERE project_evidence.project_id = p_id
-    AND 1 - (project_evidence.embedding <=> query_embedding) > match_threshold
-  ORDER BY project_evidence.embedding <=> query_embedding
+    AND 1 - (project_evidence.embedding OPERATOR(extensions.<=>) query_embedding) > match_threshold
+  ORDER BY project_evidence.embedding OPERATOR(extensions.<=>) query_embedding
   LIMIT match_count;
 $$;

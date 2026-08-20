@@ -60,15 +60,15 @@ import { exportDocument } from "../../src/app/export/export.ts";
 import type { ExportFormat } from "../../src/app/export/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
 
-import { agenticRouter } from "./project/agentic.js";
-import { activityRouter } from "./project/activity.ts";
-import { filesRouter } from "./project/files.ts";
+import { claimsRouter } from "./project/claims";
+import { evidenceRouter } from "./project/evidence";
+import { agenticRouter } from "./project/agentic";
+import { journalComplianceRouter } from "./project/journal_compliance";
+import parseRouter from "./project/parse";
+import { activityRouter } from "./project/activity";
+import { filesRouter } from "./project/files";
 
 import { emptyDocument } from "../../src/domain/document/model.ts";
-import { registerSubmissionsRoutes } from "./project/submissions.ts";
-import { registerClaimsRoutes } from "./project/claims.ts";
-import { registerEvidenceRoutes } from "./project/evidence.ts";
-import { registerJournalComplianceRoutes } from "./project/journal_compliance.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
 import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, markClaimUnsupported, ClaimGraphError } from "../../src/domain/claim/graph.ts";
 import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
@@ -1048,12 +1048,39 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   // model-backed export path. The Atlas catalog routes below are deliberately
   // left public: they are a static list of output types with no user data in
   // them, and the "choose what you are writing" screen reads them.
-  router.use("/:id/claims", registerClaimsRoutes(projectLimit));
-  router.use("/:id/evidence", registerEvidenceRoutes(projectLimit));
+  router.use("/:id/claims", claimsRouter(projectLimit));
+  router.use("/:id/evidence", evidenceRouter(projectLimit));
   router.use("/:id/activity", activityRouter);
   router.use("/:id/files", filesRouter);
   router.use("/:id/agent", agenticRouter);
-  registerJournalComplianceRoutes(router, projectLimit);
+  router.use("/:id/parse-file", parseRouter);
+  router.use("/:id/compliance", journalComplianceRouter(projectLimit));
+  
+  // Manual Human Editor Routes for relational data overrides
+  router.put("/:id/editor/gaps/:gapId", projectLimit, asyncRoute(async (req, res) => {
+    const config = getSupabaseRestConfig();
+    if (!config) return res.status(500).json({ error: "Supabase config missing" });
+    const table = new SupabaseTable(config, "project_evidence"); // Gaps are saved here by agent
+    await table.update(`id=eq.${req.params.gapId}&project_id=eq.${req.params.id}`, req.body);
+    res.json({ ok: true });
+  }));
+
+  router.put("/:id/editor/evidence/:evidenceId", projectLimit, asyncRoute(async (req, res) => {
+    const config = getSupabaseRestConfig();
+    if (!config) return res.status(500).json({ error: "Supabase config missing" });
+    const table = new SupabaseTable(config, "project_evidence");
+    await table.update(`id=eq.${req.params.evidenceId}&project_id=eq.${req.params.id}`, req.body);
+    res.json({ ok: true });
+  }));
+
+  router.put("/:id/editor/claims/:claimId", projectLimit, asyncRoute(async (req, res) => {
+    const config = getSupabaseRestConfig();
+    if (!config) return res.status(500).json({ error: "Supabase config missing" });
+    const table = new SupabaseTable(config, "project_claims"); // Assuming a project_claims table
+    await table.update(`id=eq.${req.params.claimId}&project_id=eq.${req.params.id}`, req.body);
+    res.json({ ok: true });
+  }));
+
   
   app.use("/api/projects", router);
 

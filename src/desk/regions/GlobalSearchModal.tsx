@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { authedJsonFetch } from "../api";
+import { currentUserId } from "../../services/userVault";
+import { listVaultItems, searchVaultItems, isVaultUnlocked } from "../../services/vaultContents";
 
 interface SearchResult {
   id: string;
@@ -26,11 +28,27 @@ export default function GlobalSearchModal({ onClose }: { onClose: () => void }) 
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await authedJsonFetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const response = await authedJsonFetch(`/api/search?q=${encodeURIComponent(query)}`, "GET", null);
+        let data: { projects: SearchResult[], vaultSources: SearchResult[], claims: SearchResult[] } = { projects: [], vaultSources: [], claims: [] };
         if (response.ok) {
-          const data = await response.json();
-          setResults(data);
+          data = await response.json();
         }
+        
+        // Search Vault if unlocked
+        if (isVaultUnlocked()) {
+          const userId = await currentUserId();
+          if (userId) {
+            const vaultItems = await listVaultItems(userId);
+            const matches = searchVaultItems(vaultItems, query);
+            data.vaultSources = matches.map(m => ({
+              id: m.id,
+              title: m.title.length > 50 ? m.title.substring(0, 50) + "..." : m.title,
+              type: "vault"
+            }));
+          }
+        }
+        
+        setResults(data);
       } catch (err) {
         console.error("Search failed:", err);
       } finally {
@@ -85,6 +103,42 @@ export default function GlobalSearchModal({ onClose }: { onClose: () => void }) 
                       >
                         {p.title}
                       </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {results.vaultSources.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="px-3 py-1 text-xs font-semibold text-[color:var(--text-muted)] uppercase tracking-wider">Vault Sources</h3>
+                  <div className="mt-1">
+                    {results.vaultSources.map((v) => (
+                      <div 
+                        key={v.id}
+                        className="block px-3 py-2 rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
+                        onClick={() => {
+                          // In the future this could open the vault viewer
+                          onClose();
+                        }}
+                      >
+                        {v.title}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {results.claims.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="px-3 py-1 text-xs font-semibold text-[color:var(--text-muted)] uppercase tracking-wider">Claims</h3>
+                  <div className="mt-1">
+                    {results.claims.map((c) => (
+                      <div 
+                        key={c.id}
+                        className="block px-3 py-2 rounded hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)]"
+                      >
+                        {c.title}
+                      </div>
                     ))}
                   </div>
                 </div>

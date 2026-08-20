@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { authedJsonFetch } from "../api";
+import React, { useState, useEffect, useRef } from "react";
+import { authedJsonFetch, authedFetch } from "../api";
 
 interface ProjectFile {
   id: string;
@@ -11,35 +11,86 @@ interface ProjectFile {
 export default function ProjectFilesPanel({ projectId }: { projectId: string }) {
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const fetchFiles = () => {
     setLoading(true);
-    authedJsonFetch(`/api/projects/${projectId}/files`)
+    authedJsonFetch(`/api/projects/${projectId}/files`, "GET", null)
       .then((res) => res.json())
       .then((json) => {
         setFiles(json.data || []);
       })
       .catch((err) => console.error("Failed to load files", err))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchFiles();
   }, [projectId]);
 
-  const handleUpload = () => {
-    // Stub for file upload interaction
-    alert("File upload is not yet connected to the storage bucket.");
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await authedFetch(`/api/projects/${projectId}/files`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        fetchFiles();
+      } else {
+        const err = await res.json();
+        console.error("Upload failed", err);
+        alert(`Upload failed: ${err.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Upload error", error);
+      alert("Failed to upload file.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   return (
     <div className="flex flex-col h-full bg-[color:var(--surface-canvas)]">
       <div className="p-4 border-b border-[color:var(--border-subtle)] flex items-center justify-between">
         <h2 className="text-sm font-semibold text-[color:var(--text-primary)]">Project Files</h2>
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          onChange={handleFileChange}
+        />
         <button 
-          onClick={handleUpload}
-          className="p-1 rounded bg-[color:var(--accent)] text-[color:var(--accent-contrast)] hover:bg-[color:var(--accent-hover)] transition-colors"
+          onClick={handleUploadClick}
+          disabled={uploading}
+          className="p-1 rounded bg-[color:var(--accent)] text-[color:var(--accent-contrast)] hover:bg-[color:var(--accent-hover)] transition-colors disabled:opacity-50"
           title="Upload file"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          {uploading ? (
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          )}
         </button>
       </div>
 

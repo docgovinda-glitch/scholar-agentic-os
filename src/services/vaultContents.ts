@@ -41,6 +41,9 @@ export interface VaultItem {
   title: string;
   content: string;
   citation?: string;
+  authors?: string[];
+  year?: string;
+  journal?: string;
   createdAt: string;
 }
 

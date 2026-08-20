@@ -30,10 +30,11 @@ function isValidBinding(value: unknown): value is ClaimEvidenceBinding {
   return ClaimEvidenceBindingSchema.safeParse(value).success;
 }
 
-export function registerClaimsRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
+export function claimsRouter(projectLimit: express.RequestHandler): express.Router {
+  const router = express.Router({ mergeParams: true });
   const store = getSharedStore();
 
-  app.post("/api/projects/:id/claims", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { claim } = req.body ?? {};
@@ -56,7 +57,7 @@ export function registerClaimsRoutes(app: express.Express, projectLimit: express
     }
   }));
 
-  app.post("/api/projects/:id/claims/:claimId/evidence", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/:claimId/evidence", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { binding } = req.body ?? {};
@@ -81,7 +82,7 @@ export function registerClaimsRoutes(app: express.Express, projectLimit: express
     }
   }));
 
-  app.post("/api/projects/:id/claims/:claimId/mark-unsupported", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/:claimId/mark-unsupported", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { reason, actor } = req.body ?? {};
@@ -109,31 +110,31 @@ export function registerClaimsRoutes(app: express.Express, projectLimit: express
     }
   }));
 
-  app.get("/api/projects/:id/claims", projectLimit, asyncRoute(async (req, res) => {
+  router.get("/", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json(record.claimGraph);
   }));
 
-  app.get("/api/projects/:id/claims/unsupported", projectLimit, asyncRoute(async (req, res) => {
+  router.get("/unsupported", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json({ claims: unsupportedClaims(record.claimGraph) });
   }));
 
-  app.get("/api/projects/:id/claims/conflicts", projectLimit, asyncRoute(async (req, res) => {
+  router.get("/conflicts", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json({ conflicts: findConflicts(record.claimGraph) });
   }));
 
-  app.get("/api/projects/:id/sources/:sourceId/claims", projectLimit, asyncRoute(async (req, res) => {
+  router.get("/api/projects/:id/sources/:sourceId/claims", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json({ claims: claimsDependingOnSource(record.claimGraph, req.params.sourceId) });
   }));
 
-  app.delete("/api/projects/:id/sources/:sourceId", projectLimit, asyncRoute(async (req, res) => {
+  router.delete("/api/projects/:id/sources/:sourceId", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const claimGraph = removeSource(record.claimGraph, req.params.sourceId);
@@ -148,4 +149,5 @@ export function registerClaimsRoutes(app: express.Express, projectLimit: express
       throw err;
     }
   }));
+  return router;
 }

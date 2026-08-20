@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedJsonFetch } from "../../api";
+import { authedJsonFetch, authedStreamFetch } from "../../api";
 
 export default function GapIdentificationStage({
   stage,
@@ -86,19 +86,41 @@ export default function GapIdentificationStage({
       }, 1000);
 
       try {
-        const response = await authedJsonFetch(`/api/projects/${projectId}/agent/gaps`, "POST", {});
-        const resJson = await response.json();
+        await authedStreamFetch(
+          `/api/projects/${projectId}/agent/gaps`,
+          "POST",
+          {},
+          (event, eventData) => {
+            if (!active) return;
+            if (event === "log") {
+              setLogs((prev) => [
+                ...prev,
+                {
+                  id: Date.now().toString() + Math.random(),
+                  timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                  level: "info",
+                  message: eventData.message,
+                },
+              ]);
+            } else if (event === "chunk") {
+              setLogs((prev) => {
+                const last = prev[prev.length - 1];
+                if (last && last.message.startsWith("> Agent Reasoning")) return prev;
+                return [
+                  ...prev,
+                  {
+                    id: Date.now().toString() + Math.random(),
+                    timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                    level: "info",
+                    message: "> Agent Reasoning [streaming JSON output]...",
+                  }
+                ];
+              });
+            } else if (event === "done") {
+              // wait for animations
         
-        if (!response.ok) {
-          throw new Error(resJson.error || "Agent encountered an error during gap identification.");
-        }
-        
-        await new Promise(r => setTimeout(r, 6500)); // wait for animations
-        
-        if (!active) return;
-        const { data } = resJson;
-        
-        setLogs((prev) => [
+        const data = eventData.data;
+setLogs((prev) => [
           ...prev,
           {
             id: Date.now().toString() + "done1",
@@ -122,7 +144,11 @@ export default function GapIdentificationStage({
             if (active) onAdvance();
           }, 2000);
         }
-        
+            } else if (event === "error") {
+              throw new Error(eventData.message || "Agent encountered an error.");
+            }
+          }
+        );
       } catch (err: any) {
         if (!active) return;
         setError(err.message);
@@ -137,7 +163,6 @@ export default function GapIdentificationStage({
         ]);
       } finally {
         if (active) {
-          clearInterval(logInterval);
           setIsProcessing(false);
         }
       }

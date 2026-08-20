@@ -38,7 +38,7 @@ const PASSPHRASE_VERIFIER_PREFIX = "scholar-vault-verifier:";
  * server still says exists (the same class of bug useAiSetupStatus's and
  * useVaultSetupStatus's skip-tracking were already keyed by userId to avoid).
  */
-async function currentUserId(): Promise<string | null> {
+export async function currentUserId(): Promise<string | null> {
   if (!isSupabaseConfigured()) return null;
   const { data } = await getSupabaseClient().auth.getUser();
   return data.user?.id ?? null;

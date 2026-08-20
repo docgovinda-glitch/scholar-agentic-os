@@ -295,6 +295,6 @@ export function isProjectComplete(project: ProjectGateState): boolean {
 }
 
 /** The first gate that is not yet signed off, in order — "what should I do next?" */
-export function nextOutstandingGate(project: ProjectGateState): GateId | undefined {
-  return GATE_ORDER.find((g) => !isGateSignedOff(project, g));
+export function nextOutstandingGate(project: ProjectGateState, chapterId?: string): GateId | undefined {
+  return GATE_ORDER.find((g) => !isGateSignedOff(project, g, chapterId));
 }

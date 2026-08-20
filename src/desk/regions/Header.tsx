@@ -23,6 +23,7 @@ export default function Header({
   onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
+  onToggleRail,
 }: {
   project: ProjectView;
   outputTypeLabel: string;
@@ -31,7 +32,6 @@ export default function Header({
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
   onToggleRail?: () => void;
-  onToggleAside?: () => void;
 }) {
   const current = project.gates.find((g) => g.status !== "signed_off") ?? project.gates[project.gates.length - 1];
   const [searchOpen, setSearchOpen] = useState(false);
@@ -113,18 +113,6 @@ export default function Header({
           <span title="Not yet built" className="cursor-not-allowed">
             Account Settings
           </span>
-        )}
-        
-        {onToggleAside && (
-          <button
-            type="button"
-            onClick={onToggleAside}
-            className="md:hidden shrink-0 rounded-[var(--radius-sm)] p-1 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </button>
         )}
       </div>
     </header>

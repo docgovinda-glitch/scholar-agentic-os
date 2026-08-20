@@ -16,7 +16,7 @@ export default function Tray({ projectId, onClose }: { projectId: string; onClos
   useEffect(() => {
     if (activeTab === "activity") {
       setLoading(true);
-      authedJsonFetch(`/api/projects/${projectId}/activity`)
+      authedJsonFetch(`/api/projects/${projectId}/activity`, "GET", null)
         .then((res) => res.json())
         .then((json) => {
           setEvents(json.data || []);
@@ -27,7 +27,7 @@ export default function Tray({ projectId, onClose }: { projectId: string; onClos
   }, [activeTab, projectId]);
 
   return (
-    <div className="absolute bottom-10 inset-x-0 h-64 bg-[color:var(--surface-raised)] border-t border-[color:var(--border-subtle)] shadow-lg flex flex-col z-40 transition-transform">
+    <div className="h-64 bg-[color:var(--surface-raised)] border-t border-[color:var(--border-subtle)] flex flex-col shrink-0">
       <div className="flex items-center justify-between px-4 py-2 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-base)]">
         <div className="flex gap-4">
           <button

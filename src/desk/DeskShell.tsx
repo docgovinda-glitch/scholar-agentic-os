@@ -61,8 +61,6 @@ export default function DeskShell({
   const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [railOpen, setRailOpen] = useState(false);
-  const [asideOpen, setAsideOpen] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
   // Bumped when an evidence approval creates a new Claim–Evidence binding,
   // so ClaimsPanel (which only fetches its graph on mount) remounts and
@@ -193,8 +191,6 @@ export default function DeskShell({
         onOpenAccountSettings={onOpenAccountSettings}
         onOpenVault={onOpenVault}
         onOpenAiAccess={onOpenAiAccess}
-        onToggleRail={() => setRailOpen(!railOpen)}
-        onToggleAside={() => setAsideOpen(!asideOpen)}
       />
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
         {(["definition", "requirements", "document", "evidence", "manuscript", "progress", "submissions"] as const).map((v) => (
@@ -226,14 +222,7 @@ export default function DeskShell({
           </button>
         ))}
       </nav>
-      <div className="flex flex-1 min-h-0 relative">
-        {/* Mobile overlay for closing sidebars */}
-        {(railOpen || (asideOpen && window.innerWidth < 768)) && (
-          <div 
-            className="md:hidden fixed inset-0 bg-black/50 z-30" 
-            onClick={() => { setRailOpen(false); setAsideOpen(false); }}
-          />
-        )}
+      <div className="flex flex-1 min-h-0 relative overflow-hidden">
         {view === "progress" ? (
           <div className="flex-1 overflow-y-auto">
             <GatesPanel
@@ -305,11 +294,8 @@ export default function DeskShell({
           </div>
         ) : (
           <>
-            <div className={`fixed md:relative inset-y-0 left-0 z-40 transform transition-transform duration-300 ${railOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 h-[calc(100vh-105px)] md:h-auto`}>
-              <Rail projectId={projectId} document={document} outputTypeId={project.outputTypeId} onJumpToBlock={(id) => {
-                jumpToBlock(id);
-                setRailOpen(false);
-              }} />
+            <div className="relative shrink-0 border-r border-[color:var(--border-subtle)] flex flex-col">
+              <Rail projectId={projectId} document={document} outputTypeId={project.outputTypeId} onJumpToBlock={jumpToBlock} />
             </div>
             <Primary
               document={document}
@@ -322,7 +308,7 @@ export default function DeskShell({
             />
           </>
         )}
-        <div className={`fixed md:relative inset-y-0 right-0 z-40 transform transition-transform duration-300 ${asideOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 h-[calc(100vh-105px)] md:h-auto`}>
+        <div className="relative shrink-0 border-l border-[color:var(--border-subtle)] flex flex-col w-80">
           <Aside
             projectId={projectId}
             rubric={rubric}

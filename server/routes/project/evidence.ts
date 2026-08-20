@@ -40,16 +40,17 @@ function isValidLocator(value: unknown): value is EvidenceLocator {
   return EvidenceLocatorSchema.safeParse(value).success;
 }
 
-export function registerEvidenceRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
+export function evidenceRouter(projectLimit: express.RequestHandler): express.Router {
+  const router = express.Router({ mergeParams: true });
   const store = getSharedStore();
 
-  app.get("/api/projects/:id/evidence-ledger", projectLimit, asyncRoute(async (req, res) => {
+  router.get("/", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     res.json(record.evidenceLedger);
   }));
 
-  app.post("/api/projects/:id/evidence-ledger/sources", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/sources", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     if (!isValidManualSource(req.body)) {
@@ -76,7 +77,7 @@ export function registerEvidenceRoutes(app: express.Express, projectLimit: expre
     }
   }));
 
-  app.post("/api/projects/:id/evidence-ledger/discover", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/discover", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { query, via, domains } = req.body ?? {};
@@ -114,7 +115,7 @@ export function registerEvidenceRoutes(app: express.Express, projectLimit: expre
     res.json({ added, evidenceLedger: updated.evidenceLedger });
   }));
 
-  app.post("/api/projects/:id/evidence-ledger/sources/:sourceId/extract", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/sources/:sourceId/extract", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { quote, locator } = req.body ?? {};
@@ -139,7 +140,7 @@ export function registerEvidenceRoutes(app: express.Express, projectLimit: expre
     }
   }));
 
-  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/verify", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/items/:evidenceId/verify", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { actor } = req.body ?? {};
@@ -158,7 +159,7 @@ export function registerEvidenceRoutes(app: express.Express, projectLimit: expre
     }
   }));
 
-  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/propose", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/items/:evidenceId/propose", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { claimId, actor } = req.body ?? {};
@@ -183,7 +184,7 @@ export function registerEvidenceRoutes(app: express.Express, projectLimit: expre
     }
   }));
 
-  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/approve", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/items/:evidenceId/approve", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { actor, strength, rationale } = req.body ?? {};
@@ -237,7 +238,7 @@ export function registerEvidenceRoutes(app: express.Express, projectLimit: expre
     }
   }));
 
-  app.post("/api/projects/:id/evidence-ledger/items/:evidenceId/reject", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/items/:evidenceId/reject", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { actor, reason } = req.body ?? {};
@@ -262,7 +263,7 @@ export function registerEvidenceRoutes(app: express.Express, projectLimit: expre
     }
   }));
 
-  app.post("/api/projects/:id/gates/G2/accept-smaller-corpus", projectLimit, asyncRoute(async (req, res) => {
+  router.post("/api/projects/:id/gates/G2/accept-smaller-corpus", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     const { reason, actor } = req.body ?? {};
@@ -277,4 +278,5 @@ export function registerEvidenceRoutes(app: express.Express, projectLimit: expre
     const updated = await store.save({ ...record, sourceCountOverride, gates });
     res.json(projectView(updated));
   }));
+  return router;
 }

@@ -4,7 +4,7 @@
 -- Project Activity Table
 CREATE TABLE IF NOT EXISTS public.project_activity (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES public.projects(project_id) ON DELETE CASCADE,
     event_type TEXT NOT NULL, -- e.g., 'stage_advanced', 'agent_run', 'file_uploaded'
     description TEXT NOT NULL,
     metadata JSONB DEFAULT '{}'::jsonb,
@@ -17,7 +17,7 @@ CREATE INDEX IF NOT EXISTS idx_project_activity_project_id_created_at ON public.
 -- Project Files Table
 CREATE TABLE IF NOT EXISTS public.project_files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES public.projects(project_id) ON DELETE CASCADE,
     filename TEXT NOT NULL,
     storage_path TEXT NOT NULL,
     size_bytes BIGINT NOT NULL,
@@ -38,7 +38,7 @@ CREATE POLICY "Users can view activity for their projects" ON public.project_act
     FOR SELECT
     USING (
         project_id IN (
-            SELECT id FROM public.projects WHERE user_id = auth.uid()
+            SELECT project_id FROM public.projects WHERE owner_id = auth.uid()
         )
     );
 
@@ -46,7 +46,7 @@ CREATE POLICY "Users can view files for their projects" ON public.project_files
     FOR SELECT
     USING (
         project_id IN (
-            SELECT id FROM public.projects WHERE user_id = auth.uid()
+            SELECT project_id FROM public.projects WHERE owner_id = auth.uid()
         )
     );
 
@@ -54,6 +54,6 @@ CREATE POLICY "Users can insert files for their projects" ON public.project_file
     FOR INSERT
     WITH CHECK (
         project_id IN (
-            SELECT id FROM public.projects WHERE user_id = auth.uid()
+            SELECT project_id FROM public.projects WHERE owner_id = auth.uid()
         )
     );

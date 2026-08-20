@@ -7,6 +7,7 @@ import { ResearchProvider, useResearchWorkspace } from "./ResearchContext";
 import { StageRegistry } from "./StageRegistry";
 import PlaceholderStage from "./stages/PlaceholderStage";
 import { useAiAccess } from "../aiAccess/useAiAccess";
+import Tray from "../regions/Tray";
 
 function ResearchWorkspaceInner({
   onClose,
@@ -32,12 +33,15 @@ function ResearchWorkspaceInner({
     isLoading,
     manualModelOverride,
     setManualModelOverride,
+    chapterId,
+    setChapterId,
   } = useResearchWorkspace();
 
   const { connected } = useAiAccess();
 
   const [contextPanelOpen, setContextPanelOpen] = useState(true);
   const [stageNavOpen, setStageNavOpen] = useState(false);
+  const [trayOpen, setTrayOpen] = useState(false);
 
   if (error) {
     return (
@@ -92,17 +96,6 @@ function ResearchWorkspaceInner({
                 </svg>
               </button>
             )}
-            
-            {/* Mobile Hamburger Menu */}
-            <button
-              type="button"
-              onClick={() => setStageNavOpen(!stageNavOpen)}
-              className="md:hidden shrink-0 rounded-[var(--radius-sm)] p-2 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
             <ScholarCoreLogo size="sm" withText className="text-[color:var(--text-primary)]" />
             <div className="w-px h-5 bg-[color:var(--border-subtle)] mx-1" />
             <div className="min-w-0">
@@ -116,6 +109,27 @@ function ResearchWorkspaceInner({
           </div>
 
           <div className="flex items-center gap-2">
+            {outputType?.workflowVariant === "long_form_chaptered" && (
+              <div className="hidden md:flex items-center gap-4 px-4 py-1.5 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-lg mr-2">
+                <div className="flex flex-col">
+                  <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Target Chapter</span>
+                  <select
+                    className="bg-transparent text-[11px] font-semibold text-[color:var(--text-primary)] border-none p-0 cursor-pointer focus:ring-0 outline-none w-32 truncate appearance-none hover:bg-[color:var(--surface-hover)] rounded px-1 -ml-1 mt-0.5"
+                    value={chapterId || "all"}
+                    onChange={(e) => setChapterId(e.target.value === "all" ? null : e.target.value)}
+                    title="Select a specific chapter to target"
+                  >
+                    <option value="all">Whole Document</option>
+                    {outputType?.structure.sections.find(s => s.children)?.children?.map(c => (
+                      <option key={c.key} value={c.key}>{c.title}</option>
+                    )) || outputType?.structure.sections.map(c => (
+                      <option key={c.key} value={c.key}>{c.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+            
             <div className="hidden md:flex items-center gap-4 px-4 py-1.5 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-lg mr-2">
               <div className="flex flex-col">
                 <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Active Model</span>
@@ -178,33 +192,14 @@ function ResearchWorkspaceInner({
                 Settings
               </button>
             )}
-
-            {/* Mobile Context Panel Toggle */}
-            <button
-              type="button"
-              onClick={() => setContextPanelOpen(!contextPanelOpen)}
-              className="md:hidden shrink-0 rounded-[var(--radius-sm)] p-2 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
           </div>
         </div>
       </header>
 
       {/* Three-zone workspace */}
       <div className="flex flex-1 min-h-0 relative">
-        {/* Mobile overlay for closing sidebars */}
-        {(stageNavOpen || (contextPanelOpen && window.innerWidth < 768)) && (
-          <div 
-            className="md:hidden fixed inset-0 bg-black/50 z-30" 
-            onClick={() => { setStageNavOpen(false); setContextPanelOpen(false); }}
-          />
-        )}
-        
         {/* Left: Stage Navigation */}
-        <div className={`fixed md:relative inset-y-0 left-0 z-40 transform transition-transform duration-300 ${stageNavOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 h-[calc(100vh-64px)] md:h-auto`}>
+        <div className="relative shrink-0 border-r border-[color:var(--border-subtle)] flex flex-col z-40">
           <StageNavigation
             currentStage={currentStage}
             stageStatuses={stageStatuses}
@@ -233,14 +228,18 @@ function ResearchWorkspaceInner({
         </div>
 
         {/* Right: Context Panel */}
-        <div className={`fixed md:relative inset-y-0 right-0 z-40 transform transition-transform duration-300 ${contextPanelOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 h-[calc(100vh-64px)] md:h-auto`}>
+        {contextPanelOpen && (
+          <div className="relative shrink-0 border-l border-[color:var(--border-subtle)] flex flex-col w-80 z-40">
           <ContextPanel
             currentStage={currentStage}
             isOpen={contextPanelOpen}
             onToggle={() => setContextPanelOpen(!contextPanelOpen)}
           />
         </div>
+        )}
       </div>
+
+      {trayOpen && <Tray projectId={projectId} onClose={() => setTrayOpen(false)} />}
 
       {/* Status bar */}
       <div className="shrink-0 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-1.5 flex items-center justify-between text-[10px] text-[color:var(--text-muted)]">
@@ -252,6 +251,12 @@ function ResearchWorkspaceInner({
         <div className="flex items-center gap-4">
           <span>Intake: {Math.round(project.intakeCompleteness * 100)}%</span>
           {project.hasDocument && <span>Draft: ready</span>}
+          <button 
+            onClick={() => setTrayOpen(!trayOpen)}
+            className="ml-2 hover:text-[color:var(--text-primary)] transition-colors px-2 py-0.5 rounded bg-[color:var(--surface-hover)]"
+          >
+            {trayOpen ? "Close Tray" : "Open Tray"}
+          </button>
         </div>
       </div>
     </div>

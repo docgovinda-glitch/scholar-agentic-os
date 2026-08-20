@@ -122,14 +122,15 @@ export async function authedStreamFetch(input: string, method: string, body: unk
         });
         // We simulate the backend's post-processing by parsing here
         let parsed;
+        const textResult = finalResult as string;
         try {
-          parsed = JSON.parse(finalResult);
+          parsed = JSON.parse(textResult);
         } catch(e) {
           // try removing markdown ticks if present
           try {
-            parsed = JSON.parse(finalResult.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim());
+            parsed = JSON.parse(textResult.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim());
           } catch(e2) {
-            throw new Error("Invalid JSON from LLM: " + finalResult);
+            throw new Error("Invalid JSON from LLM: " + textResult);
           }
         }
         // Then we POST it back to let the backend do its DB updates
@@ -262,13 +263,12 @@ async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskT
 
   if (onChunk) {
     let full = "";
-    const iter = await streamWithFailover(req, { candidates });
-    for await (const chunk of iter) {
-      if (!chunk.ok) {
-        throw new Error("Agentic generation failed: " + chunk.error?.message);
-      }
-      full += chunk.value;
-      onChunk(chunk.value);
+    const result = await streamWithFailover(req, (chunk) => {
+      full += chunk;
+      onChunk(chunk);
+    }, { candidates });
+    if (!result.ok) {
+      throw new Error("Agentic generation failed: " + (result as any).error?.message);
     }
     return full;
   } else {

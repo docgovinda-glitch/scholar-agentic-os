@@ -3,6 +3,7 @@ import { getOutputTypeSpec } from "../api";
 import type { CanonicalDocument, SectionSpec } from "../types";
 import ProjectFilesPanel from "./ProjectFilesPanel";
 import ProjectVaultPanel from "./ProjectVaultPanel";
+import ProjectSourcesPanel from "./ProjectSourcesPanel";
 
 const HEADING_KINDS = new Set(["heading1", "heading2", "heading3"]);
 
@@ -97,15 +98,13 @@ export default function Rail({
               <PlannedStructureList sections={plannedSections} />
             </>
           )
+        ) : tab === "sources" ? (
+          <ProjectSourcesPanel />
         ) : tab === "files" ? (
           <ProjectFilesPanel projectId={projectId} />
         ) : tab === "vault" ? (
-          <ProjectVaultPanel />
-        ) : (
-          <p className="text-xs text-[color:var(--text-muted)] p-2">
-            Not yet built — {TABS.find((t) => t.id === tab)?.label} needs {tab === "sources" ? "the Corpus API" : tab === "vault" ? "a way to search your Vault from inside a project" : "project file attachments"}, none of which exist yet.
-          </p>
-        )}
+          <ProjectVaultPanel projectId={projectId} onJumpToBlock={onJumpToBlock} />
+        ) : null}
       </div>
     </nav>
   );

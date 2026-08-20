@@ -1,6 +1,6 @@
 import express from "express";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText, streamOpenRouterJSON } from "../../utils/llm.ts";
+import { callOpenRouterJSON, callOpenRouterText, streamOpenRouterJSON, streamOpenRouterText } from "../../utils/llm.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../../src/supabaseRest.ts";
 
 const router = express.Router({ mergeParams: true });
@@ -63,7 +63,15 @@ CRITICAL INSTRUCTION: Generate exactly 15 highly relevant sources. Do not halluc
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
+          if (!res.headersSent) {
       res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
     } else {
       res.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
       res.end();
@@ -97,7 +105,8 @@ Make sure every single gap explicitly mentions concepts from the working title.`
     const workingTitle = project.answers["working_title"] || "Untitled Research";
     const researchArea = project.answers["research_area"] || "the field";
     const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "simple");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "simple");
+    if (!result) return;
     
     // Insert into Supabase
     const config = getSupabaseRestConfig();
@@ -118,10 +127,19 @@ Make sure every single gap explicitly mentions concepts from the working title.`
       }
     }
     
-    res.json({ ok: true, data: result.data });
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -146,7 +164,8 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "simple");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "simple");
+    if (!result) return;
     
     // Insert into Supabase
     const config = getSupabaseRestConfig();
@@ -190,10 +209,19 @@ Return ONLY valid JSON in this exact format:
       }
     }
     
-    res.json({ ok: true, data: result.data });
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -219,7 +247,8 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    if (!result) return;
     
     // Insert into Supabase
     const config = getSupabaseRestConfig();
@@ -239,10 +268,19 @@ Return ONLY valid JSON in this exact format:
       }
     }
     
-    res.json({ ok: true, data: result.data });
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -302,7 +340,8 @@ Return ONLY valid JSON in this exact format:
     }
 
     const finalContext = ragContext ? `Top Matched Vault Sources:\n\n${ragContext}` : `Context: ${context}`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, finalContext);
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, finalContext);
+    if (!result) return;
     
     // Update into Supabase
     const config = getSupabaseRestConfig();
@@ -346,10 +385,19 @@ Return ONLY valid JSON in this exact format:
       }
     }
     
-    res.json({ ok: true, data: result.data });
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -378,11 +426,21 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
-    res.json({ ok: true, data: result.data });
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    if (!result) return;
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -410,11 +468,21 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
-    res.json({ ok: true, data: result.data });
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    if (!result) return;
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -433,11 +501,21 @@ Return ONLY valid JSON in this exact format:
     { "title": "...", "matchScore": 95, "impactFactor": 3.5, "openAccess": true }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
-    res.json({ ok: true, data: result.data });
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    if (!result) return;
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -459,11 +537,21 @@ Return ONLY valid JSON in this exact format:
     "formatting_rules": ["Double spaced", "12pt Times New Roman"]
   }
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "simple");
-    res.json({ ok: true, data: result.data });
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "simple");
+    if (!result) return;
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -473,9 +561,12 @@ router.post("/draft", async (req: express.Request<{ id: string }>, res) => {
   if (!project) return;
   const context = JSON.stringify(project.answers);
 
+  const chapterId = req.body.chapterId;
+  const targetChapterMsg = chapterId ? `\nTarget ONLY the chapter with key "${chapterId}".` : "";
+
   try {
     const systemPrompt = `You are an expert academic writer.
-Based on the provided research context, write a complete, high-quality first draft of the manuscript.
+Based on the provided research context, write a complete, high-quality first draft of the manuscript.${targetChapterMsg}
 Return ONLY valid JSON in this exact format:
 {
   "data": [
@@ -485,11 +576,21 @@ Return ONLY valid JSON in this exact format:
     { "section": "Conclusion", "status": "Drafted", "length": 800, "content": "..." }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "long-context");
-    res.json({ ok: true, data: result.data });
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}\nChapter ID to target: ${chapterId || "all"}`, "openrouter/auto", "long-context");
+    if (!result) return;
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -508,11 +609,21 @@ Return ONLY valid JSON in this exact format:
     { "lens": "Methodological Rigor", "feedback": "...", "severity": "Moderate" }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "long-context");
-    res.json({ ok: true, data: result.data });
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "long-context");
+    if (!result) return;
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -533,11 +644,21 @@ Return ONLY valid JSON in this exact format:
     { "section": "Methodology", "find": "exact old sentence or paragraph to replace", "replace": "the new revised text" }
   ]
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "reasoning");
-    res.json({ ok: true, data: result.data });
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "reasoning");
+    if (!result) return;
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -563,11 +684,21 @@ Return ONLY valid JSON in this exact format:
   ]
 }
 Use 'verified' or 'flagged' for the status.`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
-    res.json({ ok: true, data: result.data });
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    if (!result) return;
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -596,11 +727,21 @@ Return ONLY valid JSON in this exact format:
     ]
   }
 }`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
-    res.json({ ok: true, data: result.data });
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    if (!result) return;
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -629,7 +770,15 @@ router.post("/draft-preview", async (req: express.Request<{ id: string }>, res) 
     res.json({ ok: true, data: { content, pages, status: "Ready" }});
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 router.post("/publication-readiness", async (req: express.Request<{ id: string }>, res) => {
@@ -698,11 +847,21 @@ Answer the user's question concisely. Be highly academic and professional. Use m
     }
     userPrompt += message;
 
-    const result = await callOpenRouterText(req, res, systemPrompt, userPrompt);
-    res.json({ ok: true, response: result });
+    const result = await streamOpenRouterText(req, res, systemPrompt, userPrompt);
+    if (!result) return;
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, response: result })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -760,10 +919,19 @@ router.put("/manuscript", async (req, res) => {
         })
       });
     }
-    res.json({ ok: true });
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -777,10 +945,19 @@ router.put("/evidence", async (req, res) => {
     const table = new SupabaseTable(config, "project_evidence");
     // Implementation for explicit evidence update if needed
     // ...
-    res.json({ ok: true });
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -797,10 +974,19 @@ router.put("/critiques/:critiqueId/waive", async (req, res) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ waived: true })
     });
-    res.json({ ok: true });
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -812,7 +998,8 @@ router.get("/manuscript", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const config = getSupabaseRestConfig();
-  if (!config) return res.json({ ok: true, data: [] });
+  if (!config) return res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: [] })}\n\n`);
+    res.end();
   try {
     
     const table = new SupabaseTable(config, "manuscript_sections");
@@ -839,10 +1026,19 @@ router.get("/manuscript", async (req, res) => {
     }
 
     const data = await table.request(`?project_id=eq.${project.projectId}`);
-    res.json({ ok: true, data });
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -850,14 +1046,24 @@ router.get("/evidence", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const config = getSupabaseRestConfig();
-  if (!config) return res.json({ ok: true, data: [] });
+  if (!config) return res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: [] })}\n\n`);
+    res.end();
   try {
     const table = new SupabaseTable(config, "project_evidence");
     const data = await table.request(`?project_id=eq.${project.projectId}`);
-    res.json({ ok: true, data });
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });
 
@@ -865,13 +1071,23 @@ router.get("/critiques", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const config = getSupabaseRestConfig();
-  if (!config) return res.json({ ok: true, data: [] });
+  if (!config) return res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: [] })}\n\n`);
+    res.end();
   try {
     const table = new SupabaseTable(config, "peer_review_critiques");
     const data = await table.request(`?project_id=eq.${project.projectId}`);
-    res.json({ ok: true, data });
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data })}\n\n`);
+    res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error
+data: ${JSON.stringify({ message: err.message })}
+
+`);
+      res.end();
+    }
   }
 });

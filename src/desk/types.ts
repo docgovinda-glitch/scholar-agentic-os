@@ -372,6 +372,7 @@ export interface OutputTypeSpec {
   id: string;
   label: string;
   family: string;
+  workflowVariant?: string;
   intakeSchema: {
     required: IntakeField[];
     recommended: IntakeField[];

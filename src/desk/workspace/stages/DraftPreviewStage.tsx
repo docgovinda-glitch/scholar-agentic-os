@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedJsonFetch } from "../../api";
+import { authedJsonFetch, authedStreamFetch } from "../../api";
 
 export default function DraftPreviewStage({
   stage,
@@ -76,7 +76,6 @@ export default function DraftPreviewStage({
         },
       ]);
     } finally {
-      clearInterval(logInterval);
       setIsProcessing(false);
     }
   };

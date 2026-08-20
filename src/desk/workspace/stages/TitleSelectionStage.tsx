@@ -3,7 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedJsonFetch, saveIntakeAnswers } from "../../api";
+import { authedJsonFetch, saveIntakeAnswers , authedStreamFetch} from "../../api";
 
 interface TitleItem {
   id: string;
@@ -83,18 +83,41 @@ export default function TitleSelectionStage({
       }, 900);
 
       try {
-        const response = await authedJsonFetch(`/api/projects/${projectId}/agent/titles`, "POST", {});
-        const resJson = await response.json();
+        await authedStreamFetch(
+          `/api/projects/${projectId}/agent/titles`,
+          "POST",
+          {},
+          (event, eventData) => {
+            if (!active) return;
+            if (event === "log") {
+              setLogs((prev) => [
+                ...prev,
+                {
+                  id: Date.now().toString() + Math.random(),
+                  timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                  level: "info",
+                  message: eventData.message,
+                },
+              ]);
+            } else if (event === "chunk") {
+              setLogs((prev) => {
+                const last = prev[prev.length - 1];
+                if (last && last.message.startsWith("> Agent Reasoning")) return prev;
+                return [
+                  ...prev,
+                  {
+                    id: Date.now().toString() + Math.random(),
+                    timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                    level: "info",
+                    message: "> Agent Reasoning [streaming JSON output]...",
+                  }
+                ];
+              });
+            } else if (event === "done") {
+              // wait for animations
         
-        if (!response.ok) {
-          throw new Error(resJson.error || "Agent encountered an error during title generation.");
-        }
-        
-        await new Promise(r => setTimeout(r, 5500)); // wait for animations
-        
-        if (!active) return;
-        const { data } = resJson;
-        setResults(data);
+        const data = eventData.data;
+setResults(data);
         setLogs((prev) => [
           ...prev,
           {
@@ -104,6 +127,11 @@ export default function TitleSelectionStage({
             message: `✓ ✦ Generated from your selected research gap`,
           },
         ]);
+            } else if (event === "error") {
+              throw new Error(eventData.message || "Agent encountered an error.");
+            }
+          }
+        );
       } catch (err: any) {
         if (!active) return;
         setError(err.message);
@@ -118,7 +146,6 @@ export default function TitleSelectionStage({
         ]);
       } finally {
         if (active) {
-          clearInterval(logInterval);
           setIsProcessing(false);
         }
       }

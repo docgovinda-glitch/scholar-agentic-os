@@ -38,6 +38,27 @@ export function bindEvidence(graph: ClaimEvidenceGraph, binding: ClaimEvidenceBi
   return { ...graph, bindings: [...graph.bindings, binding] };
 }
 
+export function updateClaim(graph: ClaimEvidenceGraph, claimId: string, updates: Partial<Omit<Claim, "id">>): ClaimEvidenceGraph {
+  if (!graph.claims.some((c) => c.id === claimId)) {
+    throw new ClaimGraphError(`Claim "${claimId}" does not exist in the graph.`);
+  }
+  return {
+    ...graph,
+    claims: graph.claims.map((c) => (c.id === claimId ? { ...c, ...updates } : c)),
+  };
+}
+
+export function updateBinding(graph: ClaimEvidenceGraph, bindingId: string, updates: Partial<Omit<ClaimEvidenceBinding, "id">>): ClaimEvidenceGraph {
+  if (!graph.bindings.some((b) => b.id === bindingId)) {
+    throw new ClaimGraphError(`Binding "${bindingId}" does not exist in the graph.`);
+  }
+  return {
+    ...graph,
+    bindings: graph.bindings.map((b) => (b.id === bindingId ? { ...b, ...updates } : b)),
+  };
+}
+
+
 /**
  * Remove a source from the graph: every binding loses any evidence spans
  * pointing at it, and any binding left with zero evidence is dropped

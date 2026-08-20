@@ -8,10 +8,11 @@ import { catalog } from "../../../src/app/atlas/atlas.ts";
  * Guidelines (word limits, section requirements, citation styles) that were 
  * captured during Phase 1. 
  */
-export function registerJournalComplianceRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
+export function journalComplianceRouter(projectLimit: express.RequestHandler): express.Router {
+  const router = express.Router({ mergeParams: true });
   const store = getSharedStore();
 
-  app.get("/api/projects/:id/journal-compliance-report", projectLimit, asyncRoute(async (req, res) => {
+  router.get("/api/projects/:id/journal-compliance-report", projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
 
@@ -35,4 +36,5 @@ export function registerJournalComplianceRoutes(app: express.Express, projectLim
     
     res.json({ report });
   }));
+  return router;
 }

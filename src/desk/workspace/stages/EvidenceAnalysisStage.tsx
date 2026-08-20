@@ -3,7 +3,7 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedJsonFetch, saveIntakeAnswers } from "../../api";
+import { authedJsonFetch, saveIntakeAnswers , authedStreamFetch} from "../../api";
 
 interface ArgumentMatrixRow {
   id: string;
@@ -115,7 +115,6 @@ export default function EvidenceAnalysisStage({
         },
       ]);
     } finally {
-      clearInterval(logInterval);
       setIsProcessing(false);
     }
   };

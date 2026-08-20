@@ -20,6 +20,8 @@ interface ResearchContextValue {
   isLoading: boolean;
   manualModelOverride: { providerId: string; modelId?: string } | null;
   setManualModelOverride: (override: { providerId: string; modelId?: string } | null) => void;
+  chapterId: string | null;
+  setChapterId: (id: string | null) => void;
 }
 
 const ResearchContext = createContext<ResearchContextValue | null>(null);
@@ -126,6 +128,8 @@ export function ResearchProvider({
     onStageChangeCallback(nextStage);
   }, [onStageChangeCallback]);
 
+  const [chapterId, setChapterId] = useState<string | null>(null);
+
   const value: ResearchContextValue = {
     projectId,
     project,
@@ -141,6 +145,8 @@ export function ResearchProvider({
     isLoading,
     manualModelOverride,
     setManualModelOverride,
+    chapterId,
+    setChapterId,
   };
 
   return (
