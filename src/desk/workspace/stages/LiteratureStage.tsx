@@ -177,34 +177,34 @@ export default function LiteratureStage({
           </div>
           
           {/* Research Snapshot */}
-          <div className="bg-[#121110] border border-[#3E3A35] rounded-xl p-5 shadow-xl font-mono text-[13px] text-[#F4F2EE]">
-            <h3 className="text-[#B6B0A6] font-bold mb-4 tracking-wider uppercase text-[11px] border-b border-[#3E3A35] pb-2">Research Snapshot</h3>
+          <div className="bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-xl p-5 shadow-xl font-mono text-[13px] text-[color:var(--text-primary)]">
+            <h3 className="text-[color:var(--text-secondary)] font-bold mb-4 tracking-wider uppercase text-[11px] border-b border-[color:var(--border-subtle)] pb-2">Research Snapshot</h3>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-[#9C958B]">Sources discovered:</span>
+                <span className="text-[color:var(--text-muted)]">Sources discovered:</span>
                 <span className="text-emerald-400 font-bold">{sourcesDiscovered > 0 ? sourcesDiscovered : '-'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#9C958B]">Sources shortlisted:</span>
+                <span className="text-[color:var(--text-muted)]">Sources shortlisted:</span>
                 <span className="text-emerald-400 font-bold">{sourcesShortlisted > 0 ? sourcesShortlisted : '-'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#9C958B]">Thematic clusters:</span>
+                <span className="text-[color:var(--text-muted)]">Thematic clusters:</span>
                 <span className="text-indigo-400 font-bold">{thematicClusters > 0 ? thematicClusters : '-'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#9C958B]">Recurring concepts:</span>
+                <span className="text-[color:var(--text-muted)]">Recurring concepts:</span>
                 <span className="text-indigo-400 font-bold">{thematicClusters > 0 ? 14 : '-'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#9C958B]">Methodological patterns:</span>
+                <span className="text-[color:var(--text-muted)]">Methodological patterns:</span>
                 <span className="text-amber-400 font-bold">{thematicClusters > 0 ? 6 : '-'}</span>
               </div>
             </div>
 
             {thematicClusters > 0 && (
-              <div className="mt-6 pt-4 border-t border-[#3E3A35]">
-                <h4 className="text-[#9C958B] text-[10px] uppercase mb-2">Currently Investigating</h4>
+              <div className="mt-6 pt-4 border-t border-[color:var(--border-subtle)]">
+                <h4 className="text-[color:var(--text-muted)] text-[10px] uppercase mb-2">Currently Investigating</h4>
                 <div className="text-indigo-300 font-semibold bg-indigo-950/30 border border-indigo-500/20 px-3 py-2 rounded">
                   "ritual practice" ↔ "regional variation"
                 </div>

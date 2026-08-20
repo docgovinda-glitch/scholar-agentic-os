@@ -33,19 +33,19 @@ export default function AgentTerminal({
   };
 
   return (
-    <div className="flex flex-col bg-[#121110] rounded-xl border border-[#3E3A35] overflow-hidden shadow-2xl h-[360px] w-full font-mono text-[13px] text-[#F4F2EE] relative">
+    <div className="flex flex-col bg-[color:var(--surface-sunken)] rounded-xl border border-[color:var(--border-subtle)] overflow-hidden shadow-2xl h-[360px] w-full font-mono text-[13px] text-[color:var(--text-primary)] relative">
       {/* Subtle glowing accent line */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent"></div>
       
       {/* Terminal Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[#191816]/80 border-b border-[#3E3A35] backdrop-blur-sm">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-[color:var(--surface-raised)]/80 border-b border-[color:var(--border-subtle)] backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <div className="flex gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
             <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
             <div className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
           </div>
-          <span className="font-bold text-[#B6B0A6] tracking-wider text-[10px] uppercase">Scholar_Core / Research_Pipeline / {agentName.replace(/\s+/g, '_')}</span>
+          <span className="font-bold text-[color:var(--text-secondary)] tracking-wider text-[10px] uppercase">Scholar_Core / Research_Pipeline / {agentName.replace(/\s+/g, '_')}</span>
         </div>
         <div className="flex items-center gap-2">
           {isProcessing && (
@@ -64,11 +64,11 @@ export default function AgentTerminal({
         className="flex-1 overflow-y-auto p-4 space-y-1"
       >
         {logs.length === 0 ? (
-          <div className="text-[#9C958B] italic">Awaiting instructions...</div>
+          <div className="text-[color:var(--text-muted)] italic">Awaiting instructions...</div>
         ) : (
           logs.map((log) => (
             <div key={log.id} className="flex gap-3 items-start group">
-              <span className="shrink-0 text-[#9C958B]">[{log.timestamp}]</span>
+              <span className="shrink-0 text-[color:var(--text-muted)]">[{log.timestamp}]</span>
               <span className="shrink-0 select-none">
                 {log.level === "info" && <span className="text-indigo-400 font-bold">{">"}</span>}
                 {log.level === "action" && <span className="text-blue-400 font-bold">{">"}</span>}
@@ -77,7 +77,7 @@ export default function AgentTerminal({
                 {log.level === "error" && <span className="text-red-400 font-bold">{"✕"}</span>}
               </span>
               <span className={`break-words ${
-                log.level === "action" ? "text-[#F4F2EE]" :
+                log.level === "action" ? "text-[color:var(--text-primary)]" :
                 log.level === "success" ? "text-emerald-300 font-semibold" :
                 log.level === "error" ? "text-red-400 font-semibold" :
                 log.level === "warning" ? "text-amber-300" :
@@ -90,7 +90,7 @@ export default function AgentTerminal({
         )}
         {isProcessing && (
           <div className="flex gap-3 items-center mt-2 opacity-70">
-            <span className="shrink-0 text-[#9C958B] opacity-0">[00:00:00]</span>
+            <span className="shrink-0 text-[color:var(--text-muted)] opacity-0">[00:00:00]</span>
             <span className="text-indigo-400 font-bold">{">"}</span>
             <span className="w-2 h-4 bg-indigo-400 animate-pulse" />
           </div>

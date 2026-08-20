@@ -215,6 +215,8 @@ app.use(
           "https://api.worldbank.org",
           "https://sdmx.oecd.org",
           "https://challenges.cloudflare.com",
+          "https://fonts.googleapis.com",
+          "https://fonts.gstatic.com",
         ],
         // CaptchaWidget (src/desk/auth/CaptchaWidget.tsx) injects Cloudflare
         // Turnstile's script tag at runtime and Turnstile renders its
