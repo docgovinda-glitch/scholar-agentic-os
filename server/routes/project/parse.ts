@@ -1,8 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+import * as pdfParseModule from "pdf-parse";
+const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 import mammoth from "mammoth";
 
 const parseRouter = Router({ mergeParams: true });
