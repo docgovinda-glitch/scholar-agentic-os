@@ -3,7 +3,7 @@ import { getProfile, saveProfileFields, updatePassword, type ProfileFields } fro
 import { getAiAccessStatus } from "../aiAccess/aiAccessApi";
 import { EDUCATION_LEVELS, USER_TYPES } from "../../config/accountSchema";
 import { Field, PhoneField, SelectField } from "../auth/AuthLayout";
-import { e164Problem } from "../../config/countries";
+import { e164Problem, DEFAULT_COUNTRY_ISO2, findCountry } from "../../config/countries";
 
 /**
  * Account Settings — profile and account-level details only.
@@ -70,7 +70,7 @@ export default function AccountSettingsScreen({
         if (result.success) {
           setProfile(result.profile);
           setFullName(result.profile.fullName);
-          setPhoneCountryCode(result.profile.phoneCountryCode);
+          setPhoneCountryCode(result.profile.phoneCountryCode || findCountry(DEFAULT_COUNTRY_ISO2)?.dialCode || "+977");
           setPhone(result.profile.phone);
           setAffiliation(result.profile.affiliation);
           setUserType(result.profile.userType);

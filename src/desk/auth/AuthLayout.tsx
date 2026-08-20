@@ -306,6 +306,7 @@ export function PhoneField({
           onChange={(e) => onCountryCodeChange(e.target.value.split(":")[1] ?? e.target.value)}
           className="w-28 shrink-0 px-2 py-2 text-sm"
         >
+          <option value="" disabled>Code</option>
           {COUNTRIES.map((c) => (
             <option key={c.iso2} value={`${c.iso2}:${c.dialCode}`}>
               {c.flag} {c.dialCode}
