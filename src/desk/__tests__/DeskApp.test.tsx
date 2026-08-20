@@ -106,7 +106,7 @@ const projectView = (projectId: string, over: Record<string, unknown> = {}) => (
   answers: {},
   intakeCompleteness: 0,
   hasDocument: false,
-  gates: [{ gate: "G0", name: "Intake", status: "not_started", outstandingBlocking: [] }],
+  gates: [{ gate: "G0", name: "Definition", status: "not_started", outstandingBlocking: [] }],
   ...over,
 });
 
@@ -130,7 +130,7 @@ describe("Desk — project list", () => {
 
     renderDeskApp();
 
-    expect(await screen.findByText("No projects yet")).toBeInTheDocument();
+    expect(await screen.findByText("Initialize your first project")).toBeInTheDocument();
   });
 
   it("lists the user's own projects and opens one", async () => {
@@ -144,13 +144,14 @@ describe("Desk — project list", () => {
 
     renderDeskApp();
 
-    expect(await screen.findByText(/50% of intake answered/)).toBeInTheDocument();
+    expect(await screen.findByText("Pipeline Completeness")).toBeInTheDocument();
+    expect(screen.getByText("50%")).toBeInTheDocument();
     fireEvent.click(screen.getByText("OT-06"));
 
     // The shell opens on Intake while G0 is outstanding — that is the first
     // real task, and it gates every later gate.
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
-    expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Draft your Manuscript" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/projects/proj-abc/document");
   });
 
@@ -166,12 +167,12 @@ describe("Desk — project list", () => {
 
     renderDeskApp();
 
-    fireEvent.click(await screen.findByText("Create your first project"));
-    fireEvent.change(await screen.findByLabelText("Document type"), { target: { value: "OT-06" } });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(await screen.findByText("New Project"));
+    fireEvent.change(await screen.findByLabelText("Target Publication Type"), { target: { value: "OT-06" } });
+    fireEvent.click(screen.getByRole("button", { name: "Boot Workspace" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
-    expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Draft your Manuscript" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/projects/proj-new/document");
   });
 });
@@ -189,7 +190,7 @@ describe("Desk — project shell", () => {
 
     renderDeskApp();
 
-    expect(await screen.findByText(/About your journal article/i)).toBeInTheDocument();
+    expect(await screen.findByText("Research Definition")).toBeInTheDocument();
   });
 
   it("gives each tab its own URL, so Back steps back through tabs and refresh keeps you on the one you had open", async () => {
@@ -203,17 +204,17 @@ describe("Desk — project shell", () => {
 
     renderDeskApp();
 
-    // G0 isn't signed off in this fixture, so the shell auto-decides Intake
+    // G0 isn't signed off in this fixture, so the shell auto-decides Definition
     // and replaces the bare /projects/proj-42 URL with it — not a real
     // navigation the user took, so it must not be a Back-able entry itself.
-    await waitFor(() => expect(window.location.pathname).toBe("/projects/proj-42/intake"));
+    await waitFor(() => expect(window.location.pathname).toBe("/projects/proj-42/definition"));
 
     fireEvent.click(await screen.findByRole("button", { name: "Document" }));
-    expect(await screen.findByRole("heading", { name: "No document submitted yet" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Draft your Manuscript" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/projects/proj-42/document");
 
     window.history.back();
-    await waitFor(() => expect(window.location.pathname).toBe("/projects/proj-42/intake"));
+    await waitFor(() => expect(window.location.pathname).toBe("/projects/proj-42/definition"));
 
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe("/projects"));
@@ -228,7 +229,7 @@ describe("Desk — project shell", () => {
         url: /\/api\/projects\/proj-42$/,
         body: projectView("proj-42", {
           intakeCompleteness: 0.5,
-          gates: [{ gate: "G0", name: "Intake", status: "in_progress", outstandingBlocking: ["Title required"] }],
+          gates: [{ gate: "G0", name: "Definition", status: "in_progress", outstandingBlocking: ["Title required"] }],
         }),
       },
       { url: /\/api\/projects\/proj-42\/rubric$/, body: {}, status: 404 },
@@ -238,7 +239,7 @@ describe("Desk — project shell", () => {
     renderDeskApp();
 
     expect(await screen.findByText("Journal Article")).toBeInTheDocument();
-    expect(screen.getByText(/G0 Intake/)).toBeInTheDocument();
+    expect(screen.getByText(/G0 Definition/)).toBeInTheDocument();
     expect(screen.getByText(/1 blocking/)).toBeInTheDocument();
   });
 
@@ -336,11 +337,12 @@ describe("Desk — account settings", () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
     renderDeskApp();
 
-    fireEvent.click(await screen.findByRole("button", { name: /Account Settings/ }));
+    const settingsBtns = await screen.findAllByRole("button", { name: "Settings" });
+    fireEvent.click(settingsBtns[0]);
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(await screen.findByText("No projects yet")).toBeInTheDocument();
+    expect(await screen.findByText("Initialize your first project")).toBeInTheDocument();
   });
 
   it("opens from within a project and returns to it, not to the list", async () => {
@@ -359,7 +361,7 @@ describe("Desk — account settings", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(await screen.findByText("Journal Article")).toBeInTheDocument();
-    // Not just the project — the exact tab it was opened from (Intake, here:
+    // Not just the project — the exact tab it was opened from (Definition, here:
     // G0 isn't signed off in this fixture, so that's the auto-decided tab).
     expect(window.location.pathname).toBe("/projects/proj-42/definition");
   });
@@ -386,7 +388,7 @@ describe("Desk — AI Access", () => {
     expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(await screen.findByText("No projects yet")).toBeInTheDocument();
+    expect(await screen.findByText("Initialize your first project")).toBeInTheDocument();
   });
 
   it("reflects the active section in the URL, so Back steps back through sections instead of leaving AI Access entirely", async () => {

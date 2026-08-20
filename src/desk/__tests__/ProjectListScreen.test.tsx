@@ -40,45 +40,45 @@ async function openChooser() {
   listProjects.mockResolvedValue({ items: [] });
   listOutputTypes.mockResolvedValue({ items: TYPES });
   render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
-  fireEvent.click(await screen.findByText("Create your first project"));
-  await screen.findByLabelText("Document type");
+  fireEvent.click(await screen.findByText("New Project"));
+  await screen.findByLabelText("Target Publication Type");
 }
 
 describe("the document-type dropdown", () => {
   it("groups options by family instead of listing all 24 flat", async () => {
     await openChooser();
 
-    const select = screen.getByLabelText("Document type") as HTMLSelectElement;
+    const select = screen.getByLabelText("Target Publication Type") as HTMLSelectElement;
     const groupLabels = Array.from(select.querySelectorAll("optgroup")).map((g) => g.getAttribute("label"));
 
     // Two Publications-family entries collapse into one group, not two.
     expect(groupLabels.filter((l) => l === "Publications")).toHaveLength(1);
     expect(within(select).getByRole("option", { name: "Journal Article" })).toBeInTheDocument();
-    expect(within(select).getByRole("option", { name: "Review Article — Under maintenance" })).toBeInTheDocument();
+    expect(within(select).getByRole("option", { name: "Review Article (Maintenance)" })).toBeInTheDocument();
   });
 
   it("cannot continue before a type is chosen", async () => {
     await openChooser();
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Boot Workspace" })).toBeDisabled();
   });
 
   it("creates the project for the selected type only after Continue is pressed, not on selection alone", async () => {
     await openChooser();
     createProject.mockResolvedValue({ projectId: "proj-1" });
 
-    fireEvent.change(screen.getByLabelText("Document type"), { target: { value: "OT-06" } });
+    fireEvent.change(screen.getByLabelText("Target Publication Type"), { target: { value: "OT-06" } });
     expect(createProject).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Boot Workspace" })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Boot Workspace" }));
     expect(createProject).toHaveBeenCalledWith("OT-06");
   });
 
   it("shows every type, but disables the ones under maintenance with a common message rather than hiding them", async () => {
     await openChooser();
 
-    const select = screen.getByLabelText("Document type") as HTMLSelectElement;
-    const essay = within(select).getByRole("option", { name: "Essay — Under maintenance" }) as HTMLOptionElement;
+    const select = screen.getByLabelText("Target Publication Type") as HTMLSelectElement;
+    const essay = within(select).getByRole("option", { name: "Essay (Maintenance)" }) as HTMLOptionElement;
     expect(essay.disabled).toBe(true);
 
     const journalArticle = within(select).getByRole("option", { name: "Journal Article" }) as HTMLOptionElement;
@@ -93,7 +93,7 @@ describe("the Workshop welcome banner", () => {
     const onWelcomeSeen = vi.fn();
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={onWelcomeSeen} />);
 
-    expect(await screen.findByText("Welcome to Scholar Core")).toBeInTheDocument();
+    expect(await screen.findByText("Welcome to your Command Center")).toBeInTheDocument();
     expect(onWelcomeSeen).toHaveBeenCalled();
   });
 
@@ -101,18 +101,18 @@ describe("the Workshop welcome banner", () => {
     listProjects.mockResolvedValue({ items: [] });
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={vi.fn()} />);
 
-    const banner = await screen.findByText("Welcome to Scholar Core");
+    const banner = await screen.findByText("Welcome to your Command Center");
     expect(banner).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText("Welcome to Scholar Core")).not.toBeInTheDocument();
+    expect(screen.queryByText("Welcome to your Command Center")).not.toBeInTheDocument();
   });
 
   it("never shows for a returning user with nothing to welcome them to", async () => {
     listProjects.mockResolvedValue({ items: [] });
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
-    await screen.findByText("No projects yet");
-    expect(screen.queryByText("Welcome to Scholar Core")).not.toBeInTheDocument();
+    await screen.findByText("Initialize your first project");
+    expect(screen.queryByText("Welcome to your Command Center")).not.toBeInTheDocument();
   });
 });

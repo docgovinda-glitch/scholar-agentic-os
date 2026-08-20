@@ -53,11 +53,10 @@ export function ResearchProvider({
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [proj, rub, doc] = await Promise.all([
-        getProject(projectId),
-        getRubric(projectId),
-        getDocument(projectId),
-      ]);
+      const proj = await getProject(projectId);
+      const [rub, doc] = proj.hasDocument 
+        ? await Promise.all([getRubric(projectId), getDocument(projectId)])
+        : [null, null];
       setProject(proj);
       setDocument(doc);
       setRubric(rub);

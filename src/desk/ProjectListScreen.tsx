@@ -149,6 +149,7 @@ export default function ProjectListScreen({
               </div>
             </div>
             <button
+              aria-label="Dismiss"
               onClick={() => setWelcomeVisible(false)}
               className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] transition-colors"
             >
@@ -278,7 +279,13 @@ function CapabilityCard({
   iconColor: string;
 }) {
   return (
-    <div className={`group relative p-8 rounded-3xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] transition-all duration-300 hover:border-[color:var(--border-strong)] hover:shadow-lg flex flex-col h-full overflow-hidden`}>
+    <div 
+      className={`group relative p-8 rounded-3xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] transition-all duration-300 hover:border-[color:var(--border-strong)] hover:shadow-lg flex flex-col h-full overflow-hidden ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={title}
+    >
       <div className={`w-14 h-14 rounded-2xl ${bg} border border-[color:var(--border-subtle)] flex items-center justify-center mb-6 relative z-10 transition-colors`}>
         <svg className={`w-7 h-7 ${iconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />

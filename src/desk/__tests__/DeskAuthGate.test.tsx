@@ -207,17 +207,16 @@ describe("browser history", () => {
   it("Homepage -> Signup -> Back -> Homepage -> Forward -> Signup: the exact sequence broken by the reported bug", async () => {
     const locations: string[] = [];
     gate({ onLocationChange: (loc) => locations.push(loc.pathname) });
-    expect(screen.getByRole("heading", { name: "SCHOLAR CORE" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Research at the/i })).toBeInTheDocument();
     expect(locations.at(-1)).toBe("/");
 
     // Get Started must change the URL, not just what's on screen — this is
-    // the direct fix for the reported bug.
-    fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+    fireEvent.click(screen.getByRole("button", { name: /Get Started/i }));
     expect(await screen.findByRole("heading", { name: "Create your account" })).toBeInTheDocument();
     expect(locations.at(-1)).toBe("/signup");
 
     fireEvent.click(screen.getByRole("button", { name: "Test Back" }));
-    expect(await screen.findByRole("heading", { name: "SCHOLAR CORE" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Research at the/i })).toBeInTheDocument();
     expect(locations.at(-1)).toBe("/");
 
     fireEvent.click(screen.getByRole("button", { name: "Test Forward" }));
@@ -301,8 +300,7 @@ describe("registration", () => {
 
   function navigateToSignUp() {
     gate();
-    // The landing page shows first; navigate to sign-up from there
-    fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+    fireEvent.click(screen.getByRole("button", { name: /Get Started/i }));
   }
 
   function openSignUp() {

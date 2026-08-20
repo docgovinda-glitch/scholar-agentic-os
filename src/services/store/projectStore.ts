@@ -69,6 +69,10 @@ export function getProjectStore(): ProjectStore {
  *    entered quietly.
  */
 function resolveStore(): ProjectStore {
+  if (process.env.NODE_ENV === "test" && !process.env.USE_REAL_STORE_IN_TESTS) {
+    return inMemoryAsStore();
+  }
+
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

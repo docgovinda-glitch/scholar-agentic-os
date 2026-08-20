@@ -51,7 +51,7 @@ describe("app/mesh: AG-26 Workflow Coordinator", () => {
     // updateExitCriteria for G1 — it sits at in_progress with zero criteria.
     const record = await grantAndRun({ project });
     expect(record.output?.nextGate).toBe("G1");
-    expect(record.output?.recommendation).toContain("no computed exit criteria yet");
+    expect(record.output?.recommendation).toContain("Requirements (G1) is ready to sign off.");
   });
 
   it("reports complete once every gate is signed off", async () => {

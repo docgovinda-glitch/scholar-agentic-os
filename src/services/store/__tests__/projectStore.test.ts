@@ -22,6 +22,7 @@ describe("services/store: backend selection", () => {
       original[k] = process.env[k];
       delete process.env[k];
     }
+    process.env.USE_REAL_STORE_IN_TESTS = "true";
     vi.resetModules();
   });
 
@@ -30,6 +31,7 @@ describe("services/store: backend selection", () => {
       if (original[k] === undefined) delete process.env[k];
       else process.env[k] = original[k] as string;
     }
+    delete process.env.USE_REAL_STORE_IN_TESTS;
     vi.resetModules();
     __resetProjectStoreForTests();
   });

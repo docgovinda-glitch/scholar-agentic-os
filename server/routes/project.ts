@@ -42,6 +42,7 @@ import {
   computeG5ExitCriteria,
   computeG6ExitCriteria,
   computeG7ExitCriteria,
+  flattenSections,
   intakeCompleteness,
   updateExitCriteria,
   signOff,
@@ -875,8 +876,18 @@ function recomputeG1(record: ProjectRecord, answers: Record<string, string>, jou
 
 function recomputeG3(record: ProjectRecord, document: CanonicalDocument | undefined, answers: Record<string, string>) {
   const spec = catalog.getOrThrow(record.outputTypeId);
+  let gates = record.gates;
+  
+  if (spec.workflowVariant === "long_form_chaptered") {
+    const allSections = flattenSections(spec.structure.sections);
+    for (const section of allSections) {
+      const criteria = computeG3ExitCriteria(spec, document ?? emptyDocument(record.projectId, spec.label), answers, section.key);
+      gates = updateExitCriteria(gates, "G3", criteria, section.key);
+    }
+  }
+
   const criteria = computeG3ExitCriteria(spec, document ?? emptyDocument(record.projectId, spec.label), answers);
-  return updateExitCriteria(record.gates, "G3", criteria);
+  return updateExitCriteria(gates, "G3", criteria);
 }
 
 /**
@@ -903,8 +914,18 @@ export function recomputeG2(record: ProjectRecord) {
  */
 export function recomputeG4(record: ProjectRecord, document: CanonicalDocument | undefined) {
   const spec = catalog.getOrThrow(record.outputTypeId);
+  let gates = record.gates;
+
+  if (spec.workflowVariant === "long_form_chaptered") {
+    const allSections = flattenSections(spec.structure.sections);
+    for (const section of allSections) {
+      const criteria = computeG4ExitCriteria(spec, document ?? emptyDocument(record.projectId, spec.label), record.claimGraph, section.key);
+      gates = updateExitCriteria(gates, "G4", criteria, section.key);
+    }
+  }
+
   const criteria = computeG4ExitCriteria(spec, document ?? emptyDocument(record.projectId, spec.label), record.claimGraph);
-  return updateExitCriteria(record.gates, "G4", criteria);
+  return updateExitCriteria(gates, "G4", criteria);
 }
 
 /**
@@ -1075,6 +1096,11 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       return res.status(403).json({ error: MAINTENANCE_MESSAGE });
     }
     const created = await store.create(outputTypeId, currentUserId(req));
+    [...spec.intakeSchema.required, ...spec.intakeSchema.recommended].forEach(f => {
+      if (f.allowsProvisional && created.answers[f.key] === undefined) {
+        created.answers[f.key] = "provisional";
+      }
+    });
     // Compute every gate's real exit criteria immediately from the (still
     // empty) answers/journalRequirements/document/evidenceLedger/claimGraph,
     // rather than leaving domain/project/gates.ts's default empty
@@ -2020,7 +2046,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     if (!isGateId(req.params.gate)) {
       return res.status(400).json({ error: `Unknown gate "${req.params.gate}". Must be one of: ${GATE_ORDER.join(", ")}` });
     }
-    const { actor } = req.body ?? {};
+    const { actor, chapterId } = req.body ?? {};
     if (typeof actor !== "string" || actor.length === 0) {
       return res.status(400).json({ error: "Missing required field: actor" });
     }
@@ -2045,7 +2071,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
                       : {};
 
     try {
-      const gates = await signOff(record.gates, req.params.gate, actor, approvedSnapshot);
+      const gates = await signOff(record.gates, req.params.gate, actor, approvedSnapshot, chapterId);
       const updated = await store.save({ ...record, gates });
       res.json(projectView(updated));
     } catch (err) {

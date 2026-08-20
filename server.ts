@@ -204,7 +204,7 @@ app.use(
         "upgrade-insecure-requests": null,
         "connect-src": [
           "'self'",
-          ...(supabaseOrigin ? [supabaseOrigin] : []),
+          ...(supabaseOrigin ? [supabaseOrigin, supabaseOrigin.replace("https://", "wss://")] : []),
           "https://generativelanguage.googleapis.com",
           "http://localhost:*",
           "http://127.0.0.1:*",

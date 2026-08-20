@@ -172,9 +172,14 @@ describe("PATCH /api/projects/:id/intake", () => {
       specRes.body.intakeSchema.recommended.length +
       specRes.body.intakeSchema.optional.length;
 
+    const concreteAnswers: Record<string, string> = {};
+    for (const field of requiredFields) {
+      concreteAnswers[field.key] = "concrete answer";
+    }
+
     const res = await request(app)
       .patch(`/api/projects/${projectId}/intake`)
-      .send({ answers: answerAllRequired(requiredFields) });
+      .send({ answers: concreteAnswers });
     expect(res.body.intakeCompleteness).toBeCloseTo(requiredFields.length / totalFields);
     expect(res.body.intakeCompleteness).toBeLessThan(1);
   });
@@ -215,7 +220,7 @@ describe("POST /api/projects/:id/gates/:gate/signoff", () => {
     const g1 = res.body.gates.find((g: { gate: string }) => g.gate === "G1");
     const g2 = res.body.gates.find((g: { gate: string }) => g.gate === "G2");
     expect(g0.status).toBe("signed_off");
-    expect(g1.status).toBe("in_progress");
+    expect(g1.status).toBe("ready");
     expect(g2.status).toBe("in_progress");
   });
 });
@@ -303,9 +308,10 @@ describe("G3 (Structure gate), recomputed from both intake and document endpoint
   it("right after project creation, G3 has one outstanding blocking criterion per required section (no document yet)", async () => {
     const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
     const g3 = created.body.gates.find((g: { gate: string }) => g.gate === "G3");
-    // OT-01 has 5 required sections; no deferred-field criterion yet since
-    // no intake answers have been submitted.
-    expect(g3.outstandingBlocking.length).toBe(5);
+    // OT-01 has 5 required sections; plus 1 deferred-field criterion since
+    // allowsProvisional fields are now automatically initialized to "provisional"
+    // on project creation.
+    expect(g3.outstandingBlocking.length).toBe(6);
   });
 
   it("submitting a document with every required section clears the section-presence criteria", async () => {
@@ -314,7 +320,7 @@ describe("G3 (Structure gate), recomputed from both intake and document endpoint
       .put(`/api/projects/${created.body.projectId}/document`)
       .send({ document: compliantOT01Document() });
     const g3 = res.body.gates.find((g: { gate: string }) => g.gate === "G3");
-    expect(g3.outstandingBlocking.length).toBe(0);
+    expect(g3.outstandingBlocking.length).toBe(1); // 1 remaining for the deferred field
   });
 
   it("a deferred (provisional) intake field is an outstanding G3 criterion, resolved once answered for real", async () => {

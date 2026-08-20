@@ -309,14 +309,14 @@ export function getProject(projectId: string): Promise<ProjectView> {
 /** Returns null (not an error) when no document has been submitted yet — a normal, expected state, not a failure. */
 export async function getRubric(projectId: string): Promise<RubricReport | null> {
   const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/rubric`);
-  if (res.status === 404) return null;
+  if (res.status === 404 || res.status === 204) return null;
   return json<RubricReport>(res);
 }
 
 /** Returns null (not an error) when no document has been submitted yet — same convention as getRubric(). */
 export async function getDocument(projectId: string): Promise<CanonicalDocument | null> {
   const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/document`);
-  if (res.status === 404) return null;
+  if (res.status === 404 || res.status === 204) return null;
   return json<CanonicalDocument>(res);
 }
 
@@ -341,7 +341,7 @@ export function resolveCitations(
 /** Returns null (not an error) when no journal requirements have been captured yet — a normal, expected state before the first save. */
 export async function getJournalRequirements(projectId: string): Promise<JournalRequirements | null> {
   const res = await authedFetch(`/api/projects/${encodeURIComponent(projectId)}/journal-requirements`);
-  if (res.status === 404) return null;
+  if (res.status === 404 || res.status === 204) return null;
   return json<JournalRequirements>(res);
 }
 

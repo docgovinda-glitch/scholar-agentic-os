@@ -76,6 +76,8 @@ export interface GateState {
 export interface ProjectGateState {
   projectId: string;
   gates: Record<GateId, GateState>;
+  /** Gates that operate on a per-chapter basis (G3, G4, G5). Map of chapterId (section_name) -> { gateId -> GateState } */
+  chapterGates?: Record<string, Record<GateId, GateState>>;
 }
 
 export function emptyGateState(gate: GateId, entrySatisfied = false): GateState {
@@ -94,12 +96,31 @@ export function initialProjectGateState(projectId: string): ProjectGateState {
   for (const gate of GATE_ORDER) {
     gates[gate] = emptyGateState(gate, gate === "G0");
   }
-  return { projectId, gates };
+  return { projectId, gates, chapterGates: {} };
+}
+
+/** Helper to resolve either a whole-document gate or a per-chapter gate. */
+export function getGateState(project: ProjectGateState, gate: GateId, chapterId?: string): GateState {
+  if (chapterId && project.chapterGates?.[chapterId]?.[gate]) {
+    return project.chapterGates[chapterId][gate];
+  }
+  return project.gates[gate];
+}
+
+/** Helper to check if a gate is considered signed off. For per-chapter gates without a specific chapter ID passed, it requires ALL chapters to be signed off. */
+export function isGateSignedOff(project: ProjectGateState, gate: GateId, chapterId?: string): boolean {
+  if (chapterId) {
+    return getGateState(project, gate, chapterId).status === "signed_off";
+  }
+  if (project.chapterGates && Object.keys(project.chapterGates).length > 0 && (gate === "G3" || gate === "G4" || gate === "G5")) {
+    return Object.values(project.chapterGates).every(cg => cg[gate]?.status === "signed_off");
+  }
+  return project.gates[gate].status === "signed_off";
 }
 
 /** Whether every predecessor this gate requires is currently signed off. */
-export function entryPrerequisitesMet(project: ProjectGateState, gate: GateId): boolean {
-  return GATE_ENTRY_REQUIRES[gate].every((req) => project.gates[req].status === "signed_off");
+export function entryPrerequisitesMet(project: ProjectGateState, gate: GateId, chapterId?: string): boolean {
+  return GATE_ENTRY_REQUIRES[gate].every((req) => isGateSignedOff(project, req, chapterId));
 }
 
 /** Whether every blocking exit criterion is satisfied — the condition for being ready to sign off. */
@@ -115,19 +136,14 @@ export class GateTransitionError extends Error {}
  * update status accordingly. Does not sign off; that is a separate,
  * explicit human action (`signOffGate`).
  */
-export function updateExitCriteria(project: ProjectGateState, gate: GateId, criteria: ExitCriterion[]): ProjectGateState {
-  const current = project.gates[gate];
+export function updateExitCriteria(project: ProjectGateState, gate: GateId, criteria: ExitCriterion[], chapterId?: string): ProjectGateState {
+  const current = getGateState(project, gate, chapterId);
   if (current.status === "signed_off") {
-    // Content changed under a signed-off gate — this is exactly the case
-    // §2.1 calls "invalidates downstream." The caller should invalidate
-    // first (see invalidateGate) before recomputing criteria; recomputing
-    // in place here would silently discard the "this used to be approved"
-    // signal, so we refuse.
     throw new GateTransitionError(
       `Gate ${gate} is signed off — invalidate it before recomputing exit criteria, so the invalidation is recorded.`
     );
   }
-  const entrySatisfied = entryPrerequisitesMet(project, gate);
+  const entrySatisfied = entryPrerequisitesMet(project, gate, chapterId);
   const ready = entrySatisfied && criteria.filter((c) => c.blocking).every((c) => c.satisfied);
   const nextState: GateState = {
     ...current,
@@ -135,6 +151,17 @@ export function updateExitCriteria(project: ProjectGateState, gate: GateId, crit
     exitCriteria: criteria,
     status: ready ? "ready" : entrySatisfied ? "in_progress" : "not_started",
   };
+  
+  if (chapterId) {
+    const cg = project.chapterGates || {};
+    return {
+      ...project,
+      chapterGates: {
+        ...cg,
+        [chapterId]: { ...(cg[chapterId] || {}), [gate]: nextState }
+      }
+    };
+  }
   return { ...project, gates: { ...project.gates, [gate]: nextState } };
 }
 
@@ -145,8 +172,8 @@ export function updateExitCriteria(project: ProjectGateState, gate: GateId, crit
  * computeStateHash, kept out of this pure module because it uses the Web
  * Crypto API (async).
  */
-export function signOffGate(project: ProjectGateState, gate: GateId, actor: string, stateHash: string, at: string = new Date().toISOString()): ProjectGateState {
-  const state = project.gates[gate];
+export function signOffGate(project: ProjectGateState, gate: GateId, actor: string, stateHash: string, at: string = new Date().toISOString(), chapterId?: string): ProjectGateState {
+  const state = getGateState(project, gate, chapterId);
   if (!isReadyToSignOff(state)) {
     throw new GateTransitionError(
       `Gate ${gate} is not ready to sign off: ${state.exitCriteria.filter((c) => c.blocking && !c.satisfied).map((c) => c.id).join(", ") || "entry prerequisites unmet"}.`
@@ -157,16 +184,43 @@ export function signOffGate(project: ProjectGateState, gate: GateId, actor: stri
     status: "signed_off",
     signoff: { actor, at, stateHash },
   };
-  let next: ProjectGateState = { ...project, gates: { ...project.gates, [gate]: nextState } };
+  
+  let next: ProjectGateState;
+  if (chapterId) {
+    const cg = project.chapterGates || {};
+    next = {
+      ...project,
+      chapterGates: {
+        ...cg,
+        [chapterId]: { ...(cg[chapterId] || {}), [gate]: nextState }
+      }
+    };
+  } else {
+    next = { ...project, gates: { ...project.gates, [gate]: nextState } };
+  }
 
   // Signing off a gate may satisfy the entry prerequisites of the next
   // gate(s); recompute their entrySatisfied flag so the UI reflects
   // "you can start this now" immediately, without requiring a second event.
   for (const g of GATE_ORDER) {
     if (g === gate) continue;
+    
+    // Evaluate project-level downstream gate
     const s = next.gates[g];
     if (s.status === "not_started" && entryPrerequisitesMet(next, g)) {
-      next = { ...next, gates: { ...next.gates, [g]: { ...s, entrySatisfied: true, status: "in_progress" } } };
+      const isReady = s.exitCriteria.every((c) => c.satisfied || !c.blocking);
+      next = { ...next, gates: { ...next.gates, [g]: { ...s, entrySatisfied: true, status: isReady ? "ready" : "in_progress" } } };
+    }
+    
+    // Evaluate chapter-level downstream gates
+    if (next.chapterGates) {
+      for (const cid of Object.keys(next.chapterGates)) {
+        const cs = next.chapterGates[cid][g];
+        if (cs && cs.status === "not_started" && entryPrerequisitesMet(next, g, cid)) {
+           const isReady = cs.exitCriteria.every((c) => c.satisfied || !c.blocking);
+           next.chapterGates[cid][g] = { ...cs, entrySatisfied: true, status: isReady ? "ready" : "in_progress" };
+        }
+      }
     }
   }
   return next;
@@ -178,19 +232,41 @@ export function signOffGate(project: ProjectGateState, gate: GateId, actor: stri
  * its prerequisite state has changed underneath it (docs §2.1: "Returning
  * invalidates downstream").
  */
-export function invalidateGate(project: ProjectGateState, gate: GateId, reason: string): ProjectGateState {
+export function invalidateGate(project: ProjectGateState, gate: GateId, reason: string, chapterId?: string): ProjectGateState {
   const dependents = downstreamDependents(gate);
   let next = project;
+  
+  const processInvalidation = (g: GateId, cid?: string) => {
+    const s = getGateState(next, g, cid);
+    if (s.status === "signed_off" || s.status === "ready" || (g === gate && cid === chapterId)) {
+      const invalidatedState = { ...s, status: "invalidated" as const, signoff: undefined, invalidatedBy: [...s.invalidatedBy, reason] };
+      if (cid) {
+        const cg = next.chapterGates || {};
+        next = {
+          ...next,
+          chapterGates: {
+            ...cg,
+            [cid]: { ...(cg[cid] || {}), [g]: invalidatedState }
+          }
+        };
+      } else {
+        next = { ...next, gates: { ...next.gates, [g]: invalidatedState } };
+      }
+    }
+  };
+
   for (const g of [gate, ...dependents]) {
-    const s = next.gates[g];
-    if (s.status === "signed_off" || s.status === "ready" || g === gate) {
-      next = {
-        ...next,
-        gates: {
-          ...next.gates,
-          [g]: { ...s, status: "invalidated", signoff: undefined, invalidatedBy: [...s.invalidatedBy, reason] },
-        },
-      };
+    // If we're invalidating a project-level gate, it cascades to all chapters.
+    // If we're invalidating a chapter-level gate, it cascades to that chapter's downstream gates, and any downstream project-level gates.
+    if (chapterId && (g === "G3" || g === "G4" || g === "G5")) {
+      processInvalidation(g, chapterId);
+    } else {
+      processInvalidation(g);
+      if (next.chapterGates) {
+         for (const cid of Object.keys(next.chapterGates)) {
+           processInvalidation(g, cid);
+         }
+      }
     }
   }
   return next;
@@ -215,10 +291,10 @@ function downstreamDependents(gate: GateId): GateId[] {
 
 /** True once every gate through G7 is signed off — the project is exported. */
 export function isProjectComplete(project: ProjectGateState): boolean {
-  return GATE_ORDER.every((g) => project.gates[g].status === "signed_off");
+  return GATE_ORDER.every((g) => isGateSignedOff(project, g));
 }
 
 /** The first gate that is not yet signed off, in order — "what should I do next?" */
 export function nextOutstandingGate(project: ProjectGateState): GateId | undefined {
-  return GATE_ORDER.find((g) => project.gates[g].status !== "signed_off");
+  return GATE_ORDER.find((g) => !isGateSignedOff(project, g));
 }

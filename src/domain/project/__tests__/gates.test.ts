@@ -92,7 +92,7 @@ describe("domain/project/gates: readiness and sign-off", () => {
     project = updateExitCriteria(project, "G0", [crit("a", true)]);
     project = signOffGate(project, "G0", "user", "h");
     expect(project.gates.G1.entrySatisfied).toBe(true);
-    expect(project.gates.G1.status).toBe("in_progress");
+    expect(project.gates.G1.status).toBe("ready");
     expect(project.gates.G2.entrySatisfied).toBe(true);
   });
 

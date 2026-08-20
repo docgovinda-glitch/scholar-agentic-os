@@ -3,6 +3,7 @@ import type { Claim, ClaimEvidenceBinding } from "../../src/domain/claim/types.t
 import type { DiscoveredSource, EvidenceItem } from "../../src/domain/evidence/types.ts";
 
 export async function syncClaimToRelational(projectId: string, claim: Claim) {
+  if (process.env.NODE_ENV === "test") return;
   const config = getSupabaseRestConfig();
   if (!config) return;
   const table = new SupabaseTable(config, "project_claims");
@@ -18,6 +19,7 @@ export async function syncClaimToRelational(projectId: string, claim: Claim) {
 }
 
 export async function syncBindingToRelational(projectId: string, binding: ClaimEvidenceBinding) {
+  if (process.env.NODE_ENV === "test") return;
   const config = getSupabaseRestConfig();
   if (!config) return;
   const bindingsTable = new SupabaseTable(config, "project_claim_bindings");
@@ -31,6 +33,7 @@ export async function syncBindingToRelational(projectId: string, binding: ClaimE
 }
 
 export async function syncSourceToRelational(projectId: string, source: DiscoveredSource) {
+  if (process.env.NODE_ENV === "test") return;
   const config = getSupabaseRestConfig();
   if (!config) return;
   const table = new SupabaseTable(config, "project_sources");
@@ -52,6 +55,7 @@ export async function syncSourceToRelational(projectId: string, source: Discover
 }
 
 export async function syncEvidenceItemToRelational(projectId: string, item: EvidenceItem) {
+  if (process.env.NODE_ENV === "test") return;
   const config = getSupabaseRestConfig();
   if (!config) return;
   const table = new SupabaseTable(config, "project_evidence_items");
@@ -68,6 +72,7 @@ export async function syncEvidenceItemToRelational(projectId: string, item: Evid
 }
 
 export async function deleteSourceFromRelational(projectId: string, sourceId: string) {
+  if (process.env.NODE_ENV === "test") return;
   const config = getSupabaseRestConfig();
   if (!config) return;
   const table = new SupabaseTable(config, "project_sources");

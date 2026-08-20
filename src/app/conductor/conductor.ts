@@ -156,11 +156,11 @@ export function computeG1ExitCriteria(
 export function intakeCompleteness(spec: OutputTypeSpec, answers: Record<string, string | "provisional">): number {
   const fields = allIntakeFields(spec);
   if (fields.length === 0) return 1;
-  const answered = fields.filter((f) => answers[f.key] !== undefined).length;
+  const answered = fields.filter((f) => answers[f.key] !== undefined && answers[f.key] !== "provisional").length;
   return answered / fields.length;
 }
 
-function flattenSections(sections: SectionSpec[]): SectionSpec[] {
+export function flattenSections(sections: SectionSpec[]): SectionSpec[] {
   return sections.flatMap((s) => [s, ...(s.children ?? [])]);
 }
 
@@ -253,10 +253,15 @@ export function computeG2ExitCriteria(
 export function computeG3ExitCriteria(
   spec: OutputTypeSpec,
   document: CanonicalDocument,
-  answers: Record<string, string | "provisional">
+  answers: Record<string, string | "provisional">,
+  chapterId?: string
 ): ExitCriterion[] {
-  const sectionCriteria: ExitCriterion[] = flattenSections(spec.structure.sections)
-    .filter((s) => s.required)
+  const allSections = flattenSections(spec.structure.sections);
+  const targetSections = chapterId
+    ? allSections.filter((s) => s.key === chapterId)
+    : allSections.filter((s) => s.required);
+
+  const sectionCriteria: ExitCriterion[] = targetSections
     .map((section) => ({
       id: `section-${section.key}`,
       description: `"${section.title}" exists in the structure`,
@@ -273,6 +278,10 @@ export function computeG3ExitCriteria(
       blocking: true,
     }));
 
+  // Only apply project-level deferred fields to the whole-document gate, not per-chapter.
+  if (chapterId) {
+    return sectionCriteria;
+  }
   return [...sectionCriteria, ...deferredFieldCriteria];
 }
 
@@ -308,10 +317,15 @@ export function computeG3ExitCriteria(
 export function computeG4ExitCriteria(
   spec: OutputTypeSpec,
   document: CanonicalDocument,
-  claimGraph: ClaimEvidenceGraph
+  claimGraph: ClaimEvidenceGraph,
+  chapterId?: string
 ): ExitCriterion[] {
-  const sectionCriteria: ExitCriterion[] = flattenSections(spec.structure.sections)
-    .filter((s) => s.required)
+  const allSections = flattenSections(spec.structure.sections);
+  const targetSections = chapterId
+    ? allSections.filter((s) => s.key === chapterId)
+    : allSections.filter((s) => s.required);
+
+  const sectionCriteria: ExitCriterion[] = targetSections
     .map((section) => {
       const block = document.blocks.find((b) => b.id === section.key);
       const nonEmpty = block !== undefined && block.text.trim().length > 0;
@@ -322,6 +336,12 @@ export function computeG4ExitCriteria(
         blocking: true,
       };
     });
+
+  // If chapterId is passed, we skip evaluating project-level claims. 
+  // Claims are technically whole-document in this version (no section-bound claims yet).
+  if (chapterId) {
+    return sectionCriteria;
+  }
 
   const unresolved = claimsNeedingResolution(claimGraph);
   const claimsCriterion: ExitCriterion = {
@@ -348,12 +368,18 @@ export function computeG4ExitCriteria(
  * concern; PeerReviewHistory only ever grows, so the record of what a
  * critical finding used to say is never lost even once it stops blocking).
  */
-export function computeG5ExitCriteria(history: PeerReviewHistory): ExitCriterion[] {
+export function computeG5ExitCriteria(history: PeerReviewHistory, chapterId?: string): ExitCriterion[] {
   if (history.rounds.length === 0) {
     return [{ id: "peer-review-round-completed", description: "At least one multi-lens peer review round has been run", satisfied: false, blocking: true }];
   }
   const latest = history.rounds[history.rounds.length - 1];
-  const criticalFindings = latest.lensReviews.flatMap((r) => r.findings).filter((f) => f.severity === "critical");
+  let criticalFindings = latest.lensReviews.flatMap((r) => r.findings).filter((f) => f.severity === "critical");
+  
+  if (chapterId) {
+    // If a finding doesn't specify sections, it applies to the whole document (and thus blocks every chapter).
+    criticalFindings = criticalFindings.filter(f => f.sectionKeys.length === 0 || f.sectionKeys.includes(chapterId));
+  }
+
   return [
     { id: "peer-review-round-completed", description: "At least one multi-lens peer review round has been run", satisfied: true, blocking: true },
     {
@@ -450,10 +476,11 @@ export async function signOff(
   project: ProjectGateState,
   gate: GateId,
   actor: string,
-  approvedSnapshot: unknown
+  approvedSnapshot: unknown,
+  chapterId?: string
 ): Promise<ProjectGateState> {
   const stateHash = await computeStateHash(approvedSnapshot);
-  return signOffGate(project, gate, actor, stateHash);
+  return signOffGate(project, gate, actor, stateHash, new Date().toISOString(), chapterId);
 }
 
 /**

@@ -17,7 +17,7 @@ import DeskShell, { type DeskShellView } from "./DeskShell";
 import ResearchWorkspace from "./workspace/ResearchWorkspace";
 import type { ResearchStage } from "./workspace/types";
 import { STAGE_MAP } from "./workspace/types";
-import { getProject } from "./api";
+import { getProject, UnauthenticatedError } from "./api";
 import ProjectListScreen from "./ProjectListScreen";
 import VaultSetupScreen from "./setup/VaultSetupScreen";
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
@@ -167,7 +167,13 @@ function ProjectRoute() {
           if (active) setOutputTypeId(p.outputTypeId);
         })
         .catch((e) => {
-          if (active) setError(e.message);
+          if (active) {
+            setError(
+              e instanceof UnauthenticatedError
+                ? "Your session has expired. Sign in again to continue."
+                : e.message
+            );
+          }
         });
     }
     return () => {
@@ -198,8 +204,21 @@ function ProjectRoute() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)]">
-        <div className="text-sm text-[color:var(--state-danger)] font-medium p-4 border border-[color:var(--state-danger)] rounded-md bg-[color:var(--state-danger-subtle)]">
-          {error}
+        <div className="flex flex-col items-center gap-6 max-w-md text-center p-8">
+          <div className="w-16 h-16 rounded-full bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] flex items-center justify-center">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <p className="text-lg text-[color:var(--text-primary)] font-medium">
+            {error}
+          </p>
+          <button
+            onClick={() => navigate("/projects")}
+            className="rounded-full bg-[color:var(--accent)] px-6 py-3 font-bold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-colors"
+          >
+            Back to your work
+          </button>
         </div>
       </div>
     );
