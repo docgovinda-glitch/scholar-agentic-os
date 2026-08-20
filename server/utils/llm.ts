@@ -77,7 +77,7 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
       defaultPolicy()
     );
     
-    const text = result.result.text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+    const text = (result.ok ? result.value.text : "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
     return JSON.parse(text);
   } catch (err: any) {
     if (!res.headersSent) {
@@ -108,7 +108,7 @@ export async function callOpenRouterText(req: any, res: any, systemPrompt: strin
       { candidates },
       defaultPolicy()
     );
-    return result.result.text;
+    return result.ok ? result.value.text : "";
   } catch (err: any) {
     if (!res.headersSent) res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
     throw new Error("RequireFrontendLLMException");

@@ -142,13 +142,12 @@ export function registerParseRoutes(app: express.Express, parseFileLimit: any, p
               taskClass: mapTaskType("vision"),
               systemPrompt: ocrPrompt,
               userPrompt: "",
-              responseFormat: "text",
               segments: [{ label: "Image", text: "" }]
             },
             { candidates },
             defaultPolicy()
           );
-          text = result.result.text;
+          text = result.ok ? result.value.text : `[OCR Extraction Failed] The image file "${fileName}" could not be parsed automatically.`;
         } catch (err: any) {
           console.warn("[Parser] OCR failed via gateway:", err.message);
           text = `[OCR Extraction Failed] The image file "${fileName}" could not be parsed automatically.`;
@@ -166,13 +165,12 @@ export function registerParseRoutes(app: express.Express, parseFileLimit: any, p
               taskClass: mapTaskType("audio"),
               systemPrompt: audioPrompt,
               userPrompt: "",
-              responseFormat: "text",
               segments: [{ label: "Audio", text: "" }]
             },
             { candidates },
             defaultPolicy()
           );
-          text = result.result.text;
+          text = result.ok ? result.value.text : `[Audio Transcription Failed] The audio file "${fileName}" could not be parsed automatically.`;
         } catch (err: any) {
           console.warn("[Parser] Audio transcription failed via gateway:", err.message);
           text = `[Audio Transcription Failed] The audio file "${fileName}" could not be parsed automatically.`;

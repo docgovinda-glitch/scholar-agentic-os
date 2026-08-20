@@ -215,6 +215,23 @@ export function setGlobalManualModelOverride(override: { providerId: string; mod
   activeManualModelOverride = override;
 }
 
+/**
+ * Maps the routing task type (user-facing) to the Warden's task class
+ * (egress-policy dimension). Mirrors the same mapping in server/routes/ai.ts
+ * (`taskTypeToTaskClass`) so client-side and server-side calls agree on what
+ * class a given task belongs to.
+ */
+function routingTaskTypeToTaskClass(taskType: RoutingTaskType): "drafting" | "refinement" | "chat" | "summarisation" | "verification" | "rule_extraction" | "discovery" | "embedding" | "classification" {
+  switch (taskType) {
+    case "simple":       return "chat";
+    case "reasoning":    return "verification";
+    case "coding":       return "drafting";
+    case "long-context": return "summarisation";
+    case "multimodal":   return "drafting";
+    default:             return "chat";
+  }
+}
+
 async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskType: RoutingTaskType = "reasoning", onChunk?: (chunk: string) => void) {
   const decision = await routeDecision(taskType);
   if (!decision || !decision.ok) {
@@ -226,36 +243,56 @@ async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskT
 
   for (const c of choices) {
     if (c.tier === "premium") {
-      candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "premium" });
+      // Premium calls must be mediated by the server (POST /api/studio/refine
+      // with useEngine:"premium"). This function is only called when the server
+      // has already returned 426 (requireFrontendLLM), which means the server
+      // cannot handle the request — including its own Premium path. Sending
+      // a fake literal "premium" as an API key to a cloud adapter would cause
+      // an auth failure on every call. Skip premium candidates here.
+      continue;
     } else if (c.tier === "byok" || c.tier === "free") {
       const key = await readProviderKey(c.providerId);
       if (key) {
+        // Only push when the user actually has this key on this device.
         candidates.push({ provider: c.providerId, model: c.modelId, apiKey: key });
       }
+      // If key is null, this provider is connected on another device but not
+      // here — skip it rather than sending a null/empty credential.
     } else if (c.tier === "local") {
-      // For local, we push a special flag. Our loop will attempt it.
+      // Local runners need no credential — they run on the user's own machine.
       candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "local-no-credential-required" });
     }
   }
 
   if (activeManualModelOverride) {
     const key = await readProviderKey(activeManualModelOverride.providerId);
-    candidates.unshift({ 
-      provider: activeManualModelOverride.providerId, 
-      model: activeManualModelOverride.modelId, 
-      apiKey: key || "manual-override-key" 
-    });
+    if (key) {
+      // Only inject the override when a real key is stored on this device.
+      // If key is null the user has no credential here; falling through to the
+      // router-ranked candidates is better than pushing a fake key that will
+      // fail every adapter auth check.
+      candidates.unshift({
+        provider: activeManualModelOverride.providerId,
+        model: activeManualModelOverride.modelId,
+        apiKey: key,
+      });
+    }
   }
 
   if (candidates.length === 0) {
-    throw new Error("No connected AI providers are available for this task.");
+    throw new Error(
+      "No AI providers are available on this device for this task. " +
+      "Connect a provider in AI Access settings or run a local AI runtime."
+    );
   }
+
+  const taskClass = routingTaskTypeToTaskClass(taskType);
 
   // Use completeWithFailover from the gateway
   const req = {
     systemPrompt,
     userPrompt,
-    taskClass: "drafting" as const,
+    taskClass,
     local: candidates[0].apiKey === "local-no-credential-required",
     caching: taskType === "long-context",
     segments: [],

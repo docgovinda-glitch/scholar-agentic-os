@@ -152,7 +152,8 @@ async function synthesize(searchResults: Array<{ title: string; url: string; con
     );
 
     // Strip markdown code fences if the model added them despite the prompt.
-    const cleaned = result.result.text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+    if (!result.ok) return [];
+    const cleaned = result.value.text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
     try {
       const parsed = JSON.parse(cleaned);
       return Array.isArray(parsed) ? parsed : [];
