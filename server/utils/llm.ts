@@ -26,9 +26,6 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
     return content;
   }
 
-  res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
-  throw new Error("RequireFrontendLLMException");
-
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
 
@@ -93,9 +90,12 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
       console.error("Failed to parse Gemini JSON output:", content);
       throw new Error("Invalid JSON returned by LLM");
     }
-  } else {
-    throw new Error("API_KEYS_MISSING: You must configure either OPENROUTER_API_KEY or GEMINI_API_KEY in the environment.");
   }
+  
+  if (!res.headersSent) {
+    res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+  }
+  throw new Error("RequireFrontendLLMException");
 }
 
 export async function callOpenRouterText(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning"): Promise<string> {
@@ -107,7 +107,56 @@ export async function callOpenRouterText(req: any, res: any, systemPrompt: strin
     return content;
   }
 
-  res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+
+  if (openRouterKey) {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://scholar-agentic-os.com",
+        "X-Title": "Scholar Agentic OS"
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenRouter API error: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } else if (geminiKey) {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: { text: systemPrompt } },
+        contents: [{ parts: [{ text: userPrompt }] }]
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Gemini API error: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  }
+
+  if (!res.headersSent) {
+    res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+  }
   throw new Error("RequireFrontendLLMException");
 }
 
