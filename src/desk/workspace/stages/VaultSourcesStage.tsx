@@ -175,7 +175,7 @@ export default function VaultSourcesStage({
         )}
 
         {error && (
-          <div className="max-w-4xl mx-auto p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+          <div className="max-w-4xl mx-auto p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-lg border border-[color:var(--state-danger)] opacity-80">
             {error}
           </div>
         )}

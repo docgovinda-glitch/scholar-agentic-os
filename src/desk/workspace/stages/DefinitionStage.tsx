@@ -211,7 +211,7 @@ export default function DefinitionStage({
       <div className="flex-1 overflow-y-auto p-8 relative">
         <div className="max-w-4xl mx-auto">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+            <div className="mb-6 p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-lg border border-[color:var(--state-danger)] opacity-80">
               {error}
             </div>
           )}

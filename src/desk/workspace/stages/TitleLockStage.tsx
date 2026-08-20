@@ -76,7 +76,7 @@ export default function TitleLockStage({
       <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center">
         <div className="w-full max-w-4xl space-y-6">
           {error && (
-            <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+            <div className="p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-lg border border-[color:var(--state-danger)] opacity-80">
               {error}
             </div>
           )}

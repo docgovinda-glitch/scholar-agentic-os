@@ -191,7 +191,7 @@ setLogs((prev) => [
           />
           
           {error && (
-            <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+            <div className="mt-4 p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-lg border border-[color:var(--state-danger)] opacity-80">
               {error}
             </div>
           )}
