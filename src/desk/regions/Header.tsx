@@ -1,5 +1,7 @@
 import type { ProjectView } from "../types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
+import { useState } from "react";
+import GlobalSearchModal from "./GlobalSearchModal";
 
 /**
  * Region A (docs 22 §2).
@@ -28,10 +30,14 @@ export default function Header({
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
+  onToggleRail?: () => void;
+  onToggleAside?: () => void;
 }) {
   const current = project.gates.find((g) => g.status !== "signed_off") ?? project.gates[project.gates.length - 1];
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
+    <>
     <header className="flex h-12 items-center gap-3 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 text-sm">
       {onClose ? (
         <button
@@ -48,6 +54,18 @@ export default function Header({
           <span className="hidden sm:inline font-semibold text-[color:var(--text-primary)] text-xs">SCHOLAR CORE</span>
         </div>
       )}
+
+      {onToggleRail && (
+        <button
+          type="button"
+          onClick={onToggleRail}
+          className="md:hidden shrink-0 rounded-[var(--radius-sm)] p-1 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      )}
       <span className="text-[color:var(--text-muted)]" aria-hidden="true">
         /
       </span>
@@ -58,9 +76,13 @@ export default function Header({
         {current.gate} {current.name}
       </span>
       <div className="ml-auto flex items-center gap-3 text-xs text-[color:var(--text-muted)]">
-        <span title="Not yet built" className="cursor-not-allowed">
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+        >
           Search
-        </span>
+        </button>
         {onOpenVault && (
           <button
             type="button"
@@ -92,7 +114,22 @@ export default function Header({
             Account Settings
           </span>
         )}
+        
+        {onToggleAside && (
+          <button
+            type="button"
+            onClick={onToggleAside}
+            className="md:hidden shrink-0 rounded-[var(--radius-sm)] p-1 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+        )}
       </div>
     </header>
+    {searchOpen && <GlobalSearchModal onClose={() => setSearchOpen(false)} />}
+    </>
   );
 }
+

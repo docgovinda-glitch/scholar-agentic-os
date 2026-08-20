@@ -6,6 +6,7 @@ import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { ResearchProvider, useResearchWorkspace } from "./ResearchContext";
 import { StageRegistry } from "./StageRegistry";
 import PlaceholderStage from "./stages/PlaceholderStage";
+import { useAiAccess } from "../aiAccess/useAiAccess";
 
 function ResearchWorkspaceInner({
   onClose,
@@ -29,9 +30,14 @@ function ResearchWorkspaceInner({
     advanceStage,
     error,
     isLoading,
+    manualModelOverride,
+    setManualModelOverride,
   } = useResearchWorkspace();
 
+  const { connected } = useAiAccess();
+
   const [contextPanelOpen, setContextPanelOpen] = useState(true);
+  const [stageNavOpen, setStageNavOpen] = useState(false);
 
   if (error) {
     return (
@@ -86,6 +92,17 @@ function ResearchWorkspaceInner({
                 </svg>
               </button>
             )}
+            
+            {/* Mobile Hamburger Menu */}
+            <button
+              type="button"
+              onClick={() => setStageNavOpen(!stageNavOpen)}
+              className="md:hidden shrink-0 rounded-[var(--radius-sm)] p-2 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <ScholarCoreLogo size="sm" withText className="text-[color:var(--text-primary)]" />
             <div className="w-px h-5 bg-[color:var(--border-subtle)] mx-1" />
             <div className="min-w-0">
@@ -102,10 +119,35 @@ function ResearchWorkspaceInner({
             <div className="hidden md:flex items-center gap-4 px-4 py-1.5 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-lg mr-2">
               <div className="flex flex-col">
                 <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Active Model</span>
-                <span className="text-[11px] font-semibold text-[color:var(--text-primary)] flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Gemini 1.5 Pro
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                  <select
+                    className="bg-transparent text-[11px] font-semibold text-[color:var(--text-primary)] border-none p-0 cursor-pointer focus:ring-0 outline-none w-32 truncate appearance-none hover:bg-[color:var(--surface-hover)] rounded px-1 -ml-1"
+                    value={manualModelOverride ? `${manualModelOverride.providerId}:${manualModelOverride.modelId || ""}` : "automatic"}
+                    onChange={(e) => {
+                      if (e.target.value === "automatic") {
+                        setManualModelOverride(null);
+                      } else {
+                        const [providerId, modelId] = e.target.value.split(":");
+                        setManualModelOverride({ providerId, modelId: modelId || undefined });
+                      }
+                    }}
+                    title="Select a specific AI model or let the Scholar AI Engine decide (Automatic)"
+                  >
+                    <option value="automatic">Automatic (Default)</option>
+                    {connected.length > 0 && <optgroup label="Connected Providers">
+                      {connected.map((p) => {
+                        const modelName = p.selectedModel || "Default Config";
+                        const value = `${p.id}:${p.selectedModel || ""}`;
+                        return (
+                          <option key={value} value={value}>
+                            {p.name} - {modelName}
+                          </option>
+                        );
+                      })}
+                    </optgroup>}
+                  </select>
+                </div>
               </div>
               <div className="w-px h-6 bg-[color:var(--border-subtle)]"></div>
               <div className="flex flex-col min-w-[100px]">
@@ -136,18 +178,42 @@ function ResearchWorkspaceInner({
                 Settings
               </button>
             )}
+
+            {/* Mobile Context Panel Toggle */}
+            <button
+              type="button"
+              onClick={() => setContextPanelOpen(!contextPanelOpen)}
+              className="md:hidden shrink-0 rounded-[var(--radius-sm)] p-2 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
           </div>
         </div>
       </header>
 
       {/* Three-zone workspace */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 relative">
+        {/* Mobile overlay for closing sidebars */}
+        {(stageNavOpen || (contextPanelOpen && window.innerWidth < 768)) && (
+          <div 
+            className="md:hidden fixed inset-0 bg-black/50 z-30" 
+            onClick={() => { setStageNavOpen(false); setContextPanelOpen(false); }}
+          />
+        )}
+        
         {/* Left: Stage Navigation */}
-        <StageNavigation
-          currentStage={currentStage}
-          stageStatuses={stageStatuses}
-          onStageChange={setStage}
-        />
+        <div className={`fixed md:relative inset-y-0 left-0 z-40 transform transition-transform duration-300 ${stageNavOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 h-[calc(100vh-64px)] md:h-auto`}>
+          <StageNavigation
+            currentStage={currentStage}
+            stageStatuses={stageStatuses}
+            onStageChange={(stage) => {
+              setStage(stage);
+              setStageNavOpen(false); // Auto-close on mobile
+            }}
+          />
+        </div>
 
         {/* Center: Current Stage Content */}
         <div className="flex-1 flex flex-col min-w-0 bg-[color:var(--surface-canvas)]">
@@ -167,11 +233,13 @@ function ResearchWorkspaceInner({
         </div>
 
         {/* Right: Context Panel */}
-        <ContextPanel
-          currentStage={currentStage}
-          isOpen={contextPanelOpen}
-          onToggle={() => setContextPanelOpen(!contextPanelOpen)}
-        />
+        <div className={`fixed md:relative inset-y-0 right-0 z-40 transform transition-transform duration-300 ${contextPanelOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 h-[calc(100vh-64px)] md:h-auto`}>
+          <ContextPanel
+            currentStage={currentStage}
+            isOpen={contextPanelOpen}
+            onToggle={() => setContextPanelOpen(!contextPanelOpen)}
+          />
+        </div>
       </div>
 
       {/* Status bar */}

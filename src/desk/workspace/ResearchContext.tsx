@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../types";
 import type { ResearchStage, StageStatus } from "./types";
-import { getDocument, getOutputTypeSpec, getProject, getRubric, UnauthenticatedError } from "../api";
+import { getDocument, getOutputTypeSpec, getProject, getRubric, setGlobalManualModelOverride, UnauthenticatedError } from "../api";
 import { computeStageStatuses } from "./utils";
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
 
@@ -18,6 +18,8 @@ interface ResearchContextValue {
   advanceStage: (nextStage: ResearchStage) => void;
   error: string | null;
   isLoading: boolean;
+  manualModelOverride: { providerId: string; modelId?: string } | null;
+  setManualModelOverride: (override: { providerId: string; modelId?: string } | null) => void;
 }
 
 const ResearchContext = createContext<ResearchContextValue | null>(null);
@@ -47,6 +49,7 @@ export function ResearchProvider({
   const [outputType, setOutputType] = useState<OutputTypeSpec | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [manualModelOverride, setManualModelOverride] = useState<{ providerId: string; modelId?: string } | null>(null);
 
   const currentStage = initialStage ?? "definition";
 
@@ -115,6 +118,10 @@ export function ResearchProvider({
     onStageChangeCallback(stage, options);
   }, [onStageChangeCallback]);
 
+  useEffect(() => {
+    setGlobalManualModelOverride(manualModelOverride);
+  }, [manualModelOverride]);
+
   const advanceStage = useCallback((nextStage: ResearchStage) => {
     onStageChangeCallback(nextStage);
   }, [onStageChangeCallback]);
@@ -132,6 +139,8 @@ export function ResearchProvider({
     advanceStage,
     error,
     isLoading,
+    manualModelOverride,
+    setManualModelOverride,
   };
 
   return (

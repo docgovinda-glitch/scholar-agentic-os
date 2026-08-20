@@ -24,7 +24,6 @@ import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
 import { useDeskSession } from "./useDeskSession";
 import VaultScreen from "./vault/VaultScreen";
-import DeskPocketMount from "./pocket/DeskPocketMount";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 
 
@@ -135,8 +134,6 @@ function ProjectsIndexRoute() {
   const device = useDeviceClass();
   const { justFinishedOnboarding, clearJustFinishedOnboarding } = useOutletContext<OnboardingContext>();
 
-  if (device.isMobile) return <DeskPocketMount projectId={null} />;
-
   return (
     <ProjectListScreen
       onOpen={(id) => navigate(`/projects/${id}`)}
@@ -197,8 +194,6 @@ function ProjectRoute() {
   // Guaranteed by the route pattern (":projectId" only matches with a value)
   // — this is TypeScript narrowing, not a real fallback path.
   if (!projectId) return <Navigate to="/projects" replace />;
-
-  if (device.isMobile) return <DeskPocketMount projectId={projectId} />;
 
   if (error) {
     return (

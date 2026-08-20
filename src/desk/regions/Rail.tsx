@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { getOutputTypeSpec } from "../api";
 import type { CanonicalDocument, SectionSpec } from "../types";
+import ProjectFilesPanel from "./ProjectFilesPanel";
+import ProjectVaultPanel from "./ProjectVaultPanel";
 
 const HEADING_KINDS = new Set(["heading1", "heading2", "heading3"]);
 
@@ -26,10 +28,12 @@ const TABS: { id: RailTab; label: string }[] = [
  * honest not-built states rather than omitted, so the shell's shape matches
  * the spec even where the data behind a panel doesn't exist yet. */
 export default function Rail({
+  projectId,
   document,
   outputTypeId,
   onJumpToBlock,
 }: {
+  projectId: string;
   document: CanonicalDocument | null;
   outputTypeId: string;
   onJumpToBlock: (blockId: string) => void;
@@ -93,6 +97,10 @@ export default function Rail({
               <PlannedStructureList sections={plannedSections} />
             </>
           )
+        ) : tab === "files" ? (
+          <ProjectFilesPanel projectId={projectId} />
+        ) : tab === "vault" ? (
+          <ProjectVaultPanel />
         ) : (
           <p className="text-xs text-[color:var(--text-muted)] p-2">
             Not yet built — {TABS.find((t) => t.id === tab)?.label} needs {tab === "sources" ? "the Corpus API" : tab === "vault" ? "a way to search your Vault from inside a project" : "project file attachments"}, none of which exist yet.

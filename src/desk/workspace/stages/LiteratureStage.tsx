@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedJsonFetch } from "../../api";
+import { authedJsonFetch, authedStreamFetch } from "../../api";
 
 interface LiteratureItem {
   id: string;
@@ -62,93 +62,76 @@ export default function LiteratureStage({
           level: "success",
           message: `✓ research definition loaded`,
         },
-        {
-          id: Date.now().toString() + "search",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "info",
-          message: `> literature.search()`,
-        }
       ]);
 
-      setSourceAgent("Searching → Discovering → Fetching...");
+      setSourceAgent("Connecting to Agent Pipeline...");
       
-      const verbs = [
-        "literature.filter()", 
-        "literature.extract()", 
-        "literature.cluster()", 
-        "evidence.compare()", 
-        "synthesis.build()"
-      ];
-      let step = 0;
-
-      const logInterval = setInterval(() => {
-        if (!active) return;
-        if (step < verbs.length) {
-          const action = verbs[step];
-          setLogs((prev) => [
-            ...prev,
-            {
-              id: Date.now().toString() + Math.random(),
-              timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-              level: "info",
-              message: `> ${action}`,
-            },
-          ]);
-
-          // Update Snapshot & Agent states dynamically based on step
-          if (step === 0) {
-            setSourcesDiscovered(128);
-            setSourceAgent("Filtering → Complete ✓");
-            setAnalysisAgent("Reading → Extracting...");
-          } else if (step === 1) {
-            setSourcesShortlisted(37);
-            setAnalysisAgent("Classifying → Clustering...");
-          } else if (step === 2) {
-            setThematicClusters(8);
-            setAnalysisAgent("Complete ✓");
-            setEvidenceAgent("Comparing → Mapping...");
-          } else if (step === 3) {
-            setEvidenceAgent("Complete ✓");
-            setKnowledgeAgent("Synthesizing → Connecting...");
-          } else if (step === 4) {
-            setKnowledgeAgent("Formulating → Complete ✓");
-          }
-
-          step++;
-        }
-      }, 1000);
-
       try {
-        const response = await authedJsonFetch(`/api/projects/${projectId}/agent/literature`, "POST", { trigger: "discovery" });
-        const resJson = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(resJson.error || "Agent encountered an error during discovery.");
-        }
-        
-        // Ensure all animations finish
-        await new Promise(r => setTimeout(r, 6000));
-        
-        if (!active) return;
-        const { data } = resJson;
-        setResults(data);
-        setLogs((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString() + "done",
-            timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-            level: "success",
-            message: `✓ literature review ready`,
-          },
-        ]);
-        
-        // Auto-advance
-        if (onAdvance) {
-          setTimeout(() => {
-            if (active) onAdvance();
-          }, 1500);
-        }
-        
+        await authedStreamFetch(
+          `/api/projects/${projectId}/agent/literature`,
+          "POST",
+          { trigger: "discovery" },
+          (event, data) => {
+            if (!active) return;
+            
+            if (event === "log") {
+              setLogs((prev) => [
+                ...prev,
+                {
+                  id: Date.now().toString() + Math.random(),
+                  timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                  level: "info",
+                  message: data.message,
+                },
+              ]);
+            } else if (event === "chunk") {
+              // We could render raw tokens, but for now we just show a generic "Agent Reasoning..." log
+              // if it's the first chunk
+              setLogs((prev) => {
+                const last = prev[prev.length - 1];
+                if (last && last.message.startsWith("> Agent Reasoning")) {
+                  // If you want to actually render the JSON tokens in real-time, 
+                  // you could append data.token to the message. 
+                  // For a cleaner UX in this specific stage, we'll keep the log clean:
+                  return prev; 
+                }
+                return [
+                  ...prev,
+                  {
+                    id: Date.now().toString() + Math.random(),
+                    timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                    level: "info",
+                    message: "> Agent Reasoning [streaming JSON output]...",
+                  }
+                ];
+              });
+              setSourceAgent("Generating Literature Review...");
+            } else if (event === "done") {
+              setResults(data.data || []);
+              setLogs((prev) => [
+                ...prev,
+                {
+                  id: Date.now().toString() + "done",
+                  timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                  level: "success",
+                  message: `✓ literature review ready`,
+                },
+              ]);
+              setSourceAgent("Complete ✓");
+              setAnalysisAgent("Complete ✓");
+              setEvidenceAgent("Complete ✓");
+              setKnowledgeAgent("Complete ✓");
+
+              if (onAdvance) {
+                setTimeout(() => {
+                  if (active) onAdvance();
+                }, 1500);
+              }
+            } else if (event === "error") {
+              throw new Error(data.message || "Agent encountered an error.");
+            }
+          }
+        );
       } catch (err: any) {
         if (!active) return;
         setError(err.message);
@@ -163,7 +146,6 @@ export default function LiteratureStage({
         ]);
       } finally {
         if (active) {
-          clearInterval(logInterval);
           setIsProcessing(false);
         }
       }

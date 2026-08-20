@@ -4,7 +4,7 @@ import type { ProjectView } from "../types";
  * first slice shows the two that are backed by real data today — gate and
  * blocking-count — rather than fabricate the other four (saved state,
  * spend, online state, running-agent count all need pieces not built yet). */
-export default function StatusBar({ project }: { project: ProjectView }) {
+export default function StatusBar({ project, trayOpen, onToggleTray }: { project: ProjectView, trayOpen?: boolean, onToggleTray?: () => void }) {
   const current = project.gates.find((g) => g.status !== "signed_off") ?? project.gates[project.gates.length - 1];
   const blockingCount = project.gates.reduce((n, g) => n + g.outstandingBlocking.length, 0);
 
@@ -17,6 +17,15 @@ export default function StatusBar({ project }: { project: ProjectView }) {
       <span className={blockingCount > 0 ? "text-amber-400" : ""}>
         {blockingCount === 0 ? "no blocking findings" : `⚠ ${blockingCount} blocking`}
       </span>
+      
+      {onToggleTray && (
+        <button 
+          onClick={onToggleTray}
+          className={`ml-auto px-2 py-0.5 rounded transition-colors cursor-pointer ${trayOpen ? 'bg-[color:var(--surface-hover)] text-[color:var(--text-primary)]' : 'hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]'}`}
+        >
+          Activity Tray
+        </button>
+      )}
     </div>
   );
 }

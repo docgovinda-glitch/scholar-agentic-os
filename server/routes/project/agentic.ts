@@ -1,6 +1,6 @@
 import express from "express";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
-import { callOpenRouterJSON, callOpenRouterText } from "../../utils/llm.ts";
+import { callOpenRouterJSON, callOpenRouterText, streamOpenRouterJSON } from "../../utils/llm.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../../src/supabaseRest.ts";
 
 const router = express.Router({ mergeParams: true });
@@ -55,11 +55,19 @@ Return ONLY valid JSON in this exact format:
 }
 CRITICAL INSTRUCTION: Generate exactly 15 highly relevant sources. Do not hallucinate irrelevant topics.`;
     const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}`;
-    const result = await callOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "simple");
-    res.json({ ok: true, data: result.data, meta: result.meta });
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "simple");
+    if (result) {
+      res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data, meta: result.meta })}\n\n`);
+      res.end();
+    }
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
+      res.end();
+    }
   }
 });
 

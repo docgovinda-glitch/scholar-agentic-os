@@ -12,7 +12,7 @@
 
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
 import { routeDecision, type RoutingDecision, type RoutingTaskType } from "./aiAccess/aiAccessApi";
-import { completeWithFailover, type CandidateProvider } from "../platform/gateway/gateway";
+import { completeWithFailover, streamWithFailover, type CandidateProvider } from "../platform/gateway/gateway";
 import type {
   Author,
   CanonicalDocument,
@@ -40,6 +40,7 @@ import type {
   SupportStrength,
   VoiceProfile,
 } from "./types";
+import { readProviderKey } from "../services/userAiSettings";
 
 /** Raised when the server rejects the session. Callers re-authenticate rather than retry. */
 export class UnauthenticatedError extends Error {
@@ -98,7 +99,122 @@ export async function authedJsonFetch(input: string, method: string, body: unkno
   return res;
 }
 
-async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskType: RoutingTaskType = "reasoning") {
+/** 
+ * authedStreamFetch expects the backend to stream Server-Sent Events (SSE). 
+ * If it gets a 426, it simulates SSE chunks via the local LLM engine.
+ */
+export async function authedStreamFetch(input: string, method: string, body: unknown, onEvent: (event: string, data: any) => void): Promise<void> {
+  const res = await authedFetch(input, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (res.status === 426) {
+    const data = await res.json().catch(() => null);
+    if (data && data.requireFrontendLLM) {
+      onEvent("log", { message: "> Initiating local frontend agentic stream..." });
+      try {
+        let fullContent = "";
+        const finalResult = await executeAgenticLLM(data.systemPrompt, data.userPrompt, data.taskType || "reasoning", (chunk) => {
+          fullContent += chunk;
+          onEvent("chunk", { token: chunk });
+        });
+        // We simulate the backend's post-processing by parsing here
+        let parsed;
+        try {
+          parsed = JSON.parse(finalResult);
+        } catch(e) {
+          // try removing markdown ticks if present
+          try {
+            parsed = JSON.parse(finalResult.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim());
+          } catch(e2) {
+            throw new Error("Invalid JSON from LLM: " + finalResult);
+          }
+        }
+        // Then we POST it back to let the backend do its DB updates
+        const postRes = await authedFetch(input, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...((body as any) || {}), llmResult: parsed }),
+        });
+        
+        // Wait, wait... wait, if it posts it back, the backend doesn't stream, it returns the final JSON, which would be SSE!
+        // The backend's /literature route does:
+        // if (req.body.llmResult) { ... returns llmResult }
+        // then streamOpenRouterJSON returns it.
+        // Then the endpoint does DB stuff and sends `event: done`.
+        // So we just need to consume the final SSE stream!
+        const reader = postRes.body?.getReader();
+        const decoder = new TextDecoder("utf-8");
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+            for (const line of lines) {
+              if (line.startsWith("event: ")) {
+                // Keep it simple for this fake stream parser
+                const nextLine = lines[lines.indexOf(line) + 1];
+                if (nextLine && nextLine.startsWith("data: ")) {
+                  try {
+                    const evtData = JSON.parse(nextLine.substring(6));
+                    onEvent(line.substring(7).trim(), evtData);
+                  } catch (e) {}
+                }
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        onEvent("error", { message: err.message });
+      }
+      return;
+    }
+  }
+
+  if (!res.body) {
+    onEvent("error", { message: "No response body." });
+    return;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let currentEvent = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    
+    const lines = chunk.split("\n");
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) continue;
+      
+      if (t.startsWith("event: ")) {
+        currentEvent = t.substring(7).trim();
+      } else if (t.startsWith("data: ")) {
+        try {
+          const evtData = JSON.parse(t.substring(6));
+          if (currentEvent) {
+            onEvent(currentEvent, evtData);
+            currentEvent = ""; // reset
+          }
+        } catch (e) {}
+      }
+    }
+  }
+}
+
+let activeManualModelOverride: { providerId: string; modelId?: string } | null = null;
+
+export function setGlobalManualModelOverride(override: { providerId: string; modelId?: string } | null) {
+  activeManualModelOverride = override;
+}
+
+async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskType: RoutingTaskType = "reasoning", onChunk?: (chunk: string) => void) {
   const decision = await routeDecision(taskType);
   if (!decision || !decision.ok) {
     throw new Error(decision?.reasoning || "No AI routing decision available.");
@@ -111,8 +227,7 @@ async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskT
     if (c.tier === "premium") {
       candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "premium" });
     } else if (c.tier === "byok" || c.tier === "free") {
-      // const key = await readProviderKey(c.providerId);
-      const key = undefined;
+      const key = await readProviderKey(c.providerId);
       if (key) {
         candidates.push({ provider: c.providerId, model: c.modelId, apiKey: key });
       }
@@ -120,6 +235,15 @@ async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskT
       // For local, we push a special flag. Our loop will attempt it.
       candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "local-no-credential-required" });
     }
+  }
+
+  if (activeManualModelOverride) {
+    const key = await readProviderKey(activeManualModelOverride.providerId);
+    candidates.unshift({ 
+      provider: activeManualModelOverride.providerId, 
+      model: activeManualModelOverride.modelId, 
+      apiKey: key || "manual-override-key" 
+    });
   }
 
   if (candidates.length === 0) {
@@ -136,11 +260,24 @@ async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskT
     segments: [],
   };
 
-  const result = await completeWithFailover(req, { candidates });
-  if (!result.ok) {
-    throw new Error("Agentic generation failed: " + (result as any).error?.message);
+  if (onChunk) {
+    let full = "";
+    const iter = await streamWithFailover(req, { candidates });
+    for await (const chunk of iter) {
+      if (!chunk.ok) {
+        throw new Error("Agentic generation failed: " + chunk.error?.message);
+      }
+      full += chunk.value;
+      onChunk(chunk.value);
+    }
+    return full;
+  } else {
+    const result = await completeWithFailover(req, { candidates });
+    if (!result.ok) {
+      throw new Error("Agentic generation failed: " + (result as any).error?.message);
+    }
+    return result.value;
   }
-  return result.value;
 }
 
 async function json<T>(res: Response): Promise<T> {

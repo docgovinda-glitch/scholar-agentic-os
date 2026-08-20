@@ -61,6 +61,8 @@ import type { ExportFormat } from "../../src/app/export/types.ts";
 import { buildReport, compileRubricFromOutputType, applyWaivers, waiveRule, RuleNotWaivableError } from "../../src/app/rubric/rubric.ts";
 
 import { agenticRouter } from "./project/agentic.js";
+import { activityRouter } from "./project/activity.ts";
+import { filesRouter } from "./project/files.ts";
 
 import { emptyDocument } from "../../src/domain/document/model.ts";
 import { registerSubmissionsRoutes } from "./project/submissions.ts";
@@ -1035,21 +1037,25 @@ export function getSharedStore() {
 export function registerProjectRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
   const store = getSharedStore();
 
+  const router = express.Router();
+  router.use(requireAuth);
+
   // Everything under /api/projects requires a verified Supabase session.
   //
   // Previously nothing here did. Combined with projects having no owner and
   // sequential ids, any unauthenticated caller could create projects, read
   // and overwrite anyone else's by walking the id space, and drive the
-  app.use("/api/projects", requireAuth);
-
-  registerClaimsRoutes(app, projectLimit);
-  registerEvidenceRoutes(app, projectLimit);
-  registerSubmissionsRoutes(app, projectLimit);
-  registerJournalComplianceRoutes(app, projectLimit);
   // model-backed export path. The Atlas catalog routes below are deliberately
   // left public: they are a static list of output types with no user data in
   // them, and the "choose what you are writing" screen reads them.
-  app.use("/api/projects", requireAuth);
+  router.use("/:id/claims", registerClaimsRoutes(projectLimit));
+  router.use("/:id/evidence", registerEvidenceRoutes(projectLimit));
+  router.use("/:id/activity", activityRouter);
+  router.use("/:id/files", filesRouter);
+  router.use("/:id/agent", agenticRouter);
+  registerJournalComplianceRoutes(router, projectLimit);
+  
+  app.use("/api/projects", router);
 
   /**
    * Summaries of every catalog entry — the "choose an output type" list
