@@ -27,7 +27,6 @@ import VaultScreen from "./vault/VaultScreen";
 import DeskPocketMount from "./pocket/DeskPocketMount";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 
-import { AiStatusIndicator } from "./regions/AiStatusIndicator";
 
 const SECTION_IDS: readonly SectionId[] = ["overview", "local", "free", "byok", "premium", "models", "settings"];
 
@@ -350,9 +349,6 @@ export default function DeskApp() {
           </Route>
         </Route>
       </Routes>
-      <div className="fixed bottom-4 left-4 z-50">
-        <AiStatusIndicator />
-      </div>
     </>
   );
 }

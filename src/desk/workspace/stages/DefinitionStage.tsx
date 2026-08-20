@@ -64,7 +64,7 @@ export default function DefinitionStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const [spec, setSpec] = useState<OutputTypeSpec | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>(project.answers ?? {});
@@ -126,6 +126,16 @@ export default function DefinitionStage({
   async function handleSave() {
     setBusy(true);
     setError(null);
+
+    // Validate required fields
+    for (const field of [...researchFields, ...governanceFields]) {
+      if (field.required && (!answers[field.key] || answers[field.key].trim() === "")) {
+        setError(`Please complete the required field: ${field.label.replace(' *', '').replace(' (Optional)', '')}.`);
+        setBusy(false);
+        return;
+      }
+    }
+
     try {
       const updatedAnswers = await saveIntakeAnswers(projectId, answers);
       const updatedAuthors = await saveAuthors(projectId, authors);
@@ -133,7 +143,7 @@ export default function DefinitionStage({
       onSaved({ ...updatedAnswers, authors: updatedAuthors.authors });
       setSavedAt(Date.now());
       if (onAdvance) {
-        onAdvance();
+        onAdvance("literature");
       }
     } catch (e) {
       setError((e as Error).message);
@@ -154,7 +164,7 @@ export default function DefinitionStage({
         { key: "working_title", label: "Working Title", placeholder: "Primary research-intent signal...", required: true, multiline: false },
         { key: "research_area", label: "Research Area / Domain", placeholder: "e.g., Machine Learning, Public Health...", required: true, multiline: false },
         { key: "article_type", label: "Article Type", placeholder: "Select or specify...", required: true, multiline: false },
-        { key: "study_design", label: "Study Design / Type", placeholder: "Select or specify...", required: false, multiline: false },
+        { key: "study_design", label: "Study Design / Type (Optional)", placeholder: "Select or specify...", required: false, multiline: false },
         { key: "target_journal", label: "Target Journal (Optional)", placeholder: "Optional target journal", required: false, multiline: false },
         { key: "author_guidelines", label: "Author Guidelines (Optional)", placeholder: "URL or brief notes", required: false, multiline: true },
         { key: "target_population", label: "Target Population / Sample / Data (Optional)", placeholder: "Describe the population, dataset, or sample you are studying", required: false, multiline: true },
@@ -166,7 +176,7 @@ export default function DefinitionStage({
     : [];
 
   const governanceFields = [
-    { key: "human_subjects", label: "Does this research involve Human or Animal Subjects?", placeholder: "Yes / No", required: true },
+    { key: "human_subjects", label: "Does this research involve Human or Animal Subjects? (Optional)", placeholder: "Yes / No", required: false },
     ...(answers.human_subjects?.toLowerCase().includes("yes") ? [
       { key: "ethical_approval", label: "Ethical Approval", placeholder: "IRB/Ethics committee approval number", required: true },
       { key: "consent_requirements", label: "Consent Requirements", placeholder: "Informed consent procedures", required: true }
@@ -420,37 +430,23 @@ export default function DefinitionStage({
     </div>
   </div>
 
-  <div className="sticky bottom-0 bg-[color:var(--surface-raised)]/90 backdrop-blur-md border-t border-[color:var(--border-subtle)] px-8 py-5 flex items-center justify-between z-20">
-        <div className="flex items-center gap-4 text-sm">
-          {savedAt && (
-            <span className="text-[color:var(--state-success)] font-medium flex items-center gap-1.5 animate-fade-in">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Saved
-            </span>
-          )}
-        </div>
+  <div className="sticky bottom-0 bg-[color:var(--surface-raised)]/90 backdrop-blur-md border-t border-[color:var(--border-subtle)] px-8 py-5 flex items-center justify-end z-20">
         <button
           type="button"
           onClick={handleSave}
           disabled={busy}
           className="rounded-full bg-[color:var(--accent)] px-8 py-3 text-sm font-black text-white hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] focus:ring-offset-2 disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
         >
-          {busy ? (
-            <>
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Saving...
-            </>
-          ) : (
-            <>
-              Start Research
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </>
+          {busy && (
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          )}
+          Start Research
+          {!busy && (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           )}
         </button>
       </div>
