@@ -27,6 +27,9 @@
  */
 
 import { getSupabaseRestConfig, SupabaseTable } from "../supabaseRest";
+import { completeWithFailover } from "../../../src/platform/gateway/gateway.js";
+import { defaultPolicy } from "../../../src/platform/warden/policy.js";
+import { getCandidates } from "../../utils/llm.js";
 
 interface RawOpportunity {
   providerName: string;
@@ -128,28 +131,36 @@ SEARCH RESULTS:
 `;
 
 async function synthesize(searchResults: Array<{ title: string; url: string; content: string }>): Promise<RawOpportunity[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured on the server.");
   if (searchResults.length === 0) return [];
+
+  const candidates = getCandidates();
+  if (candidates.length === 0) throw new Error("No AI provider configured. Set OPENROUTER_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY.");
 
   const resultsText = searchResults.map((r, i) => `[${i + 1}] ${r.title}\nURL: ${r.url}\n${r.content.slice(0, 1500)}\n`).join("\n");
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: SYNTHESIS_PROMPT + resultsText }] }] }),
-  });
-
-  if (!response.ok) throw new Error(`Gemini synthesis ${response.status}: ${(await response.text().catch(() => "")).slice(0, 300)}`);
-  const data = (await response.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
-
-  // Strip markdown code fences if the model added them despite the prompt.
-  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
   try {
-    const parsed = JSON.parse(cleaned);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
+    const result = await completeWithFailover(
+      {
+        taskClass: "discovery",
+        systemPrompt: SYNTHESIS_PROMPT,
+        userPrompt: resultsText,
+        responseFormat: "json",
+        segments: [{ label: "SearchResults", text: resultsText }]
+      },
+      { candidates },
+      defaultPolicy()
+    );
+
+    // Strip markdown code fences if the model added them despite the prompt.
+    const cleaned = result.result.text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+    try {
+      const parsed = JSON.parse(cleaned);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  } catch (err: any) {
+    console.warn("[OpportunityAgent] Synthesis failed:", err.message);
     return [];
   }
 }

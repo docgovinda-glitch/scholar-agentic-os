@@ -2,7 +2,18 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 
 process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
-process.env.GEMINI_API_KEY = "test-gemini-key";
+process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+
+// Mock the gateway so tests don't make real HTTP calls.
+// The mock is set up before the module under test is imported.
+const mockCompleteWithFailover = vi.fn();
+vi.mock("../../../../src/platform/gateway/gateway.js", () => ({
+  completeWithFailover: mockCompleteWithFailover,
+  streamWithFailover: vi.fn(),
+}));
+vi.mock("../../../../src/platform/warden/policy.js", () => ({
+  defaultPolicy: () => ({}),
+}));
 
 const { runOpportunityResearch } = await import("../opportunityAgent");
 
@@ -10,48 +21,58 @@ const originalFetch = global.fetch;
 afterEach(() => {
   global.fetch = originalFetch;
   vi.restoreAllMocks();
+  mockCompleteWithFailover.mockReset();
 });
 
-function mockFetch(handlers: { searchProxy?: unknown; gemini?: string; insertedRows?: any[] }) {
+/** Helper: stub the search-proxy and gateway synthesis result. */
+function mockDeps(opts: { searchResults?: any[]; geminiText?: string; insertedRows?: any[] }) {
+  const results = opts.searchResults ?? [];
+  const geminiText = opts.geminiText ?? "[]";
+
   global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
 
     if (url.includes("/functions/v1/search-proxy")) {
-      return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(handlers.searchProxy ?? { results: [] }), json: async () => handlers.searchProxy ?? { results: [] } } as Response);
-    }
-    if (url.includes("generativelanguage.googleapis.com")) {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: async () => ({ candidates: [{ content: { parts: [{ text: handlers.gemini ?? "[]" }] } }] }),
+        text: async () => JSON.stringify({ results }),
+        json: async () => ({ results }),
       } as Response);
     }
     if (url.includes("/rest/v1/ai_opportunities")) {
-      if (init?.body) handlers.insertedRows?.push(...JSON.parse(init.body as string));
+      if (init?.body) opts.insertedRows?.push(...JSON.parse(init.body as string));
       return Promise.resolve({ ok: true, status: 201, text: async () => "" } as Response);
     }
     return Promise.resolve({ ok: true, status: 200, text: async () => "[]" } as Response);
   }) as unknown as typeof fetch;
+
+  if (results.length > 0) {
+    mockCompleteWithFailover.mockResolvedValue({ result: { text: geminiText } });
+  }
 }
 
 describe("runOpportunityResearch", () => {
   it("stores zero rows and does not error when search returns nothing", async () => {
-    mockFetch({ searchProxy: { results: [] } });
+    mockDeps({ searchResults: [] });
     const count = await runOpportunityResearch("free AI API tiers 2026");
     expect(count).toBe(0);
   });
 
   it("stores zero rows when the model correctly reports no genuine opportunity found", async () => {
-    mockFetch({ searchProxy: { results: [{ title: "Some blog", url: "https://blog.example.com", content: "..." }] }, gemini: "[]" });
+    mockDeps({
+      searchResults: [{ title: "Some blog", url: "https://blog.example.com", content: "..." }],
+      geminiText: "[]",
+    });
     const count = await runOpportunityResearch("query");
     expect(count).toBe(0);
   });
 
   it("stores a well-formed opportunity with all fields mapped correctly", async () => {
     const inserted: any[] = [];
-    mockFetch({
-      searchProxy: { results: [{ title: "Gemini API pricing", url: "https://ai.google.dev/pricing", content: "Free tier..." }] },
-      gemini: JSON.stringify([
+    mockDeps({
+      searchResults: [{ title: "Gemini API pricing", url: "https://ai.google.dev/pricing", content: "Free tier..." }],
+      geminiText: JSON.stringify([
         {
           providerName: "Google",
           opportunityName: "Gemini API free tier",
@@ -81,9 +102,11 @@ describe("runOpportunityResearch", () => {
 
   it("filters out a malformed entry missing a required field rather than storing garbage", async () => {
     const inserted: any[] = [];
-    mockFetch({
-      searchProxy: { results: [{ title: "x", url: "https://x.com", content: "x" }] },
-      gemini: JSON.stringify([{ providerName: "Missing URL Corp", opportunityName: "Something", multiUserAllowed: "unclear", confidence: "low", risk: "medium" }]),
+    mockDeps({
+      searchResults: [{ title: "x", url: "https://x.com", content: "x" }],
+      geminiText: JSON.stringify([
+        { providerName: "Missing URL Corp", opportunityName: "Something", multiUserAllowed: "unclear", confidence: "low", risk: "medium" },
+      ]),
       insertedRows: inserted,
     });
 
@@ -94,9 +117,14 @@ describe("runOpportunityResearch", () => {
 
   it("tolerates the model wrapping its JSON in markdown code fences", async () => {
     const inserted: any[] = [];
-    mockFetch({
-      searchProxy: { results: [{ title: "x", url: "https://x.com", content: "x" }] },
-      gemini: "```json\n" + JSON.stringify([{ providerName: "P", opportunityName: "O", officialUrl: "https://p.com", multiUserAllowed: "unclear", confidence: "low", risk: "low" }]) + "\n```",
+    mockDeps({
+      searchResults: [{ title: "x", url: "https://x.com", content: "x" }],
+      geminiText:
+        "```json\n" +
+        JSON.stringify([
+          { providerName: "P", opportunityName: "O", officialUrl: "https://p.com", multiUserAllowed: "unclear", confidence: "low", risk: "low" },
+        ]) +
+        "\n```",
       insertedRows: inserted,
     });
 
@@ -105,7 +133,10 @@ describe("runOpportunityResearch", () => {
   });
 
   it("does not throw on unparseable model output — treats it as zero findings", async () => {
-    mockFetch({ searchProxy: { results: [{ title: "x", url: "https://x.com", content: "x" }] }, gemini: "not json at all" });
+    mockDeps({
+      searchResults: [{ title: "x", url: "https://x.com", content: "x" }],
+      geminiText: "not json at all",
+    });
     const count = await runOpportunityResearch("query");
     expect(count).toBe(0);
   });
@@ -116,7 +147,8 @@ describe("runOpportunityResearch", () => {
       const url = typeof input === "string" ? input : input.toString();
       const headers = JSON.stringify(init?.headers ?? {});
       if (/tavily/i.test(headers) || url.includes("api.tavily.com")) sawTavilyKey = true;
-      if (url.includes("/functions/v1/search-proxy")) return Promise.resolve({ ok: true, status: 200, text: async () => "{}", json: async () => ({ results: [] }) } as Response);
+      if (url.includes("/functions/v1/search-proxy"))
+        return Promise.resolve({ ok: true, status: 200, text: async () => "{}", json: async () => ({ results: [] }) } as Response);
       return Promise.resolve({ ok: true, status: 200, text: async () => "[]" } as Response);
     }) as unknown as typeof fetch;
 

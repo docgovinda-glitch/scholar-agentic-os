@@ -1,163 +1,219 @@
 import dotenv from 'dotenv';
+import { completeWithFailover, streamWithFailover } from "../../src/platform/gateway/gateway.js";
+import { defaultPolicy } from "../../src/platform/warden/policy.js";
+import type { TaskClass } from "../../src/platform/warden/types.js";
+import type { CandidateProvider } from "../../src/platform/gateway/types.js";
 
 dotenv.config();
 
-/**
- * Calls an LLM with the specified system and user prompts and returns the parsed JSON response.
- * Primary: OpenRouter (if OPENROUTER_API_KEY is set)
- * Fallback: Google Gemini (if GEMINI_API_KEY is set)
- */
-export async function callOpenRouterJSON(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning"): Promise<any> {
+export function mapTaskType(taskType: string): TaskClass {
+  const valid: TaskClass[] = ["drafting", "refinement", "chat", "summarisation", "verification", "rule_extraction", "discovery", "embedding", "classification"];
+  return valid.includes(taskType as TaskClass) ? (taskType as TaskClass) : "chat";
+}
+
+export function getCandidates(): CandidateProvider[] {
+  const candidates: CandidateProvider[] = [];
+  
+  if (process.env.OPENROUTER_API_KEY) {
+    candidates.push({ provider: "openrouter", apiKey: process.env.OPENROUTER_API_KEY });
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    candidates.push({ provider: "anthropic", apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  if (process.env.GEMINI_API_KEY) {
+    candidates.push({ provider: "gemini", apiKey: process.env.GEMINI_API_KEY });
+  }
+  
+  return candidates;
+}
+
+function handleFrontendLLMOverride(req: any) {
   if (req.body && req.body.llmResult) {
     let content = req.body.llmResult;
     if (typeof content === "object" && typeof content.text === "string") {
       content = content.text;
     }
-    
-    // Gemini sometimes wraps JSON in markdown fences
+    return content;
+  }
+  return null;
+}
+
+function handleFrontendLLMOverrideJSON(req: any) {
+  const content = handleFrontendLLMOverride(req);
+  if (content) {
     if (typeof content === "string") {
-      content = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+      const cleanContent = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
       try {
-        return JSON.parse(content);
+        return JSON.parse(cleanContent);
       } catch (err) {
         throw new Error("Invalid JSON returned by LLM");
       }
     }
     return content;
   }
+  return null;
+}
 
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
+export async function callOpenRouterJSON(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning"): Promise<any> {
+  const override = handleFrontendLLMOverrideJSON(req);
+  if (override) return override;
 
-  if (openRouterKey) {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openRouterKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://scholar-agentic-os.com", // Required by OpenRouter
-        "X-Title": "Scholar Agentic OS"
+  const candidates = getCandidates();
+  if (candidates.length === 0) {
+    if (!res.headersSent) res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+    throw new Error("RequireFrontendLLMException");
+  }
+
+  try {
+    const result = await completeWithFailover(
+      {
+        taskClass: mapTaskType(taskType),
+        systemPrompt,
+        userPrompt,
+        responseFormat: "json",
+        segments: [{ label: "Input", text: userPrompt }]
       },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        response_format: { type: "json_object" }
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenRouter API error: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-
-    try {
-      return JSON.parse(content);
-    } catch (err) {
-      console.error("Failed to parse LLM JSON output:", content);
-      throw new Error("Invalid JSON returned by LLM");
-    }
-  } else if (geminiKey) {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: { text: systemPrompt } },
-        contents: [{ parts: [{ text: userPrompt }] }],
-        generationConfig: { responseMimeType: "application/json" }
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API error: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
-    let content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      { candidates },
+      defaultPolicy()
+    );
     
-    // Gemini sometimes wraps JSON in markdown fences even with responseMimeType set
-    content = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-
-    try {
-      return JSON.parse(content);
-    } catch (err) {
-      console.error("Failed to parse Gemini JSON output:", content);
-      throw new Error("Invalid JSON returned by LLM");
+    const text = result.result.text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+    return JSON.parse(text);
+  } catch (err: any) {
+    if (!res.headersSent) {
+      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
     }
+    throw new Error("RequireFrontendLLMException");
   }
-  
-  if (!res.headersSent) {
-    res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
-  }
-  throw new Error("RequireFrontendLLMException");
 }
 
 export async function callOpenRouterText(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning"): Promise<string> {
-  if (req.body && req.body.llmResult) {
-    let content = req.body.llmResult;
-    if (typeof content === "object" && typeof content.text === "string") {
-      content = content.text;
-    }
-    return content;
+  const override = handleFrontendLLMOverride(req);
+  if (override) return override;
+
+  const candidates = getCandidates();
+  if (candidates.length === 0) {
+    if (!res.headersSent) res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+    throw new Error("RequireFrontendLLMException");
   }
 
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
-
-  if (openRouterKey) {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openRouterKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://scholar-agentic-os.com",
-        "X-Title": "Scholar Agentic OS"
+  try {
+    const result = await completeWithFailover(
+      {
+        taskClass: mapTaskType(taskType),
+        systemPrompt,
+        userPrompt,
+        segments: [{ label: "Input", text: userPrompt }]
       },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ]
-      })
-    });
+      { candidates },
+      defaultPolicy()
+    );
+    return result.result.text;
+  } catch (err: any) {
+    if (!res.headersSent) res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+    throw new Error("RequireFrontendLLMException");
+  }
+}
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenRouter API error: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content;
-  } else if (geminiKey) {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: { text: systemPrompt } },
-        contents: [{ parts: [{ text: userPrompt }] }]
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API error: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning") {
+  const candidates = getCandidates();
+  if (candidates.length === 0) {
+    res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+    return;
   }
 
   if (!res.headersSent) {
-    res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
   }
-  throw new Error("RequireFrontendLLMException");
+
+  const sendEvent = (event: string, data: any) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  sendEvent("log", { message: "> Initializing Agent Framework..." });
+
+  let fullContent = "";
+
+  try {
+    await streamWithFailover(
+      {
+        taskClass: mapTaskType(taskType),
+        systemPrompt,
+        userPrompt,
+        responseFormat: "json",
+        segments: [{ label: "Input", text: userPrompt }]
+      },
+      (chunk: string) => {
+        fullContent += chunk;
+        sendEvent("chunk", { token: chunk });
+      },
+      { candidates },
+      defaultPolicy()
+    );
+
+    sendEvent("log", { message: "> Parsing final JSON..." });
+    const cleanText = fullContent.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+    return JSON.parse(cleanText);
+  } catch (err: any) {
+    if (!res.headersSent) {
+      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+      return;
+    }
+    throw err;
+  }
+}
+
+export async function streamOpenRouterText(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning") {
+  const candidates = getCandidates();
+  if (candidates.length === 0) {
+    res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+    return;
+  }
+
+  if (!res.headersSent) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+  }
+
+  const sendEvent = (event: string, data: any) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  sendEvent("log", { message: "> Initializing Agent Framework..." });
+
+  let fullContent = "";
+
+  try {
+    await streamWithFailover(
+      {
+        taskClass: mapTaskType(taskType),
+        systemPrompt,
+        userPrompt,
+        segments: [{ label: "Input", text: userPrompt }]
+      },
+      (chunk: string) => {
+        fullContent += chunk;
+        sendEvent("chunk", { token: chunk });
+      },
+      { candidates },
+      defaultPolicy()
+    );
+
+    return fullContent;
+  } catch (err: any) {
+    if (!res.headersSent) {
+      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+      return;
+    }
+    throw err;
+  }
 }
 
 export async function generateGeminiEmbedding(text: string): Promise<number[]> {
@@ -181,207 +237,3 @@ export async function generateGeminiEmbedding(text: string): Promise<number[]> {
   const data = await response.json();
   return data.embedding.values;
 }
-
-export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning") {
-  // If fallback is required (e.g. no backend key), trigger frontend stream instead
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
-
-  if (!openRouterKey && !geminiKey) {
-    res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
-    return;
-  }
-
-  // Setup SSE headers
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-  });
-
-  const sendEvent = (event: string, data: any) => {
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  };
-
-  sendEvent("log", { message: "> Initializing Agent Framework..." });
-
-  if (openRouterKey) {
-    sendEvent("log", { message: `> Connecting to OpenRouter (${model})...` });
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openRouterKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://scholar-agentic-os.com",
-        "X-Title": "Scholar Agentic OS"
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        response_format: { type: "json_object" },
-        stream: true
-      })
-    });
-
-    if (!response.ok) {
-      sendEvent("error", { message: `OpenRouter API error: ${response.status}` });
-      
-      return;
-    }
-
-    sendEvent("log", { message: "> Awaiting reasoning tokens..." });
-
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let fullContent = "";
-
-    let buffer = "";
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        
-        for (const rawLine of lines) {
-          const line = rawLine.trim();
-          if (!line) continue;
-          if (line === "data: [DONE]") continue;
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.substring(6));
-              const token = data.choices[0]?.delta?.content || "";
-              if (token) {
-                fullContent += token;
-                sendEvent("chunk", { token });
-              }
-            } catch (e) {
-              // ignore parse errors for partial lines
-            }
-          }
-        }
-      }
-    }
-
-    sendEvent("log", { message: "> Parsing final JSON..." });
-    try {
-      const parsed = JSON.parse(fullContent);
-      return parsed;
-    } catch (err) {
-      throw new Error("Invalid JSON returned by LLM");
-    }
-    
-  } else if (geminiKey) {
-    // Basic fallback to non-streaming Gemini if needed, simulating stream
-    sendEvent("log", { message: "> Falling back to Gemini API (non-streaming)..." });
-    try {
-      const resultJSON = await callOpenRouterJSON(req, res, systemPrompt, userPrompt, model, taskType);
-      return resultJSON;
-    } catch(err: any) {
-      throw err;
-    }
-  }
-}
-
-export async function streamOpenRouterText(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning") {
-  // If fallback is required (e.g. no backend key), trigger frontend stream instead
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
-
-  if (!openRouterKey && !geminiKey) {
-    res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
-    return;
-  }
-
-  // Setup SSE headers
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-  });
-
-  const sendEvent = (event: string, data: any) => {
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  };
-
-  sendEvent("log", { message: "> Initializing Agent Framework..." });
-
-  if (openRouterKey) {
-    sendEvent("log", { message: `> Connecting to OpenRouter (${model})...` });
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openRouterKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://scholar-agentic-os.com",
-        "X-Title": "Scholar Agentic OS"
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        stream: true
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status}`);
-    }
-
-    sendEvent("log", { message: "> Awaiting tokens..." });
-
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let fullContent = "";
-
-    let buffer = "";
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        
-        for (const rawLine of lines) {
-          const line = rawLine.trim();
-          if (!line) continue;
-          if (line === "data: [DONE]") continue;
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.substring(6));
-              const token = data.choices[0]?.delta?.content || "";
-              if (token) {
-                fullContent += token;
-                sendEvent("chunk", { token });
-              }
-            } catch (e) {
-              // ignore parse errors for partial lines
-            }
-          }
-        }
-      }
-    }
-
-    sendEvent("log", { message: "> Finalizing text..." });
-    return fullContent;
-    
-  } else if (geminiKey) {
-    sendEvent("log", { message: "> Falling back to Gemini API (non-streaming)..." });
-    try {
-      const resultText = await callOpenRouterText(req, res, systemPrompt, userPrompt, model, taskType);
-      return resultText;
-    } catch(err: any) {
-      throw err;
-    }
-  }
-}
-

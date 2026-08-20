@@ -8,6 +8,9 @@ import { MarkdownParser } from "../../src/document_intelligence/parser/parsers/m
 import { detectHeadings } from "../../src/document_intelligence/parser/headingDetection.ts";
 import { importBibTex } from "../../src/citation_compliance/importers/bibtexImporter.ts";
 import { importRis } from "../../src/citation_compliance/importers/risImporter.ts";
+import { completeWithFailover } from "../../src/platform/gateway/gateway.js";
+import { defaultPolicy } from "../../src/platform/warden/policy.js";
+import { mapTaskType, getCandidates } from "../utils/llm.js";
 
 function extractPrintableStrings(buffer: Buffer): string {
   let result = "";
@@ -127,71 +130,51 @@ export function registerParseRoutes(app: express.Express, parseFileLimit: any, p
           text = extractPrintableStrings(buffer);
         }
       } else if ([".png", ".jpg", ".jpeg"].includes(ext)) {
+        const candidates = getCandidates();
+        if (candidates.length === 0) {
+          res.status(426).json({ requireFrontendLLM: true, systemPrompt: "", userPrompt: "", taskType: "vision" });
+          return;
+        }
+        const ocrPrompt = "You are an expert OCR and document analyzer. Transcribe all readable text from this image page of academic research or notes. Output only the clean transcribed text, maintaining structure, without any conversational preamble or comments.";
         try {
-          const apiKey = process.env.GEMINI_API_KEY;
-          if (!apiKey) throw new Error("Gemini API key not configured on server");
-
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: "You are an expert OCR and document analyzer. Transcribe all readable text from this image page of academic research or notes. Output only the clean transcribed text, maintaining structure, without any conversational preamble or comments." },
-                  {
-                    inlineData: {
-                      mimeType: fileType || `image/${ext === '.jpg' ? 'jpeg' : ext.slice(1)}`,
-                      data: fileContent
-                    }
-                  }
-                ]
-              }]
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(await response.text());
-          }
-          const data: any = await response.json();
-          text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          const result = await completeWithFailover(
+            {
+              taskClass: mapTaskType("vision"),
+              systemPrompt: ocrPrompt,
+              userPrompt: "",
+              responseFormat: "text",
+              segments: [{ label: "Image", text: "" }]
+            },
+            { candidates },
+            defaultPolicy()
+          );
+          text = result.result.text;
         } catch (err: any) {
-          console.warn("[Parser] Gemini OCR failed:", err.message);
+          console.warn("[Parser] OCR failed via gateway:", err.message);
           text = `[OCR Extraction Failed] The image file "${fileName}" could not be parsed automatically.`;
         }
       } else if ([".mp3", ".wav", ".m4a"].includes(ext)) {
+        const candidates = getCandidates();
+        if (candidates.length === 0) {
+          res.status(426).json({ requireFrontendLLM: true, systemPrompt: "", userPrompt: "", taskType: "audio" });
+          return;
+        }
+        const audioPrompt = "Listen to this audio recording carefully and transcribe it completely. Output only the clean transcription.";
         try {
-          const apiKey = process.env.GEMINI_API_KEY;
-          if (!apiKey) throw new Error("Gemini API key not configured on server");
-
-          let mime = "audio/mp3";
-          if (ext === ".wav") mime = "audio/wav";
-          else if (ext === ".m4a") mime = "audio/m4a";
-
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: "Listen to this audio recording carefully and transcribe it completely. Output only the clean transcription." },
-                  {
-                    inlineData: {
-                      mimeType: mime,
-                      data: fileContent
-                    }
-                  }
-                ]
-              }]
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(await response.text());
-          }
-          const data: any = await response.json();
-          text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          const result = await completeWithFailover(
+            {
+              taskClass: mapTaskType("audio"),
+              systemPrompt: audioPrompt,
+              userPrompt: "",
+              responseFormat: "text",
+              segments: [{ label: "Audio", text: "" }]
+            },
+            { candidates },
+            defaultPolicy()
+          );
+          text = result.result.text;
         } catch (err: any) {
-          console.warn("[Parser] Gemini Audio transcription failed:", err.message);
+          console.warn("[Parser] Audio transcription failed via gateway:", err.message);
           text = `[Audio Transcription Failed] The audio file "${fileName}" could not be parsed automatically.`;
         }
       } else {
