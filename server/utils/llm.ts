@@ -107,7 +107,11 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
       defaultPolicy()
     );
     
-    const text = result.ok ? result.value.text : "";
+    if (!result.ok) {
+      throw new Error(result.error.message || "AI Agent Generation Failed");
+    }
+
+    const text = result.value.text;
     return parseJsonFromLlm(text);
   } catch (err: any) {
     if (!res.headersSent) {
@@ -138,7 +142,10 @@ export async function callOpenRouterText(req: any, res: any, systemPrompt: strin
       { candidates },
       defaultPolicy()
     );
-    return result.ok ? result.value.text : "";
+    if (!result.ok) {
+      throw new Error(result.error.message || "AI Agent Generation Failed");
+    }
+    return result.value.text;
   } catch (err: any) {
     if (!res.headersSent) {
       res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
@@ -174,7 +181,7 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
   let fullContent = "";
 
   try {
-    await streamWithFailover(
+    const result = await streamWithFailover(
       {
         taskClass: mapTaskType(taskType),
         systemPrompt,
@@ -189,6 +196,10 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
       { candidates },
       defaultPolicy()
     );
+
+    if (!result.ok) {
+      throw new Error(result.error.message || "AI Agent Generation Failed");
+    }
 
     sendEvent("log", { message: "> Parsing final JSON..." });
     return parseJsonFromLlm(fullContent);
@@ -225,7 +236,7 @@ export async function streamOpenRouterText(req: any, res: any, systemPrompt: str
   let fullContent = "";
 
   try {
-    await streamWithFailover(
+    const result = await streamWithFailover(
       {
         taskClass: mapTaskType(taskType),
         systemPrompt,
@@ -239,6 +250,9 @@ export async function streamOpenRouterText(req: any, res: any, systemPrompt: str
       { candidates },
       defaultPolicy()
     );
+    if (!result.ok) {
+      throw new Error(result.error.message || "AI Agent Generation Failed");
+    }
 
     return fullContent;
   } catch (err: any) {

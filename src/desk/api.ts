@@ -163,21 +163,41 @@ export async function authedStreamFetch(input: string, method: string, body: unk
         const reader = postRes.body?.getReader();
         const decoder = new TextDecoder("utf-8");
         if (reader) {
+          let fallbackCurrentEvent = "";
+          let fallbackBuffer = "";
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split("\n").filter((line) => line.trim() !== "");
-            for (const line of lines) {
-              if (line.startsWith("event: ")) {
-                // Keep it simple for this fake stream parser
-                const nextLine = lines[lines.indexOf(line) + 1];
-                if (nextLine && nextLine.startsWith("data: ")) {
-                  try {
-                    const evtData = JSON.parse(nextLine.substring(6));
-                    onEvent(line.substring(7).trim(), evtData);
-                  } catch (e) {}
-                }
+            if (done) {
+              if (fallbackBuffer) {
+                processFallbackChunk(fallbackBuffer);
+              }
+              break;
+            }
+            fallbackBuffer += decoder.decode(value, { stream: true });
+            
+            let newlineIndex;
+            while ((newlineIndex = fallbackBuffer.indexOf("\n")) >= 0) {
+              const line = fallbackBuffer.slice(0, newlineIndex).trim();
+              fallbackBuffer = fallbackBuffer.slice(newlineIndex + 1);
+              processFallbackChunk(line);
+            }
+          }
+
+          function processFallbackChunk(line: string) {
+            if (!line) return;
+            if (line.startsWith("event: ")) {
+              fallbackCurrentEvent = line.substring(7).trim();
+            } else if (line.startsWith("data: ")) {
+              let evtData;
+              try {
+                evtData = JSON.parse(line.substring(6));
+              } catch (e) {
+                return;
+              }
+              if (fallbackCurrentEvent) {
+                const evtToDispatch = fallbackCurrentEvent;
+                fallbackCurrentEvent = ""; // reset early
+                onEvent(evtToDispatch, evtData);
               }
             }
           }
@@ -197,27 +217,43 @@ export async function authedStreamFetch(input: string, method: string, body: unk
   const reader = res.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let currentEvent = "";
+  let buffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
+    if (done) {
+      if (buffer) {
+        processChunk(buffer);
+      }
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
     
-    const lines = chunk.split("\n");
-    for (const line of lines) {
-      const t = line.trim();
-      if (!t) continue;
+    let newlineIndex;
+    while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      processChunk(line);
+    }
+  }
+
+  function processChunk(line: string) {
+    if (!line) return;
+    if (line.startsWith("event: ")) {
+      currentEvent = line.substring(7).trim();
+    } else if (line.startsWith("data: ")) {
+      let evtData;
+      try {
+        evtData = JSON.parse(line.substring(6));
+      } catch (e) {
+        // ignore JSON parse errors for incomplete/malformed chunks
+        return;
+      }
       
-      if (t.startsWith("event: ")) {
-        currentEvent = t.substring(7).trim();
-      } else if (t.startsWith("data: ")) {
-        try {
-          const evtData = JSON.parse(t.substring(6));
-          if (currentEvent) {
-            onEvent(currentEvent, evtData);
-            currentEvent = ""; // reset
-          }
-        } catch (e) {}
+      if (currentEvent) {
+        const evtToDispatch = currentEvent;
+        currentEvent = ""; // reset early
+        onEvent(evtToDispatch, evtData);
       }
     }
   }
