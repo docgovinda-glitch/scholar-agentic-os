@@ -17,6 +17,8 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
+import { getSharedStore } from "../project.ts";
+import { sourceToReference } from "../../../src/app/citation/resolveCitations.ts";
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";
 
@@ -63,6 +65,25 @@ async function addSourceAndCitableEvidence(projectId: string, claimId: string, t
   await request(app)
     .post(`/api/projects/${projectId}/evidence-ledger/items/${evidenceId}/approve`)
     .send({ actor: "u1", strength: "strong", rationale: "Direct measurement." });
+  const store = getSharedStore();
+  const record = await store.get(projectId);
+  if (record) {
+    record.evidenceLedger.sources = record.evidenceLedger.sources.map(s => {
+      if (s.id === sourceId) {
+        return { ...s, citationStatus: "confirmed", canonicalReference: sourceToReference(s) };
+      }
+      return s;
+    });
+    // Ensure the item reaches citable state since the source is now confirmed
+    record.evidenceLedger.items = record.evidenceLedger.items.map(i => {
+      if (i.sourceId === sourceId && i.state === "user_approved") {
+        return { ...i, state: "citable" };
+      }
+      return i;
+    });
+    await store.save(record);
+  }
+
   return { sourceId, evidenceId };
 }
 

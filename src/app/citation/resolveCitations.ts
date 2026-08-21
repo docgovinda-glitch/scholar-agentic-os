@@ -49,6 +49,7 @@ import { IEEEFormatter } from "../../citation_compliance/formatters/ieee";
 import { VancouverFormatter } from "../../citation_compliance/formatters/vancouver";
 import type { CitationStyle } from "../../citation_compliance/formattingEngine";
 import type { CanonicalReference, ReferenceAuthor, ReferenceKind } from "../../citation_compliance/model/reference";
+import { validateCitationCompleteness } from "../../citation_compliance/validation";
 import type { CanonicalDocument } from "../../domain/document/model";
 import type { DiscoveredSource, EvidenceLedger } from "../../domain/evidence/types";
 
@@ -152,10 +153,20 @@ export function resolveCitations(document: CanonicalDocument, evidenceLedger: Ev
       const evidenceId = match[1];
       const item = itemById.get(evidenceId);
       const source = item ? sourceById.get(item.sourceId) : undefined;
-      if (!source) {
+      const isConfirmed = source?.citationStatus === "confirmed";
+      const hasCanonical = !!source?.canonicalReference;
+      
+      let isValid = false;
+      if (hasCanonical) {
+        // Enforce the academic citation invariant: missing or unconfirmed sources cannot be cited.
+        isValid = validateCitationCompleteness(source.canonicalReference!).isValid;
+      }
+
+      if (!source || !isConfirmed || !hasCanonical || !isValid) {
         unresolvedIds.add(evidenceId);
         continue;
       }
+      
       if (!seenSourceIds.has(source.id)) {
         seenSourceIds.add(source.id);
         citationOrderSourceIds.push(source.id);
@@ -173,7 +184,10 @@ export function resolveCitations(document: CanonicalDocument, evidenceLedger: Ev
   const isNumberedInText = NUMBERED_IN_TEXT_STYLES.has(styleId);
   const isNumberedBibliography = NUMBERED_BIBLIOGRAPHY_STYLES.has(styleId);
 
-  const referenceBySourceId = new Map(citationOrderSourceIds.map((id) => [id, sourceToReference(sourceById.get(id)!)]));
+  const referenceBySourceId = new Map(citationOrderSourceIds.map((id) => {
+    const source = sourceById.get(id)!;
+    return [id, source.canonicalReference!];
+  }));
 
   const bibliographyOrderSourceIds = isNumberedBibliography
     ? citationOrderSourceIds

@@ -5,6 +5,8 @@
 
 import type { DiscoveredSource, EvidenceItem, EvidenceLedger, EvidenceLocator, EvidenceState } from "./types";
 
+import { validateCitationCompleteness } from "../../citation_compliance/validation";
+
 export class EvidenceStateError extends Error {}
 
 function getSource(ledger: EvidenceLedger, sourceId: string): DiscoveredSource {
@@ -136,10 +138,22 @@ export function confirmSourceCitation(
   actor?: string
 ): EvidenceLedger {
   const source = getSource(ledger, sourceId);
+  const updatedCanonical = canonicalReference || source.canonicalReference;
+
+  if (!updatedCanonical) {
+    throw new EvidenceStateError("Cannot confirm citation without a canonical reference.");
+  }
+  
+  // Enforce validation before confirming
+  const validation = validateCitationCompleteness(updatedCanonical);
+  if (!validation.isValid) {
+    throw new EvidenceStateError(`Cannot confirm citation: missing ${validation.missingFields.join(", ")}`);
+  }
+
   const updatedSource: DiscoveredSource = {
     ...source,
     citationStatus: "confirmed",
-    canonicalReference: canonicalReference || source.canonicalReference,
+    canonicalReference: updatedCanonical,
   };
 
   const now = new Date().toISOString();
@@ -152,6 +166,42 @@ export function confirmSourceCitation(
         history: [
           ...item.history,
           { state: "citable" as EvidenceState, at: now, by: actor },
+        ],
+      };
+    }
+    return item;
+  });
+
+  return { sources: updatedSources, items: updatedItems };
+}
+
+/**
+ * Revokes confirmed citation status and demotes any "citable" evidence
+ * items back to "user_approved". Must be called if a confirmed citation
+ * is edited or deleted.
+ */
+export function revokeSourceCitation(
+  ledger: EvidenceLedger,
+  sourceId: string,
+  actor?: string
+): EvidenceLedger {
+  const source = getSource(ledger, sourceId);
+  const updatedSource: DiscoveredSource = {
+    ...source,
+    citationStatus: "needs_user_review", // editing or revoking drops it to review status
+  };
+
+  const now = new Date().toISOString();
+  const updatedSources = ledger.sources.map((s) => (s.id === sourceId ? updatedSource : s));
+  const updatedItems = ledger.items.map((item) => {
+    // If the source is no longer confirmed, its evidence can't be citable
+    if (item.sourceId === sourceId && item.state === "citable") {
+      return {
+        ...item,
+        state: "user_approved" as EvidenceState,
+        history: [
+          ...item.history,
+          { state: "user_approved" as EvidenceState, at: now, by: actor },
         ],
       };
     }

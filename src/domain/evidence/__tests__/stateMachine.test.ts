@@ -8,6 +8,7 @@ import {
   approveEvidence,
   rejectEvidence,
   confirmSourceCitation,
+  revokeSourceCitation,
   EvidenceStateError,
 } from "../stateMachine";
 import type { DiscoveredSource } from "../types";
@@ -123,13 +124,47 @@ describe("domain/evidence: approveEvidence & Citation Readiness Guard", () => {
     expect(item.history.map((h) => h.state)).toEqual(["discovered", "extracted", "verified", "proposed", "user_approved"]);
   });
 
-  it("promotes user_approved items to citable when source citation is confirmed later", () => {
+  it("refuses to confirm citation if canonicalReference is missing or incomplete", () => {
+    const ledgerUnconfirmed = approveEvidence(proposed("e1", "needs_user_review"), "e1", "human-1");
+    // Missing completely
+    expect(() => confirmSourceCitation(ledgerUnconfirmed, "s1", undefined, "human-1")).toThrow(/Cannot confirm citation/);
+
+    // Incomplete
+    const incompleteCanonical = { kind: "JournalArticle", title: "Only Title" };
+    expect(() => confirmSourceCitation(ledgerUnconfirmed, "s1", incompleteCanonical, "human-1")).toThrow(/Cannot confirm citation: missing/);
+  });
+
+  it("promotes user_approved items to citable when source citation is confirmed later with valid metadata", () => {
     const ledgerUnconfirmed = approveEvidence(proposed("e1", "needs_user_review"), "e1", "human-1");
     expect(ledgerUnconfirmed.items[0].state).toBe("user_approved");
 
-    const ledgerConfirmed = confirmSourceCitation(ledgerUnconfirmed, "s1", undefined, "human-1");
+    const validCanonical = {
+      kind: "JournalArticle",
+      title: "Title",
+      authors: [{ lastName: "Smith" }],
+      year: "2023",
+      source: "Venue",
+    };
+    const ledgerConfirmed = confirmSourceCitation(ledgerUnconfirmed, "s1", validCanonical, "human-1");
     expect(ledgerConfirmed.sources[0].citationStatus).toBe("confirmed");
     expect(ledgerConfirmed.items[0].state).toBe("citable");
+  });
+
+  it("demotes citable items back to user_approved when citation is revoked", () => {
+    const ledgerUnconfirmed = approveEvidence(proposed("e1", "needs_user_review"), "e1", "human-1");
+    const validCanonical = {
+      kind: "JournalArticle",
+      title: "Title",
+      authors: [{ lastName: "Smith" }],
+      year: "2023",
+      source: "Venue",
+    };
+    const ledgerConfirmed = confirmSourceCitation(ledgerUnconfirmed, "s1", validCanonical, "human-1");
+    expect(ledgerConfirmed.items[0].state).toBe("citable");
+
+    const ledgerRevoked = revokeSourceCitation(ledgerConfirmed, "s1", "human-1");
+    expect(ledgerRevoked.sources[0].citationStatus).toBe("needs_user_review");
+    expect(ledgerRevoked.items[0].state).toBe("user_approved");
   });
 
   it("refuses approval with no actor — an unattributed approval is not a real one", () => {

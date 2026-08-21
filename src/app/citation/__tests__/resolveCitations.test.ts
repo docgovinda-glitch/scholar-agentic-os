@@ -5,7 +5,7 @@ import { appendBlock } from "../../../domain/document/ops";
 import type { DiscoveredSource, EvidenceItem, EvidenceLedger } from "../../../domain/evidence/types";
 
 function source(id: string, overrides: Partial<DiscoveredSource> = {}): DiscoveredSource {
-  return {
+  const base: DiscoveredSource = {
     id,
     title: `Title of ${id}`,
     authors: ["Jane Q. Smith"],
@@ -15,8 +15,11 @@ function source(id: string, overrides: Partial<DiscoveredSource> = {}): Discover
     discoveredAt: "2026-01-01T00:00:00.000Z",
     venue: "Journal of Testing",
     year: 2023,
+    citationStatus: "confirmed",
     ...overrides,
   };
+  base.canonicalReference = sourceToReference(base);
+  return base;
 }
 
 function item(id: string, sourceId: string): EvidenceItem {
@@ -177,5 +180,66 @@ describe("app/citation: resolveCitations", () => {
     const referenceBlocks = result.document.blocks.filter((b) => b.id === "references");
     expect(referenceBlocks).toHaveLength(1);
     expect(referenceBlocks[0].text).not.toBe("placeholder");
+  });
+});
+
+describe("app/citation: adversarial security validation", () => {
+  it("Case A: Formal citation rejected when citation_status is 'missing'", () => {
+    const doc = appendBlock(emptyDocument("d1", "T"), "intro", "paragraph", "A claim [ev-1].");
+    const result = resolveCitations(
+      doc,
+      ledger([source("s1", { citationStatus: "missing" })], [item("ev-1", "s1")]),
+      "apa-7"
+    );
+    expect(result.citedSourceIds).toEqual([]);
+    expect(result.unresolvedIds).toEqual(["ev-1"]);
+    expect(result.document.blocks[0].text).toBe("A claim [ev-1]."); // untranslated
+  });
+
+  it("Case B: Formal citation rejected when citation_status is 'needs_user_review'", () => {
+    const doc = appendBlock(emptyDocument("d1", "T"), "intro", "paragraph", "A claim [ev-1].");
+    const result = resolveCitations(
+      doc,
+      ledger([source("s1", { citationStatus: "needs_user_review" })], [item("ev-1", "s1")]),
+      "apa-7"
+    );
+    expect(result.citedSourceIds).toEqual([]);
+    expect(result.unresolvedIds).toEqual(["ev-1"]);
+  });
+
+  it("Case C: Formal citation rejected when citation_status is 'confirmed' but canonical_reference is incomplete", () => {
+    const doc = appendBlock(emptyDocument("d1", "T"), "intro", "paragraph", "A claim [ev-1].");
+    const incompleteSource = source("s1", { citationStatus: "confirmed" });
+    incompleteSource.canonicalReference = { kind: "JournalArticle" } as any; // clearly incomplete
+    const result = resolveCitations(doc, ledger([incompleteSource], [item("ev-1", "s1")]), "apa-7");
+    expect(result.citedSourceIds).toEqual([]);
+    expect(result.unresolvedIds).toEqual(["ev-1"]);
+  });
+
+  it("Case D: Formal citation accepted when citation_status is 'confirmed' and canonical_reference is valid", () => {
+    const doc = appendBlock(emptyDocument("d1", "T"), "intro", "paragraph", "A claim [ev-1].");
+    const result = resolveCitations(doc, ledger([source("s1")], [item("ev-1", "s1")]), "apa-7");
+    expect(result.citedSourceIds).toEqual(["s1"]);
+    expect(result.unresolvedIds).toEqual([]);
+    expect(result.document.blocks.find(b => b.id === "references")).toBeDefined();
+  });
+
+  it("Case E: AI invents author/title/year for unconfirmed source -> rejected, not trusted", () => {
+    const doc = appendBlock(emptyDocument("d1", "T"), "intro", "paragraph", "Fake fact [ev-1].");
+    // Even if AI wrote a perfect citation in the manuscript text, if it uses [ev-1] and the source is missing, it's rejected.
+    const result = resolveCitations(
+      doc,
+      ledger([source("s1", { citationStatus: "missing" })], [item("ev-1", "s1")]),
+      "apa-7"
+    );
+    expect(result.citedSourceIds).toEqual([]);
+    expect(result.unresolvedIds).toEqual(["ev-1"]);
+  });
+
+  it("Case F & G: AI references source ID belonging to another user or project -> access denied (not in ledger)", () => {
+    const doc = appendBlock(emptyDocument("d1", "T"), "intro", "paragraph", "A claim [ev-other-project].");
+    const result = resolveCitations(doc, ledger([], []), "apa-7");
+    expect(result.citedSourceIds).toEqual([]);
+    expect(result.unresolvedIds).toEqual(["ev-other-project"]);
   });
 });
