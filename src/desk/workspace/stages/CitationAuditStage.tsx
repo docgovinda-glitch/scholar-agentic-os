@@ -11,7 +11,7 @@ export default function CitationAuditStage({
 }: {
   stage: ResearchStage;
   projectId: string;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -67,7 +67,7 @@ export default function CitationAuditStage({
       
       setTimeout(() => {
         if (onAdvance) {
-          onAdvance();
+          onAdvance("originality_check");
         }
       }, 3500);
     } catch (err: any) {
@@ -212,7 +212,7 @@ export default function CitationAuditStage({
              
              <div className="flex justify-center mt-8">
                <button 
-                  onClick={() => onAdvance?.()}
+                  onClick={() => onAdvance?.("originality_check")}
                   className="px-8 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-colors flex items-center gap-2"
                 >
                   Proceed to Originality Check

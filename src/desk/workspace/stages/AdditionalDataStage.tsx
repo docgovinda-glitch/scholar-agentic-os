@@ -8,7 +8,7 @@ export default function AdditionalDataStage({
 }: {
   stage: ResearchStage;
   projectId: string;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
 
@@ -73,7 +73,7 @@ export default function AdditionalDataStage({
           
           <div className="mt-8 flex justify-center">
             <button 
-              onClick={() => onAdvance?.()}
+              onClick={() => onAdvance?.("evidence_extraction")}
               className="px-8 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-colors flex items-center gap-2"
             >
               Submit & Proceed to Extraction

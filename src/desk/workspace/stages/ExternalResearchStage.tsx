@@ -28,7 +28,7 @@ export default function ExternalResearchStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -102,7 +102,7 @@ export default function ExternalResearchStage({
       // Auto-advance after a short delay
       setTimeout(() => {
         if (onAdvance) {
-          onAdvance();
+          onAdvance("source_approval_external");
         }
       }, 2500);
 
@@ -237,7 +237,7 @@ export default function ExternalResearchStage({
             
             <div className="mt-8 flex justify-end">
               <button 
-                onClick={() => onAdvance?.()}
+                onClick={() => onAdvance?.("source_approval_external")}
                 className="px-6 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md flex items-center gap-2 hover:bg-[color:var(--accent-hover)] transition-colors"
               >
                 Proceed to External Approval Triage

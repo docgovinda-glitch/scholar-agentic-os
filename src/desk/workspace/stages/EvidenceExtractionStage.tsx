@@ -25,7 +25,7 @@ export default function EvidenceExtractionStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -99,7 +99,7 @@ export default function EvidenceExtractionStage({
       // Auto-advance after a short delay
       setTimeout(() => {
         if (onAdvance) {
-          onAdvance();
+          onAdvance("external_research");
         }
       }, 2500);
 

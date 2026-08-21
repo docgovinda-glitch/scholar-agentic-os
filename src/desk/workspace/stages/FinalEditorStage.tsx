@@ -15,7 +15,7 @@ export default function FinalEditorStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [content, setContent] = useState("");
@@ -66,7 +66,7 @@ export default function FinalEditorStage({
       if (!response.ok) throw new Error("Failed to save changes to database");
       onSaved({ ...project });
       if (onAdvance) {
-        onAdvance();
+        onAdvance("publication_readiness");
       }
     } catch (err: any) {
       setError(err.message || "Failed to save final draft.");

@@ -16,7 +16,7 @@ export default function JournalDiscoveryStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -99,7 +99,7 @@ export default function JournalDiscoveryStage({
       const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
       onSaved(updatedProject);
       if (onAdvance) {
-        onAdvance();
+        onAdvance("journal_requirements");
       }
     } catch (err: any) {
       setError(err.message || "Failed to save journal selection.");

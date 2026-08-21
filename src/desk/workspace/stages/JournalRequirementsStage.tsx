@@ -16,7 +16,7 @@ export default function JournalRequirementsStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -86,7 +86,7 @@ export default function JournalRequirementsStage({
       
       setTimeout(() => {
         if (onAdvance) {
-          onAdvance();
+          onAdvance("draft");
         }
       }, 3000);
     } catch (err: any) {
@@ -210,7 +210,7 @@ export default function JournalRequirementsStage({
                
                <div className="mt-8 text-center">
                  <button 
-                    onClick={() => onAdvance?.()}
+                    onClick={() => onAdvance?.("draft")}
                     className="px-6 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md flex items-center justify-center gap-2 hover:bg-[color:var(--accent-hover)] transition-colors w-full sm:w-auto mx-auto"
                   >
                     Proceed to AI Drafting

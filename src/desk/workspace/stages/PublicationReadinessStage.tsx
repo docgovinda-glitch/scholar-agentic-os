@@ -15,7 +15,7 @@ export default function PublicationReadinessStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -231,7 +231,7 @@ export default function PublicationReadinessStage({
       {results && !isProcessing && onAdvance && (
         <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[color:var(--surface-canvas)] via-[color:var(--surface-canvas)] to-transparent z-20 flex justify-center">
           <button 
-            onClick={onAdvance}
+            onClick={() => onAdvance?.("export")}
             className="px-8 py-4 rounded-full bg-[color:var(--accent)] text-white font-bold shadow-lg hover:bg-[color:var(--accent-hover)] transition-transform hover:-translate-y-1 flex items-center gap-3 font-sans cursor-pointer"
           >
             Advance to Export Pipeline

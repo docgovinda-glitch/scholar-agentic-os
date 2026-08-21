@@ -15,7 +15,7 @@ export default function SourceApprovalStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const isVault = stage === "source_approval_vault";
@@ -210,7 +210,7 @@ export default function SourceApprovalStage({
         </div>
         <button
           type="button"
-          onClick={() => onAdvance?.()}
+          onClick={() => onAdvance?.(stage === "source_approval_vault" ? "additional_data" : "evidence_analysis")}
           disabled={pendingToReview.length > 0}
           className="rounded-full bg-[color:var(--accent)] px-8 py-3 text-sm font-black text-white hover:bg-[color:var(--accent-hover)] focus:ring-2 focus:ring-[color:var(--accent)] focus:ring-offset-2 disabled:opacity-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
         >

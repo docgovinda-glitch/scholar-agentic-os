@@ -27,7 +27,7 @@ export default function EvidenceAnalysisStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -100,7 +100,7 @@ export default function EvidenceAnalysisStage({
       
       setTimeout(() => {
         if (onAdvance) {
-          onAdvance();
+          onAdvance("manual_review");
         }
       }, 3000);
     } catch (err: any) {

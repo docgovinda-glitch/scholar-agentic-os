@@ -11,7 +11,7 @@ export default function OriginalityCheckStage({
 }: {
   stage: ResearchStage;
   projectId: string;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -67,7 +67,7 @@ export default function OriginalityCheckStage({
       
       setTimeout(() => {
         if (onAdvance) {
-          onAdvance();
+          onAdvance("draft_preview");
         }
       }, 3500);
     } catch (err: any) {
@@ -214,7 +214,7 @@ export default function OriginalityCheckStage({
              
              <div className="flex justify-center mt-8">
                <button 
-                  onClick={() => onAdvance?.()}
+                  onClick={() => onAdvance?.("draft_preview")}
                   className="px-8 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-colors flex items-center gap-2"
                 >
                   Proceed to Draft Preview

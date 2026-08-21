@@ -24,7 +24,7 @@ export default function TitleSelectionStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -177,7 +177,7 @@ setResults(data);
       const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
       onSaved(updatedProject);
       if (onAdvance) {
-        onAdvance();
+        onAdvance("title_lock");
       }
     } catch (err: any) {
       setError(err.message || "Failed to save title selection.");
@@ -199,7 +199,7 @@ setResults(data);
       const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
       onSaved(updatedProject);
       if (onAdvance) {
-        onAdvance();
+        onAdvance("title_lock");
       }
     } catch (err: any) {
       setError(err.message || "Failed to save title selection.");

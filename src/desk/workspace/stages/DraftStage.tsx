@@ -17,7 +17,7 @@ export default function DraftStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -84,7 +84,7 @@ export default function DraftStage({
       
       setTimeout(() => {
         if (onAdvance) {
-          onAdvance();
+          onAdvance("citation_audit");
         }
       }, 3000);
     } catch (err: any) {
@@ -207,7 +207,7 @@ export default function DraftStage({
                
                <div className="flex justify-center mt-8">
                  <button 
-                    onClick={() => onAdvance?.()}
+                    onClick={() => onAdvance?.("citation_audit")}
                     className="px-8 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-colors flex items-center gap-2"
                   >
                     Proceed to Citation Audit

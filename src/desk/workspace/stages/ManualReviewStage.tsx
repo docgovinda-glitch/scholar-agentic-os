@@ -15,7 +15,7 @@ export default function ManualReviewStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   
@@ -35,7 +35,7 @@ export default function ManualReviewStage({
       const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
       onSaved(updatedProject);
       if (onAdvance) {
-        onAdvance();
+        onAdvance("journal_discovery");
       }
     } catch (err: any) {
       setError(err.message || "Failed to save synthesis.");

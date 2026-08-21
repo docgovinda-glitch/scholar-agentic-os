@@ -11,7 +11,7 @@ export default function GapIdentificationStage({
 }: {
   stage: ResearchStage;
   projectId: string;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -141,7 +141,7 @@ setLogs((prev) => [
         // Auto-advance
         if (onAdvance) {
           setTimeout(() => {
-            if (active) onAdvance();
+            if (active) onAdvance("gap_selection");
           }, 2000);
         }
             } else if (event === "error") {

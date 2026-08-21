@@ -15,7 +15,7 @@ export default function TitleLockStage({
   projectId: string;
   project: ProjectView;
   onSaved: (updated: ProjectView) => void;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   
@@ -42,7 +42,7 @@ export default function TitleLockStage({
       const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
       onSaved(updatedProject);
       if (onAdvance) {
-        onAdvance();
+        onAdvance("vault_sources");
       }
     } catch (err: any) {
       setError(err.message || "Failed to lock title.");

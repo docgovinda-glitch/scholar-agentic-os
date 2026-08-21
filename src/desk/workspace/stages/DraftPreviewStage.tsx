@@ -11,7 +11,7 @@ export default function DraftPreviewStage({
 }: {
   stage: ResearchStage;
   projectId: string;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -190,7 +190,7 @@ export default function DraftPreviewStage({
                {/* Sticky Action Bar */}
                <div className="p-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]">
                  <button 
-                   onClick={() => onAdvance?.()}
+                   onClick={() => onAdvance?.("peer_review")}
                    className="w-full px-6 py-4 rounded-xl bg-[color:var(--accent)] text-white font-black shadow-lg hover:bg-[color:var(--accent-hover)] transition-colors flex items-center justify-center gap-3 text-lg"
                  >
                    Lock Draft & Advance to Peer Review
