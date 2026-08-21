@@ -29,7 +29,15 @@ export default function TitleSelectionStage({
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<TitleItem[] | null>(null);
+  const [results, setResults] = useState<TitleItem[] | null>(() => {
+    if (project.answers?.["generated_titles"]) {
+      try {
+        const parsed = JSON.parse(project.answers["generated_titles"]);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return null;
+  });
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -83,6 +91,13 @@ export default function TitleSelectionStage({
           } else if (event === "done") {
             const data: TitleItem[] = Array.isArray(eventData.data) ? eventData.data : [];
             setResults(data);
+            
+            // Immediate checkpoint persistence of generated titles
+            saveIntakeAnswers(projectId, {
+              generated_titles: JSON.stringify(data),
+              current_stage: "title_selection",
+            }).catch(() => {});
+
             setLogs((prev) => [
               ...prev,
               {
@@ -117,6 +132,12 @@ export default function TitleSelectionStage({
     const full = item.subtitle_text ? `${item.title_text}: ${item.subtitle_text}` : item.title_text;
     setSelectedTitleText(full);
     setIsCustomMode(false);
+
+    // Immediate checkpoint persistence
+    saveIntakeAnswers(projectId, {
+      working_title: full,
+      current_stage: "title_selection",
+    }).catch(() => {});
   };
 
   const handleLockTitleAndProceed = async () => {
@@ -133,6 +154,7 @@ export default function TitleSelectionStage({
         ...project.answers,
         working_title: selectedTitleText.trim(),
         title_locked: "true",
+        current_stage: "vault_sources",
       };
 
       const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);

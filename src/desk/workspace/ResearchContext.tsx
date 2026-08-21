@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../types";
 import type { ResearchStage, StageStatus } from "./types";
-import { getDocument, getOutputTypeSpec, getProject, getRubric, setGlobalManualModelOverride, UnauthenticatedError } from "../api";
+import { isResearchStage } from "./types";
+import { getDocument, getOutputTypeSpec, getProject, getRubric, saveIntakeAnswers, setGlobalManualModelOverride, UnauthenticatedError } from "../api";
 import { computeStageStatuses } from "./utils";
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
 
@@ -74,7 +75,9 @@ export function ResearchProvider({
       setOutputType(await getOutputTypeSpec(proj.outputTypeId).catch(() => null));
 
       if (initialStage === null) {
-        onStageChangeCallback("definition", { replace: true });
+        const persistedStage = proj.answers?.["current_stage"];
+        const targetStage: ResearchStage = (persistedStage && isResearchStage(persistedStage)) ? (persistedStage as ResearchStage) : "definition";
+        onStageChangeCallback(targetStage, { replace: true });
       }
     } catch (e) {
       setError(
@@ -108,31 +111,31 @@ export function ResearchProvider({
         },
         (payload) => {
           console.log("Realtime Sync: Project updated remotely. Reloading workspace state...", payload);
-          // Reload the workspace state from the server to guarantee we have 
-          // the latest parsed document, rubric, and project data.
           load();
         }
       )
       .subscribe();
 
     return () => {
-      client.removeChannel(channel);
+      channel.unsubscribe();
     };
   }, [projectId, load]);
 
   const stageStatuses = computeStageStatuses(project);
 
   const setStage = useCallback((stage: ResearchStage, options?: { replace?: boolean }) => {
+    saveIntakeAnswers(projectId, { current_stage: stage }).catch(() => {});
     onStageChangeCallback(stage, options);
-  }, [onStageChangeCallback]);
+  }, [onStageChangeCallback, projectId]);
 
   useEffect(() => {
     setGlobalManualModelOverride(manualModelOverride);
   }, [manualModelOverride]);
 
   const advanceStage = useCallback((nextStage: ResearchStage) => {
+    saveIntakeAnswers(projectId, { current_stage: nextStage }).catch(() => {});
     onStageChangeCallback(nextStage);
-  }, [onStageChangeCallback]);
+  }, [onStageChangeCallback, projectId]);
 
   const [chapterId, setChapterId] = useState<string | null>(null);
 

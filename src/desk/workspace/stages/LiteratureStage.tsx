@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedStreamFetch } from "../../api";
+import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { useResearchWorkspace } from "../ResearchContext";
 
 export interface LiteratureItem {
   id: string;
@@ -27,16 +28,71 @@ export default function LiteratureStage({
   onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
+  const { project } = useResearchWorkspace();
+
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<LiteratureItem[] | null>(null);
+  const [results, setResults] = useState<LiteratureItem[] | null>(() => {
+    if (project?.answers?.["discovered_literature"]) {
+      try {
+        const parsed = JSON.parse(project.answers["discovered_literature"]);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return null;
+  });
   const [error, setError] = useState<string | null>(null);
   const [expandedAbstractId, setExpandedAbstractId] = useState<string | null>(null);
 
   // Excluded / removed items tracking for broadened search
-  const [removedDois, setRemovedDois] = useState<string[]>([]);
-  const [removedIds, setRemovedIds] = useState<string[]>([]);
-  const [removedTitles, setRemovedTitles] = useState<string[]>([]);
+  const [removedDois, setRemovedDois] = useState<string[]>(() => {
+    if (project?.answers?.["removed_literature"]) {
+      try {
+        const parsed = JSON.parse(project.answers["removed_literature"]);
+        if (Array.isArray(parsed?.removedDois)) return parsed.removedDois;
+      } catch (_) {}
+    }
+    return [];
+  });
+  const [removedIds, setRemovedIds] = useState<string[]>(() => {
+    if (project?.answers?.["removed_literature"]) {
+      try {
+        const parsed = JSON.parse(project.answers["removed_literature"]);
+        if (Array.isArray(parsed?.removedIds)) return parsed.removedIds;
+      } catch (_) {}
+    }
+    return [];
+  });
+  const [removedTitles, setRemovedTitles] = useState<string[]>(() => {
+    if (project?.answers?.["removed_literature"]) {
+      try {
+        const parsed = JSON.parse(project.answers["removed_literature"]);
+        if (Array.isArray(parsed?.removedTitles)) return parsed.removedTitles;
+      } catch (_) {}
+    }
+    return [];
+  });
+
+  // Re-hydrate when project loads from remote or reload
+  useEffect(() => {
+    if (project?.answers?.["discovered_literature"] && !results) {
+      try {
+        const parsed = JSON.parse(project.answers["discovered_literature"]);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setResults(parsed);
+          setSourcesDiscovered(parsed.length);
+        }
+      } catch (_) {}
+    }
+    if (project?.answers?.["removed_literature"]) {
+      try {
+        const parsed = JSON.parse(project.answers["removed_literature"]);
+        if (Array.isArray(parsed?.removedDois)) setRemovedDois(parsed.removedDois);
+        if (Array.isArray(parsed?.removedIds)) setRemovedIds(parsed.removedIds);
+        if (Array.isArray(parsed?.removedTitles)) setRemovedTitles(parsed.removedTitles);
+      } catch (_) {}
+    }
+  }, [project?.answers]);
 
   // Agent Statuses
   const [sourceAgent, setSourceAgent] = useState("Ready");
@@ -45,8 +101,15 @@ export default function LiteratureStage({
   const [knowledgeAgent, setKnowledgeAgent] = useState("Ready");
 
   // Snapshot metrics
-  const [sourcesDiscovered, setSourcesDiscovered] = useState(0);
-  const [thematicClusters, setThematicClusters] = useState(0);
+  const [sourcesDiscovered, setSourcesDiscovered] = useState(() => results?.length || 0);
+  const [thematicClusters, setThematicClusters] = useState(() => {
+    if (!results) return 0;
+    const s = new Set<string>();
+    results.forEach((item) => {
+      if (Array.isArray(item.themes)) item.themes.forEach((t) => s.add(t));
+    });
+    return s.size > 0 ? s.size : Math.max(1, Math.floor(results.length / 3));
+  });
 
   const startDiscovery = async (isBroadened: boolean = false) => {
     setIsProcessing(true);
@@ -135,13 +198,21 @@ export default function LiteratureStage({
               return true;
             });
 
-            setResults((prev) => (prev ? [...prev, ...freshItems] : freshItems));
+            const updatedList = results && (isBroadened || results.length > 0) ? [...results, ...freshItems] : freshItems;
+            setResults(updatedList);
             
-            const totalCount = (results?.length || 0) + freshItems.length;
+            // Immediate checkpoint persistence to authoritative project answers
+            saveIntakeAnswers(projectId, {
+              discovered_literature: JSON.stringify(updatedList),
+              removed_literature: JSON.stringify({ removedDois, removedIds, removedTitles }),
+              current_stage: "literature",
+            }).catch(() => {});
+
+            const totalCount = updatedList.length;
             setSourcesDiscovered(totalCount);
 
             const themesSet = new Set<string>();
-            [...(results || []), ...freshItems].forEach((item) => {
+            updatedList.forEach((item) => {
               if (Array.isArray(item.themes)) {
                 item.themes.forEach((t) => themesSet.add(t));
               }
@@ -188,16 +259,28 @@ export default function LiteratureStage({
   };
 
   const handleRemoveItem = (item: LiteratureItem) => {
-    if (item.doi) {
-      setRemovedDois((prev) => [...prev, item.doi!]);
-    }
-    if (item.id) {
-      setRemovedIds((prev) => [...prev, item.id]);
-    }
-    if (item.title) {
-      setRemovedTitles((prev) => [...prev, item.title]);
-    }
-    setResults((prev) => (prev ? prev.filter((r) => r.id !== item.id) : null));
+    const nextDois = item.doi ? [...removedDois, item.doi] : removedDois;
+    const nextIds = item.id ? [...removedIds, item.id] : removedIds;
+    const nextTitles = item.title ? [...removedTitles, item.title] : removedTitles;
+
+    if (item.doi) setRemovedDois(nextDois);
+    if (item.id) setRemovedIds(nextIds);
+    if (item.title) setRemovedTitles(nextTitles);
+
+    const nextResults = results ? results.filter((r) => r.id !== item.id) : null;
+    setResults(nextResults);
+
+    // Immediate checkpoint persistence of removal
+    saveIntakeAnswers(projectId, {
+      discovered_literature: JSON.stringify(nextResults || []),
+      removed_literature: JSON.stringify({
+        removedDois: nextDois,
+        removedIds: nextIds,
+        removedTitles: nextTitles,
+      }),
+      current_stage: "literature",
+    }).catch(() => {});
+
     setLogs((prev) => [
       ...prev,
       {

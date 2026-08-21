@@ -27,8 +27,16 @@ export default function GapSelectionStage({
   onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
-  const [gaps, setGaps] = useState<GapItem[] | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [gaps, setGaps] = useState<GapItem[] | null>(() => {
+    if (project.answers?.["identified_gaps"]) {
+      try {
+        const parsed = JSON.parse(project.answers["identified_gaps"]);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState(() => !gaps);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -45,6 +53,11 @@ export default function GapSelectionStage({
   const [selectedGapIds, setSelectedGapIds] = useState<string[]>(initialSelectedGaps);
 
   useEffect(() => {
+    if (gaps && gaps.length > 0) {
+      setIsLoading(false);
+      return;
+    }
+
     let active = true;
     setIsLoading(true);
     setError(null);
@@ -59,6 +72,10 @@ export default function GapSelectionStage({
         if (event === "done") {
           const items: GapItem[] = Array.isArray(eventData.data) ? eventData.data : [];
           setGaps(items);
+          saveIntakeAnswers(projectId, {
+            identified_gaps: JSON.stringify(items),
+            current_stage: "gap_selection",
+          }).catch(() => {});
           setIsLoading(false);
         } else if (event === "error") {
           setError(eventData.message || "Failed to load identified gaps.");
@@ -75,16 +92,20 @@ export default function GapSelectionStage({
     return () => {
       active = false;
     };
-  }, [projectId]);
+  }, [projectId, gaps]);
 
   const toggleGapSelection = (gapId: string) => {
-    setSelectedGapIds((prev) => {
-      if (prev.includes(gapId)) {
-        return prev.filter((id) => id !== gapId);
-      } else {
-        return [...prev, gapId];
-      }
-    });
+    const next = selectedGapIds.includes(gapId)
+      ? selectedGapIds.filter((id) => id !== gapId)
+      : [...selectedGapIds, gapId];
+    setSelectedGapIds(next);
+
+    // Immediate checkpoint persistence of gap selection
+    saveIntakeAnswers(projectId, {
+      selected_gaps: JSON.stringify(next),
+      selected_gap: next[0] || "",
+      current_stage: "gap_selection",
+    }).catch(() => {});
   };
 
   const handleSaveAndProceed = async () => {

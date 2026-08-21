@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedStreamFetch } from "../../api";
+import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { useResearchWorkspace } from "../ResearchContext";
 
 interface GapItem {
   id: string;
@@ -22,10 +23,29 @@ export default function GapIdentificationStage({
   onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
+  const { project } = useResearchWorkspace();
+
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [gaps, setGaps] = useState<GapItem[] | null>(null);
+  const [gaps, setGaps] = useState<GapItem[] | null>(() => {
+    if (project?.answers?.["identified_gaps"]) {
+      try {
+        const parsed = JSON.parse(project.answers["identified_gaps"]);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (project?.answers?.["identified_gaps"] && !gaps) {
+      try {
+        const parsed = JSON.parse(project.answers["identified_gaps"]);
+        if (Array.isArray(parsed) && parsed.length > 0) setGaps(parsed);
+      } catch (_) {}
+    }
+  }, [project?.answers]);
 
   const startAnalysis = async () => {
     setIsProcessing(true);
@@ -84,6 +104,13 @@ export default function GapIdentificationStage({
           } else if (event === "done") {
             const data: GapItem[] = Array.isArray(eventData.data) ? eventData.data : [];
             setGaps(data);
+            
+            // Immediate checkpoint persistence
+            saveIntakeAnswers(projectId, {
+              identified_gaps: JSON.stringify(data),
+              current_stage: "gap_identification",
+            }).catch(() => {});
+
             setLogs((prev) => [
               ...prev,
               {

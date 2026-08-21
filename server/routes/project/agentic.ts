@@ -92,6 +92,23 @@ CRITICAL INSTRUCTION: Generate exactly 15 highly relevant sources. Do not halluc
     const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}${isBroadened ? "\nMode: Broadened & Interdisciplinary Discovery" : ""}`;
     const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "discovery");
     if (result) {
+      if (result.data && Array.isArray(result.data)) {
+        const currentListStr = project.answers["discovered_literature"];
+        let existingItems: any[] = [];
+        if (currentListStr) {
+          try { existingItems = JSON.parse(currentListStr); } catch (_) {}
+        }
+        const existingDois = new Set(existingItems.map((i: any) => (i.doi || "").toLowerCase()).filter(Boolean));
+        const existingIds = new Set(existingItems.map((i: any) => i.id).filter(Boolean));
+        const newItems = result.data.filter((i: any) => {
+          if (i.doi && existingDois.has(i.doi.toLowerCase())) return false;
+          if (i.id && existingIds.has(i.id)) return false;
+          return true;
+        });
+        const combined = isBroadened ? [...existingItems, ...newItems] : (existingItems.length > 0 && req.body.isAppend ? [...existingItems, ...newItems] : result.data);
+        const nextAnswers = { ...project.answers, discovered_literature: JSON.stringify(combined), current_stage: "literature" };
+        await getProjectStore().save({ ...project, answers: nextAnswers });
+      }
       res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data, meta: result.meta })}\n\n`);
       res.end();
     }
@@ -135,36 +152,19 @@ Make sure every single gap explicitly mentions concepts from the working title.`
     const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "discovery");
     if (!result) return;
     
-    // Insert into Supabase
-    const config = getSupabaseRestConfig();
-    if (config && result.data && Array.isArray(result.data)) {
-      const table = new SupabaseTable(config, "project_evidence");
-      for (const ev of result.data) {
-        await table.request("", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project_id: project.projectId,
-            quote: ev.quote || "",
-            claim_type: ev.claim_type || "",
-            strength: ev.strength || "",
-            tags: ev.tags || []
-          })
-        });
-      }
+    if (result.data && Array.isArray(result.data)) {
+      const nextAnswers = { ...project.answers, identified_gaps: JSON.stringify(result.data), current_stage: "gap_identification" };
+      await getProjectStore().save({ ...project, answers: nextAnswers });
     }
     
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: any) {
     if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
+    if (!res.headersSent) {
       res.status(500).json({ error: err.message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
       res.end();
     }
   }
@@ -194,46 +194,9 @@ Return ONLY valid JSON in this exact format:
     const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "discovery");
     if (!result) return;
     
-    // Insert into Supabase
-    const config = getSupabaseRestConfig();
-    if (config && result.data && Array.isArray(result.data)) {
-      
-    const table = new SupabaseTable(config, "manuscript_sections");
-    const vTable = new SupabaseTable(config, "manuscript_versions");
-    
-    // First, save the old versions
-    try {
-      const oldSections = await table.request(`?project_id=eq.${project.projectId}`);
-      if (Array.isArray(oldSections)) {
-        for (const old of oldSections) {
-          await vTable.request("", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              project_id: project.projectId,
-              section_name: old.section_name,
-              content: old.content
-            })
-          });
-        }
-      }
-    } catch (e) {
-      console.error("Failed to snapshot manuscript versions", e);
-    }
-
-      for (const sec of result.data) {
-        await table.request("", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates" },
-          body: JSON.stringify({
-            project_id: project.projectId,
-            section_name: sec.section,
-            content: sec.content || "",
-            status: sec.status || "Drafted",
-            word_count: sec.length || 0
-          })
-        });
-      }
+    if (result.data && Array.isArray(result.data)) {
+      const nextAnswers = { ...project.answers, generated_titles: JSON.stringify(result.data), current_stage: "title_selection" };
+      await getProjectStore().save({ ...project, answers: nextAnswers });
     }
     
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);

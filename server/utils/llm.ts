@@ -3,6 +3,7 @@ import { completeWithFailover, streamWithFailover } from "../../src/platform/gat
 import { defaultPolicy } from "../../src/platform/warden/policy.js";
 import type { TaskClass } from "../../src/platform/warden/types.js";
 import type { CandidateProvider } from "../../src/platform/gateway/types.js";
+import { getEntitlement, isEntitlementActive } from "../src/aiEngine/entitlements.js";
 
 dotenv.config();
 
@@ -25,6 +26,34 @@ export function getCandidates(): CandidateProvider[] {
   }
   
   return candidates;
+}
+
+export interface PremiumAiPolicy {
+  status: "not_configured" | "active" | "suspended";
+  isServerAiAuthorized: boolean;
+  reason?: string;
+}
+
+export function getPremiumAiPolicy(): PremiumAiPolicy {
+  // Business plan / quota rules are not defined yet.
+  return {
+    status: "not_configured",
+    isServerAiAuthorized: false,
+    reason: "Premium AI server policy is pending configuration."
+  };
+}
+
+export async function isServerAiAuthorized(req: any): Promise<boolean> {
+  const userId = req.user?.id;
+  if (!userId) return false;
+  try {
+    const entitlement = await getEntitlement(userId);
+    if (!isEntitlementActive(entitlement)) return false;
+    const policy = getPremiumAiPolicy();
+    return policy.isServerAiAuthorized;
+  } catch (_) {
+    return false;
+  }
 }
 
 function handleFrontendLLMOverride(req: any) {
@@ -88,9 +117,13 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
   const override = handleFrontendLLMOverrideJSON(req);
   if (override) return override;
 
-  const candidates = getCandidates();
+  const serverAuthorized = await isServerAiAuthorized(req);
+  const candidates = serverAuthorized ? getCandidates() : [];
+
   if (candidates.length === 0) {
-    if (!res.headersSent) res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+    if (!res.headersSent) {
+      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+    }
     throw new Error("RequireFrontendLLMException");
   }
 
@@ -125,9 +158,13 @@ export async function callOpenRouterText(req: any, res: any, systemPrompt: strin
   const override = handleFrontendLLMOverride(req);
   if (override) return override;
 
-  const candidates = getCandidates();
+  const serverAuthorized = await isServerAiAuthorized(req);
+  const candidates = serverAuthorized ? getCandidates() : [];
+
   if (candidates.length === 0) {
-    if (!res.headersSent) res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+    if (!res.headersSent) {
+      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+    }
     throw new Error("RequireFrontendLLMException");
   }
 
@@ -158,9 +195,13 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
   const override = handleFrontendLLMOverrideJSON(req);
   if (override) return override;
 
-  const candidates = getCandidates();
+  const serverAuthorized = await isServerAiAuthorized(req);
+  const candidates = serverAuthorized ? getCandidates() : [];
+
   if (candidates.length === 0) {
-    res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+    if (!res.headersSent) {
+      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+    }
     return;
   }
 
@@ -213,9 +254,13 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
 }
 
 export async function streamOpenRouterText(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning") {
-  const candidates = getCandidates();
+  const serverAuthorized = await isServerAiAuthorized(req);
+  const candidates = serverAuthorized ? getCandidates() : [];
+
   if (candidates.length === 0) {
-    res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+    if (!res.headersSent) {
+      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
+    }
     return;
   }
 

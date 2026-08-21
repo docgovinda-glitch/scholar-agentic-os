@@ -158,3 +158,8 @@ export const RESEARCH_PHASES: PhaseDefinition[] = [
 export const STAGE_MAP = new Map<ResearchStage, StageDefinition>(
   RESEARCH_PHASES.flatMap(phase => phase.stages.map(stage => [stage.id, stage] as const))
 );
+
+export function isResearchStage(value: string | undefined): value is ResearchStage {
+  if (!value) return false;
+  return STAGE_MAP.has(value as ResearchStage);
+}
