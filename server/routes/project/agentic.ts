@@ -55,7 +55,7 @@ Return ONLY valid JSON in this exact format:
 }
 CRITICAL INSTRUCTION: Generate exactly 15 highly relevant sources. Do not hallucinate irrelevant topics.`;
     const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "simple");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "discovery");
     if (result) {
       res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data, meta: result.meta })}\n\n`);
       res.end();
@@ -105,7 +105,7 @@ Make sure every single gap explicitly mentions concepts from the working title.`
     const workingTitle = project.answers["working_title"] || "Untitled Research";
     const researchArea = project.answers["research_area"] || "the field";
     const userPrompt = `Working Title: ${workingTitle}\nResearch Area: ${researchArea}\nContext: ${context}`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "simple");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, userPrompt, "openrouter/auto", "discovery");
     if (!result) return;
     
     // Insert into Supabase
@@ -164,7 +164,7 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "simple");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "discovery");
     if (!result) return;
     
     // Insert into Supabase
@@ -537,7 +537,7 @@ Return ONLY valid JSON in this exact format:
     "formatting_rules": ["Double spaced", "12pt Times New Roman"]
   }
 }`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "simple");
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "discovery");
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
