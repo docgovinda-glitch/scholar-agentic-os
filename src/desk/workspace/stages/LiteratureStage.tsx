@@ -134,7 +134,7 @@ export default function LiteratureStage({
 
               if (onAdvance) {
                 setTimeout(() => {
-                  if (active) onAdvance();
+                  if (active) onAdvance("gap_identification");
                 }, 1500);
               }
             } else if (event === "error") {
