@@ -97,29 +97,68 @@ export function proposeEvidence(ledger: EvidenceLedger, evidenceId: string, clai
 }
 
 /**
- * The ONLY function in this module that can produce state "citable" — the
- * structural enforcement of "no user approval, no citation". `actor` is
- * required, not optional: an approval with no recorded approver is not a
- * real approval. Callers (server/routes/project.ts) pair this with the
- * existing domain/claim graph's bindEvidence() in the same request, so
- * "citable" and "actually bound into the graph the compliance rubric and
- * citation engine read from" happen atomically from the user's perspective.
+ * The ONLY function in this module that can approve evidence bindings.
+ * If the parent source citation is "confirmed", the item transitions to "citable".
+ * If the parent source citation is unconfirmed ("missing" or "needs_user_review"),
+ * the item transitions to "user_approved", requiring citation confirmation before
+ * it can be cited in a manuscript.
  */
 export function approveEvidence(ledger: EvidenceLedger, evidenceId: string, actor: string): EvidenceLedger {
   if (!actor) throw new EvidenceStateError("Approval requires an actor.");
   const item = getItem(ledger, evidenceId);
   requireState(item, "proposed");
+  const source = getSource(ledger, item.sourceId);
   const now = new Date().toISOString();
+
+  const isCitable = source.citationStatus === "confirmed";
+  const nextState: EvidenceState = isCitable ? "citable" : "user_approved";
+
   const updated: EvidenceItem = {
     ...item,
-    state: "citable",
+    state: nextState,
     history: [
       ...item.history,
       { state: "user_approved", at: now, by: actor },
-      { state: "citable", at: now, by: actor },
+      ...(isCitable ? [{ state: "citable" as EvidenceState, at: now, by: actor }] : []),
     ],
   };
   return replaceItem(ledger, updated);
+}
+
+/**
+ * Confirms canonical citation metadata on a source and promotes any
+ * "user_approved" evidence items for that source to "citable".
+ */
+export function confirmSourceCitation(
+  ledger: EvidenceLedger,
+  sourceId: string,
+  canonicalReference?: any,
+  actor?: string
+): EvidenceLedger {
+  const source = getSource(ledger, sourceId);
+  const updatedSource: DiscoveredSource = {
+    ...source,
+    citationStatus: "confirmed",
+    canonicalReference: canonicalReference || source.canonicalReference,
+  };
+
+  const now = new Date().toISOString();
+  const updatedSources = ledger.sources.map((s) => (s.id === sourceId ? updatedSource : s));
+  const updatedItems = ledger.items.map((item) => {
+    if (item.sourceId === sourceId && item.state === "user_approved") {
+      return {
+        ...item,
+        state: "citable" as EvidenceState,
+        history: [
+          ...item.history,
+          { state: "citable" as EvidenceState, at: now, by: actor },
+        ],
+      };
+    }
+    return item;
+  });
+
+  return { sources: updatedSources, items: updatedItems };
 }
 
 /**

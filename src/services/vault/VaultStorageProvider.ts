@@ -8,8 +8,11 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../supabaseClient";
+import type { CanonicalReference } from "../../citation_compliance/model/reference";
 
 export type VaultSourceType = "file" | "web" | "video" | "reference" | "custom" | "text";
+
+export type CitationStatus = "missing" | "needs_user_review" | "confirmed";
 
 export interface VaultItem {
   id: string;
@@ -21,6 +24,8 @@ export interface VaultItem {
   externalReference?: string; // URL, DOI, YouTube link
   storageReference?: string;
   citation?: string;
+  citationStatus?: CitationStatus;
+  canonicalReference?: CanonicalReference;
   authors?: string[];
   year?: string;
   journal?: string;
@@ -231,6 +236,8 @@ export class SupabaseVaultStorageProvider implements IVaultStorageProvider {
         externalReference: row.external_reference || undefined,
         storageReference: row.storage_reference || undefined,
         citation: row.metadata?.citation || undefined,
+        citationStatus: (row.citation_status as CitationStatus) || (row.metadata?.citation || row.canonical_reference ? "needs_user_review" : "missing"),
+        canonicalReference: row.canonical_reference || undefined,
         authors: row.metadata?.authors || undefined,
         year: row.metadata?.year || undefined,
         journal: row.metadata?.journal || undefined,
@@ -278,6 +285,8 @@ export class SupabaseVaultStorageProvider implements IVaultStorageProvider {
         externalReference: data.external_reference || undefined,
         storageReference: data.storage_reference || undefined,
         citation: data.metadata?.citation || undefined,
+        citationStatus: (data.citation_status as CitationStatus) || (data.metadata?.citation || data.canonical_reference ? "needs_user_review" : "missing"),
+        canonicalReference: data.canonical_reference || undefined,
         authors: data.metadata?.authors || undefined,
         year: data.metadata?.year || undefined,
         journal: data.metadata?.journal || undefined,
@@ -308,6 +317,8 @@ export class SupabaseVaultStorageProvider implements IVaultStorageProvider {
       external_reference: item.externalReference || null,
       storage_reference: item.storageReference || null,
       content_text: item.content || "",
+      citation_status: item.citationStatus || "missing",
+      canonical_reference: item.canonicalReference || null,
       metadata: {
         citation: item.citation,
         authors: item.authors,

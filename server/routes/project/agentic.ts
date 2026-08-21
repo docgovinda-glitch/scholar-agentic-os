@@ -542,6 +542,9 @@ router.post("/draft", async (req: express.Request<{ id: string }>, res) => {
   try {
     const systemPrompt = `You are an expert academic writer.
 Based on the provided research context, write a complete, high-quality first draft of the manuscript.${targetChapterMsg}
+CITATION INTEGRITY INSTRUCTION:
+- Only cite sources with confirmed citation metadata or approved evidence bracket tokens [ev-xxxx].
+- If a research source is marked with UNCONFIRMED citation status, incorporate its empirical/factual findings into the text context, but DO NOT fabricate publication details, journal names, years, or authors.
 Return ONLY valid JSON in this exact format:
 {
   "data": [

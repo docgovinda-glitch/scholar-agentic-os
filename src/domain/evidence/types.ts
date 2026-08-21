@@ -32,6 +32,9 @@ export type AuthorityTier = "A" | "B" | "C" | "D";
 
 export type DiscoveryMethod = "arxiv" | "web_search" | "openalex" | "user_upload" | "vault" | "manual";
 
+import type { CanonicalReference } from "../../citation_compliance/model/reference";
+import type { CitationStatus } from "../../services/vault/VaultStorageProvider";
+
 export interface DiscoveredSource {
   id: string;
   title: string;
@@ -46,6 +49,8 @@ export interface DiscoveredSource {
   discoveredAt: string;
   /** The Knowledge Vault item this source was pulled from, present only when discoveredVia is "vault" — traceability back to the researcher's own saved item, never resolved server-side (the Vault's contents are client-side encrypted; the server never sees them). */
   vaultItemId?: string;
+  citationStatus?: CitationStatus;
+  canonicalReference?: CanonicalReference;
 }
 
 export type EvidenceState = "discovered" | "extracted" | "verified" | "proposed" | "user_approved" | "citable";

@@ -13,8 +13,9 @@ export * from "./model/identifierModels";
 // Interfaces
 export * from "./interfaces";
 
-// Engine
+// Engine & Validation
 export * from "./formattingEngine";
+export * from "./validation";
 
 // Registry
 export { CitationRegistry } from "./registry";

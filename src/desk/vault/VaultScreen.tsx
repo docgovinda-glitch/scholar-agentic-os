@@ -9,12 +9,14 @@ import {
   searchVaultItems,
   unlockVault,
   syncLocalVaultToRemote,
+  resolveVaultProvider,
   type VaultItem,
   type SyncProgress,
 } from "../../services/vaultContents";
 import VaultSetupScreen from "../setup/VaultSetupScreen";
 import VaultImport from "./VaultImport";
 import VaultDocumentImport from "./VaultDocumentImport";
+import { CitationConfirmationModal } from "./CitationConfirmationModal";
 
 /**
  * The Universal Knowledge Vault's contents — reachable any time from Header/ProjectListScreen.
@@ -231,6 +233,9 @@ function VaultContents({
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
 
+  // Citation editing modal state
+  const [editingCitationItem, setEditingCitationItem] = useState<VaultItem | null>(null);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape" && !e.defaultPrevented) {
@@ -263,6 +268,7 @@ function VaultContents({
         title: title.trim(),
         content: content.trim(),
         citation: citation.trim() || undefined,
+        citationStatus: citation.trim() ? "needs_user_review" : "missing",
       });
       setItems((current) => [saved, ...(current ?? [])]);
       setTitle("");
@@ -470,46 +476,118 @@ function VaultContents({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.title}</p>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--text-muted)]">
-                      {item.sourceType || "source"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {item.citationStatus === "confirmed" ? (
+                        <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 rounded">
+                          🟢 Citation Ready
+                        </span>
+                      ) : item.citationStatus === "needs_user_review" ? (
+                        <button
+                          type="button"
+                          onClick={() => setEditingCitationItem(item)}
+                          className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 px-2 py-0.5 rounded hover:underline cursor-pointer"
+                        >
+                          🟡 Review Citation →
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditingCitationItem(item)}
+                          className="text-[10px] font-semibold text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] px-2 py-0.5 rounded hover:underline cursor-pointer"
+                        >
+                          🔴 Missing Citation →
+                        </button>
+                      )}
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--text-muted)]">
+                        {item.sourceType || "source"}
+                      </span>
+                    </div>
                   </div>
                   <p className="mt-1 whitespace-pre-wrap text-sm text-[color:var(--text-secondary)] line-clamp-3">
                     {item.content}
                   </p>
                   {item.citation && <p className="mt-1.5 text-xs text-[color:var(--text-muted)]">{item.citation}</p>}
 
-                  {confirmingDelete === item.id ? (
-                    <div className="mt-2 flex items-center gap-3">
-                      <span className="text-xs text-[color:var(--text-secondary)]">Delete this? There is no undo.</span>
+                  <div className="mt-2 flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setEditingCitationItem(item)}
+                      className="text-xs text-[color:var(--accent)] hover:underline cursor-pointer font-medium"
+                    >
+                      {item.citationStatus === "confirmed" ? "Edit Citation" : "Complete Citation"}
+                    </button>
+
+                    {confirmingDelete === item.id ? (
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-[color:var(--text-secondary)]">Delete this? There is no undo.</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item.id)}
+                          disabled={busy}
+                          className="text-xs text-[color:var(--state-danger)] hover:opacity-80 cursor-pointer font-bold"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingDelete(null)}
+                          className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         type="button"
-                        onClick={() => handleDelete(item.id)}
-                        disabled={busy}
-                        className="text-xs text-[color:var(--state-danger)] hover:opacity-80 cursor-pointer font-bold"
+                        onClick={() => setConfirmingDelete(item.id)}
+                        className="text-xs text-[color:var(--text-muted)] hover:text-[color:var(--state-danger)] cursor-pointer"
                       >
                         Delete
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmingDelete(null)}
-                        className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingDelete(item.id)}
-                      className="mt-2 text-xs text-[color:var(--text-muted)] hover:text-[color:var(--state-danger)] cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
+          )}
+
+          {editingCitationItem && (
+            <CitationConfirmationModal
+              initialReference={
+                editingCitationItem.canonicalReference || {
+                  title: editingCitationItem.title,
+                  source: editingCitationItem.journal,
+                  year: editingCitationItem.year,
+                  authors: editingCitationItem.authors?.map((name, i) => ({
+                    firstName: "",
+                    lastName: name,
+                    order: i + 1,
+                  })) || [],
+                }
+              }
+              initialStatus={editingCitationItem.citationStatus}
+              sourceTitle={editingCitationItem.title}
+              sourceType={editingCitationItem.sourceType}
+              onClose={() => setEditingCitationItem(null)}
+              onConfirm={async (confirmedRef, formattedCitation) => {
+                const provider = resolveVaultProvider(userId, storageMode);
+                const updatedItem: VaultItem = {
+                  ...editingCitationItem,
+                  canonicalReference: confirmedRef,
+                  citationStatus: "confirmed",
+                  citation: formattedCitation,
+                  authors: confirmedRef.authors.map((a) => [a.firstName, a.lastName].filter(Boolean).join(" ")),
+                  year: confirmedRef.year,
+                  journal: confirmedRef.journal || confirmedRef.source,
+                  updatedAt: new Date().toISOString(),
+                };
+                await provider.saveItem(userId, updatedItem);
+                setItems((prev) =>
+                  prev ? prev.map((it) => (it.id === updatedItem.id ? updatedItem : it)) : [updatedItem]
+                );
+                setEditingCitationItem(null);
+              }}
+            />
           )}
         </>
       )}

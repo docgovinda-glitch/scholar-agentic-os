@@ -7,11 +7,12 @@ import {
   proposeEvidence,
   approveEvidence,
   rejectEvidence,
+  confirmSourceCitation,
   EvidenceStateError,
 } from "../stateMachine";
 import type { DiscoveredSource } from "../types";
 
-function source(id: string): DiscoveredSource {
+function source(id: string, citationStatus: "missing" | "needs_user_review" | "confirmed" = "confirmed"): DiscoveredSource {
   return {
     id,
     title: "A Test Paper",
@@ -21,6 +22,7 @@ function source(id: string): DiscoveredSource {
     authorityTier: "B",
     discoveredVia: "arxiv",
     discoveredAt: new Date().toISOString(),
+    citationStatus,
   };
 }
 
@@ -57,32 +59,36 @@ describe("domain/evidence: extractEvidence", () => {
 });
 
 function extracted(id = "e1") {
-  let ledger = discoverSource(emptyLedger(), source("s1"));
-  ledger = extractEvidence(ledger, { id, sourceId: "s1", quote: "The cohort comprised 240 participants." });
-  return ledger;
+  return extractEvidence(discoverSource(emptyLedger(), source("s1")), { id, sourceId: "s1", quote: "A valid quote." });
 }
 
 describe("domain/evidence: verifyEvidence", () => {
   it("moves an extracted item to verified", () => {
-    const ledger = verifyEvidence(extracted(), "e1", "u1");
-    expect(ledger.items[0].state).toBe("verified");
+    const ledger = verifyEvidence(extracted(), "e1", "human-1");
+    const item = ledger.items[0];
+    expect(item.state).toBe("verified");
+    expect(item.history.map((h) => h.state)).toEqual(["discovered", "extracted", "verified"]);
+    expect(item.history.at(-1)!.by).toBe("human-1");
   });
 
   it("refuses to verify an item that hasn't been extracted first (this test uses one already past verified)", () => {
-    let ledger = verifyEvidence(extracted(), "e1", "u1");
-    expect(() => verifyEvidence(ledger, "e1", "u1")).toThrow(EvidenceStateError);
+    const alreadyVerified = verifyEvidence(extracted(), "e1");
+    expect(() => verifyEvidence(alreadyVerified, "e1")).toThrow(EvidenceStateError);
   });
 });
 
 function verified(id = "e1") {
-  return verifyEvidence(extracted(id), id, "u1");
+  return verifyEvidence(extracted(id), id);
 }
 
 describe("domain/evidence: proposeEvidence", () => {
   it("moves a verified item to proposed and records the target claim", () => {
-    const ledger = proposeEvidence(verified(), "e1", "claim-1", "ai");
-    expect(ledger.items[0].state).toBe("proposed");
-    expect(ledger.items[0].proposedClaimId).toBe("claim-1");
+    const ledger = proposeEvidence(verified(), "e1", "claim-42", "agent-1");
+    const item = ledger.items[0];
+    expect(item.state).toBe("proposed");
+    expect(item.proposedClaimId).toBe("claim-42");
+    expect(item.history.map((h) => h.state)).toEqual(["discovered", "extracted", "verified", "proposed"]);
+    expect(item.history.at(-1)!.by).toBe("agent-1");
   });
 
   it("refuses to propose an item still stuck at 'extracted'", () => {
@@ -94,17 +100,36 @@ describe("domain/evidence: proposeEvidence", () => {
   });
 });
 
-function proposed(id = "e1") {
-  return proposeEvidence(verified(id), id, "claim-1", "ai");
+function proposed(id = "e1", sourceCitationStatus: "missing" | "needs_user_review" | "confirmed" = "confirmed") {
+  const discovered = discoverSource(emptyLedger(), source("s1", sourceCitationStatus));
+  const ex = extractEvidence(discovered, { id, sourceId: "s1", quote: "A valid quote." });
+  const ver = verifyEvidence(ex, id);
+  return proposeEvidence(ver, id, "claim-1", "ai");
 }
 
-describe("domain/evidence: approveEvidence — the only path to 'citable'", () => {
-  it("moves a proposed item straight to citable, recording user_approved in its history", () => {
-    const ledger = approveEvidence(proposed(), "e1", "human-1");
+describe("domain/evidence: approveEvidence & Citation Readiness Guard", () => {
+  it("moves a proposed item straight to citable when source citation is confirmed", () => {
+    const ledger = approveEvidence(proposed("e1", "confirmed"), "e1", "human-1");
     const item = ledger.items[0];
     expect(item.state).toBe("citable");
     expect(item.history.map((h) => h.state)).toEqual(["discovered", "extracted", "verified", "proposed", "user_approved", "citable"]);
     expect(item.history.at(-1)!.by).toBe("human-1");
+  });
+
+  it("moves proposed item to user_approved (NOT citable) when source citation is unconfirmed", () => {
+    const ledger = approveEvidence(proposed("e1", "missing"), "e1", "human-1");
+    const item = ledger.items[0];
+    expect(item.state).toBe("user_approved");
+    expect(item.history.map((h) => h.state)).toEqual(["discovered", "extracted", "verified", "proposed", "user_approved"]);
+  });
+
+  it("promotes user_approved items to citable when source citation is confirmed later", () => {
+    const ledgerUnconfirmed = approveEvidence(proposed("e1", "needs_user_review"), "e1", "human-1");
+    expect(ledgerUnconfirmed.items[0].state).toBe("user_approved");
+
+    const ledgerConfirmed = confirmSourceCitation(ledgerUnconfirmed, "s1", undefined, "human-1");
+    expect(ledgerConfirmed.sources[0].citationStatus).toBe("confirmed");
+    expect(ledgerConfirmed.items[0].state).toBe("citable");
   });
 
   it("refuses approval with no actor — an unattributed approval is not a real one", () => {
@@ -113,17 +138,6 @@ describe("domain/evidence: approveEvidence — the only path to 'citable'", () =
 
   it("refuses to approve an item that was never proposed", () => {
     expect(() => approveEvidence(verified(), "e1", "human-1")).toThrow(EvidenceStateError);
-  });
-
-  it("no other function in this module can ever produce state 'citable'", () => {
-    const discovered = discoverSource(emptyLedger(), source("s1"));
-    const ex = extractEvidence(discovered, { id: "e1", sourceId: "s1", quote: "q" });
-    const ver = verifyEvidence(ex, "e1");
-    const prop = proposeEvidence(ver, "e1", "claim-1");
-    for (const ledger of [discovered, ex, ver, prop]) {
-      const item = ledger.items[0];
-      if (item) expect(item.state).not.toBe("citable");
-    }
   });
 });
 

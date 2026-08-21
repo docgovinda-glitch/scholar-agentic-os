@@ -64,6 +64,7 @@ export function evidenceRouter(projectLimit: express.RequestHandler): express.Ro
       id: `src-${crypto.randomUUID()}`,
       discoveredVia: req.body.discoveredVia ?? "manual",
       discoveredAt: new Date().toISOString(),
+      citationStatus: req.body.citationStatus ?? "confirmed",
     };
     try {
       const evidenceLedger = discoverSource(record.evidenceLedger, source);
@@ -103,7 +104,12 @@ export function evidenceRouter(projectLimit: express.RequestHandler): express.Ro
     let evidenceLedger = record.evidenceLedger;
     const added: DiscoveredSource[] = [];
     for (const draft of drafts) {
-      const source: DiscoveredSource = { ...draft, id: `src-${crypto.randomUUID()}`, discoveredAt: now };
+      const source: DiscoveredSource = {
+        ...draft,
+        id: `src-${crypto.randomUUID()}`,
+        discoveredAt: now,
+        citationStatus: "confirmed",
+      };
       evidenceLedger = discoverSource(evidenceLedger, source);
       added.push(source);
     }

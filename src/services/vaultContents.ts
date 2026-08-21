@@ -24,6 +24,7 @@ import { verifyVaultPassphrase } from "./userVault";
 import {
   type VaultItem,
   type VaultSourceType,
+  type CitationStatus,
   type SyncProgress,
   type SyncResult,
   resolveVaultProvider,
@@ -31,8 +32,9 @@ import {
   LocalVaultStorageProvider,
   SupabaseVaultStorageProvider,
 } from "./vault/VaultStorageProvider";
+import type { CanonicalReference } from "../citation_compliance/model/reference";
 
-export type { VaultItem, VaultSourceType, SyncProgress, SyncResult };
+export type { VaultItem, VaultSourceType, CitationStatus, CanonicalReference, SyncProgress, SyncResult };
 export { resolveVaultProvider, syncLocalVaultToRemote, LocalVaultStorageProvider, SupabaseVaultStorageProvider };
 
 interface StoredItem {
@@ -145,6 +147,8 @@ export async function addVaultItem(
     title: string;
     content: string;
     citation?: string;
+    citationStatus?: CitationStatus;
+    canonicalReference?: CanonicalReference;
     sourceType?: VaultSourceType;
     filename?: string;
     mimeType?: string;
@@ -163,6 +167,8 @@ export async function addVaultItem(
     title: fields.title,
     content: fields.content,
     citation: fields.citation,
+    citationStatus: fields.citationStatus || (fields.citation || fields.canonicalReference ? "needs_user_review" : "missing"),
+    canonicalReference: fields.canonicalReference,
     sourceType: fields.sourceType || "file",
     filename: fields.filename,
     mimeType: fields.mimeType,
@@ -180,6 +186,8 @@ export async function addVaultItem(
       title: item.title,
       content: item.content,
       citation: item.citation,
+      citationStatus: item.citationStatus,
+      canonicalReference: item.canonicalReference,
       sourceType: item.sourceType,
       filename: item.filename,
       mimeType: item.mimeType,
@@ -208,7 +216,8 @@ export async function listVaultItems(userId: string): Promise<VaultItem[]> {
   for (const s of stored) {
     try {
       const plain = JSON.parse(await decryptDataAsync(s.ciphertext, passphrase)) as any;
-      items.push({ id: s.id, createdAt: s.createdAt, ...plain });
+      const citationStatus: CitationStatus = plain.citationStatus || (plain.citation || plain.canonicalReference ? "needs_user_review" : "missing");
+      items.push({ id: s.id, createdAt: s.createdAt, ...plain, citationStatus });
     } catch {
       // dropped rather than failing whole list
     }
@@ -223,6 +232,8 @@ export async function addVaultItems(
     title: string;
     content: string;
     citation?: string;
+    citationStatus?: CitationStatus;
+    canonicalReference?: CanonicalReference;
     sourceType?: VaultSourceType;
     filename?: string;
     mimeType?: string;
@@ -239,6 +250,51 @@ export async function addVaultItems(
     saved.push(await addVaultItem(userId, fields));
   }
   return saved;
+}
+
+/** Updates citation metadata and status for a local vault item. */
+export async function updateVaultItemCitation(
+  userId: string,
+  id: string,
+  canonicalReference: CanonicalReference,
+  citationStatus: CitationStatus = "confirmed",
+  formattedCitation?: string
+): Promise<VaultItem | null> {
+  const passphrase = requirePassphrase();
+  const items = await listVaultItems(userId);
+  const existing = items.find((i) => i.id === id);
+  if (!existing) return null;
+
+  const updated: VaultItem = {
+    ...existing,
+    canonicalReference,
+    citationStatus,
+    citation: formattedCitation || existing.citation,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const ciphertext = await encryptDataAsync(
+    JSON.stringify({
+      title: updated.title,
+      content: updated.content,
+      citation: updated.citation,
+      citationStatus: updated.citationStatus,
+      canonicalReference: updated.canonicalReference,
+      sourceType: updated.sourceType,
+      filename: updated.filename,
+      mimeType: updated.mimeType,
+      externalReference: updated.externalReference,
+      storageReference: updated.storageReference,
+      authors: updated.authors,
+      year: updated.year,
+      journal: updated.journal,
+      metadata: updated.metadata,
+    }),
+    passphrase
+  );
+
+  await idbPut(userId, { id: updated.id, createdAt: updated.createdAt, ciphertext });
+  return updated;
 }
 
 /** Deletes a vault item from local storage. */
@@ -266,7 +322,7 @@ export function searchVaultItems(items: VaultItem[], query: string): VaultItem[]
 
 export interface VaultAIContext {
   /** The items approved for AI use in this interaction. */
-  selectedItems: Pick<VaultItem, "id" | "title" | "content" | "citation">[];
+  selectedItems: (Pick<VaultItem, "id" | "title" | "content" | "citation"> & { citationStatus?: CitationStatus })[];
   /** Total number of items in the Vault at selection time — for logging only. */
   _vaultSizeAtSelection: number;
 }
@@ -305,7 +361,13 @@ export function prepareVaultContextForAI(
   const idSet = new Set(selectedIds);
   const selectedItems = allItems
     .filter((i) => idSet.has(i.id))
-    .map(({ id, title, content, citation }) => ({ id, title, content, citation }));
+    .map(({ id, title, content, citation, citationStatus }) => ({
+      id,
+      title,
+      content,
+      citation,
+      citationStatus: citationStatus || (citation ? "needs_user_review" : "missing"),
+    }));
 
   if (selectedItems.length === 0) {
     throw new Error(

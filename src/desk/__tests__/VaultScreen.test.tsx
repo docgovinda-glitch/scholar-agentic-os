@@ -175,7 +175,12 @@ describe("unlocked", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save to Vault" }));
 
     await waitFor(() =>
-      expect(addVaultItem).toHaveBeenCalledWith("user-1", { title: saved.title, content: saved.content, citation: saved.citation })
+      expect(addVaultItem).toHaveBeenCalledWith("user-1", {
+        title: saved.title,
+        content: saved.content,
+        citation: saved.citation,
+        citationStatus: "needs_user_review",
+      })
     );
     expect(await screen.findByText(saved.title)).toBeInTheDocument();
   });
