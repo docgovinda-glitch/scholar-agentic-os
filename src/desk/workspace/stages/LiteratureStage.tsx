@@ -23,7 +23,7 @@ export default function LiteratureStage({
 }: {
   stage: ResearchStage;
   projectId: string;
-  onAdvance?: () => void;
+  onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
