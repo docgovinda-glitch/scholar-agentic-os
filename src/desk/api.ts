@@ -116,10 +116,20 @@ export async function authedStreamFetch(input: string, method: string, body: unk
       onEvent("log", { message: "> Initiating local frontend agentic stream..." });
       try {
         let fullContent = "";
-        const finalResult = await executeAgenticLLM(data.systemPrompt, data.userPrompt, data.taskType || "reasoning", (chunk) => {
-          fullContent += chunk;
-          onEvent("chunk", { token: chunk });
-        });
+        const finalResult = await executeAgenticLLM(
+          data.systemPrompt,
+          data.userPrompt,
+          data.taskType || "reasoning",
+          (chunk) => {
+            fullContent += chunk;
+            onEvent("chunk", { token: chunk });
+          },
+          (failoverEvt) => {
+            if (failoverEvt.userMessage) {
+              onEvent("log", { message: `⚠️ ${failoverEvt.userMessage}` });
+            }
+          }
+        );
         let parsed;
         const textResult = typeof finalResult === "string" ? finalResult : JSON.stringify(finalResult);
         try {
@@ -282,7 +292,13 @@ function routingTaskTypeToTaskClass(taskType: RoutingTaskType): "drafting" | "re
   }
 }
 
-async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskType: RoutingTaskType = "reasoning", onChunk?: (chunk: string) => void) {
+async function executeAgenticLLM(
+  systemPrompt: string,
+  userPrompt: string,
+  taskType: RoutingTaskType = "reasoning",
+  onChunk?: (chunk: string) => void,
+  onFailoverEvent?: (event: any) => void
+) {
   const decision = await routeDecision(taskType);
   if (!decision || !decision.ok) {
     throw new Error(decision?.reasoning || "No AI routing decision available.");
@@ -293,23 +309,13 @@ async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskT
 
   for (const c of choices) {
     if (c.tier === "premium") {
-      // Premium calls must be mediated by the server (POST /api/studio/refine
-      // with useEngine:"premium"). This function is only called when the server
-      // has already returned 426 (requireFrontendLLM), which means the server
-      // cannot handle the request — including its own Premium path. Sending
-      // a fake literal "premium" as an API key to a cloud adapter would cause
-      // an auth failure on every call. Skip premium candidates here.
       continue;
     } else if (c.tier === "byok" || c.tier === "free") {
       const key = await readProviderKey(c.providerId);
       if (key) {
-        // Only push when the user actually has this key on this device.
         candidates.push({ provider: c.providerId, model: c.modelId, apiKey: key });
       }
-      // If key is null, this provider is connected on another device but not
-      // here — skip it rather than sending a null/empty credential.
     } else if (c.tier === "local") {
-      // Local runners need no credential — they run on the user's own machine.
       candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "local-no-credential-required" });
     }
   }
@@ -317,10 +323,6 @@ async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskT
   if (activeManualModelOverride) {
     const key = await readProviderKey(activeManualModelOverride.providerId);
     if (key) {
-      // Only inject the override when a real key is stored on this device.
-      // If key is null the user has no credential here; falling through to the
-      // router-ranked candidates is better than pushing a fake key that will
-      // fail every adapter auth check.
       candidates.unshift({
         provider: activeManualModelOverride.providerId,
         model: activeManualModelOverride.modelId,
@@ -350,16 +352,26 @@ async function executeAgenticLLM(systemPrompt: string, userPrompt: string, taskT
 
   if (onChunk) {
     let full = "";
-    const result = await streamWithFailover(req, (chunk) => {
-      full += chunk;
-      onChunk(chunk);
-    }, { candidates });
+    const result = await streamWithFailover(
+      req,
+      (chunk) => {
+        full += chunk;
+        onChunk(chunk);
+      },
+      {
+        candidates,
+        onEvent: onFailoverEvent,
+      }
+    );
     if (!result.ok) {
       throw new Error("Agentic generation failed: " + (result as any).error?.message);
     }
     return full;
   } else {
-    const result = await completeWithFailover(req, { candidates });
+    const result = await completeWithFailover(req, {
+      candidates,
+      onEvent: onFailoverEvent,
+    });
     if (!result.ok) {
       throw new Error("Agentic generation failed: " + (result as any).error?.message);
     }

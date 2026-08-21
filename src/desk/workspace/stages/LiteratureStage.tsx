@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedJsonFetch, authedStreamFetch } from "../../api";
+import { authedStreamFetch } from "../../api";
 
-interface LiteratureItem {
+export interface LiteratureItem {
   id: string;
+  doi?: string;
   title: string;
   authors: string[];
   year: number;
@@ -30,232 +31,478 @@ export default function LiteratureStage({
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<LiteratureItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expandedAbstractId, setExpandedAbstractId] = useState<string | null>(null);
+
+  // Excluded / removed items tracking for broadened search
+  const [removedDois, setRemovedDois] = useState<string[]>([]);
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [removedTitles, setRemovedTitles] = useState<string[]>([]);
 
   // Agent Statuses
-  const [sourceAgent, setSourceAgent] = useState("Waiting...");
-  const [analysisAgent, setAnalysisAgent] = useState("Waiting...");
-  const [evidenceAgent, setEvidenceAgent] = useState("Waiting...");
-  const [knowledgeAgent, setKnowledgeAgent] = useState("Waiting...");
+  const [sourceAgent, setSourceAgent] = useState("Ready");
+  const [analysisAgent, setAnalysisAgent] = useState("Ready");
+  const [evidenceAgent, setEvidenceAgent] = useState("Ready");
+  const [knowledgeAgent, setKnowledgeAgent] = useState("Ready");
 
   // Snapshot metrics
   const [sourcesDiscovered, setSourcesDiscovered] = useState(0);
-  const [sourcesShortlisted, setSourcesShortlisted] = useState(0);
   const [thematicClusters, setThematicClusters] = useState(0);
 
-  useEffect(() => {
-    let active = true;
+  const startDiscovery = async (isBroadened: boolean = false) => {
+    setIsProcessing(true);
+    setError(null);
 
-    const startDiscovery = async () => {
-      setIsProcessing(true);
-      setResults(null);
-      setError(null);
-      setLogs([
-        {
-          id: Date.now().toString() + "init",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "info",
-          message: `> initialize()`,
-        },
-        {
-          id: Date.now().toString() + "loaded",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `✓ research definition loaded`,
-        },
-      ]);
+    const initLog: LogEntry = {
+      id: Date.now().toString() + "init",
+      timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+      level: "action",
+      message: isBroadened
+        ? "> Initiating Broadened & Interdisciplinary Literature Discovery..."
+        : "> Initiating Primary Academic Literature Search...",
+    };
 
-      setSourceAgent("Connecting to Agent Pipeline...");
-      
-      try {
-        await authedStreamFetch(
-          `/api/projects/${projectId}/agent/literature`,
-          "POST",
-          { trigger: "discovery" },
-          (event, data) => {
-            if (!active) return;
-            
-            if (event === "log") {
-              setLogs((prev) => [
+    setLogs((prev) => [...prev, initLog]);
+    setSourceAgent(isBroadened ? "Searching Adjacent Disciplines..." : "Querying Academic Vault...");
+    setAnalysisAgent("Synthesizing Context...");
+    setEvidenceAgent("Waiting...");
+    setKnowledgeAgent("Waiting...");
+
+    // Build canonical exclusion arrays
+    const currentKeptIds = (results || []).map((r) => r.id).filter(Boolean);
+    const currentKeptDois = (results || []).map((r) => r.doi).filter(Boolean) as string[];
+    const currentKeptTitles = (results || []).map((r) => r.title).filter(Boolean);
+
+    const excludeIds = Array.from(new Set([...currentKeptIds, ...removedIds]));
+    const excludeDois = Array.from(new Set([...currentKeptDois, ...removedDois]));
+    const excludeTitles = Array.from(new Set([...currentKeptTitles, ...removedTitles]));
+
+    try {
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/literature`,
+        "POST",
+        {
+          isBroadened,
+          excludeIds,
+          excludeDois,
+          excludeTitles,
+        },
+        (event, data) => {
+          if (event === "log") {
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + Math.random(),
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "info",
+                message: data.message,
+              },
+            ]);
+          } else if (event === "chunk") {
+            setLogs((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.message.startsWith("> Agent Reasoning")) return prev;
+              return [
                 ...prev,
                 {
                   id: Date.now().toString() + Math.random(),
                   timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                   level: "info",
-                  message: data.message,
+                  message: "> Agent Reasoning [streaming JSON analysis]...",
                 },
-              ]);
-            } else if (event === "chunk") {
-              // We could render raw tokens, but for now we just show a generic "Agent Reasoning..." log
-              // if it's the first chunk
-              setLogs((prev) => {
-                const last = prev[prev.length - 1];
-                if (last && last.message.startsWith("> Agent Reasoning")) {
-                  // If you want to actually render the JSON tokens in real-time, 
-                  // you could append data.token to the message. 
-                  // For a cleaner UX in this specific stage, we'll keep the log clean:
-                  return prev; 
-                }
-                return [
-                  ...prev,
-                  {
-                    id: Date.now().toString() + Math.random(),
-                    timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                    level: "info",
-                    message: "> Agent Reasoning [streaming JSON output]...",
-                  }
-                ];
-              });
-              setSourceAgent("Generating Literature Review...");
-            } else if (event === "done") {
-              const items = Array.isArray(data.data) ? data.data : [];
-              setResults(items);
-              setSourcesDiscovered(items.length);
-              setSourcesShortlisted(Math.min(items.length, Math.max(1, Math.round(items.length * 0.6))));
-              const themesSet = new Set<string>();
-              items.forEach((item: any) => {
-                if (Array.isArray(item.themes)) {
-                  item.themes.forEach((t: string) => themesSet.add(t));
-                }
-              });
-              setThematicClusters(themesSet.size > 0 ? themesSet.size : Math.max(1, Math.floor(items.length / 3)));
-              setLogs((prev) => [
-                ...prev,
-                {
-                  id: Date.now().toString() + "done",
-                  timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                  level: "success",
-                  message: `✓ literature review ready (${items.length} sources discovered)`,
-                },
-              ]);
-              setSourceAgent("Complete ✓");
-              setAnalysisAgent("Complete ✓");
-              setEvidenceAgent("Complete ✓");
-              setKnowledgeAgent("Complete ✓");
+              ];
+            });
+            setSourceAgent("Analyzing Literature Corpus...");
+          } else if (event === "done") {
+            const rawItems: LiteratureItem[] = Array.isArray(data.data) ? data.data : [];
+            
+            // Filter out any duplicates against exclusions canonical-first
+            const existingKeptDois = new Set(currentKeptDois.map(d => d.toLowerCase().trim()));
+            const existingKeptIds = new Set(currentKeptIds);
+            const existingKeptTitles = new Set(currentKeptTitles.map(t => t.toLowerCase().trim()));
+            const allRemovedDois = new Set(removedDois.map(d => d.toLowerCase().trim()));
+            const allRemovedTitles = new Set(removedTitles.map(t => t.toLowerCase().trim()));
 
-              if (onAdvance) {
-                setTimeout(() => {
-                  if (active) onAdvance("gap_identification");
-                }, 1500);
+            const freshItems = rawItems.filter((item) => {
+              if (item.doi && (existingKeptDois.has(item.doi.toLowerCase().trim()) || allRemovedDois.has(item.doi.toLowerCase().trim()))) {
+                return false;
               }
-            } else if (event === "error") {
-              throw new Error(data.message || "Agent encountered an error.");
-            }
+              if (item.id && existingKeptIds.has(item.id)) {
+                return false;
+              }
+              if (item.title && (existingKeptTitles.has(item.title.toLowerCase().trim()) || allRemovedTitles.has(item.title.toLowerCase().trim()))) {
+                return false;
+              }
+              return true;
+            });
+
+            setResults((prev) => (prev ? [...prev, ...freshItems] : freshItems));
+            
+            const totalCount = (results?.length || 0) + freshItems.length;
+            setSourcesDiscovered(totalCount);
+
+            const themesSet = new Set<string>();
+            [...(results || []), ...freshItems].forEach((item) => {
+              if (Array.isArray(item.themes)) {
+                item.themes.forEach((t) => themesSet.add(t));
+              }
+            });
+            setThematicClusters(themesSet.size > 0 ? themesSet.size : Math.max(1, Math.floor(totalCount / 3)));
+
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "done",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "success",
+                message: isBroadened
+                  ? `✓ Broadened search complete: added ${freshItems.length} adjacent/interdisciplinary sources.`
+                  : `✓ Discovery complete: ${freshItems.length} primary sources identified.`,
+              },
+            ]);
+
+            setSourceAgent("Complete ✓");
+            setAnalysisAgent("Complete ✓");
+            setEvidenceAgent("Complete ✓");
+            setKnowledgeAgent("Complete ✓");
+          } else if (event === "error") {
+            throw new Error(data.message || "Agent encountered an error.");
           }
-        );
-      } catch (err: any) {
-        if (!active) return;
-        setError(err.message);
-        setLogs((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString() + "err",
-            timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-            level: "error",
-            message: err.message,
-          },
-        ]);
-      } finally {
-        if (active) {
-          setIsProcessing(false);
         }
-      }
-    };
-
-    if (results === null && !isProcessing) {
-      startDiscovery();
+      );
+    } catch (err: any) {
+      setError(err.message);
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + "err",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "error",
+          message: err.message,
+        },
+      ]);
+      setSourceAgent("Failed");
+      setAnalysisAgent("Failed");
+    } finally {
+      setIsProcessing(false);
     }
+  };
 
-    return () => {
-      active = false;
-    };
-  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleRemoveItem = (item: LiteratureItem) => {
+    if (item.doi) {
+      setRemovedDois((prev) => [...prev, item.doi!]);
+    }
+    if (item.id) {
+      setRemovedIds((prev) => [...prev, item.id]);
+    }
+    if (item.title) {
+      setRemovedTitles((prev) => [...prev, item.title]);
+    }
+    setResults((prev) => (prev ? prev.filter((r) => r.id !== item.id) : null));
+    setLogs((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString() + "remove",
+        timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+        level: "warning",
+        message: `Dismissed source: "${item.title.slice(0, 45)}..." (will not be re-suggested)`,
+      },
+    ]);
+  };
 
   if (!def) return <div>Unknown stage</div>;
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)]">
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
-        
+      {/* Header */}
+      <div className="p-6 pb-4 border-b border-[color:var(--border-subtle)] flex flex-wrap justify-between items-center bg-[color:var(--surface-raised)] z-10 gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] font-bold">
+            02
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+              {def.number}. {def.label}
+            </h2>
+            <p className="text-xs text-[color:var(--text-secondary)]">
+              Discover and curate the core academic foundation for your research.
+            </p>
+          </div>
+        </div>
+
+        {/* Global Action Header Buttons */}
+        <div className="flex items-center gap-3">
+          {results && results.length > 0 && !isProcessing && (
+            <>
+              <button
+                type="button"
+                onClick={() => startDiscovery(true)}
+                className="px-4 py-2 rounded-lg bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] font-semibold text-xs transition-colors flex items-center gap-2 cursor-pointer"
+                title="Broaden the search to adjacent disciplines and related literature"
+              >
+                <span>✦</span> Find More Literature (Broaden)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onAdvance?.("gap_identification")}
+                className="px-5 py-2 rounded-lg bg-[color:var(--accent)] text-white font-bold text-xs hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+              >
+                Proceed to Gap Identification →
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Initial Empty State / Call to Action */}
+        {results === null && !isProcessing && (
+          <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl p-8 text-center max-w-2xl mx-auto my-8 shadow-sm">
+            <div className="w-14 h-14 rounded-full bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] text-[color:var(--accent)] flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              📚
+            </div>
+            <h3 className="text-lg font-bold text-[color:var(--text-primary)] mb-2">
+              Ready to Discover Scholarly Literature
+            </h3>
+            <p className="text-sm text-[color:var(--text-secondary)] mb-6 max-w-md mx-auto leading-relaxed">
+              Scholar Agent will search scholarly databases and your personal vault to assemble a foundational literature corpus for your working title.
+            </p>
+            <button
+              type="button"
+              onClick={() => startDiscovery(false)}
+              className="px-8 py-3.5 rounded-full bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white font-bold text-sm shadow-md transition-all hover:scale-[1.02] cursor-pointer inline-flex items-center gap-2"
+            >
+              <span>🚀</span> Start Literature Discovery
+            </button>
+          </div>
+        )}
+
+        {/* Progress Notification Banner */}
+        {isProcessing && (
+          <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-xl p-4 flex items-center justify-between shadow-sm animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 rounded-full bg-[color:var(--accent)] animate-ping" />
+              <div>
+                <p className="text-xs font-bold text-[color:var(--text-primary)]">
+                  Literature Discovery in Progress...
+                </p>
+                <p className="text-[11px] text-[color:var(--text-secondary)]">
+                  Retrieving, ranking, and extracting thematic clusters from academic databases.
+                </p>
+              </div>
+            </div>
+            <span className="text-[11px] font-mono text-[color:var(--accent)] font-semibold">Active Agent Stream</span>
+          </div>
+        )}
+
         {/* Terminal and Snapshot Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <AgentTerminal
               logs={logs}
               isProcessing={isProcessing}
-              agentName="Literature"
+              agentName="Literature_Agent"
             />
           </div>
-          
+
           {/* Research Snapshot */}
-          <div className="bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-xl p-5 shadow-xl font-mono text-[13px] text-[color:var(--text-primary)]">
-            <h3 className="text-[color:var(--text-secondary)] font-bold mb-4 tracking-wider uppercase text-[11px] border-b border-[color:var(--border-subtle)] pb-2">Research Snapshot</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-[color:var(--text-muted)]">Sources discovered:</span>
-                <span className="text-emerald-400 font-bold">{sourcesDiscovered > 0 ? sourcesDiscovered : '-'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[color:var(--text-muted)]">Sources shortlisted:</span>
-                <span className="text-emerald-400 font-bold">{sourcesShortlisted > 0 ? sourcesShortlisted : '-'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[color:var(--text-muted)]">Thematic clusters:</span>
-                <span className="text-indigo-400 font-bold">{thematicClusters > 0 ? thematicClusters : '-'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[color:var(--text-muted)]">Recurring concepts:</span>
-                <span className="text-indigo-400 font-bold">{thematicClusters > 0 ? 14 : '-'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[color:var(--text-muted)]">Methodological patterns:</span>
-                <span className="text-amber-400 font-bold">{thematicClusters > 0 ? 6 : '-'}</span>
+          <div className="bg-[color:var(--surface-sunken)] border border-[color:var(--border-default)] rounded-xl p-5 shadow-sm font-mono text-[13px] text-[color:var(--text-primary)] flex flex-col justify-between">
+            <div>
+              <h3 className="text-[color:var(--text-secondary)] font-bold mb-4 tracking-wider uppercase text-[11px] border-b border-[color:var(--border-subtle)] pb-2">
+                Discovery Metrics
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-[color:var(--text-muted)]">Active Sources:</span>
+                  <span className="text-[color:var(--state-success)] font-bold">{results?.length || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[color:var(--text-muted)]">Total Discovered:</span>
+                  <span className="text-[color:var(--text-primary)] font-bold">{sourcesDiscovered}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[color:var(--text-muted)]">Dismissed / Excluded:</span>
+                  <span className="text-[color:var(--state-warning)] font-bold">{removedTitles.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[color:var(--text-muted)]">Thematic Clusters:</span>
+                  <span className="text-[color:var(--state-info)] font-bold">{thematicClusters}</span>
+                </div>
               </div>
             </div>
 
-            {thematicClusters > 0 && (
-              <div className="mt-6 pt-4 border-t border-[color:var(--border-subtle)]">
-                <h4 className="text-[color:var(--text-muted)] text-[10px] uppercase mb-2">Currently Investigating</h4>
-                <div className="text-indigo-300 font-semibold bg-indigo-950/30 border border-indigo-500/20 px-3 py-2 rounded">
-                  "ritual practice" ↔ "regional variation"
-                </div>
-              </div>
-            )}
+            <div className="pt-4 border-t border-[color:var(--border-subtle)] text-[11px] text-[color:var(--text-muted)]">
+              <span className="font-semibold text-[color:var(--text-secondary)]">Status: </span>
+              {isProcessing ? "Analyzing corpus..." : results ? "Curated & Ready" : "Awaiting User Initiation"}
+            </div>
           </div>
         </div>
 
         {/* Human-Friendly Agent Activity */}
-        <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl p-5">
-          <h3 className="text-sm font-bold text-[color:var(--text-primary)] mb-4 flex items-center gap-2">
-            <span className="text-[color:var(--accent)]">✦</span> Research Team
+        <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl p-4">
+          <h3 className="text-xs font-bold text-[color:var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-2">
+            <span>✦</span> Research Sub-Agents
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <AgentStatusCard name="Source Agent" status={sourceAgent} active={sourceAgent.includes("→") && !sourceAgent.includes("Complete")} />
-            <AgentStatusCard name="Analysis Agent" status={analysisAgent} active={analysisAgent.includes("→") && !analysisAgent.includes("Complete")} />
-            <AgentStatusCard name="Evidence Agent" status={evidenceAgent} active={evidenceAgent.includes("→") && !evidenceAgent.includes("Complete")} />
-            <AgentStatusCard name="Knowledge Agent" status={knowledgeAgent} active={knowledgeAgent.includes("→") && !knowledgeAgent.includes("Complete")} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <AgentStatusCard name="Source Retrieval" status={sourceAgent} active={sourceAgent.includes("...")} />
+            <AgentStatusCard name="Thematic Analysis" status={analysisAgent} active={analysisAgent.includes("...")} />
+            <AgentStatusCard name="Evidence Extraction" status={evidenceAgent} active={evidenceAgent.includes("...")} />
+            <AgentStatusCard name="Knowledge Synthesis" status={knowledgeAgent} active={knowledgeAgent.includes("...")} />
           </div>
         </div>
 
+        {/* Error Alert */}
         {error && (
-          <div className="p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-lg border border-[color:var(--state-danger)] opacity-80">
-            {error}
+          <div className="p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-xl border border-[color:var(--state-danger)] text-sm flex items-center justify-between">
+            <span>⚠️ {error}</span>
+            <button
+              onClick={() => startDiscovery(false)}
+              className="px-3 py-1 bg-[color:var(--state-danger)] text-white text-xs font-bold rounded-lg hover:opacity-90 cursor-pointer"
+            >
+              Retry
+            </button>
           </div>
         )}
 
+        {/* Discovered Literature Cards */}
+        {results && results.length > 0 && (
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[color:var(--text-primary)] uppercase tracking-wider">
+                Curated Literature Sources ({results.length})
+              </h3>
+              <span className="text-xs text-[color:var(--text-muted)]">
+                Review and curate your sources before identifying gaps
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {results.map((item, idx) => {
+                const isExpanded = expandedAbstractId === item.id;
+
+                return (
+                  <div
+                    key={item.id || idx}
+                    className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] hover:border-[color:var(--border-default)] rounded-xl p-5 shadow-sm transition-all"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)]">
+                            {item.year || 2025}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[color:var(--state-info-subtle)] text-[color:var(--state-info)] border border-[color:var(--border-subtle)]">
+                            {item.journal || "Scholarly Journal"}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]">
+                            Relevance: {item.relevanceScore}%
+                          </span>
+                          {item.doi && (
+                            <span className="text-[11px] font-mono text-[color:var(--text-muted)] truncate max-w-[200px]">
+                              DOI: {item.doi}
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="text-base font-bold text-[color:var(--text-primary)] mb-1 leading-snug">
+                          {item.title}
+                        </h4>
+
+                        <p className="text-xs text-[color:var(--text-secondary)] mb-3">
+                          {item.authors && Array.isArray(item.authors) ? item.authors.join(", ") : "Various Authors"}
+                        </p>
+
+                        {/* Themes */}
+                        {item.themes && item.themes.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {item.themes.map((theme, tIdx) => (
+                              <span
+                                key={tIdx}
+                                className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]"
+                              >
+                                #{theme}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Expandable Abstract */}
+                        {isExpanded && (
+                          <div className="mt-3 p-3.5 rounded-lg bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] text-xs text-[color:var(--text-primary)] leading-relaxed">
+                            <p className="font-bold text-[10px] uppercase text-[color:var(--text-muted)] mb-1">
+                              Abstract & Key Findings
+                            </p>
+                            {item.abstract || "No abstract snippet available."}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Actions */}
+                      <div className="flex sm:flex-col items-center gap-2 shrink-0 border-t sm:border-t-0 sm:border-l border-[color:var(--border-subtle)] pt-3 sm:pt-0 sm:pl-4">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedAbstractId(isExpanded ? null : item.id)}
+                          className="flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] border border-[color:var(--border-subtle)] transition-colors cursor-pointer"
+                        >
+                          {isExpanded ? "Hide Details" : "Read Abstract"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(item)}
+                          className="flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg text-[color:var(--state-danger)] hover:bg-[color:var(--state-danger-subtle)] border border-transparent hover:border-[color:var(--state-danger)] transition-colors cursor-pointer"
+                          title="Remove source and exclude from future suggestions"
+                        >
+                          ✕ Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom Progression Bar */}
+            <div className="pt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[color:var(--border-subtle)]">
+              <button
+                type="button"
+                onClick={() => startDiscovery(true)}
+                disabled={isProcessing}
+                className="px-5 py-2.5 rounded-lg bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] font-semibold text-xs transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <span>✦</span> Find More Literature (Broaden to Adjacent Fields)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onAdvance?.("gap_identification")}
+                className="px-6 py-2.5 rounded-lg bg-[color:var(--accent)] text-white font-bold text-xs hover:bg-[color:var(--accent-hover)] transition-all shadow-md flex items-center gap-2 cursor-pointer"
+              >
+                Proceed to Gap Identification →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function AgentStatusCard({ name, status, active }: { name: string, status: string, active: boolean }) {
+function AgentStatusCard({ name, status, active }: { name: string; status: string; active: boolean }) {
   return (
-    <div className={`p-3 rounded-lg border text-xs transition-colors duration-300 ${active ? 'bg-indigo-50/50 border-indigo-200 shadow-sm' : 'bg-[color:var(--surface-sunken)] border-[color:var(--border-subtle)] opacity-80'}`}>
-      <div className="font-bold text-[color:var(--text-primary)] mb-1.5 flex items-center gap-1.5">
-        {active && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />}
-        {!active && status.includes("Complete") && <span className="text-emerald-500">✓</span>}
+    <div
+      className={`p-3 rounded-lg border text-xs transition-all ${
+        active
+          ? "bg-[color:var(--accent-subtle)] border-[color:var(--accent-border)] text-[color:var(--text-primary)] shadow-sm"
+          : "bg-[color:var(--surface-sunken)] border-[color:var(--border-subtle)] text-[color:var(--text-muted)]"
+      }`}
+    >
+      <div className="font-bold mb-1 flex items-center gap-1.5 text-[color:var(--text-primary)]">
+        {active && <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--accent)] animate-pulse" />}
+        {!active && status.includes("Complete") && <span className="text-[color:var(--state-success)]">✓</span>}
         {name}
       </div>
-      <div className={`font-mono truncate ${active ? 'text-indigo-600' : 'text-[color:var(--text-muted)]'}`}>
+      <div className={`font-mono text-[11px] truncate ${active ? "text-[color:var(--accent)] font-semibold" : ""}`}>
         {status}
       </div>
     </div>

@@ -22,6 +22,10 @@ interface ResearchContextValue {
   setManualModelOverride: (override: { providerId: string; modelId?: string } | null) => void;
   chapterId: string | null;
   setChapterId: (id: string | null) => void;
+  aiExhaustedError: string | null;
+  setAiExhaustedError: (err: string | null) => void;
+  fallbackToast: string | null;
+  setFallbackToast: (msg: string | null) => void;
 }
 
 const ResearchContext = createContext<ResearchContextValue | null>(null);
@@ -52,6 +56,8 @@ export function ResearchProvider({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [manualModelOverride, setManualModelOverride] = useState<{ providerId: string; modelId?: string } | null>(null);
+  const [aiExhaustedError, setAiExhaustedError] = useState<string | null>(null);
+  const [fallbackToast, setFallbackToast] = useState<string | null>(null);
 
   const currentStage = initialStage ?? "definition";
 
@@ -147,6 +153,10 @@ export function ResearchProvider({
     setManualModelOverride,
     chapterId,
     setChapterId,
+    aiExhaustedError,
+    setAiExhaustedError,
+    fallbackToast,
+    setFallbackToast,
   };
 
   return (

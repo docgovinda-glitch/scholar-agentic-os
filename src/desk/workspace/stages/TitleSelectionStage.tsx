@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedJsonFetch, saveIntakeAnswers , authedStreamFetch} from "../../api";
+import { saveIntakeAnswers, authedStreamFetch } from "../../api";
 
 interface TitleItem {
   id: string;
@@ -32,374 +32,388 @@ export default function TitleSelectionStage({
   const [results, setResults] = useState<TitleItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [customTitle, setCustomTitle] = useState("");
-  const [isCustomEditing, setIsCustomEditing] = useState(false);
 
-  const selectedTitle = project.answers?.["working_title"];
+  const isTitleLocked = project.answers?.["title_locked"] === "true";
+  const [selectedTitleText, setSelectedTitleText] = useState(project.answers?.["working_title"] || "");
+  const [customTitleInput, setCustomTitleInput] = useState("");
+  const [isCustomMode, setIsCustomMode] = useState(false);
 
-  useEffect(() => {
-    let active = true;
+  const startTitleGeneration = async () => {
+    setIsProcessing(true);
+    setError(null);
+    setLogs([
+      {
+        id: Date.now().toString() + "1",
+        timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+        level: "info",
+        message: `> title.generate() — synthesizing selected research gaps...`,
+      },
+    ]);
 
-    const startGeneration = async () => {
-      setIsProcessing(true);
-      setResults(null);
-      setError(null);
-      setLogs([
-        {
-          id: Date.now().toString() + "1",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "info",
-          message: `> title.generate()`,
-        },
-      ]);
-
-      const actions = [
-        "Synthesizing selected research gap...",
-        "Analyzing target journal naming conventions...",
-        "A/B testing title impact scores...",
-        "Refining semantic keywords for indexing...",
-        "Generating subtitle rationales...",
-      ];
-      let step = 0;
-
-      const logInterval = setInterval(() => {
-        if (!active) return;
-        if (step < actions.length) {
-          const msg = actions[step];
-          setLogs((prev) => [
-            ...prev,
-            {
-              id: Date.now().toString() + Math.random(),
-              timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-              level: "action",
-              message: `  ${msg}`,
-            },
-          ]);
-          step++;
-        }
-      }, 900);
-
-      try {
-        await authedStreamFetch(
-          `/api/projects/${projectId}/agent/titles`,
-          "POST",
-          {},
-          (event, eventData) => {
-            if (!active) return;
-            if (event === "log") {
-              setLogs((prev) => [
+    try {
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/titles`,
+        "POST",
+        {},
+        (event, eventData) => {
+          if (event === "log") {
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + Math.random(),
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "info",
+                message: eventData.message,
+              },
+            ]);
+          } else if (event === "chunk") {
+            setLogs((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.message.startsWith("> Agent Reasoning")) return prev;
+              return [
                 ...prev,
                 {
                   id: Date.now().toString() + Math.random(),
                   timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                   level: "info",
-                  message: eventData.message,
+                  message: "> Agent Reasoning [streaming title proposals]...",
                 },
-              ]);
-            } else if (event === "chunk") {
-              setLogs((prev) => {
-                const last = prev[prev.length - 1];
-                if (last && last.message.startsWith("> Agent Reasoning")) return prev;
-                return [
-                  ...prev,
-                  {
-                    id: Date.now().toString() + Math.random(),
-                    timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                    level: "info",
-                    message: "> Agent Reasoning [streaming JSON output]...",
-                  }
-                ];
-              });
-            } else if (event === "done") {
-              // wait for animations
-        
-        const data = eventData.data;
-setResults(data);
-        setLogs((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString() + "done",
-            timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-            level: "success",
-            message: `✓ ✦ Generated from your selected research gap`,
-          },
-        ]);
-            } else if (event === "error") {
-              throw new Error(eventData.message || "Agent encountered an error.");
-            }
+              ];
+            });
+          } else if (event === "done") {
+            const data: TitleItem[] = Array.isArray(eventData.data) ? eventData.data : [];
+            setResults(data);
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "done",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "success",
+                message: `✓ Generated ${data.length} academic title proposals tailored to your research gap.`,
+              },
+            ]);
+          } else if (event === "error") {
+            throw new Error(eventData.message || "Agent encountered an error.");
           }
-        );
-      } catch (err: any) {
-        if (!active) return;
-        setError(err.message);
-        setLogs((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString() + "err",
-            timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-            level: "error",
-            message: err.message,
-          },
-        ]);
-      } finally {
-        if (active) {
-          setIsProcessing(false);
         }
-      }
-    };
-
-    if (results === null && !isProcessing) {
-      startGeneration();
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleSelectTitle = async (item: TitleItem) => {
-    setIsSaving(true);
-    setError(null);
-    try {
-      const fullTitle = item.subtitle_text 
-        ? `${item.title_text}: ${item.subtitle_text}` 
-        : item.title_text;
-      
-      const newAnswers = {
-        ...project.answers,
-        working_title: fullTitle,
-        title_rationale: item.rationale,
-      };
-      
-      const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-      onSaved(updatedProject);
-      if (onAdvance) {
-        onAdvance("title_lock");
-      }
+      );
     } catch (err: any) {
-      setError(err.message || "Failed to save title selection.");
+      setError(err.message);
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + "err",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "error",
+          message: err.message,
+        },
+      ]);
     } finally {
-      setIsSaving(false);
+      setIsProcessing(false);
     }
   };
 
-  const handleSelectCustomTitle = async (title: string, rationale: string = "User customized title") => {
+  const handleSelectTitle = (item: TitleItem) => {
+    const full = item.subtitle_text ? `${item.title_text}: ${item.subtitle_text}` : item.title_text;
+    setSelectedTitleText(full);
+    setIsCustomMode(false);
+  };
+
+  const handleLockTitleAndProceed = async () => {
+    if (!selectedTitleText.trim()) {
+      setError("Please select or enter a title before locking.");
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
+
     try {
       const newAnswers = {
         ...project.answers,
-        working_title: title,
-        title_rationale: rationale,
+        working_title: selectedTitleText.trim(),
+        title_locked: "true",
       };
-      
+
       const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
       onSaved(updatedProject);
+
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + "lock",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "success",
+          message: `✓ Title officially locked: "${selectedTitleText.trim()}". Proceeding to Evidence extraction.`,
+        },
+      ]);
+
       if (onAdvance) {
-        onAdvance("title_lock");
+        onAdvance("vault_sources");
       }
     } catch (err: any) {
-      setError(err.message || "Failed to save title selection.");
+      setError(err.message || "Failed to lock title.");
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const startEditing = (item: TitleItem) => {
-    setEditingId(item.id);
-    const fullTitle = item.subtitle_text ? `${item.title_text}: ${item.subtitle_text}` : item.title_text;
-    setEditValue(fullTitle);
   };
 
   if (!def) return <div>Unknown stage</div>;
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)]">
-      <div className="p-8 pb-4 border-b border-[color:var(--border-subtle)] flex justify-between items-center bg-[color:var(--surface-raised)] z-10 shadow-sm relative">
+      {/* Header */}
+      <div className="p-6 pb-4 border-b border-[color:var(--border-subtle)] flex flex-wrap justify-between items-center bg-[color:var(--surface-raised)] z-10 gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)]">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={def.icon} />
-            </svg>
+          <div className="w-10 h-10 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] font-bold">
+            05
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-[color:var(--text-primary)]">
-              {def.number}. {def.label}
+            <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+              {def.number}. {def.label} & Locking
             </h2>
-            <p className="text-[color:var(--text-secondary)] mt-1">
-              {def.description}
+            <p className="text-xs text-[color:var(--text-secondary)]">
+              Propose, refine, and lock the final research title to anchor all subsequent evidence and manuscript drafting.
             </p>
           </div>
         </div>
-        <button
-          onClick={() => {
-            setResults(null);
-            setLogs([]);
-          }}
-          disabled={isProcessing}
-          className="px-6 py-2 rounded-full bg-[color:var(--accent)] text-white font-semibold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2"
-        >
-          {isProcessing ? (
-            <>
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Generating...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-              Generate Titles
-            </>
-          )}
-        </button>
+
+        {selectedTitleText && !isTitleLocked && (
+          <button
+            type="button"
+            onClick={handleLockTitleAndProceed}
+            disabled={isSaving || !selectedTitleText.trim()}
+            className="px-6 py-2.5 rounded-lg bg-[color:var(--accent)] text-white font-bold text-xs hover:bg-[color:var(--accent-hover)] transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            {isSaving ? "Locking Title..." : "Lock Title & Proceed to Evidence →"}
+          </button>
+        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-8 flex flex-col items-center">
-        <div className="w-full max-w-4xl animate-fade-in">
-          {(isProcessing || logs.length > 0) && (
-            <AgentTerminal
-              logs={logs}
-              isProcessing={isProcessing}
-              agentName="Title Generator"
-            />
-          )}
-
-          {error && (
-            <div className="mt-4 p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-lg border border-[color:var(--state-danger)] opacity-80">
-              {error}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Initial Prompt Hero */}
+        {results === null && !isProcessing && (
+          <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl p-8 text-center max-w-2xl mx-auto my-8 shadow-sm">
+            <div className="w-14 h-14 rounded-full bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] text-[color:var(--accent)] flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              ✍️
             </div>
-          )}
+            <h3 className="text-lg font-bold text-[color:var(--text-primary)] mb-2">
+              Ready to Suggest Research Titles
+            </h3>
+            <p className="text-sm text-[color:var(--text-secondary)] mb-6 max-w-md mx-auto leading-relaxed">
+              Scholar Agent will synthesize your selected research gap, study design, and target journal guidelines to generate high-impact scholarly titles.
+            </p>
+            <button
+              type="button"
+              onClick={startTitleGeneration}
+              className="px-8 py-3.5 rounded-full bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white font-bold text-sm shadow-md transition-all hover:scale-[1.02] cursor-pointer inline-flex items-center gap-2"
+            >
+              <span>✦</span> Suggest Titles
+            </button>
+          </div>
+        )}
+
+        {/* Progress Banner */}
+        {isProcessing && (
+          <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-xl p-4 flex items-center justify-between shadow-sm animate-pulse max-w-4xl mx-auto">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 rounded-full bg-[color:var(--accent)] animate-ping" />
+              <div>
+                <p className="text-xs font-bold text-[color:var(--text-primary)]">
+                  Generating Title Proposals...
+                </p>
+                <p className="text-[11px] text-[color:var(--text-secondary)]">
+                  Synthesizing gaps and framing academic title candidates.
+                </p>
+              </div>
+            </div>
+            <span className="text-[11px] font-mono text-[color:var(--accent)] font-semibold">Active Agent Stream</span>
+          </div>
+        )}
+
+        {/* Terminal Output */}
+        <div className="max-w-4xl mx-auto">
+          <AgentTerminal
+            logs={logs}
+            isProcessing={isProcessing}
+            agentName="Title_Generator"
+          />
         </div>
 
-        {results && (
-          <div className="w-full max-w-4xl animate-fade-in space-y-6">
-            <h3 className="text-xl font-bold text-[color:var(--text-primary)] mb-6 flex items-center gap-2">
-              <span className="text-[color:var(--accent)]">✦</span> TITLE CANDIDATES
-            </h3>
-            
-            {results.map((item, index) => {
-              const fullTitle = item.subtitle_text 
-                ? `${item.title_text}: ${item.subtitle_text}` 
-                : item.title_text;
-              const isSelected = selectedTitle === fullTitle;
-              const isEditing = editingId === item.id;
+        {/* Error Display */}
+        {error && (
+          <div className="max-w-4xl mx-auto p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-xl border border-[color:var(--state-danger)] text-sm flex items-center justify-between">
+            <span>⚠️ {error}</span>
+            <button
+              onClick={startTitleGeneration}
+              className="px-3 py-1 bg-[color:var(--state-danger)] text-white text-xs font-bold rounded-lg hover:opacity-90 cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
-              return (
-                <div key={item.id} className={`bg-[color:var(--surface-raised)] border ${isSelected ? "border-[color:var(--accent)] ring-1 ring-[color:var(--accent)]" : "border-[color:var(--border-subtle)]"} rounded-xl p-6 shadow-sm relative group`}>
-                  
-                  <div className="text-4xl text-[color:var(--text-muted)] font-black absolute top-4 right-4 opacity-30">
-                    0{index + 1}
-                  </div>
-                  
-                  {isEditing ? (
-                    <div className="mb-4">
-                      <label className="block text-xs font-bold text-[color:var(--text-muted)] mb-2 uppercase tracking-wide">Edit Title</label>
-                      <textarea
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded p-3 text-lg font-serif mb-3 focus:outline-none focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)]"
-                        rows={3}
-                      />
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => handleSelectCustomTitle(editValue, item.rationale)}
-                          disabled={isSaving}
-                          className="px-4 py-2 bg-[color:var(--accent)] text-white rounded text-sm font-semibold hover:bg-[color:var(--accent-hover)] disabled:opacity-50"
-                        >
-                          Save & Select Title
-                        </button>
-                        <button 
-                          onClick={() => setEditingId(null)}
-                          className="px-4 py-2 bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] rounded text-sm font-semibold hover:bg-[color:var(--border-default)]"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <h4 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2 font-serif pr-12">
-                        {item.title_text}
-                      </h4>
-                      {item.subtitle_text && (
-                        <h5 className="text-lg text-[color:var(--text-secondary)] font-serif italic mb-6">
-                          {item.subtitle_text}
-                        </h5>
-                      )}
-                      <p className="text-sm text-[color:var(--text-secondary)] mb-6">
-                        {item.rationale}
-                      </p>
-                      <div className="flex items-center gap-3">
-                        <button 
-                          onClick={() => handleSelectTitle(item)}
-                          disabled={isSaving}
-                          className={`px-6 py-2 rounded-lg font-semibold transition-colors shadow-sm disabled:opacity-50 ${
-                            isSelected
-                              ? "bg-[color:var(--accent)] text-white"
-                              : "bg-[color:var(--surface-sunken)] text-[color:var(--text-primary)] border border-[color:var(--border-subtle)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
-                          }`}
-                        >
-                          {isSaving && isSelected ? "Locking..." : isSelected ? "Selected" : "Select Title"}
-                        </button>
-                        {!isSelected && (
-                          <button 
-                            onClick={() => startEditing(item)}
-                            className="px-4 py-2 text-sm text-[color:var(--text-muted)] hover:text-[color:var(--accent)] transition-colors border border-transparent hover:border-[color:var(--accent)] rounded-lg font-medium"
-                          >
-                            [ Edit Title ]
-                          </button>
+        {/* Candidate Titles & Inline Editor */}
+        {results && results.length > 0 && (
+          <div className="max-w-4xl mx-auto space-y-6">
+            {/* Active Working Title Editor / Lock Box */}
+            <div className="bg-[color:var(--surface-raised)] border-2 border-[color:var(--accent)] rounded-2xl p-6 shadow-md space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[color:var(--accent)] uppercase tracking-wider flex items-center gap-2">
+                  <span>✦</span> Active Working Title (Editable)
+                </span>
+                {isTitleLocked ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)] border border-[color:var(--state-success)]">
+                    ✓ Title Locked
+                  </span>
+                ) : (
+                  <span className="text-xs text-[color:var(--text-muted)]">
+                    Edit below as needed, then click Lock Title
+                  </span>
+                )}
+              </div>
+
+              <textarea
+                value={selectedTitleText}
+                onChange={(e) => setSelectedTitleText(e.target.value)}
+                disabled={isTitleLocked || isSaving}
+                rows={2}
+                placeholder="Select a proposal below or type your custom title..."
+                className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-default)] rounded-xl p-4 text-base font-bold text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--accent)] transition-colors disabled:opacity-80"
+              />
+
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                <p className="text-xs text-[color:var(--text-secondary)]">
+                  Locking establishes the permanent ground truth for evidence extraction and drafting.
+                </p>
+                {!isTitleLocked && (
+                  <button
+                    type="button"
+                    onClick={handleLockTitleAndProceed}
+                    disabled={isSaving || !selectedTitleText.trim()}
+                    className="px-8 py-3 rounded-xl bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSaving ? "Locking Title..." : "Lock Title & Proceed to Evidence →"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Candidate Title Proposals */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-[color:var(--text-secondary)] uppercase tracking-wider px-1">
+                AI Title Proposals (Click to Adopt)
+              </h3>
+
+              {results.map((item, idx) => {
+                const fullTitle = item.subtitle_text ? `${item.title_text}: ${item.subtitle_text}` : item.title_text;
+                const isSelected = selectedTitleText === fullTitle;
+
+                return (
+                  <div
+                    key={item.id || idx}
+                    onClick={() => !isTitleLocked && handleSelectTitle(item)}
+                    className={`border rounded-xl p-5 shadow-sm transition-all cursor-pointer select-none ${
+                      isSelected
+                        ? "bg-[color:var(--surface-raised)] border-[color:var(--accent)] ring-2 ring-[color:var(--accent)]/30"
+                        : "bg-[color:var(--surface-raised)] border-[color:var(--border-subtle)] hover:border-[color:var(--border-default)]"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-[11px] font-mono font-bold text-[color:var(--accent)]">
+                            Option 0{idx + 1}
+                          </span>
+                          {isSelected && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)]">
+                              Adopted
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="text-base font-bold text-[color:var(--text-primary)] mb-1">
+                          {item.title_text}
+                        </h4>
+                        {item.subtitle_text && (
+                          <h5 className="text-sm text-[color:var(--text-secondary)] italic mb-2">
+                            {item.subtitle_text}
+                          </h5>
                         )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
 
-            {/* Write your own title */}
-            <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] border-dashed rounded-xl p-6 relative">
-              {isCustomEditing ? (
-                <div>
-                  <label className="block text-xs font-bold text-[color:var(--text-muted)] mb-2 uppercase tracking-wide">Write Your Own Title</label>
-                  <textarea
-                    value={customTitle}
-                    onChange={(e) => setCustomTitle(e.target.value)}
-                    placeholder="Enter your custom title here..."
-                    className="w-full bg-[color:var(--surface-base)] border border-[color:var(--border-default)] rounded p-3 text-lg font-serif mb-3 focus:outline-none focus:border-[color:var(--accent)] focus:ring-1 focus:ring-[color:var(--accent)]"
-                    rows={2}
+                        <p className="text-xs text-[color:var(--text-muted)] leading-relaxed">
+                          <strong>Rationale: </strong>
+                          {item.rationale}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isTitleLocked) handleSelectTitle(item);
+                        }}
+                        disabled={isTitleLocked}
+                        className={`px-4 py-2 rounded-lg text-xs font-semibold shrink-0 transition-colors ${
+                          isSelected
+                            ? "bg-[color:var(--accent)] text-white"
+                            : "bg-[color:var(--surface-sunken)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] border border-[color:var(--border-subtle)]"
+                        }`}
+                      >
+                        {isSelected ? "Adopted" : "Adopt Title"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Custom Title Option */}
+            <div className="bg-[color:var(--surface-raised)] border border-dashed border-[color:var(--border-default)] rounded-xl p-5">
+              {isCustomMode ? (
+                <div className="space-y-3">
+                  <label className="block text-xs font-bold text-[color:var(--text-secondary)] uppercase tracking-wider">
+                    Write Custom Title
+                  </label>
+                  <input
+                    type="text"
+                    value={customTitleInput}
+                    onChange={(e) => setCustomTitleInput(e.target.value)}
+                    placeholder="Enter your custom research title..."
+                    className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-default)] rounded-lg p-3 text-sm text-[color:var(--text-primary)] focus:outline-none focus:border-[color:var(--accent)]"
                   />
                   <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleSelectCustomTitle(customTitle, "User provided custom title")}
-                      disabled={isSaving || !customTitle.trim()}
-                      className="px-4 py-2 bg-[color:var(--accent)] text-white rounded text-sm font-semibold hover:bg-[color:var(--accent-hover)] disabled:opacity-50"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (customTitleInput.trim()) {
+                          setSelectedTitleText(customTitleInput.trim());
+                          setIsCustomMode(false);
+                        }
+                      }}
+                      className="px-4 py-2 bg-[color:var(--accent)] text-white text-xs font-bold rounded-lg cursor-pointer"
                     >
-                      Save & Select Custom Title
+                      Use Custom Title
                     </button>
-                    <button 
-                      onClick={() => setIsCustomEditing(false)}
-                      className="px-4 py-2 bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] rounded text-sm font-semibold hover:bg-[color:var(--border-default)]"
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomMode(false)}
+                      className="px-4 py-2 bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] text-xs font-semibold rounded-lg hover:bg-[color:var(--surface-hover)] cursor-pointer"
                     >
                       Cancel
                     </button>
                   </div>
                 </div>
               ) : (
-                <button 
-                  onClick={() => setIsCustomEditing(true)}
-                  className="w-full py-4 text-center text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] rounded-lg transition-colors font-medium"
+                <button
+                  type="button"
+                  onClick={() => setIsCustomMode(true)}
+                  className="w-full py-2 text-center text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
                 >
-                  + Write your own title
+                  + Prefer to write your own custom title from scratch?
                 </button>
               )}
             </div>
-            
           </div>
         )}
       </div>

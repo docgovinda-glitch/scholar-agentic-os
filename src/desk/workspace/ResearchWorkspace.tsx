@@ -8,6 +8,7 @@ import { StageRegistry } from "./StageRegistry";
 import PlaceholderStage from "./stages/PlaceholderStage";
 import { useAiAccess } from "../aiAccess/useAiAccess";
 import Tray from "../regions/Tray";
+import AiExhaustedModal from "./AiExhaustedModal";
 
 function ResearchWorkspaceInner({
   onClose,
@@ -35,6 +36,10 @@ function ResearchWorkspaceInner({
     setManualModelOverride,
     chapterId,
     setChapterId,
+    aiExhaustedError,
+    setAiExhaustedError,
+    fallbackToast,
+    setFallbackToast,
   } = useResearchWorkspace();
 
   const { connected } = useAiAccess();
@@ -240,6 +245,31 @@ function ResearchWorkspaceInner({
       </div>
 
       {trayOpen && <Tray projectId={projectId} onClose={() => setTrayOpen(false)} />}
+
+      {/* Visible Fallback / Switching Notification Toast */}
+      {fallbackToast && (
+        <div className="fixed bottom-12 right-6 z-50 max-w-md p-4 bg-[color:var(--surface-raised)] border border-[color:var(--accent)] text-[color:var(--text-primary)] rounded-xl shadow-xl flex items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-center gap-2.5 text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-[color:var(--accent)] animate-pulse shrink-0" />
+            <span>{fallbackToast}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFallbackToast(null)}
+            className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] text-xs font-bold px-1.5 py-0.5 rounded cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* AI Exhaustion Modal */}
+      <AiExhaustedModal
+        isOpen={!!aiExhaustedError}
+        errorMessage={aiExhaustedError}
+        onClose={() => setAiExhaustedError(null)}
+        onOpenAiAccess={onOpenAiAccess || (() => {})}
+      />
 
       {/* Status bar */}
       <div className="shrink-0 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 py-1.5 flex items-center justify-between text-[10px] text-[color:var(--text-muted)]">
