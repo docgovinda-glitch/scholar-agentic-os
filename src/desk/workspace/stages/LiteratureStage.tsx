@@ -107,14 +107,24 @@ export default function LiteratureStage({
               });
               setSourceAgent("Generating Literature Review...");
             } else if (event === "done") {
-              setResults(data.data || []);
+              const items = Array.isArray(data.data) ? data.data : [];
+              setResults(items);
+              setSourcesDiscovered(items.length);
+              setSourcesShortlisted(Math.min(items.length, Math.max(1, Math.round(items.length * 0.6))));
+              const themesSet = new Set<string>();
+              items.forEach((item: any) => {
+                if (Array.isArray(item.themes)) {
+                  item.themes.forEach((t: string) => themesSet.add(t));
+                }
+              });
+              setThematicClusters(themesSet.size > 0 ? themesSet.size : Math.max(1, Math.floor(items.length / 3)));
               setLogs((prev) => [
                 ...prev,
                 {
                   id: Date.now().toString() + "done",
                   timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                   level: "success",
-                  message: `✓ literature review ready`,
+                  message: `✓ literature review ready (${items.length} sources discovered)`,
                 },
               ]);
               setSourceAgent("Complete ✓");

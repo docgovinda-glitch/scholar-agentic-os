@@ -120,17 +120,31 @@ export async function authedStreamFetch(input: string, method: string, body: unk
           fullContent += chunk;
           onEvent("chunk", { token: chunk });
         });
-        // We simulate the backend's post-processing by parsing here
         let parsed;
-        const textResult = finalResult as string;
+        const textResult = typeof finalResult === "string" ? finalResult : JSON.stringify(finalResult);
         try {
           parsed = JSON.parse(textResult);
-        } catch(e) {
-          // try removing markdown ticks if present
-          try {
-            parsed = JSON.parse(textResult.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim());
-          } catch(e2) {
-            throw new Error("Invalid JSON from LLM: " + textResult);
+        } catch (_) {
+          const fenceMatch = textResult.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+          if (fenceMatch && fenceMatch[1]) {
+            try { parsed = JSON.parse(fenceMatch[1].trim()); } catch (_) {}
+          }
+          if (!parsed) {
+            const firstBrace = textResult.indexOf('{');
+            const lastBrace = textResult.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace > firstBrace) {
+              try { parsed = JSON.parse(textResult.slice(firstBrace, lastBrace + 1)); } catch (_) {}
+            }
+          }
+          if (!parsed) {
+            const firstBracket = textResult.indexOf('[');
+            const lastBracket = textResult.lastIndexOf(']');
+            if (firstBracket !== -1 && lastBracket > firstBracket) {
+              try { parsed = JSON.parse(textResult.slice(firstBracket, lastBracket + 1)); } catch (_) {}
+            }
+          }
+          if (!parsed) {
+            throw new Error("Invalid JSON from LLM: " + textResult.slice(0, 120));
           }
         }
         // Then we POST it back to let the backend do its DB updates

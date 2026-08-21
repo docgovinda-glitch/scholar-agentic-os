@@ -38,18 +38,48 @@ function handleFrontendLLMOverride(req: any) {
   return null;
 }
 
+export function parseJsonFromLlm(content: any): any {
+  if (!content) return null;
+  if (typeof content !== "string") return content;
+  const raw = content.trim();
+
+  // 1. Try direct parse
+  try {
+    return JSON.parse(raw);
+  } catch (_) {}
+
+  // 2. Try stripping markdown code fences: ```json ... ``` or ``` ... ```
+  const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenceMatch && fenceMatch[1]) {
+    try {
+      return JSON.parse(fenceMatch[1].trim());
+    } catch (_) {}
+  }
+
+  // 3. Try finding outer brackets / braces: {...} or [...]
+  const firstBrace = raw.indexOf('{');
+  const lastBrace = raw.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(raw.slice(firstBrace, lastBrace + 1));
+    } catch (_) {}
+  }
+
+  const firstBracket = raw.indexOf('[');
+  const lastBracket = raw.lastIndexOf(']');
+  if (firstBracket !== -1 && lastBracket > firstBracket) {
+    try {
+      return JSON.parse(raw.slice(firstBracket, lastBracket + 1));
+    } catch (_) {}
+  }
+
+  throw new Error("Invalid JSON returned by LLM: " + raw.slice(0, 120));
+}
+
 function handleFrontendLLMOverrideJSON(req: any) {
   const content = handleFrontendLLMOverride(req);
   if (content) {
-    if (typeof content === "string") {
-      const cleanContent = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-      try {
-        return JSON.parse(cleanContent);
-      } catch (err) {
-        throw new Error("Invalid JSON returned by LLM");
-      }
-    }
-    return content;
+    return parseJsonFromLlm(content);
   }
   return null;
 }
@@ -77,8 +107,8 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
       defaultPolicy()
     );
     
-    const text = (result.ok ? result.value.text : "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-    return JSON.parse(text);
+    const text = result.ok ? result.value.text : "";
+    return parseJsonFromLlm(text);
   } catch (err: any) {
     if (!res.headersSent) {
       res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
@@ -110,12 +140,17 @@ export async function callOpenRouterText(req: any, res: any, systemPrompt: strin
     );
     return result.ok ? result.value.text : "";
   } catch (err: any) {
-    if (!res.headersSent) res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+    if (!res.headersSent) {
+      res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
+    }
     throw new Error("RequireFrontendLLMException");
   }
 }
 
 export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning") {
+  const override = handleFrontendLLMOverrideJSON(req);
+  if (override) return override;
+
   const candidates = getCandidates();
   if (candidates.length === 0) {
     res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
@@ -156,8 +191,7 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
     );
 
     sendEvent("log", { message: "> Parsing final JSON..." });
-    const cleanText = fullContent.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-    return JSON.parse(cleanText);
+    return parseJsonFromLlm(fullContent);
   } catch (err: any) {
     if (!res.headersSent) {
       res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
