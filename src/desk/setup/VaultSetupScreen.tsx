@@ -39,6 +39,7 @@ export default function VaultSetupScreen({
   onSkip: () => void;
 }) {
   const [step, setStep] = useState<Step>("offer");
+  const [storageMode, setStorageMode] = useState<"local" | "synced">("synced");
   const [passphrase, setPassphrase] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saved, setSaved] = useState(false);
@@ -58,7 +59,7 @@ export default function VaultSetupScreen({
     setError(null);
     try {
       await setVaultPassphraseVerifier(passphrase);
-      const result = await createVault("My Knowledge Vault");
+      const result = await createVault("My Knowledge Vault", storageMode);
       if (!result.success) {
         setError(result.error ?? "Could not create your Vault.");
         return;
@@ -87,7 +88,9 @@ export default function VaultSetupScreen({
             Over time it becomes the foundation your work is built on — when you write something new, Scholar can draw
             on everything you have already read, and you can search years of reading in one place.
           </p>
-          <p>It stays privately in this browser on this device, encrypted with a passphrase you choose. It does not currently sync to your other devices or browsers. It is entirely optional, and everything works without it.</p>
+          <p>
+            It stays privately in this browser on this device, encrypted with a passphrase you choose. It does not currently sync to your other devices or browsers. It is entirely optional, and everything works without it.
+          </p>
         </div>
 
         {/* Three peer options, presented without a default (docs 25 §6.1). */}
@@ -107,11 +110,6 @@ export default function VaultSetupScreen({
             <span className="block text-sm font-medium text-[color:var(--text-muted)]">
               Import an existing library
             </span>
-            {/* Not offered as a way to create the Vault itself — that part is
-                real: BibTeX/RIS import (../vault/VaultImport.tsx, reachable
-                from the Vault screen once one exists) covers Zotero,
-                Mendeley, and EndNote's own export formats. What is still
-                missing is doing it right here, before a Vault exists. */}
             <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">
               Create a Vault first — then import a BibTeX or RIS file (from Zotero, Mendeley, or EndNote) from the
               Vault screen.

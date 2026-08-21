@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { loadVault, hasVaultPassphraseOnThisDevice } from "../../services/userVault";
+import { loadVault, hasVaultPassphraseOnThisDevice, updateVaultStorageMode, type VaultRecord } from "../../services/userVault";
 import {
   addVaultItem,
   deleteVaultItem,
@@ -8,36 +8,29 @@ import {
   lockVault,
   searchVaultItems,
   unlockVault,
+  syncLocalVaultToRemote,
   type VaultItem,
+  type SyncProgress,
 } from "../../services/vaultContents";
 import VaultSetupScreen from "../setup/VaultSetupScreen";
 import VaultImport from "./VaultImport";
 import VaultDocumentImport from "./VaultDocumentImport";
 
 /**
- * The Knowledge Vault's contents (docs 25 §6) — reachable any time from
- * Header/ProjectListScreen, not folded into a project. A Vault is
- * explicitly "your long-term library... across future projects" (§6.2), so
- * this is a peer destination to a project, the same reasoning that already
- * moved AI settings off `PaperProject` and onto the user.
+ * The Universal Knowledge Vault's contents — reachable any time from Header/ProjectListScreen.
  *
- * Three states in order: no Vault yet (reuses VaultSetupScreen's own create
- * flow rather than duplicating it — "Not now" here just returns, since this
- * is a deliberate visit, not the onboarding offer `useVaultSetupStatus`
- * tracks skips for), locked (the passphrase lives in memory only, per
- * session — see vaultContents.ts), and unlocked (list, add, search, delete).
+ * Supports:
+ * - Synchronized Account Storage (accessible across all devices).
+ * - This Browser Only (device-local IndexedDB storage).
+ * - Non-destructive, resumable local migration engine.
+ * - Multi-source types (PDF, Word, Excel, CSV, Text, Web URLs, YouTube, DOI).
  */
-/**
- * Three loading states for the vault:
- * - null: still checking
- * - "none": no vault row on server (user never created one)
- * - "other-device": vault row exists on server, but this browser has no local verifier
- * - "this-device": vault row exists AND this browser has a verifier
- */
-type VaultPresence = null | "none" | "other-device" | "this-device";
+
+type VaultPresence = null | "none" | "other-device" | "this-device" | "synced";
 
 export default function VaultScreen({ userId, onClose }: { userId: string; onClose: () => void }) {
   const [vaultPresence, setVaultPresence] = useState<VaultPresence>(null);
+  const [vaultRecord, setVaultRecord] = useState<VaultRecord | null>(null);
   const [unlocked, setUnlocked] = useState(isVaultUnlocked());
   const [passphrase, setPassphrase] = useState("");
   const [unlockError, setUnlockError] = useState<string | null>(null);
@@ -45,12 +38,18 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
 
   useEffect(() => {
     (async () => {
-      const vaultRecord = await loadVault();
-      if (!vaultRecord) {
+      const record = await loadVault();
+      setVaultRecord(record);
+      if (!record) {
         setVaultPresence("none");
         return;
       }
-      // Server row exists — check whether this specific browser has the local verifier.
+      if (record.storageMode === "synced") {
+        setVaultPresence("synced");
+        setUnlocked(true); // Account-synced storage is authenticated via Supabase session
+        return;
+      }
+      // Local mode: check whether this specific browser has the local verifier.
       const localVerifier = await hasVaultPassphraseOnThisDevice();
       setVaultPresence(localVerifier ? "this-device" : "other-device");
     })();
@@ -82,10 +81,10 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
   }
 
   if (vaultPresence === "none") {
-    return <VaultSetupScreen onDone={() => setVaultPresence("this-device")} onSkip={onClose} />;
+    return <VaultSetupScreen onDone={() => setVaultPresence("synced")} onSkip={onClose} />;
   }
 
-  // P1-4: Vault exists on the server (another device created it) but this browser has no local data.
+  // Local-only vault created on another browser without sync enabled
   if (vaultPresence === "other-device") {
     return (
       <Shell onClose={onClose}>
@@ -94,40 +93,51 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
         </h1>
         <div className="mt-4 flex flex-col gap-3 text-sm text-[color:var(--text-secondary)]">
           <p>
-            Your private Knowledge Vault was created in a different browser or on a different device. It is stored
-            locally there and is not available here.
+            Your Knowledge Vault is currently configured in <strong>Browser-Only mode</strong> on a different device.
           </p>
           <p>
-            Knowledge Vault synchronisation across devices is not currently available. Your projects are available
-            normally — only the Vault is device-local.
+            To access your Vault across all devices, open Scholar on your original device and select <strong>Sync to Account</strong>.
           </p>
           <p className="rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs text-[color:var(--text-muted)]">
-            🔒 Private Vault · Stored in the browser where you created it · Not synced<br />
+            🔒 Private Browser Vault · Stored in the original browser · Sync optional<br />
             ☁️ Projects · Synced to your Scholar account
           </p>
         </div>
-        <p className="mt-6 text-sm text-[color:var(--text-secondary)]">
-          To use your Vault, open Scholar in the original browser. To start a new Vault in this browser, contact
-          support or clear your Scholar Vault data on the original device first.
-        </p>
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={async () => {
+              await updateVaultStorageMode("synced");
+              setVaultPresence("synced");
+              setUnlocked(true);
+            }}
+            className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors hover:bg-[color:var(--accent-hover)] cursor-pointer"
+          >
+            Enable Synchronized Storage on this Account
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
       </Shell>
     );
   }
 
-  if (!unlocked) {
+  if (!unlocked && vaultPresence === "this-device") {
     return (
       <Shell onClose={onClose}>
         <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">Unlock your Vault</h1>
         <p className="mt-1.5 text-sm text-[color:var(--text-secondary)]">
-          Your passphrase never leaves this browser and stays in memory only for this visit.
+          Your passphrase unlocks your device-encrypted research sources for this visit.
         </p>
-        {/* P1-2: device-local badge */}
         <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">
-          <span>🔒 Private Vault</span>
+          <span>🔒 Private Local Vault</span>
           <span aria-hidden="true">·</span>
           <span>Stored in this browser</span>
-          <span aria-hidden="true">·</span>
-          <span>Not synced</span>
         </p>
         <form onSubmit={handleUnlock} className="mt-6 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -153,7 +163,7 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
             <button
               type="submit"
               disabled={busy || !passphrase}
-              className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
+              className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
             >
               {busy ? "Unlocking…" : "Unlock"}
             </button>
@@ -166,18 +176,11 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
             </button>
           </div>
         </form>
-        {/*
-          P0-2 finding: the recovery code has no automated unlock path in this version —
-          it cannot be entered here to open the Vault. The passphrase is the only unlock
-          credential. The recovery code is a proof-of-ownership token for future support
-          use. The wording is updated to be accurate rather than implying automatic recovery.
-        */}
         <p className="mt-8 text-xs text-[color:var(--text-muted)]">
           Forgotten your passphrase? In this version there is no automated way to open the Vault without it. Your
           recovery code is proof that you created this Vault, but it cannot substitute for your passphrase here. If
           you have lost your passphrase, your Vault contents cannot be recovered by anyone, including us.
         </p>
-        {/* P0-1: Browser storage clearing warning */}
         <p className="mt-3 rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs text-[color:var(--text-muted)]">
           ⚠️ Your Vault is stored privately in this browser. Clearing your browser’s site data may permanently remove
           your encrypted Vault from this device.
@@ -189,16 +192,31 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
   return (
     <VaultContents
       userId={userId}
+      storageMode={vaultPresence === "synced" ? "synced" : "local"}
       onClose={onClose}
       onLock={() => {
         lockVault();
         setUnlocked(false);
+        setVaultPresence("this-device");
       }}
+      onModeChanged={(mode) => setVaultPresence(mode === "synced" ? "synced" : "this-device")}
     />
   );
 }
 
-function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: () => void; onLock: () => void }) {
+function VaultContents({
+  userId,
+  storageMode,
+  onClose,
+  onLock,
+  onModeChanged,
+}: {
+  userId: string;
+  storageMode: "local" | "synced";
+  onClose: () => void;
+  onLock: () => void;
+  onModeChanged: (mode: "local" | "synced") => void;
+}) {
   const [items, setItems] = useState<VaultItem[] | null>(null);
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
@@ -209,7 +227,10 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // P3-2: Escape locks the Vault when it is unlocked and visible.
+  // Migration state
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape" && !e.defaultPrevented) {
@@ -220,11 +241,15 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
     return () => document.removeEventListener("keydown", onKey);
   }, [onLock]);
 
-  useEffect(() => {
+  const loadItems = () => {
     listVaultItems(userId)
       .then(setItems)
       .catch((e) => setError((e as Error).message));
-  }, [userId]);
+  };
+
+  useEffect(() => {
+    loadItems();
+  }, [userId, storageMode]);
 
   const visible = useMemo(() => (items ? searchVaultItems(items, query) : []), [items, query]);
 
@@ -265,6 +290,25 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
     }
   }
 
+  async function handleStartSync() {
+    setSyncing(true);
+    setError(null);
+    try {
+      const result = await syncLocalVaultToRemote(userId, setSyncProgress);
+      if (result.success) {
+        await updateVaultStorageMode("synced");
+        onModeChanged("synced");
+        loadItems();
+      } else if (result.errors.length > 0) {
+        setError(result.errors[0]);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to synchronize Vault.");
+    } finally {
+      setTimeout(() => setSyncing(false), 1200);
+    }
+  }
+
   return (
     <Shell onClose={onClose}>
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -273,14 +317,27 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
           <p className="mt-1.5 text-sm text-[color:var(--text-secondary)]">
             Notes, sources, and material you have already gathered — searchable, and encrypted in this browser.
           </p>
-          {/* P1-2: Persistent device-local status indicator */}
-          <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">
-            <span>🔒 Private Vault</span>
-            <span aria-hidden="true">·</span>
-            <span>Stored in this browser</span>
-            <span aria-hidden="true">·</span>
-            <span>Not synced</span>
-          </p>
+          <div className="mt-2 flex items-center gap-3">
+            {storageMode === "synced" ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-[color:var(--accent)] font-medium bg-[color:var(--accent-subtle)] px-2.5 py-1 rounded-[var(--radius-sm)] border border-[color:var(--accent-border)]">
+                ☁️ Synced to Account (Cross-Device)
+              </span>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] px-2.5 py-1 rounded-[var(--radius-sm)]">
+                  🔒 This Browser Only
+                </span>
+                <button
+                  type="button"
+                  onClick={handleStartSync}
+                  disabled={syncing}
+                  className="text-xs font-semibold text-[color:var(--accent)] hover:underline cursor-pointer"
+                >
+                  {syncing ? "Syncing…" : "Sync to Account →"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         <button
           type="button"
@@ -290,6 +347,22 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
           Lock
         </button>
       </header>
+
+      {syncProgress && syncing && (
+        <div className="mb-5 p-4 rounded-[var(--radius-md)] border border-[color:var(--accent-border)] bg-[color:var(--surface-raised)] flex flex-col gap-2">
+          <div className="flex justify-between text-xs text-[color:var(--text-secondary)] font-medium">
+            <span>Synchronizing sources to account…</span>
+            <span>{syncProgress.completed} / {syncProgress.total}</span>
+          </div>
+          <div className="w-full bg-[color:var(--surface-sunken)] h-1.5 rounded-full overflow-hidden">
+            <div
+              className="bg-[color:var(--accent-solid)] h-full transition-all duration-300"
+              style={{ width: `${(syncProgress.completed / Math.max(syncProgress.total, 1)) * 100}%` }}
+            />
+          </div>
+          <p className="text-xs text-[color:var(--text-muted)] truncate">{syncProgress.currentTitle}</p>
+        </div>
+      )}
 
       {error && (
         <p
@@ -316,20 +389,20 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
             <button
               type="button"
               onClick={() => setAdding((v) => !v)}
-              className="shrink-0 rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-3.5 py-2 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
+              className="shrink-0 rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-3.5 py-2 text-sm font-medium text-[color:var(--text-inverse)] transition-colors hover:bg-[color:var(--accent-hover)] cursor-pointer"
             >
               {adding ? "Cancel" : "Add material"}
             </button>
           </div>
 
-          <div className="mb-2 flex flex-wrap gap-4">
-            <VaultImport
-              userId={userId}
-              onImported={(saved) => setItems((current) => [...saved, ...(current ?? [])])}
-            />
+          <div className="mb-4 flex flex-wrap gap-4">
             <VaultDocumentImport
               userId={userId}
               onImported={(saved) => setItems((current) => [saved, ...(current ?? [])])}
+            />
+            <VaultImport
+              userId={userId}
+              onImported={(saved) => setItems((current) => [...saved, ...(current ?? [])])}
             />
           </div>
 
@@ -377,7 +450,7 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
               <button
                 type="submit"
                 disabled={busy || !title.trim() || !content.trim()}
-                className="self-start rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-3.5 py-2 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
+                className="self-start rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-3.5 py-2 text-sm font-medium text-[color:var(--text-inverse)] transition-colors hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
               >
                 {busy ? "Saving…" : "Save to Vault"}
               </button>
@@ -389,28 +462,31 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
               {items.length === 0 ? "Nothing in your Vault yet." : "Nothing matches that search."}
             </p>
           ) : (
-            <ul aria-label="Vault items" className="flex flex-col gap-2">
+            <ul aria-label="Vault items" className="flex flex-col gap-2.5">
               {visible.map((item) => (
                 <li
                   key={item.id}
                   className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] px-4 py-3"
                 >
-                  <p className="text-sm font-medium text-[color:var(--text-primary)]">{item.title}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-[color:var(--text-secondary)]">{item.content}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.title}</p>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--text-muted)]">
+                      {item.sourceType || "source"}
+                    </span>
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-[color:var(--text-secondary)] line-clamp-3">
+                    {item.content}
+                  </p>
                   {item.citation && <p className="mt-1.5 text-xs text-[color:var(--text-muted)]">{item.citation}</p>}
 
                   {confirmingDelete === item.id ? (
                     <div className="mt-2 flex items-center gap-3">
                       <span className="text-xs text-[color:var(--text-secondary)]">Delete this? There is no undo.</span>
-                      {/* P3-3: autoFocus moves keyboard/screen-reader focus to the
-                          destructive action so it is never missed. */}
                       <button
                         type="button"
-                        // eslint-disable-next-line jsx-a11y/no-autofocus
-                        autoFocus
                         onClick={() => handleDelete(item.id)}
                         disabled={busy}
-                        className="text-xs text-[color:var(--state-danger)] hover:opacity-80 cursor-pointer"
+                        className="text-xs text-[color:var(--state-danger)] hover:opacity-80 cursor-pointer font-bold"
                       >
                         Delete
                       </button>
@@ -448,7 +524,7 @@ function Shell({ children, onClose }: { children: React.ReactNode; onClose: () =
         <button
           type="button"
           onClick={onClose}
-          className="mb-6 text-sm text-[color:var(--accent)] transition-colors duration-[var(--motion-fast)] hover:text-[color:var(--accent-hover)] cursor-pointer"
+          className="mb-6 text-sm text-[color:var(--accent)] transition-colors hover:text-[color:var(--accent-hover)] cursor-pointer"
         >
           ← Back
         </button>

@@ -55,11 +55,14 @@ async function migrate() {
         const critiques = JSON.parse(critiqueStr);
         if (Array.isArray(critiques)) {
           for (const crit of critiques) {
+            const lens = (crit.lens || crit.category || crit.aspect || crit.type || crit.title || "Methodological Rigor").trim();
+            const feedback = (crit.feedback || crit.description || crit.critique || crit.summary || "Pending feedback").trim();
+            const severity = crit.severity || "Moderate";
             await supabase.from("peer_review_critiques").insert({
               project_id: project.project_id,
-              lens: crit.lens,
-              feedback: crit.feedback,
-              severity: crit.severity,
+              lens,
+              feedback,
+              severity,
             });
           }
         }

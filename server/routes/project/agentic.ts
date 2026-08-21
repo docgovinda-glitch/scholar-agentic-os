@@ -242,19 +242,24 @@ Return ONLY valid JSON in this exact format:
     const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
     if (!result) return;
     
-    // Insert into Supabase
+    // Insert into Supabase project_sources
     const config = getSupabaseRestConfig();
     if (config && result.data && Array.isArray(result.data)) {
-      const table = new SupabaseTable(config, "peer_review_critiques");
-      for (const crit of result.data) {
+      const table = new SupabaseTable(config, "project_sources");
+      for (const src of result.data) {
+        if (!src || typeof src !== "object") continue;
         await table.request("", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             project_id: project.projectId,
-            lens: crit.lens,
-            feedback: crit.feedback,
-            severity: crit.severity || "Moderate"
+            title: src.title || "Untitled Vault Source",
+            authors: Array.isArray(src.authors) ? src.authors : [src.author || "Unknown Author"],
+            year: typeof src.year === "number" ? src.year : (parseInt(src.year, 10) || new Date().getFullYear()),
+            source_type: "vault",
+            relevance_score: typeof src.relevance_score === "number" ? src.relevance_score : 90,
+            themes: Array.isArray(src.themes) ? src.themes : [],
+            abstract: src.snippet || src.type || ""
           })
         });
       }
@@ -335,43 +340,21 @@ Return ONLY valid JSON in this exact format:
     const result = await streamOpenRouterJSON(req, res, systemPrompt, finalContext);
     if (!result) return;
     
-    // Update into Supabase
+    // Insert into Supabase project_evidence
     const config = getSupabaseRestConfig();
     if (config && result.data && Array.isArray(result.data)) {
-      
-    const table = new SupabaseTable(config, "manuscript_sections");
-    const vTable = new SupabaseTable(config, "manuscript_versions");
-    
-    // First, save the old versions
-    try {
-      const oldSections = await table.request(`?project_id=eq.${project.projectId}`);
-      if (Array.isArray(oldSections)) {
-        for (const old of oldSections) {
-          await vTable.request("", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              project_id: project.projectId,
-              section_name: old.section_name,
-              content: old.content
-            })
-          });
-        }
-      }
-    } catch (e) {
-      console.error("Failed to snapshot manuscript versions", e);
-    }
-
-      for (const sec of result.data) {
+      const table = new SupabaseTable(config, "project_evidence");
+      for (const ev of result.data) {
+        if (!ev || typeof ev !== "object") continue;
         await table.request("", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates" },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             project_id: project.projectId,
-            section_name: sec.section,
-            content: sec.content || "",
-            status: sec.status || "Revised",
-            word_count: sec.length || 0
+            quote: ev.quote || "",
+            claim_type: ev.claim_type || "Empirical Support",
+            strength: ev.strength || "Strong",
+            tags: Array.isArray(ev.tags) ? ev.tags : []
           })
         });
       }
@@ -570,6 +553,48 @@ Return ONLY valid JSON in this exact format:
 }`;
     const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}\nChapter ID to target: ${chapterId || "all"}`, "openrouter/auto", "long-context");
     if (!result) return;
+
+    // Update into Supabase manuscript_sections and version snapshots
+    const config = getSupabaseRestConfig();
+    if (config && result.data && Array.isArray(result.data)) {
+      const table = new SupabaseTable(config, "manuscript_sections");
+      const vTable = new SupabaseTable(config, "manuscript_versions");
+
+      try {
+        const oldSections = await table.request(`?project_id=eq.${project.projectId}`);
+        if (Array.isArray(oldSections)) {
+          for (const old of oldSections) {
+            await vTable.request("", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                project_id: project.projectId,
+                section_name: old.section_name,
+                content: old.content
+              })
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to snapshot manuscript versions", e);
+      }
+
+      for (const sec of result.data) {
+        if (!sec || typeof sec !== "object") continue;
+        await table.request("", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates" },
+          body: JSON.stringify({
+            project_id: project.projectId,
+            section_name: sec.section || sec.section_name || "Untitled Section",
+            content: sec.content || "",
+            status: sec.status || "Drafted",
+            word_count: typeof sec.length === "number" ? sec.length : (sec.content ? sec.content.split(/\s+/).length : 0)
+          })
+        });
+      }
+    }
+
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: any) {
@@ -594,7 +619,8 @@ router.post("/peer-review", async (req: express.Request<{ id: string }>, res) =>
 
   try {
     const systemPrompt = `You are an expert academic peer reviewer.
-Critique the manuscript draft provided in the research context. Provide exactly 3 major critiques from different lenses.
+Critique the manuscript draft provided in the research context. Provide exactly 3 major critiques from different academic lenses.
+Academic lenses include: "Methodological Rigor", "Evidence Synthesis", "Logical Flow", "Domain Alignment", "Argument Strength", "Stylistic Register", "Compliance", "Literature Coverage".
 Return ONLY valid JSON in this exact format:
 {
   "data": [
@@ -603,6 +629,40 @@ Return ONLY valid JSON in this exact format:
 }`;
     const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`, "openrouter/auto", "long-context");
     if (!result) return;
+
+    // Insert into Supabase peer_review_critiques with strict lens and feedback validation
+    const config = getSupabaseRestConfig();
+    if (config && result.data && Array.isArray(result.data)) {
+      const table = new SupabaseTable(config, "peer_review_critiques");
+      for (const crit of result.data) {
+        if (!crit || typeof crit !== "object") continue;
+
+        // Resolve lens ensuring NOT NULL constraint is strictly satisfied with valid academic lens
+        const rawLens = (crit.lens || crit.category || crit.aspect || crit.type || crit.title || "").trim();
+        const validLens = rawLens || "Methodological Rigor";
+
+        const rawFeedback = (crit.feedback || crit.description || crit.critique || crit.summary || "").trim();
+        const validFeedback = rawFeedback || "Detailed feedback pending reviewer expansion.";
+
+        const rawSeverity = (crit.severity || "Moderate").trim();
+        const validSeverity = ["Minor", "Moderate", "Major", "Critical"].includes(rawSeverity)
+          ? rawSeverity
+          : (rawSeverity.charAt(0).toUpperCase() + rawSeverity.slice(1).toLowerCase());
+
+        await table.request("", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: project.projectId,
+            lens: validLens,
+            feedback: validFeedback,
+            severity: validSeverity || "Moderate",
+            waived: false
+          })
+        });
+      }
+    }
+
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: any) {

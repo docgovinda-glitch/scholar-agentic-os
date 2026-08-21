@@ -7,50 +7,38 @@
  * server-side — only that one exists. This module is the other half:
  * where the material actually lives once a Vault has one.
  *
- * V1 SCOPE: manual text entries only — a title, the material itself, and an
- * optional source citation. No PDF/photo/file import: that needs
- * server-side parsing (`/api/parse-file`), which is the same
- * not-built-yet OCR/parsing gap already named honestly elsewhere (reference-
- * manager import, VaultSetupScreen's "Import an existing library"). Building
- * a fake import path here would contradict that same honesty.
+ * MULTI-SOURCE SUPPORT:
+ * Supports PDFs, DOCX, XLSX, CSV, Web URLs, YouTube videos, BibTeX/RIS, and notes.
  *
  * ENCRYPTION. Each item is encrypted independently with
  * `encryptDataAsync`/`decryptDataAsync` (src/utils/crypto.ts —
  * PBKDF2-SHA256, 100k iterations, a fresh random salt and IV per call, AES-
  * GCM-256). The passphrase itself is never persisted anywhere — it lives in
- * the module-scope `activePassphrase` below for the current tab only,
- * cleared on reload, mirroring `apiVault.ts`'s in-memory-only "passphrase
- * mode" and the promise the Recovery Kit makes: if it is forgotten, only the
- * recovery code opens the Vault again, because there is nothing else on
- * this device or any server that remembers it.
+ * the module-scope `activePassphrase` below for the current tab only.
  *
- * STORAGE. IndexedDB, one database per signed-in user
- * (`scholar-vault-items:<userId>`) — origin-scoped storage otherwise has no
- * concept of "signed out", so without this a second account on the same
- * browser would try to decrypt the first account's items with the wrong
- * passphrase (harmless — AES-GCM fails closed — but `listVaultItems` needs
- * to not even attempt it, the same reasoning behind userVault.ts's verifier
- * scoping fix).
+ * STORAGE. IndexedDB, one database per signed-in user (`scholar-vault-items:<userId>`).
  */
 
 import { decryptDataAsync, encryptDataAsync } from "../utils/crypto";
 import { verifyVaultPassphrase } from "./userVault";
+import {
+  type VaultItem,
+  type VaultSourceType,
+  type SyncProgress,
+  type SyncResult,
+  resolveVaultProvider,
+  syncLocalVaultToRemote,
+  LocalVaultStorageProvider,
+  SupabaseVaultStorageProvider,
+} from "./vault/VaultStorageProvider";
 
-export interface VaultItem {
-  id: string;
-  title: string;
-  content: string;
-  citation?: string;
-  authors?: string[];
-  year?: string;
-  journal?: string;
-  createdAt: string;
-}
+export type { VaultItem, VaultSourceType, SyncProgress, SyncResult };
+export { resolveVaultProvider, syncLocalVaultToRemote, LocalVaultStorageProvider, SupabaseVaultStorageProvider };
 
 interface StoredItem {
   id: string;
   createdAt: string;
-  /** encryptDataAsync() over JSON.stringify({ title, content, citation }) */
+  /** encryptDataAsync() over JSON.stringify({ title, content, citation, ... }) */
   ciphertext: string;
 }
 
@@ -83,7 +71,7 @@ function requirePassphrase(): string {
 }
 
 /* -------------------------------------------------------------------------
- * IndexedDB
+ * IndexedDB (Device-Local storage & offline cache)
  * ---------------------------------------------------------------------- */
 
 function dbName(userId: string): string {
@@ -92,6 +80,9 @@ function dbName(userId: string): string {
 
 function openDb(userId: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      return reject(new Error("IndexedDB not available."));
+    }
     const request = indexedDB.open(dbName(userId), 1);
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -145,31 +136,70 @@ async function idbDelete(userId: string, id: string): Promise<void> {
 }
 
 /* -------------------------------------------------------------------------
- * Items
+ * Vault Items CRUD (Client-Side Encrypted)
  * ---------------------------------------------------------------------- */
 
 export async function addVaultItem(
   userId: string,
-  fields: { title: string; content: string; citation?: string }
+  fields: {
+    title: string;
+    content: string;
+    citation?: string;
+    sourceType?: VaultSourceType;
+    filename?: string;
+    mimeType?: string;
+    externalReference?: string;
+    storageReference?: string;
+    authors?: string[];
+    year?: string;
+    journal?: string;
+    metadata?: Record<string, any>;
+  }
 ): Promise<VaultItem> {
   const passphrase = requirePassphrase();
+
   const item: VaultItem = {
     id: crypto.randomUUID(),
     title: fields.title,
     content: fields.content,
     citation: fields.citation,
+    sourceType: fields.sourceType || "file",
+    filename: fields.filename,
+    mimeType: fields.mimeType,
+    externalReference: fields.externalReference,
+    storageReference: fields.storageReference,
+    authors: fields.authors,
+    year: fields.year,
+    journal: fields.journal,
+    metadata: fields.metadata || {},
     createdAt: new Date().toISOString(),
   };
-  const ciphertext = await encryptDataAsync(JSON.stringify({ title: item.title, content: item.content, citation: item.citation }), passphrase);
+
+  const ciphertext = await encryptDataAsync(
+    JSON.stringify({
+      title: item.title,
+      content: item.content,
+      citation: item.citation,
+      sourceType: item.sourceType,
+      filename: item.filename,
+      mimeType: item.mimeType,
+      externalReference: item.externalReference,
+      storageReference: item.storageReference,
+      authors: item.authors,
+      year: item.year,
+      journal: item.journal,
+      metadata: item.metadata,
+    }),
+    passphrase
+  );
   await idbPut(userId, { id: item.id, createdAt: item.createdAt, ciphertext });
+
   return item;
 }
 
 /**
- * All items, decrypted, newest first. An item that fails to decrypt — the
- * wrong passphrase somehow got cached, or the record is corrupted — is
- * dropped rather than failing the whole list, so one bad record cannot take
- * down access to everything else in the Vault.
+ * All items, decrypted, newest first. An item that fails to decrypt is
+ * dropped rather than failing the whole list.
  */
 export async function listVaultItems(userId: string): Promise<VaultItem[]> {
   const passphrase = requirePassphrase();
@@ -177,23 +207,32 @@ export async function listVaultItems(userId: string): Promise<VaultItem[]> {
   const items: VaultItem[] = [];
   for (const s of stored) {
     try {
-      const plain = JSON.parse(await decryptDataAsync(s.ciphertext, passphrase)) as {
-        title: string;
-        content: string;
-        citation?: string;
-      };
+      const plain = JSON.parse(await decryptDataAsync(s.ciphertext, passphrase)) as any;
       items.push({ id: s.id, createdAt: s.createdAt, ...plain });
     } catch {
-      // See doc comment above.
+      // dropped rather than failing whole list
     }
   }
   return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/** Adds several items in sequence, returning what was actually saved — the batch shape a reference import produces. */
+/** Adds several items in sequence, returning what was saved. */
 export async function addVaultItems(
   userId: string,
-  items: Array<{ title: string; content: string; citation?: string }>
+  items: Array<{
+    title: string;
+    content: string;
+    citation?: string;
+    sourceType?: VaultSourceType;
+    filename?: string;
+    mimeType?: string;
+    externalReference?: string;
+    storageReference?: string;
+    authors?: string[];
+    year?: string;
+    journal?: string;
+    metadata?: Record<string, any>;
+  }>
 ): Promise<VaultItem[]> {
   const saved: VaultItem[] = [];
   for (const fields of items) {
@@ -202,42 +241,33 @@ export async function addVaultItems(
   return saved;
 }
 
-/** Does not require the Vault to be unlocked — deleting a record needs no decryption. */
+/** Deletes a vault item from local storage. */
 export async function deleteVaultItem(userId: string, id: string): Promise<void> {
   await idbDelete(userId, id);
 }
 
-/** Client-side substring search over already-decrypted items — there is no server index to query. */
+/** Client-side substring search over already-decrypted items. */
 export function searchVaultItems(items: VaultItem[], query: string): VaultItem[] {
   const q = query.trim().toLowerCase();
   if (!q) return items;
   return items.filter(
-    (i) => i.title.toLowerCase().includes(q) || i.content.toLowerCase().includes(q) || (i.citation ?? "").toLowerCase().includes(q)
+    (i) =>
+      i.title.toLowerCase().includes(q) ||
+      i.content.toLowerCase().includes(q) ||
+      (i.citation ?? "").toLowerCase().includes(q) ||
+      (i.filename ?? "").toLowerCase().includes(q) ||
+      (i.externalReference ?? "").toLowerCase().includes(q)
   );
 }
 
 /* -------------------------------------------------------------------------
- * P2-1: AI → Vault isolation boundary
- *
- * RULE: if a user asks AI to work with a Vault item, only that explicitly
- * selected item (or a small, explicit allowlist of items) may be passed.
- * The entire Vault must NEVER be sent to AI automatically.
- *
- * Why here, not at the call site:
- * The function is the single chokepoint. Every future AI integration that
- * touches Vault content MUST call this function. Building the guard here means
- * a well-intentioned caller cannot accidentally pass `listVaultItems()` and
- * silently expose the whole Vault.
- *
- * Conflict #7 invariant: Vault content is client-held and passphrase-
- * encrypted. Only explicitly selected items may be exposed to AI, and only
- * within the client — no Vault content travels to the Scholar server.
+ * AI → Vault isolation boundary (Mandatory Policy)
  * ---------------------------------------------------------------------- */
 
 export interface VaultAIContext {
   /** The items approved for AI use in this interaction. */
   selectedItems: Pick<VaultItem, "id" | "title" | "content" | "citation">[];
-  /** Total number of items in the Vault at selection time — for logging only, never sent to AI. */
+  /** Total number of items in the Vault at selection time — for logging only. */
   _vaultSizeAtSelection: number;
 }
 
@@ -245,13 +275,7 @@ export interface VaultAIContext {
  * Prepares a strictly limited Vault context for AI use.
  *
  * The caller MUST provide explicit `selectedIds`. Passing an empty array is an
- * error — it means "no selection was made" and nothing should go to AI. Passing
- * the full `allItems` list without a selection is blocked: if the IDs cover
- * every item in the Vault, this throws rather than silently exposing all content.
- *
- * @param allItems  All decrypted Vault items for this user (from listVaultItems).
- * @param selectedIds  The IDs explicitly chosen by the user for this AI interaction.
- * @param maxItems  Upper bound on context size (default 5 — prevents accidental bulk export).
+ * error. Passing the full `allItems` list without a selection is blocked.
  */
 export function prepareVaultContextForAI(
   allItems: VaultItem[],
@@ -264,9 +288,6 @@ export function prepareVaultContextForAI(
       "AI must only receive items the user has chosen, not the entire Vault."
     );
   }
-  // Check entire-vault coverage FIRST so the error is informative rather than
-  // appearing to be a count-limit issue. Any selection that covers 100% of the
-  // Vault is blocked regardless of size — "all items" is never an explicit selection.
   if (allItems.length > 1 && selectedIds.length === allItems.length) {
     throw new Error(
       "[Vault AI isolation] The selection covers the entire Vault. " +

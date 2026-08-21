@@ -47,6 +47,7 @@ export async function currentUserId(): Promise<string | null> {
 export interface VaultRecord {
   label: string;
   createdAt: string;
+  storageMode?: "local" | "synced";
 }
 
 /* -------------------------------------------------------------------------
@@ -150,7 +151,44 @@ export async function loadVault(): Promise<VaultRecord | null> {
   return { label: data.label, createdAt: data.created_at };
 }
 
-export async function createVault(label: string): Promise<{ success: boolean; error?: string }> {
+export async function getVaultStorageMode(): Promise<"local" | "synced"> {
+  if (!isSupabaseConfigured()) return "local";
+  const supabase = getSupabaseClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return "local";
+
+  const { data, error } = await supabase
+    .from("user_vaults")
+    .select("storage_mode")
+    .eq("user_id", userData.user.id)
+    .maybeSingle();
+
+  if (error || !data || !(data as any).storage_mode) return "local";
+  return (data as any).storage_mode === "synced" ? "synced" : "local";
+}
+
+export async function createVault(
+  label: string,
+  storageMode?: "local" | "synced"
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { success: false, error: "Supabase is not configured." };
+  const supabase = getSupabaseClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return { success: false, error: "Not signed in." };
+
+  const payload: Record<string, any> = { user_id: userData.user.id, label };
+  if (storageMode) payload.storage_mode = storageMode;
+
+  const { error } = await supabase
+    .from("user_vaults")
+    .upsert(payload as any, { onConflict: "user_id" });
+
+  return error ? { success: false, error: error.message } : { success: true };
+}
+
+export async function updateVaultStorageMode(
+  storageMode: "local" | "synced"
+): Promise<{ success: boolean; error?: string }> {
   if (!isSupabaseConfigured()) return { success: false, error: "Supabase is not configured." };
   const supabase = getSupabaseClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -158,7 +196,8 @@ export async function createVault(label: string): Promise<{ success: boolean; er
 
   const { error } = await supabase
     .from("user_vaults")
-    .upsert({ user_id: userData.user.id, label }, { onConflict: "user_id" });
+    .update({ storage_mode: storageMode } as any)
+    .eq("user_id", userData.user.id);
 
   return error ? { success: false, error: error.message } : { success: true };
 }

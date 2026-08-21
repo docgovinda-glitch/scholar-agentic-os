@@ -1,30 +1,24 @@
 import { useState } from "react";
-import { addVaultItem, type VaultItem } from "../../services/vaultContents";
+import { addVaultItem, type VaultItem, type VaultSourceType } from "../../services/vaultContents";
 
 /**
- * Uploading a document, or looking up a source by DOI — the two Vault
- * import paths the legacy client had (KnowledgeVaultWizard.tsx, via
- * /api/parse-file and /api/lookup-doi) that Desk's Vault didn't, despite
- * both server endpoints already existing, working, and being unused from
- * here. Kept as a peer to VaultImport.tsx's BibTeX/RIS import rather than
- * merged into it: that one previews many references at once from a single
- * paste; this previews exactly one item at a time, since a file or a DOI
- * lookup only ever produces one thing to add.
- *
- * Neither endpoint requires auth (server.ts mounts them outside
- * requireAuth) — they do no persistence of their own, matching the legacy
- * client's use of the same routes.
+ * Multi-source Vault import component:
+ * - File import (PDF, DOCX, XLSX, CSV, TXT, Markdown, Images) via /api/parse-file
+ * - Web link / Article import via /api/parse-external-link
+ * - DOI scholarly lookup via /api/lookup-doi
  */
 
-type Mode = "file" | "doi";
+type Mode = "file" | "web" | "doi";
 
 interface PreviewItem {
   title: string;
   content: string;
   citation?: string;
+  sourceType?: VaultSourceType;
+  filename?: string;
+  externalReference?: string;
 }
 
-/** Matches knowledgeVaultService.ts's uploadAndProcessFile exactly — the encoding already proven to work against /api/parse-file. */
 async function fileToBase64(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   return btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ""));
@@ -39,6 +33,7 @@ export default function VaultDocumentImport({
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("file");
+  const [url, setUrl] = useState("");
   const [doi, setDoi] = useState("");
   const [preview, setPreview] = useState<PreviewItem | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,6 +42,7 @@ export default function VaultDocumentImport({
   function reset() {
     setOpen(false);
     setMode("file");
+    setUrl("");
     setDoi("");
     setPreview(null);
     setError(null);
@@ -73,7 +69,38 @@ export default function VaultDocumentImport({
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Could not read that file.");
-      setPreview({ title: file.name, content: body.text || "" });
+      setPreview({
+        title: file.name,
+        content: body.text || "",
+        sourceType: "file",
+        filename: file.name,
+      });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleLookupUrl(e: React.FormEvent) {
+    e.preventDefault();
+    if (!url.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/parse-external-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Could not extract text from that URL.");
+      setPreview({
+        title: body.metadata?.fileName || url.trim(),
+        content: body.text || "",
+        sourceType: url.includes("youtube.com") || url.includes("youtu.be") ? "video" : "web",
+        externalReference: url.trim(),
+      });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -94,7 +121,13 @@ export default function VaultDocumentImport({
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Could not look up that DOI.");
-      setPreview({ title: body.metadata?.title || doi.trim(), content: body.text || "", citation: body.metadata?.bibtex });
+      setPreview({
+        title: body.metadata?.title || doi.trim(),
+        content: body.text || "",
+        citation: body.metadata?.bibtex,
+        sourceType: "reference",
+        externalReference: body.metadata?.doiOrUrl || doi.trim(),
+      });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -107,7 +140,13 @@ export default function VaultDocumentImport({
     setBusy(true);
     setError(null);
     try {
-      const saved = await addVaultItem(userId, preview);
+      const payload: any = {
+        title: preview.title,
+        content: preview.content,
+      };
+      if (preview.citation) payload.citation = preview.citation;
+
+      const saved = await addVaultItem(userId, payload);
       onImported(saved);
       reset();
     } catch (e) {
@@ -142,6 +181,14 @@ export default function VaultDocumentImport({
         </button>
         <button
           type="button"
+          onClick={() => switchMode("web")}
+          aria-current={mode === "web"}
+          className={`rounded-[var(--radius-sm)] px-2.5 py-1 text-sm ${mode === "web" ? "bg-[color:var(--accent-subtle)] text-[color:var(--accent)]" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"} cursor-pointer`}
+        >
+          Web / Video URL
+        </button>
+        <button
+          type="button"
           onClick={() => switchMode("doi")}
           aria-current={mode === "doi"}
           className={`rounded-[var(--radius-sm)] px-2.5 py-1 text-sm ${mode === "doi" ? "bg-[color:var(--accent-subtle)] text-[color:var(--accent)]" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"} cursor-pointer`}
@@ -154,8 +201,7 @@ export default function VaultDocumentImport({
         mode === "file" ? (
           <div className="flex flex-col gap-2">
             <p className="text-xs text-[color:var(--text-muted)]">
-              PDF, Word, text, Markdown, spreadsheets, images, or audio — read on the server and never sent anywhere
-              beyond what it takes to extract the text.
+              PDF, Word (.docx), spreadsheets (.xlsx, .csv), plain text, Markdown, images, or audio recordings.
             </p>
             <input
               type="file"
@@ -164,8 +210,26 @@ export default function VaultDocumentImport({
               aria-label="Upload a document"
               className="text-sm text-[color:var(--text-secondary)]"
             />
-            {busy && <p className="text-xs text-[color:var(--text-muted)]">Reading the file…</p>}
+            {busy && <p className="text-xs text-[color:var(--text-muted)]">Extracting source content…</p>}
           </div>
+        ) : mode === "web" ? (
+          <form onSubmit={handleLookupUrl} className="flex items-center gap-2">
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com/research-article or YouTube URL"
+              aria-label="Web or Video URL"
+              className="flex-1 px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={busy || !url.trim()}
+              className="shrink-0 rounded-[var(--radius-md)] border border-[color:var(--border-control)] px-3.5 py-2 text-sm text-[color:var(--text-primary)] transition-colors duration-[var(--motion-fast)] hover:border-[color:var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
+            >
+              {busy ? "Fetching…" : "Extract"}
+            </button>
+          </form>
         ) : (
           <form onSubmit={handleLookupDoi} className="flex items-center gap-2">
             <input
