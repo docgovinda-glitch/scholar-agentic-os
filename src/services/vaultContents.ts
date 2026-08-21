@@ -215,3 +215,85 @@ export function searchVaultItems(items: VaultItem[], query: string): VaultItem[]
     (i) => i.title.toLowerCase().includes(q) || i.content.toLowerCase().includes(q) || (i.citation ?? "").toLowerCase().includes(q)
   );
 }
+
+/* -------------------------------------------------------------------------
+ * P2-1: AI → Vault isolation boundary
+ *
+ * RULE: if a user asks AI to work with a Vault item, only that explicitly
+ * selected item (or a small, explicit allowlist of items) may be passed.
+ * The entire Vault must NEVER be sent to AI automatically.
+ *
+ * Why here, not at the call site:
+ * The function is the single chokepoint. Every future AI integration that
+ * touches Vault content MUST call this function. Building the guard here means
+ * a well-intentioned caller cannot accidentally pass `listVaultItems()` and
+ * silently expose the whole Vault.
+ *
+ * Conflict #7 invariant: Vault content is client-held and passphrase-
+ * encrypted. Only explicitly selected items may be exposed to AI, and only
+ * within the client — no Vault content travels to the Scholar server.
+ * ---------------------------------------------------------------------- */
+
+export interface VaultAIContext {
+  /** The items approved for AI use in this interaction. */
+  selectedItems: Pick<VaultItem, "id" | "title" | "content" | "citation">[];
+  /** Total number of items in the Vault at selection time — for logging only, never sent to AI. */
+  _vaultSizeAtSelection: number;
+}
+
+/**
+ * Prepares a strictly limited Vault context for AI use.
+ *
+ * The caller MUST provide explicit `selectedIds`. Passing an empty array is an
+ * error — it means "no selection was made" and nothing should go to AI. Passing
+ * the full `allItems` list without a selection is blocked: if the IDs cover
+ * every item in the Vault, this throws rather than silently exposing all content.
+ *
+ * @param allItems  All decrypted Vault items for this user (from listVaultItems).
+ * @param selectedIds  The IDs explicitly chosen by the user for this AI interaction.
+ * @param maxItems  Upper bound on context size (default 5 — prevents accidental bulk export).
+ */
+export function prepareVaultContextForAI(
+  allItems: VaultItem[],
+  selectedIds: string[],
+  maxItems = 5
+): VaultAIContext {
+  if (selectedIds.length === 0) {
+    throw new Error(
+      "[Vault AI isolation] No items were explicitly selected. " +
+      "AI must only receive items the user has chosen, not the entire Vault."
+    );
+  }
+  // Check entire-vault coverage FIRST so the error is informative rather than
+  // appearing to be a count-limit issue. Any selection that covers 100% of the
+  // Vault is blocked regardless of size — "all items" is never an explicit selection.
+  if (allItems.length > 1 && selectedIds.length === allItems.length) {
+    throw new Error(
+      "[Vault AI isolation] The selection covers the entire Vault. " +
+      "Pass only the items the user explicitly chose, not all items. " +
+      "If full-Vault AI access is intentionally required, increase maxItems with product approval and " +
+      "document the decision in the call site."
+    );
+  }
+  if (selectedIds.length > maxItems) {
+    throw new Error(
+      `[Vault AI isolation] ${selectedIds.length} items selected but the limit for a single AI context is ${maxItems}. ` +
+      "Reduce the selection or increase maxItems only after explicit product approval."
+    );
+  }
+  const idSet = new Set(selectedIds);
+  const selectedItems = allItems
+    .filter((i) => idSet.has(i.id))
+    .map(({ id, title, content, citation }) => ({ id, title, content, citation }));
+
+  if (selectedItems.length === 0) {
+    throw new Error(
+      "[Vault AI isolation] None of the selected IDs matched items in the decrypted Vault. " +
+      "Ensure the Vault is unlocked and the IDs are current."
+    );
+  }
+  return {
+    selectedItems,
+    _vaultSizeAtSelection: allItems.length,
+  };
+}

@@ -447,15 +447,17 @@ describe("G7 (Export gate), recomputed from the document endpoint alongside G6",
     expect(g7.outstandingBlocking).toEqual([]);
   });
 
-  it("a document with unresolved blocking Rubric findings leaves G7's compliance criterion outstanding", async () => {
+  it("a document with unresolved blocking Rubric findings leaves G6's compliance criterion outstanding while G7 export remains clear", async () => {
     const created = await request(app).post("/api/projects").send({ outputTypeId: "OT-01" });
     const incomplete = compliantOT01Document();
     incomplete.blocks = incomplete.blocks.filter((b) => b.id !== "conclusion");
     const res = await request(app)
       .put(`/api/projects/${created.body.projectId}/document`)
       .send({ document: incomplete });
+    const g6 = res.body.gates.find((g: { gate: string }) => g.gate === "G6");
+    expect(g6.outstandingBlocking.length).toBeGreaterThan(0);
     const g7 = res.body.gates.find((g: { gate: string }) => g.gate === "G7");
-    expect(g7.outstandingBlocking.length).toBeGreaterThan(0);
+    expect(g7.outstandingBlocking).toEqual([]);
   });
 
   it("waiving the sole blocking-Rubric-finding-causing issue also clears G7's compliance criterion", async () => {

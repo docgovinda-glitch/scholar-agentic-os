@@ -263,20 +263,5 @@ export function evidenceRouter(projectLimit: express.RequestHandler): express.Ro
     }
   }));
 
-  router.post("/api/projects/:id/gates/G2/accept-smaller-corpus", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const { reason, actor } = req.body ?? {};
-    if (typeof reason !== "string" || reason.trim().length === 0) {
-      return res.status(400).json({ error: "Missing required field: reason" });
-    }
-    if (typeof actor !== "string" || actor.length === 0) {
-      return res.status(400).json({ error: "Missing required field: actor" });
-    }
-    const sourceCountOverride = { reason, acceptedBy: actor, at: new Date().toISOString() };
-    const gates = recomputeG2({ ...record, sourceCountOverride });
-    const updated = await store.save({ ...record, sourceCountOverride, gates });
-    res.json(projectView(updated));
-  }));
   return router;
 }

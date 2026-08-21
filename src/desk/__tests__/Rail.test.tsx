@@ -132,11 +132,11 @@ describe("once a document exists", () => {
 });
 
 describe("other tabs", () => {
-  it("still shows honest not-built states for Sources/Vault/Files", async () => {
+  it("renders the Sources panel when clicking the Sources tab", async () => {
     getOutputTypeSpec.mockResolvedValue({ structure: { variant: "flat", sections: [] } });
-    render(<Rail document={null} outputTypeId="OT-06" onJumpToBlock={vi.fn()} />);
+    render(<Rail projectId="p1" document={null} outputTypeId="OT-06" onJumpToBlock={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Sources" }));
-    expect(screen.getByText(/Not yet built/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search corpus...")).toBeInTheDocument();
   });
 });

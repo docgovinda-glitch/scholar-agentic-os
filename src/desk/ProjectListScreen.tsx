@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createProject, listOutputTypes, listProjects, deleteProject } from "./api";
 import { getSupabaseClient } from "../services/supabaseClient";
+import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
 import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 
@@ -84,6 +85,22 @@ export default function ProjectListScreen({
     }
   }
 
+  // P0-3: Vault-aware sign-out — remind the user that the Vault stays in this
+  // browser and does not follow their account to other devices.
+  async function handleSignOut() {
+    const vaultOnThisDevice = await hasVaultPassphraseOnThisDevice();
+    if (vaultOnThisDevice) {
+      const confirmed = window.confirm(
+        "Sign out of Scholar?\n\n" +
+        "Your Projects are synced to your account and will be available when you sign back in.\n\n" +
+        "Your private Knowledge Vault is stored in this browser only and does not sync to other devices. " +
+        "It will remain here, but it will not be available if you sign in on a different browser or device."
+      );
+      if (!confirmed) return;
+    }
+    getSupabaseClient().auth.signOut();
+  }
+
   return (
     <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] relative overflow-hidden font-sans selection:bg-[color:var(--accent-subtle)]">
       
@@ -110,8 +127,12 @@ export default function ProjectListScreen({
             )}
             <div className="flex items-center gap-1 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-full p-1 shadow-sm">
               {onOpenVault && (
-                <button onClick={onOpenVault} className="px-4 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] rounded-full transition-all">
-                  Knowledge
+                <button
+                  onClick={onOpenVault}
+                  className="px-4 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] rounded-full transition-all"
+                  title="Private Knowledge Vault — stored in this browser, not synced"
+                >
+                  Private Vault
                 </button>
               )}
               {onOpenAiAccess && (
@@ -126,7 +147,8 @@ export default function ProjectListScreen({
               )}
             </div>
             <button
-              onClick={() => getSupabaseClient().auth.signOut()}
+              onClick={handleSignOut}
+              aria-label="Sign out"
               className="ml-2 rounded-full w-10 h-10 flex items-center justify-center bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] hover:bg-[color:var(--state-danger)] hover:text-[color:var(--text-inverse)] transition-colors border border-[color:var(--state-danger-subtle)]"
               title="Sign out"
             >
@@ -497,6 +519,24 @@ function ChooseOutputType({
           </div>
         </div>
       )}
+
+      {/* P1-3: Projects vs Vault distinction — always visible so users understand
+          that projects sync to their account but their private Vault does not. */}
+      <footer className="relative z-10 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] py-4 px-6">
+        <div className="mx-auto max-w-7xl flex flex-wrap items-center justify-center gap-6 text-xs text-[color:var(--text-muted)]">
+          <span className="flex items-center gap-1.5">
+            <span>☁️</span>
+            <strong className="font-medium text-[color:var(--text-secondary)]">Projects</strong>
+            <span>— synced to your Scholar account</span>
+          </span>
+          <span aria-hidden="true" className="text-[color:var(--border-default)]">|</span>
+          <span className="flex items-center gap-1.5">
+            <span>🔒</span>
+            <strong className="font-medium text-[color:var(--text-secondary)]">Private Vault</strong>
+            <span>— stored in this browser · not synced to other devices</span>
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }

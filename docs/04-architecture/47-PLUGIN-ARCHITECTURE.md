@@ -48,23 +48,23 @@ that tries has no mechanism available to it.
 
 ```
 ┌────────────────────────────────────────────────────┐
-│  KERNEL                                             │
+│  CLIENT WEB RUNTIME / HOST                          │
 │  ┌──────────────────────────────────────────────┐  │
 │  │ Host API — capability-gated                   │  │
 │  └───────────────┬──────────────────────────────┘  │
 └──────────────────┼─────────────────────────────────┘
-                   │  every call verifies a token
+                   │  every call verifies a capability token
    ┌───────────────┼───────────────┬─────────────────┐
    ▼               ▼               ▼                 ▼
 ┌────────┐    ┌────────┐    ┌────────┐         ┌────────┐
 │ WASM   │    │ WASM   │    │ WASM   │   …     │ WASM   │
-│ sandbox│    │ sandbox│    │ sandbox│         │ sandbox│
+│ Worker │    │ Worker │    │ Worker │         │ Worker │
 └────────┘    └────────┘    └────────┘         └────────┘
  plugin A      plugin B      plugin C
 ```
 
-One sandbox per plugin. No shared memory. No direct communication between
-plugins — they compose only through kernel-mediated extension points.
+One sandboxed WebAssembly / Web Worker environment per plugin. No shared memory. No direct communication between
+plugins — they compose only through host-mediated extension points.
 
 ---
 

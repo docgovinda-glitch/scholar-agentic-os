@@ -120,16 +120,13 @@ evaluation feasible offline and within `NFR-PERF-4`'s 300 ms budget.
 
 ### 3.2 Severity
 
-| Severity | At `G6` | Waivable | Use for |
+| Severity | At `G6` (Compliance Review) | Export Impact (`G7`) | Use for |
 |---|---|---|---|
-| `blocking` | Prevents sign-off | No | Rules whose violation means rejection or ineligibility |
-| `required` | Must be resolved or waived | Yes, with a reason | Real rules the user may have context on |
-| `advisory` | Surfaced only | n/a | Best practice, and low-confidence extractions |
+| `blocking` | High-priority finding flagged for mandatory human attention in `G6` | Advisory only — does NOT prevent export of a technically valid document | Critical journal requirements whose violation risks desk rejection |
+| `required` | Standard recommendation; user may resolve or waive | Advisory only — does NOT prevent export | Real rules the user may have context on |
+| `advisory` | Surfaced as helpful guidance | Advisory only — does NOT prevent export | Best practice, stylistic notes, and low-confidence extractions |
 
-**Severity assignment rule:** an extracted rule inherits `blocking` only where the
-source language is mandatory ("must", "will not be considered") *and* extraction
-confidence is above 0.9. Everything else starts at `required`. Over-blocking
-trains users to override, which destroys the mechanism.
+**Authoritative Decision (Conflict #4):** Compliance findings provide actionable guidance and risk visibility. They inform the researcher's decisions but do not enforce automated gatekeeping that forbids file export. Technical export prerequisites remain strictly technical.
 
 ### 3.3 Scope
 

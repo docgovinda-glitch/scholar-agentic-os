@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { loadVault } from "../../services/userVault";
+import { loadVault, hasVaultPassphraseOnThisDevice } from "../../services/userVault";
 import {
   addVaultItem,
   deleteVaultItem,
@@ -27,15 +27,33 @@ import VaultDocumentImport from "./VaultDocumentImport";
  * tracks skips for), locked (the passphrase lives in memory only, per
  * session — see vaultContents.ts), and unlocked (list, add, search, delete).
  */
+/**
+ * Three loading states for the vault:
+ * - null: still checking
+ * - "none": no vault row on server (user never created one)
+ * - "other-device": vault row exists on server, but this browser has no local verifier
+ * - "this-device": vault row exists AND this browser has a verifier
+ */
+type VaultPresence = null | "none" | "other-device" | "this-device";
+
 export default function VaultScreen({ userId, onClose }: { userId: string; onClose: () => void }) {
-  const [hasVault, setHasVault] = useState<boolean | null>(null);
+  const [vaultPresence, setVaultPresence] = useState<VaultPresence>(null);
   const [unlocked, setUnlocked] = useState(isVaultUnlocked());
   const [passphrase, setPassphrase] = useState("");
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    loadVault().then((v) => setHasVault(v !== null));
+    (async () => {
+      const vaultRecord = await loadVault();
+      if (!vaultRecord) {
+        setVaultPresence("none");
+        return;
+      }
+      // Server row exists — check whether this specific browser has the local verifier.
+      const localVerifier = await hasVaultPassphraseOnThisDevice();
+      setVaultPresence(localVerifier ? "this-device" : "other-device");
+    })();
   }, []);
 
   async function handleUnlock(e: React.FormEvent) {
@@ -55,7 +73,7 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
     }
   }
 
-  if (hasVault === null) {
+  if (vaultPresence === null) {
     return (
       <Shell onClose={onClose}>
         <p className="text-sm text-[color:var(--text-muted)]">Loading your Vault…</p>
@@ -63,8 +81,37 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
     );
   }
 
-  if (!hasVault) {
-    return <VaultSetupScreen onDone={() => setHasVault(true)} onSkip={onClose} />;
+  if (vaultPresence === "none") {
+    return <VaultSetupScreen onDone={() => setVaultPresence("this-device")} onSkip={onClose} />;
+  }
+
+  // P1-4: Vault exists on the server (another device created it) but this browser has no local data.
+  if (vaultPresence === "other-device") {
+    return (
+      <Shell onClose={onClose}>
+        <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">
+          Your Vault is on another browser
+        </h1>
+        <div className="mt-4 flex flex-col gap-3 text-sm text-[color:var(--text-secondary)]">
+          <p>
+            Your private Knowledge Vault was created in a different browser or on a different device. It is stored
+            locally there and is not available here.
+          </p>
+          <p>
+            Knowledge Vault synchronisation across devices is not currently available. Your projects are available
+            normally — only the Vault is device-local.
+          </p>
+          <p className="rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs text-[color:var(--text-muted)]">
+            🔒 Private Vault · Stored in the browser where you created it · Not synced<br />
+            ☁️ Projects · Synced to your Scholar account
+          </p>
+        </div>
+        <p className="mt-6 text-sm text-[color:var(--text-secondary)]">
+          To use your Vault, open Scholar in the original browser. To start a new Vault in this browser, contact
+          support or clear your Scholar Vault data on the original device first.
+        </p>
+      </Shell>
+    );
   }
 
   if (!unlocked) {
@@ -72,7 +119,15 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
       <Shell onClose={onClose}>
         <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">Unlock your Vault</h1>
         <p className="mt-1.5 text-sm text-[color:var(--text-secondary)]">
-          Your passphrase never leaves this device and stays in memory only for this visit.
+          Your passphrase never leaves this browser and stays in memory only for this visit.
+        </p>
+        {/* P1-2: device-local badge */}
+        <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">
+          <span>🔒 Private Vault</span>
+          <span aria-hidden="true">·</span>
+          <span>Stored in this browser</span>
+          <span aria-hidden="true">·</span>
+          <span>Not synced</span>
         </p>
         <form onSubmit={handleUnlock} className="mt-6 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -111,12 +166,21 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
             </button>
           </div>
         </form>
-        {/* Honest about the one thing this screen cannot do: §6.3's promise
-            ("we cannot reset it") means there is no automated way back in
-            here, not a missing feature. */}
+        {/*
+          P0-2 finding: the recovery code has no automated unlock path in this version —
+          it cannot be entered here to open the Vault. The passphrase is the only unlock
+          credential. The recovery code is a proof-of-ownership token for future support
+          use. The wording is updated to be accurate rather than implying automatic recovery.
+        */}
         <p className="mt-8 text-xs text-[color:var(--text-muted)]">
-          Forgotten your passphrase? Only your recovery code can open this Vault. If you have lost both, its contents
-          cannot be recovered by anyone, including us.
+          Forgotten your passphrase? In this version there is no automated way to open the Vault without it. Your
+          recovery code is proof that you created this Vault, but it cannot substitute for your passphrase here. If
+          you have lost your passphrase, your Vault contents cannot be recovered by anyone, including us.
+        </p>
+        {/* P0-1: Browser storage clearing warning */}
+        <p className="mt-3 rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs text-[color:var(--text-muted)]">
+          ⚠️ Your Vault is stored privately in this browser. Clearing your browser’s site data may permanently remove
+          your encrypted Vault from this device.
         </p>
       </Shell>
     );
@@ -144,6 +208,17 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // P3-2: Escape locks the Vault when it is unlocked and visible.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !e.defaultPrevented) {
+        onLock();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onLock]);
 
   useEffect(() => {
     listVaultItems(userId)
@@ -196,7 +271,15 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">Your Vault</h1>
           <p className="mt-1.5 text-sm text-[color:var(--text-secondary)]">
-            Notes, sources, and material you have already gathered — searchable, and encrypted on this device.
+            Notes, sources, and material you have already gathered — searchable, and encrypted in this browser.
+          </p>
+          {/* P1-2: Persistent device-local status indicator */}
+          <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">
+            <span>🔒 Private Vault</span>
+            <span aria-hidden="true">·</span>
+            <span>Stored in this browser</span>
+            <span aria-hidden="true">·</span>
+            <span>Not synced</span>
           </p>
         </div>
         <button
@@ -319,8 +402,12 @@ function VaultContents({ userId, onClose, onLock }: { userId: string; onClose: (
                   {confirmingDelete === item.id ? (
                     <div className="mt-2 flex items-center gap-3">
                       <span className="text-xs text-[color:var(--text-secondary)]">Delete this? There is no undo.</span>
+                      {/* P3-3: autoFocus moves keyboard/screen-reader focus to the
+                          destructive action so it is never missed. */}
                       <button
                         type="button"
+                        // eslint-disable-next-line jsx-a11y/no-autofocus
+                        autoFocus
                         onClick={() => handleDelete(item.id)}
                         disabled={busy}
                         className="text-xs text-[color:var(--state-danger)] hover:opacity-80 cursor-pointer"

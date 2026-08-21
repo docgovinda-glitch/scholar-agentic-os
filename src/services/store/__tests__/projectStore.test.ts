@@ -14,7 +14,7 @@ import { __resetProjectStoreForTests } from "../../../app/conductor/projectStore
  * branch ran and the tests would quietly stop testing what they name.
  */
 describe("services/store: backend selection", () => {
-  const KEYS = ["DATABASE_URL", "VITE_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const;
+  const KEYS = ["DATABASE_URL", "VITE_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "NODE_ENV"] as const;
   const original: Record<string, string | undefined> = {};
 
   beforeEach(() => {
@@ -36,7 +36,8 @@ describe("services/store: backend selection", () => {
     __resetProjectStoreForTests();
   });
 
-  it("with no backend configured, falls back to in-memory and round-trips a project", async () => {
+  it("with no backend configured in development, falls back to in-memory and round-trips a project", async () => {
+    process.env.NODE_ENV = "development";
     const { getProjectStore } = await import("../projectStore");
 
     const store = getProjectStore();
@@ -46,7 +47,8 @@ describe("services/store: backend selection", () => {
     expect(created.ownerId).toBe("11111111-1111-4111-8111-111111111111");
   });
 
-  it("warns loudly when falling back to in-memory", async () => {
+  it("warns loudly when falling back to in-memory in development", async () => {
+    process.env.NODE_ENV = "development";
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { getProjectStore } = await import("../projectStore");
     getProjectStore();
@@ -57,7 +59,43 @@ describe("services/store: backend selection", () => {
     warn.mockRestore();
   });
 
+  it("P1-5: FAILS FAST in production when no durable backend is configured", async () => {
+    process.env.NODE_ENV = "production";
+    const { getProjectStore } = await import("../projectStore");
+
+    // In production, silent fallback to in-memory storage is strictly prohibited.
+    // The server must throw an explicit, actionable error rather than pretending
+    // projects are safely persisted.
+    expect(() => getProjectStore()).toThrowError(
+      /FATAL: Durable Persistence Required.*Production cannot start with ephemeral in-memory project storage/
+    );
+  });
+
+  it("P1-5: starts successfully in production when Supabase Data API is configured", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const { getProjectStore } = await import("../projectStore");
+    expect(() => getProjectStore()).not.toThrow();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Data API"));
+    log.mockRestore();
+  });
+
+  it("P1-5: starts successfully in production when direct Postgres is configured", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/testdb";
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const { getProjectStore } = await import("../projectStore");
+    expect(() => getProjectStore()).not.toThrow();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("direct Postgres"));
+    log.mockRestore();
+  });
+
   it("caches the resolved backend across calls until reset", async () => {
+    process.env.NODE_ENV = "development";
     const { getProjectStore } = await import("../projectStore");
     expect(getProjectStore()).toBe(getProjectStore());
   });
@@ -103,7 +141,8 @@ describe("services/store: backend selection", () => {
     log.mockRestore();
   });
 
-  it("does not use the Data API when only one of the two credentials is present", async () => {
+  it("does not use the Data API when only one of the two credentials is present (in dev falls back to in-memory)", async () => {
+    process.env.NODE_ENV = "development";
     process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
     // No service-role key: the URL alone cannot authenticate, and choosing the
     // Data API here would fail on every request instead of falling back.

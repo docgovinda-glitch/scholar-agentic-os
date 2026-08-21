@@ -43,7 +43,7 @@ export const GATE_ENTRY_REQUIRES: Record<GateId, GateId[]> = {
   G4: ["G1", "G2", "G3"],
   G5: ["G4"],
   G6: ["G5"],
-  G7: ["G6"],
+  G7: ["G5"], // G7 technical export requires G5 (reviewed draft) rather than mandatory G6 compliance signoff
 };
 
 export type GateStatus = "not_started" | "in_progress" | "ready" | "signed_off" | "invalidated";

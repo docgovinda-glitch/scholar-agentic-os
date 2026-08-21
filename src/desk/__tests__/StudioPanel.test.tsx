@@ -4,6 +4,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/re
 import "@testing-library/jest-dom/vitest";
 import StudioPanel from "../regions/StudioPanel";
 import { storeProviderKey } from "../../services/userAiSettings";
+import { grantLocalConsent } from "../regions/localStudioExecution";
 import { __resetSessionPoliciesForTests } from "../../app/studio/sessionPolicyStore";
 
 const originalFetch = global.fetch;
@@ -11,8 +12,67 @@ const originalFetch = global.fetch;
 function mockFetch(handler: (url: string, init?: RequestInit) => { status: number; body: unknown }) {
   global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
-    const { status, body } = handler(url, init);
-    return Promise.resolve({ ok: status < 400, status, json: async () => body } as Response);
+    const res = url.includes("generativelanguage.googleapis.com")
+      ? (() => {
+          try {
+            return handler(url, init);
+          } catch {
+            return handler("/api/studio/refine", init);
+          }
+        })()
+      : handler(url, init);
+
+    const body: any = res.body;
+    if (url.includes("generativelanguage.googleapis.com")) {
+      if (body && !body.candidates) {
+        const rawChanges = body.diff?.changes || body.changes || [];
+        const changes = rawChanges.map((c: any) => ({
+          original: c.originalText ?? c.original,
+          replacement: c.replacementText ?? c.replacement,
+          reason: c.reason,
+        }));
+        let originalText = body.diff?.originalText;
+        if (!originalText || originalText === "x") {
+          try {
+            const promptText = JSON.parse(init?.body as string)?.contents?.[0]?.parts?.[0]?.text ?? "";
+            if (promptText) originalText = promptText;
+          } catch {
+            originalText = "Some text.";
+          }
+        }
+        originalText = originalText || "Some text.";
+        const revised =
+          rawChanges.length > 0
+            ? rawChanges.reduce(
+                (acc: string, c: any) => acc.replace(c.originalText ?? c.original, c.replacementText ?? c.replacement),
+                originalText
+              )
+            : originalText;
+
+        const geminiPayload = {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: JSON.stringify({ revised, changes }) }],
+              },
+            },
+          ],
+          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
+        };
+        return Promise.resolve({
+          ok: res.status < 400,
+          status: res.status,
+          text: async () => JSON.stringify(geminiPayload),
+          json: async () => geminiPayload,
+        } as Response);
+      }
+    }
+    return Promise.resolve({
+      ok: res.status < 400,
+      status: res.status,
+      text: async () => JSON.stringify(body),
+      json: async () => body,
+    } as Response);
   }) as unknown as typeof fetch;
 }
 
@@ -27,9 +87,6 @@ function withLocalFetch(localHandler: (url: string, init?: RequestInit) => Promi
 
 beforeEach(() => {
   localStorage.clear();
-  // Local execution's own consent memory (localStudioExecution.ts) is the
-  // SAME module server/routes/studio.ts uses, just imported client-side —
-  // reset between tests so a grant in one doesn't leak into the next.
   __resetSessionPoliciesForTests();
 });
 
@@ -141,6 +198,7 @@ describe("Desk — StudioPanel", () => {
       throw new Error(`Unmocked: ${url}`);
     });
 
+    grantLocalConsent("s1", "gemini");
     render(<StudioPanel sessionId="s1" />);
     fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "clarity" } });
     switchToAdvanced();
@@ -162,23 +220,19 @@ describe("Desk — StudioPanel", () => {
   });
 
   it("shows a consent prompt on 428, and retries after accepting", async () => {
-    let refineCalls = 0;
+    let outboundCalls = 0;
     mockFetch((url) => {
-      if (url === "/api/studio/refine") {
-        refineCalls++;
-        if (refineCalls === 1) {
-          return { status: 428, body: { error: "consent_required", reason: "First use of gemini for user_content.", provider: "gemini" } };
-        }
+      if (url.includes("generativelanguage.googleapis.com")) {
+        outboundCalls++;
         return {
           status: 200,
           body: {
-            diff: { passageId: "desk-studio-passage", level: "clarity", originalText: "x", changes: [], voiceApplied: false },
+            diff: { passageId: "desk-studio-passage", level: "clarity", originalText: "Some text.", changes: [], voiceApplied: false },
             contentChangeCount: 0,
             languageChangeCount: 0,
           },
         };
       }
-      if (url === "/api/studio/consent") return { status: 200, body: { ok: true } };
       throw new Error(`Unmocked: ${url}`);
     });
 
@@ -193,7 +247,7 @@ describe("Desk — StudioPanel", () => {
     fireEvent.click(screen.getByText(/Allow gemini and retry/));
 
     expect(await screen.findByText("No changes suggested.")).toBeInTheDocument();
-    expect(refineCalls).toBe(2);
+    expect(outboundCalls).toBe(1);
   });
 
   it("shows a denial message on 403, with no retry affordance", async () => {
@@ -307,8 +361,8 @@ describe("Desk — StudioPanel", () => {
             level: "clarity",
             originalText: "The results suggest change.",
             changes: [
-              { id: "c2", category: "language", originalStart: 12, originalEnd: 19, originalText: "suggest", replacementText: "indicate", reason: "Clarity" },
               { id: "c1", category: "content", originalStart: 12, originalEnd: 19, originalText: "suggest", replacementText: "demonstrate", reason: "Strengthens claim", meaningNote: "Changes claim strength" },
+              { id: "c2", category: "language", originalStart: 20, originalEnd: 26, originalText: "change", replacementText: "variation", reason: "Clarity" },
             ],
             voiceApplied: true,
           },
@@ -318,6 +372,7 @@ describe("Desk — StudioPanel", () => {
       };
     });
 
+    grantLocalConsent("s1", "gemini");
     render(<StudioPanel sessionId="s1" />);
     fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "clarity" } });
     switchToAdvanced();
@@ -328,7 +383,7 @@ describe("Desk — StudioPanel", () => {
     const changes = await screen.findAllByRole("listitem");
     expect(changes[0]).toHaveTextContent("demonstrate");
     expect(changes[0]).toHaveTextContent("Content");
-    expect(changes[1]).toHaveTextContent("indicate");
+    expect(changes[1]).toHaveTextContent("variation");
     expect(changes[1]).toHaveTextContent("Language");
   });
 
@@ -361,23 +416,28 @@ describe("Desk — StudioPanel", () => {
 
     it("executes with the router's chosen Free/BYOK provider using this device's own stored key, and reports what ran", async () => {
       await storeProviderKey("openrouter", "sk-auto-test");
-      let capturedBody: Record<string, unknown> | null = null;
-      mockFetch((url, init) => {
+      grantLocalConsent("s1", "openrouter");
+      let capturedDirectUrl: string | null = null;
+      mockFetch((url) => {
         if (url === "/api/ai-access/route") {
           return {
             status: 200,
             body: { ok: true, choice: { tier: "free", providerId: "openrouter", modelId: "some-model", reasoning: "Using openrouter's free tier — no cost to you." }, fallbacks: [] },
           };
         }
-        if (url === "/api/studio/refine") {
-          capturedBody = JSON.parse((init?.body as string) ?? "{}");
+        if (url.includes("openrouter.ai")) {
+          capturedDirectUrl = url;
           return {
             status: 200,
             body: {
-              diff: { passageId: "desk-studio-passage", level: "clarity", originalText: "x", changes: [], voiceApplied: false },
-              contentChangeCount: 0,
-              languageChangeCount: 0,
-              usage: { provider: "openrouter", model: "some-model", inputTokensEstimate: 10, outputTokensEstimate: 5 },
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({ revised: "Some text to refine.", changes: [] }),
+                  },
+                },
+              ],
+              usage: { prompt_tokens: 10, completion_tokens: 5 },
             },
           };
         }
@@ -392,8 +452,9 @@ describe("Desk — StudioPanel", () => {
       fireEvent.click(screen.getByText("Refine"));
 
       expect(await screen.findByText(/AI used: openrouter \(some-model\) · free/)).toBeInTheDocument();
-      await waitFor(() => expect(capturedBody).not.toBeNull());
-      expect(capturedBody).toMatchObject({ provider: "openrouter", apiKey: "sk-auto-test", model: "some-model" });
+      await waitFor(() => expect(capturedDirectUrl).not.toBeNull());
+      expect(capturedDirectUrl).toContain("openrouter.ai");
+      expect(global.fetch).not.toHaveBeenCalledWith("/api/studio/refine", expect.anything());
     });
 
     it("routes to Premium without ever asking for or sending a key", async () => {
@@ -541,14 +602,18 @@ describe("Desk — StudioPanel", () => {
             },
           };
         }
-        if (url === "/api/studio/refine") {
+        if (url.includes("generativelanguage.googleapis.com")) {
           return {
             status: 200,
             body: {
-              diff: { passageId: "desk-studio-passage", level: "clarity", originalText: "x", changes: [], voiceApplied: false },
-              contentChangeCount: 0,
-              languageChangeCount: 0,
-              usage: { provider: "gemini", model: "gemini-2.0-flash", inputTokensEstimate: 10, outputTokensEstimate: 5 },
+              candidates: [
+                {
+                  content: {
+                    parts: [{ text: JSON.stringify({ revised: "Some text to refine.", changes: [] }) }],
+                  },
+                },
+              ],
+              usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
             },
           };
         }
@@ -558,6 +623,7 @@ describe("Desk — StudioPanel", () => {
         throw new Error("connection refused");
       });
       await storeProviderKey("gemini", "sk-fallback-test");
+      grantLocalConsent("s1", "gemini");
 
       render(<StudioPanel sessionId="s1" />);
       fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "clarity" } });
@@ -565,7 +631,7 @@ describe("Desk — StudioPanel", () => {
       fireEvent.change(screen.getByPlaceholderText(/Paste a passage/), { target: { value: "Some text to refine." } });
       fireEvent.click(screen.getByText("Refine"));
 
-      expect(await screen.findByText(/AI used: gemini \(gemini-2\.0-flash\) · free/)).toBeInTheDocument();
+      expect(await screen.findByText(/AI used: gemini \(gemini-2\.5-flash\) · free/)).toBeInTheDocument();
     });
 
     it("surfaces the router's own reasoning when no AI source is available at all", async () => {

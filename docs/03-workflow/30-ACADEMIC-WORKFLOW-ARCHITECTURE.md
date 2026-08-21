@@ -28,13 +28,36 @@ A gate is a **decision the human must make before the cost of not having made it
 compounds**. That framing determines everything about the design: gates exist
 where reversal is expensive, and nowhere else.
 
-### 1.1 What gates are not
+### 1.1 Dual-Layer Architecture: Gates ≠ Stages
+
+Scholar OS operates on two complementary abstraction layers:
+
+```
+                           SCHOLAR PROJECT
+                                  │
+            ┌─────────────────────┴─────────────────────┐
+            ▼                                           ▼
+   MACRO LIFECYCLE & GOVERNANCE                INTERACTIVE WORKSPACE EXECUTION
+   (Accountability & State Hashes)             (Granular User & AI Workbench)
+            │                                           │
+       8 Gates (G0–G7)                        5 Phases / 25 Stages (for OT-10)
+    Common across output types                 Output-specific interactive tools
+            │                                           │
+            └─────────────────────┬─────────────────────┘
+                                  ▼
+                     Shared Project State Store
+```
+
+- **Macro Governance Layer (8 Gates `G0`–`G7`)**: Cross-cutting lifecycle milestones, audit points, and human sign-off checkpoints.
+- **Interactive Workspace Layer (5 Phases / 25 Stages)**: The authoritative day-to-day execution environment for Journal Article (`OT-10`) research.
+- **Navigation Invariant**: Gates do **not** silently restrict stage navigation, and stages do **not** dictate gate sign-offs. Stage availability is governed by interactive workspace rules, while gates report macro governance readiness derived from verified project artifacts.
+
+### 1.2 What gates are not
 
 - Not approval workflows. There is one actor: the user.
 - Not project management. No dates, no assignments, no burndown.
 - Not quality assurance. Quality is continuous; gates are ordering.
-- Not skippable-by-configuration. An expert passes them fast (`11` §4.2), not
-  around them.
+- Not a rigid navigational barrier inside the interactive Research Workspace.
 
 ---
 
@@ -229,17 +252,15 @@ cold.
 
 | | |
 |---|---|
-| **Entry** | `G6` signed off |
-| **Activities** | Pre-flight; integrity check; format selection; render; verify; deliver |
-| **Exit** | Pre-flight passes · every blocking compliance finding resolved · required assets present · output validates structurally |
+| **Entry** | `G5` signed off (reviewed draft exists; `G6` compliance is advisory/parallel) |
+| **Activities** | Pre-flight; format selection; render; structural verify; deliver |
+| **Exit** | Technical pre-flight passes (title present, non-empty content) · output validates structurally · compliance review available (advisory) |
 | **Sign-off** | "Export this" |
 | **Agents** | Export, Privacy Guard |
 | **Typical** | 2–5 min |
 
-**Revision 2:** the authorship integrity check is withdrawn (`32` §8.2).
-`G7` blocks only on correctness — unresolved blocking compliance findings,
-missing figures, unresolvable cross-references, and output that fails structural
-validation (`33` §3).
+**Authoritative Architecture (Conflict #4 Resolution):** 
+Academic compliance, authorship, and provenance checks are **voluntary advisory assistance**. Unresolved compliance recommendations or missing waivers do NOT prevent export of a technically valid document. `G7` blocks solely on technical correctness: valid document structure, non-empty blocks, and output that passes structural container validation (`33` §3).
 
 ---
 
@@ -255,8 +276,8 @@ The Workflow Monitor (`22` §3.4) shows the pipeline. Each gate displays:
 │ ● G3 Structure       signed off · 14 Mar           │
 │ ◐ G4 Draft           4 of 7 sections               │
 │ ○ G5 Review          not started                   │
-│ ○ G6 Compliance      not started · 12 findings pending │
-│ ○ G7 Export          blocked by G6                 │
+│ ○ G6 Compliance      advisory · 12 findings pending │
+│ ○ G7 Export          ready for technical export    │
 └────────────────────────────────────────────────────┘
 ```
 

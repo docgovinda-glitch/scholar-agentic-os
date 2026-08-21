@@ -31,7 +31,7 @@ exit criterion is demonstrably met.
 | 1.14 | **Warden**: classification, policy, preview, egress audit | REQ-SEC-9, -10 |
 | 1.15 | **Gateway**: adapter contract, routing, failover, budgets | REQ-AI-1, -2, -9 |
 | 1.16 | Provider adapters: OpenAI, Anthropic, Google, OpenRouter, DeepSeek | REQ-AI-1 |
-| 1.17 | API key storage via managed KMS, write-only from the client | REQ-SEC-3 |
+| 1.17 | Client-side Web Crypto key vault (`window.crypto.subtle`) for BYOK keys; server envelope encryption for platform credentials | REQ-SEC-3 |
 | 1.18 | AI provider setup flow with live validation | REQ-ONB-3, -4 |
 | 1.19 | Chat panel; inline suggestions with explicit accept | REQ-EDT-4 |
 | 1.20 | Accessibility pass: keyboard, screen reader, contrast | NFR-A11Y-1 |

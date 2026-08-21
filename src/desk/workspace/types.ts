@@ -46,6 +46,8 @@ export type StageStatus =
   | "available"
   | "locked"
   | "warning"
+  | "stale"
+  | "needs_review"
   | "ai_processing"
   | "ai_waiting_approval";
 

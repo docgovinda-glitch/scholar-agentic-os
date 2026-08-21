@@ -9,6 +9,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
+import { clientVerifyProviderKey } from "../../services/clientProviderVerifier";
 
 async function authHeaders(): Promise<Record<string, string>> {
   if (!isSupabaseConfigured()) return {};
@@ -53,11 +54,13 @@ export interface VerifyKeyResult {
   ok: boolean;
   modelsDetected?: number;
   error?: string;
+  deferred?: boolean;
+  note?: string;
 }
 
-/** apiKey is sent once, transiently — same per-request-proxy pattern refinePassage() already uses, never stored server-side. */
-export const verifyProviderKey = (providerId: string, apiKey: string) =>
-  api<VerifyKeyResult>("/api/ai-access/verify-provider-key", { method: "POST", body: JSON.stringify({ providerId, apiKey }) });
+/** User BYOK keys are verified directly in the browser and are never sent to the Scholar server. */
+export const verifyProviderKey = (providerId: string, apiKey: string, baseUrlOverride?: string): Promise<VerifyKeyResult> =>
+  clientVerifyProviderKey(providerId, apiKey, baseUrlOverride);
 
 export interface PublicResource {
   id: string;

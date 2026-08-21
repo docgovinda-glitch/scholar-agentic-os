@@ -1,110 +1,64 @@
-# Access Model — Institutionally Gated, With Local Inference
+# Access Model — Self-Service Registration with Direct Supabase Authentication & Client AI Isolation
 
-> **Doc ID:** 63 · **Status:** Accepted · **Date:** 2026-08-04
-> **Supersedes:** `25` §1.2's account-less path
+> **Doc ID:** 63 · **Status:** Accepted (Revised) · **Date:** 2026-08-21
+> **Supersedes:** August 4, 2026 manual approval gate decision
 > **Depends on:** `01`, `25`, `46`
 
 ---
 
 ## 1. Decision
 
-**Scholar is institutionally gated. Every user holds an account, and an
-administrator approves it before it works.**
+**Scholar OS uses direct Supabase Authentication with self-service registration and email verification. Normal users do NOT require manual administrator approval.**
 
-**Inference may be local.** The AI Setup stage offers on-device model runners
-as peers to cloud providers, so a user who wants nothing sent to a third party
-gets that guarantee without needing to escape the account system.
+1. **Self-Service Registration**: Users register directly with their email, username, and password.
+2. **Email Verification**: Standard email confirmation activates the account immediately.
+3. **Data Minimization**: Affiliation is optional; no institutional ID upload or identity documents are collected for general accounts.
+4. **Client AI Resource Pool**: Non-premium AI runs 100% in-browser via Local AI, Free Cloud, or User BYOK (Conflict #3). Platform credentials are strictly protected by Premium entitlement checks, completely removing the original rationale for an approval gatekeeper.
+5. **Reactive Moderation**: Administrators manage platform abuse reactively via `public.profiles.account_status in ('active', 'restricted', 'suspended', 'deleted')`.
 
 ---
 
-## 2. What prompted it
+## 2. Context & Evolution
 
-`25` §1.2 specified an account-less path — "No account, no email, no network"
-— and required it to be "visible on first launch". Building onboarding raised
-the question of whether to implement it.
+In early development (Aug 4, 2026), manual administrative approval was considered as a stopgap to protect a shared server-side model credential from open consumption.
 
-It turned out to be a revision-1 artifact. The text describes a user who
-"**downloads** the Desk" and a "**first launch**": a desktop application.
-Revision 2 opens with "Website only. No desktop application" (`01` §1). The
-section survived the terminology pass without being reconciled with the
-platform change — which the index already recorded, marking `25` as `1†`
-("surface and architecture passages still need a full pass") even while that
-document's own header claimed "Revision: 2".
+Subsequent architectural developments permanently resolved that concern:
+- **Conflict #3 (AI Execution & Egress)**: Re-architected all non-premium AI execution to the Client AI Resource Pool. Open signups cannot consume platform credentials.
+- **Database & Auth Overhaul (Aug 14–15, 2026)**: `2026-08-14_account_system_repair.sql` dropped `authentic_id`, dropped `is_approved`, and automated profile creation with `account_status = 'active'`.
+- **Local-First & Data Minimization Philosophy**: Removing bureaucratic approval gates empowers independent, freelance, and student researchers while eliminating the liability of collecting sensitive verification documents.
 
-## 3. Why gated, and not open self-serve
+---
 
-The question is not what the documents say. Both readings have some support in
-prose. It is what the system already is, and the implementation is one-sided:
+## 3. Authoritative Architecture
 
-| Evidence | Where |
+| Aspect | Authoritative Design |
 |---|---|
-| Registration requires an institutional ID | `supabaseAuthService.signUp`, `25` §2 |
-| `is_approved` defaults to **false** | `supabase/schema.sql` |
-| An administrator is emailed on every registration | `functions/send-approval-email` |
-| An administrator approves each account | `functions/approve-registration` |
-| Even password resets require administrator sign-off | `functions/approve-password-reset`, `pending_password_resets` |
-| An admin console route exists to do the approving | `server/routes/admin.ts` |
-| `ADMIN_EMAIL` is a deployment variable | `render.yaml` |
+| **Registration** | Self-service via Supabase Auth |
+| **Account Activation** | Immediate upon email verification (`account_status = 'active'`) |
+| **Institutional ID** | **None.** Affiliation is optional |
+| **Password Reset** | Self-service via standard Supabase `resetPasswordForEmail()` |
+| **Admin Role** | Reactive account moderation (`account_status: suspended`) and telemetry |
+| **Platform AI Protection** | Independent server-side Premium entitlement checks (426) |
 
-Nobody builds five pieces of approval machinery by accident. An institutional
-ID field is only meaningful if a human checks it, and a password-reset flow
-that waits on an administrator is a deliberate, costly choice — it is slower
-and more support-intensive than self-service, and it was chosen anyway.
+---
 
-Two further arguments, one practical and one about reversibility:
+## 4. Consequences
 
-**Cost.** This project runs entirely within free tiers, and the deployment
-holds a server-side model credential. Open registration on that footing means
-the first person to find the signup form can spend the whole quota. The gate is
-what makes a shared credential survivable.
+**Positive:**
+- Immediate, friction-free onboarding for researchers worldwide.
+- Adherence to data minimization: server stores only basic account metadata.
+- Zero server/database bottleneck from manual approval queues.
+- Independent and unaffiliated scholars can use Scholar OS freely.
 
-**Direction of travel.** A gated product can be opened later by relaxing one
-default. An open product cannot be un-opened: by the time it matters, accounts
-exist, work exists under them, and retro-fitting approval means telling
-existing users their access is now provisional.
+**Security & Governance:**
+- Abuse is mitigated via express rate limits, email verification, and administrative suspension.
+- Platform AI resources remain 100% isolated behind cryptographic entitlement verification.
 
-## 4. Why local inference is kept
+---
 
-`P3`/`P4` are about where a user's prose goes. That is a question about
-inference, not about identity — and the account-less path conflated them.
+## 5. Related Decisions
 
-A user signed in with an approved account, sending passages to a model on
-`localhost`, has exactly the property the privacy principle promises: the text
-never leaves their machine. Losing that guarantee because the delivery vehicle
-changed from a desktop app to a website would be a real regression. Keeping it
-costs nothing conceptually — `src/config/localRunnerCatalog.ts` already
-describes eleven runners with install steps, CORS guidance, and difficulty
-ratings.
-
-So the AI Setup stage presents local runners as **peers** to cloud providers,
-not as an advanced option behind a disclosure. Doing otherwise would make the
-privacy-preserving choice the harder one to find, which inverts the point.
-
-## 5. Consequences
-
-**Positive**
-
-- The onboarding flow matches the access control the code already enforces.
-- The privacy promise survives the platform change, in the form that actually
-  carries it.
-- No second, local-only storage backend has to be built or maintained.
-
-**Negative / accepted**
-
-- A user who wants no account cannot use Scholar. Accepted: that user is not
-  who this deployment is for, and the approval gate says so.
-- Registration is slower than self-service, and an administrator is a
-  dependency for both signup and password reset. Accepted, and pre-existing.
-
-**Reversible**
-
-- Opening registration is one default (`is_approved`) and one flow change.
-  Doing it would need the server-side model credential reconsidered first —
-  see §3.
-
-## 6. Related
-
-- `01` §1 — website-only, the platform decision this reconciles against
-- `25` §1.2 — rewritten; the withdrawn text is quoted there
-- `61-CLIENT-CONSOLIDATION.md` — the authentication this gate sits on
-- `src/config/localRunnerCatalog.ts` — the eleven runners offered
+- `01` §1 — Web/PWA, client-first architecture.
+- `25` §2 — Self-service onboarding directly to Project List.
+- `30` — Dual-layer workflow taxonomy.
+- `src/services/supabaseAuthService.ts` — Active authentication service.

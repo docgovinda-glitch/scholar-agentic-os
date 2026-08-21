@@ -20,7 +20,7 @@
  * The legacy path encrypted keys and stored them in `api_credentials`. Its own
  * history is the argument against repeating it here: the encryption secret was
  * originally the login passcode hash, kept in the same localStorage blob as
- * the ciphertext, so the encryption protected nothing. vaultPassphrase.ts
+ * the ciphertext, so the encryption protected nothing. userVault.ts
  * fixed that by holding a passphrase in memory only — correct, but it means
  * re-entering a passphrase every session to read your own keys. Not sending
  * the secret at all is simpler and strictly stronger; the cost is that keys do
@@ -76,7 +76,7 @@ const ephemeralSecret = randomSecret();
  * This is deliberately NOT presented as protection against someone who already
  * has code execution or devtools on the device — the secret sits in the same
  * localStorage as the ciphertext, which is precisely the arrangement
- * vaultPassphrase.ts calls out as pointless for that threat.
+ * userVault.ts calls out as pointless for that threat.
  *
  * What it does buy: keys are not sitting in plaintext in a store that
  * extensions, casual inspection, and backup/sync tooling can read at a glance.

@@ -110,7 +110,10 @@ export function ResearchProvider({
           filter: `project_id=eq.${projectId}`,
         },
         (payload) => {
-          console.log("Realtime Sync: Project updated remotely. Reloading workspace state...", payload);
+          // P4-2: dev-only log — eliminated by the production build (import.meta.env.DEV is false → tree-shaken).
+          if (import.meta.env.DEV) {
+            console.log("Realtime Sync: Project updated remotely. Reloading workspace state...", payload);
+          }
           load();
         }
       )

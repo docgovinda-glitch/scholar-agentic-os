@@ -29,11 +29,7 @@ the Workshop specified in full.
 >   §6's offer/passphrase/Recovery-Kit shape closely; import (§6.1) is real
 >   but only reachable once a Vault exists (`VaultImport.tsx`), not from this
 >   screen directly.
-> - Stage 1-3 (account creation, email verification, institutional approval)
->   and stage 7-9 (the interactive Workshop tutorial, workspace creation, the
->   backup conversation) are NOT built — Desk's login is Supabase auth without
->   an approval queue, and onboarding ends at the project list, not a
->   dedicated workspace/backup step. See
+> - Account creation, email verification, and self-service authentication land directly at the Project List. Desk's login is direct Supabase Auth without an approval queue. Accounts are immediately active upon email confirmation (`account_status = 'active'`). See
 >   `docs/04-architecture/50-AI-ACCESS-ENGINE-IMPLEMENTATION.md` for the AI
 >   Setup piece's own implementation record.
 

@@ -16,11 +16,11 @@ and Supabase credentials are not.
 
 Backend precedence, in `src/services/store/projectStore.ts`:
 
-| Order | Backend | Selected when |
-|---|---|---|
-| 1 | Data API (HTTPS) | `VITE_SUPABASE_URL` **and** `SUPABASE_SERVICE_ROLE_KEY` are set |
-| 2 | Direct Postgres | `DATABASE_URL` is set and (1) is not available |
-| 3 | In-memory | nothing else is configured — **warns loudly** |
+| Order | Backend | Selected when | Production Enforcement |
+|---|---|---|---|
+| 1 | Data API (HTTPS) | `VITE_SUPABASE_URL` **and** `SUPABASE_SERVICE_ROLE_KEY` are set | **Production primary (durable)** |
+| 2 | Direct Postgres | `DATABASE_URL` is set and (1) is not available | **Production alternative (durable)** |
+| 3 | In-memory | nothing else is configured | **PROD: FATAL ERROR (fails startup)**<br>**DEV/TEST ONLY: warns loudly** |
 
 ---
 
@@ -148,10 +148,14 @@ every response, so an "empty" body arrived as the four characters `"null"`,
 which parses cleanly. **A test double that is tidier than the real thing hides
 exactly the bugs it was written to catch.**
 
-**The in-memory fallback is the dangerous one.** It behaves correctly right up
-until the process restarts, and on a plan that idles the container out after
-~15 minutes, a user's projects vanish within the hour with nothing reported.
-It now announces itself at startup rather than being entered silently.
+**The in-memory fallback is strictly prohibited in production.** It behaves
+correctly right up until the process restarts, and on a plan that idles the
+container out after ~15 minutes, a user's projects vanish within the hour with
+nothing reported. In `NODE_ENV === "production"`, `resolveStore()` throws a fatal
+startup exception preventing the server from booting without durable persistence.
+In development, it warns loudly; in tests, it is available for fast isolation.
+`/api/health` reports `persistenceMode` and `persistenceDurable` for runtime
+monitoring.
 
 ---
 

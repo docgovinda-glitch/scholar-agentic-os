@@ -185,3 +185,51 @@ describe("search", () => {
     expect(searchVaultItems(items, "nonexistent")).toHaveLength(0);
   });
 });
+
+// -------------------------------------------------------------------------
+// P2-1: AI → Vault isolation boundary
+// -------------------------------------------------------------------------
+const { prepareVaultContextForAI } = await import("../vaultContents");
+
+function makeItem(id: string, title = "T", content = "C"): import("../vaultContents").VaultItem {
+  return { id, title, content, createdAt: new Date().toISOString() };
+}
+
+describe("prepareVaultContextForAI — AI isolation boundary (P2-1)", () => {
+  const vault = [makeItem("a"), makeItem("b"), makeItem("c")];
+
+  it("throws when selectedIds is empty", () => {
+    expect(() => prepareVaultContextForAI(vault, [])).toThrow(/No items were explicitly selected/);
+  });
+
+  it("throws when selection exceeds maxItems", () => {
+    // Select 3 out of a vault of 4 (not entire vault) but exceed maxItems=2.
+    const biggerVault = [makeItem("a"), makeItem("b"), makeItem("c"), makeItem("d")];
+    expect(() => prepareVaultContextForAI(biggerVault, ["a", "b", "c"], 2)).toThrow(/limit for a single AI context is 2/);
+  });
+
+  it("throws when selection covers the entire Vault", () => {
+    // Guard fires for any selection covering 100% of a non-trivial vault.
+    const allIds = vault.map((i) => i.id);
+    expect(() => prepareVaultContextForAI(vault, allIds)).toThrow(/entire Vault/);
+  });
+
+  it("throws when none of the selected IDs match any item", () => {
+    expect(() => prepareVaultContextForAI(vault, ["nonexistent"])).toThrow(/None of the selected IDs matched/);
+  });
+
+  it("returns only the selected items with only safe fields", () => {
+    const result = prepareVaultContextForAI(vault, ["a", "c"]);
+    expect(result.selectedItems).toHaveLength(2);
+    expect(result.selectedItems.map((i) => i.id)).toEqual(expect.arrayContaining(["a", "c"]));
+    // Authors/year/journal are not in the returned type (title, content, citation only).
+    for (const item of result.selectedItems) {
+      expect(Object.keys(item).sort()).toEqual(expect.arrayContaining(["id", "title", "content"]));
+    }
+  });
+
+  it("records vault size at selection for observability, not for AI", () => {
+    const result = prepareVaultContextForAI(vault, ["b"]);
+    expect(result._vaultSizeAtSelection).toBe(3);
+  });
+});

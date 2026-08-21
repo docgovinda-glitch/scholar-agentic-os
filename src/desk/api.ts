@@ -292,37 +292,48 @@ function routingTaskTypeToTaskClass(taskType: RoutingTaskType): "drafting" | "re
   }
 }
 
-async function executeAgenticLLM(
+import { resolveClientCandidates } from "../services/clientRouter";
+
+export async function executeAgenticLLM(
   systemPrompt: string,
   userPrompt: string,
   taskType: RoutingTaskType = "reasoning",
   onChunk?: (chunk: string) => void,
   onFailoverEvent?: (event: any) => void
 ) {
-  const decision = await routeDecision(taskType);
-  if (!decision || !decision.ok) {
-    throw new Error(decision?.reasoning || "No AI routing decision available.");
-  }
+  // 1. Resolve candidates client-side first using policy-driven client router
+  const clientDecision = await resolveClientCandidates(taskType, {
+    manualOverride: activeManualModelOverride,
+  }).catch(() => null);
 
-  const choices = [decision.choice, ...decision.fallbacks];
-  const candidates: CandidateProvider[] = [];
+  let candidates: CandidateProvider[] = [];
 
-  for (const c of choices) {
-    if (c.tier === "premium") {
-      continue;
-    } else if (c.tier === "byok" || c.tier === "free") {
-      const key = await readProviderKey(c.providerId);
-      if (key) {
-        candidates.push({ provider: c.providerId, model: c.modelId, apiKey: key });
+  if (clientDecision && clientDecision.ok && clientDecision.allCandidates.length > 0) {
+    candidates = clientDecision.allCandidates.map((c) => ({
+      provider: c.provider,
+      model: c.model,
+      apiKey: c.apiKey,
+    }));
+  } else {
+    // Fallback: check server preview if client resolution had 0 candidates
+    const decision = await routeDecision(taskType).catch(() => null);
+    if (decision && decision.ok) {
+      const choices = [decision.choice, ...decision.fallbacks];
+      for (const c of choices) {
+        if (c.tier === "premium") continue;
+        if (c.tier === "byok" || c.tier === "free") {
+          const key = await readProviderKey(c.providerId);
+          if (key) candidates.push({ provider: c.providerId, model: c.modelId, apiKey: key });
+        } else if (c.tier === "local") {
+          candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "local-no-credential-required" });
+        }
       }
-    } else if (c.tier === "local") {
-      candidates.push({ provider: c.providerId, model: c.modelId, apiKey: "local-no-credential-required" });
     }
   }
 
   if (activeManualModelOverride) {
     const key = await readProviderKey(activeManualModelOverride.providerId);
-    if (key) {
+    if (key && !candidates.some((c) => c.provider === activeManualModelOverride!.providerId)) {
       candidates.unshift({
         provider: activeManualModelOverride.providerId,
         model: activeManualModelOverride.modelId,
@@ -333,6 +344,7 @@ async function executeAgenticLLM(
 
   if (candidates.length === 0) {
     throw new Error(
+      clientDecision?.reasoning ||
       "No AI providers are available on this device for this task. " +
       "Connect a provider in AI Access settings or run a local AI runtime."
     );
@@ -633,11 +645,9 @@ export async function refinePassage(params: {
   level: InterventionLevel;
   l1?: string;
   voiceProfile?: VoiceProfile;
-  /** Manual/Advanced override — supplying both bypasses server-side routing entirely, same as before this work. */
   provider?: string;
-  apiKey?: string;
   model?: string;
-  /** Omitting provider/apiKey and setting this to "premium" asks the server to route via the Scholar AI Engine using the caller's own entitlement/quota — never trusted as a client-asserted grant, always re-verified server-side. */
+  /** Setting this to "premium" asks the server to route via the Scholar AI Engine using the caller's own entitlement/quota — always re-verified server-side. */
   useEngine?: "premium";
 }): Promise<StudioRefineResult> {
   const res = await authedJsonFetch("/api/studio/refine", "POST", params);

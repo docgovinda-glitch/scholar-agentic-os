@@ -174,8 +174,10 @@ describe("PUT /api/projects/:id/journal-requirements", () => {
       expect(declarationRuleIds.length).toBe(FULL_REQUIREMENTS.requiredDeclarations.length);
       expect(res.body.rubric.blockingFailures.some((f: { ruleId: string }) => f.ruleId.includes("OT-10-declaration-"))).toBe(true);
 
+      const g6 = findGate(res.body.gates, "G6");
+      expect(g6.outstandingBlocking.length).toBeGreaterThan(0);
       const g7 = findGate(res.body.gates, "G7");
-      expect(g7.outstandingBlocking.length).toBeGreaterThan(0);
+      expect(g7.outstandingBlocking.length).toBe(0); // Advisory for G7 export
     });
 
     it("re-targeting to a venue with a different citation style changes the citation_style_exact rule's expected value, without touching the document", async () => {

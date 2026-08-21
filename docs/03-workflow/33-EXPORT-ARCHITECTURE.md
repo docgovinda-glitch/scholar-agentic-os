@@ -25,36 +25,40 @@ else is derived.
 ## 2. Pipeline
 
 ```
-   G6 signed off
+   Technical Document Ready (G5 reviewed / Document saved)
         │
         ▼
 ┌───────────────────┐
-│ 1. PRE-FLIGHT     │  blocking Rubric findings · integrity gate ·
-│                   │  missing assets · unresolved references
+│ 1. PRE-FLIGHT     │  Technical validity: document non-empty, title present
+│                   │  (Academic Rubric recommendations surfaced as advisory)
 └─────────┬─────────┘
-          │ fail → report, do not produce
+          │ fail technical validity → report error
           ▼
 ┌───────────────────┐
 │ 2. RESOLUTION     │  citations → formatted · cross-refs → numbers ·
 │                   │  bibliography · TOC · figure/table numbering
 └─────────┬─────────┘
+          │
           ▼
 ┌───────────────────┐
-│ 3. LAYOUT         │  apply Rubric formatting; measure where physical
+│ 3. LAYOUT         │  apply template formatting; measure where physical
 │                   │  limits apply (page counts, poster dimensions)
 └─────────┬─────────┘
+          │
           ▼
 ┌───────────────────┐
-│ 4. RENDER         │  format-specific writer
+│ 4. RENDER         │  format-specific writer (DOCX, ODT, PDF)
 └─────────┬─────────┘
+          │
           ▼
 ┌───────────────────┐
-│ 5. VERIFY         │  structural validation; open-test where possible
+│ 5. VERIFY         │  structural container validation (magic bytes, headers)
 └─────────┬─────────┘
+          │
           ▼
 ┌───────────────────┐
-│ 6. DELIVER        │  write file; record export in the Ledger
-└───────────────────┘
+│ 6. DELIVER        │  deliver file attachment stream to user
+└─────────┬─────────┘
 ```
 
 ---
@@ -63,18 +67,15 @@ else is derived.
 
 | Check | Severity | Behaviour |
 |---|---|---|
-| Blocking Rubric findings | Blocking | Listed with locations; export refused |
+| Document Existence & Title | Mandatory Technical Block | Export refused if document body or title is missing |
+| Supported Export Format | Mandatory Technical Block | Export refused if format is unsupported |
+| Structural Render & Verification | Mandatory Technical Block | Export refused if binary output fails container integrity |
+| Rubric Compliance Findings | Advisory Assistance | Listed with locations; user may review, but export is permitted |
+| Bibliography entries never cited | Advisory Assistance | Listed; the user decides |
+| Unsupported claims | Advisory Assistance | Handled at `G5`/review; counts surfaced without blocking |
+| Fonts unavailable | Advisory Assistance | Fallback font applied automatically |
 
-| Unresolved cross-references | Blocking | Listed |
-| Missing figure or table assets | Blocking | Listed by filename |
-| Citations without bibliography entries | Blocking | Structurally impossible, but verified |
-| Bibliography entries never cited | Advisory | Listed; the user decides |
-| Unsupported claims | Advisory at export (they are handled at `G5`) | Count shown |
-| Required declarations absent | Blocking where the Rubric requires them | Listed |
-| Fonts unavailable | Advisory | Fallback stated |
-
-The pre-flight report is a single screen: what blocks, what is advisory, what to
-do. If nothing blocks, it is one line and a format selector.
+The pre-flight report presents clear visibility: what is technically required, what is advisory guidance, and what recommendations exist. If technical pre-flight passes, format selection and file export remain immediately available.
 
 ---
 

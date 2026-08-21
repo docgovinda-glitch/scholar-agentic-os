@@ -339,10 +339,21 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
    *      independently re-derives entitlement/quota/Omni-Router's decision
    *      itself (runPremiumRefine, above) and executes with Scholar's own
    *      Premium-pool credential. The client's `useEngine` value is never
-   *      trusted as a grant; it only says which path to take.
    */
   app.post("/api/studio/refine", studioLimit, async (req, res) => {
-    const { sessionId, passageId, text, level, discipline, l1, voiceProfile, provider, apiKey, model, scopeId, useEngine } = req.body ?? {};
+    // Explicitly reject any client-submitted API keys to maintain the client-only credential boundary.
+    if (
+      (req.body && "apiKey" in req.body && req.body.apiKey) ||
+      (req.body && "api_key" in req.body && req.body.api_key) ||
+      (req.body && "providerKey" in req.body && req.body.providerKey) ||
+      (req.body && "secret" in req.body && req.body.secret)
+    ) {
+      return res.status(400).json({
+        error: "User BYOK API keys are client-held and cannot be submitted to the server. Execute BYOK operations directly on the client.",
+      });
+    }
+
+    const { sessionId, passageId, text, level, discipline, l1, voiceProfile, provider, model, scopeId, useEngine } = req.body ?? {};
 
     if (typeof sessionId !== "string" || sessionId.length === 0) {
       return res.status(400).json({ error: "Missing required field: sessionId" });
@@ -377,7 +388,7 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
       policy,
     };
 
-    const wantsPremium = useEngine === "premium" && typeof provider !== "string" && typeof apiKey !== "string";
+    const wantsPremium = useEngine === "premium";
 
     if (wantsPremium) {
       const userId = (req as express.Request & { user: AuthenticatedUser }).user.id;
@@ -415,7 +426,6 @@ export function registerStudioRoutes(app: express.Express, studioLimit: express.
       const result = await refine({
         ...baseInput,
         provider: typeof provider === "string" ? provider : undefined,
-        apiKey: typeof apiKey === "string" ? apiKey : undefined,
         model: typeof model === "string" ? model : undefined,
       });
       return res.json(result);

@@ -1,73 +1,59 @@
 # Data Residency & Privacy Architecture
 
-> **Doc ID:** 44 · **Status:** Design · **Revision:** 2
+> **Doc ID:** 44 · **Status:** Design · **Revision:** 2 (Web & Local-First)
 > **Replaces:** 44-DATA-RESIDENCY-AND-PRIVACY.md
 
-Revision 1 kept user content on the user's device. A web application cannot. This
-document states plainly what changed, what we do about it, and what we tell
-users — because the honest version of this is a feature and the evasive version
-is a liability.
+Scholar OS is designed to be **web-first and local-first**, strictly minimizing the data and secrets that ever leave the user's device. This document defines what data lives where, how keys are held, and how privacy boundaries are enforced.
 
 ---
 
-## 1. What changed, stated directly
+## 1. Data & Execution Boundaries
 
-| | Revision 1 (desktop) | Revision 2 (web) |
+| Category | Client-Side (User's Device) | Server-Side (Platform Cloud) |
 |---|---|---|
-| Document storage | User's device | Our servers, encrypted at rest |
-| Processing | User's device | Our servers |
-| Encryption keys | Held by the user | Held by us, in a managed KMS |
-| Can the operator technically read content? | **No** | **Yes, with deliberate effort and audit trail** |
-| Offline | Full authoring | Cached reading and buffered editing |
-| Local AI models | First-class | Not possible in a browser |
-
-**We do not pretend otherwise.** A web product claiming zero-knowledge
-architecture while running server-side inference on user documents is lying, and
-users who understand the technology will notice.
+| **Working Project State** | Working draft, research answers, UI state (IndexedDB / localStorage) | Authorized project record & sync envelope |
+| **User BYOK API Keys** | Sealed in client Web Crypto vault (`window.crypto.subtle`); **never sent to server** | Zero user keys stored or accessible |
+| **Platform AI Credentials** | Never accessible by client | Stored under server AES-256-GCM envelope encryption (`MASTER_KEY`) |
+| **Local AI Inference** | Loopback to `localhost` (Ollama, LM Studio); **zero network egress** | Not involved in local AI operations |
+| **Client-Side AI Inference** | Direct client-to-provider egress for BYOK models | Not involved in non-premium BYOK calls |
+| **Identity & Access** | Session token in browser | Authentication state, user profile, entitlement status |
 
 ---
 
-## 2. What we promise instead
+## 2. Privacy Guarantees
 
-Weaker than revision 1's guarantee, and still stronger than the category norm.
-
-| Promise | Mechanism |
+| Guarantee | Mechanism |
 |---|---|
-| Encrypted at rest and in transit | AES-256-GCM per-project CEK; TLS 1.3 |
-| Never trained on | Contractual and technical; no pipeline exists (`41` §11) |
-| Never read by staff without cause | Access requires break-glass with justification, alerting, and an immutable audit entry (§4) |
-| Never sold or shared | No data brokerage, no advertising, no third-party analytics on content |
-| Minimum provider exposure | The Warden sends the least that will do the job (§5) |
-| User-controlled provider policy | Per provider, per content class |
-| Real deletion | Content, derivatives, embeddings, caches, and backups within a stated window (§7) |
-| Full export, any time, any tier | `P9` |
-| Short retention | Defaults in §6 |
+| **Zero User Keys on Server** | User BYOK keys are encrypted in browser Web Crypto storage and never leave the device (`46` §5.3) |
+| **Local AI Zero-Egress** | Local models run on `localhost`; prompts and completions never touch the internet or Scholar servers |
+| **Minimum Server Knowledge** | The server does not store or process private research prompts, intermediate AI results, or working state unless a cloud service is explicitly invoked |
+| **Never Trained On** | Technical and contractual; user text is never used to train models (`41` §11) |
+| **User-Controlled Egress** | Client routing decides which provider handles each task; failover is never silent |
+| **Encrypted at Rest & Transit** | AES-256-GCM envelope encryption, TLS 1.3 |
+| **Real Deletion** | Local storage clearance and server record deletion upon request |
 
 ---
 
-## 3. Data classes and handling
+## 3. Data Classes and Handling
 
-| Class | Examples | At rest | To providers |
+| Class | Examples | Where Stored | Egress to Model Providers |
 |---|---|---|---|
-| `account` | Email, password hash, MFA | Encrypted | Never |
-| `credentials` | User API keys | KMS-encrypted, write-only from the client | Only to the provider they belong to |
-| `user_content` | Drafts, uploads, notes, Vault | Encrypted, per-project CEK | Only per user policy, minimised |
-| `derived` | Embeddings, indexes, summaries | Encrypted | Only per policy |
-| `bibliographic` | Citation metadata | Encrypted | Yes — required for verification |
-| `operational` | Logs, metrics, job records | Content-free by construction | Never |
+| `account` | Email, password hash, status | Server (Supabase Auth / Postgres) | Never |
+| `user_byok_keys` | User Gemini, Cerebras, Groq keys | Client Web Crypto Vault only | Only sent directly from client to the user's chosen provider |
+| `platform_keys` | Platform OpenRouter, Gemini keys | Server Envelope Vault only | Only sent from server for authorized platform requests |
+| `user_content` | Drafts, notes, research answers | Client-first (IndexedDB), synced to project record | Only per user-initiated AI actions |
+| `vault_items` | Private Knowledge Vault notes, extracts, citations | **Client IndexedDB only** (AES-GCM-256 encrypted); server stores only existence signal (`label`, `created_at`) | Only via Client AI Resource Pool per explicit user action; **never server-processed** |
+| `vault_secrets` | Vault passphrase, recovery code | **Client RAM / device localStorage only**; never sent to server in any form | Never |
+| `operational` | Logs, metrics, billing status | Server | Content-free by construction |
 
-### 3.1 API key handling
+### 3.1 API Key Custody Rules
 
 | Rule | Statement |
 |---|---|
-| Encrypted with a KMS-held key, never a hardcoded secret | |
-| Write-only from the client — once submitted, never returned, displayed masked | |
-| Never logged, never in error messages, never in diagnostics | |
-| Decrypted only in memory, for the duration of the call | |
-| Deletable, immediately and completely | |
-
-The current repository's `ENCRYPTION_KEY`-based server-side decryption is
-replaced by managed KMS. `46` §5 specifies it.
+| **User BYOK Keys are Client-Held** | Stored strictly in browser Web Crypto storage (`window.crypto.subtle` AES-GCM / PBKDF2). Never transmitted to the operator, never in server logs. |
+| **Platform Keys are Server-Sealed** | Envelope-encrypted via AES-256-GCM using server-held `MASTER_KEY`. |
+| **Zero Mixed Custody** | The server never accepts, proxies, or stores user BYOK credentials. |
+| **Masked Previews Only** | UI exposes only the last four characters with explicit reveal controls. |
 
 ---
 
@@ -216,6 +202,9 @@ ethics application.
 >
 > Your documents are stored on our servers, encrypted. We need them there to
 > check your formatting, search your sources, and help with your writing.
+>
+> Your Knowledge Vault stays on your device, encrypted with your passphrase.
+> We cannot read it. We do not have a copy of your passphrase.
 >
 > We don't train on your work. We don't sell it. Our staff can't browse it —
 > access needs a specific reason, two-person approval, and you get told it

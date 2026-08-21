@@ -18,51 +18,54 @@ makes the privacy promise enforceable.
 | A4 | **The user chooses.** Task-level model binding, visible and changeable |
 | A5 | **Costs are visible.** Before an expensive action, and recorded after |
 | A6 | **Failures degrade honestly.** Failover is disclosed; substitution is never silent |
-| A7 | **Keys are write-only.** Encrypted via managed KMS, never returned to the client, never logged (`44` §3.1) |
+| A7 | **Keys are isolated.** User BYOK keys are client-held in Web Crypto (`window.crypto.subtle`) and never sent to the server. Platform operator keys are envelope-encrypted on the server (`44` §3.1) |
 | A8 | **No training on user content.** Not a setting. A property |
 
 ---
 
-## 2. Structure
+## 2. Structure & Dual Resource Pools
+
+Scholar OS operates two completely isolated AI resource pools:
+
+### 2.1 Client-Side AI Resource Pool (Non-Premium / User-Owned)
+Operates directly within the user's browser:
+- **Execution Path:** Browser → Local Runtime (`localhost`) OR Browser → Cloud Provider API.
+- **Resource Composition:** Any combination of Local runtimes (Ollama, LM Studio), Free cloud tiers, and Paid BYOK keys (held in client encrypted storage).
+- **Prompt Orchestration:** Non-premium research agents construct and execute prompts client-side, avoiding unnecessary round-trips to the Scholar server.
+- **Failover Transparency:** When a provider encounters rate limits, quota exhaustion, or network errors, the client Gateway fails over to the next candidate and explicitly alerts the researcher (e.g. *"Gemini quota reached — continuing with Cerebras"*).
 
 ```
-   Agents (app/mesh)
-        │  "complete this, task class = drafting"
+   Client Agents (Browser)
+        │
         ▼
 ┌───────────────────────────────────────────────┐
-│  GATEWAY                                       │
-│  ┌─────────────────────────────────────────┐  │
-│  │ Binding resolution                       │  │
-│  │  task class + user policy + availability │  │
-│  │  + Egress Class + budget → provider+model│  │
-│  └──────────────────┬──────────────────────┘  │
-└─────────────────────┼─────────────────────────┘
+│  CLIENT GATEWAY (src/platform/gateway)        │
+│  Client Router: Local → Free → BYOK           │
+└─────────────────────┬─────────────────────────┘
                       ▼
 ┌───────────────────────────────────────────────┐
-│  WARDEN            ← mandatory, unbypassable   │
-│  1. classify content → Egress Class            │
-│  2. evaluate policy for (provider, class)      │
-│  3. redact where policy requires               │
-│  4. consent check (first time per pair)        │
-│  5. record the decision                        │
+│  CLIENT WARDEN     ← mandatory, unbypassable  │
+│  1. classify content → Egress Class           │
+│  2. evaluate policy for (provider, class)     │
+│  3. prompt preview / consent check            │
+│  4. record decision in client audit log       │
 └──────┬────────────────────────────┬───────────┘
        │ allow                      │ deny
        ▼                            ▼
-┌──────────────┐          reroute to a permitted
-│  ADAPTERS    │          provider, or refuse with
-│  ollama · lmstudio ·    the specific reason
-│  openai · anthropic ·
-│  google · openrouter ·
-│  deepseek · qwen ·
-│  mistral · azure ·
-│  custom-openai-compatible
+┌──────────────┐          reroute to next client
+│  ADAPTERS    │          resource or alert user
+│  Localhost · │
+│  Cloud BYOK  │
 └──────────────┘
 ```
 
-**The Warden sits between the Gateway's routing decision and the adapter call.**
-Routing may select a provider that the Warden then refuses, in which case routing
-runs again with that provider excluded. This ordering means privacy policy
-overrides capability preference, always.
+### 2.2 Server-Side AI Resource Pool (Premium / Platform-Owned)
+Operates strictly on the Scholar backend for entitled Premium subscribers:
+- **Execution Path:** Server → Platform AI Resource Pool → Platform Provider API.
+- **Credentials:** Server AES-256-GCM envelope vault (`platform_provider_credentials`). Platform credentials never leave the server.
+- **Quota & Entitlements:** Business plan quotas, token allocations, and pricing are **FUTURE / BUSINESS DECISION REQUIRED**.
+
+**The Warden sits between the Gateway's routing decision and the adapter call.** Privacy policy overrides capability preference, always.
 
 ---
 

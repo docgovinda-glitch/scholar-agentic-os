@@ -15,9 +15,14 @@ import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/re
 import "@testing-library/jest-dom/vitest";
 
 const loadVault = vi.fn();
+const hasVaultPassphraseOnThisDevice = vi.fn();
 vi.mock("../../services/userVault", async () => {
   const actual = await vi.importActual<typeof import("../../services/userVault")>("../../services/userVault");
-  return { ...actual, loadVault: (...a: unknown[]) => loadVault(...a) };
+  return {
+    ...actual,
+    loadVault: (...a: unknown[]) => loadVault(...a),
+    hasVaultPassphraseOnThisDevice: (...a: unknown[]) => hasVaultPassphraseOnThisDevice(...a),
+  };
 });
 
 const unlockVault = vi.fn();
@@ -55,6 +60,8 @@ const item = (over: Partial<{ id: string; title: string; content: string; citati
 
 beforeEach(() => {
   isVaultUnlocked.mockReturnValue(false);
+  // Default: vault exists on this device (the normal case for most tests).
+  hasVaultPassphraseOnThisDevice.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -77,6 +84,20 @@ describe("no Vault yet", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("Vault exists on another browser (P1-4: cross-device absence)", () => {
+  it("shows an explanation instead of the create-vault flow when the vault is on another device", async () => {
+    loadVault.mockResolvedValue({ label: "My Knowledge Vault", createdAt: "2026-01-01" });
+    hasVaultPassphraseOnThisDevice.mockResolvedValue(false);
+    render(<VaultScreen userId="user-1" onClose={vi.fn()} />);
+
+    expect(await screen.findByText(/Your Vault is on another browser/i)).toBeInTheDocument();
+    // Must NOT show the create-vault flow
+    expect(screen.queryByText(/long-term library/i)).not.toBeInTheDocument();
+    // Must show the Projects vs Vault explanation
+    expect(screen.getByText(/Projects.*Synced to your Scholar account/is)).toBeInTheDocument();
   });
 });
 
@@ -113,14 +134,15 @@ describe("locked", () => {
     expect(unlockVault).toHaveBeenCalledWith("correct horse");
   });
 
-  it("names the recovery code as the only way back in, honestly, with no reset button", async () => {
+  it("honestly states the recovery code cannot substitute for the passphrase in this version (P0-2 fix)", async () => {
     loadVault.mockResolvedValue({ label: "My Knowledge Vault", createdAt: "2026-01-01" });
     render(<VaultScreen userId="user-1" onClose={vi.fn()} />);
 
-    expect(await screen.findByText(/only your recovery code can open this Vault/i)).toBeInTheDocument();
-    // §6.3: "We cannot reset it" — there is genuinely no automated recovery
-    // path, and a button implying otherwise would be the dead-control lie
-    // docs 22 §6.2 rules out.
+    // The lock screen must NOT claim the recovery code can open the Vault (it can't, in this version).
+    expect(await screen.findByText(/no automated way to open the Vault without it/i)).toBeInTheDocument();
+    // Must still say we cannot recover the contents if the passphrase is lost.
+    expect(screen.getByText(/cannot be recovered by anyone, including us/i)).toBeInTheDocument();
+    // §6.3: No reset button — there is genuinely no automated recovery path.
     expect(screen.queryByRole("button", { name: /reset/i })).not.toBeInTheDocument();
   });
 });

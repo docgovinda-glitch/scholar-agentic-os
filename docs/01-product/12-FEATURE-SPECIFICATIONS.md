@@ -487,7 +487,7 @@ write.
 - Exceeding the word limit produces a finding within 300 ms.
 - Every finding navigates to its exact location.
 - With no network, deterministic rules still evaluate.
-- `G6` cannot be passed with an unresolved blocking finding.
+- `G6` highlights all unresolved compliance findings with actionable recommendations before sign-off; compliance recommendations are advisory assistance and do not block `G7` technical export.
 
 **Failure modes.**
 

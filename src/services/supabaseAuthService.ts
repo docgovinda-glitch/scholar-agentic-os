@@ -1,16 +1,11 @@
 /**
- * Supabase-backed replacement for the auth/user/admin routes in server.ts
- * (Phase 1 — docs/planning/hosting-and-topology.md §4's "moves to BaaS"
- * bucket). Wired into UserProfileGate.tsx (registration, login, password
- * reset); ProfileSettings.tsx and AIControlCenter.tsx still call the old
- * Express routes — not yet cut over.
+ * Supabase-backed authentication service for Scholar OS.
+ * Direct self-service signup, email verification, login, session restoration,
+ * and password recovery via Supabase Auth + Postgres.
  *
- * Password reset uses Supabase Auth's own resetPasswordForEmail/updateUser
- * flow, not a custom admin-approval gate — see sendPasswordResetEmail's own
- * doc comment. The registration admin-approval action (approve-registration)
- * is NOT here — it runs as a Supabase Edge Function (supabase/functions/)
- * using the service_role key, since approving another user's account must
- * never be possible from the anon-key client.
+ * Password reset uses Supabase Auth's self-service resetPasswordForEmail/updateUser flow.
+ * Registration automatically activates profiles via the on_auth_user_created trigger
+ * with account_status = 'active' upon email verification.
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";

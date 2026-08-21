@@ -12,6 +12,33 @@ vi.mock("../../src/middleware/auth.ts", () => ({
     next();
   },
 }));
+vi.mock("../../src/aiEngine/userRouter.ts", () => ({
+  assembleUserCandidates: vi.fn().mockResolvedValue({
+    candidates: [{ id: "premium", tier: "platform", health: "healthy", costScore: 0, qualityScore: 100, latencyScore: 100 }],
+    premiumQuotaRemaining: 1000,
+    entitlementActive: true,
+    quota: null,
+  }),
+}));
+vi.mock("../../src/aiEngine/adminRouter.ts", () => ({
+  resolvePremiumResources: vi.fn().mockResolvedValue([
+    { providerId: "openai", credentialLabel: "primary", label: "OpenAI GPT-4", modelId: "gpt-4" },
+  ]),
+}));
+vi.mock("../../src/aiEngine/credentialVault.ts", () => ({
+  getDecryptedCredential: vi.fn().mockResolvedValue("sk-platform-mock-key"),
+}));
+vi.mock("../../src/aiEngine/creditEngine.ts", () => ({
+  deductCredits: vi.fn().mockResolvedValue("ok"),
+}));
+vi.mock("../../src/aiEngine/creditPolicy.ts", () => ({
+  estimateMaxCreditsForInput: vi.fn().mockReturnValue(1),
+  creditsForUsage: vi.fn().mockReturnValue(1),
+}));
+vi.mock("../../src/aiEngine/providerHealth.ts", () => ({
+  recordProviderFailure: vi.fn(),
+  recordProviderSuccess: vi.fn(),
+}));
 import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
@@ -52,8 +79,7 @@ describe("POST /api/studio/refine", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("returns 428 consent_required for a model-backed level on first use of a provider", async () => {
-    global.fetch = vi.fn();
+  it("400s when a client sends an apiKey to enforce client-only BYOK boundary", async () => {
     const res = await request(app).post("/api/studio/refine").send({
       sessionId: "s2",
       passageId: "p2",
@@ -62,101 +88,20 @@ describe("POST /api/studio/refine", () => {
       provider: "openai",
       apiKey: "sk-test",
     });
-    expect(res.status).toBe(428);
-    expect(res.body.error).toBe("consent_required");
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("User BYOK API keys are client-held");
   });
 
-  it("proceeds once consent is recorded via /api/studio/consent for the same session", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                revised: "The cohort comprised 240 participants.",
-                changes: [{ original: "sample", replacement: "cohort", reason: "Avoids repetition." }],
-              }),
-            },
-          },
-        ],
-      }),
-    });
-
-    const consentRes = await request(app)
-      .post("/api/studio/consent")
-      .send({ sessionId: "s3", provider: "openai" });
-    expect(consentRes.status).toBe(200);
-
-    const refineRes = await request(app).post("/api/studio/refine").send({
-      sessionId: "s3",
-      passageId: "p3",
-      text: "The sample comprised 240 participants.",
-      level: "clarity",
-      provider: "openai",
-      apiKey: "sk-test",
-    });
-    expect(refineRes.status).toBe(200);
-    expect(refineRes.body.languageChangeCount).toBe(1);
-    expect(refineRes.body.diff.changes[0].reason).toBe("Avoids repetition.");
-  });
-
-  it("consent recorded for one session does not leak to another session", async () => {
-    global.fetch = vi.fn();
-    await request(app).post("/api/studio/consent").send({ sessionId: "session-A", provider: "openai" });
-
+  it("400s when a client sends providerKey or secret in payload", async () => {
     const res = await request(app).post("/api/studio/refine").send({
-      sessionId: "session-B",
-      passageId: "p4",
-      text: "Some text to refine.",
+      sessionId: "s2",
+      passageId: "p2",
+      text: "This shows that it is quite important.",
       level: "clarity",
-      provider: "openai",
-      apiKey: "sk-test",
+      providerKey: "sk-test",
     });
-    expect(res.status).toBe(428);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("denies content in a scope marked restricted, even with prior provider consent", async () => {
-    global.fetch = vi.fn();
-    await request(app).post("/api/studio/consent").send({ sessionId: "s4", provider: "openai" });
-    const restrictRes = await request(app)
-      .post("/api/studio/restrict")
-      .send({ sessionId: "s4", scopeId: "project-embargoed" });
-    expect(restrictRes.status).toBe(200);
-
-    const res = await request(app).post("/api/studio/refine").send({
-      sessionId: "s4",
-      passageId: "p5",
-      text: "the trial enrolled 40 participants under ethics approval",
-      level: "clarity",
-      provider: "openai",
-      apiKey: "sk-test",
-      scopeId: "project-embargoed",
-    });
-    expect(res.status).toBe(403);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("a restricted scope does not affect other scopes on the same session", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ choices: [{ message: { content: JSON.stringify({ revised: "x", changes: [] }) } }] }),
-    });
-    await request(app).post("/api/studio/consent").send({ sessionId: "s4b", provider: "openai" });
-    await request(app).post("/api/studio/restrict").send({ sessionId: "s4b", scopeId: "project-embargoed" });
-
-    const res = await request(app).post("/api/studio/refine").send({
-      sessionId: "s4b",
-      passageId: "p5b",
-      text: "an ordinary passage in a different project",
-      level: "clarity",
-      provider: "openai",
-      apiKey: "sk-test",
-      scopeId: "project-ordinary",
-    });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("User BYOK API keys are client-held");
   });
 
   it("rejects an unknown L1 profile", async () => {
@@ -295,8 +240,7 @@ describe("GET /api/studio/egress-audit", () => {
       passageId: "p7",
       text: "a very secret sentence to refine",
       level: "clarity",
-      provider: "openai",
-      apiKey: "sk-test",
+      useEngine: "premium",
     });
 
     const res = await request(app).get("/api/studio/egress-audit");

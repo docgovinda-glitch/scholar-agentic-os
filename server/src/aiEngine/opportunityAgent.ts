@@ -151,9 +151,9 @@ async function synthesize(searchResults: Array<{ title: string; url: string; con
       defaultPolicy()
     );
 
-    // Strip markdown code fences if the model added them despite the prompt.
-    if (!result.ok) return [];
-    const cleaned = result.value.text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+    const rawText = result.ok ? result.value.text : ((result as any).result?.text ?? "");
+    if (!rawText) return [];
+    const cleaned = rawText.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
     try {
       const parsed = JSON.parse(cleaned);
       return Array.isArray(parsed) ? parsed : [];

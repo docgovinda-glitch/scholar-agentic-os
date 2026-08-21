@@ -67,6 +67,8 @@ import { journalComplianceRouter } from "./project/journal_compliance";
 import parseRouter from "./project/parse";
 import { activityRouter } from "./project/activity";
 import { filesRouter } from "./project/files";
+import { registerSubmissionsRoutes } from "./project/submissions";
+import { deleteSourceFromRelational } from "../src/syncRelational";
 
 import { emptyDocument } from "../../src/domain/document/model.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
@@ -1034,6 +1036,22 @@ export function getSharedStore() {
   return storeInstance;
 }
 
+/**
+ * Test-only: resets the cached storeInstance so the next getSharedStore()
+ * call re-resolves the backend. Required for cross-test-file isolation when
+ * different test files each configure different env vars (e.g., one sets
+ * VITE_SUPABASE_URL and resolves to restProjectStore; another does not and
+ * expects the in-memory store). Without this, the first test file to run
+ * wins the singleton and all subsequent files see its backend.
+ *
+ * Must be paired with __resetProjectStoreSelectionForTests() from
+ * src/services/store/projectStore.ts so BOTH layers of caching are cleared.
+ */
+export function __resetSharedStoreForTests(): void {
+  storeInstance = null;
+}
+
+
 export function registerProjectRoutes(app: express.Express, projectLimit: express.RequestHandler): void {
   const store = getSharedStore();
 
@@ -1050,11 +1068,50 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   // them, and the "choose what you are writing" screen reads them.
   router.use("/:id/claims", claimsRouter(projectLimit));
   router.use("/:id/evidence", evidenceRouter(projectLimit));
+  router.use("/:id/evidence-ledger", evidenceRouter(projectLimit));
   router.use("/:id/activity", activityRouter);
   router.use("/:id/files", filesRouter);
   router.use("/:id/agent", agenticRouter);
   router.use("/:id/parse-file", parseRouter);
   router.use("/:id/compliance", journalComplianceRouter(projectLimit));
+
+  router.get("/:id/sources/:sourceId/claims", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    res.json({ claims: claimsDependingOnSource(record.claimGraph, req.params.sourceId) });
+  }));
+
+  router.delete("/:id/sources/:sourceId", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const claimGraph = removeSource(record.claimGraph, req.params.sourceId);
+    try {
+      const updated = await saveClaimGraphChange(store, record, claimGraph);
+      await deleteSourceFromRelational(updated.projectId, req.params.sourceId);
+      res.json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
+    } catch (err) {
+      if (err instanceof GateTransitionError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
+  }));
+
+  router.post("/:id/gates/G2/accept-smaller-corpus", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { reason, actor } = req.body ?? {};
+    if (typeof reason !== "string" || reason.trim().length === 0) {
+      return res.status(400).json({ error: "Missing required field: reason" });
+    }
+    if (typeof actor !== "string" || actor.length === 0) {
+      return res.status(400).json({ error: "Missing required field: actor" });
+    }
+    const sourceCountOverride = { reason, acceptedBy: actor, at: new Date().toISOString() };
+    const gates = recomputeG2({ ...record, sourceCountOverride });
+    const updated = await store.save({ ...record, sourceCountOverride, gates });
+    res.json(projectView(updated));
+  }));
   
   // Manual Human Editor Routes for relational data overrides
   router.put("/:id/editor/gaps/:gapId", projectLimit, asyncRoute(async (req, res) => {
@@ -1083,6 +1140,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
 
   
   app.use("/api/projects", router);
+  registerSubmissionsRoutes(app, projectLimit);
 
   /**
    * Summaries of every catalog entry — the "choose an output type" list

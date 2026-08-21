@@ -16,6 +16,8 @@ vi.mock("../../src/middleware/auth.ts", () => ({
 import request from "supertest";
 import { app } from "../../../server.ts";
 import { __resetProjectStoreForTests } from "../../../src/app/conductor/projectStore.ts";
+import { __resetProjectStoreSelectionForTests } from "../../../src/services/store/projectStore.ts";
+import { __resetSharedStoreForTests } from "../project.ts";
 import { __resetSessionPoliciesForTests } from "../../../src/app/studio/sessionPolicyStore.ts";
 import { __resetRateLimitStore } from "../../src/middleware/rateLimit.ts";
 import { __setEnabledOutputTypesForTests } from "../outputTypeAccess.ts";
@@ -28,7 +30,12 @@ const originalFetch = global.fetch;
 const originalMasterKey = process.env.MASTER_KEY;
 
 beforeEach(() => {
-  __resetProjectStoreForTests();
+  // P1-6: Reset ALL layers of store caching to prevent cross-test-file
+  // interference. Without both resets, the first test file to run wins the
+  // module-level singleton and later files may see the wrong backend.
+  __resetSharedStoreForTests();         // nulls server/routes/project.ts storeInstance
+  __resetProjectStoreSelectionForTests(); // nulls src/services/store/projectStore.ts cache
+  __resetProjectStoreForTests();        // clears the in-memory Map
   __resetSessionPoliciesForTests();
   __resetRateLimitStore();
   __setEnabledOutputTypesForTests(["OT-10"]);

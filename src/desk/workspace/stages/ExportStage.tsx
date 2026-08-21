@@ -130,8 +130,17 @@ export default function ExportStage({
               </div>
               <h3 className="text-2xl font-bold text-[color:var(--text-primary)] tracking-tight">Ready for Final Export</h3>
               <p className="text-[color:var(--text-secondary)] max-w-lg mx-auto mt-3 font-sans text-lg">
-                The Typesetting Agent will automatically convert your manuscript into submission-ready PDF and DOCX formats.
+                The Typesetting Agent will automatically convert your manuscript into submission-ready PDF, DOCX, and ODT formats.
               </p>
+
+              <div className="mt-6 max-w-lg rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-control)] p-4 text-left font-sans space-y-1">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[color:var(--text-primary)]">
+                  <span className="text-[color:var(--state-info)] font-bold">ℹ</span> Academic Compliance & Authorship Notice
+                </div>
+                <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
+                  Academic compliance, authorship, and formatting checks are advisory assistance to help review your academic work. Technical validity permits export at any time.
+                </p>
+              </div>
             </div>
           )}
 

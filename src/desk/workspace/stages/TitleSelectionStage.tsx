@@ -3,7 +3,10 @@ import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { saveIntakeAnswers, authedStreamFetch } from "../../api";
+import { saveIntakeAnswers, executeAgenticLLM } from "../../api";
+import { buildTitlePrompts } from "../agentPrompts/titlePrompts";
+import { parseJsonFromLlm } from "../../../utils/jsonParser";
+import { AllAiResourcesExhaustedModal } from "../../aiAccess/AllAiResourcesExhaustedModal";
 
 interface TitleItem {
   id: string;
@@ -39,6 +42,8 @@ export default function TitleSelectionStage({
     return null;
   });
   const [error, setError] = useState<string | null>(null);
+  const [exhaustedReason, setExhaustedReason] = useState<string | null>(null);
+  const [showExhaustedModal, setShowExhaustedModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const isTitleLocked = project.answers?.["title_locked"] === "true";
@@ -59,70 +64,83 @@ export default function TitleSelectionStage({
     ]);
 
     try {
-      await authedStreamFetch(
-        `/api/projects/${projectId}/agent/titles`,
-        "POST",
-        {},
-        (event, eventData) => {
-          if (event === "log") {
-            setLogs((prev) => [
+      // 1. Build prompts directly on client
+      const { systemPrompt, userPrompt } = buildTitlePrompts({
+        projectAnswers: project.answers || {},
+      });
+
+      // 2. Execute via client AI resource pool
+      const rawText = await executeAgenticLLM(
+        systemPrompt,
+        userPrompt,
+        "reasoning",
+        (chunk) => {
+          setLogs((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.message.startsWith("> Agent Reasoning")) return prev;
+            return [
               ...prev,
               {
                 id: Date.now().toString() + Math.random(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "info",
-                message: eventData.message,
+                message: "> Agent Reasoning [streaming title proposals]...",
               },
-            ]);
-          } else if (event === "chunk") {
-            setLogs((prev) => {
-              const last = prev[prev.length - 1];
-              if (last && last.message.startsWith("> Agent Reasoning")) return prev;
-              return [
-                ...prev,
-                {
-                  id: Date.now().toString() + Math.random(),
-                  timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                  level: "info",
-                  message: "> Agent Reasoning [streaming title proposals]...",
-                },
-              ];
-            });
-          } else if (event === "done") {
-            const data: TitleItem[] = Array.isArray(eventData.data) ? eventData.data : [];
-            setResults(data);
-            
-            // Immediate checkpoint persistence of generated titles
-            saveIntakeAnswers(projectId, {
-              generated_titles: JSON.stringify(data),
-              current_stage: "title_selection",
-            }).catch(() => {});
-
+            ];
+          });
+        },
+        (failoverEvt) => {
+          if (failoverEvt.userMessage) {
             setLogs((prev) => [
               ...prev,
               {
-                id: Date.now().toString() + "done",
+                id: Date.now().toString() + Math.random(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                level: "success",
-                message: `✓ Generated ${data.length} academic title proposals tailored to your research gap.`,
+                level: "warning",
+                message: `⚠️ ${failoverEvt.userMessage}`,
               },
             ]);
-          } else if (event === "error") {
-            throw new Error(eventData.message || "Agent encountered an error.");
           }
         }
       );
+
+      // 3. Parse JSON from LLM output
+      const parsedData = parseJsonFromLlm(rawText);
+      const data: TitleItem[] = parsedData && Array.isArray(parsedData.data) ? parsedData.data : [];
+      setResults(data);
+
+      // 4. Immediate checkpoint persistence of generated titles
+      saveIntakeAnswers(projectId, {
+        generated_titles: JSON.stringify(data),
+        current_stage: "title_selection",
+      }).catch(() => {});
+
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + "done",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "success",
+          message: `✓ Generated ${data.length} academic title proposals tailored to your research gap.`,
+        },
+      ]);
     } catch (err: any) {
-      setError(err.message);
+      const errMsg = err.message || "Failed to generate titles.";
+      setError(errMsg);
       setLogs((prev) => [
         ...prev,
         {
           id: Date.now().toString() + "err",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
           level: "error",
-          message: err.message,
+          message: `❌ ${errMsg}`,
         },
       ]);
+
+      if (errMsg.includes("No AI providers") || errMsg.includes("unavailable") || errMsg.includes("exhausted")) {
+        setExhaustedReason(errMsg);
+        setShowExhaustedModal(true);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -439,6 +457,16 @@ export default function TitleSelectionStage({
           </div>
         )}
       </div>
+
+      <AllAiResourcesExhaustedModal
+        isOpen={showExhaustedModal}
+        onClose={() => setShowExhaustedModal(false)}
+        onOpenAiSettings={() => {
+          setShowExhaustedModal(false);
+          window.location.hash = "#/ai-access";
+        }}
+        reason={exhaustedReason || undefined}
+      />
     </div>
   );
 }

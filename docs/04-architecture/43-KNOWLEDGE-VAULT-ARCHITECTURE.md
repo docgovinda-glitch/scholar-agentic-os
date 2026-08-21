@@ -1,7 +1,7 @@
 # Knowledge Vault Architecture
 
 > **Doc ID:** 43 · **Status:** Design · **Depends on:** `44`, `45`, `46`
-> **Revision:** 2 — website-only. Surface and architecture passages updated; see `README.md` rev key.
+> **Revision:** 3 — Client-held passphrase-encrypted local storage (Conflict #7 reconciliation).
 
 The user's optional, encrypted, local, long-term knowledge corpus.
 
@@ -16,8 +16,12 @@ Not a reference manager (it holds full content, not just metadata). Not a note
 app (it holds source material, not just notes). Not a file store (it is parsed,
 indexed, and semantically searchable).
 
-**Revision 2:** the Vault is server-side, encrypted at rest, with the data
-handling in `44`.
+**Revision 3 (Conflict #7):** the Vault is **client-held and passphrase-encrypted**,
+stored in browser IndexedDB (`scholar-vault-items:<userId>`). The Scholar server
+stores **only** a lightweight existence record (`public.user_vaults`: `{ user_id, label, created_at }`).
+Server-side Vault content storage, server-side plaintext parsing, server-side OCR,
+and server-side embedding/indexing of private Vault items are **not** part of the
+authoritative architecture. Search over private Vault content is purely client-side.
 
 For a PhD candidate in year four, the Vault is the answer to *"what did I read
 about this in 2023?"* — a question that is otherwise unanswerable and that
@@ -281,26 +285,31 @@ For discovery (AG-05) and enrichment (AG-01, AG-06).
 
 ## 9. Encryption
 
+> **Conflict #7 authoritative implementation** — verified against `src/services/vaultContents.ts`
+> and `src/services/userVault.ts`.
+
 | Aspect | Approach |
 |---|---|
-| At rest | Every blob and index encrypted with a per-object CEK |
-| Key hierarchy | Passphrase → Master Key → CEKs (`46` §5) |
-| Platform sealing | Master Key sealed to Keychain / DPAPI / TPM where available |
-| Recovery | Recovery Kit; operator cannot recover (`46` §6) |
-| Search | Index is encrypted at rest, decrypted in memory during search |
-| Sync | Encrypted before leaving the device (`44` §5) |
+| At rest | Each Vault item encrypted independently via `encryptDataAsync` (PBKDF2-SHA256 100k iterations + AES-GCM-256, unique random 16-byte salt and 12-byte IV per item) |
+| Storage | IndexedDB (`scholar-vault-items:<userId>`) — only `{ id, createdAt, ciphertext }` is persisted |
+| Key material | Passphrase held in module-scope memory (`activePassphrase`) for the current tab only; cleared on reload or explicit `lockVault()` |
+| Passphrase verification | SHA-256 hash of passphrase stored in `localStorage` (`scholar-vault-verifier:<userId>`) — device-local, never sent to server |
+| Recovery | Recovery code (Crockford-encoded `SCHL-XXXX-XXXX-XXXX-XXXX`), shown once at creation, never stored server-side; operator cannot recover |
+| Search | Client-side substring search over in-memory decrypted items; no server index, no vector database |
+| Server knowledge | `public.user_vaults`: `{ user_id, label, created_at }` only — zero content, zero ciphertext, zero keys |
+| Sync | Not yet implemented; future sync will transfer opaque ciphertext blobs only |
 
 ### 9.1 The searchable-encryption trade-off
 
 Full searchable encryption (encrypted index queried without decryption) is not
-used. The index is decrypted into process memory during search.
+used. Items are decrypted into browser process memory during search.
 
 This is an honest trade-off, documented rather than hidden:
 
-- **Gained:** fast hybrid search over 5,000 documents on baseline hardware, which
-  is the feature's entire value.
+- **Gained:** fast substring search over decrypted items with zero latency and
+  zero server roundtrips.
 - **Given up:** protection against an attacker with live memory access to the
-  running service tier on an unlocked machine.
+  running browser tab on an unlocked machine.
 - **Retained:** protection at rest, which is the realistic threat (stolen laptop,
   backup exposure, cloud sync compromise).
 
@@ -367,19 +376,28 @@ without a verified backup. See `44` §7 for the full backup regime and `RISK-04`
 
 ## 13. Current state
 
-`src/services/knowledgeVaultService.ts`,
-`src/components/KnowledgeVaultEngineV2.tsx`, `KnowledgeVaultManager.tsx`,
-`KnowledgeVaultWizard.tsx`, `KnowledgeVaultWorkspace.tsx`, and
-`src/services/vaultPassphrase.ts` exist.
+> **Conflict #7 verified** — the following reflects the actual active implementation.
 
-| Current | Target |
+### 13.1 Implemented (Verified)
+
+| Component | Implementation |
 |---|---|
-| Prototype storage | Encrypted, content-addressed local store |
-| Passphrase concept exists | Full key hierarchy with platform sealing and Recovery Kit |
-| Full-text index built (`services/index`'s `TextIndex` — real BM25 over generic `{id, text}` records, `src/services/index/textIndex.ts`) but not wired to the Vault (no VaultDocument entity exists yet to index) | Embedded inverted index over actual Vault content |
-| No local vector index | Local embeddings with hybrid retrieval |
-| Limited formats | Fourteen content categories including audio, video, handwriting |
-| No reference manager import | Zotero, Mendeley, EndNote, BibTeX, RIS |
-| No curation | AG-07 with duplicate, relationship, gap, and retraction monitoring |
-| No portable export | Documented open-format export |
-| Unclear optionality | Architecturally enforced: no module may hard-depend on it |
+| **Vault metadata** (`src/services/userVault.ts`) | `loadVault()`, `createVault()` — server stores only `{ user_id, label, created_at }` |
+| **Vault contents** (`src/services/vaultContents.ts`) | `addVaultItem()`, `listVaultItems()`, `searchVaultItems()`, `lockVault()`, `unlockVault()` — all client-side, encrypted in IndexedDB |
+| **Passphrase** (`src/services/userVault.ts`) | `setVaultPassphraseVerifier()`, `verifyVaultPassphrase()` — SHA-256 device-local verifier in localStorage |
+| **Recovery** (`src/services/userVault.ts`) | `generateRecoveryCode()` — Crockford-encoded, shown once, never server-stored |
+| **Encryption** (`src/utils/crypto.ts`) | PBKDF2-SHA256 (100k iterations) + AES-GCM-256, unique salt and IV per item |
+| **Client search** (`src/services/vaultContents.ts`) | Substring search over decrypted in-memory items; zero server involvement |
+| **Supabase schema** (`supabase/schema_user_settings.sql`) | `public.user_vaults` with RLS; no content/ciphertext/key columns |
+
+### 13.2 Not yet built (Future phases)
+
+| Target | Status |
+|---|---|
+| Full-text BM25 index over Vault content | `TextIndex` exists but not wired to Vault entities |
+| Local vector index and hybrid retrieval | Not started |
+| Fourteen content categories (PDF, audio, video, etc.) | V1 is manual text entries only |
+| Reference manager import (Zotero, Mendeley, etc.) | Not started |
+| AG-07 curation (duplicates, relationships, gaps) | Not started |
+| Portable open-format export | Not started |
+| Multi-device encrypted sync | Not started; will use opaque ciphertext transport |

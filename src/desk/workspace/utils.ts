@@ -15,9 +15,10 @@ export function computeStageStatuses(project: ProjectView | null): Record<Resear
 
   const a = project.answers || {};
 
+  // Phase I Artifacts
   const defComplete = !!a["core_problem"];
-  const litComplete = !!a["literature_review"];
-  const gapIdComplete = !!a["gap_identified"];
+  const litComplete = !!a["literature_review"] || !!a["literature_sources"];
+  const gapIdComplete = !!a["gap_identified"] || !!a["gaps"];
   const gapSelComplete = !!a["gap_selected"];
   const titleSelComplete = !!a["title_options"] && a["title_options"].length > 0;
   const titleLockComplete = !!a["working_title"] || !!a["title"];
@@ -26,52 +27,50 @@ export function computeStageStatuses(project: ProjectView | null): Record<Resear
 
   const res: Record<ResearchStage, StageStatus> = { ...allLocked };
 
-  if (defComplete) {
-    res.definition = "completed";
-    res.literature = "active";
-  }
-  if (litComplete) {
-    res.literature = "completed";
-    res.gap_identification = "active";
-  }
-  if (gapIdComplete) {
-    res.gap_identification = "completed";
-    res.gap_selection = "active";
-  }
-  if (gapSelComplete) {
-    res.gap_selection = "completed";
-    res.title_selection = "active";
-  }
-  if (titleSelComplete) {
-    res.title_selection = "completed";
-    res.title_lock = "active";
-  }
-  if (titleLockComplete) {
-    res.title_lock = "completed";
+  // Phase I Statuses
+  res.definition = defComplete ? "completed" : "active";
+  res.literature = litComplete ? "completed" : defComplete ? "active" : "locked";
+  res.gap_identification = gapIdComplete ? "completed" : litComplete ? "active" : "locked";
+  res.gap_selection = gapSelComplete ? "completed" : gapIdComplete ? "active" : "locked";
+  res.title_selection = titleSelComplete ? "completed" : gapSelComplete ? "active" : "locked";
+  res.title_lock = titleLockComplete ? "completed" : titleSelComplete ? "active" : "locked";
+
+  // Check for stale state in Phase 1 (e.g. if gap changed after title was selected)
+  if (a["stale_downstream_stages"] && Array.isArray(a["stale_downstream_stages"])) {
+    for (const staleStage of a["stale_downstream_stages"]) {
+      if (res[staleStage as ResearchStage] === "completed") {
+        res[staleStage as ResearchStage] = "stale";
+      }
+    }
   }
 
-  if (phase1Complete) {
-    res.vault_sources = "active";
-    res.source_approval_vault = "active";
-    res.additional_data = "active";
-    res.evidence_extraction = "active";
-    res.external_research = "active";
-    res.source_approval_external = "active";
-    res.evidence_analysis = "active";
-    res.manual_review = "active";
+  // Phase II Statuses
+  if (phase1Complete || a["vault_sources"] || a["evidence_ledger"]) {
+    res.vault_sources = a["vault_sources"] ? "completed" : "active";
+    res.source_approval_vault = a["source_approval_vault"] ? "completed" : "active";
+    res.additional_data = a["additional_data"] ? "completed" : "active";
+    res.evidence_extraction = a["evidence_extraction"] ? "completed" : "active";
+    res.external_research = a["external_research"] ? "completed" : "active";
+    res.source_approval_external = a["source_approval_external"] ? "completed" : "active";
+    res.evidence_analysis = a["evidence_analysis"] ? "completed" : "active";
+    res.manual_review = a["manual_review"] ? "completed" : "active";
 
-    // Unlocking later stages assuming Phase 2 is mostly manual for now
-    res.journal_discovery = "active";
-    res.journal_requirements = "active";
-    res.draft = "active";
-    res.citation_audit = "active";
-    res.originality_check = "active";
-    res.draft_preview = "active";
-    res.peer_review = "active";
-    res.revision = "active";
-    res.final_editor = "active";
-    res.publication_readiness = "active";
-    res.export = "active";
+    // Phase III Statuses
+    res.journal_discovery = a["journal_discovery"] ? "completed" : "active";
+    res.journal_requirements = a["journal_requirements"] ? "completed" : "active";
+    res.draft = project.hasDocument ? "completed" : "active";
+    res.citation_audit = a["citation_audit"] ? "completed" : "active";
+    res.originality_check = a["originality_check"] ? "completed" : "active";
+    res.draft_preview = a["draft_preview"] ? "completed" : "active";
+
+    // Phase IV Statuses
+    res.peer_review = (a["peer_review"] || a["peer_review_history"]) ? "completed" : "active";
+    res.revision = a["revision"] ? "completed" : "active";
+
+    // Phase V Statuses
+    res.final_editor = a["final_editor"] ? "completed" : "active";
+    res.publication_readiness = a["publication_readiness"] ? "completed" : "active";
+    res.export = a["export"] ? "completed" : "active";
   }
 
   return res;

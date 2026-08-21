@@ -191,16 +191,21 @@ export function classifyHttpError(
   }
 
   if (status >= 400) {
+    const isCapabilityMismatch =
+      /unsupported|not supported|unknown field|parameter|response_format|json_schema|system prompt|feature not enabled/i.test(
+        detail || ""
+      );
+
     return {
       ...base,
       kind: "bad_request",
-      label: KIND_LABELS.bad_request,
-      message: `The provider rejected the request (status ${status}).`,
+      label: isCapabilityMismatch ? "Provider capability mismatch" : KIND_LABELS.bad_request,
+      message: isCapabilityMismatch
+        ? `The provider does not support a parameter or capability required for this task.`
+        : `The provider rejected the request (status ${status}).`,
       remedy: detail ? "See the provider's message in the diagnostics log below." : null,
-      // A malformed request fails identically everywhere, so trying every
-      // other key in turn just wastes them.
       retryable: false,
-      failoverWorthwhile: false,
+      failoverWorthwhile: isCapabilityMismatch,
     };
   }
 

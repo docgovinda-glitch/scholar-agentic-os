@@ -5,7 +5,10 @@ import { routeDecision, type RoutingDecision } from "../aiAccess/aiAccessApi";
 import { getWritingHistory, enableWritingHistory, disableWritingHistory, clearWritingHistory, summarizeWritingHistory, recordRefinement } from "../../app/studio/writingHistory";
 import { getLocalRunner } from "../../config/localRunnerCatalog";
 import { CLOUD_PROVIDERS } from "../../config/providerCatalog";
-import { refineLocally, GatewayDenied, grantLocalConsent } from "./localStudioExecution";
+import { refineLocally, GatewayDenied, grantLocalConsent, getLocalPolicy } from "./localStudioExecution";
+import { refine } from "../../app/studio/studio";
+import { ALL_L1_PROFILES } from "../../domain/language/l1Patterns";
+import type { L1Profile } from "../../domain/language/types";
 import type { InterventionLevel, StudioRefineResult, VoiceProfile } from "../types";
 
 const LEVELS: { id: InterventionLevel; label: string; needsProvider: boolean; description: string }[] = [
@@ -333,21 +336,39 @@ export default function StudioPanel({
               }
             }
             // Free/BYOK keys live only on this device (never the server) —
-            // a provider the router sees as "connected" from another device
-            // has no key here, so fall through to the next candidate rather
-            // than send a request that can't succeed.
+            // execute directly on the client rather than sending the key to the server.
             const key = await readProviderKey(c.providerId);
             if (key) {
-              refineExtra.provider = c.providerId;
-              refineExtra.apiKey = key;
-              refineExtra.model = c.modelId;
               chosenProviderId = c.providerId;
               chosenTier = c.tier;
-              chosenReasoning = c.reasoning;
-              break;
+              try {
+                const l1Profile: L1Profile | undefined = l1 && (ALL_L1_PROFILES as readonly string[]).includes(l1) ? (l1 as L1Profile) : undefined;
+                r = await refine({
+                  passageId: "desk-studio-passage",
+                  text,
+                  level,
+                  discipline: undefined,
+                  l1: l1Profile,
+                  voiceProfile: voiceProfile || undefined,
+                  provider: c.providerId,
+                  apiKey: key,
+                  model: c.modelId,
+                  policy: getLocalPolicy(sessionId),
+                });
+                break;
+              } catch (clientErr) {
+                if (clientErr instanceof GatewayDenied) {
+                  throw clientErr;
+                }
+                localUnavailableNote = clientErr instanceof Error ? clientErr.message : String(clientErr);
+                chosenProviderId = undefined;
+                chosenTier = "manual";
+                chosenReasoning = "";
+                continue;
+              }
             }
           }
-          if (!chosenProviderId) {
+          if (!chosenProviderId && !r) {
             setError(
               localUnavailableNote
                 ? `${localUnavailableNote} No other AI source is currently usable. Open AI Access to reconnect one, or switch to Advanced.`
@@ -359,15 +380,32 @@ export default function StudioPanel({
       }
 
       if (!r) {
-        r = await refinePassage({
-          sessionId,
-          passageId: "desk-studio-passage",
-          text,
-          level,
-          l1: l1 || undefined,
-          voiceProfile: voiceProfile || undefined,
-          ...refineExtra,
-        });
+        if (mode === "advanced" && apiKey) {
+          const l1Profile: L1Profile | undefined = l1 && (ALL_L1_PROFILES as readonly string[]).includes(l1) ? (l1 as L1Profile) : undefined;
+          r = await refine({
+            passageId: "desk-studio-passage",
+            text,
+            level,
+            discipline: undefined,
+            l1: l1Profile,
+            voiceProfile: voiceProfile || undefined,
+            provider,
+            apiKey,
+            policy: getLocalPolicy(sessionId),
+          });
+        } else {
+          r = await refinePassage({
+            sessionId,
+            passageId: "desk-studio-passage",
+            text,
+            level,
+            l1: l1 || undefined,
+            voiceProfile: voiceProfile || undefined,
+            provider: refineExtra.provider,
+            model: refineExtra.model,
+            useEngine: refineExtra.useEngine,
+          });
+        }
       }
       setResult(r);
       setExecutedSource(

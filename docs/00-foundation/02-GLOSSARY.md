@@ -84,6 +84,8 @@ Output.
 **Requirement Source** — An input from which compliance rules derive: journal
 guidelines, a university handbook, a department template, an assignment brief.
 
+**Source Approval Queue** — The interactive workflow within a Project where a researcher reviews candidate literature and explicitly approves or rejects sources into their project's evidence ledger. Distinct from administrative user account management (registration approval is retired).
+
 **Workspace** — A container grouping related Projects with shared settings and
 Vault binding.
 

@@ -180,21 +180,11 @@ exhausting all fallbacks returns an error, never a silent success. Every
 attempt (success or failure) updates `provider_health`
 (`recordProviderSuccess`/`recordProviderFailure`).
 
-**Free / BYOK** (`src/desk/regions/StudioPanel.tsx`, "Auto" mode, the
-default): the client calls `POST /api/ai-access/route` for the router's
-pick, then — for a non-Premium choice — reads ITS OWN locally-stored key
-for that specific provider (`readProviderKey`, never the server) and
-supplies it directly to `refinePassage()`, same as the pre-existing manual
-path always did; the server still never holds a Free/BYOK credential. If
-no key is stored on this device for the chosen provider (e.g. the
-connection exists from a different device), the client tries the next
-router-ranked fallback rather than sending a request that cannot succeed.
-An "Advanced" mode preserves the original manual provider+key dropdown
-for when Auto has nothing usable, or the user just wants to pick.
+**Free / BYOK** (`src/desk/regions/StudioPanel.tsx`, `src/desk/api.ts` `executeAgenticLLM`): The client evaluates its own Client AI Resource Pool locally. For non-Premium execution, the client reads its own locally stored keys (`readProviderKey`), evaluates client Warden policies, and executes completions directly against provider APIs (`completeWithFailover` / `streamWithFailover`) without proxying requests or keys through the Scholar server.
 
-**Local** executes for real (a later pass — see §7b) — `StudioPanel`
-attempts a chosen local candidate directly in the browser rather than
-skipping it.
+**Local** executes directly on the caller's machine — the browser connects to `localhost` (Ollama/LM Studio) via direct fetch.
+
+**Failover Transparency**: When a provider encounters rate limits, quota exhaustion, or network failures, the client Gateway automatically attempts the next candidate in the user's pool and logs transparent failover messages to the user interface (e.g. *"Gemini quota reached — continuing with Cerebras"*). If all candidates are exhausted, a clear alert is presented directing the user to AI Access settings.
 
 **Transparency** ("Why this AI?"): `StudioRefineResult` carries `usage`
 (provider/model/token estimates, for any level that called a provider) and,

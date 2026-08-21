@@ -2,8 +2,10 @@ import express from "express";
 import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 import { callOpenRouterJSON, callOpenRouterText, streamOpenRouterJSON, streamOpenRouterText } from "../../utils/llm.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../../src/supabaseRest.ts";
+import { rejectClientCredentials } from "../../src/middleware/rejectClientCredentials.ts";
 
 const router = express.Router({ mergeParams: true });
+router.use(rejectClientCredentials);
 
 // Helper to get project safely
 async function getProjectSafe(req: express.Request<any>, res: express.Response) {

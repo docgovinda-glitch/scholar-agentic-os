@@ -454,9 +454,13 @@ export function computeG7ExitCriteria(document: CanonicalDocument | undefined, r
 
   const complianceCriterion: ExitCriterion = {
     id: "export-compliance-clear",
-    description: report ? "No unresolved blocking compliance findings" : "Compliance has not been evaluated yet",
+    description: report
+      ? (report.blockingFailures.length === 0
+          ? "No unresolved compliance recommendations"
+          : `${report.blockingFailures.length} compliance recommendation(s) available for review (advisory)`)
+      : "Compliance evaluation available (advisory)",
     satisfied: report !== undefined && report.blockingFailures.length === 0,
-    blocking: true,
+    blocking: false, // Advisory only — does not prevent export of a technically valid document
   };
 
   return [preflightCriterion, complianceCriterion];

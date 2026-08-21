@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { executeAgenticLLM, saveIntakeAnswers } from "../../api";
 import { useResearchWorkspace } from "../ResearchContext";
+import { buildGapPrompts } from "../agentPrompts/gapPrompts";
+import { parseJsonFromLlm } from "../../../utils/jsonParser";
+import { AllAiResourcesExhaustedModal } from "../../aiAccess/AllAiResourcesExhaustedModal";
 
 interface GapItem {
   id: string;
@@ -28,6 +31,8 @@ export default function GapIdentificationStage({
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exhaustedReason, setExhaustedReason] = useState<string | null>(null);
+  const [showExhaustedModal, setShowExhaustedModal] = useState(false);
   const [gaps, setGaps] = useState<GapItem[] | null>(() => {
     if (project?.answers?.["identified_gaps"]) {
       try {
@@ -72,76 +77,94 @@ export default function GapIdentificationStage({
     ]);
 
     try {
-      await authedStreamFetch(
-        `/api/projects/${projectId}/agent/gaps`,
-        "POST",
-        {},
-        (event, eventData) => {
-          if (event === "log") {
-            setLogs((prev) => [
+      const workingTitle = project?.answers?.["working_title"] || "Untitled Research";
+      const researchArea = project?.answers?.["research_area"] || "the field";
+
+      // 1. Build prompts directly on client
+      const { systemPrompt, userPrompt } = buildGapPrompts({
+        workingTitle,
+        researchArea,
+        projectAnswers: project?.answers || {},
+      });
+
+      // 2. Execute via client AI resource pool
+      const rawText = await executeAgenticLLM(
+        systemPrompt,
+        userPrompt,
+        "reasoning",
+        (chunk) => {
+          setLogs((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.message.startsWith("> Agent Reasoning")) return prev;
+            return [
               ...prev,
               {
                 id: Date.now().toString() + Math.random(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "info",
-                message: eventData.message,
+                message: "> Agent Reasoning [streaming gap analysis]...",
               },
-            ]);
-          } else if (event === "chunk") {
-            setLogs((prev) => {
-              const last = prev[prev.length - 1];
-              if (last && last.message.startsWith("> Agent Reasoning")) return prev;
-              return [
-                ...prev,
-                {
-                  id: Date.now().toString() + Math.random(),
-                  timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                  level: "info",
-                  message: "> Agent Reasoning [streaming gap analysis]...",
-                },
-              ];
-            });
-          } else if (event === "done") {
-            const data: GapItem[] = Array.isArray(eventData.data) ? eventData.data : [];
-            setGaps(data);
-            
-            // Immediate checkpoint persistence
-            saveIntakeAnswers(projectId, {
-              identified_gaps: JSON.stringify(data),
-              current_stage: "gap_identification",
-            }).catch(() => {});
-
+            ];
+          });
+        },
+        (failoverEvt) => {
+          if (failoverEvt.userMessage) {
             setLogs((prev) => [
               ...prev,
               {
-                id: Date.now().toString() + "done1",
+                id: Date.now().toString() + Math.random(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                level: "info",
-                message: `> gap.rank()`,
-              },
-              {
-                id: Date.now().toString() + "done2",
-                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                level: "success",
-                message: `✓ ${data.length} high-potential research gaps identified and ranked.`,
+                level: "warning",
+                message: `⚠️ ${failoverEvt.userMessage}`,
               },
             ]);
-          } else if (event === "error") {
-            throw new Error(eventData.message || "Agent encountered an error.");
           }
         }
       );
+
+      // 3. Parse JSON from LLM output
+      const parsedData = parseJsonFromLlm(rawText);
+      const data: GapItem[] = parsedData && Array.isArray(parsedData.data) ? parsedData.data : [];
+      setGaps(data);
+
+      // 4. Immediate discrete checkpoint persistence
+      saveIntakeAnswers(projectId, {
+        identified_gaps: JSON.stringify(data),
+        current_stage: "gap_identification",
+      }).catch(() => {});
+
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + "done1",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "info",
+          message: `> gap.rank()`,
+        },
+        {
+          id: Date.now().toString() + "done2",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "success",
+          message: `✓ ${data.length} high-potential research gaps identified and ranked.`,
+        },
+      ]);
     } catch (err: any) {
-      setError(err.message);
+      const errMsg = err.message || "Failed to identify research gaps.";
+      setError(errMsg);
       setLogs((prev) => [
         ...prev,
         {
           id: Date.now().toString() + "err",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
           level: "error",
-          message: err.message,
+          message: `❌ ${errMsg}`,
         },
       ]);
+
+      if (errMsg.includes("No AI providers") || errMsg.includes("unavailable") || errMsg.includes("exhausted")) {
+        setExhaustedReason(errMsg);
+        setShowExhaustedModal(true);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -264,6 +287,16 @@ export default function GapIdentificationStage({
           </div>
         )}
       </div>
+
+      <AllAiResourcesExhaustedModal
+        isOpen={showExhaustedModal}
+        onClose={() => setShowExhaustedModal(false)}
+        onOpenAiSettings={() => {
+          setShowExhaustedModal(false);
+          window.location.hash = "#/ai-access";
+        }}
+        reason={exhaustedReason || undefined}
+      />
     </div>
   );
 }

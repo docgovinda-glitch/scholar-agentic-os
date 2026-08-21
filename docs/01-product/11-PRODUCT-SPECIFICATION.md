@@ -13,50 +13,33 @@ acts*.
 ## 1. System at a glance
 
 ```
-┌────────────────────────── USER'S DEVICE ───────────────────────────┐
-│                                                                     │
-│  ┌─────────────── WORKBENCH (desktop shell) ────────────────────┐   │
-│  │  Panels · Split editors · Command palette · Plugin host       │   │
-│  └───────────────────────────┬───────────────────────────────────┘  │
-│                              │ local IPC                            │
-│  ┌───────────────────────────▼───────────────────────────────────┐  │
-│  │                          KERNEL                                │  │
-│  │  Object store · Event log · Index · Scheduler · Capabilities   │  │
-│  └──┬─────────┬──────────┬──────────┬──────────┬──────────┬──────┘  │
-│     │         │          │          │          │          │         │
-│  ┌──▼──┐  ┌───▼───┐  ┌───▼────┐ ┌───▼────┐ ┌───▼────┐ ┌───▼─────┐  │
-│  │Vault│  │Ledger │  │ Rubric │ │  Mesh  │ │Gateway │ │ Warden  │  │
-│  │     │  │       │  │        │ │(agents)│ │        │ │(egress) │  │
-│  └─────┘  └───────┘  └────────┘ └────┬───┘ └───┬────┘ └───┬─────┘  │
-│                                       │        │          │         │
-│                                  ┌────▼────┐   │          │         │
-│                                  │Conductor│   │          │         │
-│                                  │ (gates) │   │          │         │
-│                                  └─────────┘   │          │         │
-└────────────────────────────────────────────────┼──────────┼─────────┘
-                                                 │          │
-                        ┌────────────────────────┘          │
-                        │  (only what Warden permits)        │
-              ┌─────────▼──────────┐              ┌──────────▼─────────┐
-              │   AI PROVIDERS     │              │   CLOUD PLANE      │
-              │ local · cloud APIs │              │ Identity · sync service   │
-              └────────────────────┘              │ Registry · Admin   │
-                                                  └─────────┬──────────┘
-                                                            │
-                                                  ┌─────────▼──────────┐
-                                                  │  CONSOLE (web)     │
-                                                  │  quick tasks       │
-                                                  └────────────────────┘
+┌────────────────────────── USER'S DEVICE (BROWSER / PWA) ──────────────────────────┐
+│                                                                                   │
+│  ┌───────────────────────── CLIENT WEB APPLICATION ───────────────────────────┐  │
+│  │  Desk (≥1024px responsive workbench)  │  Pocket (<1024px / touch companion) │  │
+│  │  Rich TipTap editor · Workspace state · Client AI router · Local Web Crypto │  │
+│  └──────────────────────────────────────┬──────────────────────────────────────┘  │
+│                                         │                                         │
+│  ┌──────────────────────────────────────▼──────────────────────────────────────┐  │
+│  │                    CLIENT-SIDE STORAGE & LOCAL RUNTIMES                     │  │
+│  │  IndexedDB / LocalStorage · Web Crypto Key Vault · Loopback to Local AI     │  │
+│  │  (Ollama, LM Studio on localhost — zero user data leaves the machine)       │  │
+│  └──────────────────────────────────────┬──────────────────────────────────────┘  │
+└─────────────────────────────────────────┼─────────────────────────────────────────┘
+                                          │ HTTPS / SSE (Only when necessary)
+                               ┌──────────▼──────────┐
+                               │     SERVER TIER     │
+                               │ Identity & Auth     │
+                               │ Entitlements & Sync │
+                               │ Admin AI Platform   │
+                               └─────────────────────┘
 ```
 
 Two properties are worth stating explicitly because they constrain everything
 downstream:
 
-1. **The service tier runs on the device.** There is no server-side orchestration of
-   user documents. The cloud plane never holds plaintext content.
-2. **The Warden is the only egress path.** No component calls a provider
-   directly. This is what makes privacy policy enforceable rather than
-   aspirational.
+1. **Web-first and local-first.** The application is delivered via standard web technologies (Web/PWA). Working research state, client-side AI operations (Local runtimes and BYOK keys), and private research data execute on the user's device. The server provides only the centralized infrastructure genuinely needed (authentication, synchronization, entitlements, and platform-managed AI).
+2. **Minimal server footprint & knowledge.** The server does not store or process private research prompts, responses, or intermediate state unless explicitly requested by cloud features. The client's egress to model providers is strictly user-controlled.
 
 ---
 
@@ -150,8 +133,8 @@ the friction scales with the user's uncertainty, not with the gate count.
 | `G3` Structure | What shape does the document take? | Approve the outline and budgets | 5–15 min |
 | `G4` Draft | Does the text exist? | Review each section as drafted | Hours–weeks |
 | `G5` Review | Is it good? | Address findings; accept or reject edits | Hours–days |
-| `G6` Compliance | Does it satisfy the rules? | Resolve or waive every blocking finding | 15–60 min |
-| `G7` Export | Is it ready to leave? | Confirm pre-flight; choose format | 2–5 min |
+| `G6` Compliance | Does it satisfy the rules? | Review compliance recommendations and guidelines (advisory) | 15–60 min |
+| `G7` Export | Is it technically ready to leave? | Technical pre-flight passes; choose format | 2–5 min |
 
 Full entry/exit criteria in `30-ACADEMIC-WORKFLOW-ARCHITECTURE.md` §3.
 

@@ -108,12 +108,9 @@ const app = express();
 // `connect-src` added on top of helmet's other defaults (left unchanged)
 // to allow exactly the origins this app's client-side code actually calls.
 //
-// `form-action` fix (2026-07-31, same day): helmet's default directives
-// also include `form-action 'self'`, which silently blocked the real
-// <form method="POST"> at /admin/approve-scholar from submitting to the
-// approve-registration Edge Function (a different origin) — confirmed
-// live via a direct form.submit() call producing zero network request and
-// no visible error. Added a Supabase source here too.
+// `form-action` fix (2026-07-31): helmet's default directives
+// include `form-action 'self'`. Allowed Supabase source origin to support
+// direct browser form submissions to Supabase endpoints.
 //
 // Wildcard-to-exact-origin fix (2026-07-31, same day): `https://*.supabase.co`
 // worked in Chrome but confirmed live to NOT match in Safari — WebKit's CSP

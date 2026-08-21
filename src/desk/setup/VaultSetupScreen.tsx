@@ -87,7 +87,7 @@ export default function VaultSetupScreen({
             Over time it becomes the foundation your work is built on — when you write something new, Scholar can draw
             on everything you have already read, and you can search years of reading in one place.
           </p>
-          <p>It stays on your computer, encrypted. It is entirely optional, and everything works without it.</p>
+          <p>It stays privately in this browser on this device, encrypted with a passphrase you choose. It does not currently sync to your other devices or browsers. It is entirely optional, and everything works without it.</p>
         </div>
 
         {/* Three peer options, presented without a default (docs 25 §6.1). */}
@@ -138,8 +138,11 @@ export default function VaultSetupScreen({
           Choose a Vault passphrase
         </h1>
         <p className="mt-1.5 text-sm text-[color:var(--text-secondary)]">
-          This encrypts your Vault. It is <strong>not</strong> your account password, and changing one does not change
+          This encrypts your Vault locally in this browser. It is <strong>not</strong> your account password, and changing one does not change
           the other.
+        </p>
+        <p className="mt-2 rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs text-[color:var(--text-muted)]">
+          🔒 Your Vault is stored privately in this browser. Your projects sync to your Scholar account, but your Vault does not.
         </p>
 
         <div className="mt-6 flex flex-col gap-4">
@@ -225,6 +228,10 @@ export default function VaultSetupScreen({
           If you forget your passphrase, this code is the only way to open your Vault again. We do not have a copy. We
           cannot reset it. If you lose both, the Vault cannot be recovered by anyone, including us.
         </p>
+        <p className="mt-3 rounded-[var(--radius-md)] border border-[color:var(--state-warning-subtle,var(--border-default))] bg-[color:var(--surface-inset)] px-3 py-2 text-xs text-[color:var(--text-secondary)]">
+          ⚠️ Your Vault is stored privately in this browser on this device. Clearing your browser’s site data or
+          storage may permanently remove your Vault. Keep this recovery code in a safe place outside this browser.
+        </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <SecondaryButton onClick={() => void navigator.clipboard?.writeText(recoveryCode)}>Copy</SecondaryButton>
@@ -284,8 +291,11 @@ export default function VaultSetupScreen({
       <OnboardingProgress current="workshop" />
       <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">Your Vault is ready</h1>
       <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-        It is encrypted with the passphrase you chose. Find "Vault" from the header any time to add material, search
+        It is encrypted with the passphrase you chose and stored privately in this browser. Find “Vault” from the header any time to add material, search
         it, or come back to what you have already gathered.
+      </p>
+      <p className="mt-2 rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs text-[color:var(--text-muted)]">
+        ☁️ Your projects sync to your Scholar account. 🔒 Your private Vault stays in this browser and does not currently sync to other devices.
       </p>
       <button
         type="button"

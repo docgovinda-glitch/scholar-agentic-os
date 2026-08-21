@@ -128,26 +128,5 @@ export function claimsRouter(projectLimit: express.RequestHandler): express.Rout
     res.json({ conflicts: findConflicts(record.claimGraph) });
   }));
 
-  router.get("/api/projects/:id/sources/:sourceId/claims", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    res.json({ claims: claimsDependingOnSource(record.claimGraph, req.params.sourceId) });
-  }));
-
-  router.delete("/api/projects/:id/sources/:sourceId", projectLimit, asyncRoute(async (req, res) => {
-    const record = await loadOwnedProject(store, req, res);
-    if (!record) return;
-    const claimGraph = removeSource(record.claimGraph, req.params.sourceId);
-    try {
-      const updated = await saveClaimGraphChange(store, record, claimGraph);
-      await deleteSourceFromRelational(updated.projectId, req.params.sourceId);
-      res.json({ ...projectView(updated), claimGraph, ...(updated.rubricReport ? { rubric: updated.rubricReport } : {}) });
-    } catch (err) {
-      if (err instanceof GateTransitionError) {
-        return res.status(409).json({ error: err.message });
-      }
-      throw err;
-    }
-  }));
   return router;
 }

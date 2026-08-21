@@ -21,10 +21,29 @@ const TEXT_DECODER = new TextDecoder();
 // ============================================================================
 // LEGACY XOR ENCRYPTION (Preserved for backward compatibility)
 // ============================================================================
+//
+// P4-1 TECHNICAL DEBT AUDIT (2026-08-21):
+//   Active production callers:  ZERO — confirmed by grep scan.
+//   Active test callers:        src/utils/__tests__/crypto.test.ts (tests of this code itself).
+//   Vault/AI settings callers:  use encryptDataAsync (AES-GCM-256 via PBKDF2) exclusively.
+//
+//   Safe to remove when:
+//     1. All ciphertext stored with the old XOR scheme has been migrated or
+//        the user cohort that created it is empty.
+//     2. The crypto.test.ts XOR test suite is deleted alongside.
+//     3. Any third-party integration depending on decryptData() is re-evaluated.
+//
+//   Until removal: the functions are exported so that any data encrypted before
+//   the AES-GCM migration can still be decrypted. They MUST NOT be used for
+//   any new encryption — the @deprecated tag on each function enforces this in
+//   editor tooling.
+// ============================================================================
 
 /**
- * @deprecated Use encryptDataAsync() for new encryption
- * Legacy XOR encryption - kept for backward compatibility only
+ * @deprecated Use encryptDataAsync() for new encryption.
+ * Legacy XOR encryption — kept for backward compatibility only.
+ * P4-1: Zero active production callers as of 2026-08-21; safe to remove once
+ * all XOR-encrypted data is migrated.
  */
 export function encryptData(text: string, secret: string): string {
   if (!text) return "";
@@ -41,7 +60,9 @@ export function encryptData(text: string, secret: string): string {
 }
 
 /**
+ * @deprecated Use decryptDataAsync() for new decryption.
  * Decrypt legacy XOR-encrypted data.
+ * P4-1: Zero active production callers as of 2026-08-21.
  */
 export function decryptData(cipher: string, secret: string): string {
   if (!cipher) return "";

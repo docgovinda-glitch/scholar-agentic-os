@@ -14,53 +14,55 @@ service tier that does the work, and a strict egress boundary in front of model
 providers.**
 
 ```
-┌──────────────── BROWSER ──────────────────────────────────────┐
+┌──────────────── BROWSER (Client-First Execution) ─────────────┐
 │  Desk (≥1024px)              │  Pocket (<1024px)              │
 │  regions · editor · palette  │  views · queue · reader        │
 │  ── shared: design system, domain types, API client ──        │
 │  IndexedDB edit buffer · service worker cache                 │
-└───────────────────────────┬───────────────────────────────────┘
-                            │  HTTPS · SSE for streams
-┌───────────────────────────▼───────────────────────────────────┐
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │ CLIENT AI RESOURCE POOL (Non-Premium / User-Owned)      │  │
+│  │ Local Runtimes (Ollama/LM Studio) · Free Tiers · BYOK   │  │
+│  │ Isomorphic Gateway + Client Warden (Egress Control)     │  │
+│  └───────────────────────────┬─────────────────────────────┘  │
+└──────────────────────────────┼────────────────────────────────┘
+                               │ Direct Browser Fetch (Localhost / Provider)
+                               ▼
+                    ┌──────────────────────────┐
+                    │ Local Runtimes (Ollama)  │
+                    │ Direct Cloud BYOK APIs   │
+                    └──────────────────────────┘
+                               │
+                               │ HTTPS (Identity, Auth, Entitlements, Checkpoints)
+┌──────────────────────────────▼────────────────────────────────┐
 │  EDGE / APP TIER                                               │
 │  SSR shell · REST+RPC API · auth · rate limiting · sessions    │
-└───────────────────────────┬───────────────────────────────────┘
-                            │
-┌───────────────────────────▼───────────────────────────────────┐
+└──────────────────────────────┬────────────────────────────────┘
+                               │
+┌──────────────────────────────▼────────────────────────────────┐
 │  SERVICE TIER                                                  │
 │  ┌──────────┬──────────┬──────────┬──────────┬─────────────┐  │
 │  │ Conductor│  Atlas   │  Rubric  │  Studio  │   Mesh      │  │
 │  │  gates   │ catalog  │compliance│ language │  agents     │  │
-│  └──────────┴──────────┴──────────┴──────────┴─────────────┘  │
-│  ┌──────────┬──────────┬──────────┬──────────────────────┐    │
-│  │Ingestion │Discovery │  Export  │       Vault          │    │
-│  └──────────┴──────────┴──────────┴──────────────────────┘    │
-└──────┬───────────────────────────────────┬────────────────────┘
-       │                                   │
-┌──────▼──────────┐               ┌────────▼─────────┐
-│  DATA TIER      │               │  WARDEN          │
-│  Postgres       │               │  classify·policy │
-│  Object storage │               │  ↓ only path out │
-│  Vector index   │               └────────┬─────────┘
-│  Job queue      │                        │
-│  Cache          │               ┌────────▼─────────┐
-└─────────────────┘               │  GATEWAY         │
-                                  └────────┬─────────┘
-                                           │
-                              ┌────────────▼────────────┐
-                              │  AI PROVIDERS · ACADEMIC │
-                              │  APIs                    │
-                              └──────────────────────────┘
+│  ┌───────────────────────────────────────────────────────┐    │
+│  │ SERVER-SIDE AI RESOURCE POOL (Premium Subscribers)    │    │
+│  │ Platform Credentials · Server Envelope Vault · Warden │    │
+│  └───────────────────────────┬───────────────────────────┘    │
+└──────┬───────────────────────┼────────────────────────────────┘
+       │                       │
+┌──────▼──────────┐   ┌────────▼─────────┐
+│  DATA TIER      │   │  SERVER GATEWAY  │
+│  Postgres       │   │  Platform AI     │
+│  Object storage │   └────────┬─────────┘
+│  Vector index   │            │
+│  Job queue      │   ┌────────▼────────────────┐
+│  Cache          │   │ PLATFORM AI PROVIDERS   │
+└─────────────────┘   └─────────────────────────┘
 ```
 
 Two properties constrain everything downstream:
 
-1. **The browser holds no secrets and does no heavy work.** Parsing, indexing,
-   embedding, agent execution, compliance evaluation, and export all run
-   server-side. The client is an editor and a view layer.
-2. **The Warden is the only egress path to model providers.** No service calls a
-   provider directly. This is what makes privacy policy enforceable rather than
-   aspirational, and it is enforced architecturally (`13` §4).
+1. **Web-first and local-first execution.** The client handles local editing, local workspace state, and client-side AI execution through the **Client AI Resource Pool** (Local runtimes and BYOK keys via Web Crypto), with minimal egress and zero unnecessary server load. The server is invoked when centralized infrastructure is genuinely needed (identity, authentication, entitlements, optional encrypted sync, and server-side platform AI for premium subscribers).
+2. **Strict user privacy & minimal server knowledge.** The server does not store or observe user BYOK keys, private local AI traffic, or unrequested intermediate workspace states. Non-premium AI execution does not proxy private prompts through the server.
 
 ---
 
@@ -71,7 +73,7 @@ Two properties constrain everything downstream:
 Desk and Pocket share the design system, domain types, API client, and business
 logic. They share no layout shell, no routing tree, and no page components.
 
-Selection is by viewport at the layout-shell level, server-side on first render
+Selection is by viewport at the layout-shell level (`useDeviceClass()`), server-side on first render
 and client-side on resize. A user who drags a window across the 1024 px boundary
 gets a genuine application switch with state preserved.
 
@@ -79,17 +81,16 @@ gets a genuine application switch with state preserved.
 
 | Does | Does not |
 |---|---|
-| Render, and manage layout | Hold API keys |
-| Editor interaction and local buffering | Parse documents |
-| Optimistic updates | Run agents |
-| Cache for offline reading | Evaluate compliance |
-| Stream consumption (SSE) | Call model providers |
+| Render and manage responsive Desk & Pocket layouts | Transmit user BYOK keys to the server |
+| Editor interaction, TipTap authoring, and IndexedDB/localStorage buffering | Store unencrypted private research on the server without request |
+| Client-side AI routing (Local Ollama/LM Studio + Free/BYOK cloud models) | Require a native desktop application shell or native OS IPC |
+| Web Crypto client key vault management (`window.crypto.subtle`) | Require native desktop OS-level keychains or native installers |
+| Stream consumption (SSE) and client-side agentic failover | Send private local-model text across the network |
 
-### 2.3 The edit buffer
+### 2.3 The edit buffer and local persistence
 
-Every keystroke goes to IndexedDB immediately; the server is flushed on a debounce
-(`22` §5.4). This is what makes a browser tab safe for a thesis: a crash, a
-refresh, or a closed lid loses at most a couple of seconds.
+Every keystroke and stage action is buffered locally in IndexedDB / localStorage immediately (`22` §5.4). This is what makes a browser tab safe for a thesis: a crash, a
+refresh, or a closed lid loses at most a couple of seconds without creating unnecessary continuous database load.
 
 ---
 
@@ -104,7 +105,7 @@ refresh, or a closed lid loses at most a couple of seconds.
 | **Mesh** | Agent registry, execution, capability enforcement, versioning |
 | **Ingestion** | Parsing to CDM, OCR, transcription, metadata extraction |
 | **Discovery** | Academic source adapters, ranking, candidate queue |
-| **Vault** | Corpus storage, indexing, retrieval |
+| **Vault** | Vault existence metadata (server: `user_vaults`); private content storage, encryption, and search are **client-side** (`vaultContents.ts` / IndexedDB) |
 | **Export** | Rendering, template application, packaging |
 
 All stateless behind the API tier; state lives in the data tier. Long-running
@@ -116,7 +117,7 @@ work goes to the job queue and reports progress over SSE.
 
 | Store | Holds |
 |---|---|
-| **Postgres** | Projects, drafts, sources, rules, findings, structure, accounts, history |
+| **Postgres / Supabase** | Projects, drafts, sources, rules, findings, structure, accounts, history (durable project persistence required in production; unconfigured production startup fails fast) |
 | **Object storage** | Source files, uploaded media, exports, snapshots |
 | **Vector index** | Embeddings for corpus and Vault semantic search |
 | **Job queue** | Background work: ingestion, indexing, agent runs, export |
@@ -124,16 +125,16 @@ work goes to the job queue and reports progress over SSE.
 
 ### 4.1 Encryption
 
+
 | Data | Approach |
 |---|---|
-| Draft and document content | Encrypted at rest, per-project CEK |
-| Uploaded source files | Encrypted at rest in object storage |
-| User API keys | Encrypted with a key held in a managed KMS, never logged, never returned to the client |
+| User BYOK API keys | Sealed in client Web Crypto vault (`window.crypto.subtle`), never sent to server |
+| Platform AI credentials | Server envelope-encrypted (AES-256-GCM) under server-held `MASTER_KEY` |
+| Draft and document content | Local-first buffered in IndexedDB; synced to PostgreSQL projects |
+| Uploaded source files | Encrypted at rest in storage |
 | Everything else | Encrypted at rest by default |
 
-Revision 1's client-held-key model is withdrawn: it is incompatible with
-server-side processing. `44-DATA-RESIDENCY-AND-PRIVACY.md` states plainly what
-this means and what we do instead.
+User BYOK keys and local AI configurations remain client-side, enforcing zero-knowledge security on the user's private credentials. `44-DATA-RESIDENCY-AND-PRIVACY.md` defines the residency and key boundaries.
 
 ---
 

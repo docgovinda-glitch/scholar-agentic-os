@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedStreamFetch, saveIntakeAnswers } from "../../api";
+import { executeAgenticLLM, saveIntakeAnswers } from "../../api";
 import { useResearchWorkspace } from "../ResearchContext";
+import { buildLiteraturePrompts } from "../agentPrompts/literaturePrompts";
+import { parseJsonFromLlm } from "../../../utils/jsonParser";
+import { AllAiResourcesExhaustedModal } from "../../aiAccess/AllAiResourcesExhaustedModal";
 
 export interface LiteratureItem {
   id: string;
@@ -41,41 +44,20 @@ export default function LiteratureStage({
     }
     return null;
   });
-  const [error, setError] = useState<string | null>(null);
+
+  const [selectedItem, setSelectedItem] = useState<LiteratureItem | null>(null);
   const [expandedAbstractId, setExpandedAbstractId] = useState<string | null>(null);
+  const [removedDois, setRemovedDois] = useState<string[]>([]);
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [removedTitles, setRemovedTitles] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"findings" | "graph" | "themes">("findings");
+  const [error, setError] = useState<string | null>(null);
+  const [exhaustedReason, setExhaustedReason] = useState<string | null>(null);
+  const [showExhaustedModal, setShowExhaustedModal] = useState(false);
 
-  // Excluded / removed items tracking for broadened search
-  const [removedDois, setRemovedDois] = useState<string[]>(() => {
-    if (project?.answers?.["removed_literature"]) {
-      try {
-        const parsed = JSON.parse(project.answers["removed_literature"]);
-        if (Array.isArray(parsed?.removedDois)) return parsed.removedDois;
-      } catch (_) {}
-    }
-    return [];
-  });
-  const [removedIds, setRemovedIds] = useState<string[]>(() => {
-    if (project?.answers?.["removed_literature"]) {
-      try {
-        const parsed = JSON.parse(project.answers["removed_literature"]);
-        if (Array.isArray(parsed?.removedIds)) return parsed.removedIds;
-      } catch (_) {}
-    }
-    return [];
-  });
-  const [removedTitles, setRemovedTitles] = useState<string[]>(() => {
-    if (project?.answers?.["removed_literature"]) {
-      try {
-        const parsed = JSON.parse(project.answers["removed_literature"]);
-        if (Array.isArray(parsed?.removedTitles)) return parsed.removedTitles;
-      } catch (_) {}
-    }
-    return [];
-  });
-
-  // Re-hydrate when project loads from remote or reload
+  // Sync state if answers change externally or on initial load
   useEffect(() => {
-    if (project?.answers?.["discovered_literature"] && !results) {
+    if (project?.answers?.["discovered_literature"]) {
       try {
         const parsed = JSON.parse(project.answers["discovered_literature"]);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -140,119 +122,138 @@ export default function LiteratureStage({
     const excludeTitles = Array.from(new Set([...currentKeptTitles, ...removedTitles]));
 
     try {
-      await authedStreamFetch(
-        `/api/projects/${projectId}/agent/literature`,
-        "POST",
-        {
-          isBroadened,
-          excludeIds,
-          excludeDois,
-          excludeTitles,
-        },
-        (event, data) => {
-          if (event === "log") {
-            setLogs((prev) => [
+      const workingTitle = project?.answers?.["working_title"] || "Untitled Research";
+      const researchArea = project?.answers?.["research_area"] || "the field";
+
+      // 1. Build prompts client-side directly
+      const { systemPrompt, userPrompt } = buildLiteraturePrompts({
+        workingTitle,
+        researchArea,
+        projectAnswers: project?.answers || {},
+        isBroadened,
+        excludeIds,
+        excludeDois,
+        excludeTitles,
+      });
+
+      // 2. Execute via client AI resource pool
+      const rawText = await executeAgenticLLM(
+        systemPrompt,
+        userPrompt,
+        "reasoning",
+        (chunk) => {
+          setLogs((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.message.startsWith("> Agent Reasoning")) return prev;
+            return [
               ...prev,
               {
                 id: Date.now().toString() + Math.random(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
                 level: "info",
-                message: data.message,
+                message: "> Agent Reasoning [streaming JSON analysis]...",
               },
-            ]);
-          } else if (event === "chunk") {
-            setLogs((prev) => {
-              const last = prev[prev.length - 1];
-              if (last && last.message.startsWith("> Agent Reasoning")) return prev;
-              return [
-                ...prev,
-                {
-                  id: Date.now().toString() + Math.random(),
-                  timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                  level: "info",
-                  message: "> Agent Reasoning [streaming JSON analysis]...",
-                },
-              ];
-            });
-            setSourceAgent("Analyzing Literature Corpus...");
-          } else if (event === "done") {
-            const rawItems: LiteratureItem[] = Array.isArray(data.data) ? data.data : [];
-            
-            // Filter out any duplicates against exclusions canonical-first
-            const existingKeptDois = new Set(currentKeptDois.map(d => d.toLowerCase().trim()));
-            const existingKeptIds = new Set(currentKeptIds);
-            const existingKeptTitles = new Set(currentKeptTitles.map(t => t.toLowerCase().trim()));
-            const allRemovedDois = new Set(removedDois.map(d => d.toLowerCase().trim()));
-            const allRemovedTitles = new Set(removedTitles.map(t => t.toLowerCase().trim()));
-
-            const freshItems = rawItems.filter((item) => {
-              if (item.doi && (existingKeptDois.has(item.doi.toLowerCase().trim()) || allRemovedDois.has(item.doi.toLowerCase().trim()))) {
-                return false;
-              }
-              if (item.id && existingKeptIds.has(item.id)) {
-                return false;
-              }
-              if (item.title && (existingKeptTitles.has(item.title.toLowerCase().trim()) || allRemovedTitles.has(item.title.toLowerCase().trim()))) {
-                return false;
-              }
-              return true;
-            });
-
-            const updatedList = results && (isBroadened || results.length > 0) ? [...results, ...freshItems] : freshItems;
-            setResults(updatedList);
-            
-            // Immediate checkpoint persistence to authoritative project answers
-            saveIntakeAnswers(projectId, {
-              discovered_literature: JSON.stringify(updatedList),
-              removed_literature: JSON.stringify({ removedDois, removedIds, removedTitles }),
-              current_stage: "literature",
-            }).catch(() => {});
-
-            const totalCount = updatedList.length;
-            setSourcesDiscovered(totalCount);
-
-            const themesSet = new Set<string>();
-            updatedList.forEach((item) => {
-              if (Array.isArray(item.themes)) {
-                item.themes.forEach((t) => themesSet.add(t));
-              }
-            });
-            setThematicClusters(themesSet.size > 0 ? themesSet.size : Math.max(1, Math.floor(totalCount / 3)));
-
+            ];
+          });
+          setSourceAgent("Analyzing Literature Corpus...");
+        },
+        (failoverEvt) => {
+          if (failoverEvt.userMessage) {
             setLogs((prev) => [
               ...prev,
               {
-                id: Date.now().toString() + "done",
+                id: Date.now().toString() + Math.random(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                level: "success",
-                message: isBroadened
-                  ? `✓ Broadened search complete: added ${freshItems.length} adjacent/interdisciplinary sources.`
-                  : `✓ Discovery complete: ${freshItems.length} primary sources identified.`,
+                level: "warning",
+                message: `⚠️ ${failoverEvt.userMessage}`,
               },
             ]);
-
-            setSourceAgent("Complete ✓");
-            setAnalysisAgent("Complete ✓");
-            setEvidenceAgent("Complete ✓");
-            setKnowledgeAgent("Complete ✓");
-          } else if (event === "error") {
-            throw new Error(data.message || "Agent encountered an error.");
           }
         }
       );
+
+      // 3. Parse JSON from LLM output
+      const parsedData = parseJsonFromLlm(rawText);
+      const rawItems: LiteratureItem[] = parsedData && Array.isArray(parsedData.data) ? parsedData.data : [];
+
+      // Filter out any duplicates against exclusions canonical-first
+      const existingKeptDois = new Set(currentKeptDois.map((d) => d.toLowerCase().trim()));
+      const existingKeptIds = new Set(currentKeptIds);
+      const existingKeptTitles = new Set(currentKeptTitles.map((t) => t.toLowerCase().trim()));
+      const allRemovedDois = new Set(removedDois.map((d) => d.toLowerCase().trim()));
+      const allRemovedTitles = new Set(removedTitles.map((t) => t.toLowerCase().trim()));
+
+      const freshItems = rawItems.filter((item) => {
+        if (item.doi && (existingKeptDois.has(item.doi.toLowerCase().trim()) || allRemovedDois.has(item.doi.toLowerCase().trim()))) {
+          return false;
+        }
+        if (item.id && existingKeptIds.has(item.id)) {
+          return false;
+        }
+        if (item.title && (existingKeptTitles.has(item.title.toLowerCase().trim()) || allRemovedTitles.has(item.title.toLowerCase().trim()))) {
+          return false;
+        }
+        return true;
+      });
+
+      const updatedList = results && (isBroadened || results.length > 0) ? [...results, ...freshItems] : freshItems;
+      setResults(updatedList);
+
+      // 4. Immediate discrete checkpoint persistence to authoritative project answers
+      saveIntakeAnswers(projectId, {
+        discovered_literature: JSON.stringify(updatedList),
+        removed_literature: JSON.stringify({ removedDois, removedIds, removedTitles }),
+        current_stage: "literature",
+      }).catch(() => {});
+
+      const totalCount = updatedList.length;
+      setSourcesDiscovered(totalCount);
+
+      const themesSet = new Set<string>();
+      updatedList.forEach((item) => {
+        if (Array.isArray(item.themes)) {
+          item.themes.forEach((t) => themesSet.add(t));
+        }
+      });
+      setThematicClusters(themesSet.size > 0 ? themesSet.size : Math.max(1, Math.floor(totalCount / 3)));
+
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + "done",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "success",
+          message: isBroadened
+            ? `✓ Broadened search complete: added ${freshItems.length} adjacent/interdisciplinary sources.`
+            : `✓ Discovery complete: ${freshItems.length} primary sources identified.`,
+        },
+      ]);
+
+      setSourceAgent("Complete ✓");
+      setAnalysisAgent("Complete ✓");
+      setEvidenceAgent("Complete ✓");
+      setKnowledgeAgent("Complete ✓");
     } catch (err: any) {
-      setError(err.message);
+      const errMsg = err.message || "Failed to discover literature.";
+      setError(errMsg);
       setLogs((prev) => [
         ...prev,
         {
           id: Date.now().toString() + "err",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
           level: "error",
-          message: err.message,
+          message: `❌ ${errMsg}`,
         },
       ]);
       setSourceAgent("Failed");
-      setAnalysisAgent("Failed");
+      setAnalysisAgent("Halted");
+      setEvidenceAgent("Halted");
+      setKnowledgeAgent("Halted");
+
+      if (errMsg.includes("No AI providers") || errMsg.includes("unavailable") || errMsg.includes("exhausted")) {
+        setExhaustedReason(errMsg);
+        setShowExhaustedModal(true);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -567,6 +568,16 @@ export default function LiteratureStage({
           </div>
         )}
       </div>
+
+      <AllAiResourcesExhaustedModal
+        isOpen={showExhaustedModal}
+        onClose={() => setShowExhaustedModal(false)}
+        onOpenAiSettings={() => {
+          setShowExhaustedModal(false);
+          window.location.hash = "#/ai-access";
+        }}
+        reason={exhaustedReason || undefined}
+      />
     </div>
   );
 }

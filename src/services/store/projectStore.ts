@@ -86,6 +86,14 @@ function resolveStore(): ProjectStore {
     return createPgProjectStore(createPool());
   }
 
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[FATAL: Durable Persistence Required] Production cannot start with ephemeral in-memory project storage. " +
+        "User projects would be permanently lost on container restart. Configure a durable persistence backend using " +
+        "VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (preferred) or DATABASE_URL."
+    );
+  }
+
   console.warn(
     "services/store: NO durable backend configured — falling back to the in-memory store. " +
       "Projects will be lost on every restart. Set VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY " +

@@ -10,28 +10,22 @@ deletion.
 
 ## 1. Security posture
 
-**Revision 2 changes this posture materially and the change is stated plainly.**
+Scholar OS enforces a strict **two-pool key custody and local-first security architecture**:
 
-Revision 1 excluded the operator by construction — content was encrypted with
-client-held keys and we could not decrypt it. A web application cannot do that
-while processing documents server-side.
-
-Revision 2's posture: **the operator holds the keys, and access is constrained by
-controls rather than by mathematics.** Encryption at rest via managed KMS, no
-routine staff access path, break-glass only with two-person approval, and
-mandatory notification of the affected user (`44` §4).
-
-This is weaker than revision 1 and stronger than the category norm. `44` §11
-records the trade-off.
+1. **User-Owned Secrets (Client-Held Encrypted Storage):** User BYOK API credentials (Gemini, Cerebras, Groq, Anthropic, OpenAI, etc.) and local runtime configs are stored strictly on the client. They are encrypted using the browser's Web Crypto API (`window.crypto.subtle` AES-GCM device-bound key). **Under normal application operation, Scholar's server does not receive or store raw user BYOK credentials.** The browser/device remains part of the trusted client environment. Server-side custody of user BYOK keys is retired. True passphrase-derived zero-knowledge custody remains a future enhancement.
+2. **Platform-Owned Secrets (Server Envelope Vault):** Platform-managed AI credentials (for centralized infrastructure and admin operations) are stored server-side under AES-256-GCM envelope encryption (`public.platform_provider_credentials`), wrapped by a server-held `MASTER_KEY`.
+3. **Strict Boundary:** User-owned secrets and platform-owned secrets are completely isolated and never mixed.
 
 | Property | How |
 |---|---|
-| Zero-knowledge for content | E2E encryption with client-held keys |
+| Client-held user BYOK keys | Client-side Web Crypto encrypted storage; keys never transmitted to the server |
+| Zero server egress for local AI | Local runtimes execute on `localhost`; text never leaves the user's device |
+| Platform key protection | Server AES-256-GCM envelope encryption with per-credential CEK |
 | Least privilege | Capability tokens for agents and plugins |
-| Defence in depth | Process isolation, sandboxing, encryption, egress control |
+| Defence in depth | Process isolation, sandboxing, encryption, client-side egress control |
 | Fail closed | An undecidable security decision denies |
-| Auditable | Local audit log the user can read |
-| No security by obscurity | The design is documented here; its strength is the crypto and the architecture |
+| Auditable | Client and server audit logs |
+| No security by obscurity | Design documented openly; strength is derived from cryptography and strict boundary architecture |
 
 ---
 
@@ -43,7 +37,7 @@ records the trade-off.
 |---|---|---|
 | Unpublished manuscripts | **Critical** | Career-defining, embargoed, sometimes under ethics approval |
 | Research data | **Critical** | May include participant data under IRB/GDPR |
-| Vault contents | **Critical** | Years of accumulated work |
+| Vault contents | **Critical** | Years of accumulated work; **client-held passphrase-encrypted in IndexedDB** — server holds only existence metadata (`user_id, label, created_at`) |
 | API keys | High | Financial exposure |
 | Provenance Ledger | High | Evidentiary value |
 | Account credentials | High | Access to sync |
@@ -105,7 +99,10 @@ Per `40` §3. Controls at each:
 | Event log | AES-256-GCM | Project CEK |
 | Ledger | AES-256-GCM + hash chain | Project CEK |
 | Settings | AES-256-GCM | Workspace CEK |
-| API keys | Platform keystore (OS-native) | OS-managed |
+| User BYOK API keys | Client Web Crypto Vault (AES-GCM / PBKDF2) | Browser client-held key (never sent to server) |
+| Platform AI credentials | Server Envelope Encryption (AES-256-GCM) | Server Master Key (accessible only by admin service_role) |
+
+> **Historical Note [SUPERSEDED]:** Revision 1 specified sealing master keys to native desktop platform keystores (macOS Keychain, Windows DPAPI, TPM). In the Web/PWA architecture, client credentials reside in the browser's encrypted Web Crypto vault (`window.crypto.subtle`).
 
 ### 4.2 In transit
 
@@ -115,9 +112,8 @@ under our release cadence, and pinning would break users).
 
 ### 4.3 In use
 
-Decrypted only in service tier memory, for the minimum duration. Keys are
-zeroed after use where the runtime permits. The index is decrypted in memory
-during search, which is the documented trade-off in `43` §9.1.
+Decrypted only in client memory (for user BYOK keys and local state) or service tier memory (for platform operations), for the minimum duration. Keys are
+zeroed after use where the runtime permits.
 
 ---
 
@@ -127,27 +123,24 @@ during search, which is the documented trade-off in `43` §9.1.
 
 ```
 User passphrase
-      │ Argon2id (memory-hard, tuned to ~1 s on baseline hardware)
+      │ PBKDF2 / Argon2id
       ▼
- Key Encryption Key ──┐
-                      │ wraps
-                      ▼
-                 Master Key  ──── sealed to platform keystore where available
-                      │             (Keychain / DPAPI / TPM)
-                      │ wraps
-        ┌─────────────┼─────────────┐
-        ▼             ▼             ▼
-   Workspace CEK  Project CEK   Vault CEK
-        │             │             │
-        └──────► per-object CEKs ◄──┘
+ Client Key Encryption Key (Web Crypto SubtleCrypto)
+      │ wraps
+      ▼
+ Client Storage Vault (localStorage / IndexedDB encrypted records)
+      │ wraps
+ ┌────┴──────────────────────────┐
+ ▼                               ▼
+User BYOK Provider Keys     Vault Content CEKs
 ```
 
 ### 5.2 Properties
 
 | Property | Statement |
 |---|---|
-| Derivation | Argon2id with per-user salt; parameters tuned to ~1 s on baseline hardware |
-| Platform sealing | Master Key sealed to the OS keystore so the passphrase is not needed every launch |
+| Derivation | PBKDF2 / Argon2id with per-user salt; parameters tuned to ~1 s on baseline hardware |
+| Client sealing | Master Key sealed to browser Web Crypto storage so the passphrase is not needed every page load |
 | Rotation | Passphrase change re-wraps the Master Key; CEKs are untouched (fast) |
 | Compromise | Full re-encryption available, with time stated |
 | Multi-device | Each device derives independently; keys never transmitted |
@@ -159,18 +152,17 @@ User passphrase
 
 | Rule | Statement |
 |---|---|
-| Stored in the OS keystore | Keychain, Credential Manager, Secret Service |
+| Stored in client Web Crypto vault | Browser Web Crypto API (SubtleCrypto AES-GCM / PBKDF2) |
 | Never in application config files | |
 | Never transmitted to the operator | Not for validation, not for proxying, not for support |
 | Never logged | Redacted at the logging layer, not by convention |
 | Never in crash dumps or diagnostics | Explicitly excluded |
-| Never in sync | Keys do not sync; each device is configured separately |
+| Never in sync | User BYOK keys do not sync; each device is configured separately |
 | Displayed masked | Last four characters only, with an explicit reveal |
 
-**The current architecture proxies AI calls through the server, which requires
-the server to hold or receive keys** (`src/services/apiVault.ts`,
-`resolveApiKey`, `decryptServerKey`). That is retired. Clients call providers
-directly.
+**User BYOK credentials never reach the server** (`src/services/providerKeys.ts`,
+`src/services/userAiSettings.ts`). Clients call providers
+directly via the client-side AI resource pool.
 
 ---
 
@@ -436,11 +428,11 @@ prevent the two failures that would quietly invalidate the whole model.
 
 | Current | Target |
 |---|---|
-| Server holds and decrypts user API keys | Keys in the OS keystore; never transmitted |
+| Server holds and decrypts user API keys | Keys in client Web Crypto vault; never transmitted to server |
 | Server-side user data | Local, encrypted, operator-inaccessible |
 | No E2E encryption | E2E for all synced content |
 | `services/capabilities` issues/verifies/revokes tokens against the real §4.1 capability set (`src/services/capabilities/`); `write:draft` refused at issuance, non-transferable, revocable, scopable | Wired as the actual enforcement point at every agent/plugin call boundary — no caller does that yet, since `app/mesh` (the agent runtime) doesn't exist yet |
-| `services/crypto` (`src/services/crypto/`) provides working AES-256-GCM envelope encryption — generate/wrap/unwrap a CEK, encrypt/decrypt — against a server-held `MASTER_KEY` env var | §5.1's full hierarchy: passphrase-derived, Argon2id, sealed to the OS platform keystore, operator access none |
+| `services/crypto` (`src/services/crypto/`) provides working AES-256-GCM envelope encryption — generate/wrap/unwrap a CEK, encrypt/decrypt — against a server-held `MASTER_KEY` env var | §5.1's full hierarchy: client-passphrase-derived, sealed to browser Web Crypto storage, operator access none |
 | No plugin sandbox | WASM sandbox |
 | No egress control | The Warden |
 | Supabase RLS in place | **Carries forward** — correct approach for the cloud plane |
