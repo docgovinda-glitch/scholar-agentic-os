@@ -81,20 +81,9 @@ export async function signUp(input: SignUpInput): Promise<ServiceResult> {
     if (!input.captchaToken) {
       return { success: false, error: "Please complete the CAPTCHA challenge before creating your account." };
     }
-    try {
-      const verifyResponse = await fetch("/api/auth/verify-signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ captchaToken: input.captchaToken }),
-      });
-
-      if (!verifyResponse.ok) {
-        const errorData = (await verifyResponse.json().catch(() => ({}))) as { error?: string };
-        return { success: false, error: errorData.error || "CAPTCHA verification failed. Please try again." };
-      }
-    } catch (error) {
-      return { success: false, error: `CAPTCHA verification error: ${error instanceof Error ? error.message : "unknown"}` };
-    }
+    // The token is validated server-side by Supabase. We no longer verify it here
+    // as Cloudflare Turnstile tokens are single-use and doing so would burn the
+    // token before Supabase can consume it.
   }
 
   const supabase = getSupabaseClient();

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams, useOutletContext } from "react-router-dom";
 import AccountSettingsScreen from "./account/AccountSettingsScreen";
 import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
-import { RequireAuth, PublicOnly, RequireRecovery } from "./DeskAuthGate";
+import { RequireAuth, PublicOnly, RequireRecovery, RequireOnboarding } from "./DeskAuthGate";
 import {
   LandingRoute,
   SignInRoute,
@@ -12,6 +12,7 @@ import {
   RegisteredRoute,
   ResendVerificationRoute,
   VerifyEmailRoute,
+  OnboardingRoute,
 } from "./auth/AuthFlow";
 import DeskShell, { type DeskShellView } from "./DeskShell";
 import ResearchWorkspace from "./workspace/ResearchWorkspace";
@@ -332,15 +333,18 @@ export default function DeskApp() {
         />
         <Route path="/verify-email" element={<VerifyEmailRoute />} />
         <Route path="/*" element={<RequireAuth />}>
-          <Route element={<OnboardingGate />}>
-            <Route path="projects" element={<ProjectsIndexRoute />} />
-            <Route path="projects/:projectId" element={<ProjectRoute />} />
-            <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
-            <Route path="settings" element={<SettingsRoute />} />
-            <Route path="vault" element={<VaultRoute />} />
-            <Route path="ai-access" element={<AiAccessRoute />} />
-            <Route path="ai-access/:section" element={<AiAccessRoute />} />
-            <Route path="*" element={<Navigate to="/projects" replace />} />
+          <Route path="onboarding" element={<OnboardingRoute />} />
+          <Route element={<RequireOnboarding />}>
+            <Route element={<OnboardingGate />}>
+              <Route path="projects" element={<ProjectsIndexRoute />} />
+              <Route path="projects/:projectId" element={<ProjectRoute />} />
+              <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
+              <Route path="settings" element={<SettingsRoute />} />
+              <Route path="vault" element={<VaultRoute />} />
+              <Route path="ai-access" element={<AiAccessRoute />} />
+              <Route path="ai-access/:section" element={<AiAccessRoute />} />
+              <Route path="*" element={<Navigate to="/projects" replace />} />
+            </Route>
           </Route>
         </Route>
       </Routes>

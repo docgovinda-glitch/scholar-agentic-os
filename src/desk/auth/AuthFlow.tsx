@@ -9,6 +9,8 @@ import {
   checkUsernameAvailable,
   checkEmailAvailable,
   checkPhoneAvailable,
+  signInWithGoogle,
+  saveProfileFields,
 } from "../../services/supabaseAuthService";
 import { useDeskSession } from "../useDeskSession";
 import { SessionBoundaryFallback } from "../DeskAuthGate";
@@ -24,6 +26,8 @@ import {
   PhoneField,
   SelectField,
   SubmitButton,
+  AuthDivider,
+  GoogleSignInButton,
 } from "./AuthLayout";
 import {
   EMPTY_SIGN_UP,
@@ -132,6 +136,11 @@ export function ResendVerificationRoute() {
   return <ResendVerificationScreen email={email} onBack={() => navigate("/signup/check-email", { state: { email } })} />;
 }
 
+export function OnboardingRoute() {
+  const navigate = useNavigate();
+  return <OnboardingScreen onDone={() => navigate("/projects", { replace: true })} />;
+}
+
 /**
  * /verify-email — self-guarding, like RequireAuth/PublicOnly/RequireRecovery
  * in DeskAuthGate.tsx, but kept here rather than made a fourth generic
@@ -173,6 +182,7 @@ function SignInScreen({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent) {
@@ -188,6 +198,22 @@ function SignInScreen({
       setError((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setGoogleBusy(true);
+    setError(null);
+    try {
+      const result = await signInWithGoogle();
+      if (!result.success) {
+        setError(result.error ?? "Could not sign in with Google.");
+        setGoogleBusy(false);
+      }
+      // If success, the browser will redirect to Google, so we leave busy=true
+    } catch (e) {
+      setError((e as Error).message);
+      setGoogleBusy(false);
     }
   }
 
@@ -222,10 +248,17 @@ function SignInScreen({
         */}
         <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
-        <SubmitButton busy={busy} busyLabel="Signing in…" disabled={!username.trim() || !password}>
+        <SubmitButton busy={busy} busyLabel="Signing in…" disabled={!username.trim() || !password || googleBusy}>
           Sign in
         </SubmitButton>
       </AuthForm>
+
+      <div className="mt-4">
+        <AuthDivider />
+      </div>
+      <div className="mt-4">
+        <GoogleSignInButton onClick={handleGoogleSignIn} busy={googleBusy} />
+      </div>
       <div className="mt-6 flex flex-col items-start gap-2">
         <AuthLink onClick={onForgot}>Forgot your password?</AuthLink>
         <AuthLink onClick={onRegister}>Create an account</AuthLink>
@@ -615,20 +648,70 @@ function EmailVerificationSuccessScreen({ email, onContinue }: { email?: string 
 
 function ResendVerificationScreen({ email, onBack }: { email: string; onBack: () => void }) {
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleResend() {
-    if (!email) return;
     setBusy(true);
-    setMessage(null);
     setError(null);
     try {
-      const result = await resendVerificationEmail({ email: email.trim() });
+      const result = await resendVerificationEmail(email);
+      if (result.success) onBack(); // back to the "Check your email" screen
+      else setError(result.error ?? "Could not resend the email. Please wait a few minutes and try again.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthShell>
+      <AuthHeading title="Resend verification email" subtitle={`Send a new link to ${email}`} />
+      {error && (
+        <div className="mb-6">
+          <AuthError>{error}</AuthError>
+        </div>
+      )}
+      <div className="flex flex-col gap-4">
+        <SubmitButton busy={busy} busyLabel="Sending…" disabled={!email} onClick={handleResend}>
+          Send email
+        </SubmitButton>
+        <div className="mt-2 text-center">
+          <AuthLink onClick={onBack}>Back</AuthLink>
+        </div>
+      </div>
+    </AuthShell>
+  );
+}
+
+function OnboardingScreen({ onDone }: { onDone: () => void }) {
+  const [userType, setUserType] = useState<string>("");
+  const [educationLevel, setEducationLevel] = useState<string>("");
+  const [affiliation, setAffiliation] = useState("");
+  const [phoneState, setPhoneState] = useState<{ number: string; code: string }>({ number: "", code: "" });
+  
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const parsedPhone = normalizeE164(phoneState.code, phoneState.number);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await saveProfileFields({
+        userType,
+        educationLevel,
+        affiliation: affiliation.trim(),
+        phone: parsedPhone?.e164 || "",
+        phoneCountryCode: parsedPhone ? `+${parsedPhone.dialCode}` : "",
+      });
+
       if (result.success) {
-        setMessage("Verification email resent! Check your inbox.");
+        onDone();
       } else {
-        setError(result.error ?? "Could not resend the email.");
+        setError(result.error ?? "Could not save your profile details.");
       }
     } catch (e) {
       setError((e as Error).message);
@@ -639,24 +722,52 @@ function ResendVerificationScreen({ email, onBack }: { email: string; onBack: ()
 
   return (
     <AuthShell>
-      <AuthHeading title="Resend verification email" />
-      <AuthNotice>
-        We'll send another verification email to <strong>{email}</strong>.
-      </AuthNotice>
-      <AuthForm onSubmit={(e) => { e.preventDefault(); handleResend(); }}>
-        {message && <AuthNotice>{message}</AuthNotice>}
+      <AuthHeading 
+        title="Complete your profile" 
+        subtitle="Before you start researching, please tell us a bit about yourself." 
+      />
+      <AuthForm onSubmit={handleSubmit}>
+        <SelectField
+          id="user_type"
+          label="Role"
+          value={userType}
+          onChange={setUserType}
+          options={USER_TYPES}
+          placeholder="Select your role…"
+        />
+        <SelectField
+          id="education_level"
+          label="Highest education level"
+          value={educationLevel}
+          onChange={setEducationLevel}
+          options={EDUCATION_LEVELS}
+          placeholder="Select education level…"
+        />
+        <Field
+          id="affiliation"
+          label="Institution or Company"
+          value={affiliation}
+          onChange={setAffiliation}
+          hint="Optional. Where do you study or work?"
+          required={false}
+        />
+        <PhoneField
+          id="phone"
+          label="Mobile number"
+          number={phoneState.number}
+          onNumberChange={(n) => setPhoneState((s) => ({ ...s, number: n }))}
+          selectedCode={phoneState.code}
+          onCountryCodeChange={(c) => setPhoneState((s) => ({ ...s, code: c }))}
+          required={false}
+          hint="Optional. Used for SMS recovery."
+        />
+        
         {error && <AuthError>{error}</AuthError>}
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
-        >
-          {busy ? "Sending…" : "Resend email"}
-        </button>
+        
+        <SubmitButton busy={busy} busyLabel="Saving…" disabled={!userType || !educationLevel}>
+          Continue to Scholar Core
+        </SubmitButton>
       </AuthForm>
-      <div className="mt-6">
-        <AuthLink onClick={onBack}>Back</AuthLink>
-      </div>
     </AuthShell>
   );
 }

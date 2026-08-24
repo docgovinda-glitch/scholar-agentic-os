@@ -98,23 +98,9 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
 
       expect(result.success).toBe(true);
       expect(mockAuth.signUp).toHaveBeenCalled();
-      expect(global.fetch).toHaveBeenCalledWith(
-        "/api/auth/verify-signup",
-        expect.objectContaining({
-          method: "POST",
-          body: expect.stringContaining("valid_captcha_token"),
-        })
-      );
     });
 
-    it("rejects signup when CAPTCHA verification fails", async () => {
-      // Mock CAPTCHA verification endpoint returning failure
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve({ success: false, error: "CAPTCHA verification failed" }),
-      });
-
+    it("rejects signup when CAPTCHA is missing but enabled", async () => {
       const result = await signUp({
         username: "testuser",
         fullName: "Test User",
@@ -125,12 +111,11 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
       educationLevel: "undergraduate",
         affiliation: "Test University",
         password: "TestPassword123!",
-        captchaToken: "invalid_captcha_token",
+        captchaToken: "",
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("CAPTCHA");
-      // Supabase signup should NOT be called if CAPTCHA fails
+      expect(result.error).toContain("Please complete the CAPTCHA");
       expect(mockAuth.signUp).not.toHaveBeenCalled();
     });
 

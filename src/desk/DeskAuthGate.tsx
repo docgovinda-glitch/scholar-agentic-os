@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useSearchParams } from "react-router-dom";
 import { useDeskSession } from "./useDeskSession";
+import { getProfile } from "../services/supabaseAuthService";
 
 /**
  * Route guards for Desk's authentication boundary.
@@ -136,3 +138,57 @@ function Centered({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+/**
+ * Ensures the authenticated user has completed their profile (i.e. onboarding).
+ * If essential fields are missing (e.g. from a fresh Google OAuth signup),
+ * they are redirected to /onboarding.
+ */
+export function RequireOnboarding() {
+  const [status, setStatus] = useState<"loading" | "complete" | "incomplete">("loading");
+  const session = useDeskSession();
+
+  useEffect(() => {
+    // Only check if we are actually signed in
+    if (session.status !== "signed-in") return;
+
+    let active = true;
+    getProfile().then((res) => {
+      if (!active) return;
+      if (!res.success) {
+        // If we can't fetch it, we might be signed out or offline. 
+        // We'll let RequireAuth handle the signed-out case.
+        setStatus("complete"); 
+        return;
+      }
+      
+      const { userType, educationLevel } = res.profile;
+      // These are the core fields that regular sign-up collects but Google does not.
+      if (!userType || !educationLevel) {
+        setStatus("incomplete");
+      } else {
+        setStatus("complete");
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [session.status]);
+
+  if (session.status !== "signed-in") {
+    // Let RequireAuth handle the redirect
+    return <Outlet />;
+  }
+
+  if (status === "loading") {
+    return <SessionBoundaryFallback status="loading" />;
+  }
+
+  if (status === "incomplete") {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return <Outlet />;
+}
+
