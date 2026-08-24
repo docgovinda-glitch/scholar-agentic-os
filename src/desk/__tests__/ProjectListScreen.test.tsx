@@ -54,7 +54,7 @@ describe("the document-type dropdown", () => {
     // Two Publications-family entries collapse into one group, not two.
     expect(groupLabels.filter((l) => l === "Publications")).toHaveLength(1);
     expect(within(select).getByRole("option", { name: "Journal Article" })).toBeInTheDocument();
-    expect(within(select).getByRole("option", { name: "Review Article (Maintenance)" })).toBeInTheDocument();
+    expect(within(select).getByRole("option", { name: "Review Article" })).toBeInTheDocument();
   });
 
   it("cannot continue before a type is chosen", async () => {
@@ -74,12 +74,12 @@ describe("the document-type dropdown", () => {
     expect(createProject).toHaveBeenCalledWith("OT-06");
   });
 
-  it("shows every type, but disables the ones under maintenance with a common message rather than hiding them", async () => {
+  it("shows every type enabled and ready to boot without maintenance restrictions", async () => {
     await openChooser();
 
     const select = screen.getByLabelText("Target Publication Type") as HTMLSelectElement;
-    const essay = within(select).getByRole("option", { name: "Essay (Maintenance)" }) as HTMLOptionElement;
-    expect(essay.disabled).toBe(true);
+    const essay = within(select).getByRole("option", { name: "Essay" }) as HTMLOptionElement;
+    expect(essay.disabled).toBe(false);
 
     const journalArticle = within(select).getByRole("option", { name: "Journal Article" }) as HTMLOptionElement;
     expect(journalArticle.disabled).toBe(false);

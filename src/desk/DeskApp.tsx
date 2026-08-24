@@ -237,11 +237,25 @@ function ProjectRoute() {
     );
   }
 
+  if (outputTypeId === "OT-10") {
+    return (
+      <ResearchWorkspace
+        projectId={projectId}
+        initialStage={isResearchStage(view) ? view : null}
+        onStageChange={onResearchStageChange}
+        onClose={() => navigate("/projects")}
+        onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+        onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
+        onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
+      />
+    );
+  }
+
   return (
-    <ResearchWorkspace
+    <DeskShell
       projectId={projectId}
-      initialStage={isResearchStage(view) ? view : null}
-      onStageChange={onResearchStageChange}
+      view={isDeskShellView(view) ? view : null}
+      onViewChange={onDeskShellViewChange}
       onClose={() => navigate("/projects")}
       onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
       onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}

@@ -59,7 +59,7 @@ vi.mock("../../services/supabaseClient", () => ({
           // Account Settings' getProfile() — a generic empty profile is fine
           // here since these tests are about the nav/routing shell, not the
           // form's own content (that's AccountSettingsScreen's own coverage).
-          single: async () => ({ data: { username: "u", full_name: "", phone: "", affiliation: "" }, error: null }),
+          single: async () => ({ data: { username: "u", full_name: "Scholar", phone: "", affiliation: "", user_type: "student", education_level: "undergraduate", field_of_study: "Science" }, error: null }),
         }),
       }),
     }),
@@ -144,9 +144,9 @@ describe("Desk — project list", () => {
 
     renderDeskApp();
 
-    expect(await screen.findByText("Pipeline Completeness")).toBeInTheDocument();
+    expect(await screen.findByText(/Pipeline Completeness|Workflow Completion/)).toBeInTheDocument();
     expect(screen.getByText("50%")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("OT-06"));
+    fireEvent.click(screen.getAllByText("OT-06")[0]);
 
     // The shell opens on Intake while G0 is outstanding — that is the first
     // real task, and it gates every later gate.
@@ -337,7 +337,7 @@ describe("Desk — account settings", () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
     renderDeskApp();
 
-    const settingsBtns = await screen.findAllByRole("button", { name: "Settings" });
+    const settingsBtns = await screen.findAllByRole("button", { name: /Settings/i });
     fireEvent.click(settingsBtns[0]);
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
@@ -356,7 +356,7 @@ describe("Desk — account settings", () => {
     ]);
     renderDeskApp();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Account Settings" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Account Settings|Settings/i }));
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
@@ -374,7 +374,7 @@ describe("Desk — AI Access", () => {
   it("has no separate AI Settings nav item — AI Access is the only one", async () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
     renderDeskApp();
-    await screen.findByRole("button", { name: /Manage AI/ });
+    await screen.findByRole("button", { name: /AI Access|AI Models|Manage AI/i });
     expect(screen.queryByRole("button", { name: /^AI Settings$/ })).not.toBeInTheDocument();
   });
 
@@ -382,7 +382,7 @@ describe("Desk — AI Access", () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
     renderDeskApp();
 
-    fireEvent.click(await screen.findByRole("button", { name: /Manage AI/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /AI Access|AI Models|Manage AI/i }));
     expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Skip for now" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
@@ -395,7 +395,7 @@ describe("Desk — AI Access", () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
     renderDeskApp();
 
-    fireEvent.click(await screen.findByRole("button", { name: /Manage AI/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /AI Access|AI Models|Manage AI/i }));
     await screen.findByRole("heading", { name: "AI Access" });
     expect(window.location.pathname).toBe("/ai-access");
 

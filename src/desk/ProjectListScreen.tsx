@@ -52,19 +52,28 @@ export default function ProjectListScreen({
   }, []);
 
   const load = useCallback(() => {
+    setError(null);
     listProjects()
       .then((r) => setProjects(r.items))
       .catch((e) => setError((e as Error).message));
   }, []);
 
-  useEffect(load, [load]);
-
-  // Load output types
   useEffect(() => {
-    if (!choosing && types) return;
+    load();
+  }, [load]);
+
+  // Load output types lazily when user clicks New Project
+  useEffect(() => {
+    if (!choosing || types !== null) return;
+    let active = true;
     listOutputTypes()
-      .then((r) => setTypes(r.items))
-      .catch((e) => setError((e as Error).message));
+      .then((r) => {
+        if (active) setTypes(r.items);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [choosing, types]);
 
   const typeMap = useMemo(() => {
@@ -182,6 +191,7 @@ export default function ProjectListScreen({
             {onOpenAiAccess && (
               <button
                 onClick={onOpenAiAccess}
+                aria-label="Manage AI Access"
                 className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-raised)] border border-transparent hover:border-[color:var(--border-subtle)] transition-all cursor-pointer"
               >
                 <svg className="w-4 h-4 text-[color:var(--state-info)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -193,6 +203,7 @@ export default function ProjectListScreen({
             {onOpenAccountSettings && (
               <button
                 onClick={onOpenAccountSettings}
+                aria-label="Account Settings"
                 className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-raised)] border border-transparent hover:border-[color:var(--border-subtle)] transition-all cursor-pointer"
               >
                 <svg className="w-4 h-4 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -531,10 +542,28 @@ export default function ProjectListScreen({
               </div>
 
               {projects === null ? (
-                <div className="flex flex-col justify-center items-center py-24">
-                  <div className="w-10 h-10 border-3 border-[color:var(--border-subtle)] border-t-[color:var(--accent)] rounded-full animate-spin mb-4" />
-                  <span className="text-xs font-medium text-[color:var(--text-muted)]">Loading your manuscripts...</span>
-                </div>
+                error ? (
+                  <div className="flex flex-col justify-center items-center py-20 text-center">
+                    <div className="w-12 h-12 rounded-full bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] flex items-center justify-center mb-4">
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-semibold text-[color:var(--text-primary)] mb-1">Failed to load manuscripts</p>
+                    <p className="text-xs text-[color:var(--text-secondary)] max-w-sm mb-4">{error}</p>
+                    <button
+                      onClick={load}
+                      className="px-5 py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
+                    >
+                      Retry Connection
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col justify-center items-center py-24">
+                    <div className="w-10 h-10 border-3 border-[color:var(--border-subtle)] border-t-[color:var(--accent)] rounded-full animate-spin mb-4" />
+                    <span className="text-xs font-medium text-[color:var(--text-muted)]">Loading your manuscripts...</span>
+                  </div>
+                )
               ) : projects.length === 0 ? (
                 <EmptyState onStart={() => setChoosing(true)} />
               ) : filteredProjects.length === 0 ? (
