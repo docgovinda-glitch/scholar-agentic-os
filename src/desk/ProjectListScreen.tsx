@@ -285,7 +285,7 @@ export default function ProjectListScreen({
                   title="Projects"
                   desc="Active research workflows and manuscripts."
                   action="Initialize Project"
-                  onClick={onStart}
+                  onClick={() => setChoosing(true)}
                   bg="bg-[color:var(--state-info-subtle)]"
                   iconColor="text-[color:var(--state-info)]"
                 />

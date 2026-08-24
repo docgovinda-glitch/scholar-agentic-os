@@ -253,10 +253,14 @@ Return ONLY valid JSON in this exact format:
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             project_id: project.projectId,
+            source_id: `src-vault-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             title: src.title || "Untitled Vault Source",
             authors: Array.isArray(src.authors) ? src.authors : [src.author || "Unknown Author"],
             year: typeof src.year === "number" ? src.year : (parseInt(src.year, 10) || new Date().getFullYear()),
             source_type: "vault",
+            authority_tier: "Primary",
+            discovered_via: "Agentic Vault Search",
+            discovered_at: new Date().toISOString(),
             relevance_score: typeof src.relevance_score === "number" ? src.relevance_score : 90,
             themes: Array.isArray(src.themes) ? src.themes : [],
             abstract: src.snippet || src.type || ""
