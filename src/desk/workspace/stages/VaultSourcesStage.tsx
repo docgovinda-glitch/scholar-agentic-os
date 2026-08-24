@@ -46,62 +46,50 @@ export default function VaultSourcesStage({
       },
     ]);
 
-    const logInterval = setInterval(() => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + Math.random(),
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "action",
-          message: [
-            "Indexing Knowledge Vault for title keywords...",
-            "Computing semantic similarity scores across personal PDFs...",
-            "Filtering out obsolete methodology papers...",
-            "Cross-referencing author citations within vault...",
-          ][Math.floor(Math.random() * 4)],
-        },
-      ]);
-    }, 800);
-
     try {
-      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/vault-sources`, "POST", {});
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/vault-sources`,
+        "POST",
+        {},
+        async (event, data) => {
+          if (event === "log" || event === "chunk") {
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + Math.random(),
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: event === "chunk" ? "action" : "info",
+                message: data.message || data.chunk || JSON.stringify(data),
+              },
+            ]);
+          } else if (event === "done") {
+            setResults(data.data);
+            
+            try {
+              const newAnswers = {
+                ...project.answers,
+                pending_vault_sources: JSON.stringify(data.data),
+              };
+              const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+              onSaved(updatedProject);
+            } catch (saveErr) {
+              console.error("Failed to save pending vault sources", saveErr);
+            }
 
-      const resJson = await response.json();
-      if (!response.ok) {
-        throw new Error(resJson.error || "Agent encountered an error scanning the vault.");
-      }
-      const { data } = resJson;
-      setResults(data);
-      
-      // Auto-save the results to pending vault sources
-      try {
-        const newAnswers = {
-          ...project.answers,
-          pending_vault_sources: JSON.stringify(data),
-        };
-        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-        onSaved(updatedProject);
-      } catch (saveErr) {
-        console.error("Failed to save pending vault sources", saveErr);
-      }
-
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + "done",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Scan complete. Found ${data.length} highly relevant primary sources. Preparing for approval triage...`,
-        },
-      ]);
-      
-      // Auto-advance after a short delay
-      setTimeout(() => {
-        if (onAdvance) {
-          onAdvance("source_approval_vault");
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "done",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "success",
+                message: `Scan complete. Found ${data.data?.length || 0} highly relevant primary sources. Preparing for approval triage...`,
+              },
+            ]);
+          } else if (event === "error") {
+            throw new Error(data.message || "Agent encountered an error scanning the vault.");
+          }
         }
-      }, 2500);
-
+      );
     } catch (err: any) {
       setError(err.message);
       setLogs((prev) => [

@@ -24,6 +24,7 @@ export default function JournalDiscoveryStage({
   const [results, setResults] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [manualJournal, setManualJournal] = useState("");
 
   const selectedJournal = project.answers?.["target_journal"];
 
@@ -40,38 +41,38 @@ export default function JournalDiscoveryStage({
       },
     ]);
 
-    const logsArray = ["Analyzing evidence matrix for core methodologies...", "Querying Scopus for matching journal scopes...", "Filtering for Open Access availability...", "Calculating impact factor alignment...", "Scoring journals against project abstract..."];
-
-    const logInterval = setInterval(() => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + Math.random(),
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "action",
-          message: logsArray[Math.floor(Math.random() * logsArray.length)],
-        },
-      ]);
-    }, 900);
-
     try {
-      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/journal-discovery`, "POST", {});
-
-      const resJson = await response.json();
-      if (!response.ok) {
-        throw new Error(resJson.error || "Agent encountered an error.");
-      }
-      const { data } = resJson;
-      setResults(data);
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + "done",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Journal discovery complete. Found {count} high-match journals.`.replace("{count}", data?.length || 0),
-        },
-      ]);
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/journal-discovery`,
+        "POST",
+        {},
+        (event, data) => {
+          if (event === "log" || event === "chunk") {
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + Math.random(),
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: event === "chunk" ? "action" : "info",
+                message: data.message || data.chunk || JSON.stringify(data),
+              },
+            ]);
+          } else if (event === "done") {
+            setResults(data.data);
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "done",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "success",
+                message: `Journal discovery complete. Found ${data.data?.length || 0} high-match journals.`,
+              },
+            ]);
+          } else if (event === "error") {
+            throw new Error(data.message || "Agent encountered an error.");
+          }
+        }
+      );
     } catch (err: any) {
       setError(err.message);
       setLogs((prev) => [
@@ -245,9 +246,55 @@ export default function JournalDiscoveryStage({
               </svg>
             </div>
             <h3 className="text-lg font-bold text-[color:var(--text-primary)]">Ready for Journal Discovery</h3>
-            <p className="text-[color:var(--text-secondary)] max-w-md mx-auto mt-2">
+            <p className="text-[color:var(--text-secondary)] max-w-md mx-auto mt-2 mb-6">
               The Journal Discovery agent will analyze your evidence matrix and abstract to find the best academic journals for submission.
             </p>
+            <div className="w-full max-w-md mx-auto p-6 bg-[color:var(--surface-canvas)] border border-[color:var(--border-subtle)] rounded-xl text-left">
+              <h4 className="text-sm font-bold text-[color:var(--text-primary)] mb-2">Already know your target journal?</h4>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={manualJournal}
+                  onChange={(e) => setManualJournal(e.target.value)}
+                  placeholder="Enter journal name manually..."
+                  className="flex-1 px-4 py-2 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] focus:outline-none focus:border-[color:var(--accent)]"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && manualJournal.trim()) {
+                      handleSelectJournal({ title: manualJournal.trim() });
+                    }
+                  }}
+                />
+                <button 
+                  onClick={() => handleSelectJournal({ title: manualJournal.trim() })}
+                  disabled={!manualJournal.trim() || isSaving}
+                  className="px-4 py-2 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg font-semibold hover:bg-[color:var(--surface-sunken)] disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {results && (
+          <div className="max-w-5xl mx-auto mt-8 border-t border-[color:var(--border-subtle)] pt-8">
+            <h4 className="text-sm font-bold text-[color:var(--text-secondary)] mb-4 text-center uppercase tracking-wider">Manual Override</h4>
+            <div className="max-w-md mx-auto flex gap-2">
+              <input 
+                type="text" 
+                value={manualJournal}
+                onChange={(e) => setManualJournal(e.target.value)}
+                placeholder="Enter journal name manually..."
+                className="flex-1 px-4 py-2 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] focus:outline-none focus:border-[color:var(--accent)]"
+              />
+              <button 
+                onClick={() => handleSelectJournal({ title: manualJournal.trim() })}
+                disabled={!manualJournal.trim() || isSaving}
+                className="px-4 py-2 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-lg font-semibold hover:bg-[color:var(--surface-sunken)] disabled:opacity-50"
+              >
+                Save
+              </button>
+            </div>
           </div>
         )}
       </div>

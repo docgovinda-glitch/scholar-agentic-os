@@ -39,56 +39,50 @@ export default function JournalRequirementsStage({
       },
     ]);
 
-    const logsArray = ["Crawling target journal author guidelines...", "Extracting word count limits...", "Parsing citation formatting rules...", "Identifying required manuscript sections...", "Building requirement enforcement matrix..."];
-
-    const logInterval = setInterval(() => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + Math.random(),
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "action",
-          message: logsArray[Math.floor(Math.random() * logsArray.length)],
-        },
-      ]);
-    }, 900);
-
     try {
-      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/journal-requirements`, "POST", {});
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/journal-requirements`,
+        "POST",
+        {},
+        async (event, data) => {
+          if (event === "log" || event === "chunk") {
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + Math.random(),
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: event === "chunk" ? "action" : "info",
+                message: data.message || data.chunk || JSON.stringify(data),
+              },
+            ]);
+          } else if (event === "done") {
+            setResults(data.data);
+            
+            try {
+              const newAnswers = {
+                ...project.answers,
+                journal_constraints: JSON.stringify(data.data),
+              };
+              const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+              onSaved(updatedProject);
+            } catch (saveErr) {
+              console.error("Failed to save journal constraints", saveErr);
+            }
 
-      const resJson = await response.json();
-      if (!response.ok) {
-        throw new Error(resJson.error || "Agent encountered an error.");
-      }
-      const { data } = resJson;
-      setResults(data);
-
-      try {
-        const newAnswers = {
-          ...project.answers,
-          journal_constraints: JSON.stringify(data),
-        };
-        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-        onSaved(updatedProject);
-      } catch (saveErr) {
-        console.error("Failed to save journal constraints", saveErr);
-      }
-
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + "done",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Requirements extracted successfully for ${selectedJournal}.`,
-        },
-      ]);
-      
-      setTimeout(() => {
-        if (onAdvance) {
-          onAdvance("draft");
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "done",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "success",
+                message: `Requirements extracted successfully for ${selectedJournal}.`,
+              },
+            ]);
+          } else if (event === "error") {
+            throw new Error(data.message || "Agent encountered an error.");
+          }
         }
-      }, 3000);
+      );
     } catch (err: any) {
       setError(err.message);
       setLogs((prev) => [
@@ -200,7 +194,7 @@ export default function JournalRequirementsStage({
                <div className="mt-4 p-4 bg-white rounded-lg border border-[color:var(--border-subtle)]">
                  <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-2">Required Sections</div>
                  <div className="flex flex-wrap gap-2">
-                   {(results.required_sections || ["Abstract", "Introduction", "Methods", "Results", "Discussion", "Conclusion"]).map((sec: string) => (
+                   {((results.required_sections && results.required_sections.length > 0) ? results.required_sections : ["Abstract", "Introduction", "Methods", "Results", "Discussion", "Conclusion"]).map((sec: string) => (
                      <span key={sec} className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full text-sm font-semibold">
                        {sec}
                      </span>
