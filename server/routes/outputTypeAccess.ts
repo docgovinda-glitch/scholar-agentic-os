@@ -18,7 +18,7 @@
  * not the specific types they happen to use as fixtures.
  */
 
-let enabled: Set<string> | "all" = new Set(["OT-10"]);
+let enabled: Set<string> | "all" = "all";
 
 /** One shared message for every disabled type, not a per-type explanation — there isn't a different reason for each of the 23, so there shouldn't be a different sentence for each either. */
 export const MAINTENANCE_MESSAGE =

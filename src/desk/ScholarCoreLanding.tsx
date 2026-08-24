@@ -1,200 +1,727 @@
-import { useState, useEffect } from 'react';
-import ScholarCoreLogo from '../components/ScholarCoreLogo';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import ScholarCoreLogo from "../components/ScholarCoreLogo";
 
 interface ScholarCoreLandingProps {
   onGetStarted?: () => void;
   onSignIn?: () => void;
 }
 
+interface CitationInfo {
+  id: number;
+  label: string;
+  source: string;
+  year: number;
+  journal: string;
+  quote: string;
+  page: string;
+  confidence: string;
+  badgeColor: string;
+}
+
+const SAMPLE_CITATIONS: Record<number, CitationInfo> = {
+  1: {
+    id: 1,
+    label: "[1]",
+    source: "High-efficiency in vivo base editing in primate models",
+    year: 2024,
+    journal: "Nature Biotechnology, 42(3), 312-324",
+    quote: "Observed a 4.2-fold reduction in double-strand break translocations compared to standard SpCas9 nuclease controls (p < 0.001) across all targeted loci.",
+    page: "Page 14, Paragraph 3",
+    confidence: "99.4% Provenance Match",
+    badgeColor: "text-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] border-[color:var(--state-success)]",
+  },
+  2: {
+    id: 2,
+    label: "[2]",
+    source: "Epigenetic durability of prime editing in human hematopoietic stem cells",
+    year: 2023,
+    journal: "Cell Stem Cell, 30(8), 1042-1055",
+    quote: "Long-term engraftment in xenograft models demonstrated sustained target allele conversion without detectable off-target chromosomal rearrangements.",
+    page: "Page 8, Figure 4B",
+    confidence: "98.8% Provenance Match",
+    badgeColor: "text-[color:var(--state-info)] bg-[color:var(--state-info-subtle)] border-[color:var(--state-info)]",
+  },
+};
+
+const AGENT_ROLES = [
+  {
+    id: "auditor",
+    name: "Citation Auditor",
+    title: "100% Provenance Verification",
+    icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+    badge: "Active Guard",
+    description: "Scans every sentence against your private Knowledge Vault. Flags unsupported assertions or paraphrasing drift before publication.",
+    critique: "Claim #4 verified against Chen et al. (2024) [PDF p.14]. Direct quote concordance 99.4%. Zero hallucination detected.",
+    status: "PASS",
+  },
+  {
+    id: "methodologist",
+    name: "The Methodologist",
+    title: "Statistical & Experimental Rigour",
+    icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
+    badge: "Peer Review",
+    description: "Evaluates sample sizes, control groups, statistical tests, and study limitations according to international CONSORT/STROBE/PRISMA standards.",
+    critique: "Cohort size (n=142) satisfies power calculation (β=0.80, α=0.05). Bonferroni correction correctly applied for multiple comparisons.",
+    status: "VALIDATED",
+  },
+  {
+    id: "coherence",
+    name: "Voice & Tone Architect",
+    title: "Academic Register Harmonization",
+    icon: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z",
+    badge: "Style Engine",
+    description: "Maintains high-impact scholarly prose, eliminates colloquialisms, and balances active vs passive voice based on your chosen target discipline.",
+    critique: "Calculated Flesch-Kincaid Grade Level: 14.8. Register matches Nature Biotechnology editorial benchmark across Sections 1-4.",
+    status: "OPTIMIZED",
+  },
+  {
+    id: "compliance",
+    name: "Journal Compliance Warden",
+    title: "Instant Author Guideline Auditing",
+    icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+    badge: "Publisher Gate",
+    description: "Enforces target journal word counts, required headings, abstract structured constraints, and citation formatting (APA, IEEE, Vancouver, Nature).",
+    critique: "Word count: 3,840 / 4,500 limit. Abstract structured into Background, Methods, Results, Conclusion. References formatted in Nature style.",
+    status: "COMPLIANT",
+  },
+];
+
+const FORMAT_FAMILIES = [
+  {
+    id: "short_form",
+    label: "1. Short-Form Writeup",
+    desc: "Targeted scholarly essays, briefs, and structured coursework assignments.",
+    formats: [
+      { id: "OT-01", label: "Assignment", words: "800 - 3,000 words", sections: "Title, Intro, Body, Conclusion, References", bestFor: "Undergraduate & Masters coursework" },
+      { id: "OT-02", label: "Coursework Essay", words: "1,500 - 4,000 words", sections: "Abstract, Argument, Synthesis, Evaluation", bestFor: "Critical literature analysis" },
+      { id: "OT-03", label: "Research Summary", words: "500 - 1,500 words", sections: "Executive Summary, Findings, Implications", bestFor: "Executive & lab briefings" },
+      { id: "OT-04", label: "Short Case Study", words: "1,000 - 2,500 words", sections: "Case Context, Dilemma, Analysis, Outcomes", bestFor: "Clinical & business studies" },
+    ],
+  },
+  {
+    id: "long_form",
+    label: "2. Long-Form Writing",
+    desc: "Comprehensive academic milestones with multi-chapter approval gates.",
+    formats: [
+      { id: "OT-05", label: "Master Thesis Chapter", words: "6,000 - 12,000 words", sections: "Literature, Methodology, Findings, Discussion", bestFor: "Postgraduate dissertations" },
+      { id: "OT-06", label: "Doctoral Dissertation", words: "50,000 - 80,000 words", sections: "Comprehensive multi-chapter framework", bestFor: "PhD & doctorate submissions" },
+      { id: "OT-07", label: "Literature Review Monograph", words: "8,000 - 15,000 words", sections: "Thematic Synthesis, Bibliometrics, Gaps", bestFor: "Field overview treatises" },
+      { id: "OT-08", label: "Research Monograph", words: "25,000 - 60,000 words", sections: "Full theoretical & empirical treatise", bestFor: "Academic book publications" },
+    ],
+  },
+  {
+    id: "publication",
+    label: "3. Publications",
+    desc: "Peer-reviewed journal papers and clinical articles ready for editorial submission.",
+    formats: [
+      { id: "OT-10", label: "Empirical Journal Article", words: "4,000 - 8,000 words", sections: "IMRaD + Conflict of Interest + Data Availability", bestFor: "Nature, Elsevier, IEEE, Springer" },
+      { id: "OT-11", label: "Systematic Review & Meta-Analysis", words: "5,000 - 10,000 words", sections: "PRISMA Flow, Risk of Bias, Forest Plots", bestFor: "Evidence synthesis & Cochrane" },
+      { id: "OT-12", label: "Clinical Case Report", words: "1,500 - 3,000 words", sections: "CARE Guidelines, Timeline, Diagnostic Assessment", bestFor: "Medical & surgical journals" },
+      { id: "OT-13", label: "Perspective / Review Commentary", words: "2,000 - 4,500 words", sections: "Current State, Provocation, Future Horizons", bestFor: "Thought leadership & trends" },
+    ],
+  },
+  {
+    id: "applied_professional",
+    label: "4. Professional & Applied",
+    desc: "Translational research documents bridging academic evidence and industry policy.",
+    formats: [
+      { id: "OT-17", label: "Policy Brief", words: "1,500 - 3,500 words", sections: "Executive Summary, Evidence, Policy Options", bestFor: "Government & NGO stakeholders" },
+      { id: "OT-18", label: "Clinical Practice Guideline", words: "4,000 - 10,000 words", sections: "GRADE Recommendations, Evidence Tables", bestFor: "Healthcare institutions" },
+      { id: "OT-19", label: "Technical White Paper", words: "3,000 - 7,000 words", sections: "Architecture, Benchmark Analysis, Proof", bestFor: "Industry R&D & deep tech" },
+      { id: "OT-20", label: "Expert Witness Report", words: "5,000 - 15,000 words", sections: "Qualifications, Opinion, Evidentiary Basis", bestFor: "Legal & tribunal review" },
+    ],
+  },
+  {
+    id: "proposal_funding",
+    label: "5. Proposals & Funding",
+    desc: "Competitive grant applications with strict agency rubric compliance.",
+    formats: [
+      { id: "OT-14", label: "NIH / NSF Grant Proposal", words: "8,000 - 15,000 words", sections: "Specific Aims, Significance, Innovation, Approach", bestFor: "Federal & institutional grants" },
+      { id: "OT-15", label: "Horizon Europe Research Proposal", words: "10,000 - 20,000 words", sections: "Excellence, Impact, Quality of Implementation", bestFor: "EU collaborative funding" },
+      { id: "OT-16", label: "Academic Book Proposal", words: "3,000 - 6,000 words", sections: "Overview, Market Analysis, Chapter Synopses", bestFor: "University press submissions" },
+    ],
+  },
+  {
+    id: "presentation",
+    label: "6. Presentations",
+    desc: "High-impact visual communication for symposiums and conferences.",
+    formats: [
+      { id: "OT-21", label: "Conference Extended Abstract", words: "1,000 - 2,000 words", sections: "Background, Methods, Preliminary Findings", bestFor: "ACM, IEEE, Academic conferences" },
+      { id: "OT-22", label: "Academic Poster (Poster Grid)", words: "300 - 800 words", sections: "Key Takeaway, Method Diagram, Evidence Grid", bestFor: "Symposium poster sessions" },
+      { id: "OT-23", label: "Keynote Slide Script & Deck", words: "2,000 - 4,000 words", sections: "Slide Breakdown, Narrative Arc, Speaker Notes", bestFor: "Invited lectures & defenses" },
+    ],
+  },
+];
+
 export default function ScholarCoreLanding({
   onGetStarted,
   onSignIn,
 }: ScholarCoreLandingProps) {
   const [scrolled, setScrolled] = useState(false);
+  const [activeCitation, setActiveCitation] = useState<number | null>(1);
+  const [activeAgent, setActiveAgent] = useState<string>("auditor");
+  const [activeFamily, setActiveFamily] = useState<string>("short_form");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  return (
-    <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] relative overflow-hidden font-sans selection:bg-[color:var(--accent-subtle)]">
-      
-      {/* Dynamic Background Effects */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[color:var(--accent-subtle)] blur-[120px] rounded-full pointer-events-none animate-pulse-slow" />
-      <div className="absolute top-[20%] right-[-10%] w-[40%] h-[60%] bg-[color:var(--accent-subtle)] blur-[150px] rounded-full pointer-events-none mix-blend-multiply dark:mix-blend-screen" />
-      <div className="absolute bottom-[-10%] left-[20%] w-[60%] h-[40%] bg-[color:var(--state-info-subtle)] blur-[120px] rounded-full pointer-events-none" />
+  const selectedAgent = AGENT_ROLES.find((a) => a.id === activeAgent) ?? AGENT_ROLES[0];
+  const selectedFamily = FORMAT_FAMILIES.find((f) => f.id === activeFamily) ?? FORMAT_FAMILIES[0];
 
-      {/* Navigation Bar */}
-      <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[color:var(--surface-raised)]/90 backdrop-blur-xl border-b border-[color:var(--border-subtle)] shadow-md py-3' : 'bg-transparent py-6'}`}>
-        <div className="mx-auto max-w-7xl px-6 lg:px-8 flex items-center justify-between">
-          <div className="flex items-center gap-3 group cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-[color:var(--accent)] shadow-sm group-hover:shadow-[color:var(--accent-subtle)] transition-all duration-300">
-              <span className="text-[color:var(--text-inverse)] font-bold text-xl font-serif">S</span>
+  return (
+    <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] font-sans antialiased selection:bg-[color:var(--accent-subtle)] relative overflow-x-hidden">
+      {/* Ambient background glows */}
+      <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-[color:var(--accent-subtle)] blur-[140px] rounded-full pointer-events-none -z-10 opacity-70" />
+      <div className="absolute top-[40%] left-[-100px] w-[500px] h-[500px] bg-[color:var(--state-info-subtle)] blur-[160px] rounded-full pointer-events-none -z-10 opacity-60" />
+      <div className="absolute bottom-0 right-[-100px] w-[600px] h-[600px] bg-[color:var(--state-success-subtle)] blur-[160px] rounded-full pointer-events-none -z-10 opacity-50" />
+
+      {/* Header */}
+      <header
+        className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? "bg-[color:var(--surface-raised)]/90 backdrop-blur-xl border-b border-[color:var(--border-subtle)] shadow-sm py-3"
+            : "bg-transparent py-5"
+        }`}
+      >
+        <div className="mx-auto max-w-7xl px-6 flex items-center justify-between">
+          <div
+            className="flex items-center gap-3 cursor-pointer group"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          >
+            <div className="w-10 h-10 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+              <ScholarCoreLogo size="md" className="text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-[color:var(--text-primary)]">
-              Scholar Core
-            </span>
+            <div className="flex flex-col">
+              <span className="font-bold text-lg tracking-tight text-[color:var(--text-primary)] leading-none">
+                Scholar Core
+              </span>
+              <span className="text-[11px] font-semibold text-[color:var(--text-muted)] tracking-wider uppercase mt-0.5">
+                Research OS
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-6">
+
+          {/* Desktop Nav Links */}
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[color:var(--text-secondary)]">
+            <a href="#interactive-demo" className="hover:text-[color:var(--accent)] transition-colors">
+              Live Demo
+            </a>
+            <a href="#editorial-board" className="hover:text-[color:var(--accent)] transition-colors">
+              Editorial Agents
+            </a>
+            <a href="#publication-formats" className="hover:text-[color:var(--accent)] transition-colors">
+              24 Formats
+            </a>
+            <a href="#security" className="hover:text-[color:var(--accent)] transition-colors">
+              Vault & Privacy
+            </a>
+            <a href="#comparison" className="hover:text-[color:var(--accent)] transition-colors">
+              Why Scholar Core
+            </a>
+          </nav>
+
+          <div className="hidden sm:flex items-center gap-4">
             <button
               onClick={onSignIn}
-              className="text-sm font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] transition-colors duration-200 cursor-pointer"
+              className="text-sm font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] px-4 py-2 rounded-lg hover:bg-[color:var(--surface-hover)] transition-all cursor-pointer"
             >
               Sign in
             </button>
             <button
               onClick={onGetStarted}
-              className="px-6 py-2.5 rounded-full text-sm font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-sm hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer"
+              className="px-5 py-2.5 rounded-full text-sm font-bold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-sm hover:bg-[color:var(--accent-hover)] transition-all hover:shadow-md cursor-pointer flex items-center gap-2"
             >
               Start Researching
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
             </button>
           </div>
+
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
+            aria-label="Toggle menu"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
+
+        {/* Mobile Dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] px-6 py-4 flex flex-col gap-3 animate-fade-in shadow-xl">
+            <a
+              href="#interactive-demo"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-sm font-medium py-2 text-[color:var(--text-primary)]"
+            >
+              Live Demo
+            </a>
+            <a
+              href="#editorial-board"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-sm font-medium py-2 text-[color:var(--text-primary)]"
+            >
+              Editorial Agents
+            </a>
+            <a
+              href="#publication-formats"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-sm font-medium py-2 text-[color:var(--text-primary)]"
+            >
+              24 Formats
+            </a>
+            <a
+              href="#security"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-sm font-medium py-2 text-[color:var(--text-primary)]"
+            >
+              Vault & Privacy
+            </a>
+            <div className="pt-3 border-t border-[color:var(--border-subtle)] flex flex-col gap-2">
+              <button
+                onClick={onSignIn}
+                className="w-full py-2.5 text-center text-sm font-semibold rounded-lg border border-[color:var(--border-default)]"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={onGetStarted}
+                className="w-full py-2.5 text-center text-sm font-bold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-lg"
+              >
+                Start for Free
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
-      <main className="relative z-10 pt-32 pb-16">
-        {/* Hero Section */}
-        <section className="relative px-6 lg:px-8 pt-20 pb-32 text-center max-w-6xl mx-auto flex flex-col items-center">
-          <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shadow-sm mb-12">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[color:var(--state-info)] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-[color:var(--state-info)]"></span>
+      <main className="relative z-10 pt-28">
+        {/* HERO SECTION */}
+        <section className="px-6 lg:px-8 pt-12 pb-20 max-w-6xl mx-auto text-center flex flex-col items-center">
+          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-xs mb-8">
+            <span className="w-2.5 h-2.5 rounded-full bg-[color:var(--state-success)] animate-pulse" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">
+              Verifiable Autonomous Research Engine
             </span>
-            <span className="text-sm font-medium text-[color:var(--text-secondary)] tracking-wide uppercase">Agentic OS 2.0 Now Live</span>
           </div>
 
-          <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-8 leading-[1.1] text-[color:var(--text-primary)]">
-            Research at the <br className="hidden md:block" />
-            <span className="text-[color:var(--accent)]">
-              Speed of Thought
-            </span>
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-6 leading-[1.1] text-[color:var(--text-primary)]">
+            The Verifiable AI <br className="hidden sm:inline" />
+            <span className="text-[color:var(--accent)]">Research Operating System</span>
           </h1>
 
-          <p className="text-xl md:text-2xl text-[color:var(--text-secondary)] max-w-3xl mx-auto mb-14 leading-relaxed font-light">
-            Scholar Core bridges the gap between raw data and published manuscripts. 
-            Organize knowledge, ensure <strong className="text-[color:var(--text-primary)] font-medium">100% citation provenance</strong>, and write with agentic precision.
+          <p className="text-lg sm:text-xl text-[color:var(--text-secondary)] max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
+            From raw literature search and PDF extraction to publication-ready manuscripts with{" "}
+            <strong className="text-[color:var(--text-primary)] font-semibold">
+              100% cryptographic citation provenance
+            </strong>
+            , multi-agent editorial review, and strict journal compliance.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-5 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mb-12">
             <button
               onClick={onGetStarted}
-              className="px-8 py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] active:scale-[0.98] bg-[color:var(--accent)] text-[color:var(--text-inverse)] shadow-md hover:bg-[color:var(--accent-hover)]"
+              className="px-8 py-4 rounded-xl font-bold text-base bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-md hover:bg-[color:var(--accent-hover)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 cursor-pointer"
             >
-              Get Started for Free
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+              Start Researching Free
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
             </button>
-            <button
-              onClick={onSignIn}
-              className="px-8 py-4 rounded-2xl font-semibold text-lg text-[color:var(--text-primary)] border border-[color:var(--border-strong)] bg-[color:var(--surface-raised)] hover:bg-[color:var(--surface-hover)] shadow-sm transition-all flex items-center justify-center"
+            <a
+              href="#interactive-demo"
+              className="px-8 py-4 rounded-xl font-semibold text-base text-[color:var(--text-primary)] border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] hover:bg-[color:var(--surface-hover)] shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              Sign In to Workspace
-            </button>
+              <svg className="w-5 h-5 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Explore Live Demo
+            </a>
           </div>
-          <p className="mt-8 text-sm text-[color:var(--text-muted)]">No credit card required. Join 10,000+ researchers globally.</p>
-        </section>
 
-        {/* Abstract UI Mockup Dashboard */}
-        <section className="px-6 lg:px-8 -mt-10 relative z-20 pb-32">
-          <div className="max-w-6xl mx-auto rounded-[2rem] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] shadow-lg overflow-hidden relative">
-            <div className="absolute top-0 inset-x-0 h-1 bg-[color:var(--accent)]"></div>
-            
-            {/* Fake Browser Header */}
-            <div className="h-14 border-b border-[color:var(--border-subtle)] flex items-center px-6 gap-2 bg-[color:var(--surface-inset)]">
-              <div className="flex gap-2">
-                <div className="w-3 h-3 rounded-full bg-[color:var(--state-danger)] border border-[color:var(--state-danger-subtle)]"></div>
-                <div className="w-3 h-3 rounded-full bg-[color:var(--state-warning)] border border-[color:var(--state-warning-subtle)]"></div>
-                <div className="w-3 h-3 rounded-full bg-[color:var(--state-success)] border border-[color:var(--state-success-subtle)]"></div>
-              </div>
-              <div className="mx-auto px-32 py-1.5 rounded-md bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-xs text-[color:var(--text-muted)] font-mono">
-                scholar.gkshah.com.np/workspace
-              </div>
+          {/* Social proof key pills */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-4xl pt-6 border-t border-[color:var(--border-subtle)] text-left">
+            <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
+              <div className="text-2xl font-black text-[color:var(--accent)]">100%</div>
+              <div className="text-xs font-semibold text-[color:var(--text-secondary)] mt-0.5">Citation Provenance</div>
             </div>
-
-            <div className="p-8 grid md:grid-cols-3 gap-8 bg-[color:var(--surface-canvas)]">
-              {/* Sidebar Mock */}
-              <div className="col-span-1 border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] rounded-2xl p-6 flex flex-col gap-6">
-                <div className="w-full h-8 rounded-lg bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center px-4">
-                  <div className="w-3 h-3 rounded-full bg-[color:var(--accent)] mr-3 animate-pulse"></div>
-                  <div className="h-2 w-24 bg-[color:var(--accent)]/50 rounded-full"></div>
-                </div>
-                <div className="space-y-4">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="flex gap-4 items-center">
-                      <div className="w-8 h-8 rounded-lg bg-[color:var(--surface-sunken)]"></div>
-                      <div className="space-y-2 flex-1">
-                        <div className="h-2 w-full bg-[color:var(--surface-sunken)] rounded-full border border-[color:var(--border-subtle)]"></div>
-                        <div className="h-2 w-2/3 bg-[color:var(--surface-inset)] rounded-full border border-[color:var(--border-subtle)]"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Main Content Mock */}
-              <div className="col-span-2 border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] rounded-2xl p-8 relative overflow-hidden">
-                <div className="flex items-center justify-between mb-8 relative z-10">
-                  <div className="h-6 w-48 bg-[color:var(--surface-sunken)] rounded-md border border-[color:var(--border-subtle)]"></div>
-                  <div className="h-8 w-24 bg-[color:var(--state-success-subtle)] border border-[color:var(--state-success)] rounded-full"></div>
-                </div>
-                
-                <div className="space-y-6 relative z-10">
-                  <div className="p-5 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]">
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 rounded-full bg-[color:var(--accent-subtle)] flex items-center justify-center border border-[color:var(--accent-border)]">
-                         <svg className="w-5 h-5 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                      </div>
-                      <div className="flex-1 space-y-3 pt-2">
-                        <div className="h-3 w-5/6 bg-[color:var(--border-strong)] rounded-full"></div>
-                        <div className="h-3 w-full bg-[color:var(--border-subtle)] rounded-full"></div>
-                        <div className="h-3 w-4/6 bg-[color:var(--border-subtle)] rounded-full"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-5 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] opacity-60">
-                    <div className="h-3 w-3/4 bg-[color:var(--border-strong)] rounded-full mb-3"></div>
-                    <div className="h-3 w-1/2 bg-[color:var(--border-subtle)] rounded-full"></div>
-                  </div>
-                  <div className="p-5 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] opacity-40">
-                    <div className="h-3 w-5/6 bg-[color:var(--border-strong)] rounded-full mb-3"></div>
-                    <div className="h-3 w-2/3 bg-[color:var(--border-subtle)] rounded-full"></div>
-                  </div>
-                </div>
-              </div>
+            <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
+              <div className="text-2xl font-black text-[color:var(--text-primary)]">24 Formats</div>
+              <div className="text-xs font-semibold text-[color:var(--text-secondary)] mt-0.5">Journal, Thesis, Grant</div>
+            </div>
+            <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
+              <div className="text-2xl font-black text-[color:var(--state-success)]">0%</div>
+              <div className="text-xs font-semibold text-[color:var(--text-secondary)] mt-0.5">Hallucination Floor</div>
+            </div>
+            <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
+              <div className="text-2xl font-black text-[color:var(--state-info)]">Local & Cloud</div>
+              <div className="text-xs font-semibold text-[color:var(--text-secondary)] mt-0.5">Ollama, BYOK, Encrypted</div>
             </div>
           </div>
         </section>
 
-        {/* Workflow Showcase */}
-        <section className="py-24 px-6 relative border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]">
-          <div className="mx-auto max-w-7xl">
-            <div className="text-center mb-20">
-              <h2 className="text-3xl md:text-5xl font-bold mb-6 tracking-tight text-[color:var(--text-primary)]">The Agentic Research Pipeline</h2>
-              <p className="text-xl text-[color:var(--text-secondary)] max-w-2xl mx-auto">A continuous, integrated research environment where every step is handled by an agent.</p>
+        {/* INTERACTIVE PRODUCT DEMO: LIVE MANUSCRIPT & PROVENANCE INSPECTOR */}
+        <section id="interactive-demo" className="px-6 lg:px-8 py-16 scroll-mt-24">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center max-w-2xl mx-auto mb-10">
+              <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
+                Live Interactive Workspace
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[color:var(--text-primary)] mt-2">
+                Click any citation to verify provenance
+              </h2>
+              <p className="text-[color:var(--text-secondary)] mt-3">
+                Scholar Core maps every sentence directly to verbatim evidence inside your private Knowledge Vault.
+              </p>
             </div>
-            
-            <div className="grid md:grid-cols-4 gap-6">
-              {[
-                { step: "01", title: "Definition", desc: "Set your research objectives and constraints. The agent aligns to your goal." },
-                { step: "02", title: "Extraction", desc: "Data Miner AI fetches and parses relevant academic sources into your secure Vault." },
-                { step: "03", title: "Synthesis", desc: "Cross-reference vault evidence with external literature to build a theoretical framework." },
-                { step: "04", title: "Review", desc: "Generate compliant manuscripts mapped perfectly to your chosen format (from 24+ templates, including grants, reports, and books)." }
-              ].map((item, i) => (
-                <div key={i} className="group relative p-8 rounded-[2rem] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] hover:bg-[color:var(--surface-hover)] transition-all duration-300 overflow-hidden hover:-translate-y-2 hover:shadow-lg">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-[color:var(--accent)] opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                  <div className="text-7xl font-black text-[color:var(--surface-inset)] absolute -top-4 -right-2 z-0 transition-colors duration-300 pointer-events-none">
-                    {item.step}
-                  </div>
-                  <div className="relative z-10 mt-8">
-                    <div className="w-12 h-12 rounded-xl mb-6 bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center shadow-sm">
-                       <span className="text-[color:var(--accent)] font-bold text-xl">{i+1}</span>
+
+            <div className="rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-lg overflow-hidden">
+              {/* App Mock Window Header */}
+              <div className="h-12 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] flex items-center justify-between px-5">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[color:var(--state-danger)] opacity-80" />
+                  <span className="w-3 h-3 rounded-full bg-[color:var(--state-warning)] opacity-80" />
+                  <span className="w-3 h-3 rounded-full bg-[color:var(--state-success)] opacity-80" />
+                  <span className="ml-3 text-xs font-mono font-medium text-[color:var(--text-muted)] hidden sm:inline">
+                    scholar-os://workspace/empirical-article-ot10/results
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="px-2.5 py-1 rounded-md bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)] border border-[color:var(--state-success)] text-[11px] font-bold">
+                    Quality Gate: 5/5 PASSED
+                  </span>
+                  <span className="px-2.5 py-1 rounded-md bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)] text-[11px] font-bold">
+                    Target: Nature Biotech
+                  </span>
+                </div>
+              </div>
+
+              {/* Two-Pane Interactive Demo */}
+              <div className="grid lg:grid-cols-12 min-h-[480px]">
+                {/* Left Pane: Manuscript Text with Interactive Citations */}
+                <div className="lg:col-span-7 p-6 sm:p-8 bg-[color:var(--surface-canvas)] border-b lg:border-b-0 lg:border-r border-[color:var(--border-subtle)] flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-[color:var(--border-subtle)]">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
+                        Manuscript Draft — Section 3.2: Efficacy Metrics
+                      </span>
+                      <span className="text-xs font-mono text-[color:var(--text-muted)]">Word Count: 3,842</span>
                     </div>
-                    <h3 className="text-2xl font-bold mb-4 text-[color:var(--text-primary)]">{item.title}</h3>
-                    <p className="text-[color:var(--text-secondary)] leading-relaxed">{item.desc}</p>
+
+                    <h3 className="text-xl font-bold text-[color:var(--text-primary)] mb-4 leading-snug">
+                      Comparative Analysis of In Vivo Cleavage and Repair Fidelity
+                    </h3>
+
+                    <div className="space-y-4 text-[color:var(--text-primary)] text-base leading-relaxed">
+                      <p>
+                        High-throughput genomic screening revealed that targeted nucleotide modifications achieved
+                        statistically superior fidelity when compared against traditional endonucleases. Quantitative
+                        evaluation in primate cell lineages confirmed a significant reduction in unintended genomic
+                        cleavage{" "}
+                        <button
+                          onClick={() => setActiveCitation(1)}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold font-mono text-xs transition-all cursor-pointer ${
+                            activeCitation === 1
+                              ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] ring-2 ring-[color:var(--accent-border)] scale-105"
+                              : "bg-[color:var(--accent-subtle)] text-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-white"
+                          }`}
+                        >
+                          [1] Nature Biotech 2024
+                        </button>
+                        .
+                      </p>
+
+                      <p>
+                        Furthermore, longitudinal assessment across a 24-week observational window confirmed the stable
+                        heritability of target alleles in stem cell repopulation models without observable off-target
+                        translocations{" "}
+                        <button
+                          onClick={() => setActiveCitation(2)}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold font-mono text-xs transition-all cursor-pointer ${
+                            activeCitation === 2
+                              ? "bg-[color:var(--state-info)] text-white ring-2 ring-[color:var(--state-info-subtle)] scale-105"
+                              : "bg-[color:var(--state-info-subtle)] text-[color:var(--state-info)] hover:bg-[color:var(--state-info)] hover:text-white"
+                          }`}
+                        >
+                          [2] Cell Stem Cell 2023
+                        </button>
+                        . These parameters substantiate clinical viability for downstream therapeutic translation.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-[color:var(--border-subtle)] flex items-center justify-between text-xs text-[color:var(--text-secondary)]">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[color:var(--state-success)]" />
+                      Auto-Citation Resolver Active
+                    </span>
+                    <span>Click citations above to inspect evidence</span>
+                  </div>
+                </div>
+
+                {/* Right Pane: Live Evidence & Citation Inspector */}
+                <div className="lg:col-span-5 p-6 sm:p-8 bg-[color:var(--surface-raised)] flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] flex items-center gap-2">
+                        <svg className="w-4 h-4 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Knowledge Vault Provenance Inspector
+                      </span>
+                    </div>
+
+                    {activeCitation && SAMPLE_CITATIONS[activeCitation] ? (
+                      <div className="space-y-4 animate-fade-in">
+                        <div className="p-4 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)]">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <span className="font-bold text-sm text-[color:var(--text-primary)] leading-tight">
+                              {SAMPLE_CITATIONS[activeCitation].source}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${SAMPLE_CITATIONS[activeCitation].badgeColor}`}>
+                              {SAMPLE_CITATIONS[activeCitation].confidence}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium text-[color:var(--text-secondary)] mb-3">
+                            {SAMPLE_CITATIONS[activeCitation].journal}
+                          </p>
+
+                          <div className="p-3 rounded-lg bg-[color:var(--surface-raised)] border-l-4 border-[color:var(--accent)] shadow-xs">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] block mb-1">
+                              Extracted Verbatim Proof from PDF:
+                            </span>
+                            <blockquote className="text-xs italic text-[color:var(--text-primary)] leading-relaxed">
+                              "{SAMPLE_CITATIONS[activeCitation].quote}"
+                            </blockquote>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between text-[11px] font-mono text-[color:var(--text-muted)]">
+                            <span>{SAMPLE_CITATIONS[activeCitation].page}</span>
+                            <span>SHA-256 Vault Hash Verified</span>
+                          </div>
+                        </div>
+
+                        {/* Automated Quality Signoff Status */}
+                        <div className="p-4 rounded-xl bg-[color:var(--state-success-subtle)] border border-[color:var(--state-success)] flex items-start gap-3">
+                          <div className="w-5 h-5 rounded-full bg-[color:var(--state-success)] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <div>
+                            <span className="font-bold text-xs text-[color:var(--state-success)] block">
+                              Integrity Gate: ZERO Hallucination Confirmed
+                            </span>
+                            <span className="text-xs text-[color:var(--text-secondary)] leading-tight">
+                              This assertion is mathematically supported by verified vault vectors with exact page bounds.
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-16 text-center text-sm text-[color:var(--text-muted)]">
+                        Select a citation tag in the manuscript to view live proof.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-[color:var(--border-subtle)]">
+                    <button
+                      onClick={onGetStarted}
+                      className="w-full py-2.5 rounded-lg bg-[color:var(--accent-solid)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      Run Citation Audit on Your Own PDFs
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* MULTI-AGENT EDITORIAL BOARD */}
+        <section id="editorial-board" className="px-6 lg:px-8 py-20 bg-[color:var(--surface-raised)] border-y border-[color:var(--border-subtle)] scroll-mt-20">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center max-w-3xl mx-auto mb-14">
+              <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
+                Autonomous Quality Assurance
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[color:var(--text-primary)] mt-2">
+                An AI Editorial Board on Your Desktop
+              </h2>
+              <p className="text-[color:var(--text-secondary)] mt-3 text-base">
+                Four specialized agents review and critique your manuscript across every critical academic dimension before journal submission.
+              </p>
+            </div>
+
+            {/* Agent Selector Tabs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+              {AGENT_ROLES.map((agent) => {
+                const isActive = agent.id === activeAgent;
+                return (
+                  <button
+                    key={agent.id}
+                    onClick={() => setActiveAgent(agent.id)}
+                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      isActive
+                        ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)] shadow-sm"
+                        : "border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] hover:border-[color:var(--border-control)]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          isActive
+                            ? "bg-[color:var(--accent)] text-white"
+                            : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]"
+                        }`}
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={agent.icon} />
+                        </svg>
+                      </div>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                        isActive
+                          ? "bg-[color:var(--accent)] text-white"
+                          : "bg-[color:var(--surface-sunken)] text-[color:var(--text-muted)]"
+                      }`}>
+                        {agent.badge}
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-[color:var(--text-primary)]">{agent.name}</h4>
+                      <p className="text-xs text-[color:var(--text-secondary)] mt-0.5 line-clamp-1">{agent.title}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Agent Detail Card */}
+            <div className="p-8 rounded-3xl border border-[color:var(--border-default)] bg-[color:var(--surface-canvas)] shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-[color:var(--border-subtle)]">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--accent)]">
+                    Active Agent Inspection
+                  </span>
+                  <h3 className="text-2xl font-black text-[color:var(--text-primary)] mt-1">{selectedAgent.name}</h3>
+                  <p className="text-sm text-[color:var(--text-secondary)] mt-1">{selectedAgent.description}</p>
+                </div>
+                <div className="flex items-center gap-3 self-start md:self-auto">
+                  <span className="text-xs font-medium text-[color:var(--text-muted)]">Verification Status:</span>
+                  <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)] border border-[color:var(--state-success)]">
+                    ✓ {selectedAgent.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
+                <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] block mb-2">
+                  Agent Telemetry & Review Feedback:
+                </span>
+                <p className="text-sm text-[color:var(--text-primary)] leading-relaxed font-mono bg-[color:var(--surface-inset)] p-4 rounded-xl border border-[color:var(--border-subtle)]">
+                  {selectedAgent.critique}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 24 PUBLICATION FORMATS EXPLORER */}
+        <section id="publication-formats" className="px-6 lg:px-8 py-20 scroll-mt-20">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center max-w-3xl mx-auto mb-14">
+              <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
+                24 Specialized Academic Formats
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[color:var(--text-primary)] mt-2">
+                Engineered for Every Stage of Scholarship
+              </h2>
+              <p className="text-[color:var(--text-secondary)] mt-3 text-base">
+                Whether you are drafting a coursework essay, a doctoral dissertation, or a Nature research article, Scholar Core provides dedicated workflow pipelines and quality rubrics.
+              </p>
+            </div>
+
+            {/* Category Filter Tabs in specific order */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
+              {FORMAT_FAMILIES.map((family) => {
+                const isActive = family.id === activeFamily;
+                return (
+                  <button
+                    key={family.id}
+                    onClick={() => setActiveFamily(family.id)}
+                    className={`px-4 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-sm scale-105"
+                        : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)]"
+                    }`}
+                  >
+                    {family.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mb-6 text-center">
+              <p className="text-sm font-medium text-[color:var(--text-secondary)]">{selectedFamily.desc}</p>
+            </div>
+
+            {/* Format Cards Grid */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+              {selectedFamily.formats.map((fmt) => (
+                <div
+                  key={fmt.id}
+                  className="p-6 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)] hover:shadow-md transition-all flex flex-col justify-between group"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">
+                        {fmt.id}
+                      </span>
+                      <span className="text-[10px] font-semibold text-[color:var(--text-muted)] uppercase">
+                        All Disciplines
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-lg text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors mb-2">
+                      {fmt.label}
+                    </h4>
+                    <p className="text-xs text-[color:var(--text-secondary)] mb-4 font-mono font-medium">
+                      🎯 Budget: {fmt.words}
+                    </p>
+                    <div className="text-xs text-[color:var(--text-muted)] pt-3 border-t border-[color:var(--border-subtle)]">
+                      <span className="font-semibold text-[color:var(--text-secondary)] block mb-1">Structure:</span>
+                      <span className="line-clamp-2">{fmt.sections}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 pt-3 border-t border-[color:var(--border-subtle)]">
+                    <button
+                      onClick={onGetStarted}
+                      className="w-full py-2 rounded-lg text-xs font-bold text-[color:var(--accent)] bg-[color:var(--accent-subtle)] group-hover:bg-[color:var(--accent-solid)] group-hover:text-white transition-all flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      Initialize {fmt.id}
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -202,103 +729,221 @@ export default function ScholarCoreLanding({
           </div>
         </section>
 
-        {/* Feature Grid */}
-        <section className="py-32 px-6 relative bg-[color:var(--surface-canvas)]">
-          <div className="mx-auto max-w-7xl">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
+        {/* PRIVACY, LOCAL RUNNER & VAULT ARCHITECTURE */}
+        <section id="security" className="px-6 lg:px-8 py-20 bg-[color:var(--surface-raised)] border-y border-[color:var(--border-subtle)] scroll-mt-20">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div>
-                <h2 className="text-4xl md:text-5xl font-bold mb-8 leading-tight tracking-tight text-[color:var(--text-primary)]">Designed for Integrity.<br/>Built for Speed.</h2>
-                <p className="text-xl text-[color:var(--text-secondary)] mb-12 leading-relaxed">
-                  Scholar Core is not just a text generator. It is a strict enforcement engine that ensures every claim in your manuscript is backed by verified, human-approved evidence.
+                <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
+                  Research Sovereignty & Privacy
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[color:var(--text-primary)] mt-2 leading-tight">
+                  Your Unpublished Discoveries Stay Yours. Period.
+                </h2>
+                <p className="text-[color:var(--text-secondary)] mt-4 text-base leading-relaxed">
+                  Academic integrity requires absolute confidentiality. Scholar Core is engineered from the ground up so your raw data, hypotheses, and drafts are never fed back into public model training.
                 </p>
-                <div className="space-y-8">
-                  {[
-                    { title: "Knowledge Vault", desc: "A unified, searchable library of your PDFs and sources. Upload once, query forever.", icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" },
-                    { title: "Citation Integrity", desc: "Zero hallucination guarantee. If it's not in the vault, it's not in the paper.", icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" },
-                    { title: "Journal Compliance", desc: "Automated checks against specific journal word limits, formatting, and structuring.", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" }
-                  ].map((feature, idx) => (
-                    <div key={idx} className="flex items-start gap-5 group">
-                      <div className="mt-1 w-12 h-12 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] flex items-center justify-center flex-shrink-0 group-hover:bg-[color:var(--accent-subtle)] group-hover:border-[color:var(--accent-border)] transition-colors shadow-sm">
-                        <svg className="w-6 h-6 text-[color:var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={feature.icon} /></svg>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-xl mb-2 text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors">{feature.title}</h4>
-                        <p className="text-[color:var(--text-secondary)] leading-relaxed">{feature.desc}</p>
-                      </div>
+
+                <div className="space-y-6 mt-8">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)] border border-[color:var(--state-success)] flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
                     </div>
-                  ))}
+                    <div>
+                      <h4 className="font-bold text-base text-[color:var(--text-primary)]">Client-Side Encrypted Knowledge Vault</h4>
+                      <p className="text-xs text-[color:var(--text-secondary)] mt-1 leading-relaxed">
+                        Your private reference PDFs and notes are encrypted locally. Even when switching networks, your vault remains strictly sandboxed.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-[color:var(--state-info-subtle)] text-[color:var(--state-info)] border border-[color:var(--state-info)] flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-base text-[color:var(--text-primary)]">Local Offline AI & BYOK (Bring Your Own Key)</h4>
+                      <p className="text-xs text-[color:var(--text-secondary)] mt-1 leading-relaxed">
+                        Run fully air-gapped on Ollama or LM Studio, or connect your personal Anthropic, OpenAI, or Google Cloud API credentials.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)] flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-base text-[color:var(--text-primary)]">Institutional Data Governance</h4>
+                      <p className="text-xs text-[color:var(--text-secondary)] mt-1 leading-relaxed">
+                        Meets HIPAA and GDPR data minimization standards for academic health centers and defense research institutions.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              
-              {/* Dynamic UI visual */}
-              <div className="relative aspect-square w-full rounded-[3rem] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-2 shadow-sm">
-                 <div className="absolute inset-0 bg-[color:var(--surface-inset)] rounded-[2.5rem] overflow-hidden relative flex flex-col">
-                   {/* App Window Header */}
-                   <div className="h-12 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex items-center px-6">
-                      <div className="text-xs font-mono text-[color:var(--text-muted)]">Evidence Matrix</div>
-                   </div>
-                   {/* Content */}
-                   <div className="p-6 flex-1 flex flex-col gap-4 bg-[color:var(--surface-canvas)]">
-                     <div className="flex gap-4 items-center mb-4">
-                       <div className="w-10 h-10 rounded-full bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)]">
-                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                       </div>
-                       <div className="h-6 w-1/3 bg-[color:var(--border-strong)] rounded-md"></div>
-                     </div>
-                     {[
-                       { w: "w-full", c: "bg-[color:var(--state-success-subtle)] border-[color:var(--state-success)]" },
-                       { w: "w-11/12", c: "bg-[color:var(--state-info-subtle)] border-[color:var(--state-info)]" },
-                       { w: "w-4/5", c: "bg-[color:var(--state-warning-subtle)] border-[color:var(--state-warning)]" },
-                       { w: "w-full", c: "bg-[color:var(--surface-sunken)] border-[color:var(--border-strong)]" },
-                       { w: "w-[95%]", c: "bg-[color:var(--surface-inset)] border-[color:var(--border-subtle)] opacity-50" },
-                     ].map((bar, i) => (
-                       <div key={i} className={`h-16 ${bar.w} ${bar.c} border rounded-xl p-4 flex items-center justify-between relative overflow-hidden group`}>
-                         <div className="h-3 w-1/2 bg-[color:var(--surface-raised)] rounded-full mix-blend-overlay"></div>
-                         <div className="h-6 w-20 bg-[color:var(--surface-raised)] rounded-full mix-blend-overlay"></div>
-                       </div>
-                     ))}
-                   </div>
-                 </div>
+
+              {/* Security Blueprint Visual Card */}
+              <div className="p-8 rounded-3xl border border-[color:var(--border-default)] bg-[color:var(--surface-canvas)] shadow-md">
+                <div className="flex items-center justify-between pb-4 border-b border-[color:var(--border-subtle)] mb-6">
+                  <span className="text-xs font-mono font-bold text-[color:var(--text-muted)]">SYSTEM_ISOLATION_TOPOLOGY</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]">
+                    ENFORCED
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full bg-[color:var(--state-success)]" />
+                      <span className="text-xs font-bold text-[color:var(--text-primary)]">Client Sandbox (Browser / Desktop)</span>
+                    </div>
+                    <p className="text-xs text-[color:var(--text-secondary)] mt-2 pl-6">
+                      Private PDF parsing, AES-256 local vault encryption, and live citation linking execute on your machine.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full bg-[color:var(--accent)]" />
+                      <span className="text-xs font-bold text-[color:var(--text-primary)]">AI Gateway & Policy Firewall</span>
+                    </div>
+                    <p className="text-xs text-[color:var(--text-secondary)] mt-2 pl-6">
+                      Redacts PII, strips metadata, and routes exclusively through zero-data-retention API endpoints.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full bg-[color:var(--state-info)]" />
+                      <span className="text-xs font-bold text-[color:var(--text-primary)]">Export & Journal Packages</span>
+                    </div>
+                    <p className="text-xs text-[color:var(--text-secondary)] mt-2 pl-6">
+                      Outputs LaTeX, DOCX, and PDF with formatted reference bibliographies and cover letters.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="py-32 px-6 relative text-center bg-[color:var(--surface-raised)] border-t border-[color:var(--border-subtle)]">
-          <div className="mx-auto max-w-4xl relative z-10">
-            <h2 className="text-5xl md:text-7xl font-black mb-8 tracking-tighter text-[color:var(--text-primary)]">
-              Ready to elevate <br/> your research?
+        {/* COMPARISON TABLE */}
+        <section id="comparison" className="px-6 lg:px-8 py-20 scroll-mt-20">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center max-w-2xl mx-auto mb-12">
+              <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
+                Direct Comparison
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[color:var(--text-primary)] mt-2">
+                Why Researchers Choose Scholar Core
+              </h2>
+              <p className="text-[color:var(--text-secondary)] mt-2 text-sm">
+                Generic chatbots write believable fiction. Scholar Core writes verified science.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-md overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]">
+                      <th className="p-4 sm:p-5 font-bold text-[color:var(--text-primary)]">Capability</th>
+                      <th className="p-4 sm:p-5 font-medium text-[color:var(--text-secondary)] text-center">Generic LLMs (ChatGPT)</th>
+                      <th className="p-4 sm:p-5 font-medium text-[color:var(--text-secondary)] text-center">Reference Managers (Zotero)</th>
+                      <th className="p-4 sm:p-5 font-bold text-[color:var(--accent)] bg-[color:var(--accent-subtle)] text-center">Scholar Core OS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[color:var(--border-subtle)]">
+                    <tr>
+                      <td className="p-4 sm:p-5 font-semibold text-[color:var(--text-primary)]">Citation Provenance</td>
+                      <td className="p-4 sm:p-5 text-center text-[color:var(--state-danger)]">❌ Hallucinates fake papers</td>
+                      <td className="p-4 sm:p-5 text-center text-[color:var(--text-secondary)]">⚠️ Stores PDFs only</td>
+                      <td className="p-4 sm:p-5 text-center font-bold text-[color:var(--state-success)] bg-[color:var(--accent-subtle)]">✅ 100% Cryptographic Match</td>
+                    </tr>
+                    <tr>
+                      <td className="p-4 sm:p-5 font-semibold text-[color:var(--text-primary)]">24 Publication Formats</td>
+                      <td className="p-4 sm:p-5 text-center text-[color:var(--state-danger)]">❌ Generic unstructured chat</td>
+                      <td className="p-4 sm:p-5 text-center text-[color:var(--text-muted)]">—</td>
+                      <td className="p-4 sm:p-5 text-center font-bold text-[color:var(--state-success)] bg-[color:var(--accent-subtle)]">✅ Dedicated Structure Gates</td>
+                    </tr>
+                    <tr>
+                      <td className="p-4 sm:p-5 font-semibold text-[color:var(--text-primary)]">Multi-Agent Editorial Board</td>
+                      <td className="p-4 sm:p-5 text-center text-[color:var(--state-danger)]">❌ Single unspecialized model</td>
+                      <td className="p-4 sm:p-5 text-center text-[color:var(--text-muted)]">—</td>
+                      <td className="p-4 sm:p-5 text-center font-bold text-[color:var(--state-success)] bg-[color:var(--accent-subtle)]">✅ 4 Specialized Reviewers</td>
+                    </tr>
+                    <tr>
+                      <td className="p-4 sm:p-5 font-semibold text-[color:var(--text-primary)]">Journal Compliance Checks</td>
+                      <td className="p-4 sm:p-5 text-center text-[color:var(--state-danger)]">❌ Manual formatting needed</td>
+                      <td className="p-4 sm:p-5 text-center text-[color:var(--text-secondary)]">⚠️ Basic CSL styling only</td>
+                      <td className="p-4 sm:p-5 text-center font-bold text-[color:var(--state-success)] bg-[color:var(--accent-subtle)]">✅ Word limits + Section Audits</td>
+                    </tr>
+                    <tr>
+                      <td className="p-4 sm:p-5 font-semibold text-[color:var(--text-primary)]">Offline / Local AI Support</td>
+                      <td className="p-4 sm:p-5 text-center text-[color:var(--state-danger)]">❌ Cloud-only</td>
+                      <td className="p-4 sm:p-5 text-center text-[color:var(--state-success)]">✅ Local storage</td>
+                      <td className="p-4 sm:p-5 text-center font-bold text-[color:var(--state-success)] bg-[color:var(--accent-subtle)]">✅ Ollama, LM Studio & BYOK</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA BANNER */}
+        <section className="px-6 lg:px-8 py-20 bg-[color:var(--surface-raised)] border-t border-[color:var(--border-subtle)] text-center">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl sm:text-5xl font-black text-[color:var(--text-primary)] tracking-tight mb-4">
+              Accelerate Your Research Without Sacrificing Rigour
             </h2>
-            <p className="text-2xl text-[color:var(--text-secondary)] mb-12 font-light max-w-2xl mx-auto">
-              Join thousands of researchers organizing their knowledge and accelerating publication across 24+ specialized academic and professional formats with Scholar Core.
+            <p className="text-base sm:text-lg text-[color:var(--text-secondary)] max-w-2xl mx-auto mb-8">
+              Join thousands of scholars worldwide organizing their literature, guaranteeing citation integrity, and publishing faster.
             </p>
             <button
               onClick={onGetStarted}
-              className="px-10 py-5 rounded-full text-xl font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-all hover:scale-105 hover:shadow-lg flex items-center justify-center gap-3 mx-auto shadow-sm"
+              className="px-10 py-4 rounded-xl text-lg font-bold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-lg hover:bg-[color:var(--accent-hover)] transition-all hover:scale-105 active:scale-98 inline-flex items-center gap-3 cursor-pointer"
             >
-              Start for Free
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+              Get Started for Free
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
             </button>
+            <p className="text-xs text-[color:var(--text-muted)] mt-4">
+              Free forever for individual local researchers. No credit card required.
+            </p>
           </div>
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-[color:var(--border-subtle)] py-12 px-6 bg-[color:var(--surface-canvas)] relative z-10">
-        <div className="mx-auto max-w-7xl flex flex-col md:flex-row justify-between items-center gap-6">
+      {/* FOOTER */}
+      <footer className="border-t border-[color:var(--border-subtle)] py-10 px-6 bg-[color:var(--surface-canvas)]">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-[color:var(--text-muted)]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-sm flex items-center justify-center">
-              <span className="text-[color:var(--accent)] font-bold font-serif text-sm">S</span>
+            <div className="w-7 h-7 rounded-lg bg-[color:var(--accent)] text-white flex items-center justify-center">
+              <ScholarCoreLogo size="sm" className="text-white" />
             </div>
-            <span className="text-sm text-[color:var(--text-muted)] font-medium">
+            <span className="font-semibold text-[color:var(--text-secondary)]">
               © {new Date().getFullYear()} Scholar Core. All rights reserved.
             </span>
           </div>
-          <div className="flex gap-8 text-sm font-medium text-[color:var(--text-muted)]">
-            <a href="#" className="hover:text-[color:var(--text-primary)] transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-[color:var(--text-primary)] transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-[color:var(--text-primary)] transition-colors">Contact Support</a>
+          <div className="flex gap-6 font-medium">
+            <a href="#interactive-demo" className="hover:text-[color:var(--text-primary)] transition-colors">
+              Live Demo
+            </a>
+            <a href="#publication-formats" className="hover:text-[color:var(--text-primary)] transition-colors">
+              Formats
+            </a>
+            <a href="#security" className="hover:text-[color:var(--text-primary)] transition-colors">
+              Security
+            </a>
           </div>
         </div>
       </footer>
