@@ -55,38 +55,51 @@ export default function DraftStage({
     }, 900);
 
     try {
-      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/draft`, "POST", {});
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/draft`,
+        "POST",
+        {},
+        async (event, data) => {
+          if (event === "log" || event === "chunk") {
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + Math.random(),
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: event === "chunk" ? "action" : "info",
+                message: data.message || data.chunk || JSON.stringify(data),
+              },
+            ]);
+          } else if (event === "done") {
+            clearInterval(logInterval);
+            setResults(data.data);
+            
+            try {
+              onSaved({ ...project });
+            } catch (saveErr) {
+              console.error("Failed to update project view", saveErr);
+            }
 
-      const resJson = await response.json();
-      if (!response.ok) {
-        throw new Error(resJson.error || "Agent encountered an error.");
-      }
-      const { data } = resJson;
-      setResults(data);
-
-      try {
-        // Backend now handles saving to the relational tables directly!
-        // We just notify the parent that the project has new state.
-        onSaved({ ...project });
-      } catch (saveErr) {
-        console.error("Failed to update project view", saveErr);
-      }
-
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + "done",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Draft generated successfully. ${data?.length || 4} sections assembled.`,
-        },
-      ]);
-      
-      setTimeout(() => {
-        if (onAdvance) {
-          onAdvance("citation_audit");
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "done",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "success",
+                message: `Draft generated successfully. ${data.data?.length || 4} sections assembled.`,
+              },
+            ]);
+            
+            setTimeout(() => {
+              if (onAdvance) {
+                onAdvance("citation_audit");
+              }
+            }, 3000);
+          } else if (event === "error") {
+            throw new Error(data.message || "Agent encountered an error.");
+          }
         }
-      }, 3000);
+      );
     } catch (err: any) {
       setError(err.message);
       setLogs((prev) => [

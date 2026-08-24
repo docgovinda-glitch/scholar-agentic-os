@@ -149,7 +149,7 @@ export default function PublicationReadinessStage({
 
           {isProcessing && (
             <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="w-[500px] p-8 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-2xl backdrop-blur-md">
+              <div className="w-full max-w-lg p-8 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-2xl backdrop-blur-md">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h3 className="text-xl font-bold text-[color:var(--text-primary)] tracking-widest uppercase mb-1">Diagnostic Run</h3>

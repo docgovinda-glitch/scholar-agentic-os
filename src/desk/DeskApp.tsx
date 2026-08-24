@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, lazy, Suspense } from "react";
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams, useOutletContext } from "react-router-dom";
-import AccountSettingsScreen from "./account/AccountSettingsScreen";
-import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
 import { RequireAuth, PublicOnly, RequireRecovery, RequireOnboarding } from "./DeskAuthGate";
 import {
   LandingRoute,
@@ -14,18 +12,25 @@ import {
   VerifyEmailRoute,
   OnboardingRoute,
 } from "./auth/AuthFlow";
-import DeskShell, { type DeskShellView } from "./DeskShell";
-import ResearchWorkspace from "./workspace/ResearchWorkspace";
+import type { DeskShellView } from "./DeskShell";
 import type { ResearchStage } from "./workspace/types";
 import { STAGE_MAP } from "./workspace/types";
 import { getProject, UnauthenticatedError } from "./api";
-import ProjectListScreen from "./ProjectListScreen";
-import VaultSetupScreen from "./setup/VaultSetupScreen";
 import { useAiSetupStatus } from "./setup/useAiSetupStatus";
 import { useVaultSetupStatus } from "./setup/useVaultSetupStatus";
 import { useDeskSession } from "./useDeskSession";
-import VaultScreen from "./vault/VaultScreen";
 import { useDeviceClass } from "../hooks/useDeviceClass";
+import type { SectionId } from "./aiAccess/AiAccessPage";
+import GlobalLoader from "./components/GlobalLoader";
+
+// Lazy loaded heavy screens
+const AccountSettingsScreen = lazy(() => import("./account/AccountSettingsScreen"));
+const AiAccessPage = lazy(() => import("./aiAccess/AiAccessPage"));
+const DeskShell = lazy(() => import("./DeskShell"));
+const ResearchWorkspace = lazy(() => import("./workspace/ResearchWorkspace"));
+const ProjectListScreen = lazy(() => import("./ProjectListScreen"));
+const VaultSetupScreen = lazy(() => import("./setup/VaultSetupScreen"));
+const VaultScreen = lazy(() => import("./vault/VaultScreen"));
 
 
 const SECTION_IDS: readonly SectionId[] = ["overview", "local", "free", "byok", "premium", "models", "settings"];
@@ -315,7 +320,7 @@ function AiAccessRoute() {
  */
 export default function DeskApp() {
   return (
-    <>
+    <Suspense fallback={<GlobalLoader />}>
       <Routes>
         <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
         <Route path="/signin" element={<PublicOnly><SignInRoute /></PublicOnly>} />
@@ -348,6 +353,6 @@ export default function DeskApp() {
           </Route>
         </Route>
       </Routes>
-    </>
+    </Suspense>
   );
 }

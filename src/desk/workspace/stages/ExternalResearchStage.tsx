@@ -68,44 +68,56 @@ export default function ExternalResearchStage({
     }, 900);
 
     try {
-      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/external-research`, "POST", {});
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/external-research`,
+        "POST",
+        {},
+        async (event, data) => {
+          if (event === "log" || event === "chunk") {
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + Math.random(),
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: event === "chunk" ? "action" : "info",
+                message: data.message || data.chunk || JSON.stringify(data),
+              },
+            ]);
+          } else if (event === "done") {
+            clearInterval(logInterval);
+            setResults(data.data);
+            
+            try {
+              const newAnswers = {
+                ...project.answers,
+                pending_external_sources: JSON.stringify(data.data),
+              };
+              const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+              onSaved(updatedProject);
+            } catch (saveErr) {
+              console.error("Failed to save pending external sources", saveErr);
+            }
 
-      const resJson = await response.json();
-      if (!response.ok) {
-        throw new Error(resJson.error || "Agent encountered an error searching external databases.");
-      }
-      const { data } = resJson;
-      setResults(data);
-      
-      // Auto-save the results to pending external sources
-      try {
-        const newAnswers = {
-          ...project.answers,
-          pending_external_sources: JSON.stringify(data),
-        };
-        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-        onSaved(updatedProject);
-      } catch (saveErr) {
-        console.error("Failed to save pending external sources", saveErr);
-      }
-
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + "done",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Crawl complete. Found ${data.length} papers addressing missing gaps. Preparing for approval triage...`,
-        },
-      ]);
-      
-      // Auto-advance after a short delay
-      setTimeout(() => {
-        if (onAdvance) {
-          onAdvance("source_approval_external");
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "done",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "success",
+                message: `Crawl complete. Found ${data.data?.length || 0} papers addressing missing gaps. Preparing for approval triage...`,
+              },
+            ]);
+            
+            setTimeout(() => {
+              if (onAdvance) {
+                onAdvance("source_approval_external");
+              }
+            }, 2500);
+          } else if (event === "error") {
+            throw new Error(data.message || "Agent encountered an error searching external databases.");
+          }
         }
-      }, 2500);
-
+      );
     } catch (err: any) {
       setError(err.message);
       setLogs((prev) => [

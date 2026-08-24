@@ -65,45 +65,56 @@ export default function EvidenceExtractionStage({
     }, 1100);
 
     try {
-      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/evidence-extraction`, "POST", {});
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/evidence-extraction`,
+        "POST",
+        {},
+        async (event, data) => {
+          if (event === "log" || event === "chunk") {
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + Math.random(),
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: event === "chunk" ? "action" : "info",
+                message: data.message || data.chunk || JSON.stringify(data),
+              },
+            ]);
+          } else if (event === "done") {
+            clearInterval(logInterval);
+            setResults(data.data);
+            
+            try {
+              const newAnswers = {
+                ...project.answers,
+                extracted_evidence: JSON.stringify(data.data),
+              };
+              const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+              onSaved(updatedProject);
+            } catch (saveErr) {
+              console.error("Failed to save extracted evidence", saveErr);
+            }
 
-      const resJson = await response.json();
-      if (!response.ok) {
-        throw new Error(resJson.error || "Agent encountered an error during evidence extraction.");
-      }
-      const { data } = resJson;
-      setResults(data);
-      
-      // Auto-save the results to project answers
-      try {
-        const newAnswers = {
-          ...project.answers,
-          extracted_evidence: JSON.stringify(data),
-        };
-        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-        onSaved(updatedProject);
-      } catch (saveErr) {
-        console.error("Failed to save extracted evidence", saveErr);
-      }
-
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + "done",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Extraction complete. Mined ${data.length} citable evidence blocks. Packaging into Evidence Matrix...`,
-        },
-      ]);
-      
-      // Auto-advance after a short delay
-      setTimeout(() => {
-        if (onAdvance) {
-          onAdvance("external_research");
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "done",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "success",
+                message: `Extraction complete. Mined ${data.data?.length || 0} citable evidence blocks. Packaging into Evidence Matrix...`,
+              },
+            ]);
+            
+            setTimeout(() => {
+              if (onAdvance) onAdvance("evidence_review");
+            }, 2000);
+          } else if (event === "error") {
+            throw new Error(data.message || "Agent encountered an error during evidence extraction.");
+          }
         }
-      }, 2500);
-
+      );
     } catch (err: any) {
+      clearInterval(logInterval);
       setError(err.message);
       setLogs((prev) => [
         ...prev,
@@ -111,13 +122,14 @@ export default function EvidenceExtractionStage({
           id: Date.now().toString() + "err",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
           level: "error",
-          message: err.message,
+          message: `Process failed: ${err.message}`,
         },
       ]);
     } finally {
       setIsProcessing(false);
     }
   };
+
 
   const getStrengthColor = (strength: EvidenceItem["strength"]) => {
     switch (strength) {

@@ -111,8 +111,8 @@ export default function ProjectListScreen({
       <div className="absolute bottom-[-20%] left-[-10%] w-[40%] h-[60%] bg-[color:var(--state-info-subtle)] blur-[150px] rounded-full pointer-events-none" />
 
       {/* Header */}
-      <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[color:var(--surface-raised)]/90 backdrop-blur-xl border-b border-[color:var(--border-subtle)] shadow-sm py-3' : 'bg-transparent py-6'}`}>
-        <div className="mx-auto max-w-7xl px-6 py-2 flex items-center justify-between">
+      <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[color:var(--surface-raised)]/90 backdrop-blur-xl border-b border-[color:var(--border-subtle)] shadow-sm py-2 md:py-3' : 'bg-transparent py-4 md:py-6'}`}>
+        <div className="mx-auto max-w-7xl px-4 md:px-6 py-2 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-[color:var(--accent)] shadow-sm">
               <span className="text-[color:var(--text-inverse)] font-bold text-xl font-serif">S</span>
@@ -393,7 +393,7 @@ function CapabilityCard({
 }) {
   return (
     <div 
-      className={`group relative p-8 rounded-3xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] transition-all duration-300 hover:border-[color:var(--border-strong)] hover:shadow-lg flex flex-col h-full overflow-hidden ${onClick ? 'cursor-pointer' : ''}`}
+      className={`group relative p-6 md:p-8 rounded-3xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] transition-all duration-300 hover:border-[color:var(--border-strong)] hover:shadow-lg flex flex-col h-full overflow-hidden ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -436,7 +436,7 @@ function ProjectCard({ project, onOpen, onDelete }: { project: ProjectView; onOp
     <div className="relative group">
       <button
         onClick={onOpen}
-        className="w-full h-full text-left p-8 rounded-[2rem] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:bg-[color:var(--surface-hover)] transition-all duration-300 hover:border-[color:var(--accent-border)] hover:shadow-md relative overflow-hidden flex flex-col cursor-pointer"
+        className="w-full h-full text-left p-6 md:p-8 rounded-[2rem] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:bg-[color:var(--surface-hover)] transition-all duration-300 hover:border-[color:var(--accent-border)] hover:shadow-md relative overflow-hidden flex flex-col cursor-pointer"
       >
         <div className="flex items-start justify-between mb-6 relative z-10 pr-10">
           <div className="w-12 h-12 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-secondary)] group-hover:text-[color:var(--accent)] group-hover:border-[color:var(--accent-border)] group-hover:bg-[color:var(--accent-subtle)] transition-all">

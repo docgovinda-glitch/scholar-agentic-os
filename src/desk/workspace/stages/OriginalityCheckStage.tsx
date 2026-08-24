@@ -47,29 +47,45 @@ export default function OriginalityCheckStage({
     }, 900);
 
     try {
-      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/originality-check`, "POST", {});
-
-      const resJson = await response.json();
-      if (!response.ok) {
-        throw new Error(resJson.error || "Agent encountered an error.");
-      }
-      const { data } = resJson;
-      setResults(data);
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString() + "done",
-          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "success",
-          message: `Originality check passed. 2% overlap detected (within acceptable limits).`,
-        },
-      ]);
-      
-      setTimeout(() => {
-        if (onAdvance) {
-          onAdvance("draft_preview");
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/originality-check`,
+        "POST",
+        {},
+        async (event, data) => {
+          if (event === "log" || event === "chunk") {
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + Math.random(),
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: event === "chunk" ? "action" : "info",
+                message: data.message || data.chunk || JSON.stringify(data),
+              },
+            ]);
+          } else if (event === "done") {
+            clearInterval(logInterval);
+            setResults(data.data);
+            
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "done",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "success",
+                message: `Originality check passed. 2% overlap detected (within acceptable limits).`,
+              },
+            ]);
+            
+            setTimeout(() => {
+              if (onAdvance) {
+                onAdvance("draft_preview");
+              }
+            }, 3500);
+          } else if (event === "error") {
+            throw new Error(data.message || "Agent encountered an error.");
+          }
         }
-      }, 3500);
+      );
     } catch (err: any) {
       setError(err.message);
       setLogs((prev) => [

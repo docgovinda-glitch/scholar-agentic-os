@@ -77,15 +77,20 @@ export default function PeerReviewStage({
     }, 150);
 
     try {
-      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/peer-review`, "POST", {});
-      const resJson = await response.json();
-      if (!response.ok) {
-        throw new Error(resJson.error || "Agent encountered an error.");
-      }
-      const { data } = resJson;
-      setResults(data);
-      onSaved({ ...project });
-      fetchCritiques();
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/peer-review`,
+        "POST",
+        {},
+        async (event, data) => {
+          if (event === "done") {
+            setResults(data.data);
+            onSaved({ ...project });
+            fetchCritiques();
+          } else if (event === "error") {
+            throw new Error(data.message || "Agent encountered an error.");
+          }
+        }
+      );
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -160,7 +165,7 @@ export default function PeerReviewStage({
 
           {isProcessing && (
             <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="w-96 p-8 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-2xl backdrop-blur-md text-center">
+              <div className="w-full max-w-sm p-8 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-2xl backdrop-blur-md text-center">
                 <div className="relative w-24 h-24 mx-auto mb-6">
                   <svg className="w-full h-full animate-spin text-[color:var(--accent)] opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4v1m6 2l-1 1M20 12h-1m-2 6l-1-1m-6 2v-1m-6-2l1-1M4 12h1m2-6l1 1" />

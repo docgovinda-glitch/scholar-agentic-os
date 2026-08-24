@@ -47,38 +47,44 @@ export default function RevisionStage({
     }, 150);
 
     try {
-      const response = await authedJsonFetch(`/api/projects/${projectId}/agent/revision`, "POST", {});
-      const resJson = await response.json();
-      if (!response.ok) {
-        throw new Error(resJson.error || "Agent encountered an error.");
-      }
-      const { data } = resJson;
-      // Parse old draft and apply patches
-      let currentDraft = project.answers.manuscript_draft ? JSON.parse(project.answers.manuscript_draft) : [];
-      let newDraft = [...currentDraft];
-      
-      if (Array.isArray(data)) {
-        for (const patch of data) {
-          const sectionIndex = newDraft.findIndex((s: any) => s.section === patch.section || s.section_name === patch.section);
-          if (sectionIndex !== -1 && newDraft[sectionIndex].content && patch.find && patch.replace) {
-            newDraft[sectionIndex].content = newDraft[sectionIndex].content.replace(patch.find, patch.replace);
-            newDraft[sectionIndex].status = "Revised";
+      await authedStreamFetch(
+        `/api/projects/${projectId}/agent/revision`,
+        "POST",
+        {},
+        async (event, streamData) => {
+          if (event === "done") {
+            const data = streamData.data;
+            // Parse old draft and apply patches
+            let currentDraft = project.answers.manuscript_draft ? JSON.parse(project.answers.manuscript_draft) : [];
+            let newDraft = [...currentDraft];
+            
+            if (Array.isArray(data)) {
+              for (const patch of data) {
+                const sectionIndex = newDraft.findIndex((s: any) => s.section === patch.section || s.section_name === patch.section);
+                if (sectionIndex !== -1 && newDraft[sectionIndex].content && patch.find && patch.replace) {
+                  newDraft[sectionIndex].content = newDraft[sectionIndex].content.replace(patch.find, patch.replace);
+                  newDraft[sectionIndex].status = "Revised";
+                }
+              }
+            }
+
+            setResults(newDraft);
+
+            try {
+              const newAnswers = {
+                ...project.answers,
+                manuscript_draft: JSON.stringify(newDraft),
+              };
+              const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
+              onSaved(updatedProject);
+            } catch (saveErr) {
+              console.error("Failed to save revised draft", saveErr);
+            }
+          } else if (event === "error") {
+            throw new Error(streamData.message || "Agent encountered an error.");
           }
         }
-      }
-
-      setResults(newDraft);
-
-      try {
-        const newAnswers = {
-          ...project.answers,
-          manuscript_draft: JSON.stringify(newDraft),
-        };
-        const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-        onSaved(updatedProject);
-      } catch (saveErr) {
-        console.error("Failed to save revised draft", saveErr);
-      }
+      );
     } catch (err: any) {
       setError(err.message);
     } finally {
