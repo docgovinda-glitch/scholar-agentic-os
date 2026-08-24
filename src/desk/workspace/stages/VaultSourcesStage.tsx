@@ -4,6 +4,8 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedJsonFetch, saveIntakeAnswers , authedStreamFetch} from "../../api";
+import { getSupabaseClient } from "../../../services/supabaseClient";
+import { listVaultItems } from "../../../services/vaultContents";
 
 interface VaultSource {
   id: string;
@@ -47,10 +49,52 @@ export default function VaultSourcesStage({
     ]);
 
     try {
+      const { data: userData } = await getSupabaseClient().auth.getUser();
+      if (!userData.user) throw new Error("User not authenticated.");
+
+      let vaultItems: any[] = [];
+      try {
+        vaultItems = await listVaultItems(userData.user.id);
+      } catch (e) {
+        // Vault is likely locked or hasn't been set up yet.
+      }
+
+      if (vaultItems.length === 0) {
+        setLogs((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString() + "empty",
+            timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+            level: "info",
+            message: `Vault is empty or locked. Skipping source discovery and advancing...`,
+          },
+        ]);
+        setResults([]);
+        const updatedProject = await saveIntakeAnswers(projectId, {
+          ...project.answers,
+          pending_vault_sources: "[]",
+        });
+        onSaved(updatedProject);
+        if (onAdvance) {
+          // Advance immediately to next stage since there's nothing to approve
+          setTimeout(() => onAdvance("source_approval"), 1000);
+        }
+        return;
+      }
+
+      // Map vault items to a lighter context payload for the LLM to evaluate
+      const vaultContext = vaultItems.map(item => ({
+        id: item.id,
+        title: item.title,
+        authors: item.authors || [],
+        year: item.year || new Date().getFullYear(),
+        abstract: item.content ? item.content.substring(0, 500) : "",
+      }));
+
       await authedStreamFetch(
         `/api/projects/${projectId}/agent/vault-sources`,
         "POST",
-        {},
+        { vaultItems: vaultContext },
         async (event, data) => {
           if (event === "log" || event === "chunk") {
             setLogs((prev) => [

@@ -206,7 +206,7 @@ export default function ContextPanel({
   const agent = AGENT_CONFIGS[currentStage];
   const stageDef = STAGE_MAP.get(currentStage);
 
-  const [history, setHistory] = useState<Array<{ role: "user" | "copilot"; content: string }>>([]);
+  const [history, setHistory] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
@@ -227,12 +227,12 @@ export default function ContextPanel({
     try {
       const res = await sendCopilotMessage(projectId, currentStage, text, history);
       if (res.ok) {
-        setHistory([...newHistory, { role: "copilot", content: res.response }]);
+        setHistory([...newHistory, { role: "assistant", content: res.response }]);
       } else {
         throw new Error((res as any).error || "Received an error response from the AI provider.");
       }
     } catch (err: any) {
-      setHistory([...newHistory, { role: "copilot", content: `**Error**: ${err.message || "Failed to connect to Copilot."}` }]);
+      setHistory([...newHistory, { role: "assistant", content: `**Error**: ${err.message || "Failed to connect to Assistant."}` }]);
     } finally {
       setIsTyping(false);
     }

@@ -1,5 +1,8 @@
+import { useState, useRef } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
+import { addVaultItem } from "../../../services/vaultContents";
+import { getSupabaseClient } from "../../../services/supabaseClient";
 
 export default function AdditionalDataStage({
   stage,
@@ -11,8 +14,51 @@ export default function AdditionalDataStage({
   onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!def) return <div>Unknown stage</div>;
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      if (!file.name.endsWith('.txt') && !file.name.endsWith('.md')) {
+        throw new Error(`Cannot parse ${file.name}. Only .txt and .md files are supported for local parsing right now.`);
+      }
+      
+      const { data: userData } = await getSupabaseClient().auth.getUser();
+      if (!userData.user) throw new Error("User not authenticated.");
+
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result as string);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsText(file);
+      });
+
+      await addVaultItem(userData.user.id, {
+        title: file.name,
+        content: text,
+        sourceType: "file",
+        filename: file.name
+      });
+
+      setSuccess(`Successfully added ${file.name} to your Vault!`);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)]">
@@ -55,28 +101,55 @@ export default function AdditionalDataStage({
                 </p>
               </div>
               
-              <div className="border-2 border-dashed border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:border-[color:var(--accent)] hover:bg-[color:var(--accent-subtle)] rounded-xl p-10 text-center transition-all cursor-pointer group">
+              <div 
+                className="border-2 border-dashed border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] hover:border-[color:var(--accent)] hover:bg-[color:var(--accent-subtle)] rounded-xl p-10 text-center transition-all cursor-pointer group"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  onChange={handleFile} 
+                  disabled={busy}
+                />
                 <div className="w-12 h-12 bg-[color:var(--surface-canvas)] rounded-lg flex items-center justify-center mx-auto mb-3 border border-[color:var(--border-subtle)] group-hover:border-[color:var(--accent)] transition-colors">
-                  <svg className="w-6 h-6 text-[color:var(--text-muted)] group-hover:text-[color:var(--accent)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className={`w-6 h-6 transition-colors ${busy ? 'text-[color:var(--accent)] animate-bounce' : 'text-[color:var(--text-muted)] group-hover:text-[color:var(--accent)]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <h4 className="text-sm font-bold text-[color:var(--text-primary)] mb-1">
-                  Select files to upload
+                  {busy ? "Processing..." : "Select files to upload"}
                 </h4>
                 <p className="text-xs text-[color:var(--text-muted)] font-mono">
-                  Ready for parsing...
+                  {busy ? "Encrypting and storing in Vault..." : "Ready for parsing..."}
                 </p>
               </div>
+
+              {error && (
+                <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-500 text-center">
+                  {error}
+                </div>
+              )}
+              {success && (
+                <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-500 text-center font-medium">
+                  {success}
+                </div>
+              )}
             </div>
           </div>
           
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex justify-center gap-4">
+            <button 
+              onClick={() => onAdvance?.("evidence_extraction")}
+              className="px-6 py-3 rounded-xl bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] font-medium shadow-sm hover:bg-[color:var(--surface-hover)] transition-colors"
+            >
+              Skip Step
+            </button>
             <button 
               onClick={() => onAdvance?.("evidence_extraction")}
               className="px-8 py-3 rounded-xl bg-[color:var(--accent)] text-white font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-colors flex items-center gap-2"
             >
-              Submit & Proceed to Extraction
+              Proceed to Extraction
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>

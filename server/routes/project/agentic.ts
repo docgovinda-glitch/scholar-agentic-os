@@ -224,8 +224,13 @@ router.post("/vault-sources", async (req: express.Request<{ id: string }>, res) 
   const context = JSON.stringify(project.answers);
 
   try {
+    const vaultItems = req.body?.vaultItems || [];
+    const vaultContext = vaultItems.length > 0 
+        ? `Available Vault Items:\n${JSON.stringify(vaultItems)}`
+        : "No vault items available.";
+
     const systemPrompt = `You are an expert academic source discovery agent.
-Based on the provided research context, generate a realistic list of exactly 5 discovered sources from the user's "vault".
+Based on the provided research context and the user's provided vault items, select up to 5 of the most relevant sources from the vault. DO NOT invent or hallucinate any sources. If no items match, return an empty array.
 Return ONLY valid JSON in this exact format:
 {
   "data": [
@@ -235,11 +240,12 @@ Return ONLY valid JSON in this exact format:
       "author": "...",
       "year": 2024,
       "relevance_score": 90,
-      "type": "PDF Document"
+      "type": "PDF Document",
+      "snippet": "..."
     }
   ]
 }`;
-    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}`);
+    const result = await streamOpenRouterJSON(req, res, systemPrompt, `Context: ${context}\n\n${vaultContext}`);
     if (!result) return;
     
     // Insert into Supabase project_sources
