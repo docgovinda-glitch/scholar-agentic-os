@@ -138,7 +138,14 @@ export default function LocalRunnerDetail({
           {/* Surfaced up front, not only after a failure: this is the step
               users skip, and skipping it produces a confusing "can't connect"
               on an otherwise perfectly working runner. */}
-          <p className="text-sm text-[color:var(--text-secondary)]">{runner.corsGuidance}</p>
+          <div className="space-y-2">
+            <p className="text-sm text-[color:var(--text-secondary)]">{runner.corsGuidance}</p>
+            <div className="mt-2 rounded-lg bg-[color:var(--surface-sunken)] p-3 border border-[color:var(--border-subtle)]">
+              <p className="text-xs text-[color:var(--text-muted)]">
+                <strong className="text-[color:var(--text-primary)]">Why is this required?</strong> Modern browsers block public websites from secretly scanning your local network (Private Network Access). You must explicitly configure {runner.name} to allow Scholar Core to connect. This cannot be automated for your security.
+              </p>
+            </div>
+          </div>
         </Step>
 
         <Step n={3} title="Check the address">

@@ -55,6 +55,11 @@ function from(table: string) {
       }),
     };
   }
+  if (table === "profiles") {
+    return {
+      select: () => ({ eq: () => ({ single: async () => ({ data: { username: "scholar", full_name: "Scholar Student", user_type: "student", education_level: "undergrad", affiliation: "University" }, error: null }) }) }),
+    };
+  }
   throw new Error(`Unmocked table: ${table}`);
 }
 
@@ -223,7 +228,7 @@ describe("the canonical first-login journey", () => {
   it("4. skipping Knowledge moves to the workspace", async () => {
     renderDeskApp();
     fireEvent.click(await screen.findByRole("button", { name: /Skip for now/ }));
-
+    fireEvent.click(await screen.findByRole("button", { name: /Next →/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
 
     expect(await screen.findByText("Initialize your first project")).toBeInTheDocument();
@@ -233,8 +238,8 @@ describe("the canonical first-login journey", () => {
   it("5. completing Knowledge moves to the workspace, with a one-time welcome", async () => {
     renderDeskApp();
     fireEvent.click(await screen.findByRole("button", { name: /Skip for now/ }));
-
-    fireEvent.click(await screen.findByRole("button", { name: /Create a Vault/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Next →/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Create a Secure Vault/ }));
     fireEvent.change(await screen.findByLabelText("Vault passphrase"), { target: { value: "correct horse" } });
     fireEvent.change(screen.getByLabelText("Confirm passphrase"), { target: { value: "correct horse" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));

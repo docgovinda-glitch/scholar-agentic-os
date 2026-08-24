@@ -878,18 +878,14 @@ Answer the user's question concisely. Be highly academic and professional. Use m
     }
     userPrompt += message;
 
-    const result = await streamOpenRouterText(req, res, systemPrompt, userPrompt);
+    const result = await callOpenRouterText(req, res, systemPrompt, userPrompt);
     if (!result) return;
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, response: result })}\n\n`);
-    res.end();
+    res.json({ ok: true, response: result });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
       res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
     }
   }
 });

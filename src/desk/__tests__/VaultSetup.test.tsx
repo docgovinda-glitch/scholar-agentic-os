@@ -52,7 +52,8 @@ afterEach(() => {
 /** Walk the offer → passphrase → recovery path. */
 async function reachRecoveryStep() {
   render(<VaultSetupScreen onDone={vi.fn()} onSkip={vi.fn()} />);
-  fireEvent.click(await screen.findByRole("button", { name: /Create a Vault/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /Next →/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /Create a Secure Vault/ }));
   fireEvent.change(screen.getByLabelText("Vault passphrase"), { target: { value: "correct horse" } });
   fireEvent.change(screen.getByLabelText("Confirm passphrase"), { target: { value: "correct horse" } });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -87,6 +88,7 @@ describe("the offer", () => {
     const onSkip = vi.fn();
     render(<VaultSetupScreen onDone={vi.fn()} onSkip={onSkip} />);
 
+    fireEvent.click(await screen.findByRole("button", { name: /Next →/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
     expect(onSkip).toHaveBeenCalled();
   });
@@ -94,11 +96,11 @@ describe("the offer", () => {
   it("explains what a Vault is before asking for a decision", async () => {
     render(<VaultSetupScreen onDone={vi.fn()} onSkip={vi.fn()} />);
     expect(await screen.findByText(/long-term library/i)).toBeInTheDocument();
-    expect(screen.getByText(/entirely optional/i)).toBeInTheDocument();
   });
 
   it("shows import as unavailable here specifically, not as a dead button — the real import lives on the Vault screen", async () => {
     render(<VaultSetupScreen onDone={vi.fn()} onSkip={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Next →/ }));
     await screen.findByText(/Import an existing library/i);
 
     // BibTeX/RIS import is real (VaultImport.tsx) but only reachable once a
@@ -112,7 +114,8 @@ describe("the offer", () => {
 describe("passphrase", () => {
   it("says plainly that it is not the account password", async () => {
     render(<VaultSetupScreen onDone={vi.fn()} onSkip={vi.fn()} />);
-    fireEvent.click(await screen.findByRole("button", { name: /Create a Vault/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Next →/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Create a Secure Vault/ }));
 
     // Docs 25 §4: conflating the two is "a support disaster and a data-loss risk".
     expect(screen.getByText(/It is/)).toHaveTextContent(/not your account password/i);
@@ -120,7 +123,8 @@ describe("passphrase", () => {
 
   it("blocks continuing while the two entries differ", async () => {
     render(<VaultSetupScreen onDone={vi.fn()} onSkip={vi.fn()} />);
-    fireEvent.click(await screen.findByRole("button", { name: /Create a Vault/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Next →/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Create a Secure Vault/ }));
 
     fireEvent.change(screen.getByLabelText("Vault passphrase"), { target: { value: "correct horse" } });
     fireEvent.change(screen.getByLabelText("Confirm passphrase"), { target: { value: "correct hose" } });

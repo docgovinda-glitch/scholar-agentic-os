@@ -8,7 +8,7 @@ import { addVaultItem, type VaultItem, type VaultSourceType } from "../../servic
  * - DOI scholarly lookup via /api/lookup-doi
  */
 
-type Mode = "file" | "web" | "doi";
+type Mode = "file" | "doi";
 
 interface PreviewItem {
   title: string;
@@ -19,7 +19,7 @@ interface PreviewItem {
   externalReference?: string;
 }
 
-async function fileToBase64(file: File): Promise<string> {
+export async function fileToBase64(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   return btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ""));
 }
@@ -61,17 +61,20 @@ export default function VaultDocumentImport({
     setBusy(true);
     setError(null);
     try {
-      const fileContent = await fileToBase64(file);
-      const res = await fetch("/api/parse-file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: file.name, fileType: file.type, fileContent }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not read that file.");
+        if (!file.name.endsWith('.txt') && !file.name.endsWith('.md')) {
+            throw new Error(`Cannot parse ${file.name}. Only .txt and .md files are supported for local parsing.`);
+        }
+        
+        const text = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = (e) => reject(new Error("Failed to read file"));
+            reader.readAsText(file);
+        });
+
       setPreview({
         title: file.name,
-        content: body.text || "",
+        content: text || "",
         sourceType: "file",
         filename: file.name,
       });
@@ -82,31 +85,7 @@ export default function VaultDocumentImport({
     }
   }
 
-  async function handleLookupUrl(e: React.FormEvent) {
-    e.preventDefault();
-    if (!url.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/parse-external-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Could not extract text from that URL.");
-      setPreview({
-        title: body.metadata?.fileName || url.trim(),
-        content: body.text || "",
-        sourceType: url.includes("youtube.com") || url.includes("youtu.be") ? "video" : "web",
-        externalReference: url.trim(),
-      });
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
+
 
   async function handleLookupDoi(e: React.FormEvent) {
     e.preventDefault();
@@ -179,14 +158,7 @@ export default function VaultDocumentImport({
         >
           Upload a file
         </button>
-        <button
-          type="button"
-          onClick={() => switchMode("web")}
-          aria-current={mode === "web"}
-          className={`rounded-[var(--radius-sm)] px-2.5 py-1 text-sm ${mode === "web" ? "bg-[color:var(--accent-subtle)] text-[color:var(--accent)]" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"} cursor-pointer`}
-        >
-          Web / Video URL
-        </button>
+
         <button
           type="button"
           onClick={() => switchMode("doi")}
@@ -201,7 +173,7 @@ export default function VaultDocumentImport({
         mode === "file" ? (
           <div className="flex flex-col gap-2">
             <p className="text-xs text-[color:var(--text-muted)]">
-              PDF, Word (.docx), spreadsheets (.xlsx, .csv), plain text, Markdown, images, or audio recordings.
+              Plain text (.txt) or Markdown (.md) files.
             </p>
             <input
               type="file"
@@ -212,24 +184,6 @@ export default function VaultDocumentImport({
             />
             {busy && <p className="text-xs text-[color:var(--text-muted)]">Extracting source content…</p>}
           </div>
-        ) : mode === "web" ? (
-          <form onSubmit={handleLookupUrl} className="flex items-center gap-2">
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://example.com/research-article or YouTube URL"
-              aria-label="Web or Video URL"
-              className="flex-1 px-3 py-2 text-sm"
-            />
-            <button
-              type="submit"
-              disabled={busy || !url.trim()}
-              className="shrink-0 rounded-[var(--radius-md)] border border-[color:var(--border-control)] px-3.5 py-2 text-sm text-[color:var(--text-primary)] transition-colors duration-[var(--motion-fast)] hover:border-[color:var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
-            >
-              {busy ? "Fetching…" : "Extract"}
-            </button>
-          </form>
         ) : (
           <form onSubmit={handleLookupDoi} className="flex items-center gap-2">
             <input

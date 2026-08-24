@@ -254,6 +254,9 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
 }
 
 export async function streamOpenRouterText(req: any, res: any, systemPrompt: string, userPrompt: string, model: string = "openrouter/auto", taskType: string = "reasoning") {
+  const override = handleFrontendLLMOverride(req);
+  if (override) return override;
+
   const serverAuthorized = await isServerAiAuthorized(req);
   const candidates = serverAuthorized ? getCandidates() : [];
 

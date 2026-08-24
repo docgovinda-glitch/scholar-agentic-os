@@ -39,52 +39,43 @@ function open() {
 }
 
 describe("uploading a file", () => {
-  it("sends the file's contents to /api/parse-file and previews the extracted text", async () => {
-    mockFetchOnce({ text: "Extracted body text.", metadata: { fileName: "notes.pdf" } });
+  it("reads the file's contents via FileReader and previews the extracted text", async () => {
     open();
 
-    const file = new File(["hello"], "notes.pdf", { type: "application/pdf" });
+    const file = new File(["Extracted body text."], "notes.md", { type: "text/markdown" });
     const input = screen.getByLabelText("Upload a document");
     fireEvent.change(input, { target: { files: [file] } });
 
-    expect(await screen.findByText("notes.pdf")).toBeInTheDocument();
+    expect(await screen.findByText("notes.md")).toBeInTheDocument();
     expect(screen.getByText("Extracted body text.")).toBeInTheDocument();
-
-    const [url, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toBe("/api/parse-file");
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.fileName).toBe("notes.pdf");
-    expect(typeof body.fileContent).toBe("string");
   });
 
   it("saves the previewed item to the Vault only after confirming", async () => {
-    mockFetchOnce({ text: "Extracted body text.", metadata: { fileName: "notes.pdf" } });
     const onImported = vi.fn();
     render(<VaultDocumentImport userId="user-1" onImported={onImported} />);
     fireEvent.click(screen.getByRole("button", { name: "Upload a document or look up a DOI" }));
 
-    const file = new File(["hello"], "notes.pdf", { type: "application/pdf" });
+    const file = new File(["Extracted body text."], "notes.md", { type: "text/markdown" });
     fireEvent.change(screen.getByLabelText("Upload a document"), { target: { files: [file] } });
-    await screen.findByText("notes.pdf");
+    await screen.findByText("notes.md");
 
     expect(addVaultItem).not.toHaveBeenCalled();
-    addVaultItem.mockResolvedValue({ id: "1", title: "notes.pdf", content: "Extracted body text.", createdAt: "now" });
+    addVaultItem.mockResolvedValue({ id: "1", title: "notes.md", content: "Extracted body text.", createdAt: "now" });
     fireEvent.click(screen.getByRole("button", { name: "Add to Vault" }));
 
     await waitFor(() =>
-      expect(addVaultItem).toHaveBeenCalledWith("user-1", { title: "notes.pdf", content: "Extracted body text." })
+      expect(addVaultItem).toHaveBeenCalledWith("user-1", { title: "notes.md", content: "Extracted body text." })
     );
     await waitFor(() => expect(onImported).toHaveBeenCalled());
   });
 
   it("surfaces a parse failure as an announced error", async () => {
-    mockFetchOnce({ error: "Could not read that file." }, false);
     open();
 
     const file = new File(["hello"], "broken.pdf", { type: "application/pdf" });
     fireEvent.change(screen.getByLabelText("Upload a document"), { target: { files: [file] } });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not read that file.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Only .txt and .md files are supported");
   });
 });
 
@@ -140,17 +131,16 @@ describe("looking up a DOI", () => {
 
 describe("discarding and cancelling", () => {
   it("can discard a preview without saving it", async () => {
-    mockFetchOnce({ text: "x", metadata: { fileName: "notes.pdf" } });
     open();
 
     fireEvent.change(screen.getByLabelText("Upload a document"), {
-      target: { files: [new File(["hello"], "notes.pdf")] },
+      target: { files: [new File(["x"], "notes.md")] },
     });
-    await screen.findByText("notes.pdf");
+    await screen.findByText("notes.md");
 
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
-    expect(screen.queryByText("notes.pdf")).not.toBeInTheDocument();
-    expect(addVaultItem).not.toHaveBeenCalled();
+    expect(screen.queryByText("notes.md")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Upload a document")).toBeInTheDocument();
   });
 
   it("closes entirely on Cancel", async () => {

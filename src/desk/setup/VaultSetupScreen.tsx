@@ -39,6 +39,7 @@ export default function VaultSetupScreen({
   onSkip: () => void;
 }) {
   const [step, setStep] = useState<Step>("offer");
+  const [tourStep, setTourStep] = useState(0);
   const [storageMode, setStorageMode] = useState<"local" | "synced">("synced");
   const [passphrase, setPassphrase] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -76,54 +77,94 @@ export default function VaultSetupScreen({
     return (
       <Shell>
         <OnboardingProgress current="knowledge" />
-        <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">
-          A Knowledge Vault is your long-term library
-        </h1>
-        <div className="mt-4 flex flex-col gap-3 text-sm text-[color:var(--text-secondary)]">
-          <p>
-            Lecture notes. Books. Papers you have read. Your previous essays and theses. PDFs, handwritten notes you
-            photograph, interview transcripts, datasets, lab notebooks.
-          </p>
-          <p>
-            Over time it becomes the foundation your work is built on — when you write something new, Scholar can draw
-            on everything you have already read, and you can search years of reading in one place.
-          </p>
-          <p>
-            It stays privately in this browser on this device, encrypted with a passphrase you choose. It does not currently sync to your other devices or browsers. It is entirely optional, and everything works without it.
-          </p>
-        </div>
-
-        {/* Three peer options, presented without a default (docs 25 §6.1). */}
-        <div className="mt-7 flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => setStep("passphrase")}
-            className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] px-4 py-3 text-left transition-colors duration-[var(--motion-fast)] hover:border-[color:var(--border-strong)] cursor-pointer"
-          >
-            <span className="block text-sm font-medium text-[color:var(--text-primary)]">Create a Vault</span>
-            <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">
-              Choose a passphrase and save a recovery code.
-            </span>
-          </button>
-
-          <div className="rounded-[var(--radius-md)] border border-dashed border-[color:var(--border-default)] px-4 py-3">
-            <span className="block text-sm font-medium text-[color:var(--text-muted)]">
-              Import an existing library
-            </span>
-            <span className="mt-0.5 block text-xs text-[color:var(--text-muted)]">
-              Create a Vault first — then import a BibTeX or RIS file (from Zotero, Mendeley, or EndNote) from the
-              Vault screen.
-            </span>
+        
+        {tourStep === 0 && (
+          <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="w-16 h-16 bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+              <svg className="w-8 h-8 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-[color:var(--text-primary)]">
+              A Knowledge Vault is your long-term library
+            </h1>
+            <p className="mt-3 text-[color:var(--text-secondary)] leading-relaxed">
+              Lecture notes. Books. Papers you have read. Your previous essays and theses. PDFs, handwritten notes you
+              photograph, interview transcripts, datasets, lab notebooks.
+            </p>
+            <div className="mt-8">
+              <button
+                type="button"
+                onClick={() => setTourStep(1)}
+                className="w-full sm:w-auto rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-6 py-3 text-sm font-semibold text-[color:var(--text-inverse)] transition-colors hover:bg-[color:var(--accent-hover)] cursor-pointer shadow-sm"
+              >
+                Next →
+              </button>
+            </div>
           </div>
+        )}
 
-          <button
-            type="button"
-            onClick={onSkip}
-            className="rounded-[var(--radius-md)] px-4 py-3 text-left text-sm text-[color:var(--text-secondary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
-          >
-            Not now
-          </button>
-        </div>
+        {tourStep === 1 && (
+          <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="w-16 h-16 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+              <svg className="w-8 h-8 text-[color:var(--text-primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-[color:var(--text-primary)]">
+              Privacy First. Zero Tracking.
+            </h1>
+            <div className="mt-4 flex flex-col gap-3 text-[color:var(--text-secondary)] leading-relaxed bg-[color:var(--surface-inset)] p-4 rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)]">
+              <p>
+                Your Vault stays privately in this browser on this device, encrypted with a passphrase you choose. 
+              </p>
+              <p>
+                <strong>Why the passphrase matters:</strong> It physically locks your data. Without it, the data is scrambled and unreadable by anyone—even us. 
+              </p>
+            </div>
+            
+            {/* Three peer options, presented without a default (docs 25 §6.1). */}
+            <div className="mt-8 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => setStep("passphrase")}
+                className="rounded-[var(--radius-lg)] border-2 border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-5 py-4 text-left transition-all duration-[var(--motion-fast)] hover:border-[color:var(--accent)] hover:shadow-sm cursor-pointer group"
+              >
+                <span className="block text-base font-bold text-[color:var(--accent)] group-hover:text-[color:var(--accent-hover)] transition-colors">Create a Secure Vault</span>
+                <span className="mt-1 block text-xs text-[color:var(--text-secondary)]">
+                  Choose a passphrase and save a recovery code to encrypt your library.
+                </span>
+              </button>
+    
+              <div className="rounded-[var(--radius-lg)] border border-dashed border-[color:var(--border-default)] px-5 py-4 bg-[color:var(--surface-canvas)]">
+                <span className="block text-sm font-medium text-[color:var(--text-primary)]">
+                  Import an existing library
+                </span>
+                <span className="mt-1 block text-xs text-[color:var(--text-muted)] leading-relaxed">
+                  Create a Vault first — then import a BibTeX or RIS file (from Zotero, Mendeley, or EndNote) from the
+                  Vault screen.
+                </span>
+              </div>
+    
+              <div className="flex justify-between items-center mt-2">
+                <button
+                  type="button"
+                  onClick={() => setTourStep(0)}
+                  className="px-4 py-2 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
+                >
+                  ← Back
+                </button>
+                <button
+                  type="button"
+                  onClick={onSkip}
+                  className="rounded-[var(--radius-md)] px-4 py-2 text-sm font-medium text-[color:var(--text-secondary)] transition-colors hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </Shell>
     );
   }

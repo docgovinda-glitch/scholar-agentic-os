@@ -33,6 +33,8 @@ export default function ProjectListScreen({
   const [creating, setCreating] = useState(false);
   const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
   const [scrolled, setScrolled] = useState(false);
+  const [showAgentsInfo, setShowAgentsInfo] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (showWelcome) onWelcomeSeen?.();
@@ -125,31 +127,51 @@ export default function ProjectListScreen({
                 {userEmail}
               </span>
             )}
-            <div className="flex items-center gap-1 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-full p-1 shadow-sm">
+            
+            {/* Desktop Controls */}
+            <div className="hidden md:flex items-center gap-1 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-full p-1 shadow-sm">
               {onOpenVault && (
                 <button
                   onClick={onOpenVault}
-                  className="px-4 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] rounded-full transition-all"
-                  title="Private Knowledge Vault — stored in this browser, not synced"
+                  className="px-2 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] rounded-lg transition-all"
+                  title="Private Knowledge Vault"
                 >
-                  Private Vault
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
                 </button>
               )}
+              <button
+                onClick={() => setShowAgentsInfo(true)}
+                className="px-2 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] rounded-lg transition-all"
+                title="View Agents Information"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+              </button>
               {onOpenAiAccess && (
-                <button onClick={onOpenAiAccess} className="px-4 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] rounded-full transition-all">
-                  Agents
+                <button onClick={onOpenAiAccess} className="px-2 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] rounded-lg transition-all" title="Configure AI Models">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
                 </button>
               )}
               {onOpenAccountSettings && (
-                <button onClick={onOpenAccountSettings} className="px-4 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] rounded-full transition-all">
-                  Settings
+                <button onClick={onOpenAccountSettings} className="px-2 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] rounded-lg transition-all" title="Settings">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </button>
               )}
             </div>
+
+            {/* Mobile Menu Button */}
+            <button 
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden ml-1 p-2 rounded-full flex items-center justify-center bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors border border-[color:var(--border-subtle)]"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+              </svg>
+            </button>
+
             <button
               onClick={handleSignOut}
               aria-label="Sign out"
-              className="ml-2 rounded-full w-10 h-10 flex items-center justify-center bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] hover:bg-[color:var(--state-danger)] hover:text-[color:var(--text-inverse)] transition-colors border border-[color:var(--state-danger-subtle)]"
+              className="ml-1 sm:ml-2 rounded-full w-10 h-10 flex items-center justify-center bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] hover:bg-[color:var(--state-danger)] hover:text-[color:var(--text-inverse)] transition-colors border border-[color:var(--state-danger-subtle)]"
               title="Sign out"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
@@ -157,6 +179,56 @@ export default function ProjectListScreen({
           </div>
         </div>
       </header>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-[60] flex flex-col bg-[color:var(--surface-canvas)] animate-fade-in pt-24">
+          <div className="flex-1 p-6 flex flex-col gap-4">
+            {onOpenVault && (
+              <button
+                onClick={() => { onOpenVault(); setMobileMenuOpen(false); }}
+                className="w-full text-left px-5 py-4 rounded-xl font-bold text-lg text-[color:var(--text-primary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] active:bg-[color:var(--surface-hover)] flex items-center justify-between"
+              >
+                Private Vault
+                <svg className="w-6 h-6 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+            )}
+            <button
+              onClick={() => { setShowAgentsInfo(true); setMobileMenuOpen(false); }}
+              className="w-full text-left px-5 py-4 rounded-xl font-bold text-lg text-[color:var(--text-primary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] active:bg-[color:var(--surface-hover)] flex items-center justify-between"
+            >
+              Agents
+              <svg className="w-6 h-6 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </button>
+            {onOpenAiAccess && (
+              <button
+                onClick={() => { onOpenAiAccess(); setMobileMenuOpen(false); }}
+                className="w-full text-left px-5 py-4 rounded-xl font-bold text-lg text-[color:var(--text-primary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] active:bg-[color:var(--surface-hover)] flex items-center justify-between"
+              >
+                AI Models
+                <svg className="w-6 h-6 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+            )}
+            {onOpenAccountSettings && (
+              <button
+                onClick={() => { onOpenAccountSettings(); setMobileMenuOpen(false); }}
+                className="w-full text-left px-5 py-4 rounded-xl font-bold text-lg text-[color:var(--text-primary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] active:bg-[color:var(--surface-hover)] flex items-center justify-between"
+              >
+                Settings
+                <svg className="w-6 h-6 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+            )}
+          </div>
+          <div className="p-6 border-t border-[color:var(--border-subtle)] flex justify-center pb-12">
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-4 rounded-full bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] active:bg-[color:var(--surface-hover)] text-[color:var(--text-muted)]"
+            >
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="relative z-10 mx-auto max-w-7xl px-6 pt-36 pb-24 animate-fade-in">
         {welcomeVisible && (
@@ -227,7 +299,7 @@ export default function ProjectListScreen({
                 />
                 <CapabilityCard
                   icon="M13 10V3L4 14h7v7l9-11h-7z"
-                  title="AI Agents"
+                  title="AI Models"
                   desc="Configure extraction and synthesis models."
                   action="Manage AI"
                   onClick={onOpenAiAccess}
@@ -523,20 +595,96 @@ function ChooseOutputType({
       {/* P1-3: Projects vs Vault distinction — always visible so users understand
           that projects sync to their account but their private Vault does not. */}
       <footer className="relative z-10 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] py-4 px-6">
-        <div className="mx-auto max-w-7xl flex flex-wrap items-center justify-center gap-6 text-xs text-[color:var(--text-muted)]">
+        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-xs text-[color:var(--text-muted)] text-center">
           <span className="flex items-center gap-1.5">
             <span>☁️</span>
             <strong className="font-medium text-[color:var(--text-secondary)]">Projects</strong>
-            <span>— synced to your Scholar account</span>
+            <span>— synced to your account</span>
           </span>
-          <span aria-hidden="true" className="text-[color:var(--border-default)]">|</span>
+          <span aria-hidden="true" className="hidden sm:inline text-[color:var(--border-default)]">|</span>
           <span className="flex items-center gap-1.5">
             <span>🔒</span>
             <strong className="font-medium text-[color:var(--text-secondary)]">Private Vault</strong>
-            <span>— stored in this browser · not synced to other devices</span>
+            <span>— stored in this browser · not synced</span>
           </span>
         </div>
       </footer>
+
+      {showAgentsInfo && (
+        <AgentsInfoModal onClose={() => setShowAgentsInfo(false)} />
+      )}
+    </div>
+  );
+}
+
+function AgentsInfoModal({ onClose }: { onClose: () => void }) {
+  const agents = [
+    {
+      name: "Knowledge Extraction Agent",
+      icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
+      description: "Scans uploaded PDFs to extract structural information, claims, methodology, and key results to construct your knowledge vault.",
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+    },
+    {
+      name: "Drafting Agent",
+      icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
+      description: "Synthesizes the extracted claims and evidence into structured narrative blocks to draft your manuscript based on journal guidelines.",
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
+    },
+    {
+      name: "Compliance & Revision Agent",
+      icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+      description: "Reviews drafted content against strict journal submission criteria, checking word counts, citation formats, and stylistic constraints.",
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+    }
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[color:var(--surface-canvas)]/80 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="relative w-full max-w-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between p-8 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]">
+          <div>
+            <h2 className="text-2xl font-black text-[color:var(--text-primary)]">Agentic Capabilities</h2>
+            <p className="text-sm text-[color:var(--text-secondary)] mt-1">Information on the active models in your workspace.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-[color:var(--surface-hover)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="p-8 overflow-y-auto flex flex-col gap-6">
+          {agents.map((agent, i) => (
+            <div key={i} className="flex gap-5 items-start p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] hover:border-[color:var(--accent-border)] transition-colors">
+              <div className={`w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center ${agent.bg} ${agent.color}`}>
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={agent.icon} />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[color:var(--text-primary)] mb-1">{agent.name}</h3>
+                <p className="text-sm text-[color:var(--text-secondary)] leading-relaxed">{agent.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="p-6 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 rounded-full font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-colors"
+          >
+            Acknowledge
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

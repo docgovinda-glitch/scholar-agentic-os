@@ -31,7 +31,7 @@ import {
   type CloudProviderSpec,
 } from "./src/config/providerCatalog.ts";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
-import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerParseRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerAiAccessRoutes, registerSearchRoutes } from "./server/routes/index.ts";
+import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerAiAccessRoutes, registerSearchRoutes } from "./server/routes/index.ts";
 
 dotenv.config();
 
@@ -410,7 +410,6 @@ citationStyleRegistry.register(new VancouverFormatter());
 registerHealthRoutes(app);
 registerAdminRoutes(app);
 registerAuthRoutes(app);
-registerParseRoutes(app, parseFileLimit, parseExternalLinkLimit, lookupDoiLimit);
 registerAIRoutes(app, aiAbuseLimit, citationStyleRegistry);
 registerStudioRoutes(app, studioLimit);
 registerProjectRoutes(app, projectLimit);

@@ -129,6 +129,16 @@ export async function hasVaultPassphraseOnThisDevice(): Promise<boolean> {
   }
 }
 
+export async function clearVaultPassphraseVerifier(): Promise<void> {
+  const userId = await currentUserId();
+  if (!userId) return;
+  try {
+    localStorage.removeItem(`${PASSPHRASE_VERIFIER_PREFIX}${userId}`);
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
 /* -------------------------------------------------------------------------
  * Vault existence (server-side, no secrets)
  * ---------------------------------------------------------------------- */

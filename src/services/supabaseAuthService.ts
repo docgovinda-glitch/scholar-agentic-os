@@ -703,6 +703,9 @@ export async function signInWithGoogle(redirectPath: string = ""): Promise<Servi
     provider: "google",
     options: {
       redirectTo: `${window.location.origin}${redirectPath}`,
+      queryParams: {
+        prompt: "select_account",
+      },
     },
   });
   if (error) return { success: false, error: error.message };

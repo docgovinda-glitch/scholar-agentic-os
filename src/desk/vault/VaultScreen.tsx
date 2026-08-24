@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { loadVault, hasVaultPassphraseOnThisDevice, updateVaultStorageMode, type VaultRecord } from "../../services/userVault";
+import { loadVault, hasVaultPassphraseOnThisDevice, updateVaultStorageMode, clearVaultPassphraseVerifier, type VaultRecord } from "../../services/userVault";
 import {
   addVaultItem,
   deleteVaultItem,
@@ -8,14 +8,13 @@ import {
   lockVault,
   searchVaultItems,
   unlockVault,
-  syncLocalVaultToRemote,
-  resolveVaultProvider,
   type VaultItem,
-  type SyncProgress,
+  type VaultSourceType,
+  type CitationStatus,
 } from "../../services/vaultContents";
 import VaultSetupScreen from "../setup/VaultSetupScreen";
 import VaultImport from "./VaultImport";
-import VaultDocumentImport from "./VaultDocumentImport";
+import VaultDocumentImport, { fileToBase64 } from "./VaultDocumentImport";
 import { CitationConfirmationModal } from "./CitationConfirmationModal";
 
 /**
@@ -178,15 +177,25 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
             </button>
           </div>
         </form>
-        <p className="mt-8 text-xs text-[color:var(--text-muted)]">
-          Forgotten your passphrase? In this version there is no automated way to open the Vault without it. Your
-          recovery code is proof that you created this Vault, but it cannot substitute for your passphrase here. If
-          you have lost your passphrase, your Vault contents cannot be recovered by anyone, including us.
-        </p>
-        <p className="mt-3 rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs text-[color:var(--text-muted)]">
-          ⚠️ Your Vault is stored privately in this browser. Clearing your browser’s site data may permanently remove
-          your encrypted Vault from this device.
-        </p>
+        <div className="mt-8 pt-6 border-t border-[color:var(--border-subtle)]">
+          <p className="text-xs text-[color:var(--text-muted)] mb-3">
+            Forgotten your passphrase? There is no automated way to recover it. If you have lost it, you can delete this local Vault and start over.
+          </p>
+          <button
+            type="button"
+            onClick={async () => {
+              if (window.confirm("WARNING: This will permanently delete your private local vault and all its contents on this device. This action cannot be undone.\n\nAre you absolutely sure you want to proceed?")) {
+                await clearVaultPassphraseVerifier();
+                const provider = new LocalVaultStorageProvider();
+                await provider.clear(userId);
+                setVaultPresence("none");
+              }
+            }}
+            className="text-xs font-semibold text-[color:var(--state-danger)] hover:underline cursor-pointer"
+          >
+            Delete & Reset Local Vault
+          </button>
+        </div>
       </Shell>
     );
   }
@@ -229,12 +238,17 @@ function VaultContents({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Migration state
-  const [syncing, setSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
-
   // Citation editing modal state
   const [editingCitationItem, setEditingCitationItem] = useState<VaultItem | null>(null);
+
+  // Filtering & Sorting state
+  const [filterType, setFilterType] = useState<VaultSourceType | "all">("all");
+  const [filterStatus, setFilterStatus] = useState<CitationStatus | "all">("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "title">("newest");
+
+  // Bulk Actions & Drag Drop state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -256,7 +270,27 @@ function VaultContents({
     loadItems();
   }, [userId, storageMode]);
 
-  const visible = useMemo(() => (items ? searchVaultItems(items, query) : []), [items, query]);
+  const visible = useMemo(() => {
+    if (!items) return [];
+    let result = searchVaultItems(items, query);
+    
+    if (filterType !== "all") {
+      result = result.filter(item => item.sourceType === filterType);
+    }
+    
+    if (filterStatus !== "all") {
+      result = result.filter(item => item.citationStatus === filterStatus);
+    }
+    
+    result.sort((a, b) => {
+      if (sortBy === "title") return a.title.localeCompare(b.title);
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      return sortBy === "oldest" ? timeA - timeB : timeB - timeA;
+    });
+    
+    return result;
+  }, [items, query, filterType, filterStatus, sortBy]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -268,7 +302,7 @@ function VaultContents({
         title: title.trim(),
         content: content.trim(),
         citation: citation.trim() || undefined,
-        citationStatus: citation.trim() ? "needs_user_review" : "missing",
+        citationStatus: citation.trim() ? "confirmed" : "missing",
       });
       setItems((current) => [saved, ...(current ?? [])]);
       setTitle("");
@@ -289,6 +323,11 @@ function VaultContents({
       await deleteVaultItem(userId, id);
       setItems((current) => (current ?? []).filter((i) => i.id !== id));
       setConfirmingDelete(null);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -296,79 +335,104 @@ function VaultContents({
     }
   }
 
-  async function handleStartSync() {
-    setSyncing(true);
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setBusy(true);
     setError(null);
     try {
-      const result = await syncLocalVaultToRemote(userId, setSyncProgress);
-      if (result.success) {
-        await updateVaultStorageMode("synced");
-        onModeChanged("synced");
-        loadItems();
-      } else if (result.errors.length > 0) {
-        setError(result.errors[0]);
+      const ids = Array.from(selectedIds);
+      for (const id of ids) {
+        await deleteVaultItem(userId, id);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to synchronize Vault.");
+      setItems((current) => (current ?? []).filter((i) => !selectedIds.has(i.id)));
+      setSelectedIds(new Set());
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
-      setTimeout(() => setSyncing(false), 1200);
+      setBusy(false);
+    }
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    
+    setBusy(true);
+    setError(null);
+    try {
+      for (const file of files) {
+        if (!file.name.endsWith('.txt') && !file.name.endsWith('.md')) {
+            throw new Error(`Cannot parse ${file.name}. Only .txt and .md files are supported for local parsing.`);
+        }
+        
+        const text = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = (e) => reject(new Error("Failed to read file"));
+            reader.readAsText(file);
+        });
+        
+        const saved = await addVaultItem(userId, {
+          title: file.name,
+          content: text || "",
+          sourceType: "file",
+          filename: file.name,
+        });
+        setItems((current) => [saved, ...(current ?? [])]);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
-    <Shell onClose={onClose}>
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+    <div 
+      className="relative w-full h-full"
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingOver(true); }}
+      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); if (e.currentTarget.contains(e.relatedTarget as Node)) return; setIsDraggingOver(false); }}
+      onDrop={handleDrop}
+    >
+      <Shell onClose={onClose}>
+        {isDraggingOver && (
+          <div className="absolute inset-0 z-50 bg-[color:var(--surface-sunken)] bg-opacity-90 backdrop-blur-sm flex flex-col items-center justify-center border-4 border-dashed border-[color:var(--accent)] rounded-[var(--radius-xl)] m-4 pointer-events-none transition-all duration-200">
+            <svg className="w-16 h-16 text-[color:var(--accent)] mb-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <h2 className="text-2xl font-bold text-[color:var(--text-primary)]">Drop files to add to Vault</h2>
+            <p className="text-[color:var(--text-secondary)] mt-2">TXT, MD</p>
+          </div>
+        )}
+        <header className="mb-6 flex flex-wrap items-start justify-between gap-3 relative z-10">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">Your Vault</h1>
           <p className="mt-1.5 text-sm text-[color:var(--text-secondary)]">
             Notes, sources, and material you have already gathered — searchable, and encrypted in this browser.
           </p>
           <div className="mt-2 flex items-center gap-3">
-            {storageMode === "synced" ? (
-              <span className="inline-flex items-center gap-1.5 text-xs text-[color:var(--accent)] font-medium bg-[color:var(--accent-subtle)] px-2.5 py-1 rounded-[var(--radius-sm)] border border-[color:var(--accent-border)]">
-                ☁️ Synced to Account (Cross-Device)
-              </span>
-            ) : (
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 text-xs text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] px-2.5 py-1 rounded-[var(--radius-sm)]">
                   🔒 This Browser Only
                 </span>
-                <button
-                  type="button"
-                  onClick={handleStartSync}
-                  disabled={syncing}
-                  className="text-xs font-semibold text-[color:var(--accent)] hover:underline cursor-pointer"
-                >
-                  {syncing ? "Syncing…" : "Sync to Account →"}
-                </button>
               </div>
-            )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onLock}
-          className="shrink-0 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
-        >
-          Lock
-        </button>
+        {storageMode === "local" && (
+          <button
+            type="button"
+            onClick={onLock}
+            className="shrink-0 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
+          >
+            Lock
+          </button>
+        )}
       </header>
-
-      {syncProgress && syncing && (
-        <div className="mb-5 p-4 rounded-[var(--radius-md)] border border-[color:var(--accent-border)] bg-[color:var(--surface-raised)] flex flex-col gap-2">
-          <div className="flex justify-between text-xs text-[color:var(--text-secondary)] font-medium">
-            <span>Synchronizing sources to account…</span>
-            <span>{syncProgress.completed} / {syncProgress.total}</span>
-          </div>
-          <div className="w-full bg-[color:var(--surface-sunken)] h-1.5 rounded-full overflow-hidden">
-            <div
-              className="bg-[color:var(--accent-solid)] h-full transition-all duration-300"
-              style={{ width: `${(syncProgress.completed / Math.max(syncProgress.total, 1)) * 100}%` }}
-            />
-          </div>
-          <p className="text-xs text-[color:var(--text-muted)] truncate">{syncProgress.currentTitle}</p>
-        </div>
-      )}
 
       {error && (
         <p
@@ -384,14 +448,51 @@ function VaultContents({
       ) : (
         <>
           <div className="mb-4 flex items-center gap-3">
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search your Vault"
-              aria-label="Search your Vault"
-              className="flex-1 px-3 py-2 text-sm"
-            />
+            <div className="flex-1 min-w-[200px] flex items-center gap-2 relative">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search your Vault"
+                aria-label="Search your Vault"
+                className="w-full px-3 py-2 text-sm border border-[color:var(--border-default)] rounded-[var(--radius-md)] bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as any)}
+                className="text-xs px-2 py-1.5 rounded bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] outline-none"
+              >
+                <option value="all">All Types</option>
+                <option value="file">Files & Docs</option>
+                <option value="web">Web Links</option>
+                <option value="video">Videos</option>
+                <option value="reference">References</option>
+              </select>
+              
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                className="text-xs px-2 py-1.5 rounded bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] outline-none"
+              >
+                <option value="all">All Statuses</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="needs_user_review">Needs Review</option>
+                <option value="missing">Missing Citation</option>
+              </select>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="text-xs px-2 py-1.5 rounded bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] outline-none"
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="title">Title (A-Z)</option>
+              </select>
+            </div>
             <button
               type="button"
               onClick={() => setAdding((v) => !v)}
@@ -464,91 +565,157 @@ function VaultContents({
           )}
 
           {visible.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">
-              {items.length === 0 ? "Nothing in your Vault yet." : "Nothing matches that search."}
-            </p>
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <div className="w-16 h-16 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                <svg className="w-8 h-8 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {items.length === 0 
+                    ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  }
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-[color:var(--text-primary)] mb-1">
+                {items.length === 0 ? "Your Vault is Empty" : "No results found"}
+              </h3>
+              <p className="text-sm text-[color:var(--text-secondary)] max-w-sm mx-auto mb-6">
+                {items.length === 0 
+                  ? "Build your knowledge base by uploading documents, importing references, or adding manual notes. Your Vault securely encrypts your research." 
+                  : `We couldn't find anything matching "${query}". Try a different search term.`}
+              </p>
+              {items.length === 0 && (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setAdding(true)}
+                    className="px-4 py-2 bg-[color:var(--accent)] text-[color:var(--text-inverse)] text-sm font-bold rounded-lg hover:bg-[color:var(--accent-hover)] transition-colors"
+                  >
+                    Add a Note
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
-            <ul aria-label="Vault items" className="flex flex-col gap-2.5">
-              {visible.map((item) => (
-                <li
-                  key={item.id}
-                  className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] px-4 py-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.title}</p>
-                    <div className="flex items-center gap-2">
-                      {item.citationStatus === "confirmed" ? (
-                        <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 rounded">
-                          🟢 Citation Ready
-                        </span>
-                      ) : item.citationStatus === "needs_user_review" ? (
-                        <button
-                          type="button"
-                          onClick={() => setEditingCitationItem(item)}
-                          className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 px-2 py-0.5 rounded hover:underline cursor-pointer"
-                        >
-                          🟡 Review Citation →
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setEditingCitationItem(item)}
-                          className="text-[10px] font-semibold text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] px-2 py-0.5 rounded hover:underline cursor-pointer"
-                        >
-                          🔴 Missing Citation →
-                        </button>
-                      )}
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--text-muted)]">
-                        {item.sourceType || "source"}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-[color:var(--text-secondary)] line-clamp-3">
-                    {item.content}
-                  </p>
-                  {item.citation && <p className="mt-1.5 text-xs text-[color:var(--text-muted)]">{item.citation}</p>}
-
-                  <div className="mt-2 flex items-center gap-4">
+            <div className="flex flex-col gap-4">
+              {selectedIds.size > 0 && (
+                <div className="flex items-center justify-between p-3 rounded-[var(--radius-md)] bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)]">
+                  <span className="text-sm font-medium text-[color:var(--accent)]">
+                    {selectedIds.size} item{selectedIds.size === 1 ? "" : "s"} selected
+                  </span>
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => setEditingCitationItem(item)}
-                      className="text-xs text-[color:var(--accent)] hover:underline cursor-pointer font-medium"
+                      onClick={() => setSelectedIds(new Set())}
+                      className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
                     >
-                      {item.citationStatus === "confirmed" ? "Edit Citation" : "Complete Citation"}
+                      Deselect All
                     </button>
-
-                    {confirmingDelete === item.id ? (
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-[color:var(--text-secondary)]">Delete this? There is no undo.</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(item.id)}
-                          disabled={busy}
-                          className="text-xs text-[color:var(--state-danger)] hover:opacity-80 cursor-pointer font-bold"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingDelete(null)}
-                          className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmingDelete(item.id)}
-                        className="text-xs text-[color:var(--text-muted)] hover:text-[color:var(--state-danger)] cursor-pointer"
-                      >
-                        Delete
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleBulkDelete}
+                      disabled={busy}
+                      className="px-3 py-1.5 bg-[color:var(--state-danger)] text-[color:var(--text-inverse)] text-xs font-bold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                    >
+                      {busy ? "Deleting…" : "Delete Selected"}
+                    </button>
                   </div>
-                </li>
-              ))}
-            </ul>
+                </div>
+              )}
+              <ul aria-label="Vault items" className="flex flex-col gap-2.5">
+                {visible.map((item) => (
+                  <li
+                    key={item.id}
+                    className="rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] px-4 py-3 flex gap-3 group"
+                  >
+                    <div className="pt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={(e) => {
+                          const next = new Set(selectedIds);
+                          if (e.target.checked) next.add(item.id);
+                          else next.delete(item.id);
+                          setSelectedIds(next);
+                        }}
+                        className="w-4 h-4 rounded border-[color:var(--border-strong)] text-[color:var(--accent)] cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex-1 flex flex-col min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.title}</p>
+                        <div className="flex items-center gap-2">
+                          {item.citationStatus === "confirmed" ? (
+                            <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 rounded">
+                              🟢 Citation Ready
+                            </span>
+                          ) : item.citationStatus === "needs_user_review" ? (
+                            <button
+                              type="button"
+                              onClick={() => setEditingCitationItem(item)}
+                              className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 px-2 py-0.5 rounded hover:underline cursor-pointer"
+                            >
+                              🟡 Review Citation →
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setEditingCitationItem(item)}
+                              className="text-[10px] font-semibold text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] px-2 py-0.5 rounded hover:underline cursor-pointer"
+                            >
+                              🔴 Missing Citation →
+                            </button>
+                          )}
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--text-muted)]">
+                            {item.sourceType || "source"}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-[color:var(--text-secondary)] line-clamp-3">
+                        {item.content}
+                      </p>
+                      {item.citation && <p className="mt-1.5 text-xs text-[color:var(--text-muted)]">{item.citation}</p>}
+
+                      <div className="mt-2 flex items-center gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setEditingCitationItem(item)}
+                          className="text-xs text-[color:var(--accent)] hover:underline cursor-pointer font-medium"
+                        >
+                          {item.citationStatus === "confirmed" ? "Edit Citation" : "Complete Citation"}
+                        </button>
+
+                        {confirmingDelete === item.id ? (
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-[color:var(--text-secondary)]">Delete this? There is no undo.</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(item.id)}
+                              disabled={busy}
+                              className="text-xs text-[color:var(--state-danger)] hover:opacity-80 cursor-pointer font-bold"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmingDelete(null)}
+                              className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingDelete(item.id)}
+                            className="text-xs text-[color:var(--text-muted)] hover:text-[color:var(--state-danger)] cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {editingCitationItem && (
@@ -591,7 +758,8 @@ function VaultContents({
           )}
         </>
       )}
-    </Shell>
+      </Shell>
+    </div>
   );
 }
 

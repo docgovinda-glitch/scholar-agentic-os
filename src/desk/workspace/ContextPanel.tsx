@@ -228,6 +228,8 @@ export default function ContextPanel({
       const res = await sendCopilotMessage(projectId, currentStage, text, history);
       if (res.ok) {
         setHistory([...newHistory, { role: "copilot", content: res.response }]);
+      } else {
+        throw new Error((res as any).error || "Received an error response from the AI provider.");
       }
     } catch (err: any) {
       setHistory([...newHistory, { role: "copilot", content: `**Error**: ${err.message || "Failed to connect to Copilot."}` }]);
@@ -237,24 +239,9 @@ export default function ContextPanel({
   };
 
   return (
-    <>
-      {/* Toggle Button */}
-      <button
-        onClick={onToggle}
-        className={`fixed top-4 right-4 z-40 p-2 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-full shadow-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-transform duration-300 ${
-          isOpen ? "translate-x-0" : "-translate-x-4"
-        }`}
-        title="Toggle AI Context Panel"
-      >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-        </svg>
-      </button>
-
-      {/* Panel */}
       <aside
-        className={`fixed right-0 top-0 h-full w-[320px] bg-[color:var(--surface-canvas)] border-l border-[color:var(--border-subtle)] shadow-xl transition-transform duration-300 z-30 flex flex-col ${
-          isOpen ? "translate-x-0" : "translate-x-full"
+        className={`h-full w-full bg-[color:var(--surface-canvas)] flex flex-col ${
+          isOpen ? "" : "hidden"
         }`}
       >
         <div className="p-6 pb-4 border-b border-[color:var(--border-subtle)]">
@@ -372,6 +359,5 @@ export default function ContextPanel({
           </form>
         </div>
       </aside>
-    </>
   );
 }

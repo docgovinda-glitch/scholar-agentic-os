@@ -21,21 +21,30 @@
 
 import { decryptDataAsync, encryptDataAsync } from "../utils/crypto";
 import { verifyVaultPassphrase } from "./userVault";
-import {
-  type VaultItem,
-  type VaultSourceType,
-  type CitationStatus,
-  type SyncProgress,
-  type SyncResult,
-  resolveVaultProvider,
-  syncLocalVaultToRemote,
-  LocalVaultStorageProvider,
-  SupabaseVaultStorageProvider,
-} from "./vault/VaultStorageProvider";
 import type { CanonicalReference } from "../citation_compliance/model/reference";
 
-export type { VaultItem, VaultSourceType, CitationStatus, CanonicalReference, SyncProgress, SyncResult };
-export { resolveVaultProvider, syncLocalVaultToRemote, LocalVaultStorageProvider, SupabaseVaultStorageProvider };
+export type VaultSourceType = "file" | "web" | "video" | "reference" | "custom" | "text";
+export type CitationStatus = "missing" | "needs_user_review" | "confirmed";
+
+export interface VaultItem {
+  id: string;
+  title: string;
+  content: string;
+  sourceType?: VaultSourceType;
+  filename?: string;
+  mimeType?: string;
+  externalReference?: string;
+  storageReference?: string;
+  citation?: string;
+  citationStatus?: CitationStatus;
+  canonicalReference?: CanonicalReference;
+  authors?: string[];
+  year?: string;
+  journal?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 interface StoredItem {
   id: string;
@@ -167,7 +176,7 @@ export async function addVaultItem(
     title: fields.title,
     content: fields.content,
     citation: fields.citation,
-    citationStatus: fields.citationStatus || (fields.citation || fields.canonicalReference ? "needs_user_review" : "missing"),
+    citationStatus: fields.citationStatus || (fields.citation || fields.canonicalReference ? "confirmed" : "missing"),
     canonicalReference: fields.canonicalReference,
     sourceType: fields.sourceType || "file",
     filename: fields.filename,
