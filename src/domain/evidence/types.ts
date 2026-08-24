@@ -33,7 +33,7 @@ export type AuthorityTier = "A" | "B" | "C" | "D";
 export type DiscoveryMethod = "arxiv" | "web_search" | "openalex" | "user_upload" | "vault" | "manual";
 
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
-import type { CitationStatus } from "../../services/vault/VaultStorageProvider";
+import type { CitationStatus } from "../../services/vaultContents";
 
 export interface DiscoveredSource {
   id: string;

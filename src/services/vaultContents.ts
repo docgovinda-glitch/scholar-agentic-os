@@ -146,6 +146,20 @@ async function idbDelete(userId: string, id: string): Promise<void> {
   }
 }
 
+export async function clearVaultItems(userId: string): Promise<void> {
+  const db = await openDb(userId);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
 /* -------------------------------------------------------------------------
  * Vault Items CRUD (Client-Side Encrypted)
  * ---------------------------------------------------------------------- */

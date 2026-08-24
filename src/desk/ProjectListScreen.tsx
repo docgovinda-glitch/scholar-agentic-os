@@ -15,6 +15,7 @@ export default function ProjectListScreen({
   onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
+  onOpenAgents,
   showWelcome,
   onWelcomeSeen,
 }: {
@@ -23,6 +24,7 @@ export default function ProjectListScreen({
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
+  onOpenAgents?: () => void;
   showWelcome?: boolean;
   onWelcomeSeen?: () => void;
 }) {
@@ -33,7 +35,6 @@ export default function ProjectListScreen({
   const [creating, setCreating] = useState(false);
   const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
   const [scrolled, setScrolled] = useState(false);
-  const [showAgentsInfo, setShowAgentsInfo] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -143,17 +144,19 @@ export default function ProjectListScreen({
                   </div>
                 </div>
               )}
-              <div className="relative group">
-                <button
-                  onClick={() => setShowAgentsInfo(true)}
-                  className="px-2 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] rounded-lg transition-all"
-                >
+              {onOpenAgents && (
+                <div className="relative group">
+                  <button
+                    onClick={onOpenAgents}
+                    className="px-2 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] rounded-lg transition-all"
+                  >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
                 </button>
                 <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 px-2.5 py-1.5 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-primary)] text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap shadow-lg z-50">
                   View Agents Information
                 </div>
               </div>
+              )}
               {onOpenAiAccess && (
                 <div className="relative group">
                   <button onClick={onOpenAiAccess} className="px-2 py-1.5 text-sm font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] active:bg-[color:var(--surface-sunken)] rounded-lg transition-all">
@@ -211,13 +214,15 @@ export default function ProjectListScreen({
                 <svg className="w-6 h-6 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
               </button>
             )}
-            <button
-              onClick={() => { setShowAgentsInfo(true); setMobileMenuOpen(false); }}
-              className="w-full text-left px-5 py-4 rounded-xl font-bold text-lg text-[color:var(--text-primary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] active:bg-[color:var(--surface-hover)] flex items-center justify-between"
-            >
-              Agents
-              <svg className="w-6 h-6 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            </button>
+            {onOpenAgents && (
+              <button
+                onClick={() => { onOpenAgents(); setMobileMenuOpen(false); }}
+                className="w-full text-left px-5 py-4 rounded-xl font-bold text-lg text-[color:var(--text-primary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] active:bg-[color:var(--surface-hover)] flex items-center justify-between"
+              >
+                Agents
+                <svg className="w-6 h-6 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+            )}
             {onOpenAiAccess && (
               <button
                 onClick={() => { onOpenAiAccess(); setMobileMenuOpen(false); }}
@@ -629,81 +634,6 @@ function ChooseOutputType({
         </div>
       </footer>
 
-      {showAgentsInfo && (
-        <AgentsInfoModal onClose={() => setShowAgentsInfo(false)} />
-      )}
-    </div>
-  );
-}
-
-function AgentsInfoModal({ onClose }: { onClose: () => void }) {
-  const agents = [
-    {
-      name: "Knowledge Extraction Agent",
-      icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
-      description: "Scans uploaded PDFs to extract structural information, claims, methodology, and key results to construct your knowledge vault.",
-      color: "text-blue-500",
-      bg: "bg-blue-500/10",
-    },
-    {
-      name: "Drafting Agent",
-      icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
-      description: "Synthesizes the extracted claims and evidence into structured narrative blocks to draft your manuscript based on journal guidelines.",
-      color: "text-emerald-500",
-      bg: "bg-emerald-500/10",
-    },
-    {
-      name: "Compliance & Revision Agent",
-      icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-      description: "Reviews drafted content against strict journal submission criteria, checking word counts, citation formats, and stylistic constraints.",
-      color: "text-amber-500",
-      bg: "bg-amber-500/10",
-    }
-  ];
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[color:var(--surface-canvas)]/80 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="relative w-full max-w-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between p-8 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]">
-          <div>
-            <h2 className="text-2xl font-black text-[color:var(--text-primary)]">Agentic Capabilities</h2>
-            <p className="text-sm text-[color:var(--text-secondary)] mt-1">Information on the active models in your workspace.</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-[color:var(--surface-hover)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        
-        <div className="p-8 overflow-y-auto flex flex-col gap-6">
-          {agents.map((agent, i) => (
-            <div key={i} className="flex gap-5 items-start p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] hover:border-[color:var(--accent-border)] transition-colors">
-              <div className={`w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center ${agent.bg} ${agent.color}`}>
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={agent.icon} />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-[color:var(--text-primary)] mb-1">{agent.name}</h3>
-                <p className="text-sm text-[color:var(--text-secondary)] leading-relaxed">{agent.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="p-6 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-6 py-2.5 rounded-full font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] transition-colors"
-          >
-            Acknowledge
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

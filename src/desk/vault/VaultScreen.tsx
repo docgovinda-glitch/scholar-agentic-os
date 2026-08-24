@@ -16,6 +16,7 @@ import VaultSetupScreen from "../setup/VaultSetupScreen";
 import VaultImport from "./VaultImport";
 import VaultDocumentImport, { fileToBase64 } from "./VaultDocumentImport";
 import { CitationConfirmationModal } from "./CitationConfirmationModal";
+import { clearVaultItems, updateVaultItemCitation } from "../../services/vaultContents";
 
 /**
  * The Universal Knowledge Vault's contents — reachable any time from Header/ProjectListScreen.
@@ -186,8 +187,7 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
             onClick={async () => {
               if (window.confirm("WARNING: This will permanently delete your private local vault and all its contents on this device. This action cannot be undone.\n\nAre you absolutely sure you want to proceed?")) {
                 await clearVaultPassphraseVerifier();
-                const provider = new LocalVaultStorageProvider();
-                await provider.clear(userId);
+                await clearVaultItems(userId);
                 setVaultPresence("none");
               }
             }}
@@ -737,21 +737,19 @@ function VaultContents({
               sourceType={editingCitationItem.sourceType}
               onClose={() => setEditingCitationItem(null)}
               onConfirm={async (confirmedRef, formattedCitation) => {
-                const provider = resolveVaultProvider(userId, storageMode);
-                const updatedItem: VaultItem = {
-                  ...editingCitationItem,
-                  canonicalReference: confirmedRef,
-                  citationStatus: "confirmed",
-                  citation: formattedCitation,
-                  authors: confirmedRef.authors.map((a) => [a.firstName, a.lastName].filter(Boolean).join(" ")),
-                  year: confirmedRef.year,
-                  journal: confirmedRef.journal || confirmedRef.source,
-                  updatedAt: new Date().toISOString(),
-                };
-                await provider.saveItem(userId, updatedItem);
-                setItems((prev) =>
-                  prev ? prev.map((it) => (it.id === updatedItem.id ? updatedItem : it)) : [updatedItem]
+                const updatedItem = await updateVaultItemCitation(
+                  userId,
+                  editingCitationItem.id,
+                  confirmedRef,
+                  "confirmed",
+                  formattedCitation
                 );
+                
+                if (updatedItem) {
+                  setItems((prev) =>
+                    prev ? prev.map((it) => (it.id === updatedItem.id ? updatedItem : it)) : [updatedItem]
+                  );
+                }
                 setEditingCitationItem(null);
               }}
             />

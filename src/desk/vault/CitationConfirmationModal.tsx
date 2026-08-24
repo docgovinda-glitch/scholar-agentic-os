@@ -11,7 +11,7 @@ import type { CanonicalReference, ReferenceKind, ReferenceAuthor } from "../../c
 import { validateCitationCompleteness } from "../../citation_compliance/validation";
 import { CitationFormatterFactory } from "../../citation_compliance/formattingEngine";
 import { CITATION_STYLES } from "../../app/citation/resolveCitations";
-import type { CitationStatus } from "../../services/vault/VaultStorageProvider";
+import type { CitationStatus } from "../../services/vaultContents";
 
 export interface CitationConfirmationModalProps {
   initialReference?: Partial<CanonicalReference>;

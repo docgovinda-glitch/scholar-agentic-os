@@ -535,6 +535,38 @@ export type Database = {
           },
         ]
       }
+      manuscript_versions: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          project_id: string
+          section_name: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          project_id: string
+          section_name: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          section_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manuscript_versions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
       opportunity_reviews: {
         Row: {
           admin_id: string
@@ -578,6 +610,7 @@ export type Database = {
           lens: string
           project_id: string
           severity: string
+          waived: boolean
         }
         Insert: {
           created_at?: string
@@ -586,6 +619,7 @@ export type Database = {
           lens: string
           project_id: string
           severity: string
+          waived?: boolean
         }
         Update: {
           created_at?: string
@@ -594,6 +628,7 @@ export type Database = {
           lens?: string
           project_id?: string
           severity?: string
+          waived?: boolean
         }
         Relationships: [
           {
@@ -1017,6 +1052,41 @@ export type Database = {
         }
         Relationships: []
       }
+      project_activity: {
+        Row: {
+          created_at: string
+          description: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_activity_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
       project_claim_binding_evidence: {
         Row: {
           binding_id: string
@@ -1161,6 +1231,7 @@ export type Database = {
         Row: {
           claim_type: string | null
           created_at: string
+          embedding: string | null
           id: string
           project_id: string
           quote: string
@@ -1171,6 +1242,7 @@ export type Database = {
         Insert: {
           claim_type?: string | null
           created_at?: string
+          embedding?: string | null
           id?: string
           project_id: string
           quote: string
@@ -1181,6 +1253,7 @@ export type Database = {
         Update: {
           claim_type?: string | null
           created_at?: string
+          embedding?: string | null
           id?: string
           project_id?: string
           quote?: string
@@ -1259,6 +1332,44 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "project_sources"
             referencedColumns: ["project_id", "source_id"]
+          },
+        ]
+      }
+      project_files: {
+        Row: {
+          filename: string
+          id: string
+          mime_type: string
+          project_id: string
+          size_bytes: number
+          storage_path: string
+          uploaded_at: string
+        }
+        Insert: {
+          filename: string
+          id?: string
+          mime_type: string
+          project_id: string
+          size_bytes: number
+          storage_path: string
+          uploaded_at?: string
+        }
+        Update: {
+          filename?: string
+          id?: string
+          mime_type?: string
+          project_id?: string
+          size_bytes?: number
+          storage_path?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_files_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["project_id"]
           },
         ]
       }
@@ -1352,16 +1463,21 @@ export type Database = {
       }
       project_sources: {
         Row: {
+          abstract: string | null
           authority_tier: string
           authors: string[]
+          canonical_reference: Json | null
+          citation_status: string
           created_at: string
           discovered_at: string
           discovered_via: string
           doi: string | null
           id: string
           project_id: string
+          relevance_score: number | null
           source_id: string
           source_type: string
+          themes: Json | null
           title: string
           updated_at: string
           url: string | null
@@ -1370,16 +1486,21 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          abstract?: string | null
           authority_tier: string
           authors?: string[]
+          canonical_reference?: Json | null
+          citation_status?: string
           created_at?: string
           discovered_at: string
           discovered_via: string
           doi?: string | null
           id?: string
           project_id: string
+          relevance_score?: number | null
           source_id: string
           source_type: string
+          themes?: Json | null
           title: string
           updated_at?: string
           url?: string | null
@@ -1388,16 +1509,21 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          abstract?: string | null
           authority_tier?: string
           authors?: string[]
+          canonical_reference?: Json | null
+          citation_status?: string
           created_at?: string
           discovered_at?: string
           discovered_via?: string
           doi?: string | null
           id?: string
           project_id?: string
+          relevance_score?: number | null
           source_id?: string
           source_type?: string
+          themes?: Json | null
           title?: string
           updated_at?: string
           url?: string | null
@@ -1703,16 +1829,19 @@ export type Database = {
         Row: {
           created_at: string
           label: string
+          storage_mode: string
           user_id: string
         }
         Insert: {
           created_at?: string
           label?: string
+          storage_mode?: string
           user_id: string
         }
         Update: {
           created_at?: string
           label?: string
+          storage_mode?: string
           user_id?: string
         }
         Relationships: []
@@ -1771,6 +1900,23 @@ export type Database = {
       is_username_approved: {
         Args: { lookup_username: string }
         Returns: boolean
+      }
+      match_project_evidence: {
+        Args: {
+          match_count: number
+          match_threshold: number
+          p_id: string
+          query_embedding: string
+        }
+        Returns: {
+          claim_type: string
+          id: string
+          project_id: string
+          quote: string
+          similarity: number
+          strength: string
+          tags: Json
+        }[]
       }
     }
     Enums: {
