@@ -467,7 +467,7 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
  * field, and out of scope for this screen.
  */
 export async function saveProfileFields(
-  fields: Pick<ProfileFields, "fullName" | "phone" | "phoneCountryCode" | "affiliation" | "userType" | "educationLevel">
+  fields: Partial<Pick<ProfileFields, "fullName" | "phone" | "phoneCountryCode" | "affiliation" | "userType" | "educationLevel">>
 ): Promise<ServiceResult> {
   const supabase = getSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -475,17 +475,20 @@ export async function saveProfileFields(
     return { success: false, error: "Not signed in." };
   }
 
+  const updatePayload: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (fields.fullName !== undefined) updatePayload.full_name = fields.fullName;
+  if (fields.phone !== undefined) updatePayload.phone = fields.phone;
+  if (fields.phoneCountryCode !== undefined) updatePayload.phone_country_code = fields.phoneCountryCode;
+  if (fields.affiliation !== undefined) updatePayload.affiliation = fields.affiliation;
+  if (fields.userType !== undefined) updatePayload.user_type = fields.userType;
+  if (fields.educationLevel !== undefined) updatePayload.education_level = fields.educationLevel;
+
   const { error } = await supabase
     .from("profiles")
-    .update({
-      full_name: fields.fullName,
-      phone: fields.phone,
-      phone_country_code: fields.phoneCountryCode,
-      affiliation: fields.affiliation,
-      user_type: fields.userType,
-      education_level: fields.educationLevel,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", userData.user.id);
 
   if (error) {
@@ -693,15 +696,17 @@ export function clearPendingGoogleSignIn(): void {
  * path (Supabase itself failing to even start the redirect) is
  * meaningful here.
  */
-export async function signInWithGoogle() {
+export async function signInWithGoogle(redirectPath: string = ""): Promise<ServiceResult> {
   const supabase = getSupabaseClient();
   localStorage.setItem(GOOGLE_OAUTH_PENDING_KEY, "1");
-  return supabase.auth.signInWithOAuth({
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}${redirectPath}`,
     },
   });
+  if (error) return { success: false, error: error.message };
+  return { success: true };
 }
 
 /**

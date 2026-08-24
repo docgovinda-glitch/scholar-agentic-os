@@ -48,14 +48,21 @@ export default function PublicationReadinessStage({
 
     try {
       const response = await authedJsonFetch(`/api/projects/${projectId}/agent/publication-readiness`, "POST", {});
-      const resJson = await response.json();
       if (!response.ok) {
-        throw new Error(resJson.error || "Agent encountered an error.");
+         let msg = "Agent encountered an error.";
+         try {
+           const body = await response.json();
+           if (body.error) msg = body.error;
+         } catch (e) {
+           // Ignored parsing error for non-ok response
+         }
+         throw new Error(msg);
       }
+      const resJson = await response.json();
       const { data } = resJson;
       setResults(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       clearInterval(interval);
       setScanProgress(100);

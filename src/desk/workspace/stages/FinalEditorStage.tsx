@@ -28,16 +28,22 @@ export default function FinalEditorStage({
     const fetchDraft = async () => {
       try {
         const response = await authedFetch(`/api/projects/${projectId}/agent/manuscript`);
-        if (response.ok) {
-          const { data } = await response.json();
-          if (isMounted && data && Array.isArray(data)) {
-            const compiled = data.map((s: any) => `## ${s.section_name}\n\n${s.content}`).join("\n\n");
-            setContent(compiled);
-            setWordCount(compiled.split(/\s+/).filter(Boolean).length);
-          }
+        if (!response.ok) {
+           let msg = "Failed to load manuscript.";
+           try { const body = await response.json(); if (body.error) msg = body.error; } catch (e) {}
+           throw new Error(msg);
         }
-      } catch (e) {
-        console.error("Failed to load manuscript", e);
+        const { data } = await response.json();
+        if (isMounted && data && Array.isArray(data)) {
+          const compiled = data.map((s: any) => `## ${s.section_name}\n\n${s.content}`).join("\n\n");
+          setContent(compiled);
+          setWordCount(compiled.split(/\s+/).filter(Boolean).length);
+        }
+      } catch (e: unknown) {
+        if (isMounted) {
+          console.error("Failed to load manuscript", e);
+          setError(e instanceof Error ? e.message : String(e));
+        }
       }
     };
     fetchDraft();

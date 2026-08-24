@@ -285,6 +285,7 @@ function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onB
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [usernameAvailability, setUsernameAvailability] = useState<Availability>(null);
   const [emailAvailability, setEmailAvailability] = useState<Availability>(null);
@@ -342,6 +343,21 @@ function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onB
       ? "Checking availability…"
       : null) ??
     (captchaRequired && !captchaToken ? "Complete the CAPTCHA challenge." : null);
+
+  async function handleGoogleSignIn() {
+    setGoogleBusy(true);
+    setError(null);
+    try {
+      const result = await signInWithGoogle();
+      if (!result.success) {
+        setError(result.error ?? "Could not sign in with Google.");
+        setGoogleBusy(false);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+      setGoogleBusy(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -461,10 +477,18 @@ function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onB
         />
         <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
-        <SubmitButton busy={busy} busyLabel="Creating account…" disabled={problem !== null}>
+        <SubmitButton busy={busy} busyLabel="Creating account…" disabled={problem !== null || googleBusy}>
           Create account
         </SubmitButton>
       </AuthForm>
+
+      <div className="mt-4">
+        <AuthDivider />
+      </div>
+      <div className="mt-4">
+        <GoogleSignInButton onClick={handleGoogleSignIn} busy={googleBusy} />
+      </div>
+
       <div className="mt-6">
         <AuthLink onClick={onBack}>Back to sign in</AuthLink>
       </div>
@@ -654,7 +678,7 @@ function ResendVerificationScreen({ email, onBack }: { email: string; onBack: ()
     setBusy(true);
     setError(null);
     try {
-      const result = await resendVerificationEmail(email);
+      const result = await resendVerificationEmail({ email });
       if (result.success) onBack(); // back to the "Check your email" screen
       else setError(result.error ?? "Could not resend the email. Please wait a few minutes and try again.");
     } catch (e) {
@@ -704,8 +728,8 @@ function OnboardingScreen({ onDone }: { onDone: () => void }) {
         userType,
         educationLevel,
         affiliation: affiliation.trim(),
-        phone: parsedPhone?.e164 || "",
-        phoneCountryCode: parsedPhone ? `+${parsedPhone.dialCode}` : "",
+        phone: parsedPhone || "",
+        phoneCountryCode: phoneState.code,
       });
 
       if (result.success) {
@@ -752,11 +776,11 @@ function OnboardingScreen({ onDone }: { onDone: () => void }) {
           required={false}
         />
         <PhoneField
-          id="phone"
+          idPrefix="phone"
           label="Mobile number"
           number={phoneState.number}
           onNumberChange={(n) => setPhoneState((s) => ({ ...s, number: n }))}
-          selectedCode={phoneState.code}
+          countryCode={phoneState.code}
           onCountryCodeChange={(c) => setPhoneState((s) => ({ ...s, code: c }))}
           required={false}
           hint="Optional. Used for SMS recovery."

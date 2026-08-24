@@ -146,7 +146,7 @@ export async function callOpenRouterJSON(req: any, res: any, systemPrompt: strin
 
     const text = result.value.text;
     return parseJsonFromLlm(text);
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!res.headersSent) {
       res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
     }
@@ -183,7 +183,7 @@ export async function callOpenRouterText(req: any, res: any, systemPrompt: strin
       throw new Error(result.error.message || "AI Agent Generation Failed");
     }
     return result.value.text;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!res.headersSent) {
       res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType });
     }
@@ -244,7 +244,7 @@ export async function streamOpenRouterJSON(req: any, res: any, systemPrompt: str
 
     sendEvent("log", { message: "> Parsing final JSON..." });
     return parseJsonFromLlm(fullContent);
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!res.headersSent) {
       res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
       return;
@@ -300,7 +300,7 @@ export async function streamOpenRouterText(req: any, res: any, systemPrompt: str
     }
 
     return fullContent;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!res.headersSent) {
       res.status(426).json({ requireFrontendLLM: true, systemPrompt, userPrompt, taskType, stream: true });
       return;

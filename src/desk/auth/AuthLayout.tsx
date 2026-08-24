@@ -269,15 +269,18 @@ export function FileField({
  */
 export function PhoneField({
   idPrefix = "phone",
+  label = "Phone",
   countryCode,
   onCountryCodeChange,
   number,
   onNumberChange,
   onBlur,
   required = true,
+  hint,
   error,
 }: {
   idPrefix?: string;
+  label?: string;
   countryCode: string;
   onCountryCodeChange: (dialCode: string) => void;
   number: string;
@@ -285,15 +288,17 @@ export function PhoneField({
   /** Fired on blur of the number input — e.g. to trigger an async availability check. */
   onBlur?: () => void;
   required?: boolean;
+  hint?: string;
   error?: string | null;
 }) {
   const selected: Country | undefined = COUNTRIES.find((c) => c.dialCode === countryCode);
   const numberId = `${idPrefix}-number`;
   const countryId = `${idPrefix}-country-code`;
+  const hintId = hint ? `${idPrefix}-hint` : undefined;
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={numberId} className={labelClass(required)}>
-        Phone
+        {label}
       </label>
       <div className="flex gap-2">
         <label className="sr-only" htmlFor={countryId}>
@@ -326,6 +331,11 @@ export function PhoneField({
           className="w-full px-3 py-2 text-sm"
         />
       </div>
+      {hint && (
+        <p id={hintId} className="text-xs text-[color:var(--text-muted)]">
+          {hint}
+        </p>
+      )}
       {error && <AuthError>{error}</AuthError>}
     </div>
   );
@@ -370,15 +380,18 @@ export function SubmitButton({
   disabled,
   children,
   busyLabel,
+  onClick,
 }: {
   busy: boolean;
   disabled: boolean;
   children: ReactNode;
   busyLabel: string;
+  onClick?: () => void;
 }) {
   return (
     <button
       type="submit"
+      onClick={onClick}
       disabled={busy || disabled}
       className="mt-1 w-full rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
     >

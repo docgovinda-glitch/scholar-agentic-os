@@ -114,12 +114,13 @@ CRITICAL INSTRUCTION: Generate exactly 15 highly relevant sources. Do not halluc
       res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data, meta: result.meta })}\n\n`);
       res.end();
     }
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -161,12 +162,13 @@ Make sure every single gap explicitly mentions concepts from the working title.`
     
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -203,15 +205,13 @@ Return ONLY valid JSON in this exact format:
     
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -267,15 +267,13 @@ Return ONLY valid JSON in this exact format:
     
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -362,15 +360,13 @@ Return ONLY valid JSON in this exact format:
     
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -405,15 +401,13 @@ Return ONLY valid JSON in this exact format:
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -447,15 +441,13 @@ Return ONLY valid JSON in this exact format:
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -480,15 +472,13 @@ Return ONLY valid JSON in this exact format:
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -516,15 +506,13 @@ Return ONLY valid JSON in this exact format:
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -600,15 +588,13 @@ Return ONLY valid JSON in this exact format:
 
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -668,15 +654,13 @@ Return ONLY valid JSON in this exact format:
 
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -703,15 +687,13 @@ Return ONLY valid JSON in this exact format:
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -743,15 +725,13 @@ Use 'verified' or 'flagged' for the status.`;
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -786,15 +766,13 @@ Return ONLY valid JSON in this exact format:
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -823,15 +801,13 @@ router.post("/draft-preview", async (req: express.Request<{ id: string }>, res) 
     }
     
     res.json({ ok: true, data: { content, pages, status: "Ready" }});
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -906,15 +882,13 @@ Answer the user's question concisely. Be highly academic and professional. Use m
     if (!result) return;
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, response: result })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -976,15 +950,13 @@ router.put("/manuscript", async (req, res) => {
     }
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -1002,15 +974,13 @@ router.put("/evidence", async (req, res) => {
     // ...
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -1031,15 +1001,13 @@ router.put("/critiques/:critiqueId/waive", async (req, res) => {
     });
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -1083,15 +1051,13 @@ router.get("/manuscript", async (req, res) => {
     const data = await table.request(`?project_id=eq.${project.projectId}`);
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -1108,15 +1074,13 @@ router.get("/evidence", async (req, res) => {
     const data = await table.request(`?project_id=eq.${project.projectId}`);
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }
@@ -1133,15 +1097,13 @@ router.get("/critiques", async (req, res) => {
     const data = await table.request(`?project_id=eq.${project.projectId}`);
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data })}\n\n`);
     res.end();
-  } catch (err: any) {
-    if (err.message === "RequireFrontendLLMException") return;
-        if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "RequireFrontendLLMException") return;
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
     } else {
-      res.write(`event: error
-data: ${JSON.stringify({ message: err.message })}
-
-`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
       res.end();
     }
   }

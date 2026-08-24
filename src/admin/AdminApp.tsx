@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
-import { signIn } from "../services/supabaseAuthService";
+import { signIn, signInWithGoogle } from "../services/supabaseAuthService";
 import { getAdminWhoAmI, type AdminWhoAmI } from "../desk/aiAccess/aiAccessApi";
 import AdminPanel, { isAdminTab, type AdminIdentity } from "../desk/admin/AdminPanel";
+import { GoogleSignInButton, AuthDivider } from "../desk/auth/AuthLayout";
 
 type Status = "loading" | "login" | "not-found" | "authorized";
 
@@ -115,6 +116,22 @@ function AdminLoginScreen({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  async function handleGoogleSignIn() {
+    setGoogleBusy(true);
+    setError(null);
+    try {
+      const result = await signInWithGoogle("/admin");
+      if (!result.success) {
+        setError(result.error ?? "Could not sign in with Google.");
+        setGoogleBusy(false);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+      setGoogleBusy(false);
+    }
+  }
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
@@ -155,11 +172,17 @@ function AdminLoginScreen({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
         />
         <button
           type="submit"
-          disabled={busy || !username || !password}
+          disabled={busy || !username || !password || googleBusy}
           className="w-full rounded-[var(--radius-sm)] bg-[color:var(--accent-solid)] px-3 py-1.5 text-sm font-medium text-[color:var(--text-inverse)] disabled:opacity-50"
         >
           {busy ? "Signing in…" : "Sign in"}
         </button>
+        <div className="pt-2">
+          <AuthDivider />
+        </div>
+        <div className="pt-2">
+          <GoogleSignInButton onClick={handleGoogleSignIn} busy={googleBusy} />
+        </div>
       </form>
     </div>
   );
