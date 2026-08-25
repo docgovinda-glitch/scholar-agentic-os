@@ -215,7 +215,8 @@ class AnthropicAdapter implements ProviderAdapter {
     const response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false) });
     if (!response.ok) return throwForBadResponse(this.id, response);
     const data = (await response.json()) as { content?: { text?: string }[] };
-    const text = data.content?.map((c) => c.text ?? "").join("") ?? "";
+    const content = Array.isArray(data?.content) ? data.content : [];
+    const text = content.map((c) => c.text ?? "").join("");
     return { text, model };
   }
 
@@ -258,8 +259,23 @@ class GeminiAdapter implements ProviderAdapter {
     };
   }
 
-  private extractText(data: { candidates?: { content?: { parts?: { text?: string }[] } }[] }): string {
-    return data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  private extractText(data: any): string {
+    if (!data || typeof data !== "object") return "";
+    const candidate = data.candidates?.[0];
+    if (!candidate) {
+      if (data.promptFeedback?.blockReason) {
+        throw new Error(`Gemini blocked request: ${data.promptFeedback.blockReason}`);
+      }
+      if (data.error?.message) {
+        throw new Error(`Gemini API error: ${data.error.message}`);
+      }
+      return "";
+    }
+    const parts = candidate.content?.parts;
+    if (Array.isArray(parts)) {
+      return parts.map((p: any) => p?.text ?? "").join("");
+    }
+    return "";
   }
 
   async complete(req: CompletionRequest): Promise<{ text: string; model: string }> {
@@ -271,7 +287,7 @@ class GeminiAdapter implements ProviderAdapter {
       body: JSON.stringify(this.buildBody(req)),
     });
     if (!response.ok) return throwForBadResponse(this.id, response);
-    const data = (await response.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    const data = (await response.json()) as any;
     return { text: this.extractText(data), model };
   }
 

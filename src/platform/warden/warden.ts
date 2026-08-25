@@ -45,7 +45,11 @@ function applyRedaction(segments: ClassifiedSegment[], shouldRedact: boolean): C
  * (recording it via recordConsent()) and re-evaluate before proceeding.
  */
 export function evaluate(request: EgressRequest, policy: EgressPolicy = defaultPolicy()): EgressEvaluation {
-  const classified: ClassifiedSegment[] = request.segments.map((seg) => ({
+  const segs = Array.isArray(request.segments) && request.segments.length > 0
+    ? request.segments
+    : [{ label: "prompt", text: "" }];
+
+  const classified: ClassifiedSegment[] = segs.map((seg) => ({
     ...seg,
     egressClass: classifySegment(request.taskClass, seg.label, seg.text),
   }));

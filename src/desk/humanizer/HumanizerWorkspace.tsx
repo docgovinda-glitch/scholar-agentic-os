@@ -257,6 +257,7 @@ Output ONLY the restructured text.`;
           userPrompt: maskedText,
           systemPrompt: pass1SystemPrompt,
           taskClass: "refinement",
+          segments: [{ label: "draftText", text: maskedText }],
         });
 
         const pass1Text = pass1Result?.text ? pass1Result.text.trim() : maskedText;
@@ -278,6 +279,7 @@ Output ONLY the polished humanized prose.`;
           userPrompt: pass1Text,
           systemPrompt: pass2SystemPrompt,
           taskClass: "refinement",
+          segments: [{ label: "draftText", text: pass1Text }],
         });
 
         if (pass2Result && pass2Result.text) {
