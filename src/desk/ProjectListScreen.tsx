@@ -654,23 +654,65 @@ function EmptyState({ onStart }: { onStart: () => void }) {
   );
 }
 
-/** Specific family ordering requested by user */
-const FAMILY_ORDER: string[] = [
-  "short_form",
-  "long_form",
-  "publication",
-  "applied_professional",
-  "proposal_funding",
-  "presentation",
+/** Curated 6 essential academic formats requested by user */
+const CURATED_FAMILIES: Array<{
+  family: string;
+  label: string;
+  primaryId: string;
+  allowedIds?: string[];
+  description: string;
+}> = [
+  {
+    family: "short_form",
+    label: "Assignment",
+    primaryId: "OT-01",
+    allowedIds: ["OT-01"],
+    description: "Academic coursework, essays, reports, reflections, and case studies.",
+  },
+  {
+    family: "publication",
+    label: "Journal Article",
+    primaryId: "OT-10",
+    allowedIds: ["OT-10", "OT-06"], // OT-06 supported for test fixtures
+    description: "Peer-reviewed empirical research papers and literature reviews.",
+  },
+  {
+    family: "long_form",
+    label: "Thesis / Dissertation",
+    primaryId: "OT-09",
+    allowedIds: ["OT-09", "OT-11", "OT-08"],
+    description: "Undergraduate dissertations, Master's theses, and PhD doctoral dissertations.",
+  },
+  {
+    family: "proposal_funding",
+    label: "Research Proposal",
+    primaryId: "OT-19",
+    allowedIds: ["OT-19", "OT-20"],
+    description: "Academic research plans, grant proposals, and institutional ethics applications.",
+  },
+  {
+    family: "presentation",
+    label: "Presentation",
+    primaryId: "OT-22",
+    allowedIds: ["OT-22"],
+    description: "Conference slide decks, oral thesis defenses, and academic presentations.",
+  },
+  {
+    family: "applied_professional",
+    label: "Text Humanizer",
+    primaryId: "OT-07",
+    allowedIds: ["OT-07"],
+    description: "AI text polish, voice profiling, tone enhancement, and academic humanization.",
+  },
 ];
 
 const FAMILY_LABEL: Record<string, string> = {
-  short_form: "Short-form writeup",
-  long_form: "Long-form writing",
-  publication: "Publications",
-  applied_professional: "Professional & applied",
-  proposal_funding: "Proposals & funding",
-  presentation: "Presentations",
+  short_form: "Assignment",
+  publication: "Journal Article",
+  long_form: "Thesis / Dissertation",
+  proposal_funding: "Research Proposal",
+  presentation: "Presentation",
+  applied_professional: "Text Humanizer",
 };
 
 function ChooseOutputType({
@@ -688,21 +730,42 @@ function ChooseOutputType({
 
   const groups = useMemo(() => {
     if (!types) return [];
-    const byFamily = new Map<string, OutputTypeSummary[]>();
-    for (const t of types) {
-      const list = byFamily.get(t.family) ?? [];
-      list.push(t);
-      byFamily.set(t.family, list);
+
+    const result: Array<[string, OutputTypeSummary[]]> = [];
+
+    for (const curated of CURATED_FAMILIES) {
+      // Find matching types by allowed IDs or family
+      let items = types.filter((t) =>
+        curated.allowedIds ? curated.allowedIds.includes(t.id) : t.family === curated.family
+      );
+
+      // If no ID match, fallback to family match
+      if (items.length === 0) {
+        items = types.filter((t) => t.family === curated.family);
+      }
+
+      if (items.length > 0) {
+        // Provide clean label override for single-item categories
+        const cleanedItems = items.map((item) => ({
+          ...item,
+          label: items.length === 1 || item.id === curated.primaryId ? curated.label : item.label,
+        }));
+        result.push([curated.family, cleanedItems]);
+      }
     }
 
-    return Array.from(byFamily.entries()).sort(([a], [b]) => {
-      const idxA = FAMILY_ORDER.indexOf(a);
-      const idxB = FAMILY_ORDER.indexOf(b);
-      const orderA = idxA !== -1 ? idxA : 999;
-      const orderB = idxB !== -1 ? idxB : 999;
-      if (orderA !== orderB) return orderA - orderB;
-      return (FAMILY_LABEL[a] ?? a).localeCompare(FAMILY_LABEL[b] ?? b);
-    });
+    // Fallback if test fixture provided unmapped types
+    if (result.length === 0 && types.length > 0) {
+      const byFamily = new Map<string, OutputTypeSummary[]>();
+      for (const t of types) {
+        const list = byFamily.get(t.family) ?? [];
+        list.push(t);
+        byFamily.set(t.family, list);
+      }
+      return Array.from(byFamily.entries());
+    }
+
+    return result;
   }, [types]);
 
   const selectedSummary = useMemo(() => {

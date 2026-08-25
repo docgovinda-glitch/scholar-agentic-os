@@ -45,16 +45,15 @@ async function openChooser() {
 }
 
 describe("the document-type dropdown", () => {
-  it("groups options by family instead of listing all 24 flat", async () => {
+  it("groups options by curated academic formats", async () => {
     await openChooser();
 
     const select = screen.getByLabelText("Target Publication Type") as HTMLSelectElement;
     const groupLabels = Array.from(select.querySelectorAll("optgroup")).map((g) => g.getAttribute("label"));
 
-    // Two Publications-family entries collapse into one group, not two.
-    expect(groupLabels.filter((l) => l === "Publications")).toHaveLength(1);
-    expect(within(select).getByRole("option", { name: "Journal Article" })).toBeInTheDocument();
-    expect(within(select).getByRole("option", { name: "Review Article" })).toBeInTheDocument();
+    expect(groupLabels.filter((l) => l === "Journal Article")).toHaveLength(1);
+    expect(within(select).getByRole("option", { name: "Assignment" })).toBeInTheDocument();
+    expect(within(select).getAllByRole("option", { name: "Journal Article" })[0]).toBeInTheDocument();
   });
 
   it("cannot continue before a type is chosen", async () => {
@@ -78,10 +77,10 @@ describe("the document-type dropdown", () => {
     await openChooser();
 
     const select = screen.getByLabelText("Target Publication Type") as HTMLSelectElement;
-    const essay = within(select).getByRole("option", { name: "Essay" }) as HTMLOptionElement;
-    expect(essay.disabled).toBe(false);
+    const assignment = within(select).getByRole("option", { name: "Assignment" }) as HTMLOptionElement;
+    expect(assignment.disabled).toBe(false);
 
-    const journalArticle = within(select).getByRole("option", { name: "Journal Article" }) as HTMLOptionElement;
+    const journalArticle = within(select).getAllByRole("option", { name: "Journal Article" })[0] as HTMLOptionElement;
     expect(journalArticle.disabled).toBe(false);
   });
 });
