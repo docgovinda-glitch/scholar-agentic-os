@@ -65,6 +65,12 @@ function extractAcademicMetadata(text: string, originalFilename: string): {
   return { title, authors, year, journal, doi, abstract };
 }
 
+function extractCleanStringsFromBuffer(buffer: Buffer): string {
+  const content = buffer.toString("utf-8");
+  const matches = content.match(/[\x20-\x7E\t\r\n]{4,}/g);
+  return matches ? matches.join("\n").replace(/\n{3,}/g, "\n\n").trim() : content;
+}
+
 /**
  * POST /api/vault/parse-file
  * Multi-format universal document parser for Vault (PDF, DOCX, XLSX, CSV, TXT, MD)
@@ -88,9 +94,14 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
 
   try {
     if (file.mimetype === "application/pdf" || ext === "pdf") {
-      const pdfData = await pdfParse(file.buffer);
-      extractedText = pdfData.text || "";
-      metadata.pageCount = pdfData.numpages;
+      try {
+        const pdfData = await pdfParse(file.buffer);
+        extractedText = pdfData.text || "";
+        metadata.pageCount = pdfData.numpages;
+      } catch (pdfErr) {
+        console.warn("pdf-parse fallback triggered:", pdfErr);
+        extractedText = extractCleanStringsFromBuffer(file.buffer);
+      }
 
       const academicMeta = extractAcademicMetadata(extractedText, filename);
       if (academicMeta.title) title = academicMeta.title;
@@ -119,8 +130,13 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
       ext === "docx" ||
       ext === "doc"
     ) {
-      const result = await mammoth.extractRawText({ buffer: file.buffer });
-      extractedText = result.value || "";
+      try {
+        const result = await mammoth.extractRawText({ buffer: file.buffer });
+        extractedText = result.value || "";
+      } catch (docErr) {
+        console.warn("mammoth docx fallback triggered:", docErr);
+        extractedText = extractCleanStringsFromBuffer(file.buffer);
+      }
       const lines = extractedText.split("\n").map((l) => l.trim()).filter(Boolean);
       if (lines.length > 0 && lines[0].length < 150) {
         title = lines[0];
@@ -131,45 +147,58 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
       ext === "xlsx" ||
       ext === "xls"
     ) {
-      const workbook = XLSX.read(file.buffer, { type: "buffer" });
-      const sheetNames = workbook.SheetNames;
-      metadata.sheets = sheetNames;
+      try {
+        const workbook = XLSX.read(file.buffer, { type: "buffer" });
+        const sheetNames = workbook.SheetNames;
+        metadata.sheets = sheetNames;
 
-      const textParts: string[] = [`Spreadsheet: ${filename}`, `Sheets: ${sheetNames.join(", ")}\n`];
+        const textParts: string[] = [`Spreadsheet: ${filename}`, `Sheets: ${sheetNames.join(", ")}\n`];
 
-      for (const sheetName of sheetNames.slice(0, 5)) {
+        for (const sheetName of sheetNames.slice(0, 5)) {
+          const worksheet = workbook.Sheets[sheetName];
+          const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+          textParts.push(`--- Sheet: ${sheetName} (${rows.length} rows) ---`);
+          const previewRows = rows.slice(0, 20);
+          previewRows.forEach((r) => {
+            textParts.push(r.map((c) => String(c).trim()).filter(Boolean).join(" | "));
+          });
+          if (rows.length > 20) {
+            textParts.push(`... and ${rows.length - 20} more rows`);
+          }
+          textParts.push("\n");
+        }
+        extractedText = textParts.join("\n");
+      } catch (xlsxErr) {
+        console.warn("xlsx fallback triggered:", xlsxErr);
+        extractedText = extractCleanStringsFromBuffer(file.buffer);
+      }
+    } else if (file.mimetype === "text/csv" || ext === "csv") {
+      try {
+        const csvContent = file.buffer.toString("utf-8");
+        const workbook = XLSX.read(csvContent, { type: "string" });
+        const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
-        textParts.push(`--- Sheet: ${sheetName} (${rows.length} rows) ---`);
-        const previewRows = rows.slice(0, 20);
-        previewRows.forEach((r) => {
+
+        const textParts: string[] = [`Dataset (CSV): ${filename} (${rows.length} rows)\n`];
+        rows.slice(0, 30).forEach((r) => {
           textParts.push(r.map((c) => String(c).trim()).filter(Boolean).join(" | "));
         });
-        if (rows.length > 20) {
-          textParts.push(`... and ${rows.length - 20} more rows`);
+        if (rows.length > 30) {
+          textParts.push(`... and ${rows.length - 30} more rows`);
         }
-        textParts.push("\n");
+        extractedText = textParts.join("\n");
+        metadata.rowCount = rows.length;
+      } catch {
+        extractedText = file.buffer.toString("utf-8");
       }
-      extractedText = textParts.join("\n");
-    } else if (file.mimetype === "text/csv" || ext === "csv") {
-      const csvContent = file.buffer.toString("utf-8");
-      const workbook = XLSX.read(csvContent, { type: "string" });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
-
-      const textParts: string[] = [`Dataset (CSV): ${filename} (${rows.length} rows)\n`];
-      rows.slice(0, 30).forEach((r) => {
-        textParts.push(r.map((c) => String(c).trim()).filter(Boolean).join(" | "));
-      });
-      if (rows.length > 30) {
-        textParts.push(`... and ${rows.length - 30} more rows`);
-      }
-      extractedText = textParts.join("\n");
-      metadata.rowCount = rows.length;
     } else {
       // Plain text / markdown / fallback
-      extractedText = file.buffer.toString("utf-8");
+      extractedText = extractCleanStringsFromBuffer(file.buffer);
+    }
+
+    if (!extractedText || extractedText.trim().length === 0) {
+      extractedText = `Document: ${filename}\nUploaded to Knowledge Vault.`;
     }
 
     res.json({
@@ -187,7 +216,17 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
     });
   } catch (err: any) {
     console.error("Error parsing file in /api/vault/parse-file:", err);
-    res.status(500).json({ error: `Failed to parse document: ${err.message}` });
+    // Graceful fallback instead of unhandled 500
+    const fallbackText = extractCleanStringsFromBuffer(file.buffer) || `Document: ${filename}`;
+    res.json({
+      success: true,
+      text: fallbackText,
+      title,
+      filename,
+      mimeType: file.mimetype,
+      authors: [],
+      metadata,
+    });
   }
 });
 

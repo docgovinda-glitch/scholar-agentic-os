@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import { addVaultItem, type VaultItem, type VaultSourceType, type CitationStatus } from "../../services/vaultContents";
-import { getConnectedCloudDrives, fetchDriveFiles, type CloudDriveAccount, type DriveFileItem } from "../../services/vault/cloudDriveService";
+import {
+  getConnectedCloudDrives,
+  fetchDriveFiles,
+  initiateGoogleDriveAuth,
+  initiateOneDriveAuth,
+  uploadFileToCloudDrive,
+  disconnectCloudDrive,
+  type CloudDriveAccount,
+  type DriveFileItem,
+} from "../../services/vault/cloudDriveService";
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
 
 type Mode = "file" | "cloud_drive" | "doi" | "web";
@@ -357,56 +366,161 @@ export default function VaultDocumentImport({
           </div>
         ) : mode === "cloud_drive" ? (
           <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedDrive("google_drive")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${selectedDrive === "google_drive" ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)] text-[color:var(--accent)]" : "border-[color:var(--border-default)] text-[color:var(--text-secondary)]"} cursor-pointer`}
-              >
-                Google Drive
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedDrive("onedrive")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${selectedDrive === "onedrive" ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)] text-[color:var(--accent)]" : "border-[color:var(--border-default)] text-[color:var(--text-secondary)]"} cursor-pointer`}
-              >
-                Microsoft OneDrive
-              </button>
+            <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-[color:var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDrive("google_drive")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 ${selectedDrive === "google_drive" ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)] text-[color:var(--accent)]" : "border-[color:var(--border-default)] text-[color:var(--text-secondary)]"} cursor-pointer`}
+                >
+                  <span>📁</span>
+                  <span>Google Drive (Gmail)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDrive("onedrive")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 ${selectedDrive === "onedrive" ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)] text-[color:var(--accent)]" : "border-[color:var(--border-default)] text-[color:var(--text-secondary)]"} cursor-pointer`}
+                >
+                  <span>☁️</span>
+                  <span>Microsoft OneDrive (Outlook)</span>
+                </button>
+              </div>
+
+              {cloudDrives.some((d) => d.provider === selectedDrive) && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="inline-flex items-center gap-1 text-[color:var(--state-success)] font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    {cloudDrives.find((d) => d.provider === selectedDrive)?.accountEmail}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await disconnectCloudDrive(userId, selectedDrive);
+                      loadCloudDrives();
+                    }}
+                    className="text-[11px] text-[color:var(--state-danger)] hover:underline cursor-pointer ml-1"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              )}
             </div>
 
-            <p className="text-xs text-[color:var(--text-muted)]">
-              Select files from your connected {selectedDrive === "google_drive" ? "Google Drive" : "OneDrive"} to index into your Vault:
-            </p>
-
-            <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto pr-1">
-              {driveFiles.map((file) => (
-                <div
-                  key={file.id}
-                  onClick={() => handleDriveFileSelect(file)}
-                  className="flex items-center justify-between p-2.5 rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] hover:border-[color:var(--accent)] hover:bg-[color:var(--surface-hover)] transition-all cursor-pointer group"
+            {!cloudDrives.some((d) => d.provider === selectedDrive) ? (
+              <div className="flex flex-col items-center justify-center p-6 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] text-center">
+                <div className="w-12 h-12 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] flex items-center justify-center text-2xl mb-3 shadow-xs">
+                  {selectedDrive === "google_drive" ? "📁" : "☁️"}
+                </div>
+                <h4 className="text-sm font-bold text-[color:var(--text-primary)]">
+                  Connect {selectedDrive === "google_drive" ? "Google Drive (Gmail)" : "Microsoft OneDrive (Outlook)"}
+                </h4>
+                <p className="text-xs text-[color:var(--text-secondary)] max-w-sm mt-1.5 leading-relaxed">
+                  Authenticate your {selectedDrive === "google_drive" ? "Google / Gmail" : "Microsoft / Outlook 365"} account to upload and sync PDF papers, Word documents, and datasets directly across all your devices.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setBusy(true);
+                    setProgressMsg(`Authenticating with ${selectedDrive === "google_drive" ? "Google Drive (Gmail)" : "Microsoft OneDrive (Outlook)"}…`);
+                    try {
+                      if (selectedDrive === "google_drive") {
+                        await initiateGoogleDriveAuth(userId);
+                      } else {
+                        await initiateOneDriveAuth(userId);
+                      }
+                      await loadCloudDrives();
+                    } finally {
+                      setBusy(false);
+                      setProgressMsg("");
+                    }
+                  }}
+                  disabled={busy}
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
                 >
-                  <div className="flex items-center gap-2.5 overflow-hidden">
-                    <span className="text-base">
-                      {file.name.endsWith(".pdf") ? "📕" : file.name.endsWith(".xlsx") ? "📊" : "📄"}
-                    </span>
-                    <div className="truncate">
-                      <p className="text-xs font-medium text-[color:var(--text-primary)] truncate group-hover:text-[color:var(--accent)]">
-                        {file.name}
-                      </p>
-                      <p className="text-[10px] text-[color:var(--text-muted)]">
-                        {file.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : "Cloud File"}
+                  <span>🔐</span>
+                  <span>Authenticate & Connect {selectedDrive === "google_drive" ? "Google Drive" : "Microsoft OneDrive"}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {/* Upload directly to Drive */}
+                <div className="flex items-center justify-between p-3.5 rounded-[var(--radius-lg)] border border-dashed border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)]">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">⬆️</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-[color:var(--accent)]">
+                        Upload to {selectedDrive === "google_drive" ? "Google Drive" : "OneDrive"}
+                      </h4>
+                      <p className="text-[11px] text-[color:var(--text-secondary)]">
+                        Upload PDF, Word (.docx), Excel (.xlsx), or CSV files directly to your cloud drive.
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="shrink-0 px-2 py-1 text-[11px] font-semibold text-[color:var(--accent)] group-hover:underline"
-                  >
-                    Import →
-                  </button>
+                  <label className="shrink-0 px-3 py-1.5 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer shadow-xs">
+                    <span>Upload to Drive</span>
+                    <input
+                      type="file"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!file) return;
+                        setBusy(true);
+                        setError(null);
+                        setProgressMsg(`Uploading ${file.name} to ${selectedDrive === "google_drive" ? "Google Drive" : "OneDrive"}…`);
+                        try {
+                          const uploaded = await uploadFileToCloudDrive(userId, selectedDrive, file);
+                          await loadCloudDrives();
+                          await handleDriveFileSelect(uploaded);
+                        } catch (err: any) {
+                          setError(err.message || "Failed to upload to drive");
+                        } finally {
+                          setBusy(false);
+                          setProgressMsg("");
+                        }
+                      }}
+                      disabled={busy}
+                      accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.md,.txt"
+                      className="hidden"
+                    />
+                  </label>
                 </div>
-              ))}
-            </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-[color:var(--text-secondary)] mb-2">
+                    Files in your {selectedDrive === "google_drive" ? "Google Drive" : "OneDrive"}:
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto pr-1">
+                    {driveFiles.map((file) => (
+                      <div
+                        key={file.id}
+                        onClick={() => handleDriveFileSelect(file)}
+                        className="flex items-center justify-between p-2.5 rounded-[var(--radius-md)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] hover:border-[color:var(--accent)] hover:bg-[color:var(--surface-hover)] transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <span className="text-base">
+                            {file.name.endsWith(".pdf") ? "📕" : file.name.endsWith(".xlsx") ? "📊" : file.name.endsWith(".docx") ? "📘" : "📄"}
+                          </span>
+                          <div className="truncate">
+                            <p className="text-xs font-medium text-[color:var(--text-primary)] truncate group-hover:text-[color:var(--accent)]">
+                              {file.name}
+                            </p>
+                            <p className="text-[10px] text-[color:var(--text-muted)]">
+                              {file.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : "Cloud Drive File"}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="shrink-0 px-2.5 py-1 text-xs font-semibold text-[color:var(--accent)] group-hover:underline"
+                        >
+                          Import to Vault →
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : mode === "doi" ? (
           <form onSubmit={handleLookupDoi} className="flex flex-col gap-2">

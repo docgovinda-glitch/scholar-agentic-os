@@ -22,7 +22,14 @@ import {
   type CitationStatus,
 } from "../../services/vaultContents";
 import { formatVaultCitation, toBibTeX, type CitationStyleType } from "../../services/vault/citationService";
-import { getConnectedCloudDrives, connectCloudDrive, disconnectCloudDrive, type CloudDriveAccount } from "../../services/vault/cloudDriveService";
+import {
+  getConnectedCloudDrives,
+  initiateGoogleDriveAuth,
+  initiateOneDriveAuth,
+  connectCloudDrive,
+  disconnectCloudDrive,
+  type CloudDriveAccount,
+} from "../../services/vault/cloudDriveService";
 import VaultSetupScreen from "../setup/VaultSetupScreen";
 import VaultImport from "./VaultImport";
 import VaultDocumentImport from "./VaultDocumentImport";
@@ -831,9 +838,17 @@ function VaultContents({
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">📁</span>
                     <div>
-                      <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Google Drive</h4>
-                      <p className="text-[11px] text-[color:var(--text-muted)]">
-                        {connectedDrives.some((d) => d.provider === "google_drive") ? "Connected" : "Sync docs & sheets"}
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Google Drive</h4>
+                        {connectedDrives.some((d) => d.provider === "google_drive") && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Connected
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
+                        {connectedDrives.find((d) => d.provider === "google_drive")?.accountEmail || "Sync Google Docs, PDFs, & Sheets (Gmail / Workspace)"}
                       </p>
                     </div>
                   </div>
@@ -852,12 +867,13 @@ function VaultContents({
                     <button
                       type="button"
                       onClick={async () => {
-                        await connectCloudDrive(userId, "google_drive", { email: "scholar.researcher@gmail.com" });
+                        await initiateGoogleDriveAuth(userId);
                         loadDrives();
                       }}
-                      className="px-3 py-1 text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded hover:bg-[color:var(--accent-hover)] cursor-pointer"
+                      className="px-3.5 py-1.5 text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
                     >
-                      Connect
+                      <span>🔐</span>
+                      <span>Sign in with Google</span>
                     </button>
                   )}
                 </div>
@@ -867,9 +883,17 @@ function VaultContents({
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">☁️</span>
                     <div>
-                      <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Microsoft OneDrive</h4>
-                      <p className="text-[11px] text-[color:var(--text-muted)]">
-                        {connectedDrives.some((d) => d.provider === "onedrive") ? "Connected" : "Sync Office 365 docs"}
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Microsoft OneDrive</h4>
+                        {connectedDrives.some((d) => d.provider === "onedrive") && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Connected
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
+                        {connectedDrives.find((d) => d.provider === "onedrive")?.accountEmail || "Sync Office 365, Word, Excel, & OneDrive (Outlook)"}
                       </p>
                     </div>
                   </div>
@@ -888,12 +912,13 @@ function VaultContents({
                     <button
                       type="button"
                       onClick={async () => {
-                        await connectCloudDrive(userId, "onedrive", { email: "scholar.academic@outlook.com" });
+                        await initiateOneDriveAuth(userId);
                         loadDrives();
                       }}
-                      className="px-3 py-1 text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded hover:bg-[color:var(--accent-hover)] cursor-pointer"
+                      className="px-3.5 py-1.5 text-xs font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
                     >
-                      Connect
+                      <span>🔐</span>
+                      <span>Sign in with Outlook</span>
                     </button>
                   )}
                 </div>
