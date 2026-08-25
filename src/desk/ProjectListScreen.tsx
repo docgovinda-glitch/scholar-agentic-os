@@ -119,17 +119,25 @@ export default function ProjectListScreen({
     getSupabaseClient().auth.signOut();
   }
 
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
+
   // Filtered projects
   const filteredProjects = useMemo(() => {
     if (!projects) return [];
-    if (!searchQuery.trim()) return projects;
+    let list = projects;
+
+    if (selectedTypeFilter !== "all") {
+      list = list.filter((p) => p.outputTypeId === selectedTypeFilter);
+    }
+
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return projects.filter((p) => {
+    return list.filter((p) => {
       const title = p.answers?.title || p.answers?.research_question || "";
       const label = typeMap.get(p.outputTypeId)?.label || p.outputTypeId;
       return title.toLowerCase().includes(q) || label.toLowerCase().includes(q) || p.outputTypeId.toLowerCase().includes(q);
     });
-  }, [projects, searchQuery, typeMap]);
+  }, [projects, selectedTypeFilter, searchQuery, typeMap]);
 
   return (
     <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] relative overflow-x-hidden font-sans selection:bg-[color:var(--accent-subtle)]">
@@ -396,9 +404,9 @@ export default function ProjectListScreen({
               </div>
             </section>
 
-            {/* Project List Section with Live Search */}
+            {/* Project List Section with Live Search & Filter Pills */}
             <section>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[color:var(--border-subtle)]">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-[color:var(--border-subtle)]">
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-6 bg-[color:var(--accent)] rounded-full" />
                   <h2 className="text-2xl font-bold tracking-tight text-[color:var(--text-primary)]">
@@ -406,7 +414,7 @@ export default function ProjectListScreen({
                   </h2>
                   {projects && (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]">
-                      {projects.length}
+                      {filteredProjects.length} of {projects.length}
                     </span>
                   )}
                 </div>
@@ -427,6 +435,56 @@ export default function ProjectListScreen({
                   </div>
                 )}
               </div>
+
+              {/* Format Filter Pills */}
+              {projects && projects.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 mb-6">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTypeFilter("all")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      selectedTypeFilter === "all"
+                        ? "bg-[color:var(--accent-solid)] text-white shadow-xs"
+                        : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)]"
+                    }`}
+                  >
+                    <span>All</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      selectedTypeFilter === "all" ? "bg-white/20 text-white" : "bg-[color:var(--surface-inset)] text-[color:var(--text-muted)]"
+                    }`}>
+                      {projects.length}
+                    </span>
+                  </button>
+
+                  {FORMAT_TILES.map((tile) => {
+                    const count = projects.filter((p) => p.outputTypeId === tile.id).length;
+                    const isActive = selectedTypeFilter === tile.id;
+
+                    return (
+                      <button
+                        key={tile.id}
+                        type="button"
+                        onClick={() => setSelectedTypeFilter(tile.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isActive
+                            ? "bg-[color:var(--accent-solid)] text-white shadow-xs"
+                            : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)]"
+                        }`}
+                      >
+                        <span>{tile.icon}</span>
+                        <span>{tile.label}</span>
+                        {count > 0 && (
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                            isActive ? "bg-white/20 text-white" : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"
+                          }`}>
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {projects === null ? (
                 error ? (

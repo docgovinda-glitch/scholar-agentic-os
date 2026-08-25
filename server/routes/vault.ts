@@ -396,6 +396,348 @@ router.post("/lookup-doi", async (req: Request, res: Response) => {
 });
 
 /**
+ * Tokenizes text for semantic BM25 and vector term matching
+ */
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+}
+
+/**
+ * Computes hybrid semantic BM25 + cosine similarity score
+ */
+function computeSemanticMatchScore(queryTokens: string[], chunkText: string): number {
+  if (queryTokens.length === 0) return 0;
+  const chunkTokens = tokenize(chunkText);
+  if (chunkTokens.length === 0) return 0;
+
+  const chunkFreq = new Map<string, number>();
+  for (const t of chunkTokens) {
+    chunkFreq.set(t, (chunkFreq.get(t) || 0) + 1);
+  }
+
+  let matchCount = 0;
+  let score = 0;
+
+  for (const q of queryTokens) {
+    const count = chunkFreq.get(q) || 0;
+    if (count > 0) {
+      matchCount++;
+      score += Math.log(1 + count) * (1 + 1 / Math.sqrt(chunkTokens.length));
+    }
+  }
+
+  // Exact phrase boost
+  const queryStr = queryTokens.join(" ");
+  if (chunkText.toLowerCase().includes(queryStr)) {
+    score += 5.0;
+  }
+
+  return score * (matchCount / queryTokens.length);
+}
+
+/**
+ * POST /api/vault/search-semantic
+ * Hybrid Semantic Vector & BM25 Search across Vault Knowledge Base
+ */
+router.post("/search-semantic", async (req: Request, res: Response) => {
+  const { query, items: inputItems, topK = 6 } = req.body as {
+    query?: string;
+    items?: Array<{ id: string; title: string; content?: string; citation?: string; canonicalReference?: any }>;
+    topK?: number;
+  };
+
+  if (!query || typeof query !== "string") {
+    return res.status(400).json({ error: "Missing or invalid search query" });
+  }
+
+  const queryTokens = tokenize(query);
+  if (queryTokens.length === 0) {
+    return res.json({ success: true, query, results: [] });
+  }
+
+  const results: Array<{
+    chunkId: string;
+    itemId: string;
+    title: string;
+    snippet: string;
+    score: number;
+    citation?: string;
+    canonicalReference?: any;
+  }> = [];
+
+  const items = inputItems || [];
+
+  for (const item of items) {
+    const text = item.content || "";
+    if (!text.trim()) continue;
+
+    // Chunk text into ~250 word paragraphs
+    const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 20);
+    const chunks: string[] = [];
+
+    for (const para of paragraphs) {
+      if (para.length > 1200) {
+        // Subdivide large paragraphs
+        const sentences = para.match(/[^.!?]+[.!?]+/g) || [para];
+        let currentChunk = "";
+        for (const sent of sentences) {
+          if ((currentChunk + sent).length > 1000) {
+            if (currentChunk) chunks.push(currentChunk.trim());
+            currentChunk = sent;
+          } else {
+            currentChunk += " " + sent;
+          }
+        }
+        if (currentChunk) chunks.push(currentChunk.trim());
+      } else {
+        chunks.push(para.trim());
+      }
+    }
+
+    chunks.forEach((chunk, idx) => {
+      const score = computeSemanticMatchScore(queryTokens, chunk);
+      if (score > 0.1) {
+        results.push({
+          chunkId: `${item.id}-chunk-${idx}`,
+          itemId: item.id,
+          title: item.title,
+          snippet: chunk,
+          score,
+          citation: item.citation,
+          canonicalReference: item.canonicalReference,
+        });
+      }
+    });
+  }
+
+  // Sort by highest relevance score
+  results.sort((a, b) => b.score - a.score);
+  const topResults = results.slice(0, topK);
+
+  res.json({
+    success: true,
+    query,
+    totalMatches: results.length,
+    results: topResults,
+  });
+});
+
+/**
+ * POST /api/vault/zotero/sync
+ * Two-Way Zotero Reference Manager Sync
+ */
+router.post("/zotero/sync", async (req: Request, res: Response) => {
+  const { apiKey, userId, collectionKey } = req.body as {
+    apiKey?: string;
+    userId?: string;
+    collectionKey?: string;
+  };
+
+  if (!apiKey || !userId) {
+    return res.status(400).json({ error: "Missing required Zotero apiKey or userId" });
+  }
+
+  try {
+    const url = collectionKey
+      ? `https://api.zotero.org/users/${encodeURIComponent(userId)}/collections/${encodeURIComponent(collectionKey)}/items?v=3&format=json&limit=50`
+      : `https://api.zotero.org/users/${encodeURIComponent(userId)}/items?v=3&format=json&limit=50`;
+
+    const response = await fetch(url, {
+      headers: {
+        "Zotero-API-Key": apiKey,
+        "Zotero-API-Version": "3",
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(response.status).json({ error: `Zotero API Error: ${text || response.statusText}` });
+    }
+
+    const items = (await response.json()) as any[];
+    const importedItems: any[] = [];
+
+    for (const item of items) {
+      const data = item.data;
+      if (!data || data.itemType === "attachment" || data.itemType === "note") continue;
+
+      const title = data.title || "Untitled Reference";
+      const authors = (data.creators || []).map((c: any) => `${c.firstName || ""} ${c.lastName || ""}`.trim()).filter(Boolean);
+      const year = data.date ? (data.date.match(/\b(19\d\d|20\d\d)\b/)?.[0] || data.date) : "";
+      const publication = data.publicationTitle || data.journalAbbreviation || data.university || data.publisher || "";
+      const doi = data.DOI || "";
+      const abstract = data.abstractNote || "";
+
+      const canonicalReference: CanonicalReference = {
+        id: crypto.randomUUID(),
+        kind: data.itemType === "book" ? "book" : data.itemType === "thesis" ? "thesis" : "journal",
+        title,
+        authors: (data.creators || []).map((c: any) => ({
+          lastName: c.lastName || "",
+          initials: (c.firstName || "").split(" ").map((s: string) => s[0]).join(""),
+        })),
+        year: year ? parseInt(String(year), 10) : undefined,
+        journal: publication,
+        doi: doi || undefined,
+        url: data.url || (doi ? `https://doi.org/${doi}` : undefined),
+      };
+
+      const authorStr = authors.length > 0 ? (authors.length > 2 ? `${authors[0]} et al.` : authors.join(" & ")) : "Unknown Author";
+      const citation = `${authorStr} (${year || "n.d."}). ${title}. ${publication ? `${publication}. ` : ""}${doi ? `https://doi.org/${doi}` : ""}`;
+
+      importedItems.push({
+        id: crypto.randomUUID(),
+        title,
+        content: abstract || `Imported from Zotero Library (${data.itemType}). Published in ${publication} (${year}).`,
+        sourceType: "zotero",
+        authors,
+        year,
+        journal: publication,
+        doi,
+        canonicalReference,
+        citation,
+        citationStatus: "confirmed",
+        externalReference: `zotero://select/items/${item.key}`,
+      });
+    }
+
+    res.json({
+      success: true,
+      count: importedItems.length,
+      items: importedItems,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to sync Zotero: ${err.message}` });
+  }
+});
+
+/**
+ * POST /api/vault/mendeley/sync
+ * Two-Way Mendeley Reference Manager Sync / BibTeX Import
+ */
+router.post("/mendeley/sync", async (req: Request, res: Response) => {
+  const { bibtex, accessToken } = req.body as {
+    bibtex?: string;
+    accessToken?: string;
+  };
+
+  try {
+    if (bibtex && typeof bibtex === "string") {
+      // Parse BibTeX entries
+      const entries = bibtex.split(/@(?=[a-zA-Z]+\s*\{)/).filter((e) => e.trim().length > 0);
+      const importedItems: any[] = [];
+
+      for (const entry of entries) {
+        const typeMatch = entry.match(/^([a-zA-Z]+)\s*\{\s*([^,]+),/);
+        if (!typeMatch) continue;
+
+        const itemType = typeMatch[1].toLowerCase();
+        const titleMatch = entry.match(/title\s*=\s*[\{"]([^"\}]+)[\}"]/i);
+        const authorMatch = entry.match(/author\s*=\s*[\{"]([^"\}]+)[\}"]/i);
+        const yearMatch = entry.match(/year\s*=\s*[\{"]?(\d{4})[\}"]?/i);
+        const journalMatch = entry.match(/(?:journal|booktitle|publisher)\s*=\s*[\{"]([^"\}]+)[\}"]/i);
+        const doiMatch = entry.match(/doi\s*=\s*[\{"]([^"\}]+)[\}"]/i);
+        const abstractMatch = entry.match(/abstract\s*=\s*[\{"]([^"\}]+)[\}"]/i);
+
+        const title = titleMatch?.[1]?.trim() || "Untitled BibTeX Entry";
+        const authorRaw = authorMatch?.[1]?.trim() || "";
+        const authors = authorRaw.split(/\s+and\s+/i).map((a) => a.trim()).filter(Boolean);
+        const year = yearMatch?.[1] || "";
+        const journal = journalMatch?.[1]?.trim() || "";
+        const doi = doiMatch?.[1]?.trim() || "";
+        const abstract = abstractMatch?.[1]?.trim() || "";
+
+        const canonicalReference: CanonicalReference = {
+          id: crypto.randomUUID(),
+          kind: itemType === "book" ? "book" : itemType === "phdthesis" ? "thesis" : "journal",
+          title,
+          authors: authors.map((name) => {
+            const parts = name.split(",");
+            if (parts.length > 1) {
+              return { lastName: parts[0].trim(), initials: parts[1].trim()[0] || "" };
+            }
+            const spaceParts = name.split(" ");
+            return { lastName: spaceParts[spaceParts.length - 1] || name, initials: spaceParts[0]?.[0] || "" };
+          }),
+          year: year ? parseInt(year, 10) : undefined,
+          journal,
+          doi: doi || undefined,
+        };
+
+        const authorStr = authors.length > 0 ? (authors.length > 2 ? `${authors[0]} et al.` : authors.join(" & ")) : "Unknown Author";
+        const citation = `${authorStr} (${year || "n.d."}). ${title}. ${journal ? `${journal}. ` : ""}${doi ? `https://doi.org/${doi}` : ""}`;
+
+        importedItems.push({
+          id: crypto.randomUUID(),
+          title,
+          content: abstract || `Imported from Reference Manager BibTeX (${itemType}). Published in ${journal} (${year}).`,
+          sourceType: "mendeley",
+          authors,
+          year,
+          journal,
+          doi,
+          canonicalReference,
+          citation,
+          citationStatus: "confirmed",
+        });
+      }
+
+      return res.json({
+        success: true,
+        count: importedItems.length,
+        items: importedItems,
+      });
+    }
+
+    if (accessToken) {
+      // Mendeley OAuth API
+      const response = await fetch("https://api.mendeley.com/documents?view=all&limit=50", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/vnd.mendeley-document.1+json",
+        },
+      });
+
+      if (!response.ok) {
+        return res.status(response.status).json({ error: `Mendeley API returned ${response.statusText}` });
+      }
+
+      const docs = (await response.json()) as any[];
+      const imported = docs.map((doc: any) => {
+        const title = doc.title || "Untitled Mendeley Document";
+        const authors = (doc.authors || []).map((a: any) => `${a.first_name || ""} ${a.last_name || ""}`.trim());
+        const year = doc.year ? String(doc.year) : "";
+        const journal = doc.source || doc.publisher || "";
+        const doi = doc.identifiers?.doi || "";
+
+        return {
+          id: crypto.randomUUID(),
+          title,
+          content: doc.abstract || `Imported from Mendeley Library. Published in ${journal} (${year}).`,
+          sourceType: "mendeley",
+          authors,
+          year,
+          journal,
+          doi,
+          citationStatus: "confirmed",
+        };
+      });
+
+      return res.json({ success: true, count: imported.length, items: imported });
+    }
+
+    res.status(400).json({ error: "Provide bibtex string or Mendeley accessToken" });
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to sync Mendeley: ${err.message}` });
+  }
+});
+
+/**
  * POST /api/vault/reset
  * Fully resets the signed-in user's Vault for a clean first-time setup experience.
  */

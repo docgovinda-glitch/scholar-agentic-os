@@ -12,7 +12,7 @@ import {
 } from "../../services/vault/cloudDriveService";
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
 
-type Mode = "file" | "cloud_drive" | "doi" | "web";
+type Mode = "file" | "cloud_drive" | "zotero_mendeley" | "doi" | "web";
 
 interface PreviewItem {
   title: string;
@@ -45,6 +45,12 @@ export default function VaultDocumentImport({
   const [busy, setBusy] = useState(false);
   const [progressMsg, setProgressMsg] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+
+  // Reference Manager state
+  const [zoteroApiKey, setZoteroApiKey] = useState("");
+  const [zoteroUserId, setZoteroUserId] = useState("");
+  const [mendeleyBibtex, setMendeleyBibtex] = useState("");
+  const [refSubTab, setRefSubTab] = useState<"zotero" | "mendeley">("zotero");
 
   // Cloud Drive state
   const [cloudDrives, setCloudDrives] = useState<CloudDriveAccount[]>([]);
@@ -238,6 +244,75 @@ export default function VaultDocumentImport({
     }
   }
 
+  async function handleSyncZotero(e: React.FormEvent) {
+    e.preventDefault();
+    if (!zoteroApiKey.trim() || !zoteroUserId.trim()) return;
+    setBusy(true);
+    setError(null);
+    setProgressMsg("Connecting to Zotero API and syncing references…");
+
+    try {
+      const res = await fetch("/api/vault/zotero/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: zoteroApiKey.trim(),
+          userId: zoteroUserId.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to sync Zotero.");
+
+      if (data.items && data.items.length > 0) {
+        for (const item of data.items) {
+          const saved = await addVaultItem(userId, item);
+          onImported(saved);
+        }
+        reset();
+      } else {
+        setError("No references found in your Zotero library.");
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+      setProgressMsg("");
+    }
+  }
+
+  async function handleSyncMendeley(e: React.FormEvent) {
+    e.preventDefault();
+    if (!mendeleyBibtex.trim()) return;
+    setBusy(true);
+    setError(null);
+    setProgressMsg("Parsing BibTeX reference manager entries…");
+
+    try {
+      const res = await fetch("/api/vault/mendeley/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bibtex: mendeleyBibtex.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to import BibTeX.");
+
+      if (data.items && data.items.length > 0) {
+        for (const item of data.items) {
+          const saved = await addVaultItem(userId, item);
+          onImported(saved);
+        }
+        reset();
+      } else {
+        setError("No valid BibTeX entries found.");
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+      setProgressMsg("");
+    }
+  }
+
   async function handleConfirm() {
     if (!preview) return;
     setBusy(true);
@@ -320,6 +395,14 @@ export default function VaultDocumentImport({
           className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-all ${mode === "cloud_drive" ? "bg-[color:var(--surface-raised)] text-[color:var(--accent)] shadow-xs" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"} cursor-pointer`}
         >
           ☁️ Google Drive & OneDrive
+        </button>
+
+        <button
+          type="button"
+          onClick={() => switchMode("zotero_mendeley")}
+          className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-all ${mode === "zotero_mendeley" ? "bg-[color:var(--surface-raised)] text-[color:var(--accent)] shadow-xs" : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"} cursor-pointer`}
+        >
+          📚 Zotero & Mendeley
         </button>
 
         <button
@@ -520,6 +603,98 @@ export default function VaultDocumentImport({
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+        ) : mode === "zotero_mendeley" ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex gap-2 border-b border-[color:var(--border-subtle)] pb-2">
+              <button
+                type="button"
+                onClick={() => setRefSubTab("zotero")}
+                className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-bold transition-all cursor-pointer ${
+                  refSubTab === "zotero"
+                    ? "bg-[color:var(--accent-subtle)] text-[color:var(--accent)]"
+                    : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+                }`}
+              >
+                Zotero API Sync
+              </button>
+              <button
+                type="button"
+                onClick={() => setRefSubTab("mendeley")}
+                className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-bold transition-all cursor-pointer ${
+                  refSubTab === "mendeley"
+                    ? "bg-[color:var(--accent-subtle)] text-[color:var(--accent)]"
+                    : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+                }`}
+              >
+                Mendeley / BibTeX Import
+              </button>
+            </div>
+
+            {refSubTab === "zotero" ? (
+              <form onSubmit={handleSyncZotero} className="flex flex-col gap-3">
+                <p className="text-xs text-[color:var(--text-secondary)]">
+                  Connect to your Zotero web library using your API Key and User ID to import your saved collections.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-[color:var(--text-primary)] block mb-1">
+                      Zotero User ID
+                    </label>
+                    <input
+                      type="text"
+                      value={zoteroUserId}
+                      onChange={(e) => setZoteroUserId(e.target.value)}
+                      placeholder="e.g. 1234567"
+                      className="w-full px-3 py-2 text-xs border border-[color:var(--border-default)] rounded-[var(--radius-md)] bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-[color:var(--text-primary)] block mb-1">
+                      Zotero API Key
+                    </label>
+                    <input
+                      type="password"
+                      value={zoteroApiKey}
+                      onChange={(e) => setZoteroApiKey(e.target.value)}
+                      placeholder="e.g. 24-character secret key"
+                      className="w-full px-3 py-2 text-xs border border-[color:var(--border-default)] rounded-[var(--radius-md)] bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={busy || !zoteroApiKey.trim() || !zoteroUserId.trim()}
+                    className="px-4 py-2 bg-[color:var(--accent-solid)] text-white rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {busy ? "Syncing Zotero…" : "Sync Zotero Library →"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleSyncMendeley} className="flex flex-col gap-3">
+                <p className="text-xs text-[color:var(--text-secondary)]">
+                  Paste your Mendeley or LaTeX BibTeX citations below to batch-import verified academic records into your Vault.
+                </p>
+                <textarea
+                  rows={4}
+                  value={mendeleyBibtex}
+                  onChange={(e) => setMendeleyBibtex(e.target.value)}
+                  placeholder={`@article{smith2024,\n  title={Quantum Advances in Machine Learning},\n  author={Smith, Jane and Doe, John},\n  journal={Nature Biotech},\n  year={2024}\n}`}
+                  className="w-full p-3 font-mono text-xs border border-[color:var(--border-default)] rounded-[var(--radius-md)] bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                />
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    disabled={busy || !mendeleyBibtex.trim()}
+                    className="px-4 py-2 bg-[color:var(--accent-solid)] text-white rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {busy ? "Importing BibTeX…" : "Import BibTeX Entries →"}
+                  </button>
+                </div>
+              </form>
             )}
           </div>
         ) : mode === "doi" ? (
