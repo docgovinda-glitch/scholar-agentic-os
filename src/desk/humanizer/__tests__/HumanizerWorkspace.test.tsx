@@ -40,7 +40,8 @@ describe("HumanizerWorkspace (Production Pipeline & Quality Audit Dashboard)", (
       const tokensStr = tokenMatch.join(" ");
 
       return {
-        result: {
+        ok: true,
+        value: {
           text: JSON.stringify({
             rewrittenText: `Domesticated across centuries, cows remain vital to agrarian life ${tokensStr}. They supply essential dairy nourishment.`,
             improvements: ["Enhanced scholarly cadence", "Refined sentence rhythm"],

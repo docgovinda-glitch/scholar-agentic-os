@@ -41,7 +41,11 @@ export type FailureTaxonomyCode =
   | "COHERENCE_DEGRADATION"
   | "STYLE_DEGRADATION"
   | "TERMINOLOGY_FAILURE"
-  | "PROMPT_INJECTION_FAILURE";
+  | "AUTHOR_VOICE_FAILURE"
+  | "CHUNK_BOUNDARY_FAILURE"
+  | "UNSUPPORTED_ASSERTION"
+  | "PROMPT_INJECTION_FAILURE"
+  | "OTHER";
 
 export interface AcademicValidationCase {
   id: string;

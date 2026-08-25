@@ -11,6 +11,7 @@ import { RewriteMode } from "../../domain/humanizer/rewrite/promptBuilder";
 import {
   HumanizerDocument,
   HumanizerAuditReport,
+  HumanizerStyleProfile,
   CandidateState,
   ReviewUnit,
   ReviewUnitDecision,
@@ -258,7 +259,7 @@ export default function HumanizerWorkspace({
     let isMounted = true;
     async function loadSaved() {
       try {
-        const res = await authedJsonFetch(`/api/projects/${projectId}/humanizer`, "GET");
+        const res = await authedJsonFetch(`/api/projects/${projectId}/humanizer`, "GET", undefined);
         if (isMounted && res.ok) {
           const body = await res.json();
           if (body?.data) {
@@ -276,10 +277,7 @@ export default function HumanizerWorkspace({
 
   // Production-Grade Multi-Auditor Pipeline Handler (Supporting Long Documents & Chunking)
   const handleHumanize = useCallback(async () => {
-    if (!sourceText.trim()) {
-      setErrorMessage("Please enter or paste text to humanize.");
-      return;
-    }
+    if (!sourceText.trim()) return;
 
     setLoading(true);
     setErrorMessage(null);
@@ -289,28 +287,26 @@ export default function HumanizerWorkspace({
     setFallbackReason(undefined);
     setReviewUnits([]);
     setChunks([]);
+    setSentToManuscript(false);
     setProgressStage("parsing");
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
     try {
-      // LLM Adapter connecting to Gateway & Server Fallback
-      const completer = async (params: {
-        systemPrompt: string;
-        userPrompt: string;
-        temperature?: number;
-        topP?: number;
-      }) => {
-        setProgressStage("rewriting");
-        const candidates = await getCandidateProviders(activeProvider, modelName);
+      // Build LLM completer for humanizer pipeline
+      const completer = async (params: { systemPrompt: string; userPrompt: string }) => {
+        const storedKey = await readProviderKey(activeProvider);
+        const candidates: CandidateProvider[] = [
+          {
+            provider: activeProvider,
+            model: modelName,
+            apiKey: storedKey || "",
+          },
+        ];
 
         if (candidates.length > 0) {
-          let userPolicy = defaultPolicy();
-          for (const c of candidates) {
-            userPolicy = recordConsent(userPolicy, c.provider);
-          }
-
+          const userPolicy = defaultPolicy();
           const failover = await completeWithFailover(
             {
               userPrompt: params.userPrompt,
@@ -318,12 +314,12 @@ export default function HumanizerWorkspace({
               taskClass: "refinement",
               segments: [{ label: "draftText", text: params.userPrompt }],
             },
-            { candidates, maxRetriesPerCandidate: 1 },
+            { candidates, maxRetriesPerProvider: 1 },
             userPolicy
           );
 
-          if (failover?.result?.text) {
-            return failover.result.text;
+          if (failover.ok && failover.value?.text) {
+            return failover.value.text;
           }
         }
 
@@ -345,16 +341,20 @@ export default function HumanizerWorkspace({
       };
 
       // Construct optional voice profile
-      let styleProfile;
+      let styleProfile: HumanizerStyleProfile | undefined;
       if (useAuthorVoice && sourceText.length > 200) {
         const vp = buildVoiceProfile([sourceText]);
         if (vp) {
           styleProfile = {
+            name: "Author Style Profile",
             meanSentenceLength: Math.round(vp.meanSentenceLength),
-            sentenceLengthVariance: Math.round(vp.sentenceLengthStdDev ** 2),
-            firstPersonRate: vp.firstPersonRate / 1000,
+            sentenceLengthStdDev: Math.round(vp.sentenceLengthStdDev),
             passiveVoiceRatio: vp.passiveVoiceRatio,
-            formalityLevel: vp.firstPersonRate > 10 ? "moderate" : "formal" as const,
+            semicolonRate: 0,
+            firstPersonRate: vp.firstPersonRate / 1000,
+            averageWordLength: 5.5,
+            formalityLevel: vp.firstPersonRate > 10 ? "accessible_scholar" : "formal_academic",
+            preferredTransitions: [],
           };
         }
       }
@@ -985,10 +985,10 @@ export default function HumanizerWorkspace({
                   taskClass: "refinement",
                   segments: [{ label: "draftText", text: params.userPrompt }],
                 },
-                { candidates, maxRetriesPerCandidate: 1 },
+                { candidates, maxRetriesPerProvider: 1 },
                 defaultPolicy()
               );
-              if (failover?.result?.text) return failover.result.text;
+              if (failover.ok && failover.value?.text) return failover.value.text;
             }
             return JSON.stringify({ rewrittenText: params.userPrompt, improvements: [] });
           }}
