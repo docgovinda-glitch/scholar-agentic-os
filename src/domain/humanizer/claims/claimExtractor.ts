@@ -146,32 +146,39 @@ export function extractClaimsFromDocument(doc: HumanizerDocument): HumanizerDocu
   const extractedClaims: ExtractedClaim[] = [];
   let claimCounter = 0;
 
-  for (const block of doc.blocks) {
-    const rawText = block.processedText || block.sourceText;
-    const sentences = block.sentences.length > 0 ? block.sentences : segmentSentences(rawText).map((s, idx) => ({
-      id: `${block.id}_s_${idx + 1}`,
-      text: s,
-      order: idx + 1,
-      wordCount: s.split(/\s+/).length,
-      protectedTokens: [],
-      claimIds: [],
-    }));
-
-    for (const sentence of sentences) {
+  const updatedBlocks = doc.blocks.map((block) => {
+    const rawText = block.processedText !== undefined ? block.processedText : block.sourceText;
+    const rawSentences = segmentSentences(rawText);
+    const sentences = rawSentences.map((sText, idx) => {
       claimCounter++;
-      const claim = extractClaimFromSentence(sentence.text, {
+      const sId = `${block.id}_s_${idx + 1}`;
+      const claim = extractClaimFromSentence(sText, {
         blockId: block.id,
-        sentenceId: sentence.id,
+        sentenceId: sId,
         claimIndex: claimCounter,
       });
 
-      sentence.claimIds = [claim.claimId];
       extractedClaims.push(claim);
-    }
-  }
+
+      return {
+        id: sId,
+        text: sText,
+        order: idx + 1,
+        wordCount: sText.split(/\s+/).filter(Boolean).length,
+        protectedTokens: [],
+        claimIds: [claim.claimId],
+      };
+    });
+
+    return {
+      ...block,
+      sentences,
+    };
+  });
 
   return {
     ...doc,
+    blocks: updatedBlocks,
     claims: extractedClaims,
   };
 }

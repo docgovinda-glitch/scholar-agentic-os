@@ -34,10 +34,30 @@ const CAUSALITY_STRENGTH: Record<ClaimCausality, number> = {
   direct: 3,
 };
 
-/** Compute simple word overlap similarity between two proposition strings */
+/** Clean and stem words for robust proposition matching across rewrites */
+export function extractPropositionTokens(str: string): Set<string> {
+  const clean = str
+    .toLowerCase()
+    .replace(/⟦PROTECTED_[^⟧]+⟧/g, " ")
+    .replace(/[^\w\s]/g, " ");
+
+  const rawWords = clean.split(/\s+/).filter((w) => w.length > 2);
+  const stemmed = rawWords.map((w) => {
+    if (w.endsWith("ies") && w.length > 4) return w.slice(0, -3) + "y";
+    if (w.endsWith("ing") && w.length > 5) return w.slice(0, -3);
+    if (w.endsWith("ed") && w.length > 4) return w.slice(0, -2);
+    if (w.endsWith("es") && w.length > 4) return w.slice(0, -2);
+    if (w.endsWith("s") && !w.endsWith("ss") && w.length > 3) return w.slice(0, -1);
+    return w;
+  });
+
+  return new Set(stemmed);
+}
+
+/** Compute word overlap similarity between two proposition strings */
 export function computePropositionOverlap(strA: string, strB: string): number {
-  const wordsA = new Set(strA.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
-  const wordsB = new Set(strB.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
+  const wordsA = extractPropositionTokens(strA);
+  const wordsB = extractPropositionTokens(strB);
   if (wordsA.size === 0 || wordsB.size === 0) return 0;
 
   let intersection = 0;
@@ -168,8 +188,8 @@ export function compareClaims(
   const findings: ClaimComparisonFinding[] = [];
   const matchedCandidateIndices = new Set<number>();
 
-  for (const orig of originalClaims) {
-    // Find best matching candidate claim by sentence order or highest proposition overlap
+  for (let origIdx = 0; origIdx < originalClaims.length; origIdx++) {
+    const orig = originalClaims[origIdx];
     let bestMatchIdx = -1;
     let highestOverlap = -1;
 
@@ -178,7 +198,7 @@ export function compareClaims(
       const cand = candidateClaims[i];
 
       // Exact sentence ID match
-      if (cand.sourceSentenceId === orig.sourceSentenceId) {
+      if (cand.sourceSentenceId && orig.sourceSentenceId && cand.sourceSentenceId === orig.sourceSentenceId) {
         bestMatchIdx = i;
         break;
       }
@@ -190,9 +210,22 @@ export function compareClaims(
       }
     }
 
-    if (bestMatchIdx !== -1 && (highestOverlap >= 0.2 || candidateClaims[bestMatchIdx].sourceSentenceId === orig.sourceSentenceId)) {
-      matchedCandidateIndices.add(bestMatchIdx);
-      const cand = candidateClaims[bestMatchIdx];
+    // If overlap is found or if candidate is in the same block and relative position
+    const isPositionalMatch =
+      bestMatchIdx === -1 &&
+      origIdx < candidateClaims.length &&
+      !matchedCandidateIndices.has(origIdx) &&
+      originalClaims[origIdx].sourceBlockId === candidateClaims[origIdx].sourceBlockId;
+
+    const finalMatchIdx = bestMatchIdx !== -1 && (highestOverlap >= 0.1 || candidateClaims[bestMatchIdx].sourceSentenceId === orig.sourceSentenceId)
+      ? bestMatchIdx
+      : isPositionalMatch
+      ? origIdx
+      : -1;
+
+    if (finalMatchIdx !== -1) {
+      matchedCandidateIndices.add(finalMatchIdx);
+      const cand = candidateClaims[finalMatchIdx];
       const finding = compareSingleClaimPair(orig, cand);
       findings.push(finding);
     } else {

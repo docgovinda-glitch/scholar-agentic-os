@@ -25,6 +25,7 @@ export interface PromptBuilderOptions {
   claimsInBlock: ExtractedClaim[];
   lockedTerms?: string[];
   styleProfile?: HumanizerStyleProfile;
+  retryInstructions?: string[];
 }
 
 export interface BuiltPrompt {
@@ -160,7 +161,14 @@ ${claimList}`);
 - First Person Rate: ${styleProfile.firstPersonRate > 0.05 ? "Permitted" : "Minimal/Avoid"}`);
   }
 
-  // 6. Source Text to Rewrite
+  // 6. Targeted Retry Instructions (If this is a retry attempt)
+  if (options.retryInstructions && options.retryInstructions.length > 0) {
+    sections.push(`### MANDATORY RETRY CORRECTIONS (FAILED PREVIOUS AUDIT)
+The previous attempt failed safety/quality audit. You MUST correct these specific violations:
+${options.retryInstructions.map((inst) => `- ${inst}`).join("\n")}`);
+  }
+
+  // 7. Source Text to Rewrite
   const textToRewrite = block.processedText || block.sourceText;
   sections.push(`### SOURCE TEXT TO REWRITE
 """

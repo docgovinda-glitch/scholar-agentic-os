@@ -26,6 +26,7 @@ export interface RewriteEngineOptions {
   genre?: string;
   completer: LLMCompleter;
   registry: TokenRegistry;
+  retryInstructions?: string[];
 }
 
 export interface RewriteResult {
@@ -103,6 +104,7 @@ export async function rewriteBlock(
     doc: HumanizerDocument;
     previousBlockText?: string;
     nextBlockText?: string;
+    retryInstructions?: string[];
   }
 ): Promise<{ rewrittenBlock: HumanizerBlock; improvements: string[] }> {
   if (!isRewriteCandidate(block)) {
@@ -125,6 +127,7 @@ export async function rewriteBlock(
     claimsInBlock,
     lockedTerms,
     styleProfile: options.doc.styleProfile,
+    retryInstructions: options.retryInstructions,
   });
 
   const rawResponse = await options.completer({
@@ -181,6 +184,7 @@ export async function rewriteDocument(
         doc,
         previousBlockText: prevBlock,
         nextBlockText: nextBlock,
+        retryInstructions: options.retryInstructions,
       });
 
       rewrittenBlocks.push(rewrittenBlock);

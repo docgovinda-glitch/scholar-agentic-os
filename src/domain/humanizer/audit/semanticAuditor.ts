@@ -39,15 +39,28 @@ export function normalizeProtectedPlaceholders(text: string): string {
     .replace(/⟦PROTECTED_[^⟧]+⟧/g, "[PROTECTED]");
 }
 
-/** Extracts content words (words of length >= 3, lowercase) */
+/** Extracts and stems content words for robust semantic comparison */
 function extractContentWords(text: string): Set<string> {
   const normalized = normalizeProtectedPlaceholders(text).toLowerCase();
   const rawWords = normalized.match(/\b[a-z]{3,}\b/g) || [];
   const stopwords = new Set([
     "the", "and", "that", "this", "with", "from", "for", "are", "was", "were",
     "have", "has", "had", "which", "their", "they", "been", "also", "into",
+    "such", "some", "other", "about", "above", "across", "over",
   ]);
-  return new Set(rawWords.filter((w) => !stopwords.has(w)));
+
+  const stemmed = rawWords
+    .filter((w) => !stopwords.has(w))
+    .map((w) => {
+      if (w.endsWith("ies") && w.length > 4) return w.slice(0, -3) + "y";
+      if (w.endsWith("ing") && w.length > 5) return w.slice(0, -3);
+      if (w.endsWith("ed") && w.length > 4) return w.slice(0, -2);
+      if (w.endsWith("es") && w.length > 4) return w.slice(0, -2);
+      if (w.endsWith("s") && !w.endsWith("ss") && w.length > 3) return w.slice(0, -1);
+      return w;
+    });
+
+  return new Set(stemmed);
 }
 
 /**
