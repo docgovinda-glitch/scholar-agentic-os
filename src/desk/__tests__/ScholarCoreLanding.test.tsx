@@ -14,25 +14,25 @@ describe("ScholarCoreLanding", () => {
     );
 
     expect(screen.getByText(/6 DEDICATED ACADEMIC WORKSPACES/i)).toBeInTheDocument();
-    expect(screen.getByText(/1\. Assignment/i)).toBeInTheDocument();
-    expect(screen.getByText(/2\. Journal Article/i)).toBeInTheDocument();
-    expect(screen.getByText(/3\. Thesis \/ Dissertation/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Assignment/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Initialize Academic Assignment →/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Journal Article/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Thesis \/ Dissertation/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Presentation/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Text Humanizer/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Initialize Assignment →/i)).toBeInTheDocument();
   });
 
-  it("switches format categories and updates format cards", () => {
+  it("displays exact services across all 6 curated workspace cards", () => {
     render(
       <MemoryRouter>
         <ScholarCoreLanding />
       </MemoryRouter>
     );
 
-    const pubTab = screen.getByText(/2\. Journal Article/i);
-    fireEvent.click(pubTab);
-
-    expect(screen.getAllByText(/Journal Article/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Initialize Journal Article →/i)).toBeInTheDocument();
+    expect(screen.getByText(/Initialize Thesis \/ Dissertation →/i)).toBeInTheDocument();
+    expect(screen.getByText(/Initialize Presentation →/i)).toBeInTheDocument();
+    expect(screen.getByText(/Initialize Text Humanizer →/i)).toBeInTheDocument();
   });
 
   it("opens the embedded auth modal when clicking an initialize button", () => {
@@ -42,7 +42,7 @@ describe("ScholarCoreLanding", () => {
       </MemoryRouter>
     );
 
-    const initBtn = screen.getByText(/Initialize Academic Assignment →/i);
+    const initBtn = screen.getByText(/Initialize Assignment →/i);
     fireEvent.click(initBtn);
 
     // Modal opens with Scholar Core branding and auth form

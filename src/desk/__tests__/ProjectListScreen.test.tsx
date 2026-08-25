@@ -44,44 +44,44 @@ async function openChooser() {
   await screen.findByLabelText("Target Publication Type");
 }
 
-describe("the document-type dropdown", () => {
-  it("groups options by curated academic formats", async () => {
+describe("the document-type format selector", () => {
+  it("renders the curated academic format options", async () => {
     await openChooser();
 
-    const select = screen.getByLabelText("Target Publication Type") as HTMLSelectElement;
-    const groupLabels = Array.from(select.querySelectorAll("optgroup")).map((g) => g.getAttribute("label"));
-
-    expect(groupLabels.filter((l) => l === "Journal Article")).toHaveLength(1);
-    expect(within(select).getByRole("option", { name: "Assignment" })).toBeInTheDocument();
-    expect(within(select).getAllByRole("option", { name: "Journal Article" })[0]).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Thesis / Dissertation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Text Humanizer" })).toBeInTheDocument();
   });
 
-  it("cannot continue before a type is chosen", async () => {
+  it("cannot continue before a format is chosen", async () => {
     await openChooser();
-    expect(screen.getByRole("button", { name: "Boot Workspace" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Select a Format to Boot/i })).toBeDisabled();
   });
 
-  it("creates the project for the selected type only after Continue is pressed, not on selection alone", async () => {
+  it("creates the project for the selected format when Boot button is pressed", async () => {
     await openChooser();
     createProject.mockResolvedValue({ projectId: "proj-1" });
 
-    fireEvent.change(screen.getByLabelText("Target Publication Type"), { target: { value: "OT-06" } });
-    expect(createProject).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Boot Workspace" })).toBeEnabled();
+    // Click the Journal Article card
+    const journalCard = screen.getByRole("heading", { name: "Journal Article" });
+    fireEvent.click(journalCard);
 
-    fireEvent.click(screen.getByRole("button", { name: "Boot Workspace" }));
-    expect(createProject).toHaveBeenCalledWith("OT-06");
+    expect(createProject).not.toHaveBeenCalled();
+    const bootBtn = screen.getByRole("button", { name: /Boot Journal Article/i });
+    expect(bootBtn).toBeEnabled();
+
+    fireEvent.click(bootBtn);
+    expect(createProject).toHaveBeenCalledWith("OT-10");
   });
 
-  it("shows every type enabled and ready to boot without maintenance restrictions", async () => {
+  it("shows every format tile enabled and ready to boot", async () => {
     await openChooser();
 
-    const select = screen.getByLabelText("Target Publication Type") as HTMLSelectElement;
-    const assignment = within(select).getByRole("option", { name: "Assignment" }) as HTMLOptionElement;
-    expect(assignment.disabled).toBe(false);
-
-    const journalArticle = within(select).getAllByRole("option", { name: "Journal Article" })[0] as HTMLOptionElement;
-    expect(journalArticle.disabled).toBe(false);
+    expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Thesis / Dissertation" })).toBeInTheDocument();
   });
 });
 

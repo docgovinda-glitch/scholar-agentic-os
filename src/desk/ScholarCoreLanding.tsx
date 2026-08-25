@@ -91,85 +91,91 @@ const AGENT_ROLES = [
 const FORMAT_FAMILIES = [
   {
     id: "short_form",
-    label: "1. Assignment",
-    desc: "Dedicated 8-phase academic thinking, evidence evaluation, research, and grounded drafting workspace.",
+    label: "Assignment",
+    icon: "📝",
+    desc: "Dedicated 8-phase thinking, evidence board & grounded drafting workspace.",
     formats: [
       {
         id: "OT-01",
-        label: "Academic Assignment",
+        label: "Assignment",
         words: "800 – 4,000 words",
-        sections: "Understand Brief → Research Plan → Evidence Board → Think & Critique → Structure & Word Plan → Grounded Drafting → 10-Point Submission Audit",
-        bestFor: "Undergraduate & Postgraduate coursework, essays, reports, and reflections",
+        sections: "Brief Analysis → Research Plan → Evidence Board → Critical Synthesis → Adaptive Outline → Grounded Drafting → 10-Point Submission Audit",
+        bestFor: "Coursework essays, reports, reflections, and case studies (Undergraduate & Postgraduate).",
       },
     ],
   },
   {
     id: "publication",
-    label: "2. Journal Article",
-    desc: "25-stage peer-reviewed empirical & review paper pipeline with multi-agent peer review.",
+    label: "Journal Article",
+    icon: "📄",
+    desc: "25-stage peer-reviewed empirical & review paper pipeline with peer review simulator.",
     formats: [
       {
         id: "OT-10",
         label: "Journal Article",
         words: "4,000 – 10,000 words",
-        sections: "Journal Discovery → Literature Matrix → Gap Analysis → IMRaD Drafting → Multi-Agent Peer Review Simulator",
-        bestFor: "Nature, Elsevier, IEEE, Springer & peer-reviewed journals",
+        sections: "Journal Discovery → Literature Matrix → Gap Analysis → IMRaD Drafting → Multi-Agent Peer Review",
+        bestFor: "Empirical research & literature reviews for Nature, IEEE, Elsevier & Springer.",
       },
     ],
   },
   {
     id: "long_form",
-    label: "3. Thesis / Dissertation",
-    desc: "Comprehensive multi-chapter milestone framework with structured defense preparation.",
+    label: "Thesis / Dissertation",
+    icon: "🎓",
+    desc: "Comprehensive multi-chapter milestone framework with defense preparation.",
     formats: [
       {
         id: "OT-09",
         label: "Thesis / Dissertation",
         words: "10,000 – 80,000 words",
-        sections: "Proposal & Theory → Literature Review → Methodology → Findings → Discussion → Defense Ready",
-        bestFor: "Undergraduate dissertations, Master's theses & PhD doctorates",
+        sections: "Proposal & Theory → Literature Review → Methodology → Findings → Discussion → Defense Preparation",
+        bestFor: "Undergraduate capstones, Master's theses, and PhD doctoral dissertations.",
       },
     ],
   },
   {
     id: "proposal_funding",
-    label: "4. Research Proposal",
+    label: "Research Proposal",
+    icon: "💡",
     desc: "Competitive grant applications and research plans with strict agency rubric alignment.",
     formats: [
       {
         id: "OT-19",
-        label: "Research & Grant Proposal",
+        label: "Research Proposal",
         words: "3,000 – 15,000 words",
         sections: "Specific Aims → Research Significance → Methodological Design → Ethics & Timeline Budgeting",
-        bestFor: "Institutional grants, federal funding applications & PhD candidacy plans",
+        bestFor: "Institutional grant proposals, ethics applications, and funded research candidacy.",
       },
     ],
   },
   {
     id: "presentation",
-    label: "5. Presentation",
+    label: "Presentation",
+    icon: "📊",
     desc: "High-impact visual communication and narrative scripts for symposiums and oral defenses.",
     formats: [
       {
         id: "OT-22",
-        label: "Academic Presentation",
+        label: "Presentation",
         words: "10 – 35 slides",
-        sections: "Core Takeaway → Visual Methodology → Evidence Synthesis → Discussion & Defense Q&A",
-        bestFor: "Symposium talks, conference keynotes & thesis defense slide decks",
+        sections: "Core Takeaways → Visual Methodology → Empirical Synthesis → Defense & Q&A Preparation",
+        bestFor: "Conference slide decks, symposium talks, and oral thesis defense presentations.",
       },
     ],
   },
   {
     id: "applied_professional",
-    label: "6. Text Humanizer",
-    desc: "Language & Voice Studio for academic AI text polish, tone tuning, and stylometric humanization.",
+    label: "Text Humanizer",
+    icon: "✨",
+    desc: "Language & Voice Studio for AI text polish, tone tuning, and stylometric humanization.",
     formats: [
       {
         id: "OT-07",
-        label: "Academic Text Humanizer",
+        label: "Text Humanizer",
         words: "Section-by-section",
         sections: "Stylometric Analysis → Tone & Voice Calibration → Passive/Active Balance → Provenance Check",
-        bestFor: "Refining AI drafts into natural, authentic human academic prose",
+        bestFor: "Refining AI drafts into natural, authentic, publication-grade academic prose.",
       },
     ],
   },
@@ -451,7 +457,7 @@ export default function ScholarCoreLanding({
 
           {/* 6 CURATED ACADEMIC WORKSPACES */}
           <div id="formats-explorer" className="w-full scroll-mt-24 pt-4 border-t border-[color:var(--border-subtle)]">
-            <div className="text-center max-w-3xl mx-auto mb-6">
+            <div className="text-center max-w-3xl mx-auto mb-8">
               <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
                 6 DEDICATED ACADEMIC WORKSPACES
               </span>
@@ -459,61 +465,33 @@ export default function ScholarCoreLanding({
                 Engineered for Every Stage of Scholarship
               </h2>
               <p className="text-[color:var(--text-secondary)] mt-2 text-xs sm:text-sm">
-                From undergraduate assignments and postgraduate coursework to Nature empirical articles and doctoral dissertations, Scholar Core provides dedicated workflow pipelines and quality rubrics.
+                Each workspace provides dedicated workflow stages, evidence pipelines, and discipline-specific quality rubrics.
               </p>
             </div>
 
-            {/* 6 Category Filter Tabs in specific order */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
-              {FORMAT_FAMILIES.map((family) => {
-                const isActive = family.id === activeFamily;
-                return (
-                  <button
-                    key={family.id}
-                    type="button"
-                    onClick={() => setActiveFamily(family.id)}
-                    className={`px-3.5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-xs scale-105"
-                        : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)]"
-                    }`}
-                  >
-                    {family.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mb-6 text-center">
-              <p className="text-xs sm:text-sm font-medium text-[color:var(--text-secondary)]">{selectedFamily.desc}</p>
-            </div>
-
-            {/* Curated Workspace Detail Card */}
+            {/* 6 Curated Workspace Cards Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {FORMAT_FAMILIES.map((fam) => {
                 const fmt = fam.formats[0];
-                const isSelected = fam.id === activeFamily;
 
                 return (
                   <div
                     key={fmt.id}
-                    onClick={() => setActiveFamily(fam.id)}
-                    className={`p-6 rounded-3xl border transition-all flex flex-col justify-between group text-left cursor-pointer ${
-                      isSelected
-                        ? "border-[color:var(--accent)] bg-[color:var(--surface-canvas)] shadow-lg ring-1 ring-[color:var(--accent)]/30 scale-[1.02]"
-                        : "border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)] hover:shadow-md"
-                    }`}
+                    className="p-6 rounded-3xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)] hover:shadow-md transition-all flex flex-col justify-between group text-left"
                   >
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-md bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)]">
-                          {fmt.id}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{fam.icon}</span>
+                          <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-md bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)]">
+                            {fmt.id}
+                          </span>
+                        </div>
                         <span className="text-[10px] font-bold text-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] px-2 py-0.5 rounded-full border border-[color:var(--state-success)]/30">
                           Ready to Boot
                         </span>
                       </div>
-                      <h3 className="font-bold text-lg text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors mb-2">
+                      <h3 className="font-bold text-lg text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors mb-1.5">
                         {fmt.label}
                       </h3>
                       <p className="text-xs text-[color:var(--text-secondary)] mb-3 font-mono font-semibold">
@@ -535,10 +513,7 @@ export default function ScholarCoreLanding({
                     <div className="mt-6 pt-4 border-t border-[color:var(--border-subtle)]">
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openAuth("signup", fmt.id);
-                        }}
+                        onClick={() => openAuth("signup", fmt.id)}
                         className="w-full py-3 rounded-xl text-xs font-bold text-white bg-[color:var(--accent-solid)] hover:bg-[color:var(--accent-hover)] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                       >
                         Initialize {fmt.label} →

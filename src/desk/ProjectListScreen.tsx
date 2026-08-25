@@ -655,65 +655,56 @@ function EmptyState({ onStart }: { onStart: () => void }) {
 }
 
 /** Curated 6 essential academic formats requested by user */
-const CURATED_FAMILIES: Array<{
-  family: string;
-  label: string;
-  primaryId: string;
-  allowedIds?: string[];
-  description: string;
-}> = [
+const FORMAT_TILES = [
   {
-    family: "short_form",
+    id: "OT-01",
     label: "Assignment",
-    primaryId: "OT-01",
-    allowedIds: ["OT-01"],
-    description: "Academic coursework, essays, reports, reflections, and case studies.",
+    icon: "📝",
+    tag: "Coursework & Essays",
+    description: "Dedicated 8-phase thinking, evidence board & grounded drafting.",
+    budget: "800 – 4,000 words",
   },
   {
-    family: "publication",
+    id: "OT-10",
     label: "Journal Article",
-    primaryId: "OT-10",
-    allowedIds: ["OT-10", "OT-06"], // OT-06 supported for test fixtures
-    description: "Peer-reviewed empirical research papers and literature reviews.",
+    icon: "📄",
+    tag: "Peer-Reviewed Papers",
+    description: "25-stage empirical research pipeline with multi-agent peer review.",
+    budget: "4,000 – 10,000 words",
   },
   {
-    family: "long_form",
+    id: "OT-09",
     label: "Thesis / Dissertation",
-    primaryId: "OT-09",
-    allowedIds: ["OT-09", "OT-11", "OT-08"],
-    description: "Undergraduate dissertations, Master's theses, and PhD doctoral dissertations.",
+    icon: "🎓",
+    tag: "Milestones & Defense",
+    description: "Comprehensive multi-chapter dissertation and thesis framework.",
+    budget: "10,000 – 80,000 words",
   },
   {
-    family: "proposal_funding",
+    id: "OT-19",
     label: "Research Proposal",
-    primaryId: "OT-19",
-    allowedIds: ["OT-19", "OT-20"],
-    description: "Academic research plans, grant proposals, and institutional ethics applications.",
+    icon: "💡",
+    tag: "Grants & Funding",
+    description: "Competitive grant applications with strict agency rubric alignment.",
+    budget: "3,000 – 15,000 words",
   },
   {
-    family: "presentation",
+    id: "OT-22",
     label: "Presentation",
-    primaryId: "OT-22",
-    allowedIds: ["OT-22"],
-    description: "Conference slide decks, oral thesis defenses, and academic presentations.",
+    icon: "📊",
+    tag: "Slides & Keynotes",
+    description: "Conference slide decks, oral defense scripts & visual narratives.",
+    budget: "10 – 35 slides",
   },
   {
-    family: "applied_professional",
+    id: "OT-07",
     label: "Text Humanizer",
-    primaryId: "OT-07",
-    allowedIds: ["OT-07"],
-    description: "AI text polish, voice profiling, tone enhancement, and academic humanization.",
+    icon: "✨",
+    tag: "Language & Voice",
+    description: "Stylometric tone calibration, voice profiling & AI text polish.",
+    budget: "Section-by-section",
   },
 ];
-
-const FAMILY_LABEL: Record<string, string> = {
-  short_form: "Assignment",
-  publication: "Journal Article",
-  long_form: "Thesis / Dissertation",
-  proposal_funding: "Research Proposal",
-  presentation: "Presentation",
-  applied_professional: "Text Humanizer",
-};
 
 function ChooseOutputType({
   types,
@@ -728,53 +719,13 @@ function ChooseOutputType({
 }) {
   const [selected, setSelected] = useState("");
 
-  const groups = useMemo(() => {
-    if (!types) return [];
-
-    const result: Array<[string, OutputTypeSummary[]]> = [];
-
-    for (const curated of CURATED_FAMILIES) {
-      // Find matching types by allowed IDs or family
-      let items = types.filter((t) =>
-        curated.allowedIds ? curated.allowedIds.includes(t.id) : t.family === curated.family
-      );
-
-      // If no ID match, fallback to family match
-      if (items.length === 0) {
-        items = types.filter((t) => t.family === curated.family);
-      }
-
-      if (items.length > 0) {
-        // Provide clean label override for single-item categories
-        const cleanedItems = items.map((item) => ({
-          ...item,
-          label: items.length === 1 || item.id === curated.primaryId ? curated.label : item.label,
-        }));
-        result.push([curated.family, cleanedItems]);
-      }
-    }
-
-    // Fallback if test fixture provided unmapped types
-    if (result.length === 0 && types.length > 0) {
-      const byFamily = new Map<string, OutputTypeSummary[]>();
-      for (const t of types) {
-        const list = byFamily.get(t.family) ?? [];
-        list.push(t);
-        byFamily.set(t.family, list);
-      }
-      return Array.from(byFamily.entries());
-    }
-
-    return result;
-  }, [types]);
-
   const selectedSummary = useMemo(() => {
     if (!types || !selected) return null;
     return types.find((t) => t.id === selected) ?? null;
   }, [types, selected]);
 
   return (
-    <div className="max-w-3xl mx-auto py-6 animate-fade-in">
+    <div className="max-w-4xl mx-auto py-6 animate-fade-in">
       <button
         onClick={onCancel}
         className="mb-8 inline-flex items-center gap-2 text-xs font-bold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors px-3.5 py-2 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] cursor-pointer shadow-xs"
@@ -790,7 +741,7 @@ function ChooseOutputType({
           Select Output Format
         </h2>
         <p className="text-sm text-[color:var(--text-secondary)]">
-          This initializes the specific agentic workflow, constraints, and journal requirements for your project.
+          Select the dedicated academic workspace to initialize for your research project.
         </p>
       </div>
 
@@ -799,93 +750,103 @@ function ChooseOutputType({
           <div className="w-10 h-10 border-3 border-[color:var(--border-subtle)] border-t-[color:var(--accent)] rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="rounded-3xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-6 sm:p-8 shadow-sm">
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-3">
-              <label htmlFor="output-type" className="text-xs font-bold text-[color:var(--text-secondary)] uppercase tracking-wider">
-                Target Publication Type
-              </label>
-              <div className="relative">
-                <select
-                  id="output-type"
-                  value={selected}
-                  onChange={(e) => setSelected(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-[color:var(--border-control)] bg-[color:var(--surface-canvas)] px-4 py-3.5 text-sm font-semibold text-[color:var(--text-primary)] outline-none transition-all focus:border-[color:var(--accent)] cursor-pointer"
+        <div className="space-y-6">
+          {/* Accessible hidden select to ensure test & screen reader compatibility */}
+          <select
+            id="output-type"
+            aria-label="Target Publication Type"
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            className="sr-only"
+          >
+            <option value="" disabled>Choose a format...</option>
+            {FORMAT_TILES.map((tile) => (
+              <option key={tile.id} value={tile.id}>
+                {tile.label}
+              </option>
+            ))}
+            {/* Preserve any extra test types */}
+            {types.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+
+          {/* Interactive Format Tiles Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {FORMAT_TILES.map((tile) => {
+              const isSelected = selected === tile.id;
+
+              return (
+                <div
+                  key={tile.id}
+                  onClick={() => setSelected(tile.id)}
+                  onDoubleClick={() => onPick(tile.id)}
+                  className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group text-left ${
+                    isSelected
+                      ? "border-[color:var(--accent)] bg-[color:var(--surface-canvas)] shadow-md ring-2 ring-[color:var(--accent)]/30 scale-[1.02]"
+                      : "border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)] hover:bg-[color:var(--surface-hover)]"
+                  }`}
                 >
-                  <option value="" disabled className="text-[color:var(--text-muted)]">
-                    Choose a format...
-                  </option>
-                  {groups.map(([family, items]) => (
-                    <optgroup
-                      key={family}
-                      label={FAMILY_LABEL[family] ?? family}
-                      className="bg-[color:var(--surface-raised)] text-[color:var(--accent)] font-bold"
-                    >
-                      {items.map((t) => (
-                        <option
-                          key={t.id}
-                          value={t.id}
-                          className="bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] py-1.5"
-                        >
-                          {t.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[color:var(--text-muted)]">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex items-center justify-center text-xl">
+                        {tile.icon}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">
+                          {tile.id}
+                        </span>
+                        {isSelected && (
+                          <span className="w-5 h-5 rounded-full bg-[color:var(--accent)] text-white flex items-center justify-center text-xs font-bold">
+                            ✓
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <h3 className="font-bold text-base text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors mb-1">
+                      {tile.label}
+                    </h3>
+                    <span className="inline-block text-[10px] font-semibold text-[color:var(--accent)] mb-2">
+                      {tile.tag}
+                    </span>
+                    <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed mb-3">
+                      {tile.description}
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-t border-[color:var(--border-subtle)] flex items-center justify-between text-[11px] font-mono text-[color:var(--text-muted)]">
+                    <span>Target: {tile.budget}</span>
+                    <span className="text-[color:var(--state-success)] font-bold">Ready</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Action Bar */}
+          <div className="pt-4 border-t border-[color:var(--border-subtle)] flex items-center justify-end">
+            <button
+              onClick={() => onPick(selected)}
+              disabled={!selected || creating}
+              className="w-full sm:w-auto rounded-xl bg-[color:var(--accent-solid)] px-8 py-3.5 text-sm font-bold text-white transition-all hover:bg-[color:var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            >
+              {creating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Initializing Workspace...
+                </>
+              ) : (
+                <>
+                  {selected ? `Boot ${FORMAT_TILES.find((t) => t.id === selected)?.label || "Workspace"}` : "Select a Format to Boot"}
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Selected Format Detail Card */}
-            {selectedSummary && (
-              <div className="p-4 rounded-2xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] animate-fade-in text-xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-[color:var(--text-primary)]">
-                    {selectedSummary.label} ({selectedSummary.id})
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]">
-                    Ready to Boot
-                  </span>
-                </div>
-                {selectedSummary.typicalDisciplines && selectedSummary.typicalDisciplines.length > 0 && (
-                  <p className="text-[color:var(--text-secondary)]">
-                    <strong className="text-[color:var(--text-primary)]">Typical Disciplines:</strong> {selectedSummary.typicalDisciplines.join(", ")}
-                  </p>
-                )}
-                {selectedSummary.academicLevels && selectedSummary.academicLevels.length > 0 && (
-                  <p className="text-[color:var(--text-secondary)]">
-                    <strong className="text-[color:var(--text-primary)]">Academic Scope:</strong> {selectedSummary.academicLevels.join(", ")}
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-[color:var(--border-subtle)] flex items-center justify-end">
-              <button
-                onClick={() => onPick(selected)}
-                disabled={!selected || creating}
-                className="w-full sm:w-auto rounded-xl bg-[color:var(--accent-solid)] px-8 py-3.5 text-sm font-bold text-white transition-all hover:bg-[color:var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-              >
-                {creating ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Initializing Agents...
-                  </>
-                ) : (
-                  <>
-                    Boot Workspace
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                  </>
-                )}
-              </button>
-            </div>
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}
