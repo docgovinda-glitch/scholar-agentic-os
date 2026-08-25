@@ -1,10 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { HumanizerBenchmarkReport } from "../../../domain/humanizer/types";
 import { runBenchmarkSuite } from "../../../domain/humanizer/benchmark/benchmarkRunner";
 import {
   runAcademicValidationSuite,
   AcademicValidationResult,
 } from "../../../domain/humanizer/evaluation/academicValidationSuite";
+import {
+  getBetaAnalyticsSummary,
+  BetaAnalyticsSummary,
+  loadBetaEvents,
+  BetaFeedbackEvent,
+} from "../../../domain/humanizer/telemetry/betaTelemetryService";
 import { LLMCompleter } from "../../../domain/humanizer/rewrite/rewriteEngine";
 
 interface DeveloperEvaluationModalProps {
@@ -22,10 +28,19 @@ export default function DeveloperEvaluationModal({
   model,
   provider,
 }: DeveloperEvaluationModalProps) {
-  const [activeTab, setActiveTab] = useState<"benchmark" | "academic">("benchmark");
+  const [activeTab, setActiveTab] = useState<"benchmark" | "academic" | "telemetry">("benchmark");
   const [isRunning, setIsRunning] = useState(false);
   const [benchmarkReport, setBenchmarkReport] = useState<HumanizerBenchmarkReport | null>(null);
   const [academicReport, setAcademicReport] = useState<AcademicValidationResult | null>(null);
+  const [betaSummary, setBetaSummary] = useState<BetaAnalyticsSummary | null>(null);
+  const [betaEvents, setBetaEvents] = useState<BetaFeedbackEvent[]>([]);
+
+  useEffect(() => {
+    if (isOpen && activeTab === "telemetry") {
+      setBetaSummary(getBetaAnalyticsSummary());
+      setBetaEvents(loadBetaEvents());
+    }
+  }, [isOpen, activeTab]);
 
   if (!isOpen) return null;
 
@@ -39,7 +54,7 @@ export default function DeveloperEvaluationModal({
           provider,
         });
         setBenchmarkReport(res);
-      } else {
+      } else if (activeTab === "academic") {
         const res = await runAcademicValidationSuite(completer);
         setAcademicReport(res);
       }
@@ -61,10 +76,10 @@ export default function DeveloperEvaluationModal({
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <span>📊</span>
-              <span>Production Evaluation & Academic Validation Suite</span>
+              <span>Production Evaluation & Beta Diagnostics</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Deterministic invariant testing, multi-disciplinary stratification, and quality calibration.
+              Deterministic invariant testing, multi-disciplinary validation, and privacy-conscious beta telemetry.
             </p>
           </div>
           <button
@@ -98,35 +113,47 @@ export default function DeveloperEvaluationModal({
                 : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
             }`}
           >
-            Multi-Disciplinary Academic Validation
+            Academic Validation Suite
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("telemetry")}
+            className={`pb-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+              activeTab === "telemetry"
+                ? "border-indigo-600 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400"
+                : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+            }`}
+          >
+            Beta Telemetry & Incident Log
           </button>
         </div>
 
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
-          {/* Action Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60">
-            <div className="text-xs">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">Active Evaluator:</span>{" "}
-              <span className="capitalize text-indigo-600 dark:text-indigo-400 font-bold">{provider}</span>{" "}
-              <span className="text-slate-400">({model})</span>
+          {activeTab !== "telemetry" && (
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60">
+              <div className="text-xs">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">Active Evaluator:</span>{" "}
+                <span className="capitalize text-indigo-600 dark:text-indigo-400 font-bold">{provider}</span>{" "}
+                <span className="text-slate-400">({model})</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRunEvaluation}
+                disabled={isRunning}
+                className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-xl shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {isRunning
+                  ? "Running Evaluation Suite..."
+                  : activeTab === "benchmark"
+                  ? "Run Benchmark Suite (v1)"
+                  : "Run Academic Validation"}
+              </button>
             </div>
+          )}
 
-            <button
-              type="button"
-              onClick={handleRunEvaluation}
-              disabled={isRunning}
-              className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-xl shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              {isRunning
-                ? "Running Evaluation Suite..."
-                : activeTab === "benchmark"
-                ? "Run Benchmark Suite (v1)"
-                : "Run Academic Validation"}
-            </button>
-          </div>
-
-          {/* Standard Benchmark View */}
+          {/* Tab 1: Standard Benchmark View */}
           {activeTab === "benchmark" && benchmarkReport && (
             <div className="space-y-5">
               <div>
@@ -161,10 +188,9 @@ export default function DeveloperEvaluationModal({
             </div>
           )}
 
-          {/* Academic Validation View */}
+          {/* Tab 2: Academic Validation View */}
           {activeTab === "academic" && academicReport && (
             <div className="space-y-5">
-              {/* Summary Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
                   <span className="text-[10px] font-bold uppercase text-slate-400 block">Token Survival</span>
@@ -191,6 +217,51 @@ export default function DeveloperEvaluationModal({
                   </span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Tab 3: Beta Telemetry & Incident Log */}
+          {activeTab === "telemetry" && (
+            <div className="space-y-5">
+              <div className="p-3.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/40 text-xs text-indigo-900 dark:text-indigo-200">
+                <span className="font-bold block mb-1">🔒 Privacy-Safe Telemetry Architecture</span>
+                <p className="opacity-90">
+                  Telemetry logs structured decision metadata, latency, and user feedback categories only. Full manuscript text is strictly excluded from persistent telemetry logs.
+                </p>
+              </div>
+
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Recorded Runs</span>
+                  <span className="text-base font-bold text-slate-900 dark:text-slate-100">
+                    {betaSummary?.totalRuns || 0}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Meaning Preserved</span>
+                  <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                    {betaSummary?.meaningPreservedCounts.YES || 0}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Meaning Altered</span>
+                  <span className="text-base font-bold text-rose-600 dark:text-rose-400">
+                    {betaSummary?.meaningPreservedCounts.NO || 0}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Critical Incidents</span>
+                  <span className="text-base font-bold text-amber-600 dark:text-amber-400">
+                    {betaSummary?.criticalIncidentCount || 0}
+                  </span>
+                </div>
+              </div>
+
+              {/* Statistical Note */}
+              <p className="text-[11px] text-slate-400 italic">
+                * Note: Sample represents active local beta interactions. 0 observed critical failures across current runs does not imply population-level zero failure rate.
+              </p>
             </div>
           )}
         </div>
