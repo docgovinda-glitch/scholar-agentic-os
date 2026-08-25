@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createProject, listOutputTypes, listProjects, deleteProject } from "./api";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
+import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
 import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
+import UserAccountMenu from "./components/UserAccountMenu";
 
 /**
  * Desk's entry surface: the signed-in user's own projects — transformed into
@@ -60,6 +62,7 @@ export default function ProjectListScreen({
 
   useEffect(() => {
     load();
+    syncActiveSessionToRegistry();
   }, [load]);
 
   // Load output types lazily when user clicks New Project
@@ -111,15 +114,8 @@ export default function ProjectListScreen({
   }
 
   async function handleSignOut() {
-    const vaultOnThisDevice = await hasVaultPassphraseOnThisDevice();
-    if (vaultOnThisDevice) {
-      const confirmed = window.confirm(
-        "Sign out of Scholar Core?\n\n" +
-        "Your Projects are synced to your account and will remain available when you sign back in.\n\n" +
-        "Your private Knowledge Vault is stored locally on this device. It will remain safe here, but will not sync to other devices."
-      );
-      if (!confirmed) return;
-    }
+    const confirmed = window.confirm("Sign out of Scholar Core?");
+    if (!confirmed) return;
     getSupabaseClient().auth.signOut();
   }
 
@@ -216,66 +212,13 @@ export default function ProjectListScreen({
 
             <div className="h-5 w-[1px] bg-[color:var(--border-subtle)] mx-1" />
 
-            {/* User Dropdown / Sign Out */}
-            <div className="relative">
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:border-[color:var(--border-default)] transition-all cursor-pointer"
-              >
-                <span className="w-6 h-6 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] flex items-center justify-center font-bold text-xs">
-                  {userEmail ? userEmail.charAt(0).toUpperCase() : "U"}
-                </span>
-                <span className="max-w-[120px] truncate hidden lg:inline">{userEmail || "Researcher"}</span>
-                <svg className="w-3 h-3 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] shadow-xl p-2 z-50 animate-fade-in text-xs">
-                  <div className="px-3 py-2 border-b border-[color:var(--border-subtle)] mb-1">
-                    <span className="text-[10px] font-semibold text-[color:var(--text-muted)] uppercase tracking-wider block">
-                      Signed in as
-                    </span>
-                    <span className="font-bold text-[color:var(--text-primary)] truncate block mt-0.5">
-                      {userEmail || "Authenticated User"}
-                    </span>
-                  </div>
-                  {onOpenAccountSettings && (
-                    <button
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        onOpenAccountSettings();
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-[color:var(--surface-hover)] font-medium text-[color:var(--text-primary)] transition-colors cursor-pointer"
-                    >
-                      Account Settings
-                    </button>
-                  )}
-                  {onOpenVault && (
-                    <button
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        onOpenVault();
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-[color:var(--surface-hover)] font-medium text-[color:var(--text-primary)] transition-colors cursor-pointer"
-                    >
-                      Private Knowledge Vault
-                    </button>
-                  )}
-                  <div className="my-1 border-t border-[color:var(--border-subtle)]" />
-                  <button
-                    onClick={handleSignOut}
-                    className="w-full text-left px-3 py-2 rounded-lg text-[color:var(--state-danger)] hover:bg-[color:var(--state-danger-subtle)] font-semibold transition-colors cursor-pointer flex items-center justify-between"
-                  >
-                    <span>Sign Out</span>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Multi-Account User Dropdown */}
+            <UserAccountMenu
+              userEmail={userEmail}
+              onOpenAccountSettings={onOpenAccountSettings}
+              onOpenVault={onOpenVault}
+              onOpenAiAccess={onOpenAiAccess}
+            />
           </div>
 
           {/* Mobile Menu Trigger */}

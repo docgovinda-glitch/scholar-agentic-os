@@ -158,23 +158,84 @@ export async function loadVault(): Promise<VaultRecord | null> {
   // No row is the normal state for someone who declined or has not reached
   // this stage — not an error.
   if (error || !data) return null;
-  return { label: data.label, createdAt: data.created_at };
+  const result: VaultRecord = {
+    label: data.label,
+    createdAt: data.created_at,
+  };
+  if ((data as any).storage_mode) {
+    result.storageMode = (data as any).storage_mode === "local" ? "local" : "synced";
+  }
+  return result;
+}
+
+export async function resetVault(userId?: string): Promise<boolean> {
+  const currentId = userId || (await currentUserId());
+  if (!currentId) return false;
+
+  // 1. Clear Supabase tables if configured
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.from("user_vault_items").delete().eq("user_id", currentId);
+      await supabase.from("user_vaults").delete().eq("user_id", currentId);
+      await supabase.from("user_cloud_integrations").delete().eq("user_id", currentId);
+    } catch (e) {
+      console.warn("Could not delete server vault records:", e);
+    }
+  }
+
+  // 2. Call backend reset endpoint if available
+  try {
+    const token = localStorage.getItem("sb-gfjhsijrwodjvkisouzw-auth-token") || "";
+    await fetch("/api/vault/reset", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  } catch {}
+
+  // 3. Clear local storage verifiers, skips, and cache
+  try {
+    localStorage.removeItem(`${PASSPHRASE_VERIFIER_PREFIX}${currentId}`);
+    localStorage.removeItem(`scholar-vault-setup-skipped:${currentId}`);
+    localStorage.removeItem(`scholar-vault-v2-setup:${currentId}`);
+    localStorage.removeItem(`scholar_cloud_drive_${currentId}`);
+  } catch {}
+
+  // 4. Clear IndexedDB if available
+  try {
+    if (typeof indexedDB !== "undefined") {
+      indexedDB.deleteDatabase(`scholar-vault-items:${currentId}`);
+    }
+  } catch {}
+
+  return true;
 }
 
 export async function getVaultStorageMode(): Promise<"local" | "synced"> {
   if (!isSupabaseConfigured()) return "local";
-  const supabase = getSupabaseClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return "local";
+  try {
+    const supabase = getSupabaseClient();
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user) return "local";
 
-  const { data, error } = await supabase
-    .from("user_vaults")
-    .select("storage_mode")
-    .eq("user_id", userData.user.id)
-    .maybeSingle();
+    const query = supabase
+      .from("user_vaults")
+      .select("storage_mode")
+      .eq("user_id", userData.user.id);
 
-  if (error || !data || !(data as any).storage_mode) return "local";
-  return (data as any).storage_mode === "synced" ? "synced" : "local";
+    const res = typeof (query as any).maybeSingle === "function"
+      ? await (query as any).maybeSingle()
+      : await query;
+
+    const data = Array.isArray(res.data) ? res.data[0] : res.data;
+    if (res.error || !data || !(data as any).storage_mode) return "local";
+    return (data as any).storage_mode === "synced" ? "synced" : "local";
+  } catch {
+    return "local";
+  }
 }
 
 export async function createVault(

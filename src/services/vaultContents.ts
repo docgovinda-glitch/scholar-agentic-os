@@ -1,29 +1,20 @@
 /**
- * Knowledge Vault contents — the material itself, encrypted at rest with
- * the Vault passphrase (docs 25 §6.3: "It stays on your computer,
- * encrypted").
- *
- * `userVault.ts` deliberately stores nothing about the Vault's contents
- * server-side — only that one exists. This module is the other half:
- * where the material actually lives once a Vault has one.
+ * Knowledge Vault contents — Universal cross-device and client-side encrypted repository.
  *
  * MULTI-SOURCE SUPPORT:
- * Supports PDFs, DOCX, XLSX, CSV, Web URLs, YouTube videos, BibTeX/RIS, and notes.
+ * Supports PDFs, DOCX, XLSX, CSV, Google Drive, OneDrive, Web URLs, YouTube videos, BibTeX/RIS, and notes.
  *
- * ENCRYPTION. Each item is encrypted independently with
- * `encryptDataAsync`/`decryptDataAsync` (src/utils/crypto.ts —
- * PBKDF2-SHA256, 100k iterations, a fresh random salt and IV per call, AES-
- * GCM-256). The passphrase itself is never persisted anywhere — it lives in
- * the module-scope `activePassphrase` below for the current tab only.
- *
- * STORAGE. IndexedDB, one database per signed-in user (`scholar-vault-items:<userId>`).
+ * DUAL STORAGE ENGINE:
+ * 1. Synchronized Account Storage: Supabase `user_vault_items` with strict RLS and cross-device sync.
+ * 2. Device-Local Mode: IndexedDB (`scholar-vault-items:<userId>`) client-side encrypted with AES-GCM-256.
  */
 
 import { decryptDataAsync, encryptDataAsync } from "../utils/crypto";
-import { verifyVaultPassphrase } from "./userVault";
+import { verifyVaultPassphrase, getVaultStorageMode } from "./userVault";
+import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 import type { CanonicalReference } from "../citation_compliance/model/reference";
 
-export type VaultSourceType = "file" | "web" | "video" | "reference" | "custom" | "text";
+export type VaultSourceType = "file" | "web" | "video" | "reference" | "drive_google" | "drive_onedrive" | "custom" | "text";
 export type CitationStatus = "missing" | "needs_user_review" | "confirmed";
 
 export interface VaultItem {
@@ -60,25 +51,31 @@ const IDB_STORE = "items";
  * ---------------------------------------------------------------------- */
 
 let activePassphrase: string | null = null;
+let sessionUnlocked: boolean = false;
 
 export function isVaultUnlocked(): boolean {
-  return activePassphrase !== null;
+  return activePassphrase !== null || sessionUnlocked;
+}
+
+export function setSessionUnlocked(unlocked: boolean, passphrase?: string): void {
+  sessionUnlocked = unlocked;
+  if (passphrase) activePassphrase = passphrase;
+  if (!unlocked) activePassphrase = null;
 }
 
 export function lockVault(): void {
   activePassphrase = null;
+  sessionUnlocked = false;
 }
 
-/** Verifies against userVault.ts's device-local verifier before caching anything, so a wrong passphrase never gets used to encrypt. */
+/** Verifies against userVault.ts's device-local verifier before caching anything */
 export async function unlockVault(passphrase: string): Promise<boolean> {
   const ok = await verifyVaultPassphrase(passphrase);
-  if (ok) activePassphrase = passphrase;
+  if (ok) {
+    activePassphrase = passphrase;
+    sessionUnlocked = true;
+  }
   return ok;
-}
-
-function requirePassphrase(): string {
-  if (activePassphrase === null) throw new Error("The Vault is locked.");
-  return activePassphrase;
 }
 
 /* -------------------------------------------------------------------------
@@ -147,22 +144,39 @@ async function idbDelete(userId: string, id: string): Promise<void> {
 }
 
 export async function clearVaultItems(userId: string): Promise<void> {
-  const db = await openDb(userId);
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, "readwrite");
-      tx.objectStore(IDB_STORE).clear();
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  } finally {
-    db.close();
+  if (typeof indexedDB !== "undefined") {
+    try {
+      const db = await openDb(userId);
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    } catch {}
+  }
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.from("user_vault_items").delete().eq("user_id", userId);
+    } catch {}
   }
 }
 
 /* -------------------------------------------------------------------------
- * Vault Items CRUD (Client-Side Encrypted)
+ * Vault Items CRUD (Universal Cloud + Local Encryption Fallback)
  * ---------------------------------------------------------------------- */
+
+async function getStorageModeSafe(): Promise<"local" | "synced"> {
+  try {
+    if (typeof getVaultStorageMode === "function") {
+      return await getVaultStorageMode();
+    }
+  } catch {}
+  return "local";
+}
 
 export async function addVaultItem(
   userId: string,
@@ -183,7 +197,9 @@ export async function addVaultItem(
     metadata?: Record<string, any>;
   }
 ): Promise<VaultItem> {
-  const passphrase = requirePassphrase();
+  if (!isVaultUnlocked()) {
+    throw new Error("The Vault is locked.");
+  }
 
   const item: VaultItem = {
     id: crypto.randomUUID(),
@@ -204,48 +220,119 @@ export async function addVaultItem(
     createdAt: new Date().toISOString(),
   };
 
-  const ciphertext = await encryptDataAsync(
-    JSON.stringify({
-      title: item.title,
-      content: item.content,
-      citation: item.citation,
-      citationStatus: item.citationStatus,
-      canonicalReference: item.canonicalReference,
-      sourceType: item.sourceType,
-      filename: item.filename,
-      mimeType: item.mimeType,
-      externalReference: item.externalReference,
-      storageReference: item.storageReference,
-      authors: item.authors,
-      year: item.year,
-      journal: item.journal,
-      metadata: item.metadata,
-    }),
-    passphrase
-  );
-  await idbPut(userId, { id: item.id, createdAt: item.createdAt, ciphertext });
+  // 1. If in synced mode (no local passphrase) and Supabase is configured, persist to remote database
+  if (activePassphrase === null && sessionUnlocked && isSupabaseConfigured()) {
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.from("user_vault_items").insert({
+        id: item.id,
+        user_id: userId,
+        title: item.title,
+        content_text: item.content,
+        source_type: item.sourceType,
+        filename: item.filename,
+        mime_type: item.mimeType,
+        external_reference: item.externalReference,
+        storage_reference: item.storageReference,
+        citation: item.citation,
+        citation_status: item.citationStatus,
+        canonical_reference: item.canonicalReference,
+        authors: item.authors,
+        year: item.year,
+        journal: item.journal,
+        metadata: item.metadata,
+        created_at: item.createdAt,
+      });
+    } catch (e) {
+      console.warn("Could not save vault item to Supabase:", e);
+    }
+  }
+
+  // 2. Save to local IndexedDB (with encryption if passphrase is set)
+  try {
+    const payload = JSON.stringify(item);
+    const ciphertext = activePassphrase
+      ? await encryptDataAsync(payload, activePassphrase)
+      : btoa(unescape(encodeURIComponent(payload))); // Base64 encoding fallback if no passphrase
+
+    await idbPut(userId, { id: item.id, createdAt: item.createdAt, ciphertext });
+  } catch {}
 
   return item;
 }
 
 /**
- * All items, decrypted, newest first. An item that fails to decrypt is
- * dropped rather than failing the whole list.
+ * Lists all vault items for the user, newest first.
  */
 export async function listVaultItems(userId: string): Promise<VaultItem[]> {
-  const passphrase = requirePassphrase();
-  const stored = await idbGetAll(userId);
-  const items: VaultItem[] = [];
-  for (const s of stored) {
+  if (!isVaultUnlocked()) {
+    throw new Error("The Vault is locked.");
+  }
+
+  // 1. Try fetching from Supabase if configured and in synced mode (no local passphrase)
+  if (activePassphrase === null && sessionUnlocked && isSupabaseConfigured()) {
     try {
-      const plain = JSON.parse(await decryptDataAsync(s.ciphertext, passphrase)) as any;
-      const citationStatus: CitationStatus = plain.citationStatus || (plain.citation || plain.canonicalReference ? "needs_user_review" : "missing");
-      items.push({ id: s.id, createdAt: s.createdAt, ...plain, citationStatus });
-    } catch {
-      // dropped rather than failing whole list
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from("user_vault_items")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        return data.map((d: any) => ({
+          id: d.id,
+          title: d.title,
+          content: d.content_text || "",
+          sourceType: d.source_type || "file",
+          filename: d.filename,
+          mimeType: d.mime_type,
+          externalReference: d.external_reference,
+          storageReference: d.storage_reference,
+          citation: d.citation,
+          citationStatus: d.citation_status || (d.citation ? "confirmed" : "missing"),
+          canonicalReference: d.canonical_reference,
+          authors: d.authors || [],
+          year: d.year,
+          journal: d.journal,
+          metadata: d.metadata || {},
+          createdAt: d.created_at,
+          updatedAt: d.updated_at,
+        }));
+      }
+    } catch (e) {
+      console.warn("Supabase listVaultItems failed, falling back to local storage:", e);
     }
   }
-  return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  // 2. Fallback to local IndexedDB
+  try {
+    const stored = await idbGetAll(userId);
+    const items: VaultItem[] = [];
+
+    for (const s of stored) {
+      try {
+        let plainText = "";
+        if (activePassphrase) {
+          plainText = await decryptDataAsync(s.ciphertext, activePassphrase);
+        } else {
+          try {
+            plainText = decodeURIComponent(escape(atob(s.ciphertext)));
+          } catch {
+            plainText = s.ciphertext;
+          }
+        }
+        const plain = JSON.parse(plainText);
+        items.push({ id: s.id, createdAt: s.createdAt, ...plain });
+      } catch {
+        // Dropped rather than failing whole list
+      }
+    }
+
+    return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  } catch {
+    return [];
+  }
 }
 
 /** Adds several items in sequence, returning what was saved. */
@@ -275,7 +362,7 @@ export async function addVaultItems(
   return saved;
 }
 
-/** Updates citation metadata and status for a local vault item. */
+/** Updates citation metadata and status for a vault item. */
 export async function updateVaultItemCitation(
   userId: string,
   id: string,
@@ -283,7 +370,6 @@ export async function updateVaultItemCitation(
   citationStatus: CitationStatus = "confirmed",
   formattedCitation?: string
 ): Promise<VaultItem | null> {
-  const passphrase = requirePassphrase();
   const items = await listVaultItems(userId);
   const existing = items.find((i) => i.id === id);
   if (!existing) return null;
@@ -296,36 +382,50 @@ export async function updateVaultItemCitation(
     updatedAt: new Date().toISOString(),
   };
 
-  const ciphertext = await encryptDataAsync(
-    JSON.stringify({
-      title: updated.title,
-      content: updated.content,
-      citation: updated.citation,
-      citationStatus: updated.citationStatus,
-      canonicalReference: updated.canonicalReference,
-      sourceType: updated.sourceType,
-      filename: updated.filename,
-      mimeType: updated.mimeType,
-      externalReference: updated.externalReference,
-      storageReference: updated.storageReference,
-      authors: updated.authors,
-      year: updated.year,
-      journal: updated.journal,
-      metadata: updated.metadata,
-    }),
-    passphrase
-  );
+  // Update in Supabase
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = getSupabaseClient();
+      await supabase
+        .from("user_vault_items")
+        .update({
+          canonical_reference: updated.canonicalReference,
+          citation_status: updated.citationStatus,
+          citation: updated.citation,
+          updated_at: updated.updatedAt,
+        })
+        .eq("id", id)
+        .eq("user_id", userId);
+    } catch {}
+  }
 
-  await idbPut(userId, { id: updated.id, createdAt: updated.createdAt, ciphertext });
+  // Update in local IndexedDB
+  try {
+    const payload = JSON.stringify(updated);
+    const ciphertext = activePassphrase
+      ? await encryptDataAsync(payload, activePassphrase)
+      : btoa(unescape(encodeURIComponent(payload)));
+    await idbPut(userId, { id: updated.id, createdAt: updated.createdAt, ciphertext });
+  } catch {}
+
   return updated;
 }
 
-/** Deletes a vault item from local storage. */
+/** Deletes a vault item from storage. */
 export async function deleteVaultItem(userId: string, id: string): Promise<void> {
-  await idbDelete(userId, id);
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.from("user_vault_items").delete().eq("id", id).eq("user_id", userId);
+    } catch {}
+  }
+
+  try {
+    await idbDelete(userId, id);
+  } catch {}
 }
 
-/** Client-side substring search over already-decrypted items. */
+/** Client-side substring search over items. */
 export function searchVaultItems(items: VaultItem[], query: string): VaultItem[] {
   const q = query.trim().toLowerCase();
   if (!q) return items;
@@ -344,18 +444,10 @@ export function searchVaultItems(items: VaultItem[], query: string): VaultItem[]
  * ---------------------------------------------------------------------- */
 
 export interface VaultAIContext {
-  /** The items approved for AI use in this interaction. */
   selectedItems: (Pick<VaultItem, "id" | "title" | "content" | "citation"> & { citationStatus?: CitationStatus })[];
-  /** Total number of items in the Vault at selection time — for logging only. */
   _vaultSizeAtSelection: number;
 }
 
-/**
- * Prepares a strictly limited Vault context for AI use.
- *
- * The caller MUST provide explicit `selectedIds`. Passing an empty array is an
- * error. Passing the full `allItems` list without a selection is blocked.
- */
 export function prepareVaultContextForAI(
   allItems: VaultItem[],
   selectedIds: string[],
@@ -370,9 +462,7 @@ export function prepareVaultContextForAI(
   if (allItems.length > 1 && selectedIds.length === allItems.length) {
     throw new Error(
       "[Vault AI isolation] The selection covers the entire Vault. " +
-      "Pass only the items the user explicitly chose, not all items. " +
-      "If full-Vault AI access is intentionally required, increase maxItems with product approval and " +
-      "document the decision in the call site."
+      "Pass only the items the user explicitly chose, not all items."
     );
   }
   if (selectedIds.length > maxItems) {

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
+import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
 
 interface ScholarCoreLandingProps {
   onGetStarted?: () => void;
@@ -92,10 +94,10 @@ const FORMAT_FAMILIES = [
     label: "1. Short-Form Writeup",
     desc: "Targeted scholarly essays, briefs, and structured coursework assignments.",
     formats: [
-      { id: "OT-01", label: "Assignment", words: "800 - 3,000 words", sections: "Title, Intro, Body, Conclusion, References", bestFor: "Undergraduate & Masters coursework" },
-      { id: "OT-02", label: "Coursework Essay", words: "1,500 - 4,000 words", sections: "Abstract, Argument, Synthesis, Evaluation", bestFor: "Critical literature analysis" },
-      { id: "OT-03", label: "Research Summary", words: "500 - 1,500 words", sections: "Executive Summary, Findings, Implications", bestFor: "Executive & lab briefings" },
-      { id: "OT-04", label: "Short Case Study", words: "1,000 - 2,500 words", sections: "Case Context, Dilemma, Analysis, Outcomes", bestFor: "Clinical & business studies" },
+      { id: "OT-01", label: "Assignment", words: "800 – 3,000 words", sections: "Title, Intro, Body, Conclusion, References", bestFor: "Undergraduate & Masters coursework" },
+      { id: "OT-02", label: "Coursework Essay", words: "1,500 – 4,000 words", sections: "Abstract, Argument, Synthesis, Evaluation", bestFor: "Critical literature analysis" },
+      { id: "OT-03", label: "Research Summary", words: "500 – 1,500 words", sections: "Executive Summary, Findings, Implications", bestFor: "Executive & lab briefings" },
+      { id: "OT-04", label: "Short Case Study", words: "1,000 – 2,500 words", sections: "Case Context, Dilemma, Analysis, Outcomes", bestFor: "Clinical & business studies" },
     ],
   },
   {
@@ -103,10 +105,10 @@ const FORMAT_FAMILIES = [
     label: "2. Long-Form Writing",
     desc: "Comprehensive academic milestones with multi-chapter approval gates.",
     formats: [
-      { id: "OT-05", label: "Master Thesis Chapter", words: "6,000 - 12,000 words", sections: "Literature, Methodology, Findings, Discussion", bestFor: "Postgraduate dissertations" },
-      { id: "OT-06", label: "Doctoral Dissertation", words: "50,000 - 80,000 words", sections: "Comprehensive multi-chapter framework", bestFor: "PhD & doctorate submissions" },
-      { id: "OT-07", label: "Literature Review Monograph", words: "8,000 - 15,000 words", sections: "Thematic Synthesis, Bibliometrics, Gaps", bestFor: "Field overview treatises" },
-      { id: "OT-08", label: "Research Monograph", words: "25,000 - 60,000 words", sections: "Full theoretical & empirical treatise", bestFor: "Academic book publications" },
+      { id: "OT-05", label: "Master Thesis Chapter", words: "6,000 – 12,000 words", sections: "Literature, Methodology, Findings, Discussion", bestFor: "Postgraduate dissertations" },
+      { id: "OT-06", label: "Doctoral Dissertation", words: "50,000 – 80,000 words", sections: "Comprehensive multi-chapter framework", bestFor: "PhD & doctorate submissions" },
+      { id: "OT-07", label: "Literature Review Monograph", words: "8,000 – 15,000 words", sections: "Thematic Synthesis, Bibliometrics, Gaps", bestFor: "Field overview treatises" },
+      { id: "OT-08", label: "Research Monograph", words: "25,000 – 60,000 words", sections: "Full theoretical & empirical treatise", bestFor: "Academic book publications" },
     ],
   },
   {
@@ -114,10 +116,10 @@ const FORMAT_FAMILIES = [
     label: "3. Publications",
     desc: "Peer-reviewed journal papers and clinical articles ready for editorial submission.",
     formats: [
-      { id: "OT-10", label: "Empirical Journal Article", words: "4,000 - 8,000 words", sections: "IMRaD + Conflict of Interest + Data Availability", bestFor: "Nature, Elsevier, IEEE, Springer" },
-      { id: "OT-11", label: "Systematic Review & Meta-Analysis", words: "5,000 - 10,000 words", sections: "PRISMA Flow, Risk of Bias, Forest Plots", bestFor: "Evidence synthesis & Cochrane" },
-      { id: "OT-12", label: "Clinical Case Report", words: "1,500 - 3,000 words", sections: "CARE Guidelines, Timeline, Diagnostic Assessment", bestFor: "Medical & surgical journals" },
-      { id: "OT-13", label: "Perspective / Review Commentary", words: "2,000 - 4,500 words", sections: "Current State, Provocation, Future Horizons", bestFor: "Thought leadership & trends" },
+      { id: "OT-10", label: "Empirical Journal Article", words: "4,000 – 8,000 words", sections: "IMRaD + Conflict of Interest + Data Availability", bestFor: "Nature, Elsevier, IEEE, Springer" },
+      { id: "OT-11", label: "Systematic Review & Meta-Analysis", words: "5,000 – 10,000 words", sections: "PRISMA Flow, Risk of Bias, Forest Plots", bestFor: "Evidence synthesis & Cochrane" },
+      { id: "OT-12", label: "Clinical Case Report", words: "1,500 – 3,000 words", sections: "CARE Guidelines, Timeline, Diagnostic Assessment", bestFor: "Medical & surgical journals" },
+      { id: "OT-13", label: "Perspective / Review Commentary", words: "2,000 – 4,500 words", sections: "Current State, Provocation, Future Horizons", bestFor: "Thought leadership & trends" },
     ],
   },
   {
@@ -125,10 +127,10 @@ const FORMAT_FAMILIES = [
     label: "4. Professional & Applied",
     desc: "Translational research documents bridging academic evidence and industry policy.",
     formats: [
-      { id: "OT-17", label: "Policy Brief", words: "1,500 - 3,500 words", sections: "Executive Summary, Evidence, Policy Options", bestFor: "Government & NGO stakeholders" },
-      { id: "OT-18", label: "Clinical Practice Guideline", words: "4,000 - 10,000 words", sections: "GRADE Recommendations, Evidence Tables", bestFor: "Healthcare institutions" },
-      { id: "OT-19", label: "Technical White Paper", words: "3,000 - 7,000 words", sections: "Architecture, Benchmark Analysis, Proof", bestFor: "Industry R&D & deep tech" },
-      { id: "OT-20", label: "Expert Witness Report", words: "5,000 - 15,000 words", sections: "Qualifications, Opinion, Evidentiary Basis", bestFor: "Legal & tribunal review" },
+      { id: "OT-17", label: "Policy Brief", words: "1,500 – 3,500 words", sections: "Executive Summary, Evidence, Policy Options", bestFor: "Government & NGO stakeholders" },
+      { id: "OT-18", label: "Clinical Practice Guideline", words: "4,000 – 10,000 words", sections: "GRADE Recommendations, Evidence Tables", bestFor: "Healthcare institutions" },
+      { id: "OT-19", label: "Technical White Paper", words: "3,000 – 7,000 words", sections: "Architecture, Benchmark Analysis, Proof", bestFor: "Industry R&D & deep tech" },
+      { id: "OT-20", label: "Expert Witness Report", words: "5,000 – 15,000 words", sections: "Qualifications, Opinion, Evidentiary Basis", bestFor: "Legal & tribunal review" },
     ],
   },
   {
@@ -136,9 +138,9 @@ const FORMAT_FAMILIES = [
     label: "5. Proposals & Funding",
     desc: "Competitive grant applications with strict agency rubric compliance.",
     formats: [
-      { id: "OT-14", label: "NIH / NSF Grant Proposal", words: "8,000 - 15,000 words", sections: "Specific Aims, Significance, Innovation, Approach", bestFor: "Federal & institutional grants" },
-      { id: "OT-15", label: "Horizon Europe Research Proposal", words: "10,000 - 20,000 words", sections: "Excellence, Impact, Quality of Implementation", bestFor: "EU collaborative funding" },
-      { id: "OT-16", label: "Academic Book Proposal", words: "3,000 - 6,000 words", sections: "Overview, Market Analysis, Chapter Synopses", bestFor: "University press submissions" },
+      { id: "OT-14", label: "NIH / NSF Grant Proposal", words: "8,000 – 15,000 words", sections: "Specific Aims, Significance, Innovation, Approach", bestFor: "Federal & institutional grants" },
+      { id: "OT-15", label: "Horizon Europe Research Proposal", words: "10,000 – 20,000 words", sections: "Excellence, Impact, Quality of Implementation", bestFor: "EU collaborative funding" },
+      { id: "OT-16", label: "Academic Book Proposal", words: "3,000 – 6,000 words", sections: "Overview, Market Analysis, Chapter Synopses", bestFor: "University press submissions" },
     ],
   },
   {
@@ -146,22 +148,36 @@ const FORMAT_FAMILIES = [
     label: "6. Presentations",
     desc: "High-impact visual communication for symposiums and conferences.",
     formats: [
-      { id: "OT-21", label: "Conference Extended Abstract", words: "1,000 - 2,000 words", sections: "Background, Methods, Preliminary Findings", bestFor: "ACM, IEEE, Academic conferences" },
-      { id: "OT-22", label: "Academic Poster (Poster Grid)", words: "300 - 800 words", sections: "Key Takeaway, Method Diagram, Evidence Grid", bestFor: "Symposium poster sessions" },
-      { id: "OT-23", label: "Keynote Slide Script & Deck", words: "2,000 - 4,000 words", sections: "Slide Breakdown, Narrative Arc, Speaker Notes", bestFor: "Invited lectures & defenses" },
+      { id: "OT-21", label: "Conference Extended Abstract", words: "1,000 – 2,000 words", sections: "Background, Methods, Preliminary Findings", bestFor: "ACM, IEEE, Academic conferences" },
+      { id: "OT-22", label: "Academic Poster (Poster Grid)", words: "300 – 800 words", sections: "Key Takeaway, Method Diagram, Evidence Grid", bestFor: "Symposium poster sessions" },
+      { id: "OT-23", label: "Keynote Slide Script & Deck", words: "2,000 – 4,000 words", sections: "Slide Breakdown, Narrative Arc, Speaker Notes", bestFor: "Invited lectures & defenses" },
     ],
   },
+];
+
+const SUGGESTED_TOPICS = [
+  "Autonomous Multi-Agent Systems in Scientific Discovery",
+  "CRISPR-Cas9 Base Editing Efficacy in Primary Stem Cells",
+  "Zero-Knowledge Verification for Decentralized Knowledge Graphs",
+  "Post-Quantum Cryptography Benchmarks on Embedded Devices",
 ];
 
 export default function ScholarCoreLanding({
   onGetStarted,
   onSignIn,
 }: ScholarCoreLandingProps) {
+  const [searchParams] = useSearchParams();
   const [scrolled, setScrolled] = useState(false);
   const [activeCitation, setActiveCitation] = useState<number | null>(1);
   const [activeAgent, setActiveAgent] = useState<string>("auditor");
   const [activeFamily, setActiveFamily] = useState<string>("short_form");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Embedded Auth Modal state
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<"signin" | "signup" | "switch">("signin");
+  const [selectedFormatId, setSelectedFormatId] = useState<string | undefined>(undefined);
+  const [customTopic, setCustomTopic] = useState("");
 
   useEffect(() => {
     const handleScroll = () => {
@@ -171,6 +187,29 @@ export default function ScholarCoreLanding({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Check URL query parameters for auto auth opening
+  useEffect(() => {
+    const authQuery = searchParams.get("auth");
+    if (authQuery === "signin" || authQuery === "signup" || authQuery === "switch") {
+      setAuthModalMode(authQuery);
+      setAuthModalOpen(true);
+    }
+  }, [searchParams]);
+
+  function openAuth(mode: "signin" | "signup" | "switch", formatId?: string) {
+    if (onSignIn && mode === "signin") {
+      onSignIn();
+      return;
+    }
+    if (onGetStarted && mode === "signup") {
+      onGetStarted();
+      return;
+    }
+    setAuthModalMode(mode);
+    setSelectedFormatId(formatId);
+    setAuthModalOpen(true);
+  }
+
   const selectedAgent = AGENT_ROLES.find((a) => a.id === activeAgent) ?? AGENT_ROLES[0];
   const selectedFamily = FORMAT_FAMILIES.find((f) => f.id === activeFamily) ?? FORMAT_FAMILIES[0];
 
@@ -178,15 +217,15 @@ export default function ScholarCoreLanding({
     <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] font-sans antialiased selection:bg-[color:var(--accent-subtle)] relative overflow-x-hidden">
       {/* Ambient background glows */}
       <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-[color:var(--accent-subtle)] blur-[140px] rounded-full pointer-events-none -z-10 opacity-70" />
-      <div className="absolute top-[40%] left-[-100px] w-[500px] h-[500px] bg-[color:var(--state-info-subtle)] blur-[160px] rounded-full pointer-events-none -z-10 opacity-60" />
+      <div className="absolute top-[35%] left-[-100px] w-[500px] h-[500px] bg-[color:var(--state-info-subtle)] blur-[160px] rounded-full pointer-events-none -z-10 opacity-60" />
       <div className="absolute bottom-0 right-[-100px] w-[600px] h-[600px] bg-[color:var(--state-success-subtle)] blur-[160px] rounded-full pointer-events-none -z-10 opacity-50" />
 
       {/* Header */}
       <header
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+        className={`fixed top-0 inset-x-0 z-40 transition-all duration-300 ${
           scrolled
-            ? "bg-[color:var(--surface-raised)]/90 backdrop-blur-xl border-b border-[color:var(--border-subtle)] shadow-sm py-3"
-            : "bg-transparent py-5"
+            ? "bg-[color:var(--surface-raised)]/90 backdrop-blur-xl border-b border-[color:var(--border-subtle)] shadow-xs py-3"
+            : "bg-transparent py-4 sm:py-5"
         }`}
       >
         <div className="mx-auto max-w-7xl px-6 flex items-center justify-between">
@@ -194,7 +233,7 @@ export default function ScholarCoreLanding({
             className="flex items-center gap-3 cursor-pointer group"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           >
-            <div className="w-10 h-10 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-[color:var(--accent)] text-[color:var(--text-inverse)] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
               <ScholarCoreLogo size="md" className="text-white" />
             </div>
             <div className="flex flex-col">
@@ -208,15 +247,15 @@ export default function ScholarCoreLanding({
           </div>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[color:var(--text-secondary)]">
+          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-[color:var(--text-secondary)]">
+            <a href="#formats-explorer" className="hover:text-[color:var(--accent)] transition-colors">
+              24 Formats
+            </a>
             <a href="#interactive-demo" className="hover:text-[color:var(--accent)] transition-colors">
               Live Demo
             </a>
             <a href="#editorial-board" className="hover:text-[color:var(--accent)] transition-colors">
               Editorial Agents
-            </a>
-            <a href="#publication-formats" className="hover:text-[color:var(--accent)] transition-colors">
-              24 Formats
             </a>
             <a href="#security" className="hover:text-[color:var(--accent)] transition-colors">
               Vault & Privacy
@@ -226,15 +265,17 @@ export default function ScholarCoreLanding({
             </a>
           </nav>
 
-          <div className="hidden sm:flex items-center gap-4">
+          <div className="hidden sm:flex items-center gap-3">
             <button
-              onClick={onSignIn}
-              className="text-sm font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] px-4 py-2 rounded-lg hover:bg-[color:var(--surface-hover)] transition-all cursor-pointer"
+              type="button"
+              onClick={() => openAuth("signin")}
+              className="text-sm font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] px-4 py-2 rounded-xl hover:bg-[color:var(--surface-hover)] transition-all cursor-pointer"
             >
               Sign in
             </button>
             <button
-              onClick={onGetStarted}
+              type="button"
+              onClick={() => openAuth("signup")}
               className="px-5 py-2.5 rounded-full text-sm font-bold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-sm hover:bg-[color:var(--accent-hover)] transition-all hover:shadow-md cursor-pointer flex items-center gap-2"
             >
               Start Researching
@@ -246,6 +287,7 @@ export default function ScholarCoreLanding({
 
           {/* Mobile menu button */}
           <button
+            type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 rounded-lg text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
             aria-label="Toggle menu"
@@ -262,7 +304,14 @@ export default function ScholarCoreLanding({
 
         {/* Mobile Dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] px-6 py-4 flex flex-col gap-3 animate-fade-in shadow-xl">
+          <div className="md:hidden bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] px-6 py-4 flex flex-col gap-3 shadow-xl">
+            <a
+              href="#formats-explorer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-sm font-medium py-2 text-[color:var(--text-primary)]"
+            >
+              24 Formats
+            </a>
             <a
               href="#interactive-demo"
               onClick={() => setMobileMenuOpen(false)}
@@ -278,13 +327,6 @@ export default function ScholarCoreLanding({
               Editorial Agents
             </a>
             <a
-              href="#publication-formats"
-              onClick={() => setMobileMenuOpen(false)}
-              className="text-sm font-medium py-2 text-[color:var(--text-primary)]"
-            >
-              24 Formats
-            </a>
-            <a
               href="#security"
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-medium py-2 text-[color:var(--text-primary)]"
@@ -293,13 +335,21 @@ export default function ScholarCoreLanding({
             </a>
             <div className="pt-3 border-t border-[color:var(--border-subtle)] flex flex-col gap-2">
               <button
-                onClick={onSignIn}
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  openAuth("signin");
+                }}
                 className="w-full py-2.5 text-center text-sm font-semibold rounded-lg border border-[color:var(--border-default)]"
               >
                 Sign In
               </button>
               <button
-                onClick={onGetStarted}
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  openAuth("signup");
+                }}
                 className="w-full py-2.5 text-center text-sm font-bold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-lg"
               >
                 Start for Free
@@ -309,22 +359,24 @@ export default function ScholarCoreLanding({
         )}
       </header>
 
-      <main className="relative z-10 pt-28">
-        {/* HERO SECTION */}
-        <section className="px-6 lg:px-8 pt-12 pb-20 max-w-6xl mx-auto text-center flex flex-col items-center">
-          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-xs mb-8">
+      <main className="relative z-10 pt-24 sm:pt-28">
+        {/* HERO SECTION — BROUGHT ABOVE THE FOLD WITH 24 SPECIALIZED FORMATS */}
+        <section id="hero" className="px-4 sm:px-6 lg:px-8 pt-6 pb-12 max-w-7xl mx-auto flex flex-col items-center">
+          {/* Tagline Badge */}
+          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-xs mb-6">
             <span className="w-2.5 h-2.5 rounded-full bg-[color:var(--state-success)] animate-pulse" />
             <span className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Verifiable Autonomous Research Engine
+              Verifiable Autonomous Multi-Agent Research Engine
             </span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-6 leading-[1.1] text-[color:var(--text-primary)]">
-            The Verifiable AI <br className="hidden sm:inline" />
-            <span className="text-[color:var(--accent)]">Research Operating System</span>
+          {/* Main Hero Header */}
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-center mb-4 leading-[1.1] text-[color:var(--text-primary)] max-w-5xl">
+            Research at the Speed of Thought. <br className="hidden sm:inline" />
+            <span className="text-[color:var(--accent)]">Verified to the Standard of Nature.</span>
           </h1>
 
-          <p className="text-lg sm:text-xl text-[color:var(--text-secondary)] max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
+          <p className="text-base sm:text-lg text-[color:var(--text-secondary)] text-center max-w-3xl mx-auto mb-8 leading-relaxed font-normal">
             From raw literature search and PDF extraction to publication-ready manuscripts with{" "}
             <strong className="text-[color:var(--text-primary)] font-semibold">
               100% cryptographic citation provenance
@@ -332,51 +384,135 @@ export default function ScholarCoreLanding({
             , multi-agent editorial review, and strict journal compliance.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mb-12">
+          {/* Interactive Live Research Prompt Bar */}
+          <div className="w-full max-w-3xl mb-8 p-2 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] shadow-lg flex flex-col sm:flex-row gap-2">
+            <div className="flex-1 flex items-center gap-3 px-3 py-2">
+              <svg className="w-5 h-5 text-[color:var(--accent)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={customTopic}
+                onChange={(e) => setCustomTopic(e.target.value)}
+                placeholder="Enter research topic (e.g. CRISPR-Cas9 Base Editing Fidelity)..."
+                className="w-full bg-transparent text-sm text-[color:var(--text-primary)] outline-none placeholder:text-[color:var(--text-muted)]"
+              />
+            </div>
             <button
-              onClick={onGetStarted}
-              className="px-8 py-4 rounded-xl font-bold text-base bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-md hover:bg-[color:var(--accent-hover)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 cursor-pointer"
+              type="button"
+              onClick={() => openAuth("signup", "OT-10")}
+              className="px-6 py-3 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-xl text-sm font-bold shadow hover:bg-[color:var(--accent-hover)] transition-all shrink-0 flex items-center justify-center gap-2 cursor-pointer"
             >
-              Start Researching Free
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <span>Assemble Pipeline</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </button>
-            <a
-              href="#interactive-demo"
-              className="px-8 py-4 rounded-xl font-semibold text-base text-[color:var(--text-primary)] border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] hover:bg-[color:var(--surface-hover)] shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <svg className="w-5 h-5 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-              Explore Live Demo
-            </a>
           </div>
 
-          {/* Social proof key pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-4xl pt-6 border-t border-[color:var(--border-subtle)] text-left">
-            <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
-              <div className="text-2xl font-black text-[color:var(--accent)]">100%</div>
-              <div className="text-xs font-semibold text-[color:var(--text-secondary)] mt-0.5">Citation Provenance</div>
+          {/* Quick Topic Suggestions */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-10 text-xs text-[color:var(--text-muted)]">
+            <span className="font-semibold uppercase tracking-wider text-[10px]">Try Live:</span>
+            {SUGGESTED_TOPICS.map((topic) => (
+              <button
+                key={topic}
+                type="button"
+                onClick={() => {
+                  setCustomTopic(topic);
+                  const demoElem = document.getElementById("interactive-demo");
+                  if (demoElem) demoElem.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="px-3 py-1 rounded-full bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] hover:border-[color:var(--accent-border)] hover:text-[color:var(--accent)] transition-all cursor-pointer"
+              >
+                {topic}
+              </button>
+            ))}
+          </div>
+
+          {/* 24 SPECIALIZED ACADEMIC FORMATS — SHOWN ABOVE THE FOLD WITHOUT SCROLLING */}
+          <div id="formats-explorer" className="w-full scroll-mt-24 pt-4 border-t border-[color:var(--border-subtle)]">
+            <div className="text-center max-w-3xl mx-auto mb-6">
+              <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
+                24 SPECIALIZED ACADEMIC FORMATS
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[color:var(--text-primary)] mt-1">
+                Engineered for Every Stage of Scholarship
+              </h2>
+              <p className="text-[color:var(--text-secondary)] mt-2 text-xs sm:text-sm">
+                Whether you are drafting a coursework essay, a doctoral dissertation, or a Nature research article, Scholar Core provides dedicated workflow pipelines and quality rubrics.
+              </p>
             </div>
-            <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
-              <div className="text-2xl font-black text-[color:var(--text-primary)]">24 Formats</div>
-              <div className="text-xs font-semibold text-[color:var(--text-secondary)] mt-0.5">Journal, Thesis, Grant</div>
+
+            {/* 6 Category Filter Tabs in specific order */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
+              {FORMAT_FAMILIES.map((family) => {
+                const isActive = family.id === activeFamily;
+                return (
+                  <button
+                    key={family.id}
+                    type="button"
+                    onClick={() => setActiveFamily(family.id)}
+                    className={`px-3.5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-xs scale-105"
+                        : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)]"
+                    }`}
+                  >
+                    {family.label}
+                  </button>
+                );
+              })}
             </div>
-            <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
-              <div className="text-2xl font-black text-[color:var(--state-success)]">0%</div>
-              <div className="text-xs font-semibold text-[color:var(--text-secondary)] mt-0.5">Hallucination Floor</div>
+
+            <div className="mb-6 text-center">
+              <p className="text-xs sm:text-sm font-medium text-[color:var(--text-secondary)]">{selectedFamily.desc}</p>
             </div>
-            <div className="p-4 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
-              <div className="text-2xl font-black text-[color:var(--state-info)]">Local & Cloud</div>
-              <div className="text-xs font-semibold text-[color:var(--text-secondary)] mt-0.5">Ollama, BYOK, Encrypted</div>
+
+            {/* 4 Format Cards Grid for the Active Family (Matching Screenshot 3) */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {selectedFamily.formats.map((fmt) => (
+                <div
+                  key={fmt.id}
+                  className="p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)] hover:shadow-md transition-all flex flex-col justify-between group text-left"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)]">
+                        {fmt.id}
+                      </span>
+                      <span className="text-[10px] font-semibold text-[color:var(--text-muted)] uppercase">
+                        All Disciplines
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-base text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors mb-1.5">
+                      {fmt.label}
+                    </h3>
+                    <p className="text-xs text-[color:var(--text-secondary)] mb-3 font-mono font-medium">
+                      🎯 Budget: {fmt.words}
+                    </p>
+                    <div className="text-xs text-[color:var(--text-muted)] pt-2.5 border-t border-[color:var(--border-subtle)]">
+                      <span className="font-semibold text-[color:var(--text-secondary)] block mb-1">Structure:</span>
+                      <span className="line-clamp-2 text-[11px]">{fmt.sections}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-[color:var(--border-subtle)]">
+                    <button
+                      type="button"
+                      onClick={() => openAuth("signup", fmt.id)}
+                      className="w-full py-2.5 rounded-xl text-xs font-bold text-[color:var(--accent)] bg-[color:var(--accent-subtle)] group-hover:bg-[color:var(--accent-solid)] group-hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      Initialize {fmt.id} →
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
         {/* INTERACTIVE PRODUCT DEMO: LIVE MANUSCRIPT & PROVENANCE INSPECTOR */}
-        <section id="interactive-demo" className="px-6 lg:px-8 py-16 scroll-mt-24">
+        <section id="interactive-demo" className="px-4 sm:px-6 lg:px-8 py-16 scroll-mt-24 bg-[color:var(--surface-raised)] border-y border-[color:var(--border-subtle)]">
           <div className="max-w-6xl mx-auto">
             <div className="text-center max-w-2xl mx-auto mb-10">
               <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
@@ -385,12 +521,12 @@ export default function ScholarCoreLanding({
               <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[color:var(--text-primary)] mt-2">
                 Click any citation to verify provenance
               </h2>
-              <p className="text-[color:var(--text-secondary)] mt-3">
+              <p className="text-[color:var(--text-secondary)] mt-3 text-sm sm:text-base">
                 Scholar Core maps every sentence directly to verbatim evidence inside your private Knowledge Vault.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-lg overflow-hidden">
+            <div className="rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-canvas)] shadow-xl overflow-hidden">
               {/* App Mock Window Header */}
               <div className="h-12 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] flex items-center justify-between px-5">
                 <div className="flex items-center gap-2">
@@ -434,6 +570,7 @@ export default function ScholarCoreLanding({
                         evaluation in primate cell lineages confirmed a significant reduction in unintended genomic
                         cleavage{" "}
                         <button
+                          type="button"
                           onClick={() => setActiveCitation(1)}
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold font-mono text-xs transition-all cursor-pointer ${
                             activeCitation === 1
@@ -451,6 +588,7 @@ export default function ScholarCoreLanding({
                         heritability of target alleles in stem cell repopulation models without observable off-target
                         translocations{" "}
                         <button
+                          type="button"
                           onClick={() => setActiveCitation(2)}
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold font-mono text-xs transition-all cursor-pointer ${
                             activeCitation === 2
@@ -466,11 +604,11 @@ export default function ScholarCoreLanding({
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-[color:var(--border-subtle)] flex items-center justify-between text-xs text-[color:var(--text-secondary)]">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[color:var(--state-success)]" />
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-[color:var(--state-success)] animate-pulse" />
                       Auto-Citation Resolver Active
                     </span>
-                    <span>Click citations above to inspect evidence</span>
+                    <span className="text-[color:var(--accent)] font-semibold">Click citations above to inspect evidence</span>
                   </div>
                 </div>
 
@@ -487,7 +625,7 @@ export default function ScholarCoreLanding({
                     </div>
 
                     {activeCitation && SAMPLE_CITATIONS[activeCitation] ? (
-                      <div className="space-y-4 animate-fade-in">
+                      <div className="space-y-4 animate-in fade-in duration-200">
                         <div className="p-4 rounded-xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)]">
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <span className="font-bold text-sm text-[color:var(--text-primary)] leading-tight">
@@ -542,8 +680,9 @@ export default function ScholarCoreLanding({
 
                   <div className="mt-6 pt-4 border-t border-[color:var(--border-subtle)]">
                     <button
-                      onClick={onGetStarted}
-                      className="w-full py-2.5 rounded-lg bg-[color:var(--accent-solid)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      type="button"
+                      onClick={() => openAuth("signup", "OT-10")}
+                      className="w-full py-2.5 rounded-xl bg-[color:var(--accent-solid)] text-white text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                     >
                       Run Citation Audit on Your Own PDFs
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -558,7 +697,7 @@ export default function ScholarCoreLanding({
         </section>
 
         {/* MULTI-AGENT EDITORIAL BOARD */}
-        <section id="editorial-board" className="px-6 lg:px-8 py-20 bg-[color:var(--surface-raised)] border-y border-[color:var(--border-subtle)] scroll-mt-20">
+        <section id="editorial-board" className="px-4 sm:px-6 lg:px-8 py-20 bg-[color:var(--surface-canvas)] scroll-mt-20">
           <div className="max-w-6xl mx-auto">
             <div className="text-center max-w-3xl mx-auto mb-14">
               <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
@@ -579,11 +718,12 @@ export default function ScholarCoreLanding({
                 return (
                   <button
                     key={agent.id}
+                    type="button"
                     onClick={() => setActiveAgent(agent.id)}
                     className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                       isActive
                         ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)] shadow-sm"
-                        : "border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] hover:border-[color:var(--border-control)]"
+                        : "border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--border-control)]"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-3">
@@ -591,7 +731,7 @@ export default function ScholarCoreLanding({
                         className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                           isActive
                             ? "bg-[color:var(--accent)] text-white"
-                            : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]"
+                            : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]"
                         }`}
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -601,7 +741,7 @@ export default function ScholarCoreLanding({
                       <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                         isActive
                           ? "bg-[color:var(--accent)] text-white"
-                          : "bg-[color:var(--surface-sunken)] text-[color:var(--text-muted)]"
+                          : "bg-[color:var(--surface-inset)] text-[color:var(--text-muted)]"
                       }`}>
                         {agent.badge}
                       </span>
@@ -616,7 +756,7 @@ export default function ScholarCoreLanding({
             </div>
 
             {/* Agent Detail Card */}
-            <div className="p-8 rounded-3xl border border-[color:var(--border-default)] bg-[color:var(--surface-canvas)] shadow-sm">
+            <div className="p-8 rounded-3xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-sm">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-[color:var(--border-subtle)]">
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--accent)]">
@@ -633,11 +773,11 @@ export default function ScholarCoreLanding({
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
+              <div className="p-5 rounded-2xl bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)]">
                 <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] block mb-2">
                   Agent Telemetry & Review Feedback:
                 </span>
-                <p className="text-sm text-[color:var(--text-primary)] leading-relaxed font-mono bg-[color:var(--surface-inset)] p-4 rounded-xl border border-[color:var(--border-subtle)]">
+                <p className="text-sm text-[color:var(--text-primary)] leading-relaxed font-mono bg-[color:var(--surface-canvas)] p-4 rounded-xl border border-[color:var(--border-subtle)]">
                   {selectedAgent.critique}
                 </p>
               </div>
@@ -645,92 +785,8 @@ export default function ScholarCoreLanding({
           </div>
         </section>
 
-        {/* 24 PUBLICATION FORMATS EXPLORER */}
-        <section id="publication-formats" className="px-6 lg:px-8 py-20 scroll-mt-20">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center max-w-3xl mx-auto mb-14">
-              <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
-                24 Specialized Academic Formats
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[color:var(--text-primary)] mt-2">
-                Engineered for Every Stage of Scholarship
-              </h2>
-              <p className="text-[color:var(--text-secondary)] mt-3 text-base">
-                Whether you are drafting a coursework essay, a doctoral dissertation, or a Nature research article, Scholar Core provides dedicated workflow pipelines and quality rubrics.
-              </p>
-            </div>
-
-            {/* Category Filter Tabs in specific order */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
-              {FORMAT_FAMILIES.map((family) => {
-                const isActive = family.id === activeFamily;
-                return (
-                  <button
-                    key={family.id}
-                    onClick={() => setActiveFamily(family.id)}
-                    className={`px-4 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-sm scale-105"
-                        : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)]"
-                    }`}
-                  >
-                    {family.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mb-6 text-center">
-              <p className="text-sm font-medium text-[color:var(--text-secondary)]">{selectedFamily.desc}</p>
-            </div>
-
-            {/* Format Cards Grid */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
-              {selectedFamily.formats.map((fmt) => (
-                <div
-                  key={fmt.id}
-                  className="p-6 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)] hover:shadow-md transition-all flex flex-col justify-between group"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">
-                        {fmt.id}
-                      </span>
-                      <span className="text-[10px] font-semibold text-[color:var(--text-muted)] uppercase">
-                        All Disciplines
-                      </span>
-                    </div>
-                    <h4 className="font-bold text-lg text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors mb-2">
-                      {fmt.label}
-                    </h4>
-                    <p className="text-xs text-[color:var(--text-secondary)] mb-4 font-mono font-medium">
-                      🎯 Budget: {fmt.words}
-                    </p>
-                    <div className="text-xs text-[color:var(--text-muted)] pt-3 border-t border-[color:var(--border-subtle)]">
-                      <span className="font-semibold text-[color:var(--text-secondary)] block mb-1">Structure:</span>
-                      <span className="line-clamp-2">{fmt.sections}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 pt-3 border-t border-[color:var(--border-subtle)]">
-                    <button
-                      onClick={onGetStarted}
-                      className="w-full py-2 rounded-lg text-xs font-bold text-[color:var(--accent)] bg-[color:var(--accent-subtle)] group-hover:bg-[color:var(--accent-solid)] group-hover:text-white transition-all flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      Initialize {fmt.id}
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* PRIVACY, LOCAL RUNNER & VAULT ARCHITECTURE */}
-        <section id="security" className="px-6 lg:px-8 py-20 bg-[color:var(--surface-raised)] border-y border-[color:var(--border-subtle)] scroll-mt-20">
+        <section id="security" className="px-4 sm:px-6 lg:px-8 py-20 bg-[color:var(--surface-raised)] border-y border-[color:var(--border-subtle)] scroll-mt-20">
           <div className="max-w-6xl mx-auto">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div>
@@ -752,9 +808,9 @@ export default function ScholarCoreLanding({
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-bold text-base text-[color:var(--text-primary)]">Client-Side Encrypted Knowledge Vault</h4>
+                      <h4 className="font-bold text-base text-[color:var(--text-primary)]">Universal Knowledge Vault with Cloud Sync</h4>
                       <p className="text-xs text-[color:var(--text-secondary)] mt-1 leading-relaxed">
-                        Your private reference PDFs and notes are encrypted locally. Even when switching networks, your vault remains strictly sandboxed.
+                        Seamlessly sync your research papers, datasets, notes, and citations across all devices with Google Drive, OneDrive, and academic citation formats.
                       </p>
                     </div>
                   </div>
@@ -835,7 +891,7 @@ export default function ScholarCoreLanding({
         </section>
 
         {/* COMPARISON TABLE */}
-        <section id="comparison" className="px-6 lg:px-8 py-20 scroll-mt-20">
+        <section id="comparison" className="px-4 sm:px-6 lg:px-8 py-20 scroll-mt-20">
           <div className="max-w-5xl mx-auto">
             <div className="text-center max-w-2xl mx-auto mb-12">
               <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
@@ -899,7 +955,7 @@ export default function ScholarCoreLanding({
         </section>
 
         {/* CTA BANNER */}
-        <section className="px-6 lg:px-8 py-20 bg-[color:var(--surface-raised)] border-t border-[color:var(--border-subtle)] text-center">
+        <section className="px-4 sm:px-6 lg:px-8 py-20 bg-[color:var(--surface-raised)] border-t border-[color:var(--border-subtle)] text-center">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-3xl sm:text-5xl font-black text-[color:var(--text-primary)] tracking-tight mb-4">
               Accelerate Your Research Without Sacrificing Rigour
@@ -908,7 +964,8 @@ export default function ScholarCoreLanding({
               Join thousands of scholars worldwide organizing their literature, guaranteeing citation integrity, and publishing faster.
             </p>
             <button
-              onClick={onGetStarted}
+              type="button"
+              onClick={() => openAuth("signup")}
               className="px-10 py-4 rounded-xl text-lg font-bold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-lg hover:bg-[color:var(--accent-hover)] transition-all hover:scale-105 active:scale-98 inline-flex items-center gap-3 cursor-pointer"
             >
               Get Started for Free
@@ -935,11 +992,11 @@ export default function ScholarCoreLanding({
             </span>
           </div>
           <div className="flex gap-6 font-medium">
+            <a href="#formats-explorer" className="hover:text-[color:var(--text-primary)] transition-colors">
+              Formats
+            </a>
             <a href="#interactive-demo" className="hover:text-[color:var(--text-primary)] transition-colors">
               Live Demo
-            </a>
-            <a href="#publication-formats" className="hover:text-[color:var(--text-primary)] transition-colors">
-              Formats
             </a>
             <a href="#security" className="hover:text-[color:var(--text-primary)] transition-colors">
               Security
@@ -947,6 +1004,14 @@ export default function ScholarCoreLanding({
           </div>
         </div>
       </footer>
+
+      {/* EMBEDDED AUTH MODAL (Sign In / Sign Up / Multi-Account Switcher) */}
+      <EmbeddedAuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        initialMode={authModalMode}
+        selectedFormatId={selectedFormatId}
+      />
     </div>
   );
 }
