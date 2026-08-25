@@ -529,15 +529,27 @@ export default function HumanizerWorkspace({
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      {/* Top Navigation Bar aligned with Scholar Core Design System */}
+      <header className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 md:px-6 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <ScholarCoreLogo className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Back to Scholar Workspace"
+            >
+              ←
+            </button>
+          )}
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 dark:bg-indigo-500 text-white flex items-center justify-center shadow-xs">
+            <ScholarCoreLogo className="w-5 h-5 text-white" />
+          </div>
           <div>
-            <h1 className="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 dark:from-indigo-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
+            <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-slate-100">
               Text Humanizer
             </h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 hidden sm:block">
               Controlled Academic Prose Rewriting Engine • Deterministic Integrity & Modality Protection
             </p>
           </div>
@@ -548,8 +560,8 @@ export default function HumanizerWorkspace({
           <button
             type="button"
             onClick={() => setShowEvalModal(true)}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors"
-            title="Open Developer Benchmark Suite"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer"
+            title="Open Academic Validation & Benchmark Suite"
           >
             <span>📊</span>
             <span>Benchmark</span>
@@ -559,7 +571,7 @@ export default function HumanizerWorkspace({
           <button
             type="button"
             onClick={onOpenAiAccess}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer"
             title="Configure active AI provider"
           >
             <span
@@ -568,18 +580,6 @@ export default function HumanizerWorkspace({
             <span className="capitalize">{activeProvider}</span>
             <span className="text-[10px] text-slate-400">({modelName})</span>
           </button>
-
-          {/* Close / Return */}
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              aria-label="Close workspace"
-            >
-              ✕
-            </button>
-          )}
         </div>
       </header>
 
