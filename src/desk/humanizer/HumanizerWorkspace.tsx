@@ -36,6 +36,7 @@ import PipelineProgressBar, { HumanizerProgressStage } from "./components/Pipeli
 import SentenceReviewList from "./components/SentenceReviewList";
 import LongDocumentDashboard from "./components/LongDocumentDashboard";
 import DeveloperEvaluationModal from "./components/DeveloperEvaluationModal";
+import BetaFeedbackWidget from "./components/BetaFeedbackWidget";
 
 const SAMPLE_TEXT =
   "The cow is one of the most useful domestic animals in the world (Wilson et al., 2022). It has been closely associated with human civilization for thousands of years. People keep cows for milk, farming, and other useful products. In many countries, especially in South Asia, cows are an important part of rural life.\n\nA cow is a herbivorous animal that mainly eats grass, hay, and other plant-based food. It has four legs, two horns, two ears, and a long tail. Empirical studies show that milk production efficiency improves significantly with targeted forage nutrition with $p < 0.001$ and $R^2 = 0.88$ [4, 7]. Milk is one of the most important products obtained from cows. It is rich in nutrients such as protein, calcium, and vitamins and is used to make products such as curd, butter, cheese, ghee, and yogurt. Cow dung is also useful because it can be used as organic manure for agriculture and, in some places, as a source of biogas.\n\nCows have a special cultural and religious importance in Nepal and India. In Hindu traditions, the cow is regarded as a sacred and respected animal. In Nepal, the cow is also the national animal. The festival of Tihar includes a special day called Gai Tihar, when cows are worshipped and honored.\n\nCows contribute greatly to the livelihoods of farmers. However, they should not be treated merely as sources of economic benefit. They need adequate food, clean water, shelter, medical care, and humane treatment. Ultimately, the cow is a valuable and important animal. It provides food and useful agricultural resources and has deep cultural significance. We should recognize its contribution and treat cows with kindness and care.";
@@ -546,9 +547,14 @@ export default function HumanizerWorkspace({
             <ScholarCoreLogo className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              Text Humanizer
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                Text Humanizer
+              </h1>
+              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-md bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                Beta
+              </span>
+            </div>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 hidden sm:block">
               Controlled Academic Prose Rewriting Engine • Deterministic Integrity & Modality Protection
             </p>
@@ -888,6 +894,13 @@ export default function HumanizerWorkspace({
                 </div>
               </div>
             )}
+
+            {/* Privacy-Conscious Beta Feedback Widget */}
+            <BetaFeedbackWidget
+              projectId={projectId}
+              mode={selectedMode}
+              hasOutput={Boolean(humanizedText && !loading)}
+            />
           </div>
         </div>
 
