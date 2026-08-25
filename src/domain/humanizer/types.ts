@@ -69,12 +69,14 @@ export interface ProtectedElement {
 }
 
 export type EpistemicModality =
-  | "possible" // e.g. "may contribute", "might indicate"
-  | "probable" // e.g. "likely suggests", "expected to"
-  | "certain"  // e.g. "causes", "proves", "demonstrates"
+  | "possible" // e.g. "may contribute", "might indicate", "could suggest"
+  | "probable" // e.g. "likely suggests", "expected to", "tends to"
+  | "certain"  // e.g. "causes", "proves", "demonstrates", "confirms"
   | "unspecified";
 
 export type EpistemicCertainty = "low" | "medium" | "high";
+
+export type ClaimCausality = "direct" | "correlational" | "none" | "possible_causal";
 
 export interface ExtractedClaim {
   claimId: string;
@@ -86,13 +88,56 @@ export interface ExtractedClaim {
   modality: EpistemicModality;
   certainty: EpistemicCertainty;
   negation: boolean;
-  causality?: "direct" | "correlational" | "none";
+  causality?: ClaimCausality;
   temporalScope?: string;
+  populationScope?: string;
   quantitativeConstraints?: string[];
   qualifiers?: string[];
   attribution?: string;
   evidenceRefs?: string[];
+  sourceBlockId?: string;
+  sourceSentenceId?: string;
   sourceSentenceIds: string[];
+}
+
+export type ClaimComparisonStatus =
+  | "PRESERVED"
+  | "MODIFIED"
+  | "ADDED"
+  | "DROPPED"
+  | "EPISTEMIC_SHIFT"
+  | "CAUSALITY_SHIFT"
+  | "NEGATION_REVERSAL"
+  | "QUANTITATIVE_SHIFT"
+  | "ATTRIBUTION_SHIFT"
+  | "UNCERTAIN";
+
+export interface ClaimComparisonFinding {
+  claimId: string;
+  status: ClaimComparisonStatus;
+  originalProposition?: string;
+  candidateProposition?: string;
+  originalModality?: EpistemicModality;
+  candidateModality?: EpistemicModality;
+  originalCertainty?: EpistemicCertainty;
+  candidateCertainty?: EpistemicCertainty;
+  originalCausality?: ClaimCausality;
+  candidateCausality?: ClaimCausality;
+  originalNegation?: boolean;
+  candidateNegation?: boolean;
+  reason: string;
+  severity: "none" | "warning" | "error";
+}
+
+export interface ClaimComparisonReport {
+  valid: boolean;
+  preservationRate: number; // 0 - 1
+  findings: ClaimComparisonFinding[];
+  hasEpistemicShift: boolean;
+  hasNegationReversal: boolean;
+  hasCausalityShift: boolean;
+  hasDroppedClaims: boolean;
+  hasAddedClaims: boolean;
 }
 
 export interface HumanizerSentence {
