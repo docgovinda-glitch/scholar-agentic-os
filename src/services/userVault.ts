@@ -219,7 +219,7 @@ export async function getVaultStorageMode(): Promise<"local" | "synced"> {
   try {
     const supabase = getSupabaseClient();
     const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user) return "local";
+    if (!userData?.user) return "synced";
 
     const query = supabase
       .from("user_vaults")
@@ -231,10 +231,10 @@ export async function getVaultStorageMode(): Promise<"local" | "synced"> {
       : await query;
 
     const data = Array.isArray(res.data) ? res.data[0] : res.data;
-    if (res.error || !data || !(data as any).storage_mode) return "local";
-    return (data as any).storage_mode === "synced" ? "synced" : "local";
+    if (res.error || !data || !(data as any).storage_mode) return "synced";
+    return (data as any).storage_mode === "local" ? "local" : "synced";
   } catch {
-    return "local";
+    return "synced";
   }
 }
 

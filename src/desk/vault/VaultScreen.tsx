@@ -3,6 +3,7 @@ import {
   loadVault,
   hasVaultPassphraseOnThisDevice,
   updateVaultStorageMode,
+  getVaultStorageMode,
   resetVault,
   type VaultRecord,
 } from "../../services/userVault";
@@ -52,7 +53,12 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
         return;
       }
       const localVerifier = await hasVaultPassphraseOnThisDevice();
-      setVaultPresence(localVerifier ? "this-device" : "other-device");
+      if (localVerifier) {
+        setVaultPresence("this-device");
+        setUnlocked(isVaultUnlocked());
+        return;
+      }
+      setVaultPresence("other-device");
     })();
   }, [userId]);
 
@@ -482,7 +488,7 @@ function VaultContents({
               Reset
             </button>
 
-            {storageMode !== "synced" && (
+            {onLock && (
               <button
                 type="button"
                 onClick={onLock}
