@@ -192,18 +192,92 @@ export interface HumanizerStyleProfile {
   userVoiceDirectives?: string[];
 }
 
+export type AuditSeverity = "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+export type AuditDecision = "SAFE" | "WARNING" | "REJECT";
+export type CandidateState =
+  | "NO_REWRITE_NEEDED"
+  | "REWRITE_GENERATED"
+  | "REWRITE_VALIDATED"
+  | "REWRITE_REJECTED";
+
+export interface HumanizerAuditFinding {
+  auditor: string;
+  category: string;
+  severity: AuditSeverity;
+  decision: AuditDecision;
+  code: string;
+  message: string;
+  blockId?: string;
+  sentenceId?: string;
+  claimId?: string;
+  token?: string;
+  originalValue?: string;
+  candidateValue?: string;
+  confidence?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface HumanizerAuditReport {
+  finalDecision: AuditDecision;
+  overallSeverity: AuditSeverity;
+  candidateState: CandidateState;
+  shortCircuited: boolean;
+  findings: HumanizerAuditFinding[];
+  integrity: {
+    passed: boolean;
+    missingTokens: string[];
+    duplicatedTokens: string[];
+    unexpectedTokens: string[];
+    malformedTokens: string[];
+    exactRestoration: boolean;
+  };
+  claims: {
+    passed: boolean;
+    preservationRate: number;
+    epistemicShiftsCount: number;
+    negationReversalsCount: number;
+    causalityShiftsCount: number;
+    droppedClaimsCount: number;
+    addedClaimsCount: number;
+  };
+  grammar: {
+    passed: boolean;
+    errorsCount: number;
+    issues: string[];
+  };
+  coherence: {
+    passed: boolean;
+    score: number;
+    transitionQuality: "strong" | "adequate" | "broken";
+    issues: string[];
+  };
+  semantic: {
+    passed: boolean;
+    similarityScore: number;
+    driftDetected: boolean;
+    contradictionDetected: boolean;
+  };
+  delta: {
+    classification: AuditDecision;
+    wordCountDelta: number;
+    percentageChanged: number;
+  };
+  timestamp: string;
+}
+
 export type AuditStatus = "passed" | "warning" | "failed" | "pending";
 
 export interface AuditorFinding {
   auditorId: string;
   status: AuditStatus;
   message: string;
-  location?: string; // Block or sentence ID
+  location?: string;
   details?: Record<string, any>;
 }
 
 export interface DocumentAuditState {
   overallStatus: AuditStatus;
+  auditReport?: HumanizerAuditReport;
   integrity: {
     passed: boolean;
     missingTokens: string[];
