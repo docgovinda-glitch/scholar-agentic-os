@@ -64,6 +64,10 @@ import { claimsRouter } from "./project/claims";
 import { evidenceRouter } from "./project/evidence";
 import { agenticRouter } from "./project/agentic";
 import assignmentRouter from "./project/assignment";
+import thesisRouter from "./project/thesis";
+import proposalRouter from "./project/proposal";
+import presentationRouter from "./project/presentation";
+import humanizerRouter from "./project/humanizer";
 import { journalComplianceRouter } from "./project/journal_compliance";
 import parseRouter from "./project/parse";
 import { activityRouter } from "./project/activity";
@@ -1074,6 +1078,10 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   router.use("/:id/files", filesRouter);
   router.use("/:id/agent", agenticRouter);
   router.use("/:id/assignment", assignmentRouter);
+  router.use("/:id/thesis", thesisRouter);
+  router.use("/:id/proposal", proposalRouter);
+  router.use("/:id/presentation", presentationRouter);
+  router.use("/:id/humanizer", humanizerRouter);
   router.use("/:id/parse-file", parseRouter);
   router.use("/:id/compliance", journalComplianceRouter(projectLimit));
 
@@ -2233,7 +2241,11 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
   }));
 
 
-  // Mount the new 25-stage agentic pipeline router
+  // Mount the specialized agentic pipeline routers
   app.use("/api/projects/:id/agent", agenticRouter);
   app.use("/api/projects/:id/assignment", assignmentRouter);
+  app.use("/api/projects/:id/thesis", thesisRouter);
+  app.use("/api/projects/:id/proposal", proposalRouter);
+  app.use("/api/projects/:id/presentation", presentationRouter);
+  app.use("/api/projects/:id/humanizer", humanizerRouter);
 }
