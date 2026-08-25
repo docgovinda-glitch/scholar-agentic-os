@@ -6,19 +6,19 @@ import { MemoryRouter } from "react-router-dom";
 import ScholarCoreLanding from "../ScholarCoreLanding";
 
 describe("ScholarCoreLanding", () => {
-  it("renders 24 Specialized Academic Formats above the fold", () => {
+  it("renders 6 Dedicated Academic Workspaces above the fold", () => {
     render(
       <MemoryRouter>
         <ScholarCoreLanding />
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/24 SPECIALIZED ACADEMIC FORMATS/i)).toBeInTheDocument();
-    expect(screen.getByText(/1\. Short-Form Writeup/i)).toBeInTheDocument();
-    expect(screen.getByText(/2\. Long-Form Writing/i)).toBeInTheDocument();
-    expect(screen.getByText(/3\. Publications/i)).toBeInTheDocument();
+    expect(screen.getByText(/6 DEDICATED ACADEMIC WORKSPACES/i)).toBeInTheDocument();
+    expect(screen.getByText(/1\. Assignment/i)).toBeInTheDocument();
+    expect(screen.getByText(/2\. Journal Article/i)).toBeInTheDocument();
+    expect(screen.getByText(/3\. Thesis \/ Dissertation/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Assignment/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Initialize OT-01 →/i)).toBeInTheDocument();
+    expect(screen.getByText(/Initialize Academic Assignment →/i)).toBeInTheDocument();
   });
 
   it("switches format categories and updates format cards", () => {
@@ -28,11 +28,11 @@ describe("ScholarCoreLanding", () => {
       </MemoryRouter>
     );
 
-    const pubTab = screen.getByText(/3\. Publications/i);
+    const pubTab = screen.getByText(/2\. Journal Article/i);
     fireEvent.click(pubTab);
 
-    expect(screen.getByText(/Empirical Journal Article/i)).toBeInTheDocument();
-    expect(screen.getByText(/Initialize OT-10 →/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Journal Article/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Initialize Journal Article →/i)).toBeInTheDocument();
   });
 
   it("opens the embedded auth modal when clicking an initialize button", () => {
@@ -42,7 +42,7 @@ describe("ScholarCoreLanding", () => {
       </MemoryRouter>
     );
 
-    const initBtn = screen.getByText(/Initialize OT-01 →/i);
+    const initBtn = screen.getByText(/Initialize Academic Assignment →/i);
     fireEvent.click(initBtn);
 
     // Modal opens with Scholar Core branding and auth form

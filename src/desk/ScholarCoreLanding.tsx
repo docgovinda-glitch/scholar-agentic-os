@@ -91,66 +91,86 @@ const AGENT_ROLES = [
 const FORMAT_FAMILIES = [
   {
     id: "short_form",
-    label: "1. Short-Form Writeup",
-    desc: "Targeted scholarly essays, briefs, and structured coursework assignments.",
+    label: "1. Assignment",
+    desc: "Dedicated 8-phase academic thinking, evidence evaluation, research, and grounded drafting workspace.",
     formats: [
-      { id: "OT-01", label: "Assignment", words: "800 – 3,000 words", sections: "Title, Intro, Body, Conclusion, References", bestFor: "Undergraduate & Masters coursework" },
-      { id: "OT-02", label: "Coursework Essay", words: "1,500 – 4,000 words", sections: "Abstract, Argument, Synthesis, Evaluation", bestFor: "Critical literature analysis" },
-      { id: "OT-03", label: "Research Summary", words: "500 – 1,500 words", sections: "Executive Summary, Findings, Implications", bestFor: "Executive & lab briefings" },
-      { id: "OT-04", label: "Short Case Study", words: "1,000 – 2,500 words", sections: "Case Context, Dilemma, Analysis, Outcomes", bestFor: "Clinical & business studies" },
-    ],
-  },
-  {
-    id: "long_form",
-    label: "2. Long-Form Writing",
-    desc: "Comprehensive academic milestones with multi-chapter approval gates.",
-    formats: [
-      { id: "OT-05", label: "Master Thesis Chapter", words: "6,000 – 12,000 words", sections: "Literature, Methodology, Findings, Discussion", bestFor: "Postgraduate dissertations" },
-      { id: "OT-06", label: "Doctoral Dissertation", words: "50,000 – 80,000 words", sections: "Comprehensive multi-chapter framework", bestFor: "PhD & doctorate submissions" },
-      { id: "OT-07", label: "Literature Review Monograph", words: "8,000 – 15,000 words", sections: "Thematic Synthesis, Bibliometrics, Gaps", bestFor: "Field overview treatises" },
-      { id: "OT-08", label: "Research Monograph", words: "25,000 – 60,000 words", sections: "Full theoretical & empirical treatise", bestFor: "Academic book publications" },
+      {
+        id: "OT-01",
+        label: "Academic Assignment",
+        words: "800 – 4,000 words",
+        sections: "Understand Brief → Research Plan → Evidence Board → Think & Critique → Structure & Word Plan → Grounded Drafting → 10-Point Submission Audit",
+        bestFor: "Undergraduate & Postgraduate coursework, essays, reports, and reflections",
+      },
     ],
   },
   {
     id: "publication",
-    label: "3. Publications",
-    desc: "Peer-reviewed journal papers and clinical articles ready for editorial submission.",
+    label: "2. Journal Article",
+    desc: "25-stage peer-reviewed empirical & review paper pipeline with multi-agent peer review.",
     formats: [
-      { id: "OT-10", label: "Empirical Journal Article", words: "4,000 – 8,000 words", sections: "IMRaD + Conflict of Interest + Data Availability", bestFor: "Nature, Elsevier, IEEE, Springer" },
-      { id: "OT-11", label: "Systematic Review & Meta-Analysis", words: "5,000 – 10,000 words", sections: "PRISMA Flow, Risk of Bias, Forest Plots", bestFor: "Evidence synthesis & Cochrane" },
-      { id: "OT-12", label: "Clinical Case Report", words: "1,500 – 3,000 words", sections: "CARE Guidelines, Timeline, Diagnostic Assessment", bestFor: "Medical & surgical journals" },
-      { id: "OT-13", label: "Perspective / Review Commentary", words: "2,000 – 4,500 words", sections: "Current State, Provocation, Future Horizons", bestFor: "Thought leadership & trends" },
+      {
+        id: "OT-10",
+        label: "Journal Article",
+        words: "4,000 – 10,000 words",
+        sections: "Journal Discovery → Literature Matrix → Gap Analysis → IMRaD Drafting → Multi-Agent Peer Review Simulator",
+        bestFor: "Nature, Elsevier, IEEE, Springer & peer-reviewed journals",
+      },
     ],
   },
   {
-    id: "applied_professional",
-    label: "4. Professional & Applied",
-    desc: "Translational research documents bridging academic evidence and industry policy.",
+    id: "long_form",
+    label: "3. Thesis / Dissertation",
+    desc: "Comprehensive multi-chapter milestone framework with structured defense preparation.",
     formats: [
-      { id: "OT-17", label: "Policy Brief", words: "1,500 – 3,500 words", sections: "Executive Summary, Evidence, Policy Options", bestFor: "Government & NGO stakeholders" },
-      { id: "OT-18", label: "Clinical Practice Guideline", words: "4,000 – 10,000 words", sections: "GRADE Recommendations, Evidence Tables", bestFor: "Healthcare institutions" },
-      { id: "OT-19", label: "Technical White Paper", words: "3,000 – 7,000 words", sections: "Architecture, Benchmark Analysis, Proof", bestFor: "Industry R&D & deep tech" },
-      { id: "OT-20", label: "Expert Witness Report", words: "5,000 – 15,000 words", sections: "Qualifications, Opinion, Evidentiary Basis", bestFor: "Legal & tribunal review" },
+      {
+        id: "OT-09",
+        label: "Thesis / Dissertation",
+        words: "10,000 – 80,000 words",
+        sections: "Proposal & Theory → Literature Review → Methodology → Findings → Discussion → Defense Ready",
+        bestFor: "Undergraduate dissertations, Master's theses & PhD doctorates",
+      },
     ],
   },
   {
     id: "proposal_funding",
-    label: "5. Proposals & Funding",
-    desc: "Competitive grant applications with strict agency rubric compliance.",
+    label: "4. Research Proposal",
+    desc: "Competitive grant applications and research plans with strict agency rubric alignment.",
     formats: [
-      { id: "OT-14", label: "NIH / NSF Grant Proposal", words: "8,000 – 15,000 words", sections: "Specific Aims, Significance, Innovation, Approach", bestFor: "Federal & institutional grants" },
-      { id: "OT-15", label: "Horizon Europe Research Proposal", words: "10,000 – 20,000 words", sections: "Excellence, Impact, Quality of Implementation", bestFor: "EU collaborative funding" },
-      { id: "OT-16", label: "Academic Book Proposal", words: "3,000 – 6,000 words", sections: "Overview, Market Analysis, Chapter Synopses", bestFor: "University press submissions" },
+      {
+        id: "OT-19",
+        label: "Research & Grant Proposal",
+        words: "3,000 – 15,000 words",
+        sections: "Specific Aims → Research Significance → Methodological Design → Ethics & Timeline Budgeting",
+        bestFor: "Institutional grants, federal funding applications & PhD candidacy plans",
+      },
     ],
   },
   {
     id: "presentation",
-    label: "6. Presentations",
-    desc: "High-impact visual communication for symposiums and conferences.",
+    label: "5. Presentation",
+    desc: "High-impact visual communication and narrative scripts for symposiums and oral defenses.",
     formats: [
-      { id: "OT-21", label: "Conference Extended Abstract", words: "1,000 – 2,000 words", sections: "Background, Methods, Preliminary Findings", bestFor: "ACM, IEEE, Academic conferences" },
-      { id: "OT-22", label: "Academic Poster (Poster Grid)", words: "300 – 800 words", sections: "Key Takeaway, Method Diagram, Evidence Grid", bestFor: "Symposium poster sessions" },
-      { id: "OT-23", label: "Keynote Slide Script & Deck", words: "2,000 – 4,000 words", sections: "Slide Breakdown, Narrative Arc, Speaker Notes", bestFor: "Invited lectures & defenses" },
+      {
+        id: "OT-22",
+        label: "Academic Presentation",
+        words: "10 – 35 slides",
+        sections: "Core Takeaway → Visual Methodology → Evidence Synthesis → Discussion & Defense Q&A",
+        bestFor: "Symposium talks, conference keynotes & thesis defense slide decks",
+      },
+    ],
+  },
+  {
+    id: "applied_professional",
+    label: "6. Text Humanizer",
+    desc: "Language & Voice Studio for academic AI text polish, tone tuning, and stylometric humanization.",
+    formats: [
+      {
+        id: "OT-07",
+        label: "Academic Text Humanizer",
+        words: "Section-by-section",
+        sections: "Stylometric Analysis → Tone & Voice Calibration → Passive/Active Balance → Provenance Check",
+        bestFor: "Refining AI drafts into natural, authentic human academic prose",
+      },
     ],
   },
 ];
@@ -249,7 +269,7 @@ export default function ScholarCoreLanding({
           {/* Desktop Nav Links */}
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-[color:var(--text-secondary)]">
             <a href="#formats-explorer" className="hover:text-[color:var(--accent)] transition-colors">
-              24 Formats
+              Workspaces
             </a>
             <a href="#interactive-demo" className="hover:text-[color:var(--accent)] transition-colors">
               Live Demo
@@ -310,7 +330,7 @@ export default function ScholarCoreLanding({
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-medium py-2 text-[color:var(--text-primary)]"
             >
-              24 Formats
+              Workspaces
             </a>
             <a
               href="#interactive-demo"
@@ -360,7 +380,7 @@ export default function ScholarCoreLanding({
       </header>
 
       <main className="relative z-10 pt-24 sm:pt-28">
-        {/* HERO SECTION — BROUGHT ABOVE THE FOLD WITH 24 SPECIALIZED FORMATS */}
+        {/* HERO SECTION */}
         <section id="hero" className="px-4 sm:px-6 lg:px-8 pt-6 pb-12 max-w-7xl mx-auto flex flex-col items-center">
           {/* Tagline Badge */}
           <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-xs mb-6">
@@ -429,17 +449,17 @@ export default function ScholarCoreLanding({
             ))}
           </div>
 
-          {/* 24 SPECIALIZED ACADEMIC FORMATS — SHOWN ABOVE THE FOLD WITHOUT SCROLLING */}
+          {/* 6 CURATED ACADEMIC WORKSPACES */}
           <div id="formats-explorer" className="w-full scroll-mt-24 pt-4 border-t border-[color:var(--border-subtle)]">
             <div className="text-center max-w-3xl mx-auto mb-6">
               <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
-                24 SPECIALIZED ACADEMIC FORMATS
+                6 DEDICATED ACADEMIC WORKSPACES
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[color:var(--text-primary)] mt-1">
                 Engineered for Every Stage of Scholarship
               </h2>
               <p className="text-[color:var(--text-secondary)] mt-2 text-xs sm:text-sm">
-                Whether you are drafting a coursework essay, a doctoral dissertation, or a Nature research article, Scholar Core provides dedicated workflow pipelines and quality rubrics.
+                From undergraduate assignments and postgraduate coursework to Nature empirical articles and doctoral dissertations, Scholar Core provides dedicated workflow pipelines and quality rubrics.
               </p>
             </div>
 
@@ -468,45 +488,65 @@ export default function ScholarCoreLanding({
               <p className="text-xs sm:text-sm font-medium text-[color:var(--text-secondary)]">{selectedFamily.desc}</p>
             </div>
 
-            {/* 4 Format Cards Grid for the Active Family (Matching Screenshot 3) */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {selectedFamily.formats.map((fmt) => (
-                <div
-                  key={fmt.id}
-                  className="p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)] hover:shadow-md transition-all flex flex-col justify-between group text-left"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)]">
-                        {fmt.id}
-                      </span>
-                      <span className="text-[10px] font-semibold text-[color:var(--text-muted)] uppercase">
-                        All Disciplines
-                      </span>
-                    </div>
-                    <h3 className="font-bold text-base text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors mb-1.5">
-                      {fmt.label}
-                    </h3>
-                    <p className="text-xs text-[color:var(--text-secondary)] mb-3 font-mono font-medium">
-                      🎯 Budget: {fmt.words}
-                    </p>
-                    <div className="text-xs text-[color:var(--text-muted)] pt-2.5 border-t border-[color:var(--border-subtle)]">
-                      <span className="font-semibold text-[color:var(--text-secondary)] block mb-1">Structure:</span>
-                      <span className="line-clamp-2 text-[11px]">{fmt.sections}</span>
-                    </div>
-                  </div>
+            {/* Curated Workspace Detail Card */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {FORMAT_FAMILIES.map((fam) => {
+                const fmt = fam.formats[0];
+                const isSelected = fam.id === activeFamily;
 
-                  <div className="mt-5 pt-3 border-t border-[color:var(--border-subtle)]">
-                    <button
-                      type="button"
-                      onClick={() => openAuth("signup", fmt.id)}
-                      className="w-full py-2.5 rounded-xl text-xs font-bold text-[color:var(--accent)] bg-[color:var(--accent-subtle)] group-hover:bg-[color:var(--accent-solid)] group-hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                    >
-                      Initialize {fmt.id} →
-                    </button>
+                return (
+                  <div
+                    key={fmt.id}
+                    onClick={() => setActiveFamily(fam.id)}
+                    className={`p-6 rounded-3xl border transition-all flex flex-col justify-between group text-left cursor-pointer ${
+                      isSelected
+                        ? "border-[color:var(--accent)] bg-[color:var(--surface-canvas)] shadow-lg ring-1 ring-[color:var(--accent)]/30 scale-[1.02]"
+                        : "border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)] hover:shadow-md"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-md bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)]">
+                          {fmt.id}
+                        </span>
+                        <span className="text-[10px] font-bold text-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] px-2 py-0.5 rounded-full border border-[color:var(--state-success)]/30">
+                          Ready to Boot
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-lg text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors mb-2">
+                        {fmt.label}
+                      </h3>
+                      <p className="text-xs text-[color:var(--text-secondary)] mb-3 font-mono font-semibold">
+                        🎯 Budget: {fmt.words}
+                      </p>
+                      <p className="text-xs text-[color:var(--text-secondary)] mb-4 leading-relaxed">
+                        {fmt.bestFor}
+                      </p>
+                      <div className="text-xs text-[color:var(--text-muted)] pt-3 border-t border-[color:var(--border-subtle)]">
+                        <span className="font-bold text-[color:var(--text-secondary)] block mb-1 text-[11px] uppercase tracking-wider">
+                          Dedicated Pipeline:
+                        </span>
+                        <span className="text-xs leading-relaxed text-[color:var(--text-primary)] font-medium">
+                          {fmt.sections}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-[color:var(--border-subtle)]">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAuth("signup", fmt.id);
+                        }}
+                        className="w-full py-3 rounded-xl text-xs font-bold text-white bg-[color:var(--accent-solid)] hover:bg-[color:var(--accent-hover)] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                      >
+                        Initialize {fmt.label} →
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
@@ -924,10 +964,10 @@ export default function ScholarCoreLanding({
                       <td className="p-4 sm:p-5 text-center font-bold text-[color:var(--state-success)] bg-[color:var(--accent-subtle)]">✅ 100% Cryptographic Match</td>
                     </tr>
                     <tr>
-                      <td className="p-4 sm:p-5 font-semibold text-[color:var(--text-primary)]">24 Publication Formats</td>
+                      <td className="p-4 sm:p-5 font-semibold text-[color:var(--text-primary)]">Dedicated Academic Workspaces</td>
                       <td className="p-4 sm:p-5 text-center text-[color:var(--state-danger)]">❌ Generic unstructured chat</td>
                       <td className="p-4 sm:p-5 text-center text-[color:var(--text-muted)]">—</td>
-                      <td className="p-4 sm:p-5 text-center font-bold text-[color:var(--state-success)] bg-[color:var(--accent-subtle)]">✅ Dedicated Structure Gates</td>
+                      <td className="p-4 sm:p-5 text-center font-bold text-[color:var(--state-success)] bg-[color:var(--accent-subtle)]">✅ Tailored 8-to-25 Stage Workspaces</td>
                     </tr>
                     <tr>
                       <td className="p-4 sm:p-5 font-semibold text-[color:var(--text-primary)]">Multi-Agent Editorial Board</td>
