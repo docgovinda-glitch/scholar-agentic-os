@@ -1,21 +1,20 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { resolveRunnerEndpoint, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
+import {
+  diagnoseOllamaConnection,
+  generateDiagnosticReport,
+  type OllamaDiagnosisResult,
+  type OllamaModelInfo,
+} from "../../services/ollamaService";
 import { checkLocalRuntimeConnectivity } from "../../services/localRuntimeConnectivity";
 import { Chip } from "./ProviderDetail";
 import type { ProviderView } from "./useAiAccess";
 
 /**
- * The configuration surface for ONE local runner.
+ * The configuration and diagnostics surface for ONE local runner (Ollama, LM Studio, etc.).
  *
- * Deliberately a different flow from ProviderDetail, because the failure
- * modes are different: a local runner needs no key and no account, so the
- * only questions are "is it installed", "is it running", and "will it accept
- * a request from a web page". That last one is the reason most local setups
- * fail, and it is not obvious — the runner is running, the port is right, and
- * the browser still discards the response because the runner sent no
- * Access-Control-Allow-Origin header. localRunnerCatalog carries the exact,
- * runner-specific fix in `corsGuidance`, and this surfaces it the moment a
- * probe fails rather than leaving the user to guess.
+ * Provides automated discovery, intelligent model categorization, live diagnostic checklists,
+ * and OS-tailored setup commands.
  */
 export default function LocalRunnerDetail({
   view,
@@ -37,41 +36,81 @@ export default function LocalRunnerDetail({
   onBack: () => void;
 }) {
   const [endpoint, setEndpoint] = useState(savedEndpoint ?? runner.defaultEndpoint);
+  const [modelInfos, setModelInfos] = useState<OllamaModelInfo[]>([]);
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState(view.selectedModel ?? "");
-  // Only meaningful while models.length === 0 (no live probe results yet) —
-  // once models are detected the <select> is always primary, matching
-  // ProviderDetail.tsx's ModelSelectField's "dropdown first, free text is an
-  // opt-in advanced action" rule. Starts open when there's already a saved
-  // choice, since that value didn't come from a probe.
   const [useCustomModelId, setUseCustomModelId] = useState(Boolean(view.selectedModel));
   const [probing, setProbing] = useState(false);
   const [probeError, setProbeError] = useState<string | null>(null);
   const [reachable, setReachable] = useState<boolean | null>(null);
   const [verificationNotes, setVerificationNotes] = useState<string[]>([]);
+  const [diagnosis, setDiagnosis] = useState<OllamaDiagnosisResult | null>(null);
   const [makeDefault, setMakeDefault] = useState(!view.connected);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
+  const [copiedCmd, setCopiedCmd] = useState(false);
+  const [copiedReport, setCopiedReport] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<"all" | "local" | "coding">("all");
+  const [showDiagnosticsPanel, setShowDiagnosticsPanel] = useState(false);
 
-  async function handleProbe() {
+  // Filter models based on selection
+  const filteredModels = useMemo(() => {
+    if (modelInfos.length === 0) return models.map((m) => ({ name: m, model: m, isLocal: true, category: "general", formattedSize: "" }));
+    if (selectedFilter === "local") return modelInfos.filter((m) => m.isLocal);
+    if (selectedFilter === "coding") return modelInfos.filter((m) => m.category === "coding");
+    return modelInfos;
+  }, [modelInfos, models, selectedFilter]);
+
+  async function handleProbe(targetEndpoint = endpoint) {
     setProbing(true);
     setProbeError(null);
     setSaved(null);
     setVerificationNotes([]);
+
+    const resolved = resolveRunnerEndpoint(runner, targetEndpoint);
+
     try {
-      const result = await checkLocalRuntimeConnectivity(runner, resolveRunnerEndpoint(runner, endpoint));
-      if (result.diagnosis === "reachable") {
-        setReachable(true);
-        setModels(result.models);
-        if (!model && result.models.length > 0) setModel(result.models[0]);
-        if (result.models.length === 0) {
-          setProbeError(`${runner.name} answered, but has no models loaded yet. Download or load a model in ${runner.name}, then detect again.`);
+      if (runner.id === "ollama") {
+        const diag = await diagnoseOllamaConnection(resolved);
+        setDiagnosis(diag);
+
+        if (diag.ok) {
+          setReachable(true);
+          setModelInfos(diag.models);
+          const modelNames = diag.models.map((m) => m.name);
+          setModels(modelNames);
+          setEndpoint(diag.activeEndpoint);
+
+          if (!model && diag.recommendedModel) {
+            setModel(diag.recommendedModel);
+          } else if (!model && modelNames.length > 0) {
+            setModel(modelNames[0]);
+          }
+
+          if (diag.models.length === 0) {
+            setProbeError(`${runner.name} answered, but has no models loaded yet. Download or load a model in ${runner.name}, then detect again.`);
+          }
+        } else {
+          setReachable(false);
+          setModelInfos([]);
+          setModels([]);
+          setProbeError(diag.guidance);
         }
       } else {
-        setReachable(false);
-        setModels([]);
-        setProbeError(result.guidance);
-        setVerificationNotes(result.requiresRealMachineVerification);
+        const result = await checkLocalRuntimeConnectivity(runner, resolved);
+        if (result.diagnosis === "reachable") {
+          setReachable(true);
+          setModels(result.models);
+          if (!model && result.models.length > 0) setModel(result.models[0]);
+          if (result.models.length === 0) {
+            setProbeError(`${runner.name} answered, but has no models loaded yet. Download or load a model in ${runner.name}, then detect again.`);
+          }
+        } else {
+          setReachable(false);
+          setModels([]);
+          setProbeError(result.guidance);
+          setVerificationNotes(result.requiresRealMachineVerification);
+        }
       }
     } catch (e) {
       setReachable(false);
@@ -96,20 +135,57 @@ export default function LocalRunnerDetail({
     }
   }
 
+  function handleCopyCommand(cmd: string) {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(cmd);
+      setCopiedCmd(true);
+      setTimeout(() => setCopiedCmd(false), 2500);
+    }
+  }
+
+  function handleCopyDiagnostics() {
+    if (!diagnosis) return;
+    const report = generateDiagnosticReport(diagnosis);
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(report);
+      setCopiedReport(true);
+      setTimeout(() => setCopiedReport(false), 2500);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <button type="button" onClick={onBack} className="text-sm font-medium text-[color:var(--accent-solid)] hover:underline">
         ← Back
       </button>
 
-      <header className="flex items-start gap-3">
-        <span aria-hidden className="text-2xl leading-none">
-          {runner.icon}
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight text-[color:var(--text-primary)]">{runner.name}</h2>
-          <p className="mt-0.5 text-sm text-[color:var(--text-secondary)]">{runner.description}</p>
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span aria-hidden className="text-2xl leading-none">
+            {runner.icon}
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold tracking-tight text-[color:var(--text-primary)] flex items-center gap-2">
+              <span>{runner.name}</span>
+              {reachable === true && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  Online
+                </span>
+              )}
+            </h2>
+            <p className="mt-0.5 text-sm text-[color:var(--text-secondary)]">{runner.description}</p>
+          </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => void handleProbe()}
+          disabled={probing}
+          className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60 flex items-center gap-1.5"
+        >
+          <span className={probing ? "animate-spin" : ""}>🔄</span>
+          <span>{probing ? "Checking…" : "Test connection"}</span>
+        </button>
       </header>
 
       <ul className="flex flex-wrap gap-1.5">
@@ -120,6 +196,31 @@ export default function LocalRunnerDetail({
         <li><Chip tone="neutral">Setup: {runner.difficulty}</Chip></li>
         <li><Chip tone={view.connected ? "good" : "neutral"}>{view.connected ? "Connected" : "Not connected"}</Chip></li>
       </ul>
+
+      {/* Live Diagnostic Status Matrix */}
+      {diagnosis && (
+        <div className="rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
+            Connection Diagnostics
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {diagnosis.checks.map((chk) => (
+              <div
+                key={chk.id}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)]"
+              >
+                <span className="text-sm">
+                  {chk.status === "pass" ? "🟢" : chk.status === "warning" ? "🟡" : "🔴"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-[color:var(--text-primary)] truncate">{chk.label}</p>
+                  <p className="text-[11px] text-[color:var(--text-muted)] truncate">{chk.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <ol className="space-y-4">
         <Step n={1} title={`Install and start ${runner.name}`}>
@@ -135,11 +236,27 @@ export default function LocalRunnerDetail({
         </Step>
 
         <Step n={2} title="Allow this page to reach it">
-          {/* Surfaced up front, not only after a failure: this is the step
-              users skip, and skipping it produces a confusing "can't connect"
-              on an otherwise perfectly working runner. */}
           <div className="space-y-2">
             <p className="text-sm text-[color:var(--text-secondary)]">{runner.corsGuidance}</p>
+
+            {diagnosis?.requiredOriginCommand && (
+              <div className="rounded-lg bg-neutral-900 text-neutral-100 p-3 text-xs font-mono relative group">
+                <div className="flex items-center justify-between mb-1 text-[10px] text-neutral-400">
+                  <span className="uppercase font-bold">{diagnosis.os} Command</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyCommand(diagnosis.requiredOriginCommand)}
+                    className="text-emerald-400 hover:text-emerald-300 font-sans font-bold flex items-center gap-1"
+                  >
+                    {copiedCmd ? "✓ Copied!" : "📋 Copy Command"}
+                  </button>
+                </div>
+                <div className="overflow-x-auto whitespace-pre pr-12 text-emerald-400">
+                  {diagnosis.requiredOriginCommand}
+                </div>
+              </div>
+            )}
+
             <div className="mt-2 rounded-lg bg-[color:var(--surface-sunken)] p-3 border border-[color:var(--border-subtle)]">
               <p className="text-xs text-[color:var(--text-muted)]">
                 <strong className="text-[color:var(--text-primary)]">Why is this required?</strong> Modern browsers block public websites from secretly scanning your local network (Private Network Access). You must explicitly configure {runner.name} to allow Scholar Core to connect. This cannot be automated for your security.
@@ -195,17 +312,74 @@ export default function LocalRunnerDetail({
 
         <Step n={5} title="Choose a model and save">
           {models.length > 0 ? (
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-            >
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            <div className="space-y-3">
+              {modelInfos.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFilter("all")}
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      selectedFilter === "all"
+                        ? "bg-[color:var(--accent-solid)] text-white"
+                        : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]"
+                    }`}
+                  >
+                    All ({models.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFilter("coding")}
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      selectedFilter === "coding"
+                        ? "bg-[color:var(--accent-solid)] text-white"
+                        : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]"
+                    }`}
+                  >
+                    Coding & Research
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFilter("local")}
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      selectedFilter === "local"
+                        ? "bg-[color:var(--accent-solid)] text-white"
+                        : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]"
+                    }`}
+                  >
+                    Local Downloaded
+                  </button>
+                </div>
+              )}
+
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              >
+                {filteredModels.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name} {m.formattedSize ? `(${m.formattedSize})` : ""} {m.isLocal ? "— 💻 Local" : "— ☁️ Cloud"}
+                  </option>
+                ))}
+              </select>
+
+              {diagnosis?.recommendedModel && (
+                <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                  <span className="text-emerald-700 dark:text-emerald-300">
+                    💡 <strong>Recommended:</strong> {diagnosis.recommendedModel}
+                  </span>
+                  {model !== diagnosis.recommendedModel && (
+                    <button
+                      type="button"
+                      onClick={() => setModel(diagnosis.recommendedModel!)}
+                      className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
+                    >
+                      Use this model
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           ) : (
             <>
               {useCustomModelId ? (
@@ -260,6 +434,42 @@ export default function LocalRunnerDetail({
           {saved}
         </p>
       )}
+
+      {/* Developer Diagnostics Panel */}
+      <div className="border-t border-[color:var(--border-subtle)] pt-4">
+        <button
+          type="button"
+          onClick={() => setShowDiagnosticsPanel(!showDiagnosticsPanel)}
+          className="text-xs font-bold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] flex items-center gap-1.5"
+        >
+          <span>{showDiagnosticsPanel ? "▼" : "▶"}</span>
+          <span>Developer Diagnostics & Support Report</span>
+        </button>
+
+        {showDiagnosticsPanel && (
+          <div className="mt-3 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-[color:var(--text-primary)]">Ollama Connection Summary</span>
+              <button
+                type="button"
+                onClick={handleCopyDiagnostics}
+                className="text-xs font-bold text-[color:var(--accent-solid)] hover:underline flex items-center gap-1"
+              >
+                {copiedReport ? "✓ Copied Report!" : "📋 Copy Diagnostics Report"}
+              </button>
+            </div>
+            <div className="text-xs font-mono space-y-1 text-[color:var(--text-secondary)] bg-[color:var(--surface-inset)] p-3 rounded-lg border border-[color:var(--border-subtle)] overflow-x-auto">
+              <div><strong>Scholar Origin:</strong> {diagnosis?.currentOrigin || "https://scholar.gkshah.com.np"}</div>
+              <div><strong>Active Endpoint:</strong> {endpoint}</div>
+              <div><strong>Environment:</strong> {diagnosis?.os || "macos"} · {diagnosis?.browser || "chrome"} {diagnosis?.browserVersion || ""}</div>
+              <div><strong>Ollama Version:</strong> {diagnosis?.version || "Unknown"}</div>
+              <div><strong>Response Latency:</strong> {diagnosis?.latencyMs ? `${diagnosis.latencyMs}ms` : "N/A"}</div>
+              <div><strong>Status:</strong> {diagnosis?.errorKind || (reachable ? "SUCCESS" : "UNREACHABLE")}</div>
+              <div><strong>Models Detected:</strong> {models.length}</div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {view.connected && (
         <div className="flex flex-wrap gap-2 border-t border-[color:var(--border-subtle)] pt-4">

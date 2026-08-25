@@ -2,34 +2,6 @@ import { runnerHealthUrl, type LocalRunnerSpec } from "../config/localRunnerCata
 import { probeRunner } from "./localRunnerProbe";
 import { probeReachability } from "./aiErrors";
 
-/**
- * The Local Runtime Connectivity abstraction — wraps localRunnerProbe.ts
- * with the diagnosis Chrome's Local Network Access (LNA) makes necessary as
- * of Chrome 142 (2025-10-28), and makes proactive at detection time what
- * aiErrors.ts's probeReachability() previously only ran reactively, after a
- * generation call had already failed.
- *
- * Deliberately four diagnosis states, not five. It would be tempting to
- * split the "something is definitely there but blocked" case into
- * "LNA-permission-blocked" vs "CORS-misconfigured" — but the underlying
- * technique (a no-cors fetch resolving where the real fetch didn't) cannot
- * actually tell those apart: both make the real request fail while the
- * no-cors probe succeeds. A diagnosis type claiming that certainty would be
- * dishonest. "reachable-but-blocked" says only what this method can
- * actually prove; the guidance text enumerates both real causes instead of
- * the type pretending to have distinguished them.
- *
- * Requires real-machine verification, and explicitly not guessed at here:
- * whether each of the 9 catalogued local runtimes' default configuration
- * currently sends `Access-Control-Allow-Private-Network: true` (the header
- * LNA requires in addition to classic CORS), and what the actual permission
- * prompt UX looks like against the real production origin
- * (scholar.gkshah.com.np) on a real Chrome 142+ install. Nothing in this
- * sandbox — no real browser, no real local runtime — can confirm either
- * fact, so both are surfaced honestly via requiresRealMachineVerification
- * rather than asserted.
- */
-
 export type ConnectivityDiagnosis = "reachable" | "reachable-but-blocked" | "unreachable" | "unknown";
 
 export interface ConnectivityResult {
@@ -45,29 +17,12 @@ const OPEN_VERIFICATION_ITEMS = [
   "The actual Local Network Access permission-prompt experience for a real visitor on the production origin — this can only be observed in a real Chrome 142+ session, not simulated here.",
 ];
 
-/**
- * `targetAddressSpace` (Chrome 124+) needs no feature-detection branch: it
- * is an ordinary extra RequestInit dictionary member, and the Fetch spec's
- * standard behavior for an unrecognized dictionary member is to ignore it,
- * not throw — so passing it unconditionally is safe on Firefox, Safari, and
- * older Chrome alike. They simply proceed with a plain fetch, exactly as if
- * the field weren't there.
- */
-function probeWithAddressSpaceHint(
-  runner: LocalRunnerSpec,
-  endpointOverride: string | undefined,
-  fetchImpl: typeof fetch,
-  addressSpace: "local" | "private"
-): ReturnType<typeof probeRunner> {
-  return probeRunner(runner, endpointOverride, fetchImpl, { targetAddressSpace: addressSpace });
-}
-
 function isLoopbackEndpoint(url: string): boolean {
   try {
     const host = new URL(url).hostname;
     return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
   } catch {
-    return true; // an unparseable "endpoint" is almost certainly a bare loopback host:port a user typed
+    return true;
   }
 }
 
@@ -95,10 +50,7 @@ function guidanceFor(runner: LocalRunnerSpec, diagnosis: ConnectivityDiagnosis):
 
 /**
  * Diagnoses whether a local runner is reachable, distinguishing "reachable"
- * from "something's there but blocked" from "genuinely unreachable" —
- * proactively, at detection time, rather than only after a later generation
- * call fails the way aiErrors.ts's probeReachability() was previously only
- * ever invoked.
+ * from "something's there but blocked" from "genuinely unreachable".
  */
 export async function checkLocalRuntimeConnectivity(
   runner: LocalRunnerSpec,
@@ -108,7 +60,7 @@ export async function checkLocalRuntimeConnectivity(
   const healthUrl = runnerHealthUrl(runner, endpointOverride);
   const addressSpace = isLoopbackEndpoint(healthUrl) ? "local" : "private";
 
-  const primary = await probeWithAddressSpaceHint(runner, endpointOverride, fetchImpl, addressSpace);
+  const primary = await probeRunner(runner, endpointOverride, fetchImpl, { targetAddressSpace: addressSpace });
   if (primary.reachable) {
     return { diagnosis: "reachable", models: primary.models, guidance: guidanceFor(runner, "reachable"), requiresRealMachineVerification: [] };
   }
