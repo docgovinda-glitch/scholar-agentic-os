@@ -21,7 +21,7 @@ vi.mock("../../../services/userAiSettings", () => ({
 import { authedJsonFetch } from "../../api";
 import { complete } from "../../../platform/gateway/gateway";
 
-describe("HumanizerWorkspace (Simplified 2-Box Interface)", () => {
+describe("HumanizerWorkspace (Simplified 2-Box Interface with Hybrid Detection)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (authedJsonFetch as any).mockResolvedValue({
@@ -36,13 +36,14 @@ describe("HumanizerWorkspace (Simplified 2-Box Interface)", () => {
     });
   });
 
-  it("renders simple 2-box interface without complex side rails", () => {
+  it("renders simple 2-box interface with detection badges", () => {
     render(<HumanizerWorkspace projectId="proj-hum-1" />);
 
     expect(screen.getByText(/Text Humanizer/i)).toBeInTheDocument();
     expect(screen.getByText(/Original \/ AI-Generated Text/i)).toBeInTheDocument();
     expect(screen.getByText(/Humanized Publication Prose/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Humanize Text/i })).toBeInTheDocument();
+    expect(screen.getByText(/AI Likelihood:/i)).toBeInTheDocument();
   });
 
   it("allows selecting tone and clearing/loading sample text", () => {
@@ -62,7 +63,7 @@ describe("HumanizerWorkspace (Simplified 2-Box Interface)", () => {
     expect(textarea.value).toContain("The cow");
   });
 
-  it("executes humanize with connected Gemini key and populates right box", async () => {
+  it("executes humanize with connected Gemini key, renders diff toggle and detection score", async () => {
     render(<HumanizerWorkspace projectId="proj-hum-1" />);
 
     const humanizeBtn = screen.getByRole("button", { name: /Humanize Text/i });
@@ -84,5 +85,10 @@ describe("HumanizerWorkspace (Simplified 2-Box Interface)", () => {
         screen.getByText(/Rewritten organic human prose produced by Google Gemini AI/i)
       ).toBeInTheDocument();
     });
+
+    // Test Diff toggle
+    const diffToggleBtn = screen.getByRole("button", { name: /Show Changes \(Diff\)/i });
+    fireEvent.click(diffToggleBtn);
+    expect(screen.getByRole("button", { name: /Plain View/i })).toBeInTheDocument();
   });
 });
