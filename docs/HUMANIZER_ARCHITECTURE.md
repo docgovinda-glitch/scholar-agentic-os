@@ -98,3 +98,32 @@ Document-scoped terms are never automatically promoted to permanent memory, avoi
 ## 6. Failure & Security Defenses
 - **Data vs. Instruction Separation**: Source manuscript text is strictly enclosed in triple-quote data envelopes (`### SOURCE TEXT TO REWRITE\n"""..."""`). Embedded adversarial instructions are treated as document data and never executed.
 - **Fail-Safe Fallback**: Any provider timeout, HTTP 429, malformed response, or audit rejection cleanly preserves the original source text. Unvalidated candidates are never displayed.
+
+---
+
+## 7. Production Release Checklist
+
+| Area | Invariant / Requirement | Gate Status |
+| :--- | :--- | :--- |
+| **Security** | Prompt injections treated strictly as data; zero instruction override | **PASS** |
+| **Privacy** | Zero raw user manuscript logging in telemetry or local storage | **PASS** |
+| **Protected Citations** | In-text APA, IEEE, numeric citations survive 100% | **PASS** |
+| **Protected Mathematics** | Inline/display LaTeX equations and operators survive 100% | **PASS** |
+| **Quantitative Rigour** | Exact numbers, p-values, sample sizes, and CIs survive 100% | **PASS** |
+| **Claim Safety** | Negation inversions and causality leaps rejected 100% | **PASS** |
+| **Fail-Safe Fallback** | Original text restored on audit rejection or provider failure | **PASS** |
+| **Bounded Retry** | Maximum 2 retries from canonical state; zero infinite loops | **PASS** |
+| **Long Documents** | Multi-chapter chunk isolation & cancellation support | **PASS** |
+| **Design Consistency** | Native Scholar Core UI tokens, typography, dark/light theme | **PASS** |
+| **Accessibility** | Semantic buttons, contrast, and non-color status cues | **PASS** |
+
+---
+
+## 8. Final Product Positioning
+The **Text Humanizer** is positioned exclusively as:
+> **An AI-assisted academic prose refinement engine with deterministic claim, citation, quantitative, and terminology safeguards.**
+
+It is **NOT** positioned as:
+- An "AI detector bypasser" or "undetectable AI";
+- A tool for plagiarized text evasion;
+- A substitute for human peer review.
