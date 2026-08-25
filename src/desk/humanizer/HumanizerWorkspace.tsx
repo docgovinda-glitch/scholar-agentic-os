@@ -1,23 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { authedJsonFetch } from "../api";
-import { complete, completeWithFailover, type CandidateProvider } from "../../platform/gateway/gateway";
+import { completeWithFailover, type CandidateProvider } from "../../platform/gateway/gateway";
 import { loadUserAiSettings, readProviderKey, providersWithStoredKey } from "../../services/userAiSettings";
 import { getCloudProvider } from "../../config/providerCatalog";
 import { defaultPolicy, recordConsent } from "../../platform/warden/warden";
-import {
-  analyzeLocalStylometrics,
-  verifyWithGptZero,
-  verifyWithSapling,
-  type LocalStylometricVerdict,
-  type ExternalDetectorResult,
-} from "../../services/aiDetectorService";
-import {
-  maskCitationsAndFormulas,
-  restoreCitationsAndFormulas,
-  type ProtectedItem,
-} from "../../domain/language/citationGuardian";
-import { analyzeReadability } from "../../domain/language/readability";
+import { runHumanizerPipeline } from "../../domain/humanizer/orchestration/humanizerPipeline";
+import { RewriteMode } from "../../domain/humanizer/rewrite/promptBuilder";
+import { HumanizerAuditReport, CandidateState } from "../../domain/humanizer/types";
+import { buildVoiceProfile } from "../../domain/language/voiceProfile";
+import AuditSummaryCard from "./components/AuditSummaryCard";
+import LockedTermsManager from "./components/LockedTermsManager";
+import PipelineProgressBar, { HumanizerProgressStage } from "./components/PipelineProgressBar";
 
 const SAMPLE_TEXT =
   "The cow is one of the most useful domestic animals in the world (Wilson et al., 2022). It has been closely associated with human civilization for thousands of years. People keep cows for milk, farming, and other useful products. In many countries, especially in South Asia, cows are an important part of rural life.\n\nA cow is a herbivorous animal that mainly eats grass, hay, and other plant-based food. It has four legs, two horns, two ears, and a long tail. Empirical studies show that milk production efficiency improves significantly with targeted forage nutrition with $p < 0.001$ and $R^2 = 0.88$ [4, 7]. Milk is one of the most important products obtained from cows. It is rich in nutrients such as protein, calcium, and vitamins and is used to make products such as curd, butter, cheese, ghee, and yogurt. Cow dung is also useful because it can be used as organic manure for agriculture and, in some places, as a source of biogas.\n\nCows have a special cultural and religious importance in Nepal and India. In Hindu traditions, the cow is regarded as a sacred and respected animal. In Nepal, the cow is also the national animal. The festival of Tihar includes a special day called Gai Tihar, when cows are worshipped and honored.\n\nCows contribute greatly to the livelihoods of farmers. However, they should not be treated merely as sources of economic benefit. They need adequate food, clean water, shelter, medical care, and humane treatment. Ultimately, the cow is a valuable and important animal. It provides food and useful agricultural resources and has deep cultural significance. We should recognize its contribution and treat cows with kindness and care.";
@@ -53,31 +47,29 @@ async function getCandidateProviders(activeProviderId: string, activeModelName?:
   return candidates;
 }
 
-const FIELD_PRESETS = [
+const REWRITE_MODES: { id: RewriteMode; label: string; desc: string }[] = [
   {
-    id: "academic",
-    label: "Academic Journal",
-    desc: "Peer-reviewed publication standard with disciplined epistemic modesty",
-    prompt: "rigorous, authoritative academic journal prose with disciplinary precision and epistemic modesty",
+    id: "conservative",
+    label: "Conservative",
+    desc: "Light editing for clarity and grammar while preserving near 1:1 sentence structure.",
   },
   {
-    id: "natural",
-    label: "Natural Human Flow",
-    desc: "Organic conversational yet professional human flow with zero AI detection footprint",
-    prompt: "fluid, authentic human flow with organic sentence length variation and zero synthetic patterns",
+    id: "balanced",
+    label: "Balanced (Default)",
+    desc: "Natural academic rewriting while preserving meaning, citations, and scholarly register.",
   },
   {
-    id: "grant",
-    label: "Grant & Proposal",
-    desc: "Assertive, high-impact persuasive rhetoric for research funding bodies (NIH/NSF)",
-    prompt: "assertive, persuasive, high-impact prose for research proposals and grant applications",
+    id: "deep_restructure",
+    label: "Deep Restructure",
+    desc: "Stronger sentence and paragraph restructuring while preserving 100% of facts and claims.",
   },
-  {
-    id: "simplifier",
-    label: "Plain English",
-    desc: "Converts overly dense academic jargon into clear, accessible prose",
-    prompt: "clear, accessible plain English eliminating convoluted padding and obscure jargon",
-  },
+];
+
+const GENRES = [
+  "Academic Journal",
+  "Academic Assignment",
+  "General Professional",
+  "General Writing",
 ];
 
 /** Word-level Diff Renderer */
@@ -176,40 +168,33 @@ export default function HumanizerWorkspace({
 }) {
   const [sourceText, setSourceText] = useState(SAMPLE_TEXT);
   const [humanizedText, setHumanizedText] = useState("");
-  const [selectedPreset, setSelectedPreset] = useState("academic");
+  const [selectedMode, setSelectedMode] = useState<RewriteMode>("balanced");
+  const [selectedGenre, setSelectedGenre] = useState("Academic Journal");
+  const [lockedTerms, setLockedTerms] = useState<string[]>([]);
+  const [useAuthorVoice, setUseAuthorVoice] = useState(false);
+
   const [showDiff, setShowDiff] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [progressStage, setProgressStage] = useState<HumanizerProgressStage>("parsing");
   const [copied, setCopied] = useState(false);
   const [sentToManuscript, setSentToManuscript] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [activeProvider, setActiveProvider] = useState<string>("gemini");
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   const [modelName, setModelName] = useState<string>("Gemini 2.0 Flash");
-  const [protectedCount, setProtectedCount] = useState<number>(0);
 
-  // External Verification State
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
-  const [externalApiKey, setExternalApiKey] = useState("");
-  const [externalProvider, setExternalProvider] = useState<"gptzero" | "sapling">("gptzero");
-  const [verifying, setVerifying] = useState(false);
-  const [verifiedResult, setVerifiedResult] = useState<ExternalDetectorResult | null>(null);
+  // Multi-Auditor Pipeline Results
+  const [auditReport, setAuditReport] = useState<HumanizerAuditReport | undefined>(undefined);
+  const [candidateState, setCandidateState] = useState<CandidateState | undefined>(undefined);
+  const [fallbackUsed, setFallbackUsed] = useState(false);
+  const [fallbackReason, setFallbackReason] = useState<string | undefined>(undefined);
 
-  // Layer 1: Real-time Stylometric Analysis
-  const inputVerdict: LocalStylometricVerdict = useMemo(() => {
-    return analyzeLocalStylometrics(sourceText);
-  }, [sourceText]);
+  // Responsive mobile view tab
+  const [mobileTab, setMobileTab] = useState<"original" | "humanized">("original");
 
-  const outputVerdict: LocalStylometricVerdict = useMemo(() => {
-    return analyzeLocalStylometrics(humanizedText);
-  }, [humanizedText]);
-
-  // Readability Analysis
-  const readabilityReport = useMemo(() => {
-    return analyzeReadability(humanizedText || sourceText);
-  }, [humanizedText, sourceText]);
-
-  // Check active AI provider and key on mount
+  // Check active AI provider on mount
   useEffect(() => {
     async function checkAiConfig() {
       try {
@@ -221,7 +206,8 @@ export default function HumanizerWorkspace({
         setHasApiKey(Boolean(key && key.trim()));
 
         const providerSpec = getCloudProvider(providerId);
-        let chosenModel = settings.preferences?.[`${providerId}_model`] || providerSpec?.defaultModel || "gemini-3.6-flash";
+        let chosenModel =
+          settings.preferences?.[`${providerId}_model`] || providerSpec?.defaultModel || "gemini-3.6-flash";
         if (providerId === "gemini" && (chosenModel === "gemini-2.5-flash" || !chosenModel)) {
           chosenModel = "gemini-3.6-flash";
         }
@@ -252,7 +238,7 @@ export default function HumanizerWorkspace({
     };
   }, [projectId]);
 
-  // Multi-Pass Stylometric Humanization Engine
+  // Production-Grade Multi-Auditor Pipeline Handler
   const handleHumanize = useCallback(async () => {
     if (!sourceText.trim()) {
       setErrorMessage("Please enter or paste text to humanize.");
@@ -261,133 +247,150 @@ export default function HumanizerWorkspace({
 
     setLoading(true);
     setErrorMessage(null);
-    setVerifiedResult(null);
-
-    const presetSpec = FIELD_PRESETS.find((t) => t.id === selectedPreset) || FIELD_PRESETS[0];
-
-    // Step 1: Guard & Mask Citations / Formulas / Math
-    const { maskedText, items, citationCount, formulaCount } = maskCitationsAndFormulas(sourceText);
-    const totalProtected = citationCount + formulaCount;
-    setProtectedCount(totalProtected);
-
-    let finalHumanized = "";
+    setAuditReport(undefined);
+    setCandidateState(undefined);
+    setFallbackUsed(false);
+    setFallbackReason(undefined);
+    setProgressStage("parsing");
 
     try {
-      const candidates = await getCandidateProviders(activeProvider, modelName);
+      // LLM Adapter connecting to Gateway & Server Fallback
+      const completer = async (params: {
+        systemPrompt: string;
+        userPrompt: string;
+        temperature?: number;
+        topP?: number;
+      }) => {
+        setProgressStage("rewriting");
+        const candidates = await getCandidateProviders(activeProvider, modelName);
 
-      if (candidates.length > 0) {
-        let userPolicy = defaultPolicy();
-        for (const c of candidates) {
-          userPolicy = recordConsent(userPolicy, c.provider);
-        }
+        if (candidates.length > 0) {
+          let userPolicy = defaultPolicy();
+          for (const c of candidates) {
+            userPolicy = recordConsent(userPolicy, c.provider);
+          }
 
-        // ─── PASS 1: Rhythm & Cadence Breakdown (Break ~18-word AI symmetry) ───
-        const pass1SystemPrompt = `You are a stylometric cadence restructuring agent.
-Your objective is to re-architect the input text to eliminate robotic, uniform sentence rhythm.
-Rules:
-1. FORCE ASYMMETRIC BURSTINESS: Mix punchy short sentences (5-9 words) with complex, multi-clause analytical sentences (25-35 words).
-2. NEVER alter or remove tokens matching ⟦CITATION_X⟧ or ⟦FORMULA_X⟧. Leave them verbatim.
-3. Preserve all factual claims, names, dates, and paragraph breaks.
-Output ONLY the restructured text.`;
-
-        let pass1Text = maskedText;
-        try {
-          const pass1Failover = await completeWithFailover(
+          const failover = await completeWithFailover(
             {
-              userPrompt: maskedText,
-              systemPrompt: pass1SystemPrompt,
+              userPrompt: params.userPrompt,
+              systemPrompt: params.systemPrompt,
               taskClass: "refinement",
-              segments: [{ label: "draftText", text: maskedText }],
+              segments: [{ label: "draftText", text: params.userPrompt }],
             },
             { candidates, maxRetriesPerCandidate: 1 },
             userPolicy
           );
-          if (pass1Failover?.result?.text) {
-            pass1Text = pass1Failover.result.text.trim();
+
+          if (failover?.result?.text) {
+            return failover.result.text;
           }
-        } catch (pass1Err) {
-          console.warn("Pass 1 failover notice:", pass1Err);
         }
 
-        // ─── PASS 2: Cliché Purge & Academic Epistemic Hedging ───
-        const pass2SystemPrompt = `You are an elite academic prose humanizer and disciplinary editor.
-Refine the provided text into authentic, publication-grade academic prose with zero artificial markers.
-Rules:
-1. VOCABULARY PURGE: Eradicate robotic AI clichés and stock transition adverbs (e.g., "Moreover", "Furthermore", "Delve", "Testament to", "Pivotal role", "Multifaceted landscape", "Rich tapestry", "In conclusion, it is evident", "Crucial to remember", "Spearheading", "A plethora of", "Underscores"). Use authentic disciplinary transitions.
-2. TONE CALIBRATION: ${presetSpec.prompt}.
-3. ZERO HALLUCINATION & CITATION INTEGRITY: Leave every token ⟦CITATION_X⟧ and ⟦FORMULA_X⟧ completely intact and unchanged.
-4. Structure: Maintain the original headings and paragraph divisions.
-Output ONLY the polished humanized prose.`;
-
-        const pass2Failover = await completeWithFailover(
-          {
-            userPrompt: pass1Text,
-            systemPrompt: pass2SystemPrompt,
-            taskClass: "refinement",
-            segments: [{ label: "draftText", text: pass1Text }],
-          },
-          { candidates, maxRetriesPerCandidate: 1 },
-          userPolicy
-        );
-
-        if (pass2Failover?.result?.text) {
-          finalHumanized = pass2Failover.result.text.trim();
-        }
-      }
-
-      // Step 2: Fallback to server endpoint if no client key
-      if (!finalHumanized) {
+        // Server fallback
         const res = await authedJsonFetch(`/api/projects/${projectId}/humanizer/humanize`, "POST", {
-          text: maskedText,
-          register: presetSpec.label,
+          systemPrompt: params.systemPrompt,
+          userPrompt: params.userPrompt,
+          register: selectedGenre,
         });
 
         if (res.ok) {
           const body = await res.json();
-          if (body.humanizedText) {
-            finalHumanized = body.humanizedText.trim();
+          if (body.humanizedText || body.text) {
+            return body.humanizedText || body.text;
           }
+        }
+
+        throw new Error("Unable to reach AI model. Please verify your connection or API key in AI Access.");
+      };
+
+      // Construct optional voice profile
+      let styleProfile;
+      if (useAuthorVoice && sourceText.length > 200) {
+        const vp = buildVoiceProfile([sourceText]);
+        if (vp) {
+          styleProfile = {
+            meanSentenceLength: Math.round(vp.meanSentenceLength),
+            sentenceLengthVariance: Math.round(vp.sentenceLengthStdDev ** 2),
+            firstPersonRate: vp.firstPersonRate / 1000,
+            passiveVoiceRatio: vp.passiveVoiceRatio,
+            formalityLevel: vp.firstPersonRate > 10 ? "moderate" : "formal" as const,
+          };
         }
       }
 
-      if (finalHumanized) {
-        // Step 3: Restore all Citations and Formulas with 100% Fidelity
-        const restoredProse = restoreCitationsAndFormulas(finalHumanized, items);
-        setHumanizedText(restoredProse);
+      setProgressStage("protecting");
 
+      // Execute Production Pipeline
+      const result = await runHumanizerPipeline(sourceText, {
+        mode: selectedMode,
+        genre: selectedGenre,
+        completer,
+        maxRetries: 2,
+        lockedTerms,
+        styleProfile,
+      });
+
+      setProgressStage("finalizing");
+      setHumanizedText(result.finalText);
+      setAuditReport(result.auditReport);
+      setCandidateState(result.candidateState);
+      setFallbackUsed(result.fallbackUsed);
+      setFallbackReason(result.fallbackReason);
+
+      if (result.success) {
+        setMobileTab("humanized");
         // Persist to server store
         authedJsonFetch(`/api/projects/${projectId}/humanizer/humanize`, "POST", {
           text: sourceText,
-          llmResult: restoredProse,
-          register: presetSpec.label,
+          llmResult: result.finalText,
+          register: selectedGenre,
         }).catch(() => {});
-      } else {
-        throw new Error("Unable to humanize text. Please verify your AI API key in AI Access.");
       }
     } catch (err: any) {
       console.error("Humanizer failed:", err);
       let msg = err.message || "Failed to humanize text. Please check your AI connection.";
       if (msg.includes("denied access") || msg.includes("403")) {
-        msg = "Google Gemini project was denied access by Google. Please create a new free API key at aistudio.google.com (in a new project) or switch to Groq in AI Access.";
+        msg = "Google Gemini project was denied access by Google. Please create a new free API key at aistudio.google.com or switch to Groq in AI Access.";
       } else if (msg.includes("401") || msg.includes("invalid_api_key")) {
         msg = "Invalid API key. Please verify your key in AI Access.";
       } else if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
-        msg = "Rate limit or quota reached. Please wait a moment or switch provider in AI Access.";
+        msg = "Rate limit reached. Please wait a moment or switch provider in AI Access.";
       }
       setErrorMessage(msg);
+      setFallbackUsed(true);
+      setFallbackReason(msg);
     } finally {
       setLoading(false);
     }
-  }, [sourceText, selectedPreset, activeProvider, modelName, projectId]);
+  }, [sourceText, selectedMode, selectedGenre, lockedTerms, useAuthorVoice, activeProvider, modelName, projectId]);
+
+  // Keep Humanized text as source
+  function handleAcceptRewrite() {
+    if (!humanizedText) return;
+    setSourceText(humanizedText);
+    setHumanizedText("");
+    setAuditReport(undefined);
+    setCandidateState(undefined);
+  }
+
+  // Reject Humanized text and keep original
+  function handleRejectRewrite() {
+    setHumanizedText("");
+    setAuditReport(undefined);
+    setCandidateState(undefined);
+    setFallbackUsed(false);
+    setFallbackReason(undefined);
+  }
 
   // Send Humanized text to Active Manuscript
   async function handleSendToManuscript() {
-    if (!humanizedText) return;
+    const textToSend = humanizedText || sourceText;
+    if (!textToSend) return;
     try {
-      const res = await authedJsonFetch(`/api/projects/${projectId}/activity`, "POST", {
+      await authedJsonFetch(`/api/projects/${projectId}/activity`, "POST", {
         type: "humanizer_export",
         description: "Applied publication-grade stylometrics to manuscript draft.",
-        content: humanizedText,
+        content: textToSend,
       });
       setSentToManuscript(true);
       setTimeout(() => setSentToManuscript(false), 3000);
@@ -399,15 +402,16 @@ Output ONLY the polished humanized prose.`;
 
   // Direct File Download (.md, .docx, .tex)
   function handleDownload(format: "md" | "docx" | "tex") {
-    if (!humanizedText) return;
+    const textToDownload = humanizedText || sourceText;
+    if (!textToDownload) return;
     setShowExportMenu(false);
 
     let mimeType = "text/markdown";
-    let fileContent = humanizedText;
+    let fileContent = textToDownload;
 
     if (format === "tex") {
       mimeType = "application/x-tex";
-      fileContent = `% Scholar Core Humanized Prose\n\\documentclass{article}\n\\begin{document}\n\n${humanizedText}\n\n\\end{document}`;
+      fileContent = `% Scholar Core Humanized Prose\n\\documentclass{article}\n\\begin{document}\n\n${textToDownload}\n\n\\end{document}`;
     } else if (format === "docx") {
       mimeType = "text/plain";
     }
@@ -416,209 +420,228 @@ Output ONLY the polished humanized prose.`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `humanized_manuscript_${selectedPreset}.${format}`;
+    a.download = `humanized_manuscript_${selectedMode}.${format}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
 
-  // Run External Verification (GPTZero / Sapling)
-  async function handleExternalVerify() {
-    if (!humanizedText.trim()) return;
-    if (!externalApiKey.trim()) {
-      setErrorMessage("Please enter an API key for external verification.");
-      return;
-    }
-
-    setVerifying(true);
-    setErrorMessage(null);
-
-    try {
-      let res: ExternalDetectorResult;
-      if (externalProvider === "gptzero") {
-        res = await verifyWithGptZero(humanizedText, externalApiKey);
-      } else {
-        res = await verifyWithSapling(humanizedText, externalApiKey);
-      }
-      setVerifiedResult(res);
-      setShowVerifyModal(false);
-    } catch (e: any) {
-      setErrorMessage(e.message || "External verification failed. Please check your API key.");
-    } finally {
-      setVerifying(false);
-    }
-  }
-
-  function copyToClipboard() {
-    if (!humanizedText) return;
-    navigator.clipboard.writeText(humanizedText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  const gradeLevel = Math.max(8, Math.round(readabilityReport.metrics.fleschKincaidGradeLevel || 13));
-
   return (
-    <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] font-sans flex flex-col selection:bg-[color:var(--accent-subtle)]">
-      {/* Top Navigation Bar */}
-      <header className="h-14 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]/90 backdrop-blur-md px-4 md:px-8 flex items-center justify-between sticky top-0 z-40">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans">
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
+          <ScholarCoreLogo className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
+          <div>
+            <h1 className="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 dark:from-indigo-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
+              Text Humanizer
+            </h1>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
+              Controlled Academic Prose Rewriting Engine • Deterministic Integrity & Modality Protection
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Provider / AI Access link */}
+          <button
+            type="button"
+            onClick={onOpenAiAccess}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+            title="Configure active AI provider"
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${hasApiKey ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
+            />
+            <span className="capitalize">{activeProvider}</span>
+            <span className="text-[10px] text-slate-400">({modelName})</span>
+          </button>
+
+          {/* Close / Return */}
           {onClose && (
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
-              title="Back to Projects"
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Close workspace"
             >
-              ← Back
-            </button>
-          )}
-          <div className="w-8 h-8 rounded-lg bg-[color:var(--accent)] text-white flex items-center justify-center shadow-xs">
-            <ScholarCoreLogo size="sm" />
-          </div>
-          <div>
-            <h1 className="font-bold text-sm md:text-base text-[color:var(--text-primary)] flex items-center gap-2">
-              <span>Text Humanizer</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">
-                2-Pass Stylometric Engine
-              </span>
-            </h1>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Active AI Connection Badge */}
-          {hasApiKey ? (
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{activeProvider === "gemini" ? "Google Gemini Connected" : `${activeProvider} Connected`}</span>
-            </div>
-          ) : (
-            <button
-              onClick={onOpenAiAccess}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[11px] font-medium hover:bg-amber-100 cursor-pointer"
-            >
-              <span>⚙️ Connect Gemini Key</span>
-            </button>
-          )}
-
-          {onOpenAiAccess && (
-            <button
-              onClick={onOpenAiAccess}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] transition-all cursor-pointer"
-            >
-              AI Access
-            </button>
-          )}
-          {onOpenVault && (
-            <button
-              onClick={onOpenVault}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] transition-all cursor-pointer"
-            >
-              Vault
+              ✕
             </button>
           )}
         </div>
       </header>
 
-      {/* Error Alert */}
-      {errorMessage && (
-        <div className="bg-rose-500/10 border-b border-rose-500/20 px-6 py-2.5 flex items-center justify-between text-xs text-rose-600 dark:text-rose-400">
-          <div className="flex items-center gap-2">
-            <span>⚠️</span>
-            <span>{errorMessage}</span>
+      {/* Main Workspace Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-5">
+        {/* Controls Bar: Mode, Genre, Author Voice, Locked Terms */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Rewrite Mode */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="mode-select" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Rewrite Mode
+              </label>
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                {REWRITE_MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setSelectedMode(m.id)}
+                    className={`px-2 py-1.5 text-xs font-semibold rounded-lg transition-all text-center truncate ${
+                      selectedMode === m.id
+                        ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                    }`}
+                    title={m.desc}
+                  >
+                    {m.label.split(" ")[0]}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                {REWRITE_MODES.find((m) => m.id === selectedMode)?.desc}
+              </p>
+            </div>
+
+            {/* Disciplinary Genre */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="genre-select" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Disciplinary Genre
+              </label>
+              <select
+                id="genre-select"
+                value={selectedGenre}
+                onChange={(e) => setSelectedGenre(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-indigo-500"
+              >
+                {GENRES.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Calibrates vocabulary register and epistemic style.
+              </p>
+            </div>
+
+            {/* Author Voice Option */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Author Voice Profiling
+              </label>
+              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useAuthorVoice}
+                  onChange={(e) => setUseAuthorVoice(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                />
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Adapt to Author Voice
+                </span>
+              </label>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Matches sentence rhythm & first-person stance from input.
+              </p>
+            </div>
           </div>
-          <button
-            onClick={() => setErrorMessage(null)}
-            className="text-rose-500 hover:text-rose-700 font-bold px-2 py-0.5 cursor-pointer"
-          >
-            ✕
-          </button>
+
+          {/* Locked Terminology Memory */}
+          <LockedTermsManager
+            lockedTerms={lockedTerms}
+            onAddTerm={(term) => setLockedTerms([...lockedTerms, term])}
+            onRemoveTerm={(term) => setLockedTerms(lockedTerms.filter((t) => t !== term))}
+          />
         </div>
-      )}
 
-      {/* Main Two-Box Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 flex flex-col gap-6">
-        {/* Preset Pills & Primary Action Bar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[color:var(--surface-raised)] p-4 rounded-2xl border border-[color:var(--border-subtle)] shadow-xs">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider mr-1">
-              Field Preset:
-            </span>
-            {FIELD_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => setSelectedPreset(preset.id)}
-                title={preset.desc}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                  selectedPreset === preset.id
-                    ? "bg-[color:var(--accent-solid)] text-white shadow-xs"
-                    : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
+        {/* Real-time Progress Stepper */}
+        {loading && <PipelineProgressBar stage={progressStage} />}
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            {humanizedText && (
-              <button
-                type="button"
-                onClick={() => setShowVerifyModal(true)}
-                className="px-3.5 py-2 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-              >
-                <span>🛡️ External Verify</span>
-              </button>
-            )}
+        {/* Quality Audit Dashboard (When candidate exists or was rejected) */}
+        {!loading && (auditReport || fallbackUsed) && (
+          <AuditSummaryCard
+            auditReport={auditReport}
+            candidateState={candidateState}
+            fallbackUsed={fallbackUsed}
+            fallbackReason={fallbackReason}
+          />
+        )}
 
+        {/* Error Notification Alert */}
+        {errorMessage && (
+          <div
+            role="alert"
+            className="p-3.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-900 dark:text-rose-200 text-xs flex items-center justify-between"
+          >
+            <span>{errorMessage}</span>
             <button
               type="button"
-              onClick={handleHumanize}
-              disabled={loading || !sourceText.trim()}
-              className="flex-1 sm:flex-none px-6 py-2.5 bg-[color:var(--accent-solid)] text-white text-sm font-bold rounded-xl hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              onClick={() => setErrorMessage(null)}
+              className="text-rose-700 dark:text-rose-300 font-bold ml-2"
             >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>2-Pass Stylometrics Running…</span>
-                </>
-              ) : (
-                <>
-                  <span>✨ Humanize Text</span>
-                </>
-              )}
+              ✕
             </button>
           </div>
+        )}
+
+        {/* Mobile Tab Switcher */}
+        <div className="flex sm:hidden border border-slate-200 dark:border-slate-800 rounded-xl p-1 bg-slate-100 dark:bg-slate-800">
+          <button
+            type="button"
+            onClick={() => setMobileTab("original")}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              mobileTab === "original"
+                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm"
+                : "text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            Original Text
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("humanized")}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              mobileTab === "humanized"
+                ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm"
+                : "text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            Humanized Result
+          </button>
         </div>
 
-        {/* Side-by-Side 2-Box Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 items-stretch min-h-[520px]">
-          {/* Box 1: Input Box */}
-          <div className="flex flex-col rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]/40 flex items-center justify-between">
+        {/* Dual Panel Editor / Review View */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 flex-1">
+          {/* Panel 1: Original Source */}
+          <div
+            className={`flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm ${
+              mobileTab === "humanized" ? "hidden sm:flex" : "flex"
+            }`}
+          >
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-xs text-[color:var(--text-primary)]">
-                  Original / AI-Generated Text
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Original / Input Text
                 </span>
-                <span className="text-[11px] text-[color:var(--text-muted)]">
-                  ({inputVerdict.wordCount} words)
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">
+                  {sourceText.split(/\s+/).filter(Boolean).length} words
                 </span>
               </div>
-              <div className="flex items-center gap-3">
+
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setSourceText(SAMPLE_TEXT)}
-                  className="text-xs text-[color:var(--accent)] hover:underline cursor-pointer"
+                  className="text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400"
                 >
                   Load Sample
                 </button>
                 <button
                   type="button"
                   onClick={() => setSourceText("")}
-                  className="text-xs text-[color:var(--text-muted)] hover:text-rose-500 cursor-pointer"
+                  className="text-xs font-medium text-rose-600 dark:text-rose-400 hover:underline"
                 >
                   Clear
                 </button>
@@ -628,271 +651,171 @@ Output ONLY the polished humanized prose.`;
             <textarea
               value={sourceText}
               onChange={(e) => setSourceText(e.target.value)}
-              placeholder="Paste your AI-generated text or draft essay here..."
-              className="flex-1 w-full p-4 md:p-5 text-sm font-sans bg-[color:var(--surface-input)] text-[color:var(--text-primary)] leading-relaxed resize-none focus:outline-hidden min-h-[380px]"
+              placeholder="Paste or type academic text with citations (e.g. Wilson et al., 2022) or formulas ($p < 0.001$)..."
+              className="flex-1 min-h-[300px] w-full resize-y bg-transparent border-0 text-sm leading-relaxed focus:ring-0 focus:outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 font-serif"
             />
-
-            {/* Input Detection Footer Bar */}
-            <div className="px-4 py-2.5 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]/60 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 ${
-                    inputVerdict.aiProbability > 50
-                      ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                      : inputVerdict.aiProbability > 25
-                      ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                      : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                  }`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      inputVerdict.aiProbability > 50 ? "bg-rose-500" : inputVerdict.aiProbability > 25 ? "bg-amber-500" : "bg-emerald-500"
-                    }`}
-                  />
-                  <span>AI Likelihood: {inputVerdict.aiProbability}%</span>
-                </span>
-                <span className="text-[11px] text-[color:var(--text-muted)]">
-                  {inputVerdict.detectedClichés.length} clichés detected
-                </span>
-              </div>
-              <span className="text-[10px] text-[color:var(--text-muted)] hidden sm:inline">
-                Burstiness: {inputVerdict.burstinessScore}/100
-              </span>
-            </div>
           </div>
 
-          {/* Box 2: Humanized Output Box */}
-          <div className="flex flex-col rounded-2xl border border-[color:var(--accent-border)] bg-[color:var(--surface-raised)] shadow-xs overflow-hidden relative">
-            <div className="px-4 py-3 border-b border-[color:var(--border-subtle)] bg-[color:var(--accent-subtle)]/30 flex items-center justify-between">
+          {/* Panel 2: Humanized Candidate Result */}
+          <div
+            className={`flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm ${
+              mobileTab === "original" ? "hidden sm:flex" : "flex"
+            }`}
+          >
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-xs text-[color:var(--accent)] flex items-center gap-1.5">
-                  <span>✨ Humanized Publication Prose</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Humanized Publication Prose
                 </span>
-                {outputVerdict.wordCount > 0 && (
-                  <span className="text-[11px] text-[color:var(--text-muted)]">
-                    ({outputVerdict.wordCount} words)
+                {humanizedText && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-medium">
+                    {humanizedText.split(/\s+/).filter(Boolean).length} words
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                {humanizedText && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setShowDiff(!showDiff)}
-                      className={`text-xs px-2.5 py-1 rounded-lg border transition-all cursor-pointer font-medium ${
-                        showDiff
-                          ? "bg-[color:var(--accent-solid)] text-white border-[color:var(--accent-solid)]"
-                          : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border-[color:var(--border-control)] hover:text-[color:var(--text-primary)]"
-                      }`}
-                    >
-                      {showDiff ? "Plain View" : "Show Changes (Diff)"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleSendToManuscript}
-                      className="text-xs px-2.5 py-1 rounded-lg bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-control)] hover:text-[color:var(--text-primary)] transition-all cursor-pointer font-medium hidden sm:inline-block"
-                      title="Insert into active manuscript"
-                    >
-                      {sentToManuscript ? "✓ Sent to Manuscript" : "📥 Send to Manuscript"}
-                    </button>
-
-                    {/* Export Dropdown */}
-                    <div className="relative inline-block text-left">
-                      <button
-                        type="button"
-                        onClick={() => setShowExportMenu(!showExportMenu)}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-control)] hover:text-[color:var(--text-primary)] transition-all cursor-pointer font-medium flex items-center gap-1"
-                      >
-                        <span>Export ▾</span>
-                      </button>
-
-                      {showExportMenu && (
-                        <div className="absolute right-0 mt-1 w-36 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl shadow-xl z-50 py-1 text-xs">
-                          <button
-                            onClick={() => handleDownload("docx")}
-                            className="w-full text-left px-3 py-1.5 hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
-                          >
-                            Word (.docx)
-                          </button>
-                          <button
-                            onClick={() => handleDownload("md")}
-                            className="w-full text-left px-3 py-1.5 hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
-                          >
-                            Markdown (.md)
-                          </button>
-                          <button
-                            onClick={() => handleDownload("tex")}
-                            className="w-full text-left px-3 py-1.5 hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
-                          >
-                            LaTeX (.tex)
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                <button
-                  type="button"
-                  onClick={copyToClipboard}
-                  disabled={!humanizedText}
-                  className="text-xs font-bold text-[color:var(--accent)] hover:underline cursor-pointer disabled:opacity-40 flex items-center gap-1 pl-1"
-                >
-                  {copied ? "✓ Copied!" : "Copy Text"}
-                </button>
-              </div>
+              {humanizedText && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDiff(!showDiff)}
+                    className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
+                      showDiff
+                        ? "bg-indigo-600 text-white"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+                    }`}
+                  >
+                    {showDiff ? "Plain View" : "Show Changes (Diff)"}
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="flex-1 w-full p-4 md:p-5 text-sm font-sans bg-[color:var(--surface-sunken)] text-[color:var(--text-primary)] leading-relaxed overflow-y-auto min-h-[380px]">
+            <div className="flex-1 min-h-[300px] overflow-y-auto text-sm leading-relaxed font-serif text-slate-800 dark:text-slate-200">
               {loading ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3 opacity-80">
-                  <div className="w-8 h-8 border-3 border-[color:var(--accent-subtle)] border-t-[color:var(--accent)] rounded-full animate-spin" />
-                  <p className="text-xs text-[color:var(--text-secondary)] font-medium">
-                    Applying 2-pass stylometrics (cadence rebalancing + cliché purge) with Google Gemini…
-                  </p>
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400 py-16">
+                  <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs font-medium">Rewriting prose & auditing invariants...</p>
                 </div>
               ) : humanizedText ? (
                 showDiff ? (
                   <DiffText original={sourceText} modified={humanizedText} />
                 ) : (
-                  <div className="whitespace-pre-wrap">{humanizedText}</div>
+                  <div className="whitespace-pre-wrap leading-relaxed">{humanizedText}</div>
                 )
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-2 text-[color:var(--text-muted)]">
-                  <span className="text-3xl">✨</span>
-                  <p className="text-xs font-medium">
-                    Click <strong>"Humanize Text"</strong> above to transform your draft into organic, publication-grade prose.
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs py-16 text-center">
+                  <p>Click "Humanize Text" below to execute the multi-auditor pipeline.</p>
+                  <p className="text-[11px] text-slate-400/80 mt-1">
+                    Protected elements, mathematical symbols, citations, and epistemic claims will be validated.
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Output Stylometric & AI Score Bar */}
-            {humanizedText && (
-              <div className="px-4 py-2.5 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]/70 flex items-center justify-between text-xs flex-wrap gap-2">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>AI Pattern: {outputVerdict.aiProbability}% (Human Grade)</span>
-                  </span>
-
-                  <span className="text-[11px] text-[color:var(--text-secondary)] font-medium hidden sm:inline">
-                    Burstiness: <strong>High ({outputVerdict.burstinessScore}/100)</strong>
-                  </span>
-
-                  <span className="text-[11px] text-[color:var(--text-secondary)] font-medium hidden sm:inline">
-                    Readability: <strong>Grade {gradeLevel}</strong>
-                  </span>
-
-                  {protectedCount > 0 && (
-                    <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
-                      🛡️ {protectedCount} Citations & Formulas Preserved
-                    </span>
-                  )}
+            {/* Candidate Review Controls (Keep Humanized / Keep Original) */}
+            {humanizedText && !loading && (
+              <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAcceptRewrite}
+                    className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors shadow-sm"
+                  >
+                    ✓ Keep Humanized
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRejectRewrite}
+                    className="px-3 py-1.5 text-xs font-semibold bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-lg transition-colors"
+                  >
+                    Keep Original
+                  </button>
                 </div>
 
-                {verifiedResult && (
-                  <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                    <span>🛡️ GPTZero Verified: {verifiedResult.humanProbability}% Human</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(humanizedText);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 bg-slate-100 dark:bg-slate-800 rounded-lg"
+                  >
+                    {copied ? "✓ Copied" : "Copy"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSendToManuscript}
+                    className="px-2.5 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 rounded-lg"
+                  >
+                    {sentToManuscript ? "✓ Sent to Manuscript" : "Send to Manuscript"}
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
-      </main>
 
-      {/* External Verification Modal */}
-      {showVerifyModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🛡️</span>
-                <h3 className="font-bold text-sm text-[color:var(--text-primary)]">
-                  External AI Detection Verification
-                </h3>
-              </div>
+        {/* Primary Action Button Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            <span>Deterministic Protected Elements: Citations, LaTeX formulas, and Locked Terms are 100% invariant.</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Export Menu */}
+            <div className="relative">
               <button
-                onClick={() => setShowVerifyModal(false)}
-                className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] font-bold text-base cursor-pointer"
+                type="button"
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={!humanizedText && !sourceText}
+                className="px-4 py-2.5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700 disabled:opacity-50"
               >
-                ✕
+                Export Draft ▾
               </button>
-            </div>
 
-            <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
-              Verify your humanized prose against industry-standard detectors (GPTZero or Sapling) to obtain an official verification verdict.
-            </p>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-bold text-[color:var(--text-secondary)] block mb-1">
-                  Detector Service:
-                </label>
-                <div className="grid grid-cols-2 gap-2">
+              {showExportMenu && (
+                <div className="absolute right-0 bottom-full mb-2 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-50 text-xs">
                   <button
                     type="button"
-                    onClick={() => setExternalProvider("gptzero")}
-                    className={`p-2.5 rounded-xl text-xs font-semibold border text-center transition-all cursor-pointer ${
-                      externalProvider === "gptzero"
-                        ? "border-[color:var(--accent-solid)] bg-[color:var(--accent-subtle)] text-[color:var(--accent)]"
-                        : "border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]"
-                    }`}
+                    onClick={() => handleDownload("md")}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-100 dark:hover:bg-slate-700"
                   >
-                    GPTZero API
+                    Markdown (.md)
                   </button>
                   <button
                     type="button"
-                    onClick={() => setExternalProvider("sapling")}
-                    className={`p-2.5 rounded-xl text-xs font-semibold border text-center transition-all cursor-pointer ${
-                      externalProvider === "sapling"
-                        ? "border-[color:var(--accent-solid)] bg-[color:var(--accent-subtle)] text-[color:var(--accent)]"
-                        : "border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]"
-                    }`}
+                    onClick={() => handleDownload("tex")}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-100 dark:hover:bg-slate-700"
                   >
-                    Sapling AI Detector
+                    LaTeX (.tex)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownload("docx")}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-100 dark:hover:bg-slate-700"
+                  >
+                    Plain Text (.txt)
                   </button>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-[color:var(--text-secondary)] block mb-1">
-                  {externalProvider === "gptzero" ? "GPTZero API Key:" : "Sapling API Key:"}
-                </label>
-                <input
-                  type="password"
-                  value={externalApiKey}
-                  onChange={(e) => setExternalApiKey(e.target.value)}
-                  placeholder="Paste your API key here..."
-                  className="w-full p-2.5 text-xs bg-[color:var(--surface-input)] border border-[color:var(--border-control)] rounded-xl text-[color:var(--text-primary)]"
-                />
-              </div>
+              )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowVerifyModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleExternalVerify}
-                disabled={verifying || !externalApiKey.trim()}
-                className="px-5 py-2 bg-[color:var(--accent-solid)] text-white text-xs font-bold rounded-xl hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
-              >
-                {verifying ? "Verifying…" : "Run Verification →"}
-              </button>
-            </div>
+            {/* Main Humanize Action */}
+            <button
+              type="button"
+              onClick={handleHumanize}
+              disabled={loading || !sourceText.trim()}
+              className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-xl shadow-md shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              {loading ? "Humanizing & Auditing..." : "Humanize Text"}
+            </button>
           </div>
         </div>
-      )}
+      </main>
     </div>
   );
 }
