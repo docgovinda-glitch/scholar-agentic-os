@@ -11,15 +11,17 @@ vi.mock("../../api", () => ({
 
 vi.mock("../../../platform/gateway/gateway", () => ({
   complete: vi.fn(),
+  completeWithFailover: vi.fn(),
 }));
 
 vi.mock("../../../services/userAiSettings", () => ({
   loadUserAiSettings: vi.fn().mockResolvedValue({ provider: "gemini", preferences: {} }),
   readProviderKey: vi.fn().mockResolvedValue("test-gemini-key"),
+  providersWithStoredKey: vi.fn().mockReturnValue(["gemini"]),
 }));
 
 import { authedJsonFetch } from "../../api";
-import { complete } from "../../../platform/gateway/gateway";
+import { completeWithFailover } from "../../../platform/gateway/gateway";
 
 describe("HumanizerWorkspace (2-Pass Stylometrics & Citations Guardian)", () => {
   beforeEach(() => {
@@ -32,15 +34,17 @@ describe("HumanizerWorkspace (2-Pass Stylometrics & Citations Guardian)", () => 
       }),
     });
 
-    (complete as any).mockImplementation(async ({ systemPrompt, userPrompt }: any) => {
+    (completeWithFailover as any).mockImplementation(async ({ systemPrompt, userPrompt }: any) => {
       if (systemPrompt.includes("cadence")) {
-        return { text: "Pass 1: " + userPrompt };
+        return { result: { text: "Pass 1: " + userPrompt } };
       }
       // Pass 2 keeps citations intact
       return {
-        text: `Pass 2: Organic publication-grade prose with ${
-          userPrompt.includes("⟦CITATION_3⟧") ? "⟦CITATION_3⟧" : "(Wilson et al., 2022)"
-        } and zero AI clichés.`,
+        result: {
+          text: `Pass 2: Organic publication-grade prose with ${
+            userPrompt.includes("⟦CITATION_3⟧") ? "⟦CITATION_3⟧" : "(Wilson et al., 2022)"
+          } and zero AI clichés.`,
+        },
       };
     });
   });
@@ -81,7 +85,7 @@ describe("HumanizerWorkspace (2-Pass Stylometrics & Citations Guardian)", () => 
     fireEvent.click(humanizeBtn);
 
     await waitFor(() => {
-      expect(complete).toHaveBeenCalled();
+      expect(completeWithFailover).toHaveBeenCalled();
     });
 
     await waitFor(() => {

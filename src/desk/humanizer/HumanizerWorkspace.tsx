@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { authedJsonFetch } from "../api";
-import { complete } from "../../platform/gateway/gateway";
-import { loadUserAiSettings, readProviderKey } from "../../services/userAiSettings";
+import { complete, completeWithFailover, type CandidateProvider } from "../../platform/gateway/gateway";
+import { loadUserAiSettings, readProviderKey, providersWithStoredKey } from "../../services/userAiSettings";
 import { getCloudProvider } from "../../config/providerCatalog";
 import { defaultPolicy, recordConsent } from "../../platform/warden/warden";
 import {
@@ -21,6 +21,37 @@ import { analyzeReadability } from "../../domain/language/readability";
 
 const SAMPLE_TEXT =
   "The cow is one of the most useful domestic animals in the world (Wilson et al., 2022). It has been closely associated with human civilization for thousands of years. People keep cows for milk, farming, and other useful products. In many countries, especially in South Asia, cows are an important part of rural life.\n\nA cow is a herbivorous animal that mainly eats grass, hay, and other plant-based food. It has four legs, two horns, two ears, and a long tail. Empirical studies show that milk production efficiency improves significantly with targeted forage nutrition with $p < 0.001$ and $R^2 = 0.88$ [4, 7]. Milk is one of the most important products obtained from cows. It is rich in nutrients such as protein, calcium, and vitamins and is used to make products such as curd, butter, cheese, ghee, and yogurt. Cow dung is also useful because it can be used as organic manure for agriculture and, in some places, as a source of biogas.\n\nCows have a special cultural and religious importance in Nepal and India. In Hindu traditions, the cow is regarded as a sacred and respected animal. In Nepal, the cow is also the national animal. The festival of Tihar includes a special day called Gai Tihar, when cows are worshipped and honored.\n\nCows contribute greatly to the livelihoods of farmers. However, they should not be treated merely as sources of economic benefit. They need adequate food, clean water, shelter, medical care, and humane treatment. Ultimately, the cow is a valuable and important animal. It provides food and useful agricultural resources and has deep cultural significance. We should recognize its contribution and treat cows with kindness and care.";
+
+async function getCandidateProviders(activeProviderId: string, activeModelName?: string): Promise<CandidateProvider[]> {
+  const connectedIds = providersWithStoredKey();
+  const orderedIds = [
+    activeProviderId,
+    ...connectedIds.filter((id) => id !== activeProviderId),
+  ];
+
+  const settings = await loadUserAiSettings();
+  const candidates: CandidateProvider[] = [];
+
+  for (const pid of orderedIds) {
+    const k = await readProviderKey(pid);
+    if (k && k.trim()) {
+      const spec = getCloudProvider(pid);
+      let chosenModel =
+        pid === activeProviderId && activeModelName
+          ? activeModelName
+          : settings.preferences?.[`${pid}_model`] || spec?.defaultModel;
+
+      if (pid === "gemini" && (chosenModel === "gemini-2.5-flash" || !chosenModel)) {
+        chosenModel = "gemini-3.6-flash";
+      } else if (pid === "groq" && (chosenModel === "llama-3.3-70b-versatile" || !chosenModel)) {
+        chosenModel = "llama-3.1-8b-instant";
+      }
+
+      candidates.push({ provider: pid, apiKey: k, model: chosenModel });
+    }
+  }
+  return candidates;
+}
 
 const FIELD_PRESETS = [
   {
@@ -242,9 +273,14 @@ export default function HumanizerWorkspace({
     let finalHumanized = "";
 
     try {
-      const key = await readProviderKey(activeProvider);
+      const candidates = await getCandidateProviders(activeProvider, modelName);
 
-      if (key && key.trim()) {
+      if (candidates.length > 0) {
+        let userPolicy = defaultPolicy();
+        for (const c of candidates) {
+          userPolicy = recordConsent(userPolicy, c.provider);
+        }
+
         // ─── PASS 1: Rhythm & Cadence Breakdown (Break ~18-word AI symmetry) ───
         const pass1SystemPrompt = `You are a stylometric cadence restructuring agent.
 Your objective is to re-architect the input text to eliminate robotic, uniform sentence rhythm.
@@ -254,22 +290,24 @@ Rules:
 3. Preserve all factual claims, names, dates, and paragraph breaks.
 Output ONLY the restructured text.`;
 
-        const userPolicy = recordConsent(defaultPolicy(), activeProvider);
-
-        const pass1Result = await complete(
-          {
-            provider: activeProvider,
-            apiKey: key,
-            model: modelName || undefined,
-            userPrompt: maskedText,
-            systemPrompt: pass1SystemPrompt,
-            taskClass: "refinement",
-            segments: [{ label: "draftText", text: maskedText }],
-          },
-          userPolicy
-        );
-
-        const pass1Text = pass1Result?.text ? pass1Result.text.trim() : maskedText;
+        let pass1Text = maskedText;
+        try {
+          const pass1Failover = await completeWithFailover(
+            {
+              userPrompt: maskedText,
+              systemPrompt: pass1SystemPrompt,
+              taskClass: "refinement",
+              segments: [{ label: "draftText", text: maskedText }],
+            },
+            { candidates, maxRetriesPerCandidate: 1 },
+            userPolicy
+          );
+          if (pass1Failover?.result?.text) {
+            pass1Text = pass1Failover.result.text.trim();
+          }
+        } catch (pass1Err) {
+          console.warn("Pass 1 failover notice:", pass1Err);
+        }
 
         // ─── PASS 2: Cliché Purge & Academic Epistemic Hedging ───
         const pass2SystemPrompt = `You are an elite academic prose humanizer and disciplinary editor.
@@ -281,21 +319,19 @@ Rules:
 4. Structure: Maintain the original headings and paragraph divisions.
 Output ONLY the polished humanized prose.`;
 
-        const pass2Result = await complete(
+        const pass2Failover = await completeWithFailover(
           {
-            provider: activeProvider,
-            apiKey: key,
-            model: modelName || undefined,
             userPrompt: pass1Text,
             systemPrompt: pass2SystemPrompt,
             taskClass: "refinement",
             segments: [{ label: "draftText", text: pass1Text }],
           },
+          { candidates, maxRetriesPerCandidate: 1 },
           userPolicy
         );
 
-        if (pass2Result && pass2Result.text) {
-          finalHumanized = pass2Result.text.trim();
+        if (pass2Failover?.result?.text) {
+          finalHumanized = pass2Failover.result.text.trim();
         }
       }
 
