@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { authedJsonFetch } from "../api";
 import { completeWithFailover, type CandidateProvider } from "../../platform/gateway/gateway";
@@ -6,12 +6,26 @@ import { loadUserAiSettings, readProviderKey, providersWithStoredKey } from "../
 import { getCloudProvider } from "../../config/providerCatalog";
 import { defaultPolicy, recordConsent } from "../../platform/warden/warden";
 import { runHumanizerPipeline } from "../../domain/humanizer/orchestration/humanizerPipeline";
+import { runLongDocumentPipeline } from "../../domain/humanizer/orchestration/longDocumentPipeline";
 import { RewriteMode } from "../../domain/humanizer/rewrite/promptBuilder";
-import { HumanizerAuditReport, CandidateState } from "../../domain/humanizer/types";
+import {
+  HumanizerDocument,
+  HumanizerAuditReport,
+  CandidateState,
+  ReviewUnit,
+  ReviewUnitDecision,
+  DocumentChunk,
+  LongDocumentPipelineProgress,
+} from "../../domain/humanizer/types";
+import { generateReviewUnits } from "../../domain/humanizer/review/sentenceMapper";
+import { applyReviewUnitDecision } from "../../domain/humanizer/review/documentReviewManager";
+import { renderHumanizerDocument } from "../../domain/humanizer/document/humanizerDocument";
 import { buildVoiceProfile } from "../../domain/language/voiceProfile";
 import AuditSummaryCard from "./components/AuditSummaryCard";
 import LockedTermsManager from "./components/LockedTermsManager";
 import PipelineProgressBar, { HumanizerProgressStage } from "./components/PipelineProgressBar";
+import SentenceReviewList from "./components/SentenceReviewList";
+import LongDocumentDashboard from "./components/LongDocumentDashboard";
 
 const SAMPLE_TEXT =
   "The cow is one of the most useful domestic animals in the world (Wilson et al., 2022). It has been closely associated with human civilization for thousands of years. People keep cows for milk, farming, and other useful products. In many countries, especially in South Asia, cows are an important part of rural life.\n\nA cow is a herbivorous animal that mainly eats grass, hay, and other plant-based food. It has four legs, two horns, two ears, and a long tail. Empirical studies show that milk production efficiency improves significantly with targeted forage nutrition with $p < 0.001$ and $R^2 = 0.88$ [4, 7]. Milk is one of the most important products obtained from cows. It is rich in nutrients such as protein, calcium, and vitamins and is used to make products such as curd, butter, cheese, ghee, and yogurt. Cow dung is also useful because it can be used as organic manure for agriculture and, in some places, as a source of biogas.\n\nCows have a special cultural and religious importance in Nepal and India. In Hindu traditions, the cow is regarded as a sacred and respected animal. In Nepal, the cow is also the national animal. The festival of Tihar includes a special day called Gai Tihar, when cows are worshipped and honored.\n\nCows contribute greatly to the livelihoods of farmers. However, they should not be treated merely as sources of economic benefit. They need adequate food, clean water, shelter, medical care, and humane treatment. Ultimately, the cow is a valuable and important animal. It provides food and useful agricultural resources and has deep cultural significance. We should recognize its contribution and treat cows with kindness and care.";
@@ -185,11 +199,20 @@ export default function HumanizerWorkspace({
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   const [modelName, setModelName] = useState<string>("Gemini 2.0 Flash");
 
-  // Multi-Auditor Pipeline Results
+  // Document & Multi-Auditor State
+  const [documentState, setDocumentState] = useState<HumanizerDocument | undefined>(undefined);
   const [auditReport, setAuditReport] = useState<HumanizerAuditReport | undefined>(undefined);
   const [candidateState, setCandidateState] = useState<CandidateState | undefined>(undefined);
   const [fallbackUsed, setFallbackUsed] = useState(false);
   const [fallbackReason, setFallbackReason] = useState<string | undefined>(undefined);
+
+  // Phase 8: Long Document Chunks & Sentence Review Units
+  const [chunks, setChunks] = useState<DocumentChunk[]>([]);
+  const [longDocProgress, setLongDocProgress] = useState<LongDocumentPipelineProgress | undefined>(undefined);
+  const [reviewUnits, setReviewUnits] = useState<ReviewUnit[]>([]);
+
+  // Abort Controller for Cancellation
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Responsive mobile view tab
   const [mobileTab, setMobileTab] = useState<"original" | "humanized">("original");
@@ -238,7 +261,7 @@ export default function HumanizerWorkspace({
     };
   }, [projectId]);
 
-  // Production-Grade Multi-Auditor Pipeline Handler
+  // Production-Grade Multi-Auditor Pipeline Handler (Supporting Long Documents & Chunking)
   const handleHumanize = useCallback(async () => {
     if (!sourceText.trim()) {
       setErrorMessage("Please enter or paste text to humanize.");
@@ -251,7 +274,12 @@ export default function HumanizerWorkspace({
     setCandidateState(undefined);
     setFallbackUsed(false);
     setFallbackReason(undefined);
+    setReviewUnits([]);
+    setChunks([]);
     setProgressStage("parsing");
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
       // LLM Adapter connecting to Gateway & Server Fallback
@@ -320,31 +348,64 @@ export default function HumanizerWorkspace({
 
       setProgressStage("protecting");
 
-      // Execute Production Pipeline
-      const result = await runHumanizerPipeline(sourceText, {
-        mode: selectedMode,
-        genre: selectedGenre,
-        completer,
-        maxRetries: 2,
-        lockedTerms,
-        styleProfile,
-      });
+      // Check document size for long-document chunking vs standard pipeline
+      const isLongDoc = sourceText.length > 3500;
 
-      setProgressStage("finalizing");
-      setHumanizedText(result.finalText);
-      setAuditReport(result.auditReport);
-      setCandidateState(result.candidateState);
-      setFallbackUsed(result.fallbackUsed);
-      setFallbackReason(result.fallbackReason);
+      if (isLongDoc) {
+        const longResult = await runLongDocumentPipeline(sourceText, {
+          mode: selectedMode,
+          genre: selectedGenre,
+          completer,
+          maxRetries: 2,
+          lockedTerms,
+          styleProfile,
+          abortSignal: abortController.signal,
+          onProgress: (p) => setLongDocProgress(p),
+        });
 
-      if (result.success) {
-        setMobileTab("humanized");
-        // Persist to server store
-        authedJsonFetch(`/api/projects/${projectId}/humanizer/humanize`, "POST", {
-          text: sourceText,
-          llmResult: result.finalText,
-          register: selectedGenre,
-        }).catch(() => {});
+        setProgressStage("finalizing");
+        setDocumentState(longResult.document);
+        setChunks(longResult.chunks);
+        setReviewUnits(longResult.reviewUnits);
+        const finalRendered = renderHumanizerDocument(longResult.document, "processed");
+        setHumanizedText(finalRendered);
+        setFallbackUsed(longResult.fallbackChunksCount > 0 && !longResult.success);
+
+        if (longResult.success) {
+          setMobileTab("humanized");
+        }
+      } else {
+        const result = await runHumanizerPipeline(sourceText, {
+          mode: selectedMode,
+          genre: selectedGenre,
+          completer,
+          maxRetries: 2,
+          lockedTerms,
+          styleProfile,
+        });
+
+        setProgressStage("finalizing");
+        setDocumentState(result.document);
+        setHumanizedText(result.finalText);
+        setAuditReport(result.auditReport);
+        setCandidateState(result.candidateState);
+        setFallbackUsed(result.fallbackUsed);
+        setFallbackReason(result.fallbackReason);
+
+        if (result.document) {
+          const generatedUnits = generateReviewUnits(result.document, result.document, result.auditReport);
+          setReviewUnits(generatedUnits);
+        }
+
+        if (result.success) {
+          setMobileTab("humanized");
+          // Persist to server store
+          authedJsonFetch(`/api/projects/${projectId}/humanizer/humanize`, "POST", {
+            text: sourceText,
+            llmResult: result.finalText,
+            register: selectedGenre,
+          }).catch(() => {});
+        }
       }
     } catch (err: any) {
       console.error("Humanizer failed:", err);
@@ -364,6 +425,29 @@ export default function HumanizerWorkspace({
     }
   }, [sourceText, selectedMode, selectedGenre, lockedTerms, useAuthorVoice, activeProvider, modelName, projectId]);
 
+  // Cancel long document humanization
+  function handleCancelProcessing() {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setLoading(false);
+    }
+  }
+
+  // Handle fine-grained sentence-level accept/reject
+  function handleSentenceDecision(unitId: string, decision: ReviewUnitDecision) {
+    if (!documentState) return;
+
+    const res = applyReviewUnitDecision(documentState, unitId, decision);
+    if (res.success) {
+      setDocumentState(res.updatedDoc);
+      setReviewUnits(res.updatedDoc.reviewUnits || []);
+      const updatedProse = renderHumanizerDocument(res.updatedDoc, "processed");
+      setHumanizedText(updatedProse);
+    } else if (res.validationError) {
+      setErrorMessage(res.validationError);
+    }
+  }
+
   // Keep Humanized text as source
   function handleAcceptRewrite() {
     if (!humanizedText) return;
@@ -371,6 +455,8 @@ export default function HumanizerWorkspace({
     setHumanizedText("");
     setAuditReport(undefined);
     setCandidateState(undefined);
+    setReviewUnits([]);
+    setChunks([]);
   }
 
   // Reject Humanized text and keep original
@@ -380,6 +466,8 @@ export default function HumanizerWorkspace({
     setCandidateState(undefined);
     setFallbackUsed(false);
     setFallbackReason(undefined);
+    setReviewUnits([]);
+    setChunks([]);
   }
 
   // Send Humanized text to Active Manuscript
@@ -558,6 +646,16 @@ export default function HumanizerWorkspace({
 
         {/* Real-time Progress Stepper */}
         {loading && <PipelineProgressBar stage={progressStage} />}
+
+        {/* Long Document Multi-Section Dashboard */}
+        {chunks.length > 1 && (
+          <LongDocumentDashboard
+            chunks={chunks}
+            progress={longDocProgress}
+            onCancel={handleCancelProcessing}
+            isProcessing={loading}
+          />
+        )}
 
         {/* Quality Audit Dashboard (When candidate exists or was rejected) */}
         {!loading && (auditReport || fallbackUsed) && (
@@ -758,6 +856,14 @@ export default function HumanizerWorkspace({
             )}
           </div>
         </div>
+
+        {/* Phase 8: Granular Sentence & Review Units List */}
+        {!loading && reviewUnits.length > 0 && (
+          <SentenceReviewList
+            reviewUnits={reviewUnits}
+            onDecisionChange={handleSentenceDecision}
+          />
+        )}
 
         {/* Primary Action Button Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 pt-2">

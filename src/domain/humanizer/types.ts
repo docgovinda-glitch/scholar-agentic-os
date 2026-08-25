@@ -328,6 +328,99 @@ export interface PipelineVersionInfo {
   timestamp: string;
 }
 
+export type SentenceMappingType =
+  | "ONE_TO_ONE"
+  | "ONE_TO_MANY"   // Sentence split
+  | "MANY_TO_ONE"   // Sentences merged
+  | "MANY_TO_MANY"  // Complex restructure
+  | "UNMAPPED";
+
+export type ReviewUnitStatus =
+  | "UNCHANGED"
+  | "MODIFIED"
+  | "RESTRUCTURED"
+  | "ADDED"
+  | "REMOVED"
+  | "REVIEW_REQUIRED";
+
+export type ReviewUnitDecision =
+  | "ACCEPTED"   // Keep Humanized
+  | "REJECTED"   // Keep Original
+  | "PENDING";
+
+export interface ReviewUnit {
+  unitId: string;
+  blockId: string;
+  sourceSentenceIds: string[];
+  candidateSentenceIds: string[];
+  sourceText: string;
+  candidateText: string;
+  mappingType: SentenceMappingType;
+  status: ReviewUnitStatus;
+  decision: ReviewUnitDecision;
+  confidence: number;
+  auditFindings: HumanizerAuditFinding[];
+  hasProtectedTokens: boolean;
+  explanation?: string;
+}
+
+export interface ChunkingPolicy {
+  maxTokensPerChunk?: number;
+  maxCharsPerChunk?: number;
+  maxBlocksPerChunk?: number;
+  contextBlocksBefore?: number;
+  contextBlocksAfter?: number;
+  preserveHeadingHierarchy?: boolean;
+}
+
+export type ChunkStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "VALIDATED"
+  | "REVIEW_REQUIRED"
+  | "FAILED"
+  | "CANCELLED";
+
+export interface DocumentChunk {
+  chunkId: string;
+  order: number;
+  title?: string;
+  blockIds: string[];
+  contextPrecedingBlockIds: string[];
+  contextSucceedingBlockIds: string[];
+  status: ChunkStatus;
+  attemptsCount: number;
+  fallbackUsed: boolean;
+  fallbackReason?: string;
+  auditReport?: HumanizerAuditReport;
+  sourceWordCount: number;
+  processedWordCount?: number;
+}
+
+export interface LongDocumentPipelineProgress {
+  totalChunks: number;
+  completedChunks: number;
+  failedChunks: number;
+  reviewRequiredChunks: number;
+  activeChunkIndex?: number;
+  activeChunkId?: string;
+  activeSectionTitle?: string;
+  percentComplete: number;
+  isCancelled: boolean;
+}
+
+export interface LongDocumentPipelineResult {
+  success: boolean;
+  document: HumanizerDocument;
+  chunks: DocumentChunk[];
+  reviewUnits: ReviewUnit[];
+  progress: LongDocumentPipelineProgress;
+  totalWordsProcessed: number;
+  fallbackChunksCount: number;
+  finalValidationPassed: boolean;
+  validationIssues?: string[];
+}
+
 export interface HumanizerDocument {
   metadata: {
     id: string;
@@ -352,4 +445,8 @@ export interface HumanizerDocument {
   auditState?: DocumentAuditState;
   /** Complete version and provenance tracking */
   versionInfo: PipelineVersionInfo;
+  /** Optional review units for fine-grained acceptance */
+  reviewUnits?: ReviewUnit[];
+  /** Optional chunks metadata for long documents */
+  chunks?: DocumentChunk[];
 }
