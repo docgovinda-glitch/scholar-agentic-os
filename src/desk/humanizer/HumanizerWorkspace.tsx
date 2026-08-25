@@ -16,16 +16,26 @@ import {
   ReviewUnitDecision,
   DocumentChunk,
   LongDocumentPipelineProgress,
+  TerminologyScope,
+  TerminologyConflict,
 } from "../../domain/humanizer/types";
 import { generateReviewUnits } from "../../domain/humanizer/review/sentenceMapper";
 import { applyReviewUnitDecision } from "../../domain/humanizer/review/documentReviewManager";
 import { renderHumanizerDocument } from "../../domain/humanizer/document/humanizerDocument";
+import {
+  createTerminologyEntry,
+  resolveTerminologyHierarchy,
+  promoteTerminologyEntry,
+  savePersistentTerminology,
+  loadPersistentTerminology,
+} from "../../domain/humanizer/memory/terminologyMemoryService";
 import { buildVoiceProfile } from "../../domain/language/voiceProfile";
 import AuditSummaryCard from "./components/AuditSummaryCard";
 import LockedTermsManager from "./components/LockedTermsManager";
 import PipelineProgressBar, { HumanizerProgressStage } from "./components/PipelineProgressBar";
 import SentenceReviewList from "./components/SentenceReviewList";
 import LongDocumentDashboard from "./components/LongDocumentDashboard";
+import DeveloperEvaluationModal from "./components/DeveloperEvaluationModal";
 
 const SAMPLE_TEXT =
   "The cow is one of the most useful domestic animals in the world (Wilson et al., 2022). It has been closely associated with human civilization for thousands of years. People keep cows for milk, farming, and other useful products. In many countries, especially in South Asia, cows are an important part of rural life.\n\nA cow is a herbivorous animal that mainly eats grass, hay, and other plant-based food. It has four legs, two horns, two ears, and a long tail. Empirical studies show that milk production efficiency improves significantly with targeted forage nutrition with $p < 0.001$ and $R^2 = 0.88$ [4, 7]. Milk is one of the most important products obtained from cows. It is rich in nutrients such as protein, calcium, and vitamins and is used to make products such as curd, butter, cheese, ghee, and yogurt. Cow dung is also useful because it can be used as organic manure for agriculture and, in some places, as a source of biogas.\n\nCows have a special cultural and religious importance in Nepal and India. In Hindu traditions, the cow is regarded as a sacred and respected animal. In Nepal, the cow is also the national animal. The festival of Tihar includes a special day called Gai Tihar, when cows are worshipped and honored.\n\nCows contribute greatly to the livelihoods of farmers. However, they should not be treated merely as sources of economic benefit. They need adequate food, clean water, shelter, medical care, and humane treatment. Ultimately, the cow is a valuable and important animal. It provides food and useful agricultural resources and has deep cultural significance. We should recognize its contribution and treat cows with kindness and care.";
@@ -185,6 +195,8 @@ export default function HumanizerWorkspace({
   const [selectedMode, setSelectedMode] = useState<RewriteMode>("balanced");
   const [selectedGenre, setSelectedGenre] = useState("Academic Journal");
   const [lockedTerms, setLockedTerms] = useState<string[]>([]);
+  const [terminologyConflicts, setTerminologyConflicts] = useState<TerminologyConflict[]>([]);
+  const [showEvalModal, setShowEvalModal] = useState(false);
   const [useAuthorVoice, setUseAuthorVoice] = useState(false);
 
   const [showDiff, setShowDiff] = useState(false);
@@ -532,6 +544,17 @@ export default function HumanizerWorkspace({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Developer Evaluation Benchmark Suite */}
+          <button
+            type="button"
+            onClick={() => setShowEvalModal(true)}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors"
+            title="Open Developer Benchmark Suite"
+          >
+            <span>📊</span>
+            <span>Benchmark</span>
+          </button>
+
           {/* Provider / AI Access link */}
           <button
             type="button"
@@ -639,8 +662,19 @@ export default function HumanizerWorkspace({
           {/* Locked Terminology Memory */}
           <LockedTermsManager
             lockedTerms={lockedTerms}
-            onAddTerm={(term) => setLockedTerms([...lockedTerms, term])}
+            onAddTerm={(term, scope) => {
+              if (scope && scope !== "DOCUMENT") {
+                const entry = createTerminologyEntry({ term, scope, projectId });
+                savePersistentTerminology(entry, scope === "PROJECT" ? projectId : undefined);
+              }
+              setLockedTerms([...lockedTerms, term]);
+            }}
             onRemoveTerm={(term) => setLockedTerms(lockedTerms.filter((t) => t !== term))}
+            onPromoteTerm={(term, targetScope) => {
+              const entry = createTerminologyEntry({ term, scope: targetScope, projectId });
+              savePersistentTerminology(entry, targetScope === "PROJECT" ? projectId : undefined);
+            }}
+            conflicts={terminologyConflicts}
           />
         </div>
 
@@ -922,6 +956,33 @@ export default function HumanizerWorkspace({
           </div>
         </div>
       </main>
+
+      {/* Developer Benchmark & Evaluation Modal */}
+      {showEvalModal && (
+        <DeveloperEvaluationModal
+          isOpen={showEvalModal}
+          onClose={() => setShowEvalModal(false)}
+          completer={async (params) => {
+            const candidates = await getCandidateProviders(activeProvider, modelName);
+            if (candidates.length > 0) {
+              const failover = await completeWithFailover(
+                {
+                  userPrompt: params.userPrompt,
+                  systemPrompt: params.systemPrompt,
+                  taskClass: "refinement",
+                  segments: [{ label: "draftText", text: params.userPrompt }],
+                },
+                { candidates, maxRetriesPerCandidate: 1 },
+                defaultPolicy()
+              );
+              if (failover?.result?.text) return failover.result.text;
+            }
+            return JSON.stringify({ rewrittenText: params.userPrompt, improvements: [] });
+          }}
+          model={modelName}
+          provider={activeProvider}
+        />
+      )}
     </div>
   );
 }

@@ -450,3 +450,124 @@ export interface HumanizerDocument {
   /** Optional chunks metadata for long documents */
   chunks?: DocumentChunk[];
 }
+
+export type TerminologyScope = "DOCUMENT" | "PROJECT" | "USER" | "SYSTEM";
+
+export interface TerminologyMemoryEntry {
+  id: string;
+  term: string;
+  preferredForm?: string;
+  alternatives?: string[];
+  scope: TerminologyScope;
+  projectId?: string;
+  userId?: string;
+  source?: string;
+  locked: boolean;
+  caseSensitive?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  usageCount: number;
+  status?: "ACTIVE" | "CONFLICT" | "ARCHIVED";
+  metadata?: Record<string, any>;
+}
+
+export interface TerminologyConflict {
+  term: string;
+  higherScope: TerminologyScope;
+  lowerScope: TerminologyScope;
+  higherEntry: TerminologyMemoryEntry;
+  lowerEntry: TerminologyMemoryEntry;
+  resolution: "HIGHER_SCOPE_APPLIED" | "MANUAL_RESOLUTION_REQUIRED";
+  description: string;
+}
+
+export type HumanizerBenchmarkCategory =
+  | "standard_academic"
+  | "citations_apa"
+  | "citations_ieee"
+  | "citations_numeric"
+  | "latex_math"
+  | "statistics_data"
+  | "quotations"
+  | "urls_dois"
+  | "locked_terminology"
+  | "epistemic_modality"
+  | "causal_claims"
+  | "negation_reversal"
+  | "sentence_split_merge"
+  | "deep_restructuring"
+  | "long_document_chunks"
+  | "adversarial_input";
+
+export interface HumanizerBenchmarkCase {
+  id: string;
+  category: HumanizerBenchmarkCategory;
+  sourceText: string;
+  expectedOutcome: "PASS" | "WARNING" | "REJECT" | "NO_REWRITE";
+  expectedInvariants: {
+    requiredTokens?: string[];
+    requiredTerms?: string[];
+    minPreservationRate?: number;
+    prohibitedPhrases?: string[];
+  };
+  expectedClaimsCount?: number;
+  rewriteMode?: "conservative" | "balanced" | "deep_restructure";
+  severity?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  description: string;
+}
+
+export interface HumanizerBenchmarkCaseResult {
+  caseId: string;
+  passed: boolean;
+  actualOutcome: "PASS" | "WARNING" | "REJECT";
+  expectedOutcome: string;
+  protectedElementsSurvivalRate: number;
+  claimPreservationRate: number;
+  terminologyPreservationRate: number;
+  issues: string[];
+  latencyMs: number;
+  attemptsCount: number;
+}
+
+export interface HumanizerBenchmarkReport {
+  benchmarkVersion: string;
+  pipelineVersion: string;
+  model: string;
+  provider: string;
+  mode: string;
+  totalCases: number;
+  passed: number;
+  warnings: number;
+  rejected: number;
+  falseAcceptances: number;
+  falseRejections: number;
+  protectedElementSurvivalRate: number; // 0 - 1.0 (Target: 1.0)
+  tokenIntegrityRate: number; // 0 - 1.0 (Target: 1.0)
+  claimPreservationRate: number; // 0 - 1.0
+  lockedTerminologyPreservationRate: number; // 0 - 1.0 (Target: 1.0)
+  sentenceBoundaryIntegrityRate: number;
+  paragraphBoundaryIntegrityRate: number;
+  retryRecoveryRate: number;
+  safeFallbackRate: number;
+  averageLatencyMs: number;
+  totalTokensEstimated: number;
+  estimatedCostUsd: number | "UNKNOWN";
+  regressionGates: {
+    name: string;
+    passed: boolean;
+    target: string;
+    actual: string;
+    status: "PASS" | "FAIL" | "CALIBRATION_REQUIRED";
+  }[];
+  caseResults: HumanizerBenchmarkCaseResult[];
+  timestamp: string;
+}
+
+export interface SemanticEvaluationProvider {
+  name: string;
+  type: "HEURISTIC" | "NLI_ENTAILMENT" | "MODEL_BASED";
+  evaluate(
+    source: string,
+    candidate: string
+  ): Promise<{ score: number; driftDetected: boolean; details?: string }>;
+}
