@@ -232,7 +232,7 @@ describe("the canonical first-login journey", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
 
     expect(await screen.findByText("Initialize your first project")).toBeInTheDocument();
-    expect(await screen.findByText("Welcome to your Command Center")).toBeInTheDocument();
+    expect(await screen.findByText("Welcome to your Scholar Workspace")).toBeInTheDocument();
   });
 
   it("5. completing Knowledge moves to the workspace, with a one-time welcome", async () => {
@@ -250,7 +250,7 @@ describe("the canonical first-login journey", () => {
     fireEvent.click(screen.getByRole("button", { name: "Go to your work" }));
 
     expect(await screen.findByText("Initialize your first project")).toBeInTheDocument();
-    expect(await screen.findByText("Welcome to your Command Center")).toBeInTheDocument();
+    expect(await screen.findByText("Welcome to your Scholar Workspace")).toBeInTheDocument();
   });
 
   it("6. a user who finished AI Setup but not Knowledge resumes at Knowledge on a fresh mount, not back at AI Setup", async () => {

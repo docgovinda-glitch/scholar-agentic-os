@@ -155,7 +155,7 @@ export default function ProjectListScreen({
                 Scholar Core
               </span>
               <span className="text-[11px] font-semibold text-[color:var(--text-muted)] tracking-wider uppercase mt-0.5">
-                Command Center
+                Workspace
               </span>
             </div>
           </div>
@@ -289,19 +289,22 @@ export default function ProjectListScreen({
         )}
       </header>
 
-      {/* Main Content */}
-      <main className="relative z-10 mx-auto max-w-7xl px-4 md:px-8 pt-28 pb-20 animate-fade-in">
-        {/* Welcome Banner for first-time / newly onboarded users */}
+      {/* Main Content View */}
+      <main className="mx-auto max-w-7xl px-4 md:px-8 pt-28 pb-20">
+        {/* Onboarding welcome banner */}
         {welcomeVisible && (
-          <div className="mb-8 flex items-center justify-between gap-4 rounded-2xl border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)] px-6 py-4 shadow-xs animate-fade-in">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[color:var(--accent)] text-white flex items-center justify-center flex-shrink-0">
-                <ScholarCoreLogo size="sm" className="text-white" />
+          <div
+            role="status"
+            className="mb-8 rounded-3xl border border-[color:var(--accent-subtle)] bg-[color:var(--surface-raised)] p-6 shadow-sm flex items-start justify-between gap-4 animate-fade-in"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-[color:var(--accent-subtle)] text-[color:var(--accent)] flex items-center justify-center flex-shrink-0">
+                <ScholarCoreLogo size="sm" className="text-[color:var(--accent)]" />
               </div>
               <div>
-                <p className="text-base font-bold text-[color:var(--text-primary)]">Welcome to your Command Center</p>
+                <p className="text-base font-bold text-[color:var(--text-primary)]">Welcome to your Scholar Workspace</p>
                 <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-                  Initialize a new manuscript, upload reference PDFs to your Vault, or configure your editorial agents.
+                  Select an academic workspace to begin, upload reference PDFs to your Vault, or configure your editorial agents.
                 </p>
               </div>
             </div>
@@ -336,15 +339,15 @@ export default function ProjectListScreen({
           />
         ) : (
           <>
-            {/* Researcher Pulse Hub */}
-            <section className="mb-10">
+            {/* Quick-Launch Dedicated Workspaces */}
+            <section className="mb-12">
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
                 <div>
                   <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[color:var(--text-primary)]">
-                    Research Command Center
+                    Scholar Workspace
                   </h1>
                   <p className="text-sm text-[color:var(--text-secondary)] mt-1">
-                    Active academic manuscripts, evidence ledgers, and multi-agent pipelines.
+                    Select a dedicated academic workspace to initialize, or continue your active projects below.
                   </p>
                 </div>
                 {projects && projects.length > 0 && (
@@ -360,95 +363,36 @@ export default function ProjectListScreen({
                 )}
               </div>
 
-              {/* Quick Researcher Hub Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div
-                  onClick={onOpenVault}
-                  className="p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--state-success)] hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-9 h-9 rounded-xl bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)] flex items-center justify-center">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                      </svg>
+              {/* 6 Quick-Launch Workspace Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                {FORMAT_TILES.map((tile) => (
+                  <div
+                    key={tile.id}
+                    onClick={() => handleCreate(tile.id)}
+                    className="p-4 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)] hover:bg-[color:var(--surface-hover)] hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group text-left"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex items-center justify-center text-base">
+                          {tile.icon}
+                        </div>
+                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">
+                          {tile.id}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors leading-tight mb-1">
+                        {tile.label}
+                      </h4>
+                      <p className="text-[11px] text-[color:var(--text-secondary)] line-clamp-2 leading-relaxed">
+                        {tile.tag}
+                      </p>
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] px-2 py-0.5 rounded">
-                      Local Vault
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-base text-[color:var(--text-primary)] group-hover:text-[color:var(--state-success)] transition-colors">
-                      Knowledge Vault
-                    </h4>
-                    <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">Central verified PDF evidence</p>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setChoosing(true)}
-                  className="p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent)] hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-9 h-9 rounded-xl bg-[color:var(--accent-subtle)] text-[color:var(--accent)] flex items-center justify-center">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+                    <div className="mt-3 pt-2.5 border-t border-[color:var(--border-subtle)] flex items-center justify-between text-[10px] font-bold text-[color:var(--accent)]">
+                      <span>Start {tile.label.split(" ")[0]}</span>
+                      <span>→</span>
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)] bg-[color:var(--accent-subtle)] px-2 py-0.5 rounded">
-                      {projects ? `${projects.length} Active` : "Loading..."}
-                    </span>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-base text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors">
-                      Manuscripts
-                    </h4>
-                    <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">24 Supported Formats</p>
-                  </div>
-                </div>
-
-                <div
-                  onClick={onOpenAgents}
-                  className="p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--state-info)] hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-9 h-9 rounded-xl bg-[color:var(--state-info-subtle)] text-[color:var(--state-info)] flex items-center justify-center">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                      </svg>
-                    </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--state-info)] bg-[color:var(--state-info-subtle)] px-2 py-0.5 rounded">
-                      4 Agents
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-base text-[color:var(--text-primary)] group-hover:text-[color:var(--state-info)] transition-colors">
-                      Editorial Agents
-                    </h4>
-                    <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">Methodologist & Auditor</p>
-                  </div>
-                </div>
-
-                <div
-                  onClick={onOpenAiAccess}
-                  className="p-5 rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--border-strong)] hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-9 h-9 rounded-xl bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] flex items-center justify-center">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] px-2 py-0.5 rounded">
-                      BYOK & Local
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-base text-[color:var(--text-primary)] group-hover:text-[color:var(--accent)] transition-colors">
-                      AI Models
-                    </h4>
-                    <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">Routing & Engine Settings</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </section>
 
@@ -458,7 +402,7 @@ export default function ProjectListScreen({
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-6 bg-[color:var(--accent)] rounded-full" />
                   <h2 className="text-2xl font-bold tracking-tight text-[color:var(--text-primary)]">
-                    Active Manuscripts
+                    Active Projects
                   </h2>
                   {projects && (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)]">
@@ -472,7 +416,7 @@ export default function ProjectListScreen({
                   <div className="relative w-full sm:w-72">
                     <input
                       type="text"
-                      placeholder="Search manuscripts..."
+                      placeholder="Search projects..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full rounded-xl border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] pl-9 pr-4 py-2 text-xs font-medium text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] outline-none focus:border-[color:var(--accent)] transition-all"

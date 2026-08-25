@@ -92,7 +92,7 @@ describe("the Workshop welcome banner", () => {
     const onWelcomeSeen = vi.fn();
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={onWelcomeSeen} />);
 
-    expect(await screen.findByText("Welcome to your Command Center")).toBeInTheDocument();
+    expect(await screen.findByText("Welcome to your Scholar Workspace")).toBeInTheDocument();
     expect(onWelcomeSeen).toHaveBeenCalled();
   });
 
@@ -100,11 +100,11 @@ describe("the Workshop welcome banner", () => {
     listProjects.mockResolvedValue({ items: [] });
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={vi.fn()} />);
 
-    const banner = await screen.findByText("Welcome to your Command Center");
+    const banner = await screen.findByText("Welcome to your Scholar Workspace");
     expect(banner).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText("Welcome to your Command Center")).not.toBeInTheDocument();
+    expect(screen.queryByText("Welcome to your Scholar Workspace")).not.toBeInTheDocument();
   });
 
   it("never shows for a returning user with nothing to welcome them to", async () => {
@@ -112,6 +112,6 @@ describe("the Workshop welcome banner", () => {
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
     await screen.findByText("Initialize your first project");
-    expect(screen.queryByText("Welcome to your Command Center")).not.toBeInTheDocument();
+    expect(screen.queryByText("Welcome to your Scholar Workspace")).not.toBeInTheDocument();
   });
 });
