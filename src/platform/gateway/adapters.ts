@@ -158,10 +158,21 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
   }
 
   async complete(req: CompletionRequest): Promise<{ text: string; model: string }> {
-    const model = req.model || this.spec.defaultModel;
+    let model = req.model || this.spec.defaultModel;
     const url = chatUrl(this.spec);
     const headers = { "Content-Type": "application/json", ...buildAuthHeaders(this.spec, req.apiKey) };
-    const response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false) });
+    let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false) });
+    
+    // Auto-fallback if model not found on Groq (e.g. llama-3.3-70b-versatile -> llama-3.1-8b-instant)
+    if (!response.ok && response.status === 404 && this.id === "groq" && model !== "llama-3.1-8b-instant") {
+      const fallbackBody = this.buildBody({ ...req, model: "llama-3.1-8b-instant" }, false);
+      const retryRes = await fetch(url, { method: "POST", headers, body: fallbackBody });
+      if (retryRes.ok) {
+        response = retryRes;
+        model = "llama-3.1-8b-instant";
+      }
+    }
+
     if (!response.ok) return throwForBadResponse(this.id, response);
     const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
     const text = data.choices?.[0]?.message?.content ?? "";
@@ -279,13 +290,27 @@ class GeminiAdapter implements ProviderAdapter {
   }
 
   async complete(req: CompletionRequest): Promise<{ text: string; model: string }> {
-    const model = req.model || this.spec.defaultModel;
+    let model = req.model || this.spec.defaultModel;
     const url = `${resolveBaseUrl(this.spec)}/models/${model}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.buildBody(req)),
     });
+
+    if (!response.ok && response.status === 404 && model !== "gemini-3.6-flash") {
+      const fallbackUrl = `${resolveBaseUrl(this.spec)}/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(req.apiKey)}`;
+      const retryRes = await fetch(fallbackUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(this.buildBody(req)),
+      });
+      if (retryRes.ok) {
+        response = retryRes;
+        model = "gemini-3.6-flash";
+      }
+    }
+
     if (!response.ok) return throwForBadResponse(this.id, response);
     const data = (await response.json()) as any;
     return { text: this.extractText(data), model };
