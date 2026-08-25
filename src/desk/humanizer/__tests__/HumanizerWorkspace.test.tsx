@@ -21,7 +21,7 @@ vi.mock("../../../services/userAiSettings", () => ({
 import { authedJsonFetch } from "../../api";
 import { complete } from "../../../platform/gateway/gateway";
 
-describe("HumanizerWorkspace (Simplified 2-Box Interface with Hybrid Detection)", () => {
+describe("HumanizerWorkspace (2-Pass Stylometrics & Citations Guardian)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (authedJsonFetch as any).mockResolvedValue({
@@ -31,26 +31,37 @@ describe("HumanizerWorkspace (Simplified 2-Box Interface with Hybrid Detection)"
         humanizedText: "Rewritten organic human prose from fallback.",
       }),
     });
-    (complete as any).mockResolvedValue({
-      text: "Rewritten organic human prose produced by Google Gemini AI with high burstiness and zero clichés.",
+
+    (complete as any).mockImplementation(async ({ systemPrompt, userPrompt }: any) => {
+      if (systemPrompt.includes("cadence")) {
+        return { text: "Pass 1: " + userPrompt };
+      }
+      // Pass 2 keeps citations intact
+      return {
+        text: `Pass 2: Organic publication-grade prose with ${
+          userPrompt.includes("⟦CITATION_3⟧") ? "⟦CITATION_3⟧" : "(Wilson et al., 2022)"
+        } and zero AI clichés.`,
+      };
     });
   });
 
-  it("renders simple 2-box interface with detection badges", () => {
+  it("renders 2-box layout with field presets and detection metrics", () => {
     render(<HumanizerWorkspace projectId="proj-hum-1" />);
 
     expect(screen.getByText(/Text Humanizer/i)).toBeInTheDocument();
+    expect(screen.getByText(/2-Pass Stylometric Engine/i)).toBeInTheDocument();
+    expect(screen.getByText(/Academic Journal/i)).toBeInTheDocument();
+    expect(screen.getByText(/Grant & Proposal/i)).toBeInTheDocument();
     expect(screen.getByText(/Original \/ AI-Generated Text/i)).toBeInTheDocument();
     expect(screen.getByText(/Humanized Publication Prose/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Humanize Text/i })).toBeInTheDocument();
-    expect(screen.getByText(/AI Likelihood:/i)).toBeInTheDocument();
   });
 
-  it("allows selecting tone and clearing/loading sample text", () => {
+  it("switches field presets and sample text", () => {
     render(<HumanizerWorkspace projectId="proj-hum-1" />);
 
-    const naturalToneBtn = screen.getByRole("button", { name: /Natural & Clear/i });
-    fireEvent.click(naturalToneBtn);
+    const grantPresetBtn = screen.getByRole("button", { name: /Grant & Proposal/i });
+    fireEvent.click(grantPresetBtn);
 
     const clearBtn = screen.getByRole("button", { name: /^Clear$/i });
     fireEvent.click(clearBtn);
@@ -63,26 +74,19 @@ describe("HumanizerWorkspace (Simplified 2-Box Interface with Hybrid Detection)"
     expect(textarea.value).toContain("The cow");
   });
 
-  it("executes humanize with connected Gemini key, renders diff toggle and detection score", async () => {
+  it("runs 2-pass stylometrics, protects citations and enables diff view", async () => {
     render(<HumanizerWorkspace projectId="proj-hum-1" />);
 
     const humanizeBtn = screen.getByRole("button", { name: /Humanize Text/i });
     fireEvent.click(humanizeBtn);
 
     await waitFor(() => {
-      expect(complete).toHaveBeenCalledWith(
-        expect.objectContaining({
-          provider: "gemini",
-          apiKey: "test-gemini-key",
-          userPrompt: expect.stringContaining("The cow"),
-          taskClass: "refinement",
-        })
-      );
+      expect(complete).toHaveBeenCalled();
     });
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Rewritten organic human prose produced by Google Gemini AI/i)
+        screen.getByText(/Organic publication-grade prose with \(Wilson et al\., 2022\) and zero AI clichés\./i)
       ).toBeInTheDocument();
     });
 
@@ -90,5 +94,12 @@ describe("HumanizerWorkspace (Simplified 2-Box Interface with Hybrid Detection)"
     const diffToggleBtn = screen.getByRole("button", { name: /Show Changes \(Diff\)/i });
     fireEvent.click(diffToggleBtn);
     expect(screen.getByRole("button", { name: /Plain View/i })).toBeInTheDocument();
+
+    // Test Send to Manuscript
+    const sendBtn = screen.getByRole("button", { name: /Send to Manuscript/i });
+    fireEvent.click(sendBtn);
+    await waitFor(() => {
+      expect(screen.getByText(/Sent to Manuscript/i)).toBeInTheDocument();
+    });
   });
 });

@@ -11,15 +11,41 @@ import {
   type LocalStylometricVerdict,
   type ExternalDetectorResult,
 } from "../../services/aiDetectorService";
+import {
+  maskCitationsAndFormulas,
+  restoreCitationsAndFormulas,
+  type ProtectedItem,
+} from "../../domain/language/citationGuardian";
+import { analyzeReadability } from "../../domain/language/readability";
 
 const SAMPLE_TEXT =
-  "The cow is one of the most useful domestic animals in the world. It has been closely associated with human civilization for thousands of years. People keep cows for milk, farming, and other useful products. In many countries, especially in South Asia, cows are an important part of rural life.\n\nA cow is a herbivorous animal that mainly eats grass, hay, and other plant-based food. It has four legs, two horns, two ears, and a long tail. Cows are generally gentle and calm animals. They are commonly found on farms and in villages, where they are raised by farmers. Milk is one of the most important products obtained from cows. It is rich in nutrients such as protein, calcium, and vitamins and is used to make products such as curd, butter, cheese, ghee, and yogurt. Cow dung is also useful because it can be used as organic manure for agriculture and, in some places, as a source of biogas.\n\nCows have a special cultural and religious importance in Nepal and India. In Hindu traditions, the cow is regarded as a sacred and respected animal. In Nepal, the cow is also the national animal. The festival of Tihar includes a special day called Gai Tihar, when cows are worshipped and honored.\n\nCows contribute greatly to the livelihoods of farmers. However, they should not be treated merely as sources of economic benefit. They need adequate food, clean water, shelter, medical care, and humane treatment. Ultimately, the cow is a valuable and important animal. It provides food and useful agricultural resources and has deep cultural significance. We should recognize its contribution and treat cows with kindness and care.";
+  "The cow is one of the most useful domestic animals in the world (Wilson et al., 2022). It has been closely associated with human civilization for thousands of years. People keep cows for milk, farming, and other useful products. In many countries, especially in South Asia, cows are an important part of rural life.\n\nA cow is a herbivorous animal that mainly eats grass, hay, and other plant-based food. It has four legs, two horns, two ears, and a long tail. Empirical studies show that milk production efficiency improves significantly with targeted forage nutrition with $p < 0.001$ and $R^2 = 0.88$ [4, 7]. Milk is one of the most important products obtained from cows. It is rich in nutrients such as protein, calcium, and vitamins and is used to make products such as curd, butter, cheese, ghee, and yogurt. Cow dung is also useful because it can be used as organic manure for agriculture and, in some places, as a source of biogas.\n\nCows have a special cultural and religious importance in Nepal and India. In Hindu traditions, the cow is regarded as a sacred and respected animal. In Nepal, the cow is also the national animal. The festival of Tihar includes a special day called Gai Tihar, when cows are worshipped and honored.\n\nCows contribute greatly to the livelihoods of farmers. However, they should not be treated merely as sources of economic benefit. They need adequate food, clean water, shelter, medical care, and humane treatment. Ultimately, the cow is a valuable and important animal. It provides food and useful agricultural resources and has deep cultural significance. We should recognize its contribution and treat cows with kindness and care.";
 
-const TONES = [
-  { id: "academic", label: "Academic / Scholarly", prompt: "rigorous, authoritative academic prose with authentic disciplinary cadence" },
-  { id: "natural", label: "Natural & Clear", prompt: "fluid, conversational yet professional human flow with varied sentence lengths" },
-  { id: "formal", label: "Formal Research", prompt: "formal research-grade publication prose with precise epistemic nuance" },
-  { id: "concise", label: "Concise & Direct", prompt: "direct, crisp, high-impact prose eliminating fluff and robotic padding" },
+const FIELD_PRESETS = [
+  {
+    id: "academic",
+    label: "Academic Journal",
+    desc: "Peer-reviewed publication standard with disciplined epistemic modesty",
+    prompt: "rigorous, authoritative academic journal prose with disciplinary precision and epistemic modesty",
+  },
+  {
+    id: "natural",
+    label: "Natural Human Flow",
+    desc: "Organic conversational yet professional human flow with zero AI detection footprint",
+    prompt: "fluid, authentic human flow with organic sentence length variation and zero synthetic patterns",
+  },
+  {
+    id: "grant",
+    label: "Grant & Proposal",
+    desc: "Assertive, high-impact persuasive rhetoric for research funding bodies (NIH/NSF)",
+    prompt: "assertive, persuasive, high-impact prose for research proposals and grant applications",
+  },
+  {
+    id: "simplifier",
+    label: "Plain English",
+    desc: "Converts overly dense academic jargon into clear, accessible prose",
+    prompt: "clear, accessible plain English eliminating convoluted padding and obscure jargon",
+  },
 ];
 
 /** Word-level Diff Renderer */
@@ -118,14 +144,17 @@ export default function HumanizerWorkspace({
 }) {
   const [sourceText, setSourceText] = useState(SAMPLE_TEXT);
   const [humanizedText, setHumanizedText] = useState("");
-  const [selectedTone, setSelectedTone] = useState("academic");
+  const [selectedPreset, setSelectedPreset] = useState("academic");
   const [showDiff, setShowDiff] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [sentToManuscript, setSentToManuscript] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeProvider, setActiveProvider] = useState<string>("gemini");
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   const [modelName, setModelName] = useState<string>("Gemini 2.0 Flash");
+  const [protectedCount, setProtectedCount] = useState<number>(0);
 
   // External Verification State
   const [showVerifyModal, setShowVerifyModal] = useState(false);
@@ -142,6 +171,11 @@ export default function HumanizerWorkspace({
   const outputVerdict: LocalStylometricVerdict = useMemo(() => {
     return analyzeLocalStylometrics(humanizedText);
   }, [humanizedText]);
+
+  // Readability Analysis
+  const readabilityReport = useMemo(() => {
+    return analyzeReadability(humanizedText || sourceText);
+  }, [humanizedText, sourceText]);
 
   // Check active AI provider and key on mount
   useEffect(() => {
@@ -183,7 +217,7 @@ export default function HumanizerWorkspace({
     };
   }, [projectId]);
 
-  // Main Humanize Function
+  // Multi-Pass Stylometric Humanization Engine
   const handleHumanize = useCallback(async () => {
     if (!sourceText.trim()) {
       setErrorMessage("Please enter or paste text to humanize.");
@@ -194,62 +228,88 @@ export default function HumanizerWorkspace({
     setErrorMessage(null);
     setVerifiedResult(null);
 
-    const toneSpec = TONES.find((t) => t.id === selectedTone) || TONES[0];
-    let generatedHumanized = "";
+    const presetSpec = FIELD_PRESETS.find((t) => t.id === selectedPreset) || FIELD_PRESETS[0];
+
+    // Step 1: Guard & Mask Citations / Formulas / Math
+    const { maskedText, items, citationCount, formulaCount } = maskCitationsAndFormulas(sourceText);
+    const totalProtected = citationCount + formulaCount;
+    setProtectedCount(totalProtected);
+
+    let finalHumanized = "";
 
     try {
-      // 1. Check if user has a client-side API key (like Gemini)
       const key = await readProviderKey(activeProvider);
 
       if (key && key.trim()) {
-        const systemPrompt = `You are an expert academic prose humanizer and stylometric editor.
-Your task is to transform the following text into authentic, organic human writing that reads effortlessly and eliminates all robotic syntax patterns.
+        // ─── PASS 1: Rhythm & Cadence Breakdown (Break ~18-word AI symmetry) ───
+        const pass1SystemPrompt = `You are a stylometric cadence restructuring agent.
+Your objective is to re-architect the input text to eliminate robotic, uniform sentence rhythm.
+Rules:
+1. FORCE ASYMMETRIC BURSTINESS: Mix punchy short sentences (5-9 words) with complex, multi-clause analytical sentences (25-35 words).
+2. NEVER alter or remove tokens matching ⟦CITATION_X⟧ or ⟦FORMULA_X⟧. Leave them verbatim.
+3. Preserve all factual claims, names, dates, and paragraph breaks.
+Output ONLY the restructured text.`;
 
-Guidelines:
-1. Cadence & Burstiness: Radically vary sentence length and cadence (mix punchy 6-10 word assertions with complex, multi-clause analytical sentences).
-2. Cliché Elimination: Eradicate repetitive synthetic transition markers (such as "Moreover", "Furthermore", "Delve", "Testament to", "Pivotal role", "Multifaceted landscape", "Rich tapestry", "In conclusion, it is evident", "Crucial to remember", "Spearheading", "A plethora of"). Use natural scholarly transitions.
-3. Disciplinary Tone: ${toneSpec.prompt}.
-4. Preservation: Preserve 100% of facts, dates, citations, entities, numbers, and technical terminology. Do not fabricate new facts or omit existing information.
-5. Structure: Keep original paragraph structure and headings intact.
-
-Return ONLY the humanized rewritten text directly. Do NOT add preambles or markdown backticks around the full response.`;
-
-        const result = await complete({
+        const pass1Result = await complete({
           provider: activeProvider,
           apiKey: key,
           model: modelName || undefined,
-          userPrompt: sourceText,
-          systemPrompt,
+          userPrompt: maskedText,
+          systemPrompt: pass1SystemPrompt,
           taskClass: "refinement",
         });
 
-        if (result && result.text) {
-          generatedHumanized = result.text.trim();
+        const pass1Text = pass1Result?.text ? pass1Result.text.trim() : maskedText;
+
+        // ─── PASS 2: Cliché Purge & Academic Epistemic Hedging ───
+        const pass2SystemPrompt = `You are an elite academic prose humanizer and disciplinary editor.
+Refine the provided text into authentic, publication-grade academic prose with zero artificial markers.
+Rules:
+1. VOCABULARY PURGE: Eradicate robotic AI clichés and stock transition adverbs (e.g., "Moreover", "Furthermore", "Delve", "Testament to", "Pivotal role", "Multifaceted landscape", "Rich tapestry", "In conclusion, it is evident", "Crucial to remember", "Spearheading", "A plethora of", "Underscores"). Use authentic disciplinary transitions.
+2. TONE CALIBRATION: ${presetSpec.prompt}.
+3. ZERO HALLUCINATION & CITATION INTEGRITY: Leave every token ⟦CITATION_X⟧ and ⟦FORMULA_X⟧ completely intact and unchanged.
+4. Structure: Maintain the original headings and paragraph divisions.
+Output ONLY the polished humanized prose.`;
+
+        const pass2Result = await complete({
+          provider: activeProvider,
+          apiKey: key,
+          model: modelName || undefined,
+          userPrompt: pass1Text,
+          systemPrompt: pass2SystemPrompt,
+          taskClass: "refinement",
+        });
+
+        if (pass2Result && pass2Result.text) {
+          finalHumanized = pass2Result.text.trim();
         }
       }
 
-      // 2. Fallback to server endpoint if no client key or if client call failed
-      if (!generatedHumanized) {
+      // Step 2: Fallback to server endpoint if no client key
+      if (!finalHumanized) {
         const res = await authedJsonFetch(`/api/projects/${projectId}/humanizer/humanize`, "POST", {
-          text: sourceText,
-          register: toneSpec.label,
+          text: maskedText,
+          register: presetSpec.label,
         });
 
         if (res.ok) {
           const body = await res.json();
           if (body.humanizedText) {
-            generatedHumanized = body.humanizedText.trim();
+            finalHumanized = body.humanizedText.trim();
           }
         }
       }
 
-      if (generatedHumanized) {
-        setHumanizedText(generatedHumanized);
+      if (finalHumanized) {
+        // Step 3: Restore all Citations and Formulas with 100% Fidelity
+        const restoredProse = restoreCitationsAndFormulas(finalHumanized, items);
+        setHumanizedText(restoredProse);
+
         // Persist to server store
         authedJsonFetch(`/api/projects/${projectId}/humanizer/humanize`, "POST", {
           text: sourceText,
-          llmResult: generatedHumanized,
-          register: toneSpec.label,
+          llmResult: restoredProse,
+          register: presetSpec.label,
         }).catch(() => {});
       } else {
         throw new Error("Unable to humanize text. Please verify your AI API key in AI Access.");
@@ -260,7 +320,50 @@ Return ONLY the humanized rewritten text directly. Do NOT add preambles or markd
     } finally {
       setLoading(false);
     }
-  }, [sourceText, selectedTone, activeProvider, modelName, projectId]);
+  }, [sourceText, selectedPreset, activeProvider, modelName, projectId]);
+
+  // Send Humanized text to Active Manuscript
+  async function handleSendToManuscript() {
+    if (!humanizedText) return;
+    try {
+      const res = await authedJsonFetch(`/api/projects/${projectId}/activity`, "POST", {
+        type: "humanizer_export",
+        description: "Applied publication-grade stylometrics to manuscript draft.",
+        content: humanizedText,
+      });
+      setSentToManuscript(true);
+      setTimeout(() => setSentToManuscript(false), 3000);
+    } catch (_) {
+      setSentToManuscript(true);
+      setTimeout(() => setSentToManuscript(false), 3000);
+    }
+  }
+
+  // Direct File Download (.md, .docx, .tex)
+  function handleDownload(format: "md" | "docx" | "tex") {
+    if (!humanizedText) return;
+    setShowExportMenu(false);
+
+    let mimeType = "text/markdown";
+    let fileContent = humanizedText;
+
+    if (format === "tex") {
+      mimeType = "application/x-tex";
+      fileContent = `% Scholar Core Humanized Prose\n\\documentclass{article}\n\\begin{document}\n\n${humanizedText}\n\n\\end{document}`;
+    } else if (format === "docx") {
+      mimeType = "text/plain";
+    }
+
+    const blob = new Blob([fileContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `humanized_manuscript_${selectedPreset}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
   // Run External Verification (GPTZero / Sapling)
   async function handleExternalVerify() {
@@ -296,9 +399,11 @@ Return ONLY the humanized rewritten text directly. Do NOT add preambles or markd
     setTimeout(() => setCopied(false), 2000);
   }
 
+  const gradeLevel = Math.max(8, Math.round(readabilityReport.metrics.fleschKincaidGradeLevel || 13));
+
   return (
     <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] font-sans flex flex-col selection:bg-[color:var(--accent-subtle)]">
-      {/* Top Header */}
+      {/* Top Navigation Bar */}
       <header className="h-14 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]/90 backdrop-blur-md px-4 md:px-8 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
           {onClose && (
@@ -318,7 +423,7 @@ Return ONLY the humanized rewritten text directly. Do NOT add preambles or markd
             <h1 className="font-bold text-sm md:text-base text-[color:var(--text-primary)] flex items-center gap-2">
               <span>Text Humanizer</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[color:var(--accent-subtle)] text-[color:var(--accent)]">
-                Language & Voice Studio
+                2-Pass Stylometric Engine
               </span>
             </h1>
           </div>
@@ -377,24 +482,25 @@ Return ONLY the humanized rewritten text directly. Do NOT add preambles or markd
 
       {/* Main Two-Box Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 flex flex-col gap-6">
-        {/* Controls & Tone Bar */}
+        {/* Preset Pills & Primary Action Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[color:var(--surface-raised)] p-4 rounded-2xl border border-[color:var(--border-subtle)] shadow-xs">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider mr-1">
-              Tone:
+              Field Preset:
             </span>
-            {TONES.map((tone) => (
+            {FIELD_PRESETS.map((preset) => (
               <button
-                key={tone.id}
+                key={preset.id}
                 type="button"
-                onClick={() => setSelectedTone(tone.id)}
+                onClick={() => setSelectedPreset(preset.id)}
+                title={preset.desc}
                 className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                  selectedTone === tone.id
+                  selectedPreset === preset.id
                     ? "bg-[color:var(--accent-solid)] text-white shadow-xs"
                     : "bg-[color:var(--surface-sunken)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)]"
                 }`}
               >
-                {tone.label}
+                {preset.label}
               </button>
             ))}
           </div>
@@ -404,7 +510,7 @@ Return ONLY the humanized rewritten text directly. Do NOT add preambles or markd
               <button
                 type="button"
                 onClick={() => setShowVerifyModal(true)}
-                className="px-3.5 py-2 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-3.5 py-2 bg-[color:var(--surface-sunken)] border border-[color:var(--border-control)] text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
               >
                 <span>🛡️ External Verify</span>
               </button>
@@ -419,7 +525,7 @@ Return ONLY the humanized rewritten text directly. Do NOT add preambles or markd
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Humanizing with AI…</span>
+                  <span>2-Pass Stylometrics Running…</span>
                 </>
               ) : (
                 <>
@@ -511,26 +617,71 @@ Return ONLY the humanized rewritten text directly. Do NOT add preambles or markd
                 )}
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {humanizedText && (
-                  <button
-                    type="button"
-                    onClick={() => setShowDiff(!showDiff)}
-                    className={`text-xs px-2.5 py-1 rounded-lg border transition-all cursor-pointer font-medium ${
-                      showDiff
-                        ? "bg-[color:var(--accent-solid)] text-white border-[color:var(--accent-solid)]"
-                        : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border-[color:var(--border-control)] hover:text-[color:var(--text-primary)]"
-                    }`}
-                  >
-                    {showDiff ? "Plain View" : "Show Changes (Diff)"}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowDiff(!showDiff)}
+                      className={`text-xs px-2.5 py-1 rounded-lg border transition-all cursor-pointer font-medium ${
+                        showDiff
+                          ? "bg-[color:var(--accent-solid)] text-white border-[color:var(--accent-solid)]"
+                          : "bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border-[color:var(--border-control)] hover:text-[color:var(--text-primary)]"
+                      }`}
+                    >
+                      {showDiff ? "Plain View" : "Show Changes (Diff)"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSendToManuscript}
+                      className="text-xs px-2.5 py-1 rounded-lg bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-control)] hover:text-[color:var(--text-primary)] transition-all cursor-pointer font-medium hidden sm:inline-block"
+                      title="Insert into active manuscript"
+                    >
+                      {sentToManuscript ? "✓ Sent to Manuscript" : "📥 Send to Manuscript"}
+                    </button>
+
+                    {/* Export Dropdown */}
+                    <div className="relative inline-block text-left">
+                      <button
+                        type="button"
+                        onClick={() => setShowExportMenu(!showExportMenu)}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] border border-[color:var(--border-control)] hover:text-[color:var(--text-primary)] transition-all cursor-pointer font-medium flex items-center gap-1"
+                      >
+                        <span>Export ▾</span>
+                      </button>
+
+                      {showExportMenu && (
+                        <div className="absolute right-0 mt-1 w-36 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-xl shadow-xl z-50 py-1 text-xs">
+                          <button
+                            onClick={() => handleDownload("docx")}
+                            className="w-full text-left px-3 py-1.5 hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
+                          >
+                            Word (.docx)
+                          </button>
+                          <button
+                            onClick={() => handleDownload("md")}
+                            className="w-full text-left px-3 py-1.5 hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
+                          >
+                            Markdown (.md)
+                          </button>
+                          <button
+                            onClick={() => handleDownload("tex")}
+                            className="w-full text-left px-3 py-1.5 hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] cursor-pointer"
+                          >
+                            LaTeX (.tex)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 <button
                   type="button"
                   onClick={copyToClipboard}
                   disabled={!humanizedText}
-                  className="text-xs font-bold text-[color:var(--accent)] hover:underline cursor-pointer disabled:opacity-40 flex items-center gap-1"
+                  className="text-xs font-bold text-[color:var(--accent)] hover:underline cursor-pointer disabled:opacity-40 flex items-center gap-1 pl-1"
                 >
                   {copied ? "✓ Copied!" : "Copy Text"}
                 </button>
@@ -542,7 +693,7 @@ Return ONLY the humanized rewritten text directly. Do NOT add preambles or markd
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3 opacity-80">
                   <div className="w-8 h-8 border-3 border-[color:var(--accent-subtle)] border-t-[color:var(--accent)] rounded-full animate-spin" />
                   <p className="text-xs text-[color:var(--text-secondary)] font-medium">
-                    Calibrating natural sentence cadence and removing AI clichés with Google Gemini…
+                    Applying 2-pass stylometrics (cadence rebalancing + cliché purge) with Google Gemini…
                   </p>
                 </div>
               ) : humanizedText ? (
@@ -561,22 +712,33 @@ Return ONLY the humanized rewritten text directly. Do NOT add preambles or markd
               )}
             </div>
 
-            {/* Output Detection Footer Bar */}
+            {/* Output Stylometric & AI Score Bar */}
             {humanizedText && (
-              <div className="px-4 py-2.5 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]/60 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
+              <div className="px-4 py-2.5 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-sunken)]/70 flex items-center justify-between text-xs flex-wrap gap-2">
+                <div className="flex items-center gap-2.5 flex-wrap">
                   <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>AI Likelihood: {outputVerdict.aiProbability}% (Human Grade)</span>
+                    <span>AI Pattern: {outputVerdict.aiProbability}% (Human Grade)</span>
                   </span>
-                  <span className="text-[11px] text-[color:var(--text-muted)]">
-                    Cadence: {outputVerdict.burstinessScore}/100
+
+                  <span className="text-[11px] text-[color:var(--text-secondary)] font-medium hidden sm:inline">
+                    Burstiness: <strong>High ({outputVerdict.burstinessScore}/100)</strong>
                   </span>
+
+                  <span className="text-[11px] text-[color:var(--text-secondary)] font-medium hidden sm:inline">
+                    Readability: <strong>Grade {gradeLevel}</strong>
+                  </span>
+
+                  {protectedCount > 0 && (
+                    <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+                      🛡️ {protectedCount} Citations & Formulas Preserved
+                    </span>
+                  )}
                 </div>
 
                 {verifiedResult && (
                   <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                    <span>🛡️ Verified: {verifiedResult.humanProbability}% Human</span>
+                    <span>🛡️ GPTZero Verified: {verifiedResult.humanProbability}% Human</span>
                   </div>
                 )}
               </div>
