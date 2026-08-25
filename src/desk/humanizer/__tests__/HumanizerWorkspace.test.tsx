@@ -9,80 +9,80 @@ vi.mock("../../api", () => ({
   authedJsonFetch: vi.fn(),
 }));
 
-import { authedJsonFetch } from "../../api";
+vi.mock("../../../platform/gateway/gateway", () => ({
+  complete: vi.fn(),
+}));
 
-describe("HumanizerWorkspace", () => {
+vi.mock("../../../services/userAiSettings", () => ({
+  loadUserAiSettings: vi.fn().mockResolvedValue({ provider: "gemini", preferences: {} }),
+  readProviderKey: vi.fn().mockResolvedValue("test-gemini-key"),
+}));
+
+import { authedJsonFetch } from "../../api";
+import { complete } from "../../../platform/gateway/gateway";
+
+describe("HumanizerWorkspace (Simplified 2-Box Interface)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (authedJsonFetch as any).mockResolvedValue({
       ok: true,
       json: async () => ({
         success: true,
-        humanizedText: "Rewritten organic scholarly prose with varied sentence cadence.",
-        burstinessScore: 88,
-        aiProbability: 8,
-        improvements: ["Replaced cliché transition adverbs.", "Balanced sentence cadence."],
+        humanizedText: "Rewritten organic human prose from fallback.",
       }),
+    });
+    (complete as any).mockResolvedValue({
+      text: "Rewritten organic human prose produced by Google Gemini AI with high burstiness and zero clichés.",
     });
   });
 
-  it("renders side-by-side stylometric studio with AI clichés and humanized prose", () => {
+  it("renders simple 2-box interface without complex side rails", () => {
     render(<HumanizerWorkspace projectId="proj-hum-1" />);
 
-    expect(screen.getByText(/Stylometric Tone & Burstiness Calibration/i)).toBeInTheDocument();
-    expect(screen.getByText(/Side-by-Side Stylometric Studio/i)).toBeInTheDocument();
-    expect(screen.getByText(/Draft Input \(AI \/ Raw Text\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Publication-Grade Humanized Prose/i)).toBeInTheDocument();
-    expect(screen.getByText(/Burstiness Meter/i)).toBeInTheDocument();
+    expect(screen.getByText(/Text Humanizer/i)).toBeInTheDocument();
+    expect(screen.getByText(/Original \/ AI-Generated Text/i)).toBeInTheDocument();
+    expect(screen.getByText(/Humanized Publication Prose/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Humanize Text/i })).toBeInTheDocument();
   });
 
-  it("switches stages when clicking on stage navigation rail", async () => {
+  it("allows selecting tone and clearing/loading sample text", () => {
     render(<HumanizerWorkspace projectId="proj-hum-1" />);
 
-    // Click 2. Register & Persona
-    const personaButton = screen.getByText(/2. Register & Persona/i);
-    fireEvent.click(personaButton);
-    expect(screen.getByText(/Target Disciplinary Register/i)).toBeInTheDocument();
-    expect(screen.getByText(/Calibrated Author Persona/i)).toBeInTheDocument();
+    const naturalToneBtn = screen.getByRole("button", { name: /Natural & Clear/i });
+    fireEvent.click(naturalToneBtn);
 
-    // Click 3. Burstiness & Rhythm
-    const rhythmButton = screen.getByText(/3. Burstiness & Rhythm/i);
-    fireEvent.click(rhythmButton);
-    expect(screen.getByText(/Sentence Length Variation & Cadence Tuning/i)).toBeInTheDocument();
-    expect(screen.getByText(/High Dynamic Cadence/i)).toBeInTheDocument();
+    const clearBtn = screen.getByRole("button", { name: /^Clear$/i });
+    fireEvent.click(clearBtn);
 
-    // Click 4. Hedging & Modality
-    const hedgingButton = screen.getByText(/4. Hedging & Modality/i);
-    fireEvent.click(hedgingButton);
-    expect(screen.getByText(/Epistemic Hedging & Scholarly Caution/i)).toBeInTheDocument();
-    expect(screen.getByText(/Strict Academic Caution/i)).toBeInTheDocument();
+    const textarea = screen.getByPlaceholderText(/Paste your AI-generated text/i) as HTMLTextAreaElement;
+    expect(textarea.value).toBe("");
 
-    // Click 5. Provenance Gate
-    const provenanceButton = screen.getByText(/5. Provenance Gate/i);
-    fireEvent.click(provenanceButton);
-    expect(screen.getByText(/Zero Hallucination Guarantee/i)).toBeInTheDocument();
+    const loadSampleBtn = screen.getByRole("button", { name: /Load Sample/i });
+    fireEvent.click(loadSampleBtn);
+    expect(textarea.value).toContain("The cow");
   });
 
-  it("executes humanize with authenticated fetch and updates publication prose", async () => {
+  it("executes humanize with connected Gemini key and populates right box", async () => {
     render(<HumanizerWorkspace projectId="proj-hum-1" />);
 
-    const humanizeBtn = screen.getByRole("button", { name: /Apply Human Stylometrics/i });
+    const humanizeBtn = screen.getByRole("button", { name: /Humanize Text/i });
     fireEvent.click(humanizeBtn);
 
     await waitFor(() => {
-      expect(authedJsonFetch).toHaveBeenCalledWith(
-        "/api/projects/proj-hum-1/humanizer/humanize",
-        "POST",
+      expect(complete).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.any(String),
-          register: expect.any(String),
-          persona: expect.any(String),
+          provider: "gemini",
+          apiKey: "test-gemini-key",
+          userPrompt: expect.stringContaining("The cow"),
+          taskClass: "refinement",
         })
       );
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/Rewritten organic scholarly prose/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Rewritten organic human prose produced by Google Gemini AI/i)
+      ).toBeInTheDocument();
     });
   });
 });

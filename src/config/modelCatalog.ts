@@ -229,11 +229,11 @@ export const MODEL_CATALOG: ModelSpec[] = [
     providerId: "gemini",
     modelId: "gemini-2.0-flash",
     displayName: "Gemini 2.0 Flash",
-    status: "deprecated",
-    capabilities: ["longContext", "vision"],
+    capabilities: ["reasoning", "longContext", "vision", "fastGeneration"],
+    contextWindow: 1_048_576,
+    inputModalities: ["text", "image", "document"],
     relativeQuality: "balanced",
     relativeSpeed: "fast",
-    notes: "Confirmed shut down / requires migration per Google's current models page.",
   }),
 
   // ─── Groq — verified 2026-08-13 (console.groq.com/docs/models) ───
