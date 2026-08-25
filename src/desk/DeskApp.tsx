@@ -28,11 +28,14 @@ const AccountSettingsScreen = lazy(() => import("./account/AccountSettingsScreen
 const AiAccessPage = lazy(() => import("./aiAccess/AiAccessPage"));
 const DeskShell = lazy(() => import("./DeskShell"));
 const ResearchWorkspace = lazy(() => import("./workspace/ResearchWorkspace"));
+const AssignmentWorkspace = lazy(() => import("./assignment/AssignmentWorkspace"));
 const ProjectListScreen = lazy(() => import("./ProjectListScreen"));
 const VaultSetupScreen = lazy(() => import("./setup/VaultSetupScreen"));
 const VaultScreen = lazy(() => import("./vault/VaultScreen"));
 const AgentsScreen = lazy(() => import("./agents/AgentsScreen"));
 
+import type { AssignmentStage } from "./assignment/types";
+import { ASSIGNMENT_STAGES } from "./assignment/types";
 
 const SECTION_IDS: readonly SectionId[] = ["overview", "local", "free", "byok", "premium", "models", "settings"];
 
@@ -48,6 +51,11 @@ function isDeskShellView(value: string | undefined): value is DeskShellView {
 
 function isResearchStage(value: string | undefined): value is ResearchStage {
   return !!value && STAGE_MAP.has(value as ResearchStage);
+}
+
+const ASSIGNMENT_STAGE_SET = new Set<string>(ASSIGNMENT_STAGES.map((s) => s.id));
+function isAssignmentStage(value: string | undefined): value is AssignmentStage {
+  return !!value && ASSIGNMENT_STAGE_SET.has(value);
 }
 
 /** Where to return to when closing Settings/Vault/AI Access — passed as router state on the way in, since these overlays aren't meant to grow their own history entries. */
@@ -199,6 +207,13 @@ function ProjectRoute() {
     [navigate, projectId]
   );
 
+  const onAssignmentStageChange = useCallback(
+    (next: AssignmentStage, options?: { replace?: boolean }) => {
+      navigate(`/projects/${projectId}/${next}`, options);
+    },
+    [navigate, projectId]
+  );
+
   // Guaranteed by the route pattern (":projectId" only matches with a value)
   // — this is TypeScript narrowing, not a real fallback path.
   if (!projectId) return <Navigate to="/projects" replace />;
@@ -234,6 +249,20 @@ function ProjectRoute() {
           <span className="text-sm text-[color:var(--text-muted)] font-medium">Loading project...</span>
         </div>
       </div>
+    );
+  }
+
+  if (outputTypeId === "OT-01") {
+    return (
+      <AssignmentWorkspace
+        projectId={projectId}
+        initialStage={isAssignmentStage(view) ? view : null}
+        onStageChange={onAssignmentStageChange}
+        onClose={() => navigate("/projects")}
+        onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+        onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
+        onOpenAiAccess={() => navigate("/ai-access", { state: { from: location.pathname } })}
+      />
     );
   }
 
