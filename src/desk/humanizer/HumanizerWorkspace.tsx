@@ -4,6 +4,7 @@ import { authedJsonFetch } from "../api";
 import { complete } from "../../platform/gateway/gateway";
 import { loadUserAiSettings, readProviderKey } from "../../services/userAiSettings";
 import { getCloudProvider } from "../../config/providerCatalog";
+import { defaultPolicy, recordConsent } from "../../platform/warden/warden";
 import {
   analyzeLocalStylometrics,
   verifyWithGptZero,
@@ -250,15 +251,20 @@ Rules:
 3. Preserve all factual claims, names, dates, and paragraph breaks.
 Output ONLY the restructured text.`;
 
-        const pass1Result = await complete({
-          provider: activeProvider,
-          apiKey: key,
-          model: modelName || undefined,
-          userPrompt: maskedText,
-          systemPrompt: pass1SystemPrompt,
-          taskClass: "refinement",
-          segments: [{ label: "draftText", text: maskedText }],
-        });
+        const userPolicy = recordConsent(defaultPolicy(), activeProvider);
+
+        const pass1Result = await complete(
+          {
+            provider: activeProvider,
+            apiKey: key,
+            model: modelName || undefined,
+            userPrompt: maskedText,
+            systemPrompt: pass1SystemPrompt,
+            taskClass: "refinement",
+            segments: [{ label: "draftText", text: maskedText }],
+          },
+          userPolicy
+        );
 
         const pass1Text = pass1Result?.text ? pass1Result.text.trim() : maskedText;
 
@@ -272,15 +278,18 @@ Rules:
 4. Structure: Maintain the original headings and paragraph divisions.
 Output ONLY the polished humanized prose.`;
 
-        const pass2Result = await complete({
-          provider: activeProvider,
-          apiKey: key,
-          model: modelName || undefined,
-          userPrompt: pass1Text,
-          systemPrompt: pass2SystemPrompt,
-          taskClass: "refinement",
-          segments: [{ label: "draftText", text: pass1Text }],
-        });
+        const pass2Result = await complete(
+          {
+            provider: activeProvider,
+            apiKey: key,
+            model: modelName || undefined,
+            userPrompt: pass1Text,
+            systemPrompt: pass2SystemPrompt,
+            taskClass: "refinement",
+            segments: [{ label: "draftText", text: pass1Text }],
+          },
+          userPolicy
+        );
 
         if (pass2Result && pass2Result.text) {
           finalHumanized = pass2Result.text.trim();

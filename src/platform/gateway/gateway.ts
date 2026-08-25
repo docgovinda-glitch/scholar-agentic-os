@@ -7,7 +7,7 @@
  * importing the adapter directly (see __tests__/noBypass.test.ts).
  */
 
-import { evaluate, type EgressPolicy } from "../warden/warden";
+import { evaluate, recordConsent, type EgressPolicy } from "../warden/warden";
 import { defaultPolicy } from "../warden/policy";
 import { getAdapter, AdapterHttpError } from "./adapters";
 import { GatewayDenied, type CompletionRequest, type CompletionResult, type CandidateProvider } from "./types";
