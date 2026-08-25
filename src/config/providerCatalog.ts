@@ -165,8 +165,8 @@ export const CLOUD_PROVIDERS = [
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
     chatPath: "/models",
     modelsPath: "/models",
-    defaultModel: "gemini-2.5-flash",
-    models: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
+    defaultModel: "gemini-3.6-flash",
+    models: ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
     freeTier: "freemium",
     freeTierNote: "Free tier with a generous daily request allowance; no card required.",
     getKeyUrl: "https://aistudio.google.com/app/apikey",
@@ -812,9 +812,20 @@ export const CLOUD_PROVIDERS = [
  *  be called directly from the browser. Kept as an explicit list because each
  *  one needs a matching CSP `connect-src` entry in server.ts — adding a
  *  provider here without updating the CSP silently breaks it in production. */
-export const DIRECT_BROWSER_CALL_ORIGINS: string[] = [
-  "https://generativelanguage.googleapis.com",
-];
+export const DIRECT_BROWSER_CALL_ORIGINS: string[] = Array.from(
+  new Set([
+    "https://generativelanguage.googleapis.com",
+    "https://api.gptzero.me",
+    "https://api.sapling.ai",
+    ...CLOUD_PROVIDERS.flatMap((p) => {
+      try {
+        return p.baseUrl ? [new URL(p.baseUrl).origin] : [];
+      } catch {
+        return [];
+      }
+    }),
+  ])
+);
 
 const PROVIDER_BY_ID: Record<string, CloudProviderSpec> = Object.fromEntries(
   CLOUD_PROVIDERS.map((p) => [p.id, p])

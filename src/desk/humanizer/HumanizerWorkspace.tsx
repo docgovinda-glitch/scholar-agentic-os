@@ -190,7 +190,10 @@ export default function HumanizerWorkspace({
         setHasApiKey(Boolean(key && key.trim()));
 
         const providerSpec = getCloudProvider(providerId);
-        const chosenModel = settings.preferences?.[`${providerId}_model`] || providerSpec?.defaultModel || "gemini-2.0-flash";
+        let chosenModel = settings.preferences?.[`${providerId}_model`] || providerSpec?.defaultModel || "gemini-3.6-flash";
+        if (providerId === "gemini" && (chosenModel === "gemini-2.5-flash" || !chosenModel)) {
+          chosenModel = "gemini-3.6-flash";
+        }
         setModelName(chosenModel);
       } catch (_) {}
     }

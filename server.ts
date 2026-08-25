@@ -28,6 +28,7 @@ import {
   getCloudProvider,
   chatUrl,
   buildAuthHeaders,
+  DIRECT_BROWSER_CALL_ORIGINS,
   type CloudProviderSpec,
 } from "./src/config/providerCatalog.ts";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
@@ -202,7 +203,7 @@ app.use(
         "connect-src": [
           "'self'",
           ...(supabaseOrigin ? [supabaseOrigin, supabaseOrigin.replace("https://", "wss://")] : []),
-          "https://generativelanguage.googleapis.com",
+          ...DIRECT_BROWSER_CALL_ORIGINS,
           "http://localhost:*",
           "http://127.0.0.1:*",
           ...localRunnerSources,
