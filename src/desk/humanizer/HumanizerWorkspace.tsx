@@ -330,7 +330,15 @@ Output ONLY the polished humanized prose.`;
       }
     } catch (err: any) {
       console.error("Humanizer failed:", err);
-      setErrorMessage(err.message || "Failed to humanize text. Please check your AI connection.");
+      let msg = err.message || "Failed to humanize text. Please check your AI connection.";
+      if (msg.includes("denied access") || msg.includes("403")) {
+        msg = "Google Gemini project was denied access by Google. Please create a new free API key at aistudio.google.com (in a new project) or switch to Groq in AI Access.";
+      } else if (msg.includes("401") || msg.includes("invalid_api_key")) {
+        msg = "Invalid API key. Please verify your key in AI Access.";
+      } else if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
+        msg = "Rate limit or quota reached. Please wait a moment or switch provider in AI Access.";
+      }
+      setErrorMessage(msg);
     } finally {
       setLoading(false);
     }
