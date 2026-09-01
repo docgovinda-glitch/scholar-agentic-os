@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "migrate:users-to-supabase": "tsx scripts/migrate-users-to-supabase.ts",
-    "seed:ai-registry": "tsx scripts/seedAiRegistry.ts",
+    "seed:ai-registry": "tsx -r dotenv/config scripts/seedAiRegistry.ts",
     "generate:knowledge": "node .claude/scripts/generate-knowledge.js",
     "validate:knowledge": "node .claude/scripts/validate-knowledge.js",
     "check:knowledge": "node .claude/scripts/check-drift.js",

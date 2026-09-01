@@ -59,6 +59,14 @@ import { getCaptchaConfig } from "../services/captchaService";
 describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuth.signUp.mockReset();
+    mockAuth.signInWithPassword.mockReset();
+    mockAuth.getUser.mockReset();
+    mockAuth.resetPasswordForEmail.mockReset();
+    mockAuth.updateUser.mockReset();
+    mockFrom.mockReset();
+    mockRpc.mockReset();
+    (global.fetch as any).mockReset?.();
   });
 
   describe("Test 1: Signup with CAPTCHA Verification", () => {
@@ -354,10 +362,9 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
     });
 
     it("rejects signup if CAPTCHA verification endpoint returns 429 (rate limited)", async () => {
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 429,
-        json: () => Promise.resolve({ success: false, error: "Too many requests" }),
+      mockAuth.signUp.mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: "Too many requests. Please try again later." },
       });
 
       const result = await signUp({
@@ -365,9 +372,9 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
         fullName: "Rate Limited User",
         email: "ratelimited@example.com",
         phone: "+1234567890",
-      phoneCountryCode: "+1",
-      userType: "student",
-      educationLevel: "undergraduate",
+        phoneCountryCode: "+1",
+        userType: "student",
+        educationLevel: "undergraduate",
         affiliation: "Test University",
         password: "TestPassword123!",
         captchaToken: "token",
@@ -379,10 +386,9 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
 
     it("re-challenges CAPTCHA after multiple failed attempts", async () => {
       // First attempt fails
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve({ success: false, error: "CAPTCHA verification failed" }),
+      mockAuth.signUp.mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: "CAPTCHA verification failed" },
       });
 
       const result1 = await signUp({
@@ -390,9 +396,9 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
         fullName: "No CAPTCHA User 1",
         email: "nocaptcha1@example.com",
         phone: "+1234567890",
-      phoneCountryCode: "+1",
-      userType: "student",
-      educationLevel: "undergraduate",
+        phoneCountryCode: "+1",
+        userType: "student",
+        educationLevel: "undergraduate",
         affiliation: "Test University",
         password: "TestPassword123!",
         captchaToken: "invalid_token_1",
@@ -401,11 +407,6 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
       expect(result1.success).toBe(false);
 
       // Second attempt with new token should be allowed to try
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
       mockAuth.signUp.mockResolvedValueOnce({
         data: { user: { id: "user-retry", email: "nocaptcha1@example.com" } },
         error: null,
@@ -416,9 +417,9 @@ describe("Phase 4: Integration Testing - Automated Authentication Flow", () => {
         fullName: "No CAPTCHA User 1",
         email: "nocaptcha1@example.com",
         phone: "+1234567890",
-      phoneCountryCode: "+1",
-      userType: "student",
-      educationLevel: "undergraduate",
+        phoneCountryCode: "+1",
+        userType: "student",
+        educationLevel: "undergraduate",
         affiliation: "Test University",
         password: "TestPassword123!",
         captchaToken: "valid_token_retry",

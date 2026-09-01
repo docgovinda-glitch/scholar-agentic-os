@@ -18,19 +18,69 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = { "Content-Type": "application/json", ...(init.headers as Record<string, string> | undefined), ...(await authHeaders()) };
-  const res = await fetch(path, { ...init, headers });
-  const body = await res.json().catch(() => null);
-  if (!res.ok) {
-    // Guarded: a non-OK response whose body is null (or an array, or a bare
-    // string) used to throw a TypeError here, hiding the actual HTTP failure
-    // behind an unrelated crash. `null` is a real shape this client sees —
-    // GET /premium-request returns it when a user has never asked.
-    const message = body && typeof body === "object" && !Array.isArray(body) ? (body as { error?: string }).error : undefined;
-    throw new Error(message || `Request failed (${res.status})`);
+interface ApiOptions extends RequestInit {
+  retries?: number;
+}
+
+async function api<T>(path: string, init: ApiOptions = {}): Promise<T> {
+  const method = (init.method || "GET").toUpperCase();
+  const maxRetries = init.retries ?? (method === "GET" ? 2 : 0);
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const headers = {
+      "Content-Type": "application/json",
+      ...(init.headers as Record<string, string> | undefined),
+      ...(await authHeaders()),
+    };
+
+    try {
+      const res = await fetch(path, { ...init, headers });
+      const body = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const isRetryable = res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504;
+        if (isRetryable && attempt < maxRetries) {
+          const retryAfterHeader = res.headers.get("retry-after");
+          const retryAfterSec = retryAfterHeader ? parseInt(retryAfterHeader, 10) : NaN;
+          const delayMs = !isNaN(retryAfterSec) && retryAfterSec > 0 && retryAfterSec <= 10
+            ? retryAfterSec * 1000
+            : Math.min(3000, 500 * Math.pow(2, attempt) + Math.random() * 200);
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+
+        const rawMessage =
+          body && typeof body === "object" && !Array.isArray(body)
+            ? (body as { error?: string; message?: string }).error ||
+              (body as { error?: string; message?: string }).message
+            : undefined;
+
+        let message = rawMessage;
+        if (!message) {
+          if (res.status === 429) {
+            message = "Rate limit reached (429). Please wait a moment.";
+          } else {
+            message = `Request failed (${res.status})`;
+          }
+        }
+        throw new Error(message);
+      }
+
+      return body as T;
+    } catch (err) {
+      if (attempt < maxRetries && (err as Error).name !== "AbortError") {
+        const isNetworkErr = err instanceof TypeError || (err as Error).message.includes("fetch");
+        if (isNetworkErr) {
+          const delayMs = 500 * Math.pow(2, attempt) + Math.random() * 200;
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+      }
+      throw err;
+    }
   }
-  return body as T;
+
+  throw new Error("Request failed after retries");
 }
 
 // ── User-facing AI Access ──────────────────────────────────────────────

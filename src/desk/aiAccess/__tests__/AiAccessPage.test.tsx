@@ -313,6 +313,24 @@ describe("Error handling", () => {
     // The page still renders its catalogue rather than blanking.
     expect(await screen.findByRole("button", { name: "Free AI" })).toBeInTheDocument();
   });
+
+  it("allows retrying live status when an error occurs", async () => {
+    const api = await import("../aiAccessApi");
+    vi.mocked(api.getAiAccessStatus).mockRejectedValueOnce(new Error("Request failed (429)"));
+    renderPage();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Request failed \(429\)/);
+    const retryBtn = screen.getByRole("button", { name: "Retry" });
+    expect(retryBtn).toBeInTheDocument();
+
+    vi.mocked(api.getAiAccessStatus).mockResolvedValueOnce(status);
+    fireEvent.click(retryBtn);
+
+    await waitFor(() => {
+      expect(api.getAiAccessStatus).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe("Onboarding mode — AI Access as the first destination after login", () => {

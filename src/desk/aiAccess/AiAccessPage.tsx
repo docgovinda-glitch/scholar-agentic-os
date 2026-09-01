@@ -178,9 +178,19 @@ export default function AiAccessPage({
 
         <main className="min-w-0">
           {access.error && (
-            <p role="alert" className="mb-4 rounded-[var(--radius-md)] border border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] px-3 py-2 text-sm text-[color:var(--state-warning)]">
-              Live status is unavailable ({access.error}). You can still browse providers; connecting needs the server.
-            </p>
+            <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] px-3 py-2 text-sm text-[color:var(--state-warning)]">
+              <span>
+                Live status is unavailable ({access.error}). You can still browse providers; connecting needs the server.
+              </span>
+              <button
+                type="button"
+                onClick={() => void access.refresh()}
+                disabled={access.loading}
+                className="shrink-0 rounded-[var(--radius-sm)] border border-[color:var(--state-warning)] px-2.5 py-1 text-xs font-medium hover:bg-[color:var(--state-warning)] hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {access.loading ? "Checking..." : "Retry"}
+              </button>
+            </div>
           )}
 
           {openProvider ? (
