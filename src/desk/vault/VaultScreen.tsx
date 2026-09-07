@@ -34,6 +34,7 @@ import VaultSetupScreen from "../setup/VaultSetupScreen";
 import VaultImport from "./VaultImport";
 import VaultDocumentImport from "./VaultDocumentImport";
 import { CitationConfirmationModal } from "./CitationConfirmationModal";
+import { downloadVaultZip } from "../../services/vault/vaultExportService";
 
 type VaultPresence = null | "none" | "other-device" | "this-device" | "synced";
 
@@ -242,6 +243,7 @@ function VaultContents({
   const [content, setContent] = useState("");
   const [citation, setCitation] = useState("");
   const [busy, setBusy] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Cloud drive integration modal
@@ -480,6 +482,27 @@ function VaultContents({
               {connectedDrives.length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
               )}
+            </button>
+
+            <button
+              type="button"
+              disabled={isExporting || !items || items.length === 0}
+              onClick={async () => {
+                if (!items || items.length === 0) return;
+                setIsExporting(true);
+                try {
+                  await downloadVaultZip(items);
+                } catch (err: any) {
+                  setError(err.message || "Failed to export Vault");
+                } finally {
+                  setIsExporting(false);
+                }
+              }}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[color:var(--border-default)] text-[color:var(--text-primary)] hover:border-[color:var(--accent)] hover:bg-[color:var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1.5"
+              title="Export complete Vault archive as open-format ZIP"
+            >
+              <span>📦</span>
+              <span>{isExporting ? "Exporting…" : "Export (.zip)"}</span>
             </button>
 
             <button

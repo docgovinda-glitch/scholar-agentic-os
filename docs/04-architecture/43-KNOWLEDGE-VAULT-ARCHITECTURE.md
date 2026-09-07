@@ -1,9 +1,9 @@
 # Knowledge Vault Architecture
 
 > **Doc ID:** 43 · **Status:** Design · **Depends on:** `44`, `45`, `46`
-> **Revision:** 3 — Client-held passphrase-encrypted local storage (Conflict #7 reconciliation).
+> **Revision:** 4 — Universal Vault v2 Dual Engine (Universal Cloud Sync + Browser-Held Encrypted Storage).
 
-The user's optional, encrypted, local, long-term knowledge corpus.
+The user's optional, encrypted or cloud-synced, long-term knowledge corpus.
 
 ---
 
@@ -16,12 +16,10 @@ Not a reference manager (it holds full content, not just metadata). Not a note
 app (it holds source material, not just notes). Not a file store (it is parsed,
 indexed, and semantically searchable).
 
-**Revision 3 (Conflict #7):** the Vault is **client-held and passphrase-encrypted**,
-stored in browser IndexedDB (`scholar-vault-items:<userId>`). The Scholar server
-stores **only** a lightweight existence record (`public.user_vaults`: `{ user_id, label, created_at }`).
-Server-side Vault content storage, server-side plaintext parsing, server-side OCR,
-and server-side embedding/indexing of private Vault items are **not** part of the
-authoritative architecture. Search over private Vault content is purely client-side.
+**Universal Vault v2 Dual Engine:**
+The Vault offers the user two distinct storage and privacy paradigms:
+1. **Universal Cloud Sync (Recommended):** Real-time multi-device synchronized storage backed by Supabase `public.user_vault_items` with Row Level Security (RLS). Automatically synchronizes papers, datasets, cloud drive files (Google Drive & OneDrive), and auto-extracted academic citations across any computer or browser.
+2. **Private Browser-Only Mode (Conflict #7):** Client-held and passphrase-encrypted, stored strictly in browser IndexedDB (`scholar-vault-items:<userId>`) with PBKDF2-SHA256 (100k iterations) and AES-GCM-256 encryption. Only a lightweight existence record (`public.user_vaults`: `{ user_id, label, storage_mode, created_at }`) resides on the server.
 
 For a PhD candidate in year four, the Vault is the answer to *"what did I read
 about this in 2023?"* — a question that is otherwise unanswerable and that
@@ -382,22 +380,23 @@ without a verified backup. See `44` §7 for the full backup regime and `RISK-04`
 
 | Component | Implementation |
 |---|---|
-| **Vault metadata** (`src/services/userVault.ts`) | `loadVault()`, `createVault()` — server stores only `{ user_id, label, created_at }` |
-| **Vault contents** (`src/services/vaultContents.ts`) | `addVaultItem()`, `listVaultItems()`, `searchVaultItems()`, `lockVault()`, `unlockVault()` — all client-side, encrypted in IndexedDB |
-| **Passphrase** (`src/services/userVault.ts`) | `setVaultPassphraseVerifier()`, `verifyVaultPassphrase()` — SHA-256 device-local verifier in localStorage |
-| **Recovery** (`src/services/userVault.ts`) | `generateRecoveryCode()` — Crockford-encoded, shown once, never server-stored |
-| **Encryption** (`src/utils/crypto.ts`) | PBKDF2-SHA256 (100k iterations) + AES-GCM-256, unique salt and IV per item |
-| **Client search** (`src/services/vaultContents.ts`) | Substring search over decrypted in-memory items; zero server involvement |
-| **Supabase schema** (`supabase/schema_user_settings.sql`) | `public.user_vaults` with RLS; no content/ciphertext/key columns |
+| **Universal Dual Engine** (`src/services/userVault.ts`, `src/services/vaultContents.ts`) | Supports both `synced` (Supabase RLS `user_vault_items`) and `local` (IndexedDB AES-GCM-256) |
+| **Vault metadata** (`src/services/userVault.ts`) | `loadVault()`, `createVault()`, `updateVaultStorageMode()`, `resetVault()` |
+| **Vault contents** (`src/services/vaultContents.ts`) | `addVaultItem()`, `listVaultItems()`, `searchVaultItems()`, `lockVault()`, `unlockVault()`, `deleteVaultItem()` |
+| **Multi-format Ingestion** (`src/desk/vault/VaultDocumentImport.tsx`, `server/routes/vault.ts`) | PDFs (with metadata heuristic parsing), DOCX (`mammoth`), XLSX/CSV (`xlsx`), BibTeX/RIS, Plain Text, DOIs (Crossref API), Web URLs & YouTube |
+| **Cloud Drive Integration** (`src/services/vault/cloudDriveService.ts`) | Google Drive & Microsoft OneDrive OAuth2 browsing, search, and import |
+| **Reference Manager Ingestion** (`src/desk/vault/VaultDocumentImport.tsx`) | Zotero API sync and Mendeley BibTeX parsing |
+| **Academic Citation Engine** (`src/services/vault/citationService.ts`) | Multi-style formatting (APA7, IEEE, MLA9, Chicago, Harvard, Vancouver), in-text citations, and BibTeX conversion |
+| **Project Approval Gate** (`src/desk/workspace/stages/VaultSourcesStage.tsx`) | Archivist Agent scans Vault, computes relevance, and requires user approval before adding to project corpus (`REQ-VLT-5`) |
+| **Passphrase & Recovery** (`src/services/userVault.ts`) | Local SHA-256 verifier in localStorage, `generateRecoveryCode()` Crockford-encoded |
+| **Portable Open Export** (`src/services/vault/vaultExportService.ts`) | `exportVaultAsZip()` produces `.zip` with `manifest.json`, `references.bib`, and `documents/<id>/content.md` (`REQ-VLT-7`) |
 
-### 13.2 Not yet built (Future phases)
+### 13.2 Remaining / Future Enhancements
 
 | Target | Status |
 |---|---|
-| Full-text BM25 index over Vault content | `TextIndex` exists but not wired to Vault entities |
-| Local vector index and hybrid retrieval | Not started |
-| Fourteen content categories (PDF, audio, video, etc.) | V1 is manual text entries only |
-| Reference manager import (Zotero, Mendeley, etc.) | Not started |
-| AG-07 curation (duplicates, relationships, gaps) | Not started |
-| Portable open-format export | Not started |
-| Multi-device encrypted sync | Not started; will use opaque ciphertext transport |
+| In-browser vector embedding index (ANN) | In progress |
+| Local audio/video speech-to-text transcription (Whisper) | In progress |
+| Handwritten notes & image OCR | In progress |
+| Automated background Retraction Watch monitoring | In progress |
+| Virtualized list rendering for 5,000+ items | In progress |

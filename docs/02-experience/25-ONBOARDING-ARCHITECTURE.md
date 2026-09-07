@@ -327,10 +327,11 @@ two ever diverge, the summary is wrong and that is a P0 defect.
 Three peer options (`12` F-ONB-2), presented without a default:
 
 | Option | Leads to |
+| Option | Action |
 |---|---|
-| Create a Vault | Location → passphrase → Recovery Kit → optional first import |
-| Import an existing library | Zotero, Mendeley, EndNote XML, BibTeX, or a folder |
-| Not now | Proceeds; re-offered contextually later |
+| **Enable Universal Cloud Sync (Recommended)** | Multi-device sync, cloud drives (Google Drive & OneDrive), automatic citation parsing |
+| **Create a Secure Vault (Private Browser-Only)** | Local encrypted storage → passphrase → Recovery Kit → optional first import |
+| **Not now** | Proceeds; re-offered contextually later (`REQ-VLT-1`) |
 
 ### 6.2 The explanation
 
@@ -338,15 +339,16 @@ Concrete, using the examples from `REQ-VLT-2`:
 
 > **A Knowledge Vault is your long-term library.**
 >
-> Lecture notes. Books. Papers you have read. Your previous essays and theses.
-> PDFs, handwritten notes you photograph, interview transcripts, datasets, lab
-> notebooks.
+> Store and synthesize all your academic material across projects: PDF papers, Word
+> documents, Excel datasets, Google Drive files, OneDrive documents, lecture notes,
+> and citation libraries.
 >
 > Over time it becomes the foundation your work is built on — when you write
 > something new, Scholar OS can draw on everything you have already read, and you
 > can search four years of reading in one place.
 >
-> It stays on your computer, encrypted. It is entirely optional, and everything
+> It can be synced across all your devices with Universal Cloud Sync or kept
+> privately encrypted in your browser. It is entirely optional, and everything
 > works without it.
 
 ### 6.3 Encryption and the Recovery Kit
