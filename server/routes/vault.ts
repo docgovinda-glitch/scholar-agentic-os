@@ -111,7 +111,7 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
 
       canonicalReference = {
         id: crypto.randomUUID(),
-        kind: "journal",
+        kind: "JournalArticle",
         title: title,
         authors: authors.map((name) => {
           const parts = name.split(" ");
@@ -292,7 +292,7 @@ router.post("/parse-url", async (req: Request, res: Response) => {
 
     const canonicalReference: CanonicalReference = {
       id: crypto.randomUUID(),
-      kind: "webpage",
+      kind: "Website",
       title: title,
       publisher: siteName,
       url: url,
@@ -359,7 +359,7 @@ router.post("/lookup-doi", async (req: Request, res: Response) => {
 
     const canonicalReference: CanonicalReference = {
       id: crypto.randomUUID(),
-      kind: "journal",
+      kind: "JournalArticle",
       title,
       authors: (item.author || []).map((a: any) => ({
         lastName: a.family || "",
@@ -575,7 +575,7 @@ router.post("/zotero/sync", async (req: Request, res: Response) => {
 
       const canonicalReference: CanonicalReference = {
         id: crypto.randomUUID(),
-        kind: data.itemType === "book" ? "book" : data.itemType === "thesis" ? "thesis" : "journal",
+        kind: data.itemType === "book" ? "Book" : data.itemType === "thesis" ? "Thesis" : "JournalArticle",
         title,
         authors: (data.creators || []).map((c: any) => ({
           lastName: c.lastName || "",
@@ -654,7 +654,7 @@ router.post("/mendeley/sync", async (req: Request, res: Response) => {
 
         const canonicalReference: CanonicalReference = {
           id: crypto.randomUUID(),
-          kind: itemType === "book" ? "book" : itemType === "phdthesis" ? "thesis" : "journal",
+          kind: itemType === "book" ? "Book" : itemType === "phdthesis" ? "Thesis" : "JournalArticle",
           title,
           authors: authors.map((name) => {
             const parts = name.split(",");
@@ -767,4 +767,8 @@ router.post("/reset", requireAuth, async (req: Request, res: Response) => {
 
 export function registerVaultRoutes(app: express.Express): void {
   app.use("/api/vault", router);
+  // Alias for /api/lookup-doi
+  app.post("/api/lookup-doi", (req, res) => {
+    (router.handle as any)({ ...req, url: "/lookup-doi" }, res);
+  });
 }

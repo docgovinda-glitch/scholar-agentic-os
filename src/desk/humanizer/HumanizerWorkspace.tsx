@@ -322,16 +322,10 @@ export default function HumanizerWorkspace({
     try {
       // Build LLM completer for humanizer pipeline
       const completer = async (params: { systemPrompt: string; userPrompt: string }) => {
-        const storedKey = await readProviderKey(activeProvider);
-        const candidates: CandidateProvider[] = [
-          {
-            provider: activeProvider,
-            model: modelName,
-            apiKey: storedKey || "",
-          },
-        ];
+        const candidates = await getCandidateProviders(activeProvider, modelName);
+        const validCandidates = candidates.filter((c) => c.apiKey && c.apiKey.trim());
 
-        if (candidates.length > 0) {
+        if (validCandidates.length > 0) {
           const userPolicy = defaultPolicy();
           const failover = await completeWithFailover(
             {
@@ -340,7 +334,7 @@ export default function HumanizerWorkspace({
               taskClass: "refinement",
               segments: [{ label: "draftText", text: params.userPrompt }],
             },
-            { candidates, maxRetriesPerProvider: 1 },
+            { candidates: validCandidates, maxRetriesPerProvider: 1 },
             userPolicy
           );
 
@@ -354,12 +348,17 @@ export default function HumanizerWorkspace({
           systemPrompt: params.systemPrompt,
           userPrompt: params.userPrompt,
           register: selectedGenre,
+          hedgingLevel: selectedHedging,
         });
 
         if (res.ok) {
           const body = await res.json();
-          if (body.humanizedText || body.text) {
-            return body.humanizedText || body.text;
+          const responseText = body.rewrittenText || body.humanizedText || body.text;
+          if (responseText) {
+            return JSON.stringify({
+              rewrittenText: responseText,
+              improvements: body.improvements || ["Scholarly vocabulary refinement and cadence enhancement."],
+            });
           }
         }
 

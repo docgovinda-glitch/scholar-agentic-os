@@ -186,7 +186,11 @@ export async function resetVault(userId?: string): Promise<boolean> {
 
   // 2. Call backend reset endpoint if available
   try {
-    const token = localStorage.getItem("sb-gfjhsijrwodjvkisouzw-auth-token") || "";
+    let token = "";
+    if (isSupabaseConfigured()) {
+      const { data } = await getSupabaseClient().auth.getSession();
+      token = data.session?.access_token || "";
+    }
     await fetch("/api/vault/reset", {
       method: "POST",
       headers: {

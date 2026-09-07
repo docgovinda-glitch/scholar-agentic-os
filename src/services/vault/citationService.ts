@@ -23,6 +23,19 @@ const formatters = {
   vancouver: new VancouverFormatter(),
 };
 
+function normalizeReferenceKind(kind?: string): any {
+  if (!kind) return "JournalArticle";
+  const lower = kind.toLowerCase();
+  if (lower === "journal" || lower === "journalarticle" || lower === "article") return "JournalArticle";
+  if (lower === "webpage" || lower === "website" || lower === "web") return "Website";
+  if (lower === "book") return "Book";
+  if (lower === "bookchapter") return "BookChapter";
+  if (lower === "thesis" || lower === "phdthesis" || lower === "dissertation") return "Thesis";
+  if (lower === "preprint") return "Preprint";
+  if (lower === "conferencepaper") return "ConferencePaper";
+  return kind;
+}
+
 /**
  * Formats a canonical reference or vault item into the requested academic style.
  */
@@ -33,15 +46,21 @@ export function formatVaultCitation(
   let ref: CanonicalReference;
 
   if ("canonicalReference" in item && item.canonicalReference) {
-    ref = item.canonicalReference;
+    ref = {
+      ...item.canonicalReference,
+      kind: normalizeReferenceKind(item.canonicalReference.kind),
+    };
   } else if ("kind" in item && "title" in item) {
-    ref = item as CanonicalReference;
+    ref = {
+      ...(item as CanonicalReference),
+      kind: normalizeReferenceKind((item as CanonicalReference).kind),
+    };
   } else {
     // Construct minimal CanonicalReference from VaultItem fields
     const vaultItem = item as VaultItem;
     ref = {
       id: vaultItem.id || crypto.randomUUID(),
-      kind: "journal",
+      kind: normalizeReferenceKind(vaultItem.sourceType),
       title: vaultItem.title || "Untitled Source",
       authors: (vaultItem.authors || []).map((name) => {
         const parts = name.trim().split(" ");
@@ -77,14 +96,20 @@ export function formatVaultInText(
 ): string {
   let ref: CanonicalReference;
   if ("canonicalReference" in item && item.canonicalReference) {
-    ref = item.canonicalReference;
+    ref = {
+      ...item.canonicalReference,
+      kind: normalizeReferenceKind(item.canonicalReference.kind),
+    };
   } else if ("kind" in item && "title" in item) {
-    ref = item as CanonicalReference;
+    ref = {
+      ...(item as CanonicalReference),
+      kind: normalizeReferenceKind((item as CanonicalReference).kind),
+    };
   } else {
     const vaultItem = item as VaultItem;
     ref = {
       id: vaultItem.id || crypto.randomUUID(),
-      kind: "journal",
+      kind: normalizeReferenceKind(vaultItem.sourceType),
       title: vaultItem.title || "Untitled",
       authors: (vaultItem.authors || []).map((name) => ({
         lastName: name.trim().split(" ").pop() || name,

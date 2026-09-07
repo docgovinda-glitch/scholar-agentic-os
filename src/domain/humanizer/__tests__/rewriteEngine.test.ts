@@ -30,6 +30,26 @@ describe("Phase 4: RewriteEngine & Hierarchical Document Processing", () => {
       const parsed = parseLlmRewriteOutput(raw);
       expect(parsed.rewrittenText).toBe("Rewritten scholarly prose.");
     });
+
+    it("parses alternative JSON keys (humanizedText and text)", () => {
+      const raw1 = JSON.stringify({
+        humanizedText: "Rewritten text using humanizedText key.",
+        improvements: ["Improved clarity"],
+      });
+      expect(parseLlmRewriteOutput(raw1).rewrittenText).toBe("Rewritten text using humanizedText key.");
+
+      const raw2 = JSON.stringify({
+        text: "Rewritten text using text key.",
+      });
+      expect(parseLlmRewriteOutput(raw2).rewrittenText).toBe("Rewritten text using text key.");
+    });
+
+    it("gracefully falls back on clean plain prose when model omits JSON formatting", () => {
+      const plain = "Domesticated across millennia, cows remain foundational to agricultural economies.";
+      const parsed = parseLlmRewriteOutput(plain);
+      expect(parsed.rewrittenText).toBe("Domesticated across millennia, cows remain foundational to agricultural economies.");
+      expect(parsed.improvements.length).toBeGreaterThan(0);
+    });
   });
 
   describe("Candidate Filtering", () => {
@@ -83,6 +103,51 @@ Empirical studies show milk efficiency improves with $p < 0.001$.`;
       expect(result.candidateDoc.blocks[1].processedText).toContain("Quantitative assessments confirm");
       expect(result.candidateDoc.versionInfo.decodingProfile).toBe("balanced");
       expect(result.improvements.length).toBeGreaterThan(0);
+    });
+
+    it("normalizes square bracket protected tokens and auto re-shields restored citations", async () => {
+      const rawText = "The cow is an animal (Wilson et al., 2022).";
+      const doc = createHumanizerDocument(rawText);
+      const { shieldedDoc, registry } = shieldDocument(doc);
+      const token = registry.getAll()[0].token;
+
+      // Completer returning square brackets [PROTECTED_...]
+      const squareBracketCompleter = vi.fn().mockResolvedValue(
+        JSON.stringify({
+          rewrittenText: `Domesticated bovines represent an agrarian asset ${token.replace("⟦", "[").replace("⟧", "]")}.`,
+          improvements: ["Enhanced register"],
+        })
+      );
+
+      const res1 = await rewriteBlock(shieldedDoc.blocks[0], {
+        mode: "balanced",
+        genre: "Empirical Natural Sciences",
+        completer: squareBracketCompleter,
+        registry,
+        doc: shieldedDoc,
+      });
+
+      expect(res1.rewrittenBlock.processedText).toContain(token);
+      expect(res1.rewrittenBlock.processedText).not.toContain("[PROTECTED_");
+
+      // Completer returning original citation text directly instead of token
+      const originalCitationCompleter = vi.fn().mockResolvedValue(
+        JSON.stringify({
+          rewrittenText: "Domesticated bovines represent an agrarian asset (Wilson et al., 2022).",
+          improvements: ["Enhanced register"],
+        })
+      );
+
+      const res2 = await rewriteBlock(shieldedDoc.blocks[0], {
+        mode: "balanced",
+        genre: "Empirical Natural Sciences",
+        completer: originalCitationCompleter,
+        registry,
+        doc: shieldedDoc,
+      });
+
+      // Should automatically re-shield back to the token so integrity auditor passes
+      expect(res2.rewrittenBlock.processedText).toContain(token);
     });
   });
 });

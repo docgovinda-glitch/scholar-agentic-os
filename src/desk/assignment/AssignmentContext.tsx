@@ -15,6 +15,8 @@ import type {
   OutlineSection,
   SubmissionCheckReport,
   TutorChatMessage,
+  TutorMode,
+  RubricGradeEstimation,
 } from "./types";
 import { ASSIGNMENT_STAGES } from "./types";
 

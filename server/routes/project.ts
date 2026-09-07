@@ -1148,7 +1148,84 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     res.json({ ok: true });
   }));
 
-  
+  // Offline Sync Queue & Mutation Replay Endpoints
+  router.post("/:id/sync", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { mutations, document, answers } = req.body ?? {};
+    let updated = record;
+
+    if (answers && typeof answers === "object") {
+      updated = { ...updated, answers: { ...updated.answers, ...answers } };
+    }
+    if (document && isValidDocument(document)) {
+      const { rubricReport, gates: gatesAfterG6 } = recomputeG6(updated, document);
+      const gatesAfterG3 = recomputeG3({ ...updated, gates: gatesAfterG6 }, document, updated.answers);
+      const gates = recomputeG4({ ...updated, gates: gatesAfterG3 }, document);
+      updated = { ...updated, document, rubricReport, gates };
+    }
+    const saved = await store.save(updated);
+    res.json({ success: true, processed: Array.isArray(mutations) ? mutations.length : 1, project: projectView(saved) });
+  }));
+
+  router.post("/:id/draft", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { document, answers } = req.body ?? {};
+    let updated = record;
+    if (answers && typeof answers === "object") {
+      updated = { ...updated, answers: { ...updated.answers, ...answers } };
+    }
+    if (document && isValidDocument(document)) {
+      const { rubricReport, gates: gatesAfterG6 } = recomputeG6(updated, document);
+      const gatesAfterG3 = recomputeG3({ ...updated, gates: gatesAfterG6 }, document, updated.answers);
+      const gates = recomputeG4({ ...updated, gates: gatesAfterG3 }, document);
+      updated = { ...updated, document, rubricReport, gates };
+    }
+    const saved = await store.save(updated);
+    res.json({ success: true, project: projectView(saved) });
+  }));
+
+  router.post("/:id/sources/approve", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { sourceId, evidenceId, actor = currentUserId(req) } = req.body ?? {};
+    const targetId = evidenceId || sourceId;
+    if (!targetId) {
+      return res.status(400).json({ error: "Missing required field: sourceId or evidenceId" });
+    }
+    let evidenceLedger = record.evidenceLedger;
+    if (evidenceLedger.items.some((i) => i.id === targetId || i.sourceId === targetId)) {
+      const item = evidenceLedger.items.find((i) => i.id === targetId || i.sourceId === targetId)!;
+      try {
+        evidenceLedger = approveEvidence(evidenceLedger, item.id, actor);
+      } catch (_) {}
+    }
+    const gates = recomputeG2({ ...record, evidenceLedger });
+    const updated = await store.save({ ...record, evidenceLedger, gates });
+    res.json({ success: true, project: projectView(updated) });
+  }));
+
+  router.post("/:id/sources/reject", projectLimit, asyncRoute(async (req, res) => {
+    const record = await loadOwnedProject(store, req, res);
+    if (!record) return;
+    const { sourceId, evidenceId, actor = currentUserId(req) } = req.body ?? {};
+    const targetId = evidenceId || sourceId;
+    if (!targetId) {
+      return res.status(400).json({ error: "Missing required field: sourceId or evidenceId" });
+    }
+    let evidenceLedger = record.evidenceLedger;
+    if (evidenceLedger.items.some((i) => i.id === targetId || i.sourceId === targetId)) {
+      const item = evidenceLedger.items.find((i) => i.id === targetId || i.sourceId === targetId)!;
+      try {
+        evidenceLedger = rejectEvidence(evidenceLedger, item.id, actor);
+      } catch (_) {}
+    }
+    const gates = recomputeG2({ ...record, evidenceLedger });
+    const updated = await store.save({ ...record, evidenceLedger, gates });
+    res.json({ success: true, project: projectView(updated) });
+  }));
+
   app.use("/api/projects", router);
   registerSubmissionsRoutes(app, projectLimit);
 

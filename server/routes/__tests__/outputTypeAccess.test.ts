@@ -5,7 +5,7 @@
 // __setEnabledOutputTypesForTests — see that file's own comment); this file
 // tests the restriction itself.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 
 export const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
 vi.mock("../../src/middleware/auth.ts", () => ({
@@ -28,6 +28,10 @@ beforeEach(() => {
   // The real production default — made explicit here rather than relying on
   // load order, since other test files in this directory reset it to "all".
   __setEnabledOutputTypesForTests(["OT-10"]);
+});
+
+afterAll(() => {
+  __setEnabledOutputTypesForTests("all");
 });
 
 describe("isOutputTypeEnabled", () => {

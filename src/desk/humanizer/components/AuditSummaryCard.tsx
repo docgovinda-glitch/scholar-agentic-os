@@ -83,10 +83,14 @@ export default function AuditSummaryCard({
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Protected Content</span>
           <span
             className={`text-xs font-semibold flex items-center gap-1 ${
-              auditReport?.integrity?.passed ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+              auditReport
+                ? auditReport.integrity?.passed
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-amber-600 dark:text-amber-400"
+                : "text-slate-500 dark:text-slate-400"
             }`}
           >
-            {auditReport?.integrity?.passed ? "✓ Passed (100%)" : "✕ Discrepancy"}
+            {auditReport ? (auditReport.integrity?.passed ? "✓ Passed (100%)" : "✕ Discrepancy") : "— Not Evaluated"}
           </span>
         </div>
 
@@ -95,10 +99,14 @@ export default function AuditSummaryCard({
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Claims & Modality</span>
           <span
             className={`text-xs font-semibold flex items-center gap-1 ${
-              auditReport?.claims?.passed ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+              auditReport
+                ? auditReport.claims?.passed
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-amber-600 dark:text-amber-400"
+                : "text-slate-500 dark:text-slate-400"
             }`}
           >
-            {auditReport?.claims?.passed ? "✓ Preserved" : "⚠ Modality Shift"}
+            {auditReport ? (auditReport.claims?.passed ? "✓ Preserved" : "⚠ Modality Shift") : "— Not Evaluated"}
           </span>
         </div>
 
@@ -107,10 +115,14 @@ export default function AuditSummaryCard({
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Grammar & Bounds</span>
           <span
             className={`text-xs font-semibold flex items-center gap-1 ${
-              auditReport?.grammar?.passed ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+              auditReport
+                ? auditReport.grammar?.passed
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-amber-600 dark:text-amber-400"
+                : "text-slate-500 dark:text-slate-400"
             }`}
           >
-            {auditReport?.grammar?.passed ? "✓ Passed" : "⚠ Grammar Issues"}
+            {auditReport ? (auditReport.grammar?.passed ? "✓ Passed" : "⚠ Grammar Issues") : "— Not Evaluated"}
           </span>
         </div>
 
@@ -119,10 +131,14 @@ export default function AuditSummaryCard({
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Paragraph Flow</span>
           <span
             className={`text-xs font-semibold flex items-center gap-1 ${
-              auditReport?.coherence?.passed ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+              auditReport
+                ? auditReport.coherence?.passed
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-amber-600 dark:text-amber-400"
+                : "text-slate-500 dark:text-slate-400"
             }`}
           >
-            {auditReport?.coherence?.passed ? "✓ Good" : "⚠ Flow Warning"}
+            {auditReport ? (auditReport.coherence?.passed ? "✓ Good" : "⚠ Flow Warning") : "— Not Evaluated"}
           </span>
         </div>
 
@@ -131,10 +147,14 @@ export default function AuditSummaryCard({
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Semantic Fidelity</span>
           <span
             className={`text-xs font-semibold flex items-center gap-1 ${
-              auditReport?.semantic?.passed ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+              auditReport
+                ? auditReport.semantic?.passed
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-amber-600 dark:text-amber-400"
+                : "text-slate-500 dark:text-slate-400"
             }`}
           >
-            {auditReport?.semantic?.passed ? "✓ Verified" : "⚠ Potential Drift"}
+            {auditReport ? (auditReport.semantic?.passed ? "✓ Verified" : "⚠ Potential Drift") : "— Not Evaluated"}
           </span>
         </div>
       </div>

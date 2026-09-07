@@ -181,4 +181,46 @@ describe("HumanizerWorkspace (Production Pipeline & Quality Audit Dashboard)", (
     // Ensure rejected candidate was NOT exposed
     expect(screen.queryByText(/causes absolute cure/i)).not.toBeInTheDocument();
   });
+
+  it("gracefully succeeds via server fallback when client providers fail or have no keys", async () => {
+    (completeWithFailover as any).mockResolvedValue({
+      ok: false,
+      error: "No active client API key available",
+    });
+
+    (authedJsonFetch as any).mockImplementation(async (url: string) => {
+      if (url.includes("/humanize")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            rewrittenText: "Domesticated across centuries, cows remain vital to agrarian life (Wilson et al., 2022). They supply essential dairy nourishment.",
+            improvements: ["Disciplinary vocabulary enrichment", "Cadence optimization"],
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({ success: true, data: null }) };
+    });
+
+    render(<HumanizerWorkspace projectId="proj-hum-1" />);
+
+    const textarea = screen.getByPlaceholderText(/Paste or type academic text/i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, {
+      target: {
+        value: "The cow is a domestic animal in South Asia (Wilson et al., 2022). It provides dairy nutrition.",
+      },
+    });
+
+    const humanizeBtn = screen.getByRole("button", { name: /Humanize Text/i });
+    fireEvent.click(humanizeBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Domesticated across centuries, cows remain vital to agrarian life/i)
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Safety & Integrity Verified/i)).toBeInTheDocument();
+    expect(screen.getByText(/Protected Content/i)).toBeInTheDocument();
+  });
 });

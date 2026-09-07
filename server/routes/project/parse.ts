@@ -21,17 +21,30 @@ parseRouter.post("/", upload.single("file"), async (req, res) => {
   let text = "";
 
   try {
-    if (file.mimetype === "application/pdf") {
+    if (file.mimetype === "application/pdf" || file.originalname.endsWith(".pdf")) {
       const data = await pdfParse(file.buffer);
       text = data.text;
     } else if (
       file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      file.originalname.endsWith(".docx")
+      file.originalname.endsWith(".docx") ||
+      file.originalname.endsWith(".doc")
     ) {
       const result = await mammoth.extractRawText({ buffer: file.buffer });
       text = result.value;
+    } else if (
+      file.mimetype.startsWith("text/") ||
+      file.originalname.endsWith(".txt") ||
+      file.originalname.endsWith(".md") ||
+      file.originalname.endsWith(".csv") ||
+      file.originalname.endsWith(".tsv") ||
+      file.originalname.endsWith(".json")
+    ) {
+      text = file.buffer.toString("utf-8");
     } else {
-      return res.status(400).json({ error: `Unsupported file type: ${file.mimetype}` });
+      // Fallback extraction
+      const raw = file.buffer.toString("utf-8");
+      const matches = raw.match(/[\x20-\x7E\t\r\n]{4,}/g);
+      text = matches ? matches.join("\n").replace(/\n{3,}/g, "\n\n").trim() : raw;
     }
   } catch (error: any) {
     return res.status(400).json({ error: `Failed to parse document: ${error.message}` });

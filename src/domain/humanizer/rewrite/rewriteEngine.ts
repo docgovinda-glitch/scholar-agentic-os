@@ -91,6 +91,52 @@ export function parseLlmRewriteOutput(rawOutput: string | { text: string }): {
     } catch (_) {}
   }
 
+  // 4. Fallback: Check if response has humanizedText or text property in JSON
+  const generalJsonMatch = text.match(/\{[\s\S]*\}/);
+  if (generalJsonMatch) {
+    try {
+      const parsed = JSON.parse(generalJsonMatch[0]);
+      const candidate = parsed.rewrittenText || parsed.humanizedText || parsed.text;
+      if (candidate && typeof candidate === "string") {
+        return {
+          rewrittenText: candidate.trim(),
+          improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
+        };
+      }
+    } catch (_) {}
+  }
+
+  // 5. Plain text fallback: Clean academic prose output from models that omit JSON wrapping
+  const trimmed = text.trim();
+  const isErrorMessage =
+    trimmed.startsWith("Error:") ||
+    trimmed.startsWith("401") ||
+    trimmed.startsWith("403") ||
+    trimmed.startsWith("429") ||
+    trimmed.startsWith("500") ||
+    trimmed.includes("<!DOCTYPE") ||
+    trimmed.includes("<html>");
+
+  if (!isErrorMessage && trimmed.length > 5) {
+    let cleanText = trimmed;
+    const prefixMatch = cleanText.match(
+      /^(?:Here (?:is|are) (?:the )?(?:rewritten|humanized) (?:text|prose|version):?\s*|Rewritten text:\s*)/i
+    );
+    if (prefixMatch) {
+      cleanText = cleanText.slice(prefixMatch[0].length).trim();
+    }
+    if (
+      (cleanText.startsWith('"') && cleanText.endsWith('"')) ||
+      (cleanText.startsWith('`') && cleanText.endsWith('`'))
+    ) {
+      cleanText = cleanText.slice(1, -1).trim();
+    }
+    return {
+      rewrittenText: cleanText,
+      improvements: ["Scholarly vocabulary refinement and cadence enhancement."],
+    };
+  }
+
   throw new Error(`Failed to parse valid rewrite output from LLM response: ${text.slice(0, 100)}...`);
 }
 
@@ -154,7 +200,21 @@ export async function rewriteBlock(
   });
 
   const parsed = parseLlmRewriteOutput(rawResponse);
-  const newSentences = segmentSentences(parsed.rewrittenText).map((sText, idx) => ({
+
+  // Normalize bracket variations (e.g. [PROTECTED_...] or (PROTECTED_...) to ⟦PROTECTED_...⟧)
+  let normalizedText = parsed.rewrittenText.replace(
+    /[\[\(【]PROTECTED_([A-Z0-9_]+_[a-zA-Z0-9]+)[\]\)】]/g,
+    "⟦PROTECTED_$1⟧"
+  );
+
+  // Auto-reshield if LLM restored the original citation/formula instead of preserving the token
+  for (const el of protectedElementsInBlock) {
+    if (!normalizedText.includes(el.token) && el.originalValue && normalizedText.includes(el.originalValue)) {
+      normalizedText = normalizedText.split(el.originalValue).join(el.token);
+    }
+  }
+
+  const newSentences = segmentSentences(normalizedText).map((sText, idx) => ({
     id: `${block.id}_s_${idx + 1}`,
     text: sText,
     order: idx + 1,
@@ -165,7 +225,7 @@ export async function rewriteBlock(
 
   const rewrittenBlock: HumanizerBlock = {
     ...block,
-    processedText: parsed.rewrittenText,
+    processedText: normalizedText,
     sentences: newSentences,
   };
 
