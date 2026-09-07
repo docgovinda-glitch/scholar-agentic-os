@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { HumanizerAuditReport, CandidateState } from "../../../domain/humanizer/types";
+import { getPrimaryFailureReason } from "../../../domain/humanizer/audit/deltaAuditor";
 
 interface AuditSummaryCardProps {
   auditReport?: HumanizerAuditReport;
@@ -17,6 +18,14 @@ export default function AuditSummaryCard({
   const [showDetails, setShowDetails] = useState(false);
 
   if (!auditReport && !fallbackUsed) return null;
+
+  const effectiveFallbackReason =
+    fallbackReason && !fallbackReason.toLowerCase().includes("faithfully preserved")
+      ? fallbackReason
+      : getPrimaryFailureReason(
+          auditReport,
+          fallbackReason || "A safe rewrite could not be produced within the retry budget; original text has been preserved."
+        );
 
   const isSafe = auditReport?.finalDecision === "SAFE";
   const isWarning = auditReport?.finalDecision === "WARNING";
@@ -69,10 +78,10 @@ export default function AuditSummaryCard({
       </div>
 
       {/* Fail-Safe Explanation Notice */}
-      {fallbackUsed && fallbackReason && (
+      {fallbackUsed && effectiveFallbackReason && (
         <div className="mt-3 p-3 bg-amber-500/15 rounded-lg text-xs leading-relaxed text-amber-900 dark:text-amber-200">
           <p className="font-medium mb-1">Fail-Safe Reason:</p>
-          <p>{fallbackReason}</p>
+          <p>{effectiveFallbackReason}</p>
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { getProjectStore } from "../../../src/services/store/projectStore.ts";
 import { completeWithFailover } from "../../../src/platform/gateway/gateway.ts";
 import { defaultPolicy } from "../../../src/platform/warden/policy.ts";
 import { getCandidates, isServerAiAuthorized, parseJsonFromLlm } from "../../utils/llm.ts";
+import { unshieldAllTokens } from "../../../src/domain/humanizer/protection/tokenRegistry.ts";
 
 const router = Router({ mergeParams: true });
 
@@ -225,7 +226,19 @@ router.get("/", async (req: Request, res: Response) => {
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        return res.json({ success: true, data: parsed });
+        if (parsed) {
+          if (parsed.sourceText) {
+            const promptMatch = parsed.sourceText.match(/### SOURCE TEXT TO REWRITE\s*\n+"""\s*\n([\s\S]*?)\n\s*"""/);
+            if (promptMatch && promptMatch[1]) {
+              parsed.sourceText = promptMatch[1].trim();
+            }
+            parsed.sourceText = unshieldAllTokens(parsed.sourceText);
+          }
+          if (parsed.humanizedText) {
+            parsed.humanizedText = unshieldAllTokens(parsed.humanizedText);
+          }
+          return res.json({ success: true, data: parsed });
+        }
       } catch (_) {}
     }
     return res.json({ success: true, data: null });
@@ -368,8 +381,9 @@ Return ONLY valid JSON matching this schema:
   // Analyze the resulting humanized text
   const postAnalysis = analyzeStylometrics(humanizedText);
 
-  // Persist to project answers if possible
-  if (projectId) {
+  // Persist to project answers only for complete document runs (never for single-block prompt completions)
+  const isDocumentLevelSave = Boolean(llmResult || (!userPrompt && inputRawText));
+  if (projectId && isDocumentLevelSave) {
     try {
       const store = getProjectStore();
       const project = await store.get(projectId);
@@ -377,9 +391,12 @@ Return ONLY valid JSON matching this schema:
         if (!project.answers) {
           project.answers = {};
         }
+        const cleanSource = unshieldAllTokens(inputRawText || text);
+        const cleanHumanized = unshieldAllTokens(humanizedText);
+
         project.answers["humanizer_data"] = JSON.stringify({
-          sourceText: text,
-          humanizedText,
+          sourceText: cleanSource,
+          humanizedText: cleanHumanized,
           register,
           persona,
           burstinessLevel,

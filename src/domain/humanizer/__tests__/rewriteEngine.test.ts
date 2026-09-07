@@ -146,8 +146,24 @@ Empirical studies show milk efficiency improves with $p < 0.001$.`;
         doc: shieldedDoc,
       });
 
-      // Should automatically re-shield back to the token so integrity auditor passes
-      expect(res2.rewrittenBlock.processedText).toContain(token);
+      // Completer returning outer brackets around double-bracket tokens [⟦PROTECTED_...⟧]
+      const redundantOuterBracketCompleter = vi.fn().mockResolvedValue(
+        JSON.stringify({
+          rewrittenText: `Domesticated bovines represent an agrarian asset [${token}].`,
+          improvements: ["Enhanced register"],
+        })
+      );
+
+      const res3 = await rewriteBlock(shieldedDoc.blocks[0], {
+        mode: "balanced",
+        genre: "Empirical Natural Sciences",
+        completer: redundantOuterBracketCompleter,
+        registry,
+        doc: shieldedDoc,
+      });
+
+      expect(res3.rewrittenBlock.processedText).toBe(`Domesticated bovines represent an agrarian asset ${token}.`);
+      expect(res3.rewrittenBlock.processedText).not.toContain(`[${token}]`);
     });
   });
 });

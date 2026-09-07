@@ -29,6 +29,7 @@ import {
   RetryHistoryEntry,
   RetryPlan,
 } from "./adaptiveRetry";
+import { getPrimaryFailureReason } from "../audit/deltaAuditor";
 
 export interface HumanizerPipelineOptions {
   mode?: RewriteMode;
@@ -206,9 +207,10 @@ export async function runHumanizerPipeline(
     document: initialDoc,
     attemptsCount: attemptNumber,
     fallbackUsed: true,
-    fallbackReason:
-      lastReport?.findings[0]?.message ||
-      "A safe rewrite could not be produced within the retry budget; original text has been preserved.",
+    fallbackReason: getPrimaryFailureReason(
+      lastReport,
+      "A safe rewrite could not be produced within the retry budget; original text has been preserved."
+    ),
     improvements: [],
     auditReport: lastReport,
     retryHistory,

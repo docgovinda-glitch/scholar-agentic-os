@@ -24,6 +24,7 @@ import {
 import { generateReviewUnits } from "../../domain/humanizer/review/sentenceMapper";
 import { applyReviewUnitDecision } from "../../domain/humanizer/review/documentReviewManager";
 import { renderHumanizerDocument } from "../../domain/humanizer/document/humanizerDocument";
+import { unshieldAllTokens } from "../../domain/humanizer/protection/tokenRegistry";
 import {
   createTerminologyEntry,
   resolveTerminologyHierarchy,
@@ -289,8 +290,18 @@ export default function HumanizerWorkspace({
         if (isMounted && res.ok) {
           const body = await res.json();
           if (body?.data) {
-            if (body.data.sourceText) setSourceText(body.data.sourceText);
-            if (body.data.humanizedText) setHumanizedText(body.data.humanizedText);
+            let savedSource = body.data.sourceText;
+            if (savedSource) {
+              const promptMatch = savedSource.match(/### SOURCE TEXT TO REWRITE\s*\n+"""\s*\n([\s\S]*?)\n\s*"""/);
+              if (promptMatch && promptMatch[1]) {
+                savedSource = promptMatch[1].trim();
+              }
+              savedSource = unshieldAllTokens(savedSource);
+              setSourceText(savedSource);
+            }
+            if (body.data.humanizedText) {
+              setHumanizedText(unshieldAllTokens(body.data.humanizedText));
+            }
           }
         }
       } catch (_) {}
@@ -303,7 +314,11 @@ export default function HumanizerWorkspace({
 
   // Production-Grade Multi-Auditor Pipeline Handler (Supporting Long Documents & Chunking)
   const handleHumanize = useCallback(async () => {
-    if (!sourceText.trim()) return;
+    const rawClean = unshieldAllTokens(sourceText.trim());
+    if (!rawClean) return;
+    if (rawClean !== sourceText) {
+      setSourceText(rawClean);
+    }
 
     setLoading(true);
     setErrorMessage(null);
@@ -387,10 +402,10 @@ export default function HumanizerWorkspace({
       setProgressStage("protecting");
 
       // Check document size for long-document chunking vs standard pipeline
-      const isLongDoc = sourceText.length > 3500;
+      const isLongDoc = rawClean.length > 3500;
 
       if (isLongDoc) {
-        const longResult = await runLongDocumentPipeline(sourceText, {
+        const longResult = await runLongDocumentPipeline(rawClean, {
           mode: selectedMode,
           genre: selectedGenre,
           discipline: selectedDiscipline,
@@ -415,7 +430,7 @@ export default function HumanizerWorkspace({
           setMobileTab("humanized");
         }
       } else {
-        const result = await runHumanizerPipeline(sourceText, {
+        const result = await runHumanizerPipeline(rawClean, {
           mode: selectedMode,
           genre: selectedGenre,
           discipline: selectedDiscipline,

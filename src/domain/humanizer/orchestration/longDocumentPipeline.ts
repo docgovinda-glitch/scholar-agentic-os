@@ -23,14 +23,14 @@ import {
 } from "../protection/protectedElementExtractor";
 import { TokenRegistry } from "../protection/tokenRegistry";
 import { extractClaimsFromDocument } from "../claims/claimExtractor";
-import { LLMCompleter } from "../rewrite/rewriteEngine";
+import { rewriteDocument, LLMCompleter } from "../rewrite/rewriteEngine";
 import { RewriteMode, DisciplineProfile, HedgingLevel } from "../rewrite/promptBuilder";
 import { createDocumentChunks } from "../chunking/longDocumentChunker";
 import { auditHumanizerCandidate } from "../audit/auditOrchestrator";
-import { rewriteDocument } from "../rewrite/rewriteEngine";
 import { buildRetryPlan } from "./adaptiveRetry";
 import { generateReviewUnits } from "../review/sentenceMapper";
 import { validateFinalDocument } from "../review/documentReviewManager";
+import { getPrimaryFailureReason } from "../audit/deltaAuditor";
 
 export interface LongDocumentPipelineOptions {
   mode?: RewriteMode;
@@ -243,8 +243,10 @@ export async function runLongDocumentPipeline(
       chunk.status = "FAILED";
       chunk.attemptsCount = attempt;
       chunk.fallbackUsed = true;
-      chunk.fallbackReason =
-        lastReport?.findings[0]?.message || "Chunk failed safety checks; original source preserved.";
+      chunk.fallbackReason = getPrimaryFailureReason(
+        lastReport,
+        "Chunk failed safety checks; original source preserved."
+      );
       chunk.auditReport = lastReport;
       failedChunks++;
 

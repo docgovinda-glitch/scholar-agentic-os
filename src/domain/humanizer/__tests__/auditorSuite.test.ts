@@ -7,6 +7,7 @@ import { auditGrammar } from "../audit/grammarAuditor";
 import { auditCoherence } from "../audit/coherenceAuditor";
 import { auditSemantic, normalizeProtectedPlaceholders } from "../audit/semanticAuditor";
 import { auditHumanizerCandidate } from "../audit/auditOrchestrator";
+import { getPrimaryFailureReason } from "../audit/deltaAuditor";
 
 describe("Phase 5: Multi-Auditor Suite", () => {
   const COW_ORIGINAL = `The cow is one of the most useful domestic animals in the world (Wilson et al., 2022). It has been closely associated with human civilization for thousands of years. People keep cows for milk, farming, and other useful products. In many countries, especially in South Asia, cows are an important part of rural life.
@@ -192,6 +193,88 @@ A cow is a herbivorous animal that mainly eats grass, hay, and other plant-based
       expect(report.candidateState).toBe("REWRITE_REJECTED");
       expect(report.shortCircuited).toBe(true);
       expect(auditedDoc.auditState?.overallStatus).toBe("failed");
+    });
+  });
+
+  describe("8. getPrimaryFailureReason", () => {
+    it("returns default message when report is undefined or has no findings", () => {
+      expect(getPrimaryFailureReason(undefined, "fallback")).toBe("fallback");
+      expect(
+        getPrimaryFailureReason(
+          {
+            finalDecision: "SAFE",
+            overallSeverity: "INFO",
+            candidateState: "REWRITE_VALIDATED",
+            shortCircuited: false,
+            findings: [],
+            integrity: { passed: true, missingTokens: [], duplicatedTokens: [], unexpectedTokens: [], malformedTokens: [], exactRestoration: true },
+            claims: { passed: true, preservationRate: 1, epistemicShiftsCount: 0, negationReversalsCount: 0, causalityShiftsCount: 0, droppedClaimsCount: 0, addedClaimsCount: 0 },
+            grammar: { passed: true, errorsCount: 0, issues: [] },
+            coherence: { passed: true, score: 100, transitionQuality: "high", issues: [] },
+            semantic: { passed: true, similarityScore: 1, driftDetected: false, contradictionDetected: false },
+            delta: { classification: "SAFE", wordCountDelta: 0, percentageChanged: 0 },
+            timestamp: new Date().toISOString(),
+          },
+          "fallback"
+        )
+      ).toBe("fallback");
+    });
+
+    it("skips passing/preserved claims and extracts the real failure reason", () => {
+      const mockReport: any = {
+        finalDecision: "REJECT",
+        overallSeverity: "ERROR",
+        findings: [
+          {
+            auditor: "claim_auditor",
+            category: "epistemic_claims",
+            severity: "INFO",
+            decision: "SAFE",
+            code: "CLAIM_PRESERVED",
+            message: "Propositional meaning, epistemic certainty, and quantitative constraints are faithfully preserved.",
+          },
+          {
+            auditor: "claim_auditor",
+            category: "epistemic_claims",
+            severity: "ERROR",
+            decision: "REJECT",
+            code: "CLAIM_EPISTEMIC_SHIFT",
+            message: "Epistemic stance shifted from cautious hedging to definitive assertion.",
+          },
+        ],
+      };
+
+      const reason = getPrimaryFailureReason(mockReport);
+      expect(reason).toBe("Epistemic stance shifted from cautious hedging to definitive assertion.");
+      expect(reason).not.toContain("faithfully preserved");
+    });
+
+    it("prioritizes REJECT decisions over WARNING decisions", () => {
+      const mockReport: any = {
+        finalDecision: "REJECT",
+        overallSeverity: "CRITICAL",
+        findings: [
+          {
+            auditor: "coherence_auditor",
+            category: "coherence_flow",
+            severity: "WARNING",
+            decision: "WARNING",
+            code: "TRANSITION_GAP",
+            message: "Transition flow between paragraphs is weak.",
+          },
+          {
+            auditor: "integrity_auditor",
+            category: "token_integrity",
+            severity: "CRITICAL",
+            decision: "REJECT",
+            code: "INTEGRITY_TOKEN_MISSING",
+            message: "Protected citation was omitted.",
+          },
+        ],
+      };
+
+      const reason = getPrimaryFailureReason(mockReport);
+      expect(reason).toBe("Protected citation was omitted.");
     });
   });
 });

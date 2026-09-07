@@ -14,6 +14,7 @@ import {
   TokenRegistry,
   generateElementHash,
   formatProtectedToken,
+  unshieldTokenValue,
 } from "./tokenRegistry";
 
 export interface OccupiedSpan {
@@ -30,6 +31,23 @@ interface RawExtractionCandidate {
   value: string;
   start: number;
   end: number;
+}
+
+/** Layer 0: Pre-existing / Shielded Protected Tokens (e.g. ⟦PROTECTED_CITATION_APA_...⟧) */
+function extractExistingProtectedTokenSpans(text: string): RawExtractionCandidate[] {
+  const candidates: RawExtractionCandidate[] = [];
+  const tokenRegex = /⟦PROTECTED_([A-Z0-9_]+)_([a-zA-Z0-9]+)⟧/g;
+  let match: RegExpExecArray | null;
+  while ((match = tokenRegex.exec(text)) !== null) {
+    const rawType = match[1].toLowerCase() as ProtectedElementType;
+    candidates.push({
+      type: rawType,
+      value: match[0],
+      start: match.index,
+      end: match.index + match[0].length,
+    });
+  }
+  return candidates;
 }
 
 /** Layer 1: Code blocks & Inline code */
@@ -377,6 +395,7 @@ export function extractProtectedElements(
   };
 
   // Execute extraction layers in strict deterministic order
+  addNonOverlapping(extractExistingProtectedTokenSpans(text));
   addNonOverlapping(extractCodeSpans(text));
   addNonOverlapping(extractMathSpans(text));
   addNonOverlapping(extractUrlDoiEmailSpans(text));
@@ -396,8 +415,12 @@ export function extractProtectedElements(
 
   for (let idx = 0; idx < rawElements.length; idx++) {
     const item = rawElements[idx];
-    const hash = generateElementHash(item.type, item.value, String(idx));
-    const token = formatProtectedToken(item.type, hash);
+    const existingMatch = item.value.match(/^⟦PROTECTED_([A-Z0-9_]+)_([a-zA-Z0-9]+)⟧$/);
+    const hash = existingMatch ? existingMatch[2] : generateElementHash(item.type, item.value, String(idx));
+    const token = existingMatch ? item.value : formatProtectedToken(item.type, hash);
+    const originalValue = existingMatch
+      ? unshieldTokenValue(item.value, existingMatch[1], existingMatch[2])
+      : item.value;
 
     const contextBefore = text.slice(Math.max(0, item.start - 50), item.start);
     const contextAfter = text.slice(item.end, Math.min(text.length, item.end + 50));
@@ -405,7 +428,7 @@ export function extractProtectedElements(
     elements.push({
       token,
       type: item.type,
-      originalValue: item.value,
+      originalValue,
       startOffset: item.start,
       endOffset: item.end,
       blockId,

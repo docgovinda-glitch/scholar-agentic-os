@@ -155,6 +155,29 @@ describe("Phase 6: HumanizerPipeline & Fail-Safe Fallback", () => {
       expect(result.attemptsCount).toBe(3); // Attempt 1 + 2 retries
     });
 
+    it("reports the actual failure reason and ignores preserved claims in fallbackReason", async () => {
+      // First sentence has preserved claim, second sentence has an epistemic shift
+      const input = "The cow is a domestic animal. Evidence suggests that sleep loss may affect cognition.";
+      const mockCompleter = vi.fn().mockImplementation(async () => {
+        return JSON.stringify({
+          rewrittenText: "The cow is a domestic animal. Evidence proves that sleep loss causes cognitive collapse.",
+          improvements: ["Assertive tone"],
+        });
+      });
+
+      const result = await runHumanizerPipeline(input, {
+        mode: "balanced",
+        completer: mockCompleter,
+        maxRetries: 0,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.fallbackUsed).toBe(true);
+      expect(result.fallbackReason).toBeDefined();
+      expect(result.fallbackReason).not.toContain("faithfully preserved");
+      expect(result.fallbackReason).toMatch(/epistemic|claim/i);
+    });
+
     it("safely falls back to original text upon provider failure", async () => {
       const failingCompleter = vi.fn().mockRejectedValue(new Error("Provider Timeout 504"));
 

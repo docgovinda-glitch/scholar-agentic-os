@@ -5,6 +5,7 @@ import {
   restoreDocument,
   isOverlapping,
 } from "../protection/protectedElementExtractor";
+import { TokenRegistry } from "../protection/tokenRegistry";
 import {
   createHumanizerDocument,
   renderHumanizerDocument,
@@ -144,6 +145,27 @@ Cows contribute greatly to the livelihoods of farmers. However, they should not 
       // 5. Verify byte-for-byte exact equality with the original text
       expect(restoredText).toBe(ACADEMIC_SAMPLE);
       expect(restoredText.length).toBe(ACADEMIC_SAMPLE.length);
+    });
+
+    it("safely extracts pre-existing protected tokens and restores them to scholarly values", () => {
+      const textWithPreExisting =
+        "The domestic bovine ⟦PROTECTED_CITATION_APA_f65444m8⟧ serves rural communities across Eurasia.";
+
+      const { elements, shieldedText } = extractProtectedElements(textWithPreExisting);
+      expect(elements).toHaveLength(1);
+      expect(elements[0].token).toBe("⟦PROTECTED_CITATION_APA_f65444m8⟧");
+      expect(elements[0].originalValue).toBe("(Wilson et al., 2022)");
+      expect(shieldedText).toBe(textWithPreExisting);
+
+      const registry = new TokenRegistry(elements);
+      expect(registry.has("⟦PROTECTED_CITATION_APA_f65444m8⟧")).toBe(true);
+      const validation = registry.validateOccurrences(shieldedText);
+      expect(validation.valid).toBe(true);
+      expect(validation.unexpected).toHaveLength(0);
+
+      const restored = registry.restore(shieldedText);
+      expect(restored).toBe("The domestic bovine (Wilson et al., 2022) serves rural communities across Eurasia.");
+      expect(restored).not.toContain("⟦PROTECTED_");
     });
   });
 });

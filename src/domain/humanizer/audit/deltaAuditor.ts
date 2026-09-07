@@ -155,3 +155,40 @@ export function aggregateAuditResults(inputs: AggregateAuditorInputs): Humanizer
     timestamp: new Date().toISOString(),
   };
 }
+
+/**
+ * Extracts the primary reason for failure/rejection from an audit report.
+ * Prioritizes REJECT decisions and CRITICAL/ERROR severities over WARNINGs,
+ * and explicitly ignores passing/safe findings (e.g. CLAIM_PRESERVED).
+ */
+export function getPrimaryFailureReason(
+  report?: HumanizerAuditReport,
+  defaultMessage = "A safe rewrite could not be produced within the retry budget; original text has been preserved."
+): string {
+  if (!report || !report.findings || report.findings.length === 0) {
+    return defaultMessage;
+  }
+
+  // Filter for actual failing or warning findings (exclude SAFE / INFO)
+  const failingFindings = report.findings.filter(
+    (f) =>
+      f.decision === "REJECT" ||
+      f.decision === "WARNING" ||
+      f.severity === "CRITICAL" ||
+      f.severity === "ERROR"
+  );
+
+  if (failingFindings.length === 0) {
+    return defaultMessage;
+  }
+
+  // Sort by decision rank (REJECT > WARNING > SAFE), then by severity rank (CRITICAL > ERROR > WARNING > INFO)
+  const sorted = [...failingFindings].sort((a, b) => {
+    const decDiff = (DECISION_RANK[b.decision] || 0) - (DECISION_RANK[a.decision] || 0);
+    if (decDiff !== 0) return decDiff;
+    return (SEVERITY_RANK[b.severity] || 0) - (SEVERITY_RANK[a.severity] || 0);
+  });
+
+  return sorted[0]?.message || defaultMessage;
+}
+

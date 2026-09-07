@@ -177,14 +177,18 @@ export async function rewriteBlock(
   );
   const lockedTerms = options.doc.terminologyMemory?.lockedTerms || [];
 
+  // Provide human-readable surrounding context so LLM does not leak or duplicate tokens across blocks
+  const cleanPrev = options.previousBlockText ? options.registry.restore(options.previousBlockText) : undefined;
+  const cleanNext = options.nextBlockText ? options.registry.restore(options.nextBlockText) : undefined;
+
   const prompt = buildPromptForBlock({
     mode: options.mode,
     genre: options.genre,
     discipline: options.discipline,
     hedgingLevel: options.hedgingLevel,
     block,
-    previousBlockText: options.previousBlockText,
-    nextBlockText: options.nextBlockText,
+    previousBlockText: cleanPrev,
+    nextBlockText: cleanNext,
     protectedElementsInBlock,
     claimsInBlock,
     lockedTerms,
@@ -201,9 +205,12 @@ export async function rewriteBlock(
 
   const parsed = parseLlmRewriteOutput(rawResponse);
 
-  // Normalize bracket variations (e.g. [PROTECTED_...] or (PROTECTED_...) to ⟦PROTECTED_...⟧)
-  let normalizedText = parsed.rewrittenText.replace(
-    /[\[\(【]PROTECTED_([A-Z0-9_]+_[a-zA-Z0-9]+)[\]\)】]/g,
+  // Normalize redundant outer brackets around double-bracketed tokens (e.g. [⟦PROTECTED_...⟧] -> ⟦PROTECTED_...⟧)
+  let normalizedText = parsed.rewrittenText.replace(/[\[\(【]⟦(PROTECTED_[^⟧]+)⟧[\]\)】]/g, "⟦$1⟧");
+
+  // Normalize single bracket tokens (e.g. [PROTECTED_...] or (PROTECTED_...) to ⟦PROTECTED_...⟧)
+  normalizedText = normalizedText.replace(
+    /[\[\(【]+PROTECTED_([A-Z0-9_]+_[a-zA-Z0-9]+)[\]\)】]+/g,
     "⟦PROTECTED_$1⟧"
   );
 
