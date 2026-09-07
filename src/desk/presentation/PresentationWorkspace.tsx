@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import type { PresentationStage, PresentationProjectData, PresentationSlide } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { authedJsonFetch } from "../api";
+import LiveSlidePlayer from "./components/LiveSlidePlayer";
+import SpeakerRehearsalTimer from "./components/SpeakerRehearsalTimer";
+import { generateMarpMarkdown, generateHtmlPresentation, downloadFile } from "./export/marpExporter";
 
 const PRESENTATION_STAGES: Array<{ id: PresentationStage; label: string; icon: string; desc: string }> = [
   { id: "profiler_constraints", label: "1. Timing & Constraints", icon: "⏱️", desc: "Talk duration (10-45m) & audience depth" },
@@ -26,6 +29,7 @@ export default function PresentationWorkspace({
   onOpenAiAccess?: () => void;
 }) {
   const [currentStage, setCurrentStage] = useState<PresentationStage>("visual_deck_preview");
+  const [showLivePlayer, setShowLivePlayer] = useState(false);
   const [deckData, setDeckData] = useState<PresentationProjectData>({
     projectId,
     title: "Autonomous Knowledge Grounding in Multi-Agent Scientific Synthesis",
@@ -151,59 +155,36 @@ export default function PresentationWorkspace({
     }
   }
 
-  function generateMarpMarkdown(): string {
-    let md = `---
-marp: true
-theme: default
-paginate: true
-backgroundColor: #0f172a
-color: #f8fafc
----
-
-<!-- _class: lead -->
-# ${deckData.title}
-### ${deckData.targetAudience} · ${deckData.durationMinutes} Mins
-`;
-
-    deckData.slides.forEach((s) => {
-      md += `
----
-
-# ${s.title}
-${s.subtitle ? `### ${s.subtitle}\n` : ""}
-${s.keyPoints.map((k) => `- ${k}`).join("\n")}
-
-<!--
-Speaker Notes (${s.targetDurationSeconds}s):
-${s.speakerNotes}
--->
-`;
-    });
-
-    return md;
-  }
-
   function handleExportMarp() {
-    const md = generateMarpMarkdown();
+    const md = generateMarpMarkdown(deckData);
     navigator.clipboard.writeText(md);
     setCopiedMarp(true);
     setTimeout(() => setCopiedMarp(false), 3000);
   }
 
   function handleDownloadMarp() {
-    const md = generateMarpMarkdown();
-    const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `${deckData.title.toLowerCase().replace(/[^a-z0-9]/g, "_")}_presentation.marp.md`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const md = generateMarpMarkdown(deckData);
+    const filename = `${deckData.title.toLowerCase().replace(/[^a-z0-9]/g, "_")}_presentation.marp.md`;
+    downloadFile(md, filename, "text/markdown;charset=utf-8;");
+  }
+
+  function handleDownloadHtml() {
+    const html = generateHtmlPresentation(deckData);
+    const filename = `${deckData.title.toLowerCase().replace(/[^a-z0-9]/g, "_")}_deck.html`;
+    downloadFile(html, filename, "text/html;charset=utf-8;");
   }
 
   return (
     <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] font-sans flex flex-col selection:bg-[color:var(--accent-subtle)]">
+      {/* Live Fullscreen Slide Player Modal */}
+      {showLivePlayer && (
+        <LiveSlidePlayer
+          deckData={deckData}
+          initialSlideIndex={activeSlideIndex}
+          onClose={() => setShowLivePlayer(false)}
+        />
+      )}
+
       {/* Top Header */}
       <header className="h-14 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]/80 backdrop-blur-md px-4 md:px-6 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
@@ -235,11 +216,20 @@ ${s.speakerNotes}
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
+          <button
+            type="button"
+            onClick={() => setShowLivePlayer(true)}
+            className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-sky-500 hover:bg-sky-600 text-slate-950 transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+            data-testid="present-fullscreen-btn"
+          >
+            <span>▶</span>
+            <span>Present Fullscreen</span>
+          </button>
           <button
             type="button"
             onClick={handleExportMarp}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] transition-all cursor-pointer"
+            className="hidden sm:inline-block px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] transition-all cursor-pointer"
           >
             {copiedMarp ? "✓ Copied Marp MD" : "Copy Marp MD"}
           </button>
@@ -249,6 +239,13 @@ ${s.speakerNotes}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[color:var(--accent-solid)] text-white hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
           >
             Export .marp.md
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadHtml}
+            className="hidden md:inline-block px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] transition-all cursor-pointer"
+          >
+            HTML Deck
           </button>
           {onOpenVault && (
             <button
@@ -378,6 +375,14 @@ ${s.speakerNotes}
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => setShowLivePlayer(true)}
+                    className="px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-slate-950 text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <span>▶</span>
+                    <span>Live Mode</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setActiveSlideIndex((prev) => Math.max(0, prev - 1))}
                     disabled={activeSlideIndex === 0}
                     className="px-3 py-1.5 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] text-xs font-bold disabled:opacity-40 cursor-pointer"
@@ -444,26 +449,66 @@ ${s.speakerNotes}
                   "{activeSlide.speakerNotes}"
                 </p>
               </div>
+
+              {/* Live Speaker Rehearsal Timer */}
+              <SpeakerRehearsalTimer
+                currentSlide={activeSlide}
+                slideIndex={activeSlideIndex}
+                totalSlides={deckData.slides.length}
+                onNextSlide={() => setActiveSlideIndex((prev) => Math.min(deckData.slides.length - 1, prev + 1))}
+                onPrevSlide={() => setActiveSlideIndex((prev) => Math.max(0, prev - 1))}
+              />
             </div>
           )}
 
           {currentStage === "speaker_script" && (
             <div className="flex flex-col gap-6">
-              <div>
-                <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
-                  Full Speaker Script & Pacing Guide
-                </h2>
-                <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-                  Sequential transcript of your entire talk with target timings and transition cues.
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                    Full Speaker Script & Pacing Guide
+                  </h2>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                    Sequential transcript of your entire talk with target timings and transition cues.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowLivePlayer(true)}
+                  className="px-3.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-slate-950 text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  <span>▶</span>
+                  <span>Present Fullscreen</span>
+                </button>
               </div>
+
+              {/* Rehearsal timer at top of script */}
+              <SpeakerRehearsalTimer
+                currentSlide={activeSlide}
+                slideIndex={activeSlideIndex}
+                totalSlides={deckData.slides.length}
+                onNextSlide={() => setActiveSlideIndex((prev) => Math.min(deckData.slides.length - 1, prev + 1))}
+                onPrevSlide={() => setActiveSlideIndex((prev) => Math.max(0, prev - 1))}
+              />
 
               <div className="space-y-4">
                 {deckData.slides.map((s, idx) => (
-                  <div key={idx} className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <div
+                    key={idx}
+                    onClick={() => setActiveSlideIndex(idx)}
+                    className={`p-5 rounded-2xl border transition-all cursor-pointer ${
+                      idx === activeSlideIndex
+                        ? "border-[color:var(--accent)] bg-[color:var(--surface-raised)] shadow-sm"
+                        : "border-[color:var(--border-default)] bg-[color:var(--surface-sunken)]/50 hover:bg-[color:var(--surface-raised)]"
+                    }`}
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-bold text-xs flex items-center justify-center">
+                        <span className={`w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center ${
+                          idx === activeSlideIndex
+                            ? "bg-[color:var(--accent-solid)] text-white"
+                            : "bg-[color:var(--accent-subtle)] text-[color:var(--accent)]"
+                        }`}>
                           {s.slideNumber}
                         </span>
                         <h4 className="text-xs font-bold text-[color:var(--text-primary)]">{s.title}</h4>

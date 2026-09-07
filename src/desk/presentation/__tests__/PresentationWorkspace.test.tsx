@@ -18,7 +18,7 @@ describe("PresentationWorkspace", () => {
     render(<PresentationWorkspace projectId="proj-pres-1" />);
 
     expect(screen.getByText(/Slide 1 of 5/i)).toBeInTheDocument();
-    const nextBtn = screen.getByRole("button", { name: /Next →/i });
+    const nextBtn = screen.getAllByRole("button", { name: /Next →/i })[0];
     fireEvent.click(nextBtn);
 
     expect(await screen.findByText(/Slide 2 of 5/i)).toBeInTheDocument();
@@ -73,5 +73,20 @@ describe("PresentationWorkspace", () => {
 
     expect(await screen.findByText(/How do you mitigate contradictory evidence\?/i)).toBeInTheDocument();
     expect(screen.getByText(/Senior Conference Referee/i)).toBeInTheDocument();
+  });
+
+  it("opens LiveSlidePlayer when Present Fullscreen is clicked and closes on Exit", async () => {
+    render(<PresentationWorkspace projectId="proj-pres-1" />);
+
+    const presentBtn = screen.getByTestId("present-fullscreen-btn");
+    fireEvent.click(presentBtn);
+
+    expect(await screen.findByTestId("live-slide-player")).toBeInTheDocument();
+    expect(screen.getByText(/Audience Mode/i)).toBeInTheDocument();
+
+    const exitBtn = screen.getByTitle(/Exit Presentation/i);
+    fireEvent.click(exitBtn);
+
+    expect(screen.queryByTestId("live-slide-player")).not.toBeInTheDocument();
   });
 });
