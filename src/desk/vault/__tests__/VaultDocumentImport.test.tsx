@@ -69,6 +69,17 @@ describe("uploading a file", () => {
     await waitFor(() => expect(onImported).toHaveBeenCalled());
   });
 
+  it("performs in-browser OCR on image files and shows parsed preview", async () => {
+    open();
+
+    const file = new File(["fake image content"], "lab_spectrogram.png", { type: "image/png" });
+    const input = screen.getByLabelText("Upload a document");
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole("heading", { name: /lab spectrogram/i })).toBeInTheDocument();
+    expect(screen.getByText(/In-Browser OCR Extracted/i)).toBeInTheDocument();
+  });
+
   it("surfaces a parse failure as an announced error", async () => {
     open();
 

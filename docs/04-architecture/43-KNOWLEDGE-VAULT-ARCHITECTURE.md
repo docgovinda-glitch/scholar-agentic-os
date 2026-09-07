@@ -390,6 +390,7 @@ without a verified backup. See `44` §7 for the full backup regime and `RISK-04`
 | **Collections & Tagging** (`src/desk/vault/VaultItemEditModal.tsx`, `src/services/vaultContents.ts`) | User-defined collections, flat tags, metadata editing, and filter toolbar (§3) |
 | **Retraction & Integrity Watch** (`src/services/vault/retractionService.ts`) | Crossref API & title heuristic retraction inspection, alerts, and publisher notice links (§7.1) |
 | **Semantic Vector & Concept Search** (`src/services/vault/semanticSearchService.ts`) | In-browser cosine similarity, BM25 term coverage, concept extraction, and project topic ranking |
+| **In-Browser OCR & Figure Extraction** (`src/services/vault/ocrService.ts`) | Client-side pixel luminance analysis, caption & table detection, and markdown conversion for lab notes & scans |
 | **Passphrase & Recovery** (`src/services/userVault.ts`) | Local SHA-256 verifier in localStorage, `generateRecoveryCode()` Crockford-encoded |
 | **Portable Open Export** (`src/services/vault/vaultExportService.ts`) | `exportVaultAsZip()` produces `.zip` with `manifest.json`, `references.bib`, and `documents/<id>/content.md` (`REQ-VLT-7`) |
 
@@ -398,6 +399,5 @@ without a verified backup. See `44` §7 for the full backup regime and `RISK-04`
 | Target | Status |
 |---|---|
 | Local audio/video speech-to-text transcription (Whisper) | In progress |
-| Handwritten notes & image OCR | In progress |
 | Automated background Retraction Watch monitoring | In progress |
 | Virtualized list rendering for 5,000+ items | In progress |
