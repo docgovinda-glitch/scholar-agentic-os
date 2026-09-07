@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import { loadVault } from "../../../services/userVault";
 import { getConnectedCloudDrives } from "../../../services/vault/cloudDriveService";
+import { authedJsonFetch } from "../../api";
 import type { DiscoveredSource } from "../types";
 
 export default function AssignmentResearchStage() {
@@ -59,15 +60,11 @@ export default function AssignmentResearchStage() {
     setIsSearching(true);
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/assignment/research`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          academicLevel,
-          citationStyle,
-          plan: researchPlan,
-        }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/assignment/research`, "POST", {
+        question,
+        academicLevel,
+        citationStyle,
+        plan: researchPlan,
       });
 
       if (!res.ok) throw new Error("Failed to search scholarly sources");

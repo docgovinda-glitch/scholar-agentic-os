@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
+import { authedFetch } from "../../api";
 import type { EvidenceItem } from "../types";
 
 export default function AssignmentEvidenceStage() {
@@ -75,7 +76,7 @@ export default function AssignmentEvidenceStage() {
     formData.append("file", file);
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/parse-file`, {
+      const res = await authedFetch(`/api/projects/${projectId}/parse-file`, {
         method: "POST",
         body: formData,
       });

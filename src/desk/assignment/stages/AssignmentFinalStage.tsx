@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
+import { authedJsonFetch } from "../../api";
 import type { SubmissionCheckReport } from "../types";
 
 export default function AssignmentFinalStage() {
@@ -32,17 +33,13 @@ export default function AssignmentFinalStage() {
     setIsReviewing(true);
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/assignment/review`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          academicLevel,
-          assignmentType,
-          targetWordCount,
-          citationStyle,
-          outline,
-        }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/assignment/review`, "POST", {
+        question,
+        academicLevel,
+        assignmentType,
+        targetWordCount,
+        citationStyle,
+        outline,
       });
 
       if (!res.ok) throw new Error("Failed to run submission review");

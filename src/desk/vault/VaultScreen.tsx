@@ -35,6 +35,7 @@ import VaultImport from "./VaultImport";
 import VaultDocumentImport from "./VaultDocumentImport";
 import { CitationConfirmationModal } from "./CitationConfirmationModal";
 import VaultItemEditModal from "./VaultItemEditModal";
+import { authedFetch } from "../api";
 import { downloadVaultZip } from "../../services/vault/vaultExportService";
 import { scanVaultRetractions } from "../../services/vault/retractionService";
 import {
@@ -492,7 +493,7 @@ function VaultContents({
         const formData = new FormData();
         formData.append("file", file);
 
-        const res = await fetch("/api/vault/parse-file", {
+        const res = await authedFetch("/api/vault/parse-file", {
           method: "POST",
           body: formData,
         });

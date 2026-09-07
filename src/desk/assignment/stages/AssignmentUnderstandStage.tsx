@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
+import { authedJsonFetch, authedFetch } from "../../api";
 import {
   type AcademicLevel,
   type AssignmentType,
@@ -26,23 +27,26 @@ export default function AssignmentUnderstandStage() {
     targetWordCount,
     citationStyle,
     assignmentBriefText,
+    courseName,
+    institutionName,
+    deadlineDate,
+    markingRubricText,
+    saveIntake,
     analysis,
     setAnalysis,
-    saveAnswers,
     advanceStage,
-    project,
   } = useAssignmentWorkspace();
 
   const [localQuestion, setLocalQuestion] = useState(question);
   const [localLevel, setLocalLevel] = useState<AcademicLevel>(academicLevel);
   const [localType, setLocalType] = useState<AssignmentType>(assignmentType);
-  const [localWordCount, setLocalWordCount] = useState(targetWordCount || 2000);
-  const [localCitation, setLocalCitation] = useState(citationStyle || "apa7");
+  const [localWordCount, setLocalWordCount] = useState<number>(targetWordCount);
+  const [localCitation, setLocalCitation] = useState<string>(citationStyle);
   const [localBrief, setLocalBrief] = useState(assignmentBriefText);
-  const [course, setCourse] = useState(project?.answers["course_name"] || "");
-  const [institution, setInstitution] = useState(project?.answers["institution"] || "");
-  const [deadline, setDeadline] = useState(project?.answers["deadline"] || "");
-  const [rubricText, setRubricText] = useState(project?.answers["marking_rubric"] || "");
+  const [course, setCourse] = useState(courseName);
+  const [institution, setInstitution] = useState(institutionName);
+  const [deadline, setDeadline] = useState(deadlineDate);
+  const [rubricText, setRubricText] = useState(markingRubricText);
   const [showAdditional, setShowAdditional] = useState(false);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -50,7 +54,6 @@ export default function AssignmentUnderstandStage() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [userFeedback, setUserFeedback] = useState("");
 
-  // Validation
   const canAnalyze =
     localQuestion.trim().length >= 10 &&
     localWordCount > 0 &&
@@ -63,9 +66,9 @@ export default function AssignmentUnderstandStage() {
     setIsAnalyzing(true);
     setAnalysisError(null);
 
-    // Save inputs first
-    await saveAnswers({
-      assignment_question: localQuestion,
+    // Save intake details first
+    await saveIntake({
+      research_topic: localQuestion,
       academic_level: localLevel,
       assignment_type: localType,
       word_count: localWordCount,
@@ -79,18 +82,14 @@ export default function AssignmentUnderstandStage() {
     });
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/assignment/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: localQuestion,
-          assignmentType: localType,
-          academicLevel: localLevel,
-          targetWordCount: localWordCount,
-          citationStyle: localCitation,
-          briefText: localBrief,
-          rubricText,
-        }),
+      const response = await authedJsonFetch(`/api/projects/${projectId}/assignment/analyze`, "POST", {
+        question: localQuestion,
+        assignmentType: localType,
+        academicLevel: localLevel,
+        targetWordCount: localWordCount,
+        citationStyle: localCitation,
+        briefText: localBrief,
+        rubricText,
       });
 
       if (!response.ok) throw new Error("Failed to analyze assignment");
@@ -124,7 +123,7 @@ export default function AssignmentUnderstandStage() {
     formData.append("file", file);
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/parse-file`, {
+      const res = await authedFetch(`/api/projects/${projectId}/parse-file`, {
         method: "POST",
         body: formData,
       });

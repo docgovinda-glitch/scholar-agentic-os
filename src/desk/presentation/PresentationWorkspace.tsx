@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { PresentationStage, PresentationProjectData, PresentationSlide } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
+import { authedJsonFetch } from "../api";
 
 const PRESENTATION_STAGES: Array<{ id: PresentationStage; label: string; icon: string; desc: string }> = [
   { id: "profiler_constraints", label: "1. Timing & Constraints", icon: "⏱️", desc: "Talk duration (10-45m) & audience depth" },
@@ -113,14 +114,10 @@ export default function PresentationWorkspace({
   async function handleGenerateDeck() {
     setIsGenerating(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/presentation/generate-deck`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: deckData.title,
-          durationMinutes: deckData.durationMinutes,
-          targetAudience: deckData.targetAudience,
-        }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/presentation/generate-deck`, "POST", {
+        title: deckData.title,
+        durationMinutes: deckData.durationMinutes,
+        targetAudience: deckData.targetAudience,
       });
       const data = await res.json();
       if (data.slides && data.slides.length > 0) {
@@ -140,10 +137,8 @@ export default function PresentationWorkspace({
   async function handleLoadQaSim() {
     setQaLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/presentation/qa-simulate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: deckData.title }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/presentation/qa-simulate`, "POST", {
+        title: deckData.title,
       });
       const data = await res.json();
       if (data.qaScenarios) {

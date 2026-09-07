@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import type { ThesisStage, ThesisProjectData } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
+import { authedJsonFetch } from "../api";
 
 const THESIS_STAGES: Array<{ id: ThesisStage; label: string; icon: string; desc: string }> = [
   { id: "proposal_framing", label: "1. Proposal & Framing", icon: "🏛️", desc: "Theoretical framework & research questions" },
@@ -57,15 +58,11 @@ export default function ThesisWorkspace({
   async function handleSimulateViva() {
     setVivaLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/thesis/viva-simulate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: thesisData.title,
-          researchQuestions: thesisData.researchQuestions,
-          theoreticalFramework: thesisData.theoreticalFramework,
-          methodology: thesisData.methodologicalDesign,
-        }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/thesis/viva-simulate`, "POST", {
+        title: thesisData.title,
+        researchQuestions: thesisData.researchQuestions,
+        theoreticalFramework: thesisData.theoreticalFramework,
+        methodology: thesisData.methodologicalDesign,
       });
       const data = await res.json();
       setVivaResults(data);
@@ -85,10 +82,8 @@ export default function ThesisWorkspace({
   async function handleRunChapterAudit() {
     setAuditLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/thesis/chapter-audit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapters: thesisData.chapters }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/thesis/chapter-audit`, "POST", {
+        chapters: thesisData.chapters,
       });
       const data = await res.json();
       if (data.audit) {

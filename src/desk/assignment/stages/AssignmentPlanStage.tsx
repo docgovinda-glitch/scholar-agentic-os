@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
+import { authedJsonFetch } from "../../api";
 import type { ResearchPlan } from "../types";
 
 export default function AssignmentPlanStage() {
@@ -42,15 +43,11 @@ export default function AssignmentPlanStage() {
     setIsGenerating(true);
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/assignment/plan`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          academicLevel,
-          assignmentType,
-          analysis,
-        }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/assignment/plan`, "POST", {
+        question,
+        academicLevel,
+        assignmentType,
+        analysis,
       });
       if (!res.ok) throw new Error("Failed to generate research plan");
       const data: ResearchPlan = await res.json();

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
+import { authedJsonFetch } from "../../api";
 import type { OutlineSection } from "../types";
 
 export default function AssignmentStructureStage() {
@@ -36,16 +37,12 @@ export default function AssignmentStructureStage() {
     setIsGenerating(true);
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/assignment/structure`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          assignmentType,
-          academicLevel,
-          targetWordCount,
-          thesis: activeThesis,
-        }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/assignment/structure`, "POST", {
+        question,
+        assignmentType,
+        academicLevel,
+        targetWordCount,
+        thesis: activeThesis,
       });
 
       if (!res.ok) throw new Error("Failed to generate outline structure");

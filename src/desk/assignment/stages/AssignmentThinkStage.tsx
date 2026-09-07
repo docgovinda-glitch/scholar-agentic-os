@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
+import { authedJsonFetch } from "../../api";
 import type { ThinkingMap } from "../types";
 
 export default function AssignmentThinkStage() {
@@ -38,16 +39,12 @@ export default function AssignmentThinkStage() {
     setError(null);
     try {
       const approved = evidenceItems.filter((e) => e.status === "approved");
-      const res = await fetch(`/api/projects/${projectId}/assignment/think`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          academicLevel,
-          assignmentType,
-          sources: sources.filter((s) => s.status === "kept"),
-          evidence: approved,
-        }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/assignment/think`, "POST", {
+        question,
+        academicLevel,
+        assignmentType,
+        sources: sources.filter((s) => s.status === "kept"),
+        evidence: approved,
       });
 
       if (!res.ok) throw new Error("Failed to generate critical thinking synthesis");

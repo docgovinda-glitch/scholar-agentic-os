@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useMemo } from "react";
 import type { CanonicalDocument, OutputTypeSpec, ProjectView, RubricReport } from "../types";
-import { getDocument, getOutputTypeSpec, getProject, getRubric, saveIntakeAnswers, UnauthenticatedError } from "../api";
+import { getDocument, getOutputTypeSpec, getProject, getRubric, saveIntakeAnswers, authedJsonFetch, UnauthenticatedError } from "../api";
 import { getSupabaseClient, isSupabaseConfigured } from "../../services/supabaseClient";
 import type {
   AssignmentStage,
@@ -388,23 +388,19 @@ export function AssignmentProvider({
       setIsTutorReplying(true);
 
       try {
-        const response = await fetch(`/api/projects/${projectId}/assignment/tutor-chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: text,
-            mode: modeToUse,
-            stage: currentStage,
-            academicLevel,
-            assignmentType,
-            question,
-            targetWordCount,
-            currentWordCount,
-            outline,
-            evidence: evidenceItems.filter((e) => e.status === "approved"),
-            thesis: thinkingMap?.customThesis || thinkingMap?.thesisOptions?.find((t) => t.id === thinkingMap?.selectedThesisId)?.statement,
-            activeDraftText,
-          }),
+        const response = await authedJsonFetch(`/api/projects/${projectId}/assignment/tutor-chat`, "POST", {
+          message: text,
+          mode: modeToUse,
+          stage: currentStage,
+          academicLevel,
+          assignmentType,
+          question,
+          targetWordCount,
+          currentWordCount,
+          outline,
+          evidence: evidenceItems.filter((e) => e.status === "approved"),
+          thesis: thinkingMap?.customThesis || thinkingMap?.thesisOptions?.find((t) => t.id === thinkingMap?.selectedThesisId)?.statement,
+          activeDraftText,
         });
 
         if (!response.ok) throw new Error("Failed to reach AI Tutor");
@@ -446,17 +442,13 @@ export function AssignmentProvider({
     async (selectedSectionId?: string): Promise<RubricGradeEstimation | null> => {
       setIsEstimatingRubric(true);
       try {
-        const res = await fetch(`/api/projects/${projectId}/assignment/estimate-rubric`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            question,
-            academicLevel,
-            assignmentType,
-            targetWordCount,
-            outline,
-            selectedSectionId,
-          }),
+        const res = await authedJsonFetch(`/api/projects/${projectId}/assignment/estimate-rubric`, "POST", {
+          question,
+          academicLevel,
+          assignmentType,
+          targetWordCount,
+          outline,
+          selectedSectionId,
         });
         if (!res.ok) throw new Error("Failed to estimate rubric grade");
         const data: RubricGradeEstimation = await res.json();

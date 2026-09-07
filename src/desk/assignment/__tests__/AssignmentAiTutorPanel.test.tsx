@@ -12,13 +12,17 @@ const getRubric = vi.fn();
 const getOutputTypeSpec = vi.fn();
 const saveIntakeAnswers = vi.fn();
 
-vi.mock("../../api", () => ({
-  getProject: (...a: unknown[]) => getProject(...a),
-  getDocument: (...a: unknown[]) => getDocument(...a),
-  getRubric: (...a: unknown[]) => getRubric(...a),
-  getOutputTypeSpec: (...a: unknown[]) => getOutputTypeSpec(...a),
-  saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
-}));
+vi.mock("../../api", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    getProject: (...a: unknown[]) => getProject(...a),
+    getDocument: (...a: unknown[]) => getDocument(...a),
+    getRubric: (...a: unknown[]) => getRubric(...a),
+    getOutputTypeSpec: (...a: unknown[]) => getOutputTypeSpec(...a),
+    saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
+  };
+});
 
 vi.mock("../../../services/userVault", () => ({
   loadVault: vi.fn().mockResolvedValue([]),

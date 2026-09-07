@@ -13,6 +13,7 @@ import {
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
 import { isOcrSupportedImage, performOcrOnImage } from "../../services/vault/ocrService";
 import { isAudioOrVideoMedia, transcribeMediaFile } from "../../services/vault/transcriptionService";
+import { authedFetch, authedJsonFetch } from "../api";
 
 type Mode = "file" | "cloud_drive" | "zotero_mendeley" | "doi" | "web";
 
@@ -161,7 +162,7 @@ export default function VaultDocumentImport({
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("/api/vault/parse-file", {
+      const res = await authedFetch("/api/vault/parse-file", {
         method: "POST",
         body: formData,
       });
@@ -228,11 +229,7 @@ export default function VaultDocumentImport({
     setError(null);
     setProgressMsg("Fetching DOI metadata from CrossRef…");
     try {
-      const res = await fetch("/api/lookup-doi", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doi: doi.trim() }),
-      });
+      const res = await authedJsonFetch("/api/lookup-doi", "POST", { doi: doi.trim() });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Could not look up that DOI.");
       setPreview({
@@ -262,11 +259,7 @@ export default function VaultDocumentImport({
     setError(null);
     setProgressMsg("Scraping web page and extracting content…");
     try {
-      const res = await fetch("/api/vault/parse-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
-      });
+      const res = await authedJsonFetch("/api/vault/parse-url", "POST", { url: url.trim() });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Could not parse that URL.");
       setPreview({
@@ -294,13 +287,9 @@ export default function VaultDocumentImport({
     setProgressMsg("Connecting to Zotero API and syncing references…");
 
     try {
-      const res = await fetch("/api/vault/zotero/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          apiKey: zoteroApiKey.trim(),
-          userId: zoteroUserId.trim(),
-        }),
+      const res = await authedJsonFetch("/api/vault/zotero/sync", "POST", {
+        apiKey: zoteroApiKey.trim(),
+        userId: zoteroUserId.trim(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to sync Zotero.");
@@ -330,11 +319,7 @@ export default function VaultDocumentImport({
     setProgressMsg("Parsing BibTeX reference manager entries…");
 
     try {
-      const res = await fetch("/api/vault/mendeley/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bibtex: mendeleyBibtex.trim() }),
-      });
+      const res = await authedJsonFetch("/api/vault/mendeley/sync", "POST", { bibtex: mendeleyBibtex.trim() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to import BibTeX.");
 

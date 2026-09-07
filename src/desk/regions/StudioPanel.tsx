@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { grantStudioConsent, refinePassage, StudioConsentRequiredError, StudioDeniedError, StudioNoAiSourceError } from "../api";
+import { grantStudioConsent, refinePassage, authedJsonFetch, StudioConsentRequiredError, StudioDeniedError, StudioNoAiSourceError } from "../api";
 import { loadUserAiSettings, readProviderKey } from "../../services/userAiSettings";
 import { routeDecision, type RoutingDecision } from "../aiAccess/aiAccessApi";
 import { getWritingHistory, enableWritingHistory, disableWritingHistory, clearWritingHistory, summarizeWritingHistory, recordRefinement } from "../../app/studio/writingHistory";
@@ -213,10 +213,8 @@ export default function StudioPanel({
     setBuildingVoiceProfile(true);
     setError(null);
     try {
-      const response = await fetch("/api/studio/voice-profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ samples: voiceSamples.split("\n\n").filter((s) => s.trim()) }),
+      const response = await authedJsonFetch("/api/studio/voice-profile", "POST", {
+        samples: voiceSamples.split("\n\n").filter((s) => s.trim()),
       });
       if (!response.ok) {
         const err = await response.json();

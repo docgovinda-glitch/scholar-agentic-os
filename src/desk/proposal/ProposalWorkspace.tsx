@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { ProposalStage, ProposalProjectData } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
+import { authedJsonFetch } from "../api";
 
 const PROPOSAL_STAGES: Array<{ id: ProposalStage; label: string; icon: string; desc: string }> = [
   { id: "agency_rubric", label: "1. Agency & Rubric", icon: "🏛️", desc: "Funding mechanism, budget ceiling & guidelines" },
@@ -54,15 +55,11 @@ export default function ProposalWorkspace({
   async function handleSimulateStudySection() {
     setReviewLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/proposal/study-section-simulate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: proposalData.title,
-          specificAims: proposalData.specificAims,
-          significance: proposalData.significanceStatement,
-          agency: proposalData.fundingAgency,
-        }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/proposal/study-section-simulate`, "POST", {
+        title: proposalData.title,
+        specificAims: proposalData.specificAims,
+        significance: proposalData.significanceStatement,
+        agency: proposalData.fundingAgency,
       });
       const data = await res.json();
       setReviewResults(data);
@@ -76,12 +73,8 @@ export default function ProposalWorkspace({
   async function handleAuditAims() {
     setAuditLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/proposal/aims-audit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          aimsText: proposalData.specificAims.join("\n"),
-        }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/proposal/aims-audit`, "POST", {
+        aimsText: proposalData.specificAims.join("\n"),
       });
       const data = await res.json();
       if (data.checks) {

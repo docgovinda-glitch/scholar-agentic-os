@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
 import WordCountTracker from "../components/WordCountTracker";
+import { authedJsonFetch } from "../../api";
 
 export default function AssignmentDraftStage() {
   const {
@@ -38,19 +39,15 @@ export default function AssignmentDraftStage() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/assignment/draft-section`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sectionTitle: sec.title,
-          sectionGuidance: sec.guidance,
-          targetWordCount: sec.targetWordCount,
-          academicLevel,
-          citationStyle,
-          thesis: activeThesis,
-          approvedEvidence,
-          keyPoints: sec.keyPoints || [],
-        }),
+      const res = await authedJsonFetch(`/api/projects/${projectId}/assignment/draft-section`, "POST", {
+        sectionTitle: sec.title,
+        sectionGuidance: sec.guidance,
+        targetWordCount: sec.targetWordCount,
+        academicLevel,
+        citationStyle,
+        thesis: activeThesis,
+        approvedEvidence,
+        keyPoints: sec.keyPoints || [],
       });
 
       if (!res.ok) throw new Error("Failed to draft section");
