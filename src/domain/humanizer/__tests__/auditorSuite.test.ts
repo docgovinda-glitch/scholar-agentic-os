@@ -170,6 +170,32 @@ A cow is a herbivorous animal that mainly eats grass, hay, and other plant-based
       expect(auditedDoc.auditState?.overallStatus).toBe("passed");
     });
 
+    it("REJECTS an identical candidate with NO_REWRITE_PRODUCED and ERROR severity", () => {
+      const origDoc = createHumanizerDocument(
+        "The cow is one of the most useful domestic animals in the world (Wilson et al., 2022)."
+      );
+      const { shieldedDoc, registry } = shieldDocument(origDoc);
+
+      // Candidate text unchanged from shieldedDoc
+      const identicalCandidateDoc = {
+        ...shieldedDoc,
+        blocks: [
+          {
+            ...shieldedDoc.blocks[0],
+            processedText: shieldedDoc.blocks[0].processedText,
+          },
+        ],
+      };
+
+      const { report, auditedDoc } = auditHumanizerCandidate(origDoc, identicalCandidateDoc, registry);
+
+      expect(report.finalDecision).toBe("REJECT");
+      expect(report.candidateState).toBe("REWRITE_REJECTED");
+      expect(report.overallSeverity).toBe("ERROR");
+      expect(report.findings.some((f) => f.code === "NO_REWRITE_PRODUCED")).toBe(true);
+      expect(auditedDoc.auditState?.overallStatus).toBe("failed");
+    });
+
     it("short-circuits on catastrophic integrity failure and outputs REWRITE_REJECTED", () => {
       const origDoc = createHumanizerDocument(
         "The cow is one of the most useful domestic animals in the world (Wilson et al., 2022)."

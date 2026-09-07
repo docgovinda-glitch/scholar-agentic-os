@@ -35,25 +35,62 @@ export interface PremiumAiPolicy {
 }
 
 export function getPremiumAiPolicy(): PremiumAiPolicy {
-  // Business plan / quota rules are not defined yet.
+  const isExplicitlyDisabled = process.env.ENABLE_SERVER_AI === "false";
+  const isExplicitlyEnabled =
+    process.env.ENABLE_SERVER_AI === "true" ||
+    process.env.ALLOW_SERVER_FALLBACK_AI === "true" ||
+    process.env.NODE_ENV !== "production";
+
+  const candidates = getCandidates();
+  const hasCredentials = candidates.length > 0;
+
+  if (isExplicitlyDisabled) {
+    return {
+      status: "suspended",
+      isServerAiAuthorized: false,
+      reason: "Server AI is explicitly disabled by environment configuration.",
+    };
+  }
+
+  if (!hasCredentials) {
+    return {
+      status: "not_configured",
+      isServerAiAuthorized: false,
+      reason: "No server-side AI provider API keys (OPENROUTER_API_KEY, GEMINI_API_KEY, etc.) are configured.",
+    };
+  }
+
+  if (isExplicitlyEnabled) {
+    return {
+      status: "active",
+      isServerAiAuthorized: true,
+    };
+  }
+
   return {
     status: "not_configured",
     isServerAiAuthorized: false,
-    reason: "Premium AI server policy is pending configuration."
+    reason: "Server AI requires ENABLE_SERVER_AI=true in production.",
   };
 }
 
 export async function isServerAiAuthorized(req: any): Promise<boolean> {
+  const policy = getPremiumAiPolicy();
+  if (!policy.isServerAiAuthorized) return false;
+
   const userId = req.user?.id;
-  if (!userId) return false;
-  try {
-    const entitlement = await getEntitlement(userId);
-    if (!isEntitlementActive(entitlement)) return false;
-    const policy = getPremiumAiPolicy();
-    return policy.isServerAiAuthorized;
-  } catch (_) {
-    return false;
+  if (userId) {
+    try {
+      const entitlement = await getEntitlement(userId);
+      if (entitlement && !isEntitlementActive(entitlement)) {
+        return false;
+      }
+    } catch (_) {
+      // Allow fallback if entitlements table not reachable
+    }
   }
+
+  return true;
 }
 
 function handleFrontendLLMOverride(req: any) {

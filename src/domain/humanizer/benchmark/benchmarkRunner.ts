@@ -49,7 +49,7 @@ export async function runBenchmarkSuite(
   options: BenchmarkRunnerOptions
 ): Promise<HumanizerBenchmarkReport> {
   const cases = options.cases || HUMANIZER_BENCHMARK_V1_CASES;
-  const model = options.model || "gemini-3.6-flash";
+  const model = options.model || "gemini-2.5-flash";
   const provider = options.provider || "gemini";
   const mode = options.mode || "balanced";
   const genre = options.genre || "Academic Journal";

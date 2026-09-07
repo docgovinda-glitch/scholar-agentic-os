@@ -102,10 +102,23 @@ export function buildSystemPrompt(
     authoritative: "STANCE CALIBRATION (AUTHORITATIVE DOCTORAL STANCE): Firm, assertive, and decisive scholarly voice ('these results fundamentally establish', 'the data confirms').",
   }[hedgingLevel];
 
-  return `You are an elite academic prose humanizer and disciplinary editor for ${genre}.
+  const isAcademic =
+    genre.toLowerCase().includes("academic") ||
+    genre.toLowerCase().includes("journal") ||
+    genre.toLowerCase().includes("science");
+
+  const personaLine = isAcademic
+    ? `You are an elite academic prose humanizer and disciplinary editor for ${genre}.`
+    : `You are an elite prose humanizer and stylistic editor for ${genre}.`;
+
+  const objectiveLine = isAcademic
+    ? `Transform synthetic or rigid text into authentic, publication-grade academic prose that reads as if composed by an accomplished human researcher.`
+    : `Transform synthetic, robotic, or AI-generated text into authentic, engaging, and expressive human prose with varied sentence cadence and lively human voice.`;
+
+  return `${personaLine}
 
 OBJECTIVE:
-Transform synthetic or rigid text into authentic, publication-grade academic prose that reads as if composed by an accomplished human researcher.
+${objectiveLine}
 
 OPERATIONAL MODE:
 ${modeDirectives}
@@ -120,6 +133,8 @@ CRITICAL SYSTEM INVARIANTS (VIOLATION WILL CAUSE COMPLETE REJECTION):
 3. NEGATION INVARIANCE: Never flip, remove, or introduce grammatical negation.
 4. LOCKED TERMINOLOGY: Terms marked as locked must be used verbatim without paraphrasing.
 5. ZERO HALLUCINATIONS: Do not introduce unsupported empirical facts or claims.
+6. NARRATIVE, DIALOGUE & PROPER NOUN INVARIANCE: Preserve all character names, proper nouns, dialogue, quotations, narrative perspective, and core storyline verbatim.
+7. PARAGRAPH STRUCTURE: When input contains multiple paragraphs separated by double newlines (\n\n), you MUST preserve the exact paragraph count and structure in your output. Separate each rewritten paragraph with double newlines (\n\n). Do not merge separate paragraphs into one.
 
 OUTPUT FORMAT:
 Return ONLY valid JSON matching this exact schema:

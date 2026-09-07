@@ -18,6 +18,7 @@ import { ClaimAuditResult } from "./claimAuditor";
 import { GrammarAuditResult } from "./grammarAuditor";
 import { CoherenceAuditResult } from "./coherenceAuditor";
 import { SemanticAuditResult } from "./semanticAuditor";
+import { TokenRegistry } from "../protection/tokenRegistry";
 import { renderHumanizerDocument } from "../document/humanizerDocument";
 
 export interface AggregateAuditorInputs {
@@ -28,6 +29,7 @@ export interface AggregateAuditorInputs {
   grammarResult: GrammarAuditResult;
   coherenceResult: CoherenceAuditResult;
   semanticResult: SemanticAuditResult;
+  registry?: TokenRegistry;
   shortCircuited?: boolean;
 }
 
@@ -56,8 +58,26 @@ export function aggregateAuditResults(inputs: AggregateAuditorInputs): Humanizer
     grammarResult,
     coherenceResult,
     semanticResult,
+    registry,
     shortCircuited = false,
   } = inputs;
+
+  // Calculate text change metrics
+  const origText = renderHumanizerDocument(originalDoc, "source");
+  const rawCandText = renderHumanizerDocument(candidateDoc, "processed");
+  const candText = registry ? registry.restore(rawCandText) : rawCandText;
+  const shieldedOrigText = renderHumanizerDocument(originalDoc, "processed");
+
+  const origWords = origText.split(/\s+/).filter(Boolean);
+  const candWords = candText.split(/\s+/).filter(Boolean);
+  const wordCountDelta = candWords.length - origWords.length;
+
+  let differingWords = 0;
+  const maxLen = Math.max(origWords.length, candWords.length, 1);
+  for (let i = 0; i < maxLen; i++) {
+    if (origWords[i] !== candWords[i]) differingWords++;
+  }
+  const percentageChanged = Math.round((differingWords / maxLen) * 100);
 
   const allFindings: HumanizerAuditFinding[] = [
     ...integrityResult.findings,
@@ -66,6 +86,24 @@ export function aggregateAuditResults(inputs: AggregateAuditorInputs): Humanizer
     ...coherenceResult.findings,
     ...semanticResult.findings,
   ];
+
+  // Invariant: Non-empty candidate identical to source must be rejected as NO_REWRITE_PRODUCED
+  const isIdentical =
+    origText.trim().length > 0 &&
+    (differingWords === 0 ||
+      candText.trim() === origText.trim() ||
+      rawCandText.trim() === shieldedOrigText.trim());
+
+  if (isIdentical) {
+    allFindings.push({
+      auditor: "delta_auditor",
+      category: "rewrite_quality",
+      severity: "ERROR",
+      decision: "REJECT",
+      code: "NO_REWRITE_PRODUCED",
+      message: "Candidate text is identical to source text; no humanization or stylistic transformation was produced.",
+    });
+  }
 
   // Determine highest severity
   let highestSeverity: AuditSeverity = "INFO";
@@ -88,21 +126,6 @@ export function aggregateAuditResults(inputs: AggregateAuditorInputs): Humanizer
       finalDecision = f.decision;
     }
   }
-
-  // Calculate text change metrics
-  const origText = renderHumanizerDocument(originalDoc, "source");
-  const candText = renderHumanizerDocument(candidateDoc, "processed");
-
-  const origWords = origText.split(/\s+/).filter(Boolean);
-  const candWords = candText.split(/\s+/).filter(Boolean);
-  const wordCountDelta = candWords.length - origWords.length;
-
-  let differingWords = 0;
-  const maxLen = Math.max(origWords.length, candWords.length, 1);
-  for (let i = 0; i < maxLen; i++) {
-    if (origWords[i] !== candWords[i]) differingWords++;
-  }
-  const percentageChanged = Math.round((differingWords / maxLen) * 100);
 
   const candidateState: CandidateState =
     finalDecision === "REJECT" ? "REWRITE_REJECTED" : "REWRITE_VALIDATED";

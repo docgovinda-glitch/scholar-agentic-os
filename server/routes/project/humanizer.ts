@@ -308,11 +308,14 @@ router.post("/humanize", async (req: Request, res: Response) => {
   let humanizedText = "";
   let improvements: string[] = [];
 
+  let serverAiError: string | undefined;
+  let failureCode: string = "SERVER_AI_UNAVAILABLE";
+
   // 1. Check frontend LLM override if provided
   if (llmResult) {
     try {
       const parsed = parseJsonFromLlm(typeof llmResult === "object" ? llmResult.text || llmResult : llmResult);
-      if (parsed?.humanizedText) {
+      if (parsed?.humanizedText && parsed.humanizedText.trim() !== text.trim()) {
         humanizedText = parsed.humanizedText.trim();
         improvements = Array.isArray(parsed.improvements) ? parsed.improvements : [];
       }
@@ -323,9 +326,14 @@ router.post("/humanize", async (req: Request, res: Response) => {
   if (!humanizedText) {
     try {
       const authorized = await isServerAiAuthorized(req);
-      const candidates = authorized ? getCandidates() : [];
-      if (candidates.length > 0) {
-        const systemPrompt = `You are the Scholar Core Language & Voice Stylometric Studio Agent.
+      if (!authorized) {
+        failureCode = "SERVER_AI_UNAUTHORIZED";
+      } else {
+        const candidates = getCandidates();
+        if (candidates.length === 0) {
+          failureCode = "SERVER_AI_UNAVAILABLE";
+        } else {
+          const systemPrompt = `You are the Scholar Core Language & Voice Stylometric Studio Agent.
 Your objective is to transform raw/AI-drafted text into organic, publication-grade academic prose that sounds authentically human.
 
 Rules:
@@ -344,38 +352,56 @@ Return ONLY valid JSON matching this schema:
   ]
 }`;
 
-        const userPrompt = `Source Text to Humanize:\n"""\n${text}\n"""\n\nParameters:\n- Scholarly Register: ${register}\n- Author Persona: ${persona}\n- Burstiness Level: ${burstinessLevel}\n- Hedging Level: ${hedgingLevel}`;
+          const userPrompt = `Source Text to Humanize:\n"""\n${text}\n"""\n\nParameters:\n- Scholarly Register: ${register}\n- Author Persona: ${persona}\n- Burstiness Level: ${burstinessLevel}\n- Hedging Level: ${hedgingLevel}`;
 
-        const result = await completeWithFailover(
-          {
-            taskClass: "refinement",
-            systemPrompt,
-            userPrompt,
-            responseFormat: "json",
-            segments: [{ label: "Input", text: userPrompt }],
-          },
-          { candidates },
-          defaultPolicy()
-        );
+          const result = await completeWithFailover(
+            {
+              taskClass: "refinement",
+              systemPrompt,
+              userPrompt,
+              responseFormat: "json",
+              segments: [{ label: "Input", text: userPrompt }],
+            },
+            { candidates },
+            defaultPolicy()
+          );
 
-        if (result.ok) {
-          const parsed = parseJsonFromLlm(result.value.text);
-          if (parsed?.humanizedText) {
-            humanizedText = parsed.humanizedText.trim();
-            improvements = Array.isArray(parsed.improvements) ? parsed.improvements : [];
+          if (result.ok) {
+            const parsed = parseJsonFromLlm(result.value.text);
+            if (parsed?.humanizedText && parsed.humanizedText.trim() !== text.trim()) {
+              humanizedText = parsed.humanizedText.trim();
+              improvements = Array.isArray(parsed.improvements) ? parsed.improvements : [];
+            }
+          } else {
+            serverAiError = result.error.message;
+            failureCode = "MODEL_UNREACHABLE";
           }
         }
       }
-    } catch (_) {
-      // Graceful fallback to algorithmic engine below
+    } catch (err: any) {
+      serverAiError = err?.message || "Server AI execution failure";
+      failureCode = "MODEL_UNREACHABLE";
     }
   }
 
-  // 3. Fallback to our robust algorithmic engine
+  // 3. Fallback to our algorithmic engine only if it actually transforms the text
   if (!humanizedText) {
     const algorithmic = applyAlgorithmicHumanization(text, register, persona, burstinessLevel, hedgingLevel);
-    humanizedText = algorithmic.humanizedText;
-    improvements = algorithmic.improvements;
+    if (algorithmic.humanizedText && algorithmic.humanizedText.trim() !== text.trim()) {
+      humanizedText = algorithmic.humanizedText;
+      improvements = algorithmic.improvements;
+    }
+  }
+
+  // 4. Invariant: If output is still empty or identical to input, it is a FAILURE, never a success.
+  if (!humanizedText || humanizedText.trim() === text.trim()) {
+    return res.status(422).json({
+      success: false,
+      error: "No stylometric rewrite could be produced; output is identical to original input.",
+      code: failureCode,
+      detail: serverAiError || "The algorithmic fallback engine found no matching stylistic transformations for this input.",
+      originalText: text,
+    });
   }
 
   // Analyze the resulting humanized text

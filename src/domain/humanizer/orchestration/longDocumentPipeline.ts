@@ -183,8 +183,8 @@ export async function runLongDocumentPipeline(
           retryInstructions: currentRetryPlan?.retryInstructions,
         });
       } catch (err: any) {
-        if (attempt > maxRetries) break;
-        continue;
+        // Provider execution failure: do not repeat dead request
+        break;
       }
 
       // Audit candidate chunk with scoped registry
@@ -197,10 +197,13 @@ export async function runLongDocumentPipeline(
 
       lastReport = report;
 
-      if (report.finalDecision === "SAFE" || report.finalDecision === "WARNING") {
-        // Restore chunk blocks
-        const restoredDoc = restoreDocument(auditedDoc, chunkRegistry);
+      // Restore chunk blocks
+      const restoredDoc = restoreDocument(auditedDoc, chunkRegistry);
+      const chunkOriginal = targetBlocks.map((b) => b.sourceText).join(" ").trim();
+      const chunkRestored = restoredDoc.blocks.map((b) => b.processedText || b.sourceText).join(" ").trim();
+      const isIdentical = chunkOriginal.length > 0 && chunkOriginal === chunkRestored;
 
+      if ((report.finalDecision === "SAFE" || report.finalDecision === "WARNING") && !isIdentical) {
         // Update workingDoc blocks
         workingDoc = {
           ...workingDoc,

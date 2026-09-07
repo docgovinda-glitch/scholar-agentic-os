@@ -254,6 +254,12 @@ class AnthropicAdapter implements ProviderAdapter {
   }
 }
 
+const GEMINI_CONTROLLED_FALLBACK_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+];
+
 class GeminiAdapter implements ProviderAdapter {
   public id = "gemini";
   constructor(private spec: CloudProviderSpec) {}
@@ -291,23 +297,35 @@ class GeminiAdapter implements ProviderAdapter {
 
   async complete(req: CompletionRequest): Promise<{ text: string; model: string }> {
     let model = req.model || this.spec.defaultModel;
-    const url = `${resolveBaseUrl(this.spec)}/models/${model}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
+    const baseUrl = resolveBaseUrl(this.spec);
+    const url = `${baseUrl}/models/${model}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
     let response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.buildBody(req)),
     });
 
-    if (!response.ok && response.status === 404 && model !== "gemini-3.6-flash") {
-      const fallbackUrl = `${resolveBaseUrl(this.spec)}/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(req.apiKey)}`;
-      const retryRes = await fetch(fallbackUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(this.buildBody(req)),
-      });
-      if (retryRes.ok) {
-        response = retryRes;
-        model = "gemini-3.6-flash";
+    // Controlled fallback ONLY on 404 (model not found / unavailable on this key/project).
+    // Do NOT fallback on 401 (bad key), 403, 429 (rate limit), or 400 (bad prompt).
+    if (!response.ok && response.status === 404) {
+      const fallbacks = GEMINI_CONTROLLED_FALLBACK_MODELS.filter((m) => m !== model);
+      for (const fbModel of fallbacks) {
+        const fbUrl = `${baseUrl}/models/${fbModel}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
+        const retryRes = await fetch(fbUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(this.buildBody(req)),
+        });
+        if (retryRes.ok) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+        if (retryRes.status !== 404) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
       }
     }
 
@@ -317,13 +335,38 @@ class GeminiAdapter implements ProviderAdapter {
   }
 
   async stream(req: CompletionRequest, onChunk: (delta: string) => void): Promise<{ text: string; model: string }> {
-    const model = req.model || this.spec.defaultModel;
-    const url = `${resolveBaseUrl(this.spec)}/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
-    const response = await fetch(url, {
+    let model = req.model || this.spec.defaultModel;
+    const baseUrl = resolveBaseUrl(this.spec);
+    const url = `${baseUrl}/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
+    let response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.buildBody(req)),
     });
+
+    // Controlled fallback ONLY on 404
+    if (!response.ok && response.status === 404) {
+      const fallbacks = GEMINI_CONTROLLED_FALLBACK_MODELS.filter((m) => m !== model);
+      for (const fbModel of fallbacks) {
+        const fbUrl = `${baseUrl}/models/${fbModel}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
+        const retryRes = await fetch(fbUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(this.buildBody(req)),
+        });
+        if (retryRes.ok) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+        if (retryRes.status !== 404) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+      }
+    }
+
     if (!response.ok) return throwForBadResponse(this.id, response);
 
     let text = "";

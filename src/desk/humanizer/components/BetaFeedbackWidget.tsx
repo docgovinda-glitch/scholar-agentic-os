@@ -16,7 +16,7 @@ export default function BetaFeedbackWidget({
   mode,
   hasOutput,
   provider = "gemini",
-  model = "gemini-3.6-flash",
+  model = "gemini-2.5-flash",
   genre = "Academic Journal",
   auditDecision = "SAFE",
 }: BetaFeedbackWidgetProps) {

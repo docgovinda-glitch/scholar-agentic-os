@@ -115,4 +115,22 @@ describe("Humanizer Project Router (/api/projects/:id/humanizer)", () => {
     expect(getRes.body.data).toBeDefined();
     expect(getRes.body.data.sourceText).toBe(rawText);
   });
+
+  it("POST /humanize fails with 422 when server AI is unavailable and algorithmic fallback makes zero changes", async () => {
+    const projectId = await createProject();
+    // A clean narrative sentence without any of the hardcoded academic clichés
+    const narrativeText = "The mountain stood quietly in the morning mist.";
+
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/humanizer/humanize`)
+      .send({
+        text: narrativeText,
+        register: "General Nonfiction",
+      });
+
+    expect(res.status).toBe(422);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toContain("No stylometric rewrite could be produced");
+    expect(res.body.code).toBeDefined();
+  });
 });

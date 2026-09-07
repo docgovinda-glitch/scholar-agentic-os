@@ -4,6 +4,7 @@ import {
   isRewriteCandidate,
   rewriteBlock,
   rewriteDocument,
+  isCohesiveRewriteSafe,
 } from "../rewrite/rewriteEngine";
 import { createHumanizerDocument } from "../document/humanizerDocument";
 import { shieldDocument } from "../protection/protectedElementExtractor";
@@ -164,6 +165,78 @@ Empirical studies show milk efficiency improves with $p < 0.001$.`;
 
       expect(res3.rewrittenBlock.processedText).toBe(`Domesticated bovines represent an agrarian asset ${token}.`);
       expect(res3.rewrittenBlock.processedText).not.toContain(`[${token}]`);
+    });
+
+    it("performs cohesive single-call rewrite for multi-paragraph document (>2 paragraphs)", async () => {
+      const multiParaText = `Paragraph 1: Morning broke over the mountain with crisp winter air.
+
+Paragraph 2: The baker prepared the sourdough before the sun rose.
+
+Paragraph 3: Smoke drifted steadily from the village chimneys.
+
+Paragraph 4: A quiet bell signaled the opening of the market square.`;
+
+      const doc = createHumanizerDocument(multiParaText);
+      const { shieldedDoc, registry } = shieldDocument(doc);
+      expect(shieldedDoc.blocks).toHaveLength(4);
+
+      const mockCompleter = vi.fn().mockImplementation(async ({ userPrompt }: any) => {
+        // Return 4 rewritten paragraphs joined by double newlines
+        return JSON.stringify({
+          rewrittenText: `Dawn broke across the ridge with cold morning air.\n\nDown below, the baker kneaded sourdough prior to sunrise.\n\nThin smoke rose from chimneys across the village.\n\nA gentle chime marked the market's early opening.`,
+          improvements: ["Cohesive narrative flow", "Varied syntax across paragraphs"],
+        });
+      });
+
+      const result = await rewriteDocument(shieldedDoc, {
+        mode: "balanced",
+        genre: "General Nonfiction",
+        completer: mockCompleter,
+        registry,
+      });
+
+      // Crucial: Single LLM call for all 4 paragraphs, not 4 sequential calls
+      expect(mockCompleter).toHaveBeenCalledTimes(1);
+      expect(result.blocksRewritten).toBe(4);
+      expect(result.candidateDoc.blocks).toHaveLength(4);
+      expect(result.candidateDoc.blocks[0].processedText).toContain("Dawn broke across the ridge");
+      expect(result.candidateDoc.blocks[1].processedText).toContain("Down below, the baker");
+      expect(result.candidateDoc.blocks[2].processedText).toContain("Thin smoke rose");
+      expect(result.candidateDoc.blocks[3].processedText).toContain("A gentle chime marked");
+    });
+  });
+
+  describe("Cohesive Rewrite Token Budget Safety", () => {
+    it("approves documents that safely fit within input and output token budgets", () => {
+      // Typical 20-paragraph story: ~650 words, few protected tokens
+      const safeBudget = isCohesiveRewriteSafe({
+        sourceWords: 650,
+        protectedTokenCount: 2,
+        lockedTermCount: 1,
+        retryInstructionCount: 0,
+      });
+      expect(safeBudget).toBe(true);
+    });
+
+    it("rejects documents that would breach output token ceilings or total context limits", () => {
+      // Overly large document: 2,500 words would produce ~3,750 output tokens, exceeding safe 3000 cap
+      const unsafeBudget = isCohesiveRewriteSafe({
+        sourceWords: 2500,
+        protectedTokenCount: 5,
+        lockedTermCount: 2,
+        retryInstructionCount: 0,
+      });
+      expect(unsafeBudget).toBe(false);
+    });
+
+    it("rejects documents with excessive protected tokens that inflate prompt overhead beyond safety ceiling", () => {
+      const heavyTokenBudget = isCohesiveRewriteSafe({
+        sourceWords: 1800,
+        protectedTokenCount: 150, // massive token overhead
+        lockedTermCount: 50,
+        retryInstructionCount: 5,
+      });
+      expect(heavyTokenBudget).toBe(false);
     });
   });
 });

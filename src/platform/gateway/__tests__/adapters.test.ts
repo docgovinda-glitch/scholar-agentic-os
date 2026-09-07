@@ -97,6 +97,64 @@ describe("platform/gateway/adapters: Gemini", () => {
       adapter.complete({ provider: "gemini", apiKey: "k", taskClass: "drafting", userPrompt: "hi", segments: [] })
     ).rejects.toMatchObject({ status: 429 } as Partial<AdapterHttpError>);
   });
+
+  it("performs controlled fallback to next verified model on 404 model-not-found", async () => {
+    const fetchMock = vi
+      .fn()
+      // First call fails with 404 (model not found)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        text: async () => "models/invalid-model is not found",
+      })
+      // Fallback call succeeds with 200
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: "response from fallback model" }] } }],
+        }),
+      });
+    global.fetch = fetchMock;
+
+    const adapter = getAdapter("gemini")!;
+    const result = await adapter.complete({
+      provider: "gemini",
+      model: "invalid-model",
+      apiKey: "test-key",
+      taskClass: "drafting",
+      userPrompt: "test prompt",
+      segments: [],
+    });
+
+    expect(result.text).toBe("response from fallback model");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toContain("/models/invalid-model:generateContent");
+    expect(fetchMock.mock.calls[1][0]).toContain("/models/gemini-2.5-flash:generateContent");
+  });
+
+  it("does NOT fall back on 401 or 403 authentication errors", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: async () => "API key not valid",
+    });
+    global.fetch = fetchMock;
+
+    const adapter = getAdapter("gemini")!;
+    await expect(
+      adapter.complete({
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        apiKey: "bad-key",
+        taskClass: "drafting",
+        userPrompt: "test prompt",
+        segments: [],
+      })
+    ).rejects.toMatchObject({ status: 401 } as Partial<AdapterHttpError>);
+
+    // Strictly 1 call — no inappropriate model hopping on auth failure
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("platform/gateway/adapters: Cohere", () => {

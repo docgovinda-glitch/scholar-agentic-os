@@ -135,7 +135,7 @@ export async function runHumanizerPipeline(
         retryInstructions: currentRetryPlan?.retryInstructions,
       });
     } catch (err: any) {
-      // Provider failure / timeout / rate limit
+      // Provider failure / timeout / rate limit: do not burn retry budget on dead provider
       retryHistory.push({
         attemptNumber,
         findingCodes: ["PROVIDER_EXECUTION_FAILURE"],
@@ -143,8 +143,7 @@ export async function runHumanizerPipeline(
         timestamp: new Date().toISOString(),
       });
 
-      if (attemptNumber > maxRetries) break;
-      continue;
+      break;
     }
 
     // Audit the generated candidate
@@ -174,7 +173,11 @@ export async function runHumanizerPipeline(
       report.finalDecision === "SAFE" ||
       (report.finalDecision === "WARNING" && warningPolicy === "accept");
 
-    if (isAccepted) {
+    const isIdentical =
+      originalSourceText.trim().length > 0 &&
+      restoredCandidateText.trim() === originalSourceText.trim();
+
+    if (isAccepted && !isIdentical) {
       // Step 6: Final Deterministic Restoration
       // Verify that no un-restored protected tokens remain
       if (!restoredCandidateText.includes("⟦PROTECTED_")) {

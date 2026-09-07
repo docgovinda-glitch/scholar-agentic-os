@@ -234,4 +234,116 @@ describe("HumanizerWorkspace (Production Pipeline & Quality Audit Dashboard)", (
     expect(screen.getByText(/Safety & Integrity Verified/i)).toBeInTheDocument();
     expect(screen.getByText(/Protected Content/i)).toBeInTheDocument();
   });
+
+  it("never marks original text fallback as success: true or displays green Keep Humanized button", async () => {
+    (completeWithFailover as any).mockResolvedValue({
+      ok: false,
+      error: "All providers failed",
+    });
+
+    (authedJsonFetch as any).mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        success: false,
+        error: "Server AI unavailable and algorithmic rewrite produced no changes.",
+      }),
+    });
+
+    render(<HumanizerWorkspace projectId="proj-hum-1" />);
+
+    const textarea = screen.getByPlaceholderText(/Paste or type academic text/i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, {
+      target: { value: "Original test input that will not be rewritten." },
+    });
+
+    const humanizeBtn = screen.getByRole("button", { name: /Humanize Text/i });
+    fireEvent.click(humanizeBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Rewrite Unsuccessful — Original Source Preserved/i)).toBeInTheDocument();
+    });
+
+    // Invariant: The UI must NEVER display the green "Keep Humanized" button on emergency fallback
+    expect(screen.queryByRole("button", { name: /Keep Humanized/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Safety & Integrity Verified/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Preserved Source \(Fallback\)/i)).toBeInTheDocument();
+  });
+
+  it("clears stale successful output when a subsequent run fails", async () => {
+    // Run 1: Succeeds
+    (completeWithFailover as any).mockResolvedValueOnce({
+      ok: true,
+      value: {
+        text: JSON.stringify({
+          rewrittenText: "First successful rewrite output.",
+          improvements: ["Enhanced style"],
+        }),
+      },
+    });
+
+    render(<HumanizerWorkspace projectId="proj-hum-1" />);
+
+    const textarea = screen.getByPlaceholderText(/Paste or type academic text/i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "First input text." } });
+
+    const humanizeBtn = screen.getByRole("button", { name: /Humanize Text/i });
+    fireEvent.click(humanizeBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("First successful rewrite output.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Keep Humanized/i })).toBeInTheDocument();
+    });
+
+    // Run 2: Fails with 429 rate limit
+    (completeWithFailover as any).mockRejectedValueOnce(
+      new Error("429 RESOURCE_EXHAUSTED: Rate limit exceeded")
+    );
+    (authedJsonFetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: "Rate limit reached" }),
+    });
+
+    fireEvent.change(textarea, { target: { value: "Second input text." } });
+    fireEvent.click(humanizeBtn);
+
+    await waitFor(() => {
+      // Invariant: Stale rewrite from Run 1 MUST NOT survive Run 2 failure
+      expect(screen.queryByText("First successful rewrite output.")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Keep Humanized/i })).not.toBeInTheDocument();
+      expect(screen.getByText(/Rewrite Unsuccessful — Original Source Preserved/i)).toBeInTheDocument();
+    });
+  });
+
+  it("rejects unexpected backend response if backend returns source text with success: true", async () => {
+    const identicalInput = "Input text that backend fails to change.";
+
+    // Completer returns identical input inside JSON
+    (completeWithFailover as any).mockResolvedValueOnce({
+      ok: true,
+      value: {
+        text: JSON.stringify({
+          rewrittenText: identicalInput,
+          improvements: [],
+        }),
+      },
+    });
+
+    render(<HumanizerWorkspace projectId="proj-hum-1" />);
+
+    const textarea = screen.getByPlaceholderText(/Paste or type academic text/i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: identicalInput } });
+
+    const humanizeBtn = screen.getByRole("button", { name: /Humanize Text/i });
+    fireEvent.click(humanizeBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Rewrite Unsuccessful — Original Source Preserved/i)).toBeInTheDocument();
+    });
+
+    // Invariant: Even if an AI completer claimed success, identical output is never shown as successful
+    expect(screen.queryByRole("button", { name: /Keep Humanized/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Preserved Source \(Fallback\)/i)).toBeInTheDocument();
+  });
 });

@@ -65,9 +65,7 @@ async function getCandidateProviders(activeProviderId: string, activeModelName?:
           ? activeModelName
           : settings.preferences?.[`${pid}_model`] || spec?.defaultModel;
 
-      if (pid === "gemini" && (chosenModel === "gemini-2.5-flash" || !chosenModel)) {
-        chosenModel = "gemini-3.6-flash";
-      } else if (pid === "groq" && (chosenModel === "llama-3.3-70b-versatile" || !chosenModel)) {
+      if (pid === "groq" && (chosenModel === "llama-3.3-70b-versatile" || !chosenModel)) {
         chosenModel = "llama-3.1-8b-instant";
       }
 
@@ -248,6 +246,7 @@ export default function HumanizerWorkspace({
   const [fallbackReason, setFallbackReason] = useState<string | undefined>(undefined);
   const [candidateDraftText, setCandidateDraftText] = useState<string | undefined>(undefined);
   const [candidateDraftDoc, setCandidateDraftDoc] = useState<HumanizerDocument | undefined>(undefined);
+  const [isSuccessfulRewrite, setIsSuccessfulRewrite] = useState(false);
 
   // Phase 8: Long Document Chunks & Sentence Review Units
   const [chunks, setChunks] = useState<DocumentChunk[]>([]);
@@ -272,11 +271,8 @@ export default function HumanizerWorkspace({
         setHasApiKey(Boolean(key && key.trim()));
 
         const providerSpec = getCloudProvider(providerId);
-        let chosenModel =
-          settings.preferences?.[`${providerId}_model`] || providerSpec?.defaultModel || "gemini-3.6-flash";
-        if (providerId === "gemini" && (chosenModel === "gemini-2.5-flash" || !chosenModel)) {
-          chosenModel = "gemini-3.6-flash";
-        }
+        const chosenModel =
+          settings.preferences?.[`${providerId}_model`] || providerSpec?.defaultModel || "gemini-2.5-flash";
         setModelName(chosenModel);
       } catch (_) {}
     }
@@ -323,6 +319,8 @@ export default function HumanizerWorkspace({
     }
 
     setLoading(true);
+    setHumanizedText("");
+    setIsSuccessfulRewrite(false);
     setErrorMessage(null);
     setAuditReport(undefined);
     setCandidateState(undefined);
@@ -372,16 +370,25 @@ export default function HumanizerWorkspace({
 
         if (res.ok) {
           const body = await res.json();
-          const responseText = body.rewrittenText || body.humanizedText || body.text;
-          if (responseText) {
+          const responseText = (body.rewrittenText || body.humanizedText || body.text || "").trim();
+          // Invariant: Response text must not be identical to user prompt
+          if (responseText && responseText !== params.userPrompt.trim()) {
             return JSON.stringify({
               rewrittenText: responseText,
               improvements: body.improvements || ["Scholarly vocabulary refinement and cadence enhancement."],
             });
           }
+          throw new Error(body.error || "No rewrite produced: output is identical to input.");
         }
 
-        throw new Error("Unable to reach AI model. Please verify your connection or API key in AI Access.");
+        let errMsg = "Unable to reach AI model. Please verify your connection or API key in AI Access.";
+        try {
+          const errBody = await res.json();
+          if (errBody.detail || errBody.error) {
+            errMsg = `${errBody.error || "AI Error"}: ${errBody.detail || errBody.code || ""}`;
+          }
+        } catch (_) {}
+        throw new Error(errMsg);
       };
 
       // Construct optional voice profile
@@ -405,8 +412,10 @@ export default function HumanizerWorkspace({
 
       setProgressStage("protecting");
 
-      // Check document size for long-document chunking vs standard pipeline
-      const isLongDoc = rawClean.length > 3500;
+      // Check document size for long-document chunking vs standard single-call pipeline
+      // Conservatively chunks when source exceeds ~1800 words to ensure prompt + output fits 4k/8k limits
+      const approxWords = rawClean.split(/\s+/).filter(Boolean).length;
+      const isLongDoc = approxWords > 1800 || rawClean.length > 11000;
 
       if (isLongDoc) {
         const longResult = await runLongDocumentPipeline(rawClean, {
@@ -427,11 +436,17 @@ export default function HumanizerWorkspace({
         setChunks(longResult.chunks);
         setReviewUnits(longResult.reviewUnits);
         const finalRendered = renderHumanizerDocument(longResult.document, "processed");
-        setHumanizedText(finalRendered);
         setFallbackUsed(longResult.fallbackChunksCount > 0 && !longResult.success);
+        setIsSuccessfulRewrite(longResult.success);
 
         if (longResult.success) {
+          setHumanizedText(finalRendered);
           setMobileTab("humanized");
+        } else {
+          setHumanizedText("");
+          setFallbackReason(
+            `Humanization failed for ${longResult.fallbackChunksCount} chunks. Original source text has been preserved.`
+          );
         }
       } else {
         const result = await runHumanizerPipeline(rawClean, {
@@ -447,20 +462,27 @@ export default function HumanizerWorkspace({
 
         setProgressStage("finalizing");
         setDocumentState(result.document);
-        setHumanizedText(result.finalText);
         setAuditReport(result.auditReport);
         setCandidateState(result.candidateState);
         setFallbackUsed(result.fallbackUsed);
         setFallbackReason(result.fallbackReason);
         setCandidateDraftText(result.candidateText);
         setCandidateDraftDoc(result.candidateDocument);
+        const isLegitimateRewrite =
+          result.success &&
+          !result.fallbackUsed &&
+          Boolean(result.finalText) &&
+          result.finalText.trim() !== rawClean.trim();
+
+        setIsSuccessfulRewrite(isLegitimateRewrite);
 
         if (result.document) {
           const generatedUnits = generateReviewUnits(result.document, result.document, result.auditReport);
           setReviewUnits(generatedUnits);
         }
 
-        if (result.success) {
+        if (isLegitimateRewrite) {
+          setHumanizedText(result.finalText);
           setMobileTab("humanized");
           // Persist to server store
           authedJsonFetch(`/api/projects/${projectId}/humanizer/humanize`, "POST", {
@@ -468,10 +490,18 @@ export default function HumanizerWorkspace({
             llmResult: result.finalText,
             register: selectedGenre,
           }).catch(() => {});
+        } else {
+          setHumanizedText("");
+          if (!result.fallbackUsed) {
+            setFallbackUsed(true);
+            setFallbackReason("No genuine stylistic rewrite was produced. Original source text has been preserved.");
+          }
         }
       }
     } catch (err: any) {
       console.error("Humanizer failed:", err);
+      setHumanizedText("");
+      setIsSuccessfulRewrite(false);
       let msg = err.message || "Failed to humanize text. Please check your AI connection.";
       if (msg.includes("denied access") || msg.includes("403")) {
         msg = "Google Gemini project was denied access by Google. Please create a new free API key at aistudio.google.com or switch to Groq in AI Access.";
@@ -537,6 +567,7 @@ export default function HumanizerWorkspace({
   function handleUseCandidateAnyway() {
     if (!candidateDraftText) return;
     setHumanizedText(candidateDraftText);
+    setIsSuccessfulRewrite(true);
     if (candidateDraftDoc) {
       setDocumentState(candidateDraftDoc);
       const generatedUnits = generateReviewUnits(candidateDraftDoc, candidateDraftDoc, auditReport);
@@ -557,6 +588,7 @@ export default function HumanizerWorkspace({
   // Reject Humanized text and keep original
   function handleRejectRewrite() {
     setHumanizedText("");
+    setIsSuccessfulRewrite(false);
     setAuditReport(undefined);
     setCandidateState(undefined);
     setFallbackUsed(false);
@@ -937,16 +969,21 @@ export default function HumanizerWorkspace({
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Humanized Publication Prose
+                  {fallbackUsed ? "Preserved Source (Fallback)" : "Humanized Publication Prose"}
                 </span>
-                {humanizedText && (
+                {isSuccessfulRewrite && humanizedText && (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-medium">
                     {humanizedText.split(/\s+/).filter(Boolean).length} words
                   </span>
                 )}
+                {fallbackUsed && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 font-medium">
+                    Emergency Fallback
+                  </span>
+                )}
               </div>
 
-              {humanizedText && (
+              {isSuccessfulRewrite && humanizedText && (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -969,12 +1006,40 @@ export default function HumanizerWorkspace({
                   <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                   <p className="text-xs font-medium">Rewriting prose & auditing invariants...</p>
                 </div>
-              ) : humanizedText ? (
+              ) : isSuccessfulRewrite && humanizedText ? (
                 showDiff ? (
                   <DiffText original={sourceText} modified={humanizedText} />
                 ) : (
                   <div className="whitespace-pre-wrap leading-relaxed">{humanizedText}</div>
                 )
+              ) : fallbackUsed ? (
+                <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-12 px-6">
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl font-bold">
+                    ⚠️
+                  </div>
+                  <div className="max-w-md flex flex-col gap-1.5">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      Rewrite Unsuccessful — Original Source Preserved
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                      {fallbackReason || "A safe, validated rewrite could not be produced within the retry budget. The original source text has been preserved to guarantee data safety."}
+                    </p>
+                  </div>
+                  {candidateDraftText && (
+                    <div className="pt-2 flex flex-col items-center gap-2">
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                        An unvalidated candidate draft was generated but did not pass all automated checks.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleUseCandidateAnyway}
+                        className="px-3.5 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-sm transition-colors cursor-pointer"
+                      >
+                        Use Candidate Draft Anyway
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs py-16 text-center">
                   <p>Click "Humanize Text" below to execute the multi-auditor pipeline.</p>
@@ -986,7 +1051,7 @@ export default function HumanizerWorkspace({
             </div>
 
             {/* Candidate Review Controls (Keep Humanized / Keep Original) */}
-            {humanizedText && !loading && (
+            {isSuccessfulRewrite && humanizedText && !loading && (
               <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <button

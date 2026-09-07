@@ -80,6 +80,7 @@ export function auditHumanizerCandidate(
       grammarResult: emptyGrammarResult,
       coherenceResult: emptyCoherenceResult,
       semanticResult: emptySemanticResult,
+      registry,
       shortCircuited: true,
     });
 
@@ -133,6 +134,7 @@ export function auditHumanizerCandidate(
     grammarResult,
     coherenceResult,
     semanticResult,
+    registry,
     shortCircuited: false,
   });
 

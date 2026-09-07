@@ -19,7 +19,7 @@ describe("Phase 9: Production Evaluation & Benchmark Suite", () => {
 
     const report = await runBenchmarkSuite({
       completer: mockCompleter,
-      model: "gemini-3.6-flash",
+      model: "gemini-2.5-flash",
       provider: "gemini",
     });
 
