@@ -5,7 +5,9 @@
 
 import type { CanonicalDocument } from "../../desk/types";
 
-export type ExportFormat = "docx" | "odt" | "pdf";
+import type { AcademicExportOptions } from "./academicPdfCompiler";
+
+export type ExportFormat = "docx" | "odt" | "pdf" | "latex" | "typst" | "camera_ready_pdf";
 
 export interface ExportInput {
   document: CanonicalDocument;
@@ -15,6 +17,7 @@ export interface ExportInput {
   discipline?: string;
   includeTableOfContents?: boolean;
   templateName?: string; // e.g., "APA7", "Chicago", project-specific
+  academicOptions?: AcademicExportOptions;
   trackChanges?: boolean;
 }
 

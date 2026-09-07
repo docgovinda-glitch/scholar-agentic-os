@@ -456,6 +456,7 @@ router.post("/tutor-chat", async (req: express.Request<{ id: string }>, res) => 
 
   const {
     message,
+    mode = "socratic",
     stage = "draft",
     academicLevel = "undergraduate",
     assignmentType = "essay",
@@ -465,29 +466,131 @@ router.post("/tutor-chat", async (req: express.Request<{ id: string }>, res) => 
     outline = [],
     evidence = [],
     thesis = "",
+    activeDraftText = "",
   } = req.body || {};
 
   try {
-    const prompt = `You are the Scholar Core Academic Writing & Thinking Tutor.
-A university student is asking for your advice on their assignment.
+    const draftContext = activeDraftText
+      ? `ACTIVE DRAFT EXCERPT:\n"""${activeDraftText.slice(0, 3000)}"""\n`
+      : outline.length > 0
+      ? `OUTLINE & DRAFTS OVERVIEW:\n` +
+        (outline as any[])
+          .map((s) => `[${s.title} (${s.currentWordCount || 0}w)] ${s.draftContent?.slice(0, 300) || "(No draft yet)"}`)
+          .join("\n")
+      : "";
 
+    let modeInstruction = "";
+    if (mode === "socratic") {
+      modeInstruction = `
+ROLE & SOCRATIC METHOD:
+- You are a Classical Socratic Academic Advisor.
+- Do NOT simply provide finished answers or write the essay for the student.
+- Instead, formulate 2-3 deep, dialectical, thought-provoking questions that challenge underlying premises, identify logical gaps, prompt synthesis across theoretical traditions, or expose unexamined assumptions.
+- Provide "socraticQuestions" array where each object has: { id, question, targetConcept, challengeType ("probe_assumptions" | "request_evidence" | "explore_implications" | "counter_perspective" | "clarify_concepts"), rationale }.`;
+    } else if (mode === "rubric") {
+      modeInstruction = `
+ROLE & RUBRIC GRADING ESTIMATOR:
+- Evaluate the student's current work against standard University Marking Criteria (First Class 70%+, 2:1 Upper Second 60-69%, 2:2 Lower Second 50-59%, 3rd 40-49%, Fail <40%).
+- Provide a rigorous, realistic assessment.
+- Populate "rubricEstimation" with:
+  {
+    "overallScore": number (0-100),
+    "overallBand": "1st_class" | "2_1_upper_second" | "2_2_lower_second" | "3rd_class" | "fail",
+    "bandLabel": "First Class (1st) — 74%" (or appropriate),
+    "summary": "...",
+    "criteria": [
+      {
+        "id": "crit-1",
+        "criterion": "Critical Argumentation & Thesis",
+        "weightPercent": 30,
+        "currentBand": "2_1_upper_second",
+        "score": 67,
+        "maxScore": 100,
+        "critique": "...",
+        "howToReachNextBand": "..."
+      },
+      {
+        "id": "crit-2",
+        "criterion": "Evidence Grounding & Source Synthesis",
+        "weightPercent": 30,
+        "currentBand": "1st_class",
+        "score": 75,
+        "maxScore": 100,
+        "critique": "...",
+        "howToReachNextBand": "..."
+      },
+      {
+        "id": "crit-3",
+        "criterion": "Structure, Academic Style & Clarity",
+        "weightPercent": 20,
+        "currentBand": "2_1_upper_second",
+        "score": 68,
+        "maxScore": 100,
+        "critique": "...",
+        "howToReachNextBand": "..."
+      },
+      {
+        "id": "crit-4",
+        "criterion": "Command of Theoretical Frameworks",
+        "weightPercent": 20,
+        "currentBand": "2_1_upper_second",
+        "score": 64,
+        "maxScore": 100,
+        "critique": "...",
+        "howToReachNextBand": "..."
+      }
+    ],
+    "keyStrengths": ["...", "..."],
+    "keyRecommendations": ["...", "..."],
+    "targetBandRoadmap": {
+      "targetBand": "First Class (1st)",
+      "actionableSteps": ["...", "..."]
+    }
+  }`;
+    } else if (mode === "counterargument") {
+      modeInstruction = `
+ROLE & COUNTERARGUMENT GENERATOR:
+- Formulate 2-3 rigorous scholarly counterarguments and objections from competing schools of thought or empirical findings.
+- Populate "counterArguments" array with:
+  [
+    {
+      "id": "ca-1",
+      "opposingViewpoint": "...",
+      "theoreticalGrounding": "...",
+      "keyScholarsOrSchools": ["...", "..."],
+      "suggestedRebuttalStrategy": "..."
+    }
+  ]`;
+    } else {
+      modeInstruction = `
+ROLE & ACADEMIC POLISH:
+- Refine prose for formal academic tone, clarity, and conciseness.
+- If applicable, populate "suggestion" with: { "type": "rephrase", "suggestedText": "..." }`;
+    }
+
+    const prompt = `You are the Scholar Core Live Academic Tutor & Rubric Estimator.
 Student's Query: "${message}"
+Active Mode: ${mode}
 Current Phase: ${stage}
-Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Provide rigorous theoretical critique, counterarguments, and advanced academic vocabulary" : "Provide clear, supportive explanations, structure guidance, and analytical enhancement"})
+Academic Level: ${academicLevel} (${academicLevel === "postgraduate" ? "Expect deep theoretical critique, counterarguments, and advanced academic vocabulary" : "Focus on conceptual clarity, rigorous evidence, clear argument, and accurate referencing"})
 Assignment Type: ${assignmentType}
 Assignment Question: "${question}"
 Central Thesis: "${thesis}"
 Target Word Count: ${targetWordCount} (Current: ${currentWordCount})
 
-Respond conversationally, constructively, and academically.
-Explain the pedagogical reasoning behind your recommendations.
-If suggesting a text rewrite or paragraph improvement, provide a concise, polished sample.
+${draftContext}
 
-Return ONLY valid JSON:
+${modeInstruction}
+
+Return ONLY valid JSON matching:
 {
-  "reply": "...",
+  "reply": "Conversational, constructive academic response explaining the tutor's advice...",
+  "mode": "${mode}",
+  "socraticQuestions": [ ... ],
+  "rubricEstimation": { ... },
+  "counterArguments": [ ... ],
   "suggestion": {
-    "type": "rephrase",
+    "type": "rephrase" | "replace_text" | "reduce_words" | "add_evidence",
     "suggestedText": "..."
   }
 }`;
@@ -501,6 +604,120 @@ Return ONLY valid JSON:
   } catch (err: any) {
     console.error("Tutor chat error:", err);
     res.status(500).json({ error: err.message || "Failed to process tutor query" });
+  }
+});
+
+// 9. POST /api/projects/:id/assignment/estimate-rubric
+router.post("/estimate-rubric", async (req: express.Request<{ id: string }>, res) => {
+  const project = await getProjectSafe(req, res);
+  if (!project) return;
+
+  const {
+    question = project.answers["assignment_question"] || "",
+    academicLevel = project.answers["academic_level"] || "undergraduate",
+    assignmentType = project.answers["assignment_type"] || "essay",
+    targetWordCount = project.answers["word_count"] || 2000,
+    outline = project.answers["assignment_outline"] || [],
+    selectedSectionId,
+  } = req.body || {};
+
+  const fullText = (outline as any[])
+    .map((sec) => `## ${sec.title}\n\n${sec.draftContent || "(No draft yet)"}`)
+    .join("\n\n");
+
+  const targetText = selectedSectionId
+    ? (outline as any[]).find((s) => s.id === selectedSectionId)?.draftContent || fullText
+    : fullText;
+
+  try {
+    const prompt = `You are the Scholar Core Senior Examiner & Rubric Grading Estimator.
+Grade and estimate marks for this university submission draft based on rigorous UK / International university grading standards:
+- First Class (1st): 70-100%
+- Upper Second Class (2:1): 60-69%
+- Lower Second Class (2:2): 50-59%
+- Third Class (3rd): 40-49%
+- Fail: <40%
+
+Assignment Details:
+Question: "${question}"
+Type: ${assignmentType}
+Level: ${academicLevel}
+Target Word Count: ${targetWordCount}
+
+Draft Content:
+${targetText}
+
+Assess all 4 primary dimensions:
+1. Critical Argumentation & Thesis Depth
+2. Evidence Grounding & Source Synthesis
+3. Structure, Academic Style & Coherence
+4. Command of Theoretical Frameworks & Originality
+
+Return ONLY valid JSON matching:
+{
+  "overallScore": 72,
+  "overallBand": "1st_class",
+  "bandLabel": "First Class (1st) — 72%",
+  "summary": "...",
+  "criteria": [
+    {
+      "id": "crit-1",
+      "criterion": "Critical Argumentation & Thesis Depth",
+      "weightPercent": 30,
+      "currentBand": "1st_class",
+      "score": 72,
+      "maxScore": 100,
+      "critique": "...",
+      "howToReachNextBand": "..."
+    },
+    {
+      "id": "crit-2",
+      "criterion": "Evidence Grounding & Source Synthesis",
+      "weightPercent": 30,
+      "currentBand": "2_1_upper_second",
+      "score": 68,
+      "maxScore": 100,
+      "critique": "...",
+      "howToReachNextBand": "..."
+    },
+    {
+      "id": "crit-3",
+      "criterion": "Structure, Academic Style & Coherence",
+      "weightPercent": 20,
+      "currentBand": "1st_class",
+      "score": 74,
+      "maxScore": 100,
+      "critique": "...",
+      "howToReachNextBand": "..."
+    },
+    {
+      "id": "crit-4",
+      "criterion": "Theoretical Rigour & Academic Level",
+      "weightPercent": 20,
+      "currentBand": "1st_class",
+      "score": 70,
+      "maxScore": 100,
+      "critique": "...",
+      "howToReachNextBand": "..."
+    }
+  ],
+  "keyStrengths": ["...", "..."],
+  "keyRecommendations": ["...", "..."],
+  "targetBandRoadmap": {
+    "targetBand": "High First Class (80%+)",
+    "actionableSteps": ["...", "..."]
+  }
+}`;
+
+    const data = await callOpenRouterJSON<any>({
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+    });
+
+    res.json(data);
+  } catch (err: any) {
+    console.error("Rubric estimation error:", err);
+    res.status(500).json({ error: err.message || "Failed to estimate rubric grade" });
   }
 });
 

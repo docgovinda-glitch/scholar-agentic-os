@@ -160,19 +160,33 @@ export async function scanVaultRetractions(
       retractedCount++;
     }
 
-    if (item.retractionStatus !== check.status) {
-      const updated = await updateVaultItemDetails(userId, item.id, {
-        retractionStatus: check.status,
-        retractionDetails: {
-          noticeUrl: check.noticeUrl,
-          reason: check.reason,
-          date: check.date,
-        },
-      });
+    const itemCopy: VaultItem = {
+      ...item,
+      retractionStatus: check.status,
+      retractionDetails: {
+        noticeUrl: check.noticeUrl,
+        reason: check.reason,
+        date: check.date,
+      },
+    };
+    updatedItems[i] = itemCopy;
 
-      if (updated) {
-        const idx = updatedItems.findIndex((x) => x.id === item.id);
-        if (idx >= 0) updatedItems[idx] = updated;
+    if (item.retractionStatus !== check.status) {
+      try {
+        const updated = await updateVaultItemDetails(userId, item.id, {
+          retractionStatus: check.status,
+          retractionDetails: {
+            noticeUrl: check.noticeUrl,
+            reason: check.reason,
+            date: check.date,
+          },
+        });
+
+        if (updated) {
+          updatedItems[i] = updated;
+        }
+      } catch (e) {
+        // Local persistence fallback
       }
     }
   }

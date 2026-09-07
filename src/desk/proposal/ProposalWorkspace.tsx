@@ -47,6 +47,10 @@ export default function ProposalWorkspace({
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewResults, setReviewResults] = useState<any>(null);
 
+  // Aims audit state
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [aimsAuditChecks, setAimsAuditChecks] = useState<any[] | null>(null);
+
   async function handleSimulateStudySection() {
     setReviewLoading(true);
     try {
@@ -66,6 +70,27 @@ export default function ProposalWorkspace({
       console.error(e);
     } finally {
       setReviewLoading(false);
+    }
+  }
+
+  async function handleAuditAims() {
+    setAuditLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/proposal/aims-audit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aimsText: proposalData.specificAims.join("\n"),
+        }),
+      });
+      const data = await res.json();
+      if (data.checks) {
+        setAimsAuditChecks(data.checks);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAuditLoading(false);
     }
   }
 
@@ -155,16 +180,108 @@ export default function ProposalWorkspace({
 
         {/* Center Stage Content */}
         <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-5xl">
-          {currentStage === "specific_aims" && (
+          {currentStage === "agency_rubric" && (
             <div className="flex flex-col gap-6">
               <div>
                 <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
-                  Specific Aims Executive Page
+                  Funding Agency & Grant Rubric
                 </h2>
                 <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-                  The most critical page of your grant application. Sets the central hypothesis and concrete milestone deliverables.
+                  Calibrate grant mechanism constraints, total direct cost ceilings, and review panel expectations.
                 </p>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                    Funding Agency
+                  </label>
+                  <input
+                    type="text"
+                    value={proposalData.fundingAgency}
+                    onChange={(e) => setProposalData({ ...proposalData, fundingAgency: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                  />
+                </div>
+
+                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                    Grant Mechanism / Opportunity Track
+                  </label>
+                  <input
+                    type="text"
+                    value={proposalData.mechanism}
+                    onChange={(e) => setProposalData({ ...proposalData, mechanism: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                  />
+                </div>
+
+                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                    Budget Ceiling (USD)
+                  </label>
+                  <input
+                    type="number"
+                    value={proposalData.targetBudgetUSD}
+                    onChange={(e) => setProposalData({ ...proposalData, targetBudgetUSD: parseInt(e.target.value, 10) || 0 })}
+                    className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                  />
+                </div>
+
+                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                    Project Duration (Months)
+                  </label>
+                  <input
+                    type="number"
+                    value={proposalData.durationMonths}
+                    onChange={(e) => setProposalData({ ...proposalData, durationMonths: parseInt(e.target.value, 10) || 0 })}
+                    className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStage === "specific_aims" && (
+            <div className="flex flex-col gap-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                    Specific Aims Executive Page
+                  </h2>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                    The most critical page of your grant application. Sets the central hypothesis and concrete milestone deliverables.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAuditAims}
+                  disabled={auditLoading}
+                  className="px-3.5 py-1.5 rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] hover:bg-[color:var(--surface-hover)] text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {auditLoading ? "Auditing Aims…" : "Audit Aims Structure"}
+                </button>
+              </div>
+
+              {aimsAuditChecks && (
+                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--accent)] block mb-1">
+                    Specific Aims Compliance Check
+                  </span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {aimsAuditChecks.map((chk: any, idx: number) => (
+                      <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-[color:var(--surface-sunken)] text-xs">
+                        <span className="text-emerald-500 font-bold">✓</span>
+                        <div>
+                          <strong className="text-[color:var(--text-primary)]">{chk.name}: </strong>
+                          <span className="text-[color:var(--text-secondary)]">{chk.detail}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
                 <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
@@ -184,7 +301,7 @@ export default function ProposalWorkspace({
                     Specific Aims (Milestone Deliverables)
                   </h3>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
-                    3 Aims Formulated
+                    {proposalData.specificAims.length} Aims Formulated
                   </span>
                 </div>
 
@@ -205,6 +322,94 @@ export default function ProposalWorkspace({
                     />
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {currentStage === "significance_innovation" && (
+            <div className="flex flex-col gap-6">
+              <div>
+                <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                  Significance & Innovation
+                </h2>
+                <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                  Articulate the critical deficit in current literature and the paradigm shift introduced by your proposed research.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                  Significance & Societal/Economic Impact
+                </label>
+                <textarea
+                  rows={3}
+                  value={proposalData.significanceStatement}
+                  onChange={(e) => setProposalData({ ...proposalData, significanceStatement: e.target.value })}
+                  className="w-full p-3 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                />
+              </div>
+
+              <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                  Methodological & Conceptual Innovation
+                </label>
+                <textarea
+                  rows={3}
+                  value={proposalData.innovationStatement}
+                  onChange={(e) => setProposalData({ ...proposalData, innovationStatement: e.target.value })}
+                  className="w-full p-3 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                />
+              </div>
+            </div>
+          )}
+
+          {currentStage === "budget_justification" && (
+            <div className="flex flex-col gap-6">
+              <div>
+                <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                  Budget Justification & Resource Breakdown
+                </h2>
+                <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                  Direct and indirect cost allocation across personnel, computation, open science, and institutional facilities.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)]">
+                    Personnel & Postdocs (60%)
+                  </span>
+                  <h4 className="text-lg font-bold text-[color:var(--text-primary)] mt-1">
+                    ${Math.round(proposalData.targetBudgetUSD * 0.6).toLocaleString()}
+                  </h4>
+                  <p className="text-[11px] text-[color:var(--text-muted)] mt-1">
+                    Lead PI (2 summer months) + 2 Postdoctoral Researchers.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)]">
+                    Compute & Equipment (25%)
+                  </span>
+                  <h4 className="text-lg font-bold text-[color:var(--text-primary)] mt-1">
+                    ${Math.round(proposalData.targetBudgetUSD * 0.25).toLocaleString()}
+                  </h4>
+                  <p className="text-[11px] text-[color:var(--text-muted)] mt-1">
+                    Cloud GPU compute clusters & high-throughput validation.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)]">
+                    Open Science & Travel (15%)
+                  </span>
+                  <h4 className="text-lg font-bold text-[color:var(--text-primary)] mt-1">
+                    ${Math.round(proposalData.targetBudgetUSD * 0.15).toLocaleString()}
+                  </h4>
+                  <p className="text-[11px] text-[color:var(--text-muted)] mt-1">
+                    Gold Open Access publishing & major conference dissemination.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -285,31 +490,35 @@ export default function ProposalWorkspace({
             </div>
           )}
 
-          {currentStage !== "specific_aims" && currentStage !== "study_section_review" && (
-            <div className="flex flex-col gap-6">
-              <div>
-                <h2 className="text-xl font-bold text-[color:var(--text-primary)] capitalize">
-                  {PROPOSAL_STAGES.find((s) => s.id === currentStage)?.label}
-                </h2>
-                <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-                  {PROPOSAL_STAGES.find((s) => s.id === currentStage)?.desc}
-                </p>
-              </div>
+          {currentStage !== "specific_aims" &&
+            currentStage !== "agency_rubric" &&
+            currentStage !== "significance_innovation" &&
+            currentStage !== "budget_justification" &&
+            currentStage !== "study_section_review" && (
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h2 className="text-xl font-bold text-[color:var(--text-primary)] capitalize">
+                    {PROPOSAL_STAGES.find((s) => s.id === currentStage)?.label}
+                  </h2>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                    {PROPOSAL_STAGES.find((s) => s.id === currentStage)?.desc}
+                  </p>
+                </div>
 
-              <div className="p-6 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
-                <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed mb-4">
-                  This section is calibrated against {proposalData.fundingAgency} grant requirements and word budget constraints.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setCurrentStage("study_section_review")}
-                  className="px-4 py-2 bg-[color:var(--accent-solid)] text-white text-xs font-bold rounded-xl hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
-                >
-                  Proceed to Study Section Review →
-                </button>
+                <div className="p-6 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed mb-4">
+                    This section is calibrated against {proposalData.fundingAgency} grant requirements and word budget constraints.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStage("study_section_review")}
+                    className="px-4 py-2 bg-[color:var(--accent-solid)] text-white text-xs font-bold rounded-xl hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
+                  >
+                    Proceed to Study Section Review →
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </main>
       </div>
     </div>

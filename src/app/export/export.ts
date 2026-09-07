@@ -11,6 +11,12 @@ import type { CanonicalDocument, Block } from "../../desk/types";
 import { renderDocx } from "./docxWriter";
 import { renderOdt } from "./odtWriter";
 import { renderPdf } from "./pdfWriter";
+import {
+  generateLatexSource,
+  generateTypstSource,
+  compileAcademicPdf,
+  type AcademicExportOptions,
+} from "./academicPdfCompiler";
 import type { ExportFormat, ExportInput, ExportResult, ExportMetadata, PreflightReport } from "./types";
 
 /**
@@ -65,7 +71,12 @@ function resolve(_document: CanonicalDocument): CanonicalDocument {
 /**
  * Stage 4: Render — convert to the target format.
  */
-async function render(document: CanonicalDocument, format: ExportFormat, metadata: ExportMetadata): Promise<Buffer> {
+async function render(
+  document: CanonicalDocument,
+  format: ExportFormat,
+  metadata: ExportMetadata,
+  academicOptions?: AcademicExportOptions
+): Promise<Buffer> {
   switch (format) {
     case "docx":
       return renderDocx(document, metadata);
@@ -73,6 +84,16 @@ async function render(document: CanonicalDocument, format: ExportFormat, metadat
       return renderOdt(document, metadata);
     case "pdf":
       return renderPdf(document, metadata);
+    case "camera_ready_pdf":
+      return compileAcademicPdf(document, metadata, academicOptions);
+    case "latex": {
+      const tex = generateLatexSource(document, metadata, academicOptions);
+      return Buffer.from(tex, "utf-8");
+    }
+    case "typst": {
+      const typ = generateTypstSource(document, metadata, academicOptions);
+      return Buffer.from(typ, "utf-8");
+    }
     default:
       throw new Error(`Unknown export format: ${format}`);
   }
@@ -80,13 +101,20 @@ async function render(document: CanonicalDocument, format: ExportFormat, metadat
 
 /**
  * Stage 5: Verify — check the output is well-formed.
- * Stub: proper implementation checks full DOCX/ODT/PDF structural validity, not just the magic bytes.
  */
 function verify(data: Buffer, format: ExportFormat): boolean {
   if (data.length === 0) return false;
-  if (format === "pdf") {
+  if (format === "pdf" || format === "camera_ready_pdf") {
     // PDFs start with the literal "%PDF" header.
     return data[0] === 0x25 && data[1] === 0x50 && data[2] === 0x44 && data[3] === 0x46;
+  }
+  if (format === "latex") {
+    const text = data.toString("utf-8");
+    return text.includes("\\documentclass") && text.includes("\\begin{document}");
+  }
+  if (format === "typst") {
+    const text = data.toString("utf-8");
+    return text.includes("#set page") && text.includes("#set text");
   }
   // DOCX and ODT are both zip containers, starting with the PK signature.
   return data[0] === 0x50 && data[1] === 0x4b;
@@ -111,13 +139,22 @@ export async function exportDocument(input: ExportInput): Promise<ExportResult> 
     modified: new Date(),
   };
 
-  const data = await render(resolved, input.format, metadata);
+  const data = await render(resolved, input.format, metadata, input.academicOptions);
 
   if (!verify(data, input.format)) {
     throw new Error("Export verification failed — output is malformed");
   }
 
-  const extension = input.format === "odt" ? "odt" : input.format === "pdf" ? "pdf" : "docx";
+  const extensionMap: Record<ExportFormat, string> = {
+    odt: "odt",
+    pdf: "pdf",
+    camera_ready_pdf: "pdf",
+    docx: "docx",
+    latex: "tex",
+    typst: "typ",
+  };
+
+  const extension = extensionMap[input.format] || "docx";
   const filename = `${input.title.replace(/[^a-z0-9]/gi, "_")}.${extension}`;
 
   return {

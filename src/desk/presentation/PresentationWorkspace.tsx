@@ -103,7 +103,109 @@ export default function PresentationWorkspace({
   });
 
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copiedMarp, setCopiedMarp] = useState(false);
+  const [qaScenarios, setQaScenarios] = useState<any[]>([]);
+  const [qaLoading, setQaLoading] = useState(false);
+
   const activeSlide = deckData.slides[activeSlideIndex] || deckData.slides[0];
+
+  async function handleGenerateDeck() {
+    setIsGenerating(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/presentation/generate-deck`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: deckData.title,
+          durationMinutes: deckData.durationMinutes,
+          targetAudience: deckData.targetAudience,
+        }),
+      });
+      const data = await res.json();
+      if (data.slides && data.slides.length > 0) {
+        setDeckData((prev) => ({
+          ...prev,
+          slides: data.slides,
+        }));
+        setActiveSlideIndex(0);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function handleLoadQaSim() {
+    setQaLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/presentation/qa-simulate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: deckData.title }),
+      });
+      const data = await res.json();
+      if (data.qaScenarios) {
+        setQaScenarios(data.qaScenarios);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setQaLoading(false);
+    }
+  }
+
+  function generateMarpMarkdown(): string {
+    let md = `---
+marp: true
+theme: default
+paginate: true
+backgroundColor: #0f172a
+color: #f8fafc
+---
+
+<!-- _class: lead -->
+# ${deckData.title}
+### ${deckData.targetAudience} · ${deckData.durationMinutes} Mins
+`;
+
+    deckData.slides.forEach((s) => {
+      md += `
+---
+
+# ${s.title}
+${s.subtitle ? `### ${s.subtitle}\n` : ""}
+${s.keyPoints.map((k) => `- ${k}`).join("\n")}
+
+<!--
+Speaker Notes (${s.targetDurationSeconds}s):
+${s.speakerNotes}
+-->
+`;
+    });
+
+    return md;
+  }
+
+  function handleExportMarp() {
+    const md = generateMarpMarkdown();
+    navigator.clipboard.writeText(md);
+    setCopiedMarp(true);
+    setTimeout(() => setCopiedMarp(false), 3000);
+  }
+
+  function handleDownloadMarp() {
+    const md = generateMarpMarkdown();
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `${deckData.title.toLowerCase().replace(/[^a-z0-9]/g, "_")}_presentation.marp.md`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   return (
     <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] font-sans flex flex-col selection:bg-[color:var(--accent-subtle)]">
@@ -139,20 +241,26 @@ export default function PresentationWorkspace({
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleExportMarp}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] transition-all cursor-pointer"
+          >
+            {copiedMarp ? "✓ Copied Marp MD" : "Copy Marp MD"}
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadMarp}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[color:var(--accent-solid)] text-white hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
+          >
+            Export .marp.md
+          </button>
           {onOpenVault && (
             <button
               onClick={onOpenVault}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] transition-all cursor-pointer"
             >
               Vault
-            </button>
-          )}
-          {onOpenAiAccess && (
-            <button
-              onClick={onOpenAiAccess}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] transition-all cursor-pointer"
-            >
-              AI Access
             </button>
           )}
         </div>
@@ -191,6 +299,76 @@ export default function PresentationWorkspace({
 
         {/* Center Presentation Stage Content */}
         <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-5xl">
+          {currentStage === "profiler_constraints" && (
+            <div className="flex flex-col gap-6">
+              <div>
+                <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                  Talk Timing, Audience & Constraints
+                </h2>
+                <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                  Configure presentation duration, target audience rigor, and generate an AI-tailored slide structure.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                    Presentation Title
+                  </label>
+                  <input
+                    type="text"
+                    value={deckData.title}
+                    onChange={(e) => setDeckData({ ...deckData, title: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                  />
+                </div>
+
+                <div className="p-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                    Target Audience / Venue
+                  </label>
+                  <input
+                    type="text"
+                    value={deckData.targetAudience}
+                    onChange={(e) => setDeckData({ ...deckData, targetAudience: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                  />
+                </div>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-xs font-bold text-[color:var(--text-primary)]">
+                    Target Talk Duration: <span className="text-[color:var(--accent)]">{deckData.durationMinutes} Minutes</span>
+                  </label>
+                  <span className="text-xs text-[color:var(--text-muted)]">
+                    Estimated Slide Count: ~{Math.max(6, Math.round(deckData.durationMinutes * 0.8))} slides
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={5}
+                  max={60}
+                  step={5}
+                  value={deckData.durationMinutes}
+                  onChange={(e) => setDeckData({ ...deckData, durationMinutes: parseInt(e.target.value, 10) })}
+                  className="w-full accent-[color:var(--accent)] cursor-pointer"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleGenerateDeck}
+                  disabled={isGenerating}
+                  className="px-5 py-2.5 bg-[color:var(--accent-solid)] text-white rounded-xl text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isGenerating ? "Synthesizing Slide Deck…" : "Generate AI Slide Deck & Scripts →"}
+                </button>
+              </div>
+            </div>
+          )}
+
           {currentStage === "visual_deck_preview" && (
             <div className="flex flex-col gap-6">
               <div className="flex items-center justify-between">
@@ -274,31 +452,127 @@ export default function PresentationWorkspace({
             </div>
           )}
 
-          {currentStage !== "visual_deck_preview" && (
+          {currentStage === "speaker_script" && (
             <div className="flex flex-col gap-6">
               <div>
-                <h2 className="text-xl font-bold text-[color:var(--text-primary)] capitalize">
-                  {PRESENTATION_STAGES.find((s) => s.id === currentStage)?.label}
+                <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                  Full Speaker Script & Pacing Guide
                 </h2>
                 <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-                  {PRESENTATION_STAGES.find((s) => s.id === currentStage)?.desc}
+                  Sequential transcript of your entire talk with target timings and transition cues.
                 </p>
               </div>
 
-              <div className="p-6 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
-                <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed mb-4">
-                  Visual storyboard is automatically linked to your Knowledge Vault evidence points.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setCurrentStage("visual_deck_preview")}
-                  className="px-4 py-2 bg-[color:var(--accent-solid)] text-white text-xs font-bold rounded-xl hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
-                >
-                  View Visual Slide Deck →
-                </button>
+              <div className="space-y-4">
+                {deckData.slides.map((s, idx) => (
+                  <div key={idx} className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-bold text-xs flex items-center justify-center">
+                          {s.slideNumber}
+                        </span>
+                        <h4 className="text-xs font-bold text-[color:var(--text-primary)]">{s.title}</h4>
+                      </div>
+                      <span className="text-[10px] font-bold text-[color:var(--text-muted)]">
+                        ~{s.targetDurationSeconds}s ({Math.round(s.speakerNotes.split(" ").length / (s.targetDurationSeconds / 60))} wpm)
+                      </span>
+                    </div>
+                    <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed bg-[color:var(--surface-sunken)] p-3 rounded-xl border border-[color:var(--border-subtle)]">
+                      {s.speakerNotes}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           )}
+
+          {currentStage === "defense_qa_sim" && (
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                    Conference Q&A & Referee Defense Simulator
+                  </h2>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                    Anticipate aggressive referee questions and rehearse crisp, authoritative rebuttals.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLoadQaSim}
+                  disabled={qaLoading}
+                  className="px-4 py-2 bg-[color:var(--accent-solid)] text-white rounded-xl text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {qaLoading ? "Generating Q&A Scenarios…" : "Simulate Audience Q&A →"}
+                </button>
+              </div>
+
+              {qaScenarios.length > 0 ? (
+                <div className="space-y-4">
+                  {qaScenarios.map((sc, idx) => (
+                    <div key={idx} className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[color:var(--surface-sunken)] text-[color:var(--accent)]">
+                          {sc.audienceType}
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-bold text-[color:var(--text-primary)] mb-2">
+                        "{sc.questionText}"
+                      </h4>
+                      <p className="text-xs text-[color:var(--text-muted)] italic mb-3">
+                        Probing Intent: {sc.probingIntent}
+                      </p>
+                      <div className="p-3 bg-[color:var(--surface-sunken)] rounded-xl border border-[color:var(--border-subtle)]">
+                        <span className="text-[11px] font-bold text-[color:var(--text-primary)] block mb-1">
+                          Suggested Rebuttal Strategy:
+                        </span>
+                        <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
+                          {sc.suggestedAnswer}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-10 text-center rounded-2xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <div className="text-2xl mb-2">🛡️</div>
+                  <h4 className="text-sm font-bold text-[color:var(--text-primary)]">Ready for Q&A Rehearsal</h4>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                    Click "Simulate Audience Q&A" to generate targeted attendee questions tailored to your research claims.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentStage !== "visual_deck_preview" &&
+            currentStage !== "profiler_constraints" &&
+            currentStage !== "speaker_script" &&
+            currentStage !== "defense_qa_sim" && (
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h2 className="text-xl font-bold text-[color:var(--text-primary)] capitalize">
+                    {PRESENTATION_STAGES.find((s) => s.id === currentStage)?.label}
+                  </h2>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                    {PRESENTATION_STAGES.find((s) => s.id === currentStage)?.desc}
+                  </p>
+                </div>
+
+                <div className="p-6 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed mb-4">
+                    Visual storyboard is automatically linked to your Knowledge Vault evidence points.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStage("visual_deck_preview")}
+                    className="px-4 py-2 bg-[color:var(--accent-solid)] text-white text-xs font-bold rounded-xl hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
+                  >
+                    View Visual Slide Deck →
+                  </button>
+                </div>
+              </div>
+            )}
         </main>
       </div>
     </div>

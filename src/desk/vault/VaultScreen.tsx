@@ -37,6 +37,18 @@ import { CitationConfirmationModal } from "./CitationConfirmationModal";
 import VaultItemEditModal from "./VaultItemEditModal";
 import { downloadVaultZip } from "../../services/vault/vaultExportService";
 import { scanVaultRetractions } from "../../services/vault/retractionService";
+import {
+  runVaultRetractionAudit,
+  isAuditDue,
+  getRetractionAlerts,
+  acknowledgeRetractionAlert,
+  dismissRetractionAlert,
+  getAuditHistory,
+  getAuditScheduleConfig,
+  saveAuditScheduleConfig,
+  type RetractionAlert,
+  type AuditReport,
+} from "../../services/vault/scheduledRetractionAudit";
 import { searchVaultSemantically, type SemanticSearchResult } from "../../services/vault/semanticSearchService";
 
 type VaultPresence = null | "none" | "other-device" | "this-device" | "synced";
@@ -337,23 +349,36 @@ function VaultContents({
     }
   };
 
+  const [retractionAlerts, setRetractionAlerts] = useState<RetractionAlert[]>([]);
+
+  useEffect(() => {
+    if (userId) {
+      setRetractionAlerts(getRetractionAlerts(userId));
+    }
+  }, [userId]);
+
   async function handleScanRetractions() {
     if (!items || items.length === 0) return;
     setIsScanningRetractions(true);
     setScanMessage("Scanning Crossref & Retraction Watch for academic integrity notices…");
     try {
-      const res = await scanVaultRetractions(userId, items, (curr, total) => {
+      const report = await runVaultRetractionAudit(userId, items, (curr, total) => {
         setScanMessage(`Scanning papers for retractions (${curr}/${total})…`);
       });
-      setItems(res.updatedItems);
-      if (res.retractedCount > 0) {
-        setScanMessage(`Scan complete: ${res.retractedCount} item(s) flagged with retraction or concern notices.`);
+      // Refresh items
+      loadItems();
+      setRetractionAlerts(getRetractionAlerts(userId));
+
+      if (report.retractedCount > 0 || report.expressionOfConcernCount > 0) {
+        setScanMessage(
+          `Audit complete: ${report.retractedCount} retraction(s), ${report.expressionOfConcernCount} concern note(s) flagged.`
+        );
       } else {
-        setScanMessage("Scan complete: No retraction notices found across all scanned items.");
+        setScanMessage("Audit complete: No retraction notices found across all scanned items.");
       }
       setTimeout(() => setScanMessage(null), 5000);
     } catch (err: any) {
-      setScanMessage(`Retraction scan error: ${err.message}`);
+      setScanMessage(`Retraction audit error: ${err.message}`);
     } finally {
       setIsScanningRetractions(false);
     }

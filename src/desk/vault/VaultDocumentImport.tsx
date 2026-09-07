@@ -12,6 +12,7 @@ import {
 } from "../../services/vault/cloudDriveService";
 import type { CanonicalReference } from "../../citation_compliance/model/reference";
 import { isOcrSupportedImage, performOcrOnImage } from "../../services/vault/ocrService";
+import { isAudioOrVideoMedia, transcribeMediaFile } from "../../services/vault/transcriptionService";
 
 type Mode = "file" | "cloud_drive" | "zotero_mendeley" | "doi" | "web";
 
@@ -99,6 +100,27 @@ export default function VaultDocumentImport({
     setProgressMsg(`Uploading and parsing ${file.name}…`);
 
     try {
+      if (isAudioOrVideoMedia(file)) {
+        setProgressMsg(`Transcribing recorded audio/video from ${file.name}…`);
+        const transcription = await transcribeMediaFile(file, { filename: file.name });
+        setPreview({
+          title: transcription.title,
+          content: transcription.markdownContent,
+          sourceType: file.type.startsWith("video") ? "video" : "file",
+          filename: file.name,
+          mimeType: file.type || "audio/mpeg",
+          citationStatus: "needs_user_review",
+          metadata: {
+            ...transcription.metadata,
+            duration: transcription.duration,
+            formattedDuration: transcription.formattedDuration,
+            topicsIdentified: transcription.topicsIdentified,
+            isAudioVideoTranscript: true,
+          },
+        });
+        return;
+      }
+
       if (isOcrSupportedImage(file)) {
         setProgressMsg(`Performing in-browser OCR on ${file.name}…`);
         const ocrResult = await performOcrOnImage(file, { filename: file.name });
@@ -450,18 +472,18 @@ export default function VaultDocumentImport({
               <svg className="w-10 h-10 text-[color:var(--accent)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">Upload research documents & scanned notes</p>
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">Upload research documents, notes & media</p>
               <p className="text-xs text-[color:var(--text-muted)] mt-1">
-                Supports PDF, Word (.docx), Excel (.xlsx), CSV, Markdown (.md), Text (.txt), and Images/Figures (.png, .jpg, .webp, .tiff) with in-browser OCR
+                Supports PDF, Word (.docx), Excel (.xlsx), CSV, Markdown (.md), Text (.txt), Images (.png, .jpg, .webp), and Audio/Video (.mp3, .wav, .m4a, .mp4, .webm)
               </p>
               <label className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer shadow-xs">
-                <span>Select File or Scanned Note</span>
+                <span>Select File or Media</span>
                 <input
                   type="file"
                   onChange={handleFile}
                   disabled={busy}
                   aria-label="Upload a document"
-                  accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.md,.txt,.png,.jpg,.jpeg,.webp,.bmp,.tiff"
+                  accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.md,.txt,.png,.jpg,.jpeg,.webp,.bmp,.tiff,.mp3,.wav,.m4a,.ogg,.flac,.aac,.mp4,.mov,.webm,.mkv"
                   className="hidden"
                 />
               </label>
@@ -775,6 +797,11 @@ export default function VaultDocumentImport({
                 {preview.title}
               </h4>
             </div>
+            {preview.metadata?.isAudioVideoTranscript && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-semibold shrink-0">
+                🎙️ Audio Transcript ({preview.metadata.formattedDuration})
+              </span>
+            )}
             {preview.metadata?.isScannedDocument && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-semibold shrink-0">
                 🔍 In-Browser OCR Extracted

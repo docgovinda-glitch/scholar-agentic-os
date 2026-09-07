@@ -72,10 +72,16 @@ interface AssignmentContextValue {
   submissionReport: SubmissionCheckReport | null;
   setSubmissionReport: (report: SubmissionCheckReport) => Promise<void>;
 
-  // AI Tutor
+  // AI Tutor & Rubric Estimator
+  tutorMode: TutorMode;
+  setTutorMode: (mode: TutorMode) => void;
   tutorMessages: TutorChatMessage[];
-  sendTutorMessage: (message: string) => Promise<void>;
+  sendTutorMessage: (message: string, overrideMode?: TutorMode, activeDraftText?: string) => Promise<void>;
   isTutorReplying: boolean;
+  isEstimatingRubric: boolean;
+  lastRubricEstimation: RubricGradeEstimation | null;
+  estimateRubricGrade: (selectedSectionId?: string) => Promise<RubricGradeEstimation | null>;
+  applyTutorSuggestionToDraft: (suggestion: { targetSectionId?: string; suggestedText: string; type?: string }) => Promise<void>;
 
   // Save Answers Helper
   saveAnswers: (updates: Record<string, any>) => Promise<void>;
@@ -112,9 +118,12 @@ export function AssignmentProvider({
   // Active stage
   const currentStage: AssignmentStage = initialStage ?? "understand";
 
-  // AI Tutor state
+  // AI Tutor & Rubric Estimator state
+  const [tutorMode, setTutorMode] = useState<TutorMode>("socratic");
   const [tutorMessages, setTutorMessages] = useState<TutorChatMessage[]>([]);
   const [isTutorReplying, setIsTutorReplying] = useState(false);
+  const [isEstimatingRubric, setIsEstimatingRubric] = useState(false);
+  const [lastRubricEstimation, setLastRubricEstimation] = useState<RubricGradeEstimation | null>(null);
 
   // Load project data
   const load = useCallback(async () => {
@@ -144,7 +153,8 @@ export function AssignmentProvider({
           {
             id: "greeting",
             sender: "tutor",
-            text: `👋 Hello! I am your Scholar Core Academic Writing & Thinking Tutor.\n\nI am here to help you unpack assignment prompts, evaluate evidence, sharpen your critical arguments, and ensure your submission meets top academic standards.`,
+            mode: "socratic",
+            text: `👋 Hello! I am your Scholar Core Socratic Academic Tutor & Rubric Estimator.\n\nChoose an advising mode above: Engage in deep Socratic questioning, estimate your marking rubric grade band (1st / 2:1 / 2:2), stress-test counterarguments, or polish academic prose.`,
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           },
         ]);
@@ -365,10 +375,12 @@ export function AssignmentProvider({
 
   // AI Tutor chat
   const sendTutorMessage = useCallback(
-    async (text: string) => {
+    async (text: string, overrideMode?: TutorMode, activeDraftText?: string) => {
+      const modeToUse = overrideMode || tutorMode;
       const userMsg: TutorChatMessage = {
         id: `msg-${Date.now()}`,
         sender: "user",
+        mode: modeToUse,
         text,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
@@ -381,6 +393,7 @@ export function AssignmentProvider({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: text,
+            mode: modeToUse,
             stage: currentStage,
             academicLevel,
             assignmentType,
@@ -390,17 +403,26 @@ export function AssignmentProvider({
             outline,
             evidence: evidenceItems.filter((e) => e.status === "approved"),
             thesis: thinkingMap?.customThesis || thinkingMap?.thesisOptions?.find((t) => t.id === thinkingMap?.selectedThesisId)?.statement,
+            activeDraftText,
           }),
         });
 
         if (!response.ok) throw new Error("Failed to reach AI Tutor");
         const data = await response.json();
 
+        if (data.rubricEstimation) {
+          setLastRubricEstimation(data.rubricEstimation);
+        }
+
         const replyMsg: TutorChatMessage = {
           id: `tutor-${Date.now()}`,
           sender: "tutor",
+          mode: modeToUse,
           text: data.reply || "I am analyzing your query. How else can I assist your writing?",
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          socraticQuestions: data.socraticQuestions,
+          rubricEstimation: data.rubricEstimation,
+          counterArguments: data.counterArguments,
           actionableSuggestion: data.suggestion,
         };
         setTutorMessages((prev) => [...prev, replyMsg]);
@@ -416,7 +438,68 @@ export function AssignmentProvider({
         setIsTutorReplying(false);
       }
     },
-    [projectId, currentStage, academicLevel, assignmentType, question, targetWordCount, currentWordCount, outline, evidenceItems, thinkingMap]
+    [projectId, tutorMode, currentStage, academicLevel, assignmentType, question, targetWordCount, currentWordCount, outline, evidenceItems, thinkingMap]
+  );
+
+  // Estimate Rubric Grade
+  const estimateRubricGrade = useCallback(
+    async (selectedSectionId?: string): Promise<RubricGradeEstimation | null> => {
+      setIsEstimatingRubric(true);
+      try {
+        const res = await fetch(`/api/projects/${projectId}/assignment/estimate-rubric`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question,
+            academicLevel,
+            assignmentType,
+            targetWordCount,
+            outline,
+            selectedSectionId,
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to estimate rubric grade");
+        const data: RubricGradeEstimation = await res.json();
+        setLastRubricEstimation(data);
+
+        // Also add a tutor message with this estimation
+        const estMsg: TutorChatMessage = {
+          id: `rubric-est-${Date.now()}`,
+          sender: "tutor",
+          mode: "rubric",
+          text: `📊 **Rubric Grade Assessment:** Your current draft is estimated at **${data.bandLabel}** (${data.overallScore}%).\n\n${data.summary}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          rubricEstimation: data,
+        };
+        setTutorMessages((prev) => [...prev, estMsg]);
+        return data;
+      } catch (err) {
+        console.error("Failed to estimate rubric grade:", err);
+        return null;
+      } finally {
+        setIsEstimatingRubric(false);
+      }
+    },
+    [projectId, question, academicLevel, assignmentType, targetWordCount, outline]
+  );
+
+  // Apply Tutor Suggestion to Draft
+  const applyTutorSuggestionToDraft = useCallback(
+    async (suggestion: { targetSectionId?: string; suggestedText: string; type?: string }) => {
+      if (!suggestion.suggestedText) return;
+      const targetSec = suggestion.targetSectionId
+        ? outline.find((s) => s.id === suggestion.targetSectionId)
+        : outline[0];
+      if (!targetSec) return;
+
+      const currentText = targetSec.draftContent || "";
+      const updatedText = currentText
+        ? `${currentText}\n\n${suggestion.suggestedText}`
+        : suggestion.suggestedText;
+
+      await updateSectionDraft(targetSec.id, updatedText);
+    },
+    [outline, updateSectionDraft]
   );
 
   // Compute status for all 8 stages
@@ -497,9 +580,15 @@ export function AssignmentProvider({
         wordCountPercentage,
         submissionReport,
         setSubmissionReport,
+        tutorMode,
+        setTutorMode,
         tutorMessages,
         sendTutorMessage,
         isTutorReplying,
+        isEstimatingRubric,
+        lastRubricEstimation,
+        estimateRubricGrade,
+        applyTutorSuggestionToDraft,
         saveAnswers,
       }}
     >

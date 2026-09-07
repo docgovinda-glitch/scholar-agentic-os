@@ -184,11 +184,70 @@ export interface SubmissionCheckReport {
   priorityFixes: string[];
 }
 
+export type TutorMode = "socratic" | "rubric" | "counterargument" | "writing_polish";
+
+export type GradingBand =
+  | "1st_class"
+  | "2_1_upper_second"
+  | "2_2_lower_second"
+  | "3rd_class"
+  | "fail";
+
+export interface RubricCriterionEstimate {
+  id: string;
+  criterion: string;
+  weightPercent?: number;
+  currentBand: GradingBand;
+  score: number; // e.g. 74
+  maxScore: number; // e.g. 100
+  critique: string;
+  howToReachNextBand: string;
+}
+
+export interface RubricGradeEstimation {
+  overallScore: number; // 0 - 100
+  overallBand: GradingBand;
+  bandLabel: string; // e.g. "First Class (1st) — 74%"
+  summary: string;
+  criteria: RubricCriterionEstimate[];
+  keyStrengths: string[];
+  keyRecommendations: string[];
+  targetBandRoadmap: {
+    targetBand: string;
+    actionableSteps: string[];
+  };
+}
+
+export interface SocraticQuestion {
+  id: string;
+  question: string;
+  targetConcept: string;
+  challengeType:
+    | "probe_assumptions"
+    | "request_evidence"
+    | "explore_implications"
+    | "counter_perspective"
+    | "clarify_concepts";
+  rationale: string;
+}
+
+export interface CounterArgument {
+  id: string;
+  opposingViewpoint: string;
+  theoreticalGrounding: string;
+  keyScholarsOrSchools: string[];
+  suggestedRebuttalStrategy: string;
+}
+
 export interface TutorChatMessage {
   id: string;
   sender: "user" | "tutor";
   text: string;
   timestamp: string;
+  mode?: TutorMode;
+  socraticQuestions?: SocraticQuestion[];
+  rubricEstimation?: RubricGradeEstimation;
+  counterArguments?: CounterArgument[];
   actionableSuggestion?: {
     type: "replace_text" | "reduce_words" | "add_evidence" | "rephrase";
     targetSectionId?: string;

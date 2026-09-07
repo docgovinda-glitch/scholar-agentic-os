@@ -78,6 +78,29 @@ export default function ThesisWorkspace({
 
   const progressPercent = Math.round((thesisData.currentWordCount / thesisData.targetWordCount) * 100);
 
+  // Chapter audit state
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [chapterAuditResults, setChapterAuditResults] = useState<any>(null);
+
+  async function handleRunChapterAudit() {
+    setAuditLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/thesis/chapter-audit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chapters: thesisData.chapters }),
+      });
+      const data = await res.json();
+      if (data.audit) {
+        setChapterAuditResults(data.audit);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] font-sans flex flex-col selection:bg-[color:var(--accent-subtle)]">
       {/* Top Navigation Bar */}
@@ -249,6 +272,162 @@ export default function ThesisWorkspace({
             </div>
           )}
 
+          {currentStage === "literature_matrix" && (
+            <div className="flex flex-col gap-6">
+              <div>
+                <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                  Chapter 2: Thematic Literature Matrix
+                </h2>
+                <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                  Synthesize competing theoretical paradigms, identify empirical fractures, and link literature clusters directly to your Knowledge Vault.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)]">
+                    Paradigm 1: Classical Computationalism
+                  </span>
+                  <h4 className="text-xs font-bold text-[color:var(--text-primary)] mt-1">
+                    Symbolic & Discrete Logic
+                  </h4>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-2 leading-relaxed">
+                    Assumes cognition operates over formal syntactic token manipulations with discrete state transitions.
+                  </p>
+                  <div className="mt-3 text-[11px] text-[color:var(--text-muted)]">
+                    Vault Links: 14 Indexed Papers
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)]">
+                    Paradigm 2: Dynamic Neural Field Theory
+                  </span>
+                  <h4 className="text-xs font-bold text-[color:var(--text-primary)] mt-1">
+                    Continuous Activation Fields
+                  </h4>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-2 leading-relaxed">
+                    Models spatial-temporal continuity and attractor stabilization in high-dimensional agent state spaces.
+                  </p>
+                  <div className="mt-3 text-[11px] text-[color:var(--text-muted)]">
+                    Vault Links: 22 Indexed Papers
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)]">
+                    The Scholarly Tension (Gap)
+                  </span>
+                  <h4 className="text-xs font-bold text-[color:var(--text-primary)] mt-1">
+                    Epistemic Uncertainty Calibration
+                  </h4>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-2 leading-relaxed">
+                    Neither paradigm adequately predicts non-Markovian memory drift in autonomous multi-agent consensus protocols.
+                  </p>
+                  <div className="mt-3 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                    Target of Dissertation Contribution
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStage === "methodology_design" && (
+            <div className="flex flex-col gap-6">
+              <div>
+                <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                  Chapter 3: Methodology & Epistemological Rigor
+                </h2>
+                <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                  Epistemological framing, sampling strategy, instrument validity, and ethics/IRB clearance.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-[color:var(--text-primary)] block mb-1">
+                    Epistemological & Methodological Design
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={thesisData.methodologicalDesign}
+                    onChange={(e) => setThesisData({ ...thesisData, methodologicalDesign: e.target.value })}
+                    className="w-full p-3 text-xs border border-[color:var(--border-control)] rounded-xl bg-[color:var(--surface-input)] text-[color:var(--text-primary)]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  <div className="p-3 bg-[color:var(--surface-sunken)] rounded-xl border border-[color:var(--border-subtle)]">
+                    <span className="text-xs font-bold text-[color:var(--text-primary)] block">
+                      Quantitative Phase: Empirical Benchmarks
+                    </span>
+                    <p className="text-[11px] text-[color:var(--text-muted)] mt-1">
+                      Controlled ablation experiments across 10,000 synthetic reasoning traces with Bayesian ANOVA.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-[color:var(--surface-sunken)] rounded-xl border border-[color:var(--border-subtle)]">
+                    <span className="text-xs font-bold text-[color:var(--text-primary)] block">
+                      Qualitative Phase: Thematic Trace Coding
+                    </span>
+                    <p className="text-[11px] text-[color:var(--text-muted)] mt-1">
+                      Double-blind inter-rater reliability analysis (Cohen's Kappa &gt; 0.85) on epistemic drift logs.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStage === "discussion_contributions" && (
+            <div className="flex flex-col gap-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                    Chapter 5: Critical Discussion & Cross-Chapter Audit
+                  </h2>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                    Audit thematic consistency and research question resolution across your complete dissertation.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRunChapterAudit}
+                  disabled={auditLoading}
+                  className="px-4 py-2 bg-[color:var(--accent-solid)] text-white rounded-xl text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {auditLoading ? "Auditing Chapters…" : "Run Cross-Chapter Audit →"}
+                </button>
+              </div>
+
+              {chapterAuditResults && (
+                <div className="p-5 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--accent)]">
+                        Structural Alignment Score
+                      </span>
+                      <h4 className="text-xl font-black text-[color:var(--text-primary)] mt-0.5">
+                        {chapterAuditResults.alignmentScore}% · {chapterAuditResults.coherenceStatus}
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {chapterAuditResults.crossChapterChecks.map((chk: any, idx: number) => (
+                      <div key={idx} className="flex items-start gap-2.5 p-3 rounded-xl bg-[color:var(--surface-sunken)] text-xs">
+                        <span className="text-emerald-500 font-bold mt-0.5">✓</span>
+                        <div>
+                          <strong className="text-[color:var(--text-primary)]">{chk.check}: </strong>
+                          <span className="text-[color:var(--text-secondary)]">{chk.details}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {currentStage === "viva_defense" && (
             <div className="flex flex-col gap-6">
               <div className="flex items-start justify-between">
@@ -331,33 +510,37 @@ export default function ThesisWorkspace({
             </div>
           )}
 
-          {currentStage !== "proposal_framing" && currentStage !== "viva_defense" && (
-            <div className="flex flex-col gap-6">
-              <div>
-                <h2 className="text-xl font-bold text-[color:var(--text-primary)] capitalize">
-                  {THESIS_STAGES.find((s) => s.id === currentStage)?.label}
-                </h2>
-                <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-                  {THESIS_STAGES.find((s) => s.id === currentStage)?.desc}
-                </p>
-              </div>
+          {currentStage !== "proposal_framing" &&
+            currentStage !== "literature_matrix" &&
+            currentStage !== "methodology_design" &&
+            currentStage !== "discussion_contributions" &&
+            currentStage !== "viva_defense" && (
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h2 className="text-xl font-bold text-[color:var(--text-primary)] capitalize">
+                    {THESIS_STAGES.find((s) => s.id === currentStage)?.label}
+                  </h2>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+                    {THESIS_STAGES.find((s) => s.id === currentStage)?.desc}
+                  </p>
+                </div>
 
-              <div className="p-6 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
-                <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed mb-4">
-                  This chapter is grounded in your Knowledge Vault references and structured according to your departmental dissertation guidelines.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStage("viva_defense")}
-                    className="px-4 py-2 bg-[color:var(--accent-solid)] text-white text-xs font-bold rounded-xl hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
-                  >
-                    Proceed to Defense Prep →
-                  </button>
+                <div className="p-6 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
+                  <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed mb-4">
+                    This chapter is grounded in your Knowledge Vault references and structured according to your departmental dissertation guidelines.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStage("viva_defense")}
+                      className="px-4 py-2 bg-[color:var(--accent-solid)] text-white text-xs font-bold rounded-xl hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
+                    >
+                      Proceed to Defense Prep →
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
         </main>
       </div>
     </div>

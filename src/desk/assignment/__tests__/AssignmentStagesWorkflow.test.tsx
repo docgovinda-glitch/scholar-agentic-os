@@ -108,9 +108,9 @@ describe("Assignment Workspace Stages & Workflow", () => {
 
     expect(await screen.findByText(/Phase 6: Structure & Word Count Planner/i)).toBeInTheDocument();
     expect(screen.getByText(/Mandatory Target/i)).toBeInTheDocument();
-    expect(screen.getByText(/3,000 words/i)).toBeInTheDocument();
-    expect(screen.getByText(/Introduction & Context/i)).toBeInTheDocument();
-    expect(screen.getByText(/Theoretical Framework/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/3,000 words/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Introduction & Context/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Theoretical Framework/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders the Grounded Drafting stage with word count tracking and active section draft", async () => {
