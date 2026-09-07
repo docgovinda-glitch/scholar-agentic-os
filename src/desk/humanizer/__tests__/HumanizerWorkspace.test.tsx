@@ -51,18 +51,36 @@ describe("HumanizerWorkspace (Production Pipeline & Quality Audit Dashboard)", (
     });
   });
 
-  it("renders rewrite modes, genre selector, locked terms manager, and dual panels", () => {
+  it("renders rewrite modes, discipline selector, hedging selector, genre selector, locked terms manager, detector simulation, cadence ribbon, and dual panels", () => {
     render(<HumanizerWorkspace projectId="proj-hum-1" />);
 
     expect(screen.getByText(/Text Humanizer/i)).toBeInTheDocument();
     expect(screen.getByText(/Controlled Academic Prose Rewriting Engine/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Conservative$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Balanced/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Deep/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Conservative$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Balanced/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Deep/i })).toBeInTheDocument();
+    expect(screen.getByText(/Discipline Voice Profile/i)).toBeInTheDocument();
+    expect(screen.getByText(/Epistemic Hedging \/ Stance/i)).toBeInTheDocument();
     expect(screen.getByText(/Locked Terminology Memory/i)).toBeInTheDocument();
+    expect(screen.getByTestId("detector-simulation-card")).toBeInTheDocument();
+    expect(screen.getByTestId("cadence-ribbon-visualizer")).toBeInTheDocument();
     expect(screen.getByText(/Original \/ Input Text/i)).toBeInTheDocument();
     expect(screen.getByText(/Humanized Publication Prose/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Humanize Text/i })).toBeInTheDocument();
+  });
+
+  it("allows selecting discipline profile and hedging level", () => {
+    render(<HumanizerWorkspace projectId="proj-hum-1" />);
+
+    const disciplineSelect = screen.getByLabelText(/Discipline Voice Profile/i) as HTMLSelectElement;
+    expect(disciplineSelect.value).toBe("general");
+    fireEvent.change(disciplineSelect, { target: { value: "stem" } });
+    expect(disciplineSelect.value).toBe("stem");
+
+    const hedgingSelect = screen.getByLabelText(/Epistemic Hedging \/ Stance/i) as HTMLSelectElement;
+    expect(hedgingSelect.value).toBe("balanced");
+    fireEvent.change(hedgingSelect, { target: { value: "authoritative" } });
+    expect(hedgingSelect.value).toBe("authoritative");
   });
 
   it("manages locked terminology and sample text", () => {

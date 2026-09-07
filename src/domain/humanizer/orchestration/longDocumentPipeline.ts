@@ -24,7 +24,7 @@ import {
 import { TokenRegistry } from "../protection/tokenRegistry";
 import { extractClaimsFromDocument } from "../claims/claimExtractor";
 import { LLMCompleter } from "../rewrite/rewriteEngine";
-import { RewriteMode } from "../rewrite/promptBuilder";
+import { RewriteMode, DisciplineProfile, HedgingLevel } from "../rewrite/promptBuilder";
 import { createDocumentChunks } from "../chunking/longDocumentChunker";
 import { auditHumanizerCandidate } from "../audit/auditOrchestrator";
 import { rewriteDocument } from "../rewrite/rewriteEngine";
@@ -35,6 +35,8 @@ import { validateFinalDocument } from "../review/documentReviewManager";
 export interface LongDocumentPipelineOptions {
   mode?: RewriteMode;
   genre?: string;
+  discipline?: DisciplineProfile;
+  hedgingLevel?: HedgingLevel;
   completer: LLMCompleter;
   maxRetries?: number;
   maxConcurrentChunks?: number;
@@ -174,6 +176,8 @@ export async function runLongDocumentPipeline(
         rewriteResult = await rewriteDocument(chunkDoc, {
           mode,
           genre,
+          discipline: options.discipline,
+          hedgingLevel: options.hedgingLevel,
           completer: options.completer,
           registry: chunkRegistry,
           retryInstructions: currentRetryPlan?.retryInstructions,

@@ -7,7 +7,8 @@ import { getCloudProvider } from "../../config/providerCatalog";
 import { defaultPolicy, recordConsent } from "../../platform/warden/warden";
 import { runHumanizerPipeline } from "../../domain/humanizer/orchestration/humanizerPipeline";
 import { runLongDocumentPipeline } from "../../domain/humanizer/orchestration/longDocumentPipeline";
-import { RewriteMode } from "../../domain/humanizer/rewrite/promptBuilder";
+import { RewriteMode, DisciplineProfile, HedgingLevel } from "../../domain/humanizer/rewrite/promptBuilder";
+import { simulateAiDetectors, type DetectorSimulationResult } from "../../domain/humanizer/evaluation/detectorSimulator";
 import {
   HumanizerDocument,
   HumanizerAuditReport,
@@ -38,6 +39,8 @@ import SentenceReviewList from "./components/SentenceReviewList";
 import LongDocumentDashboard from "./components/LongDocumentDashboard";
 import DeveloperEvaluationModal from "./components/DeveloperEvaluationModal";
 import BetaFeedbackWidget from "./components/BetaFeedbackWidget";
+import DetectorSimulationCard from "./components/DetectorSimulationCard";
+import CadenceRibbonVisualizer from "./components/CadenceRibbonVisualizer";
 
 const SAMPLE_TEXT =
   "The cow is one of the most useful domestic animals in the world (Wilson et al., 2022). It has been closely associated with human civilization for thousands of years. People keep cows for milk, farming, and other useful products. In many countries, especially in South Asia, cows are an important part of rural life.\n\nA cow is a herbivorous animal that mainly eats grass, hay, and other plant-based food. It has four legs, two horns, two ears, and a long tail. Empirical studies show that milk production efficiency improves significantly with targeted forage nutrition with $p < 0.001$ and $R^2 = 0.88$ [4, 7]. Milk is one of the most important products obtained from cows. It is rich in nutrients such as protein, calcium, and vitamins and is used to make products such as curd, butter, cheese, ghee, and yogurt. Cow dung is also useful because it can be used as organic manure for agriculture and, in some places, as a source of biogas.\n\nCows have a special cultural and religious importance in Nepal and India. In Hindu traditions, the cow is regarded as a sacred and respected animal. In Nepal, the cow is also the national animal. The festival of Tihar includes a special day called Gai Tihar, when cows are worshipped and honored.\n\nCows contribute greatly to the livelihoods of farmers. However, they should not be treated merely as sources of economic benefit. They need adequate food, clean water, shelter, medical care, and humane treatment. Ultimately, the cow is a valuable and important animal. It provides food and useful agricultural resources and has deep cultural significance. We should recognize its contribution and treat cows with kindness and care.";
@@ -89,6 +92,20 @@ const REWRITE_MODES: { id: RewriteMode; label: string; desc: string }[] = [
     label: "Deep Restructure",
     desc: "Stronger sentence and paragraph restructuring while preserving 100% of facts and claims.",
   },
+];
+
+const DISCIPLINE_PROFILES: { id: DisciplineProfile; label: string; desc: string }[] = [
+  { id: "general", label: "General Academic", desc: "Balanced scholarly tone and general academic register." },
+  { id: "stem", label: "STEM & Quantitative", desc: "Passive-voice precision, data density, and empirical clarity." },
+  { id: "humanities", label: "Humanities & Hermeneutics", desc: "Interpretive depth, nuanced vocabulary, and complex clauses." },
+  { id: "social_sciences", label: "Social Sciences", desc: "Participant-centric verbs and balanced qualitative/quantitative register." },
+  { id: "biomedical", label: "Biomedical & Clinical", desc: "Strict CONSORT/PRISMA clinical reporting and non-hyperbolic assertions." },
+];
+
+const HEDGING_LEVELS: { id: HedgingLevel; label: string; desc: string }[] = [
+  { id: "cautious", label: "Cautious / Exploratory", desc: "Modal qualifiers ('suggests potential correlation', 'may indicate')." },
+  { id: "balanced", label: "Balanced Scholarly", desc: "Evidentiary grounding with standard academic confidence." },
+  { id: "authoritative", label: "Authoritative Doctoral", desc: "Assertive, decisive scholarly voice ('the empirical data establishes')." },
 ];
 
 const GENRES = [
@@ -195,11 +212,20 @@ export default function HumanizerWorkspace({
   const [sourceText, setSourceText] = useState(SAMPLE_TEXT);
   const [humanizedText, setHumanizedText] = useState("");
   const [selectedMode, setSelectedMode] = useState<RewriteMode>("balanced");
+  const [selectedDiscipline, setSelectedDiscipline] = useState<DisciplineProfile>("general");
+  const [selectedHedging, setSelectedHedging] = useState<HedgingLevel>("balanced");
   const [selectedGenre, setSelectedGenre] = useState("Academic Journal");
   const [lockedTerms, setLockedTerms] = useState<string[]>([]);
   const [terminologyConflicts, setTerminologyConflicts] = useState<TerminologyConflict[]>([]);
   const [showEvalModal, setShowEvalModal] = useState(false);
   const [useAuthorVoice, setUseAuthorVoice] = useState(false);
+
+  // Pre-flight AI Detector Simulation & Cadence Analysis
+  const activeTextForSimulation = humanizedText || sourceText;
+  const detectorSimulation = useMemo(() => {
+    if (!activeTextForSimulation || !activeTextForSimulation.trim()) return null;
+    return simulateAiDetectors(activeTextForSimulation);
+  }, [activeTextForSimulation]);
 
   const [showDiff, setShowDiff] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -368,6 +394,8 @@ export default function HumanizerWorkspace({
         const longResult = await runLongDocumentPipeline(sourceText, {
           mode: selectedMode,
           genre: selectedGenre,
+          discipline: selectedDiscipline,
+          hedgingLevel: selectedHedging,
           completer,
           maxRetries: 2,
           lockedTerms,
@@ -391,6 +419,8 @@ export default function HumanizerWorkspace({
         const result = await runHumanizerPipeline(sourceText, {
           mode: selectedMode,
           genre: selectedGenre,
+          discipline: selectedDiscipline,
+          hedgingLevel: selectedHedging,
           completer,
           maxRetries: 2,
           lockedTerms,
@@ -436,7 +466,18 @@ export default function HumanizerWorkspace({
     } finally {
       setLoading(false);
     }
-  }, [sourceText, selectedMode, selectedGenre, lockedTerms, useAuthorVoice, activeProvider, modelName, projectId]);
+  }, [
+    sourceText,
+    selectedMode,
+    selectedGenre,
+    selectedDiscipline,
+    selectedHedging,
+    lockedTerms,
+    useAuthorVoice,
+    activeProvider,
+    modelName,
+    projectId,
+  ]);
 
   // Cancel long document humanization
   function handleCancelProcessing() {
@@ -591,21 +632,21 @@ export default function HumanizerWorkspace({
 
       {/* Main Workspace Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-5">
-        {/* Controls Bar: Mode, Genre, Author Voice, Locked Terms */}
+        {/* Controls Bar: Mode, Discipline, Hedging, Genre, Author Voice, Locked Terms */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Rewrite Mode */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. Rewrite Mode */}
             <div className="flex flex-col gap-1.5">
               <label htmlFor="mode-select" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Rewrite Mode
               </label>
-              <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                 {REWRITE_MODES.map((m) => (
                   <button
                     key={m.id}
                     type="button"
                     onClick={() => setSelectedMode(m.id)}
-                    className={`px-2 py-1.5 text-xs font-semibold rounded-lg transition-all text-center truncate ${
+                    className={`px-1.5 py-1.5 text-[11px] font-semibold rounded-lg transition-all text-center truncate ${
                       selectedMode === m.id
                         ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm"
                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -616,51 +657,89 @@ export default function HumanizerWorkspace({
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 italic truncate">
                 {REWRITE_MODES.find((m) => m.id === selectedMode)?.desc}
               </p>
             </div>
 
-            {/* Disciplinary Genre */}
+            {/* 2. Disciplinary Voice Profile */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="genre-select" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Disciplinary Genre
+              <label htmlFor="discipline-select" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Discipline Voice Profile
               </label>
               <select
-                id="genre-select"
-                value={selectedGenre}
-                onChange={(e) => setSelectedGenre(e.target.value)}
+                id="discipline-select"
+                value={selectedDiscipline}
+                onChange={(e) => setSelectedDiscipline(e.target.value as DisciplineProfile)}
                 className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-indigo-500"
               >
-                {GENRES.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
+                {DISCIPLINE_PROFILES.map((dp) => (
+                  <option key={dp.id} value={dp.id}>
+                    {dp.label}
                   </option>
                 ))}
               </select>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Calibrates vocabulary register and epistemic style.
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 italic truncate">
+                {DISCIPLINE_PROFILES.find((dp) => dp.id === selectedDiscipline)?.desc}
               </p>
             </div>
 
-            {/* Author Voice Option */}
+            {/* 3. Epistemic Hedging & Stance */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Author Voice Profiling
+              <label htmlFor="hedging-select" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Epistemic Hedging / Stance
               </label>
-              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useAuthorVoice}
-                  onChange={(e) => setUseAuthorVoice(e.target.checked)}
-                  className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-                />
-                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  Adapt to Author Voice
-                </span>
-              </label>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Matches sentence rhythm & first-person stance from input.
+              <select
+                id="hedging-select"
+                value={selectedHedging}
+                onChange={(e) => setSelectedHedging(e.target.value as HedgingLevel)}
+                className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-indigo-500"
+              >
+                {HEDGING_LEVELS.map((hl) => (
+                  <option key={hl.id} value={hl.id}>
+                    {hl.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 italic truncate">
+                {HEDGING_LEVELS.find((hl) => hl.id === selectedHedging)?.desc}
+              </p>
+            </div>
+
+            {/* 4. Disciplinary Genre & Author Voice */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label htmlFor="genre-select" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Genre & Author Voice
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  id="genre-select"
+                  value={selectedGenre}
+                  onChange={(e) => setSelectedGenre(e.target.value)}
+                  className="flex-1 px-2.5 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-indigo-500"
+                >
+                  {GENRES.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+                <label className="flex items-center gap-1.5 p-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer" title="Adapt to Author Voice">
+                  <input
+                    type="checkbox"
+                    checked={useAuthorVoice}
+                    onChange={(e) => setUseAuthorVoice(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                  />
+                  <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    Voice Match
+                  </span>
+                </label>
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                Calibrates publication register and author style.
               </p>
             </div>
           </div>
@@ -686,6 +765,16 @@ export default function HumanizerWorkspace({
 
         {/* Real-time Progress Stepper */}
         {loading && <PipelineProgressBar stage={progressStage} />}
+
+        {/* Pre-Flight AI Detector Simulation Engine */}
+        {detectorSimulation && (
+          <DetectorSimulationCard simulation={detectorSimulation} />
+        )}
+
+        {/* Cadence Rhythm & Sentence Length Oscillation Visualizer */}
+        {activeTextForSimulation && activeTextForSimulation.trim().length > 0 && (
+          <CadenceRibbonVisualizer text={activeTextForSimulation} />
+        )}
 
         {/* Long Document Multi-Section Dashboard */}
         {chunks.length > 1 && (

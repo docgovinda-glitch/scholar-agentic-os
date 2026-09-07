@@ -22,7 +22,7 @@ import {
 } from "../protection/protectedElementExtractor";
 import { extractClaimsFromDocument } from "../claims/claimExtractor";
 import { rewriteDocument, LLMCompleter } from "../rewrite/rewriteEngine";
-import { RewriteMode } from "../rewrite/promptBuilder";
+import { RewriteMode, DisciplineProfile, HedgingLevel } from "../rewrite/promptBuilder";
 import { auditHumanizerCandidate } from "../audit/auditOrchestrator";
 import {
   buildRetryPlan,
@@ -33,6 +33,8 @@ import {
 export interface HumanizerPipelineOptions {
   mode?: RewriteMode;
   genre?: string;
+  discipline?: DisciplineProfile;
+  hedgingLevel?: HedgingLevel;
   completer: LLMCompleter;
   maxRetries?: number;
   styleProfile?: HumanizerStyleProfile;
@@ -120,6 +122,8 @@ export async function runHumanizerPipeline(
       rewriteResult = await rewriteDocument(immutableOriginalDoc, {
         mode,
         genre,
+        discipline: options.discipline,
+        hedgingLevel: options.hedgingLevel,
         completer: options.completer,
         registry,
         retryInstructions: currentRetryPlan?.retryInstructions,

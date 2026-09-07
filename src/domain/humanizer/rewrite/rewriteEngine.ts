@@ -11,7 +11,12 @@ import {
   HumanizerBlock,
 } from "../types";
 import { TokenRegistry } from "../protection/tokenRegistry";
-import { buildPromptForBlock, RewriteMode } from "./promptBuilder";
+import {
+  buildPromptForBlock,
+  RewriteMode,
+  DisciplineProfile,
+  HedgingLevel,
+} from "./promptBuilder";
 import { segmentSentences } from "../document/humanizerDocument";
 
 export type LLMCompleter = (params: {
@@ -24,6 +29,8 @@ export type LLMCompleter = (params: {
 export interface RewriteEngineOptions {
   mode?: RewriteMode;
   genre?: string;
+  discipline?: DisciplineProfile;
+  hedgingLevel?: HedgingLevel;
   completer: LLMCompleter;
   registry: TokenRegistry;
   retryInstructions?: string[];
@@ -58,7 +65,7 @@ export function parseLlmRewriteOutput(rawOutput: string | { text: string }): {
 
   // 2. Try extracting JSON from markdown code block ```json ... ```
   const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  if (codeBlockMatch) {
+  if (codeBlockMatch && codeBlockMatch[1]) {
     try {
       const parsed = JSON.parse(codeBlockMatch[1]);
       if (parsed && typeof parsed.rewrittenText === "string") {
@@ -70,13 +77,18 @@ export function parseLlmRewriteOutput(rawOutput: string | { text: string }): {
     } catch (_) {}
   }
 
-  // 3. Fallback: If output is clean text without brackets, return it as rewrittenText
-  const trimmed = text.trim();
-  if (!trimmed.startsWith("{") && !trimmed.endsWith("}")) {
-    return {
-      rewrittenText: trimmed,
-      improvements: ["Prose fluency and rhythm refinement"],
-    };
+  // 3. Fallback: Check if response has {"rewrittenText": ...} embedded
+  const jsonObjectMatch = text.match(/\{[\s\S]*"rewrittenText"[\s\S]*\}/);
+  if (jsonObjectMatch) {
+    try {
+      const parsed = JSON.parse(jsonObjectMatch[0]);
+      if (parsed && typeof parsed.rewrittenText === "string") {
+        return {
+          rewrittenText: parsed.rewrittenText.trim(),
+          improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
+        };
+      }
+    } catch (_) {}
   }
 
   throw new Error(`Failed to parse valid rewrite output from LLM response: ${text.slice(0, 100)}...`);
@@ -99,6 +111,8 @@ export async function rewriteBlock(
   options: {
     mode: RewriteMode;
     genre: string;
+    discipline?: DisciplineProfile;
+    hedgingLevel?: HedgingLevel;
     completer: LLMCompleter;
     registry: TokenRegistry;
     doc: HumanizerDocument;
@@ -120,6 +134,8 @@ export async function rewriteBlock(
   const prompt = buildPromptForBlock({
     mode: options.mode,
     genre: options.genre,
+    discipline: options.discipline,
+    hedgingLevel: options.hedgingLevel,
     block,
     previousBlockText: options.previousBlockText,
     nextBlockText: options.nextBlockText,
@@ -179,6 +195,8 @@ export async function rewriteDocument(
       const { rewrittenBlock, improvements } = await rewriteBlock(currentBlock, {
         mode,
         genre,
+        discipline: options.discipline,
+        hedgingLevel: options.hedgingLevel,
         completer: options.completer,
         registry: options.registry,
         doc,

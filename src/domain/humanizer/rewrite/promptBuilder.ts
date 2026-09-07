@@ -14,10 +14,14 @@ import {
 } from "../types";
 
 export type RewriteMode = "conservative" | "balanced" | "deep_restructure";
+export type DisciplineProfile = "stem" | "humanities" | "social_sciences" | "biomedical" | "general";
+export type HedgingLevel = "cautious" | "balanced" | "authoritative";
 
 export interface PromptBuilderOptions {
   mode: RewriteMode;
   genre?: string;
+  discipline?: DisciplineProfile;
+  hedgingLevel?: HedgingLevel;
   block: HumanizerBlock;
   previousBlockText?: string;
   nextBlockText?: string;
@@ -69,7 +73,12 @@ export function getDecodingParamsForMode(mode: RewriteMode) {
 }
 
 /** Builds the System Prompt specifying invariant rules and role directives */
-export function buildSystemPrompt(mode: RewriteMode, genre: string = "Academic Journal"): string {
+export function buildSystemPrompt(
+  mode: RewriteMode,
+  genre: string = "Academic Journal",
+  discipline: DisciplineProfile = "general",
+  hedgingLevel: HedgingLevel = "balanced"
+): string {
   const modeDirectives = {
     conservative:
       "CONSERVATIVE MODE: Apply minimal structural alteration. Focus strictly on repairing awkward phrasing, grammatical cadence, and wordiness while maintaining near 1:1 sentence structure.",
@@ -79,6 +88,20 @@ export function buildSystemPrompt(mode: RewriteMode, genre: string = "Academic J
       "DEEP RESTRUCTURE MODE: Substantially reorganize syntax, vary clause hierarchy (e.g. participial fronting, periodic sentences), combine or split sentences where natural, and elevate prose artistry while preserving 100% of facts and claims.",
   }[mode];
 
+  const disciplineDirectives = {
+    stem: "DISCIPLINE REGISTER (STEM & QUANTITATIVE): Maintain passive voice precision, high empirical density, rigorous mathematical and experimental clarity, avoiding conversational metaphors.",
+    humanities: "DISCIPLINE REGISTER (HUMANITIES & HERMENEUTICS): Employ varied subordinate clauses, interpretive depth, sophisticated transitions, and nuanced hermeneutic vocabulary.",
+    social_sciences: "DISCIPLINE REGISTER (SOCIAL SCIENCES): Balance qualitative and quantitative nuance, participant-centric verbs, and calibrated sociological terminology.",
+    biomedical: "DISCIPLINE REGISTER (BIOMEDICAL & CLINICAL): Adhere to strict clinical reporting rigor (CONSORT/PRISMA standards) and objective, non-hyperbolic reporting.",
+    general: "DISCIPLINE REGISTER (GENERAL ACADEMIC): Balanced, fluent, authentic academic register.",
+  }[discipline];
+
+  const hedgingDirectives = {
+    cautious: "STANCE CALIBRATION (HIGH CAUTIOUS HEDGING): Emphasize exploratory modesty with calibrated modal qualifiers ('suggests a potential correlation', 'may tentatively indicate').",
+    balanced: "STANCE CALIBRATION (BALANCED STANCE): Standard scholarly confidence rooted directly in evidentiary backing ('the empirical data demonstrates', 'findings indicate').",
+    authoritative: "STANCE CALIBRATION (AUTHORITATIVE DOCTORAL STANCE): Firm, assertive, and decisive scholarly voice ('these results fundamentally establish', 'the data confirms').",
+  }[hedgingLevel];
+
   return `You are an elite academic prose humanizer and disciplinary editor for ${genre}.
 
 OBJECTIVE:
@@ -86,6 +109,10 @@ Transform synthetic or rigid text into authentic, publication-grade academic pro
 
 OPERATIONAL MODE:
 ${modeDirectives}
+
+${disciplineDirectives}
+
+${hedgingDirectives}
 
 CRITICAL SYSTEM INVARIANTS (VIOLATION WILL CAUSE COMPLETE REJECTION):
 1. PROTECTED TOKENS: You will encounter placeholders in the format ⟦PROTECTED_<TYPE>_<HASH>⟧. These represent citations, LaTeX formulas, numbers, DOIs, and locked terms. Every single placeholder present in the input MUST appear in your rewritten text with EXACT spelling and brackets. Never remove, translate, or modify a placeholder.
@@ -180,7 +207,12 @@ ${textToRewrite}
 
 /** Complete prompt constructor for a HumanizerBlock */
 export function buildPromptForBlock(options: PromptBuilderOptions): BuiltPrompt {
-  const systemPrompt = buildSystemPrompt(options.mode, options.genre);
+  const systemPrompt = buildSystemPrompt(
+    options.mode,
+    options.genre,
+    options.discipline,
+    options.hedgingLevel
+  );
   const userPrompt = buildUserPrompt(options);
   const decodingParams = getDecodingParamsForMode(options.mode);
 
