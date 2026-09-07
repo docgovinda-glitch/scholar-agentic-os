@@ -387,7 +387,9 @@ without a verified backup. See `44` §7 for the full backup regime and `RISK-04`
 | **Cloud Drive Integration** (`src/services/vault/cloudDriveService.ts`) | Google Drive & Microsoft OneDrive OAuth2 browsing, search, and import |
 | **Reference Manager Ingestion** (`src/desk/vault/VaultDocumentImport.tsx`) | Zotero API sync and Mendeley BibTeX parsing |
 | **Academic Citation Engine** (`src/services/vault/citationService.ts`) | Multi-style formatting (APA7, IEEE, MLA9, Chicago, Harvard, Vancouver), in-text citations, and BibTeX conversion |
-| **Project Approval Gate** (`src/desk/workspace/stages/VaultSourcesStage.tsx`) | Archivist Agent scans Vault, computes relevance, and requires user approval before adding to project corpus (`REQ-VLT-5`) |
+| **Collections & Tagging** (`src/desk/vault/VaultItemEditModal.tsx`, `src/services/vaultContents.ts`) | User-defined collections, flat tags, metadata editing, and filter toolbar (§3) |
+| **Retraction & Integrity Watch** (`src/services/vault/retractionService.ts`) | Crossref API & title heuristic retraction inspection, alerts, and publisher notice links (§7.1) |
+| **Semantic Vector & Concept Search** (`src/services/vault/semanticSearchService.ts`) | In-browser cosine similarity, BM25 term coverage, concept extraction, and project topic ranking |
 | **Passphrase & Recovery** (`src/services/userVault.ts`) | Local SHA-256 verifier in localStorage, `generateRecoveryCode()` Crockford-encoded |
 | **Portable Open Export** (`src/services/vault/vaultExportService.ts`) | `exportVaultAsZip()` produces `.zip` with `manifest.json`, `references.bib`, and `documents/<id>/content.md` (`REQ-VLT-7`) |
 
@@ -395,7 +397,6 @@ without a verified backup. See `44` §7 for the full backup regime and `RISK-04`
 
 | Target | Status |
 |---|---|
-| In-browser vector embedding index (ANN) | In progress |
 | Local audio/video speech-to-text transcription (Whisper) | In progress |
 | Handwritten notes & image OCR | In progress |
 | Automated background Retraction Watch monitoring | In progress |

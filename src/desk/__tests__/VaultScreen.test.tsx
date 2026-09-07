@@ -279,6 +279,38 @@ describe("unlocked", () => {
     expect(screen.getByText(/RETRACTION NOTICE/i)).toBeInTheDocument();
   });
 
+  it("performs semantic concept search and displays match percentage", async () => {
+    listVaultItems.mockResolvedValue([
+      item({
+        id: "item-ml",
+        title: "Reinforcement Learning for Robotics",
+        content: "Policy gradient algorithms for complex robotic manipulation.",
+        tags: ["robotics", "reinforcement learning"],
+      } as any),
+      item({
+        id: "item-bio",
+        title: "Coastal Marine Biology",
+        content: "Ecology of benthic organisms in tidal regions.",
+        tags: ["marine", "ecology"],
+      } as any),
+    ]);
+    render(<VaultScreen userId="user-1" onClose={vi.fn()} />);
+
+    expect(await screen.findByText("Reinforcement Learning for Robotics")).toBeInTheDocument();
+
+    // Toggle Semantic Search
+    fireEvent.click(screen.getByRole("button", { name: /Semantic Search/i }));
+
+    // Type semantic search query
+    fireEvent.change(screen.getByLabelText("Search your Vault"), {
+      target: { value: "robotic policy gradient manipulation" },
+    });
+
+    expect(await screen.findByText("Reinforcement Learning for Robotics")).toBeInTheDocument();
+    expect(screen.getByText(/Match/i)).toBeInTheDocument();
+    expect(screen.queryByText("Coastal Marine Biology")).not.toBeInTheDocument();
+  });
+
   it("locks and returns to the passphrase gate", async () => {
     listVaultItems.mockResolvedValue([]);
     render(<VaultScreen userId="user-1" onClose={vi.fn()} />);

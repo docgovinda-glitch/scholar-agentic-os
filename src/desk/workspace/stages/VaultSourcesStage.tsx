@@ -6,6 +6,7 @@ import AgentTerminal, { LogEntry } from "../AgentTerminal";
 import { authedJsonFetch, saveIntakeAnswers , authedStreamFetch} from "../../api";
 import { getSupabaseClient } from "../../../services/supabaseClient";
 import { listVaultItems } from "../../../services/vaultContents";
+import { rankVaultItemsForProject } from "../../../services/vault/semanticSearchService";
 
 interface VaultSource {
   id: string;
@@ -82,14 +83,31 @@ export default function VaultSourcesStage({
         return;
       }
 
+      // Semantically rank vault items against project research context
+      const rankedResults = rankVaultItemsForProject(vaultItems, {
+        title: project.title,
+        topic: project.answers?.topic || project.answers?.research_topic,
+        researchQuestion: project.answers?.research_question || project.answers?.hypothesis,
+        methodology: project.answers?.methodology,
+      });
+
+      // Prioritize top semantically ranked items
+      const orderedItems = rankedResults.length > 0
+        ? [...rankedResults.map((r) => r.item), ...vaultItems.filter((v) => !rankedResults.some((r) => r.item.id === v.id))]
+        : vaultItems;
+
       // Map vault items to a lighter context payload for the LLM to evaluate
-      const vaultContext = vaultItems.map(item => ({
-        id: item.id,
-        title: item.title,
-        authors: item.authors || [],
-        year: item.year || new Date().getFullYear(),
-        abstract: item.content ? item.content.substring(0, 500) : "",
-      }));
+      const vaultContext = orderedItems.slice(0, 15).map((item) => {
+        const semScore = rankedResults.find((r) => r.item.id === item.id)?.score;
+        return {
+          id: item.id,
+          title: item.title,
+          authors: item.authors || [],
+          year: item.year || new Date().getFullYear(),
+          semantic_score: semScore,
+          abstract: item.content ? item.content.substring(0, 500) : "",
+        };
+      });
 
       await authedStreamFetch(
         `/api/projects/${projectId}/agent/vault-sources`,

@@ -37,6 +37,7 @@ import { CitationConfirmationModal } from "./CitationConfirmationModal";
 import VaultItemEditModal from "./VaultItemEditModal";
 import { downloadVaultZip } from "../../services/vault/vaultExportService";
 import { scanVaultRetractions } from "../../services/vault/retractionService";
+import { searchVaultSemantically, type SemanticSearchResult } from "../../services/vault/semanticSearchService";
 
 type VaultPresence = null | "none" | "other-device" | "this-device" | "synced";
 
@@ -271,6 +272,9 @@ function VaultContents({
   const [isScanningRetractions, setIsScanningRetractions] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
 
+  // Semantic Vector Search state
+  const [isSemanticMode, setIsSemanticMode] = useState(false);
+
   // Drag & drop state
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
@@ -355,9 +359,17 @@ function VaultContents({
     }
   }
 
+  const semanticResultsMap = useMemo(() => {
+    if (!items || !query.trim() || !isSemanticMode) return new Map<string, SemanticSearchResult>();
+    const semResults = searchVaultSemantically(items, query);
+    return new Map(semResults.map((r) => [r.item.id, r]));
+  }, [items, query, isSemanticMode]);
+
   const visible = useMemo(() => {
     if (!items) return [];
-    let result = searchVaultItems(items, query);
+    let result = isSemanticMode && query.trim()
+      ? Array.from(semanticResultsMap.values()).map((r) => r.item)
+      : searchVaultItems(items, query);
 
     if (filterType !== "all") {
       result = result.filter((item) => item.sourceType === filterType);
@@ -383,15 +395,17 @@ function VaultContents({
       );
     }
 
-    result.sort((a, b) => {
-      if (sortBy === "title") return a.title.localeCompare(b.title);
-      const timeA = new Date(a.createdAt).getTime();
-      const timeB = new Date(b.createdAt).getTime();
-      return sortBy === "oldest" ? timeA - timeB : timeB - timeA;
-    });
+    if (!isSemanticMode || !query.trim()) {
+      result.sort((a, b) => {
+        if (sortBy === "title") return a.title.localeCompare(b.title);
+        const timeA = new Date(a.createdAt).getTime();
+        const timeB = new Date(b.createdAt).getTime();
+        return sortBy === "oldest" ? timeA - timeB : timeB - timeA;
+      });
+    }
 
     return result;
-  }, [items, query, filterType, filterStatus, filterCollection, filterTag, filterRetractionOnly, sortBy]);
+  }, [items, query, filterType, filterStatus, filterCollection, filterTag, filterRetractionOnly, sortBy, isSemanticMode, semanticResultsMap]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -855,15 +869,32 @@ function VaultContents({
 
             {/* Search, Filters, and Style Toolbar */}
             <div className="mb-5 flex flex-wrap items-center gap-3">
-              <div className="flex-1 min-w-[220px]">
+              <div className="flex-1 min-w-[220px] flex items-center gap-2">
                 <input
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search across papers, datasets, tags, collections, and citations…"
+                  placeholder={
+                    isSemanticMode
+                      ? "✨ Semantic Concept Search: enter research questions or topics…"
+                      : "Search across papers, datasets, tags, collections, and citations…"
+                  }
                   aria-label="Search your Vault"
                   className="w-full px-3.5 py-2 text-sm border border-[color:var(--border-default)] rounded-[var(--radius-md)] bg-[color:var(--surface-input)] text-[color:var(--text-primary)] shadow-xs"
                 />
+                <button
+                  type="button"
+                  onClick={() => setIsSemanticMode(!isSemanticMode)}
+                  className={`px-3 py-2 text-xs font-semibold rounded-[var(--radius-md)] border transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                    isSemanticMode
+                      ? "bg-indigo-600 text-white border-indigo-700 shadow-sm"
+                      : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border-[color:var(--border-default)] hover:text-[color:var(--text-primary)]"
+                  }`}
+                  title="Toggle in-browser Vector & Concept Semantic Search"
+                >
+                  <span>✨</span>
+                  <span>Semantic Search</span>
+                </button>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
@@ -931,6 +962,7 @@ function VaultContents({
                   const isNeedsReview = item.citationStatus === "needs_user_review";
                   const isConfirmingDelete = confirmDeleteId === item.id;
                   const isRetracted = item.retractionStatus === "retracted" || item.retractionStatus === "expression_of_concern";
+                  const semResult = semanticResultsMap.get(item.id);
 
                   return (
                     <div
@@ -945,9 +977,16 @@ function VaultContents({
                         <div className="flex items-start gap-2.5 min-w-0">
                           <span className="text-xl shrink-0 mt-0.5">{getSourceIcon(item.sourceType)}</span>
                           <div className="min-w-0">
-                            <h4 className="text-sm font-bold text-[color:var(--text-primary)] truncate">
-                              {item.title}
-                            </h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-bold text-[color:var(--text-primary)] truncate">
+                                {item.title}
+                              </h4>
+                              {semResult && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 shrink-0">
+                                  🎯 {semResult.score}% Match
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2 flex-wrap mt-1">
                               {item.authors && item.authors.length > 0 && (
                                 <span className="text-xs text-[color:var(--text-secondary)]">
@@ -978,6 +1017,11 @@ function VaultContents({
                                   #{t}
                                 </span>
                               ))}
+                              {semResult && semResult.matchedConcepts.length > 0 && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-600 dark:text-indigo-400">
+                                  Concepts: {semResult.matchedConcepts.map((c) => `#${c}`).join(" ")}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
