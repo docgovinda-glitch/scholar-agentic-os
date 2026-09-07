@@ -70,7 +70,7 @@ describe("ThesisWorkspace", () => {
     const vivaNavBtn = screen.getByRole("button", { name: /7\. Viva \/ Defense Simulator/i });
     fireEvent.click(vivaNavBtn);
 
-    expect(await screen.findByText(/Viva Voce & Oral Defense Simulator/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Doctoral Viva Voce & Oral Defense Committee Simulator/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Launch Examiner Simulation →/i })).toBeInTheDocument();
   });
 });

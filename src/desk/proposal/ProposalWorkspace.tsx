@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { ProposalStage, ProposalProjectData } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { authedJsonFetch } from "../api";
+import StudySectionScorer from "./components/StudySectionScorer";
 
 const PROPOSAL_STAGES: Array<{ id: ProposalStage; label: string; icon: string; desc: string }> = [
   { id: "agency_rubric", label: "1. Agency & Rubric", icon: "🏛️", desc: "Funding mechanism, budget ceiling & guidelines" },
@@ -409,13 +410,19 @@ export default function ProposalWorkspace({
 
           {currentStage === "study_section_review" && (
             <div className="flex flex-col gap-6">
-              <div className="flex items-start justify-between">
+              <StudySectionScorer
+                proposalTitle={proposalData.title}
+                fundingAgency={proposalData.fundingAgency}
+                mechanism={proposalData.mechanism}
+              />
+
+              <div className="flex items-start justify-between pt-4 border-t border-[color:var(--border-subtle)]">
                 <div>
-                  <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
-                    Study Section Review Simulator (NIH / NSF Standard)
-                  </h2>
-                  <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-                    Simulate a 3-member grant evaluation panel scoring against standard federal research criteria.
+                  <h3 className="text-sm font-bold text-[color:var(--text-primary)]">
+                    Adversarial Grant Review Simulation
+                  </h3>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
+                    Generate live reviewer critiques and fundability verdict.
                   </p>
                 </div>
                 <button
@@ -428,8 +435,8 @@ export default function ProposalWorkspace({
                 </button>
               </div>
 
-              {reviewResults ? (
-                <div className="flex flex-col gap-4">
+              {reviewResults && (
+                <div className="flex flex-col gap-4 animate-fadeIn">
                   <div className="p-4 rounded-2xl border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)]/40 flex items-center justify-between">
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)]">
@@ -466,18 +473,6 @@ export default function ProposalWorkspace({
                       </div>
                     ))}
                   </div>
-                </div>
-              ) : (
-                <div className="p-12 text-center rounded-2xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
-                  <div className="w-12 h-12 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] flex items-center justify-center mx-auto mb-3 text-xl">
-                    ⚖️
-                  </div>
-                  <h4 className="text-sm font-bold text-[color:var(--text-primary)] mb-1">
-                    Grant Review Simulator
-                  </h4>
-                  <p className="text-xs text-[color:var(--text-secondary)] max-w-md mx-auto mb-4">
-                    Click "Run Study Section Simulation" to evaluate your proposal across Significance, Innovation, Approach, and Investigator feasibility.
-                  </p>
                 </div>
               )}
             </div>

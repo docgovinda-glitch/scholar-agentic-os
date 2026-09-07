@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import type { ThesisStage, ThesisProjectData } from "./types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { authedJsonFetch } from "../api";
+import VivaVoceSimulator from "./components/VivaVoceSimulator";
 
 const THESIS_STAGES: Array<{ id: ThesisStage; label: string; icon: string; desc: string }> = [
   { id: "proposal_framing", label: "1. Proposal & Framing", icon: "🏛️", desc: "Theoretical framework & research questions" },
@@ -425,13 +426,15 @@ export default function ThesisWorkspace({
 
           {currentStage === "viva_defense" && (
             <div className="flex flex-col gap-6">
-              <div className="flex items-start justify-between">
+              <VivaVoceSimulator thesisData={thesisData} />
+
+              <div className="flex items-start justify-between pt-4 border-t border-[color:var(--border-subtle)]">
                 <div>
-                  <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
-                    Viva Voce & Oral Defense Simulator
-                  </h2>
-                  <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-                    Simulate rigorous external examiner questioning to prepare for your doctoral defense.
+                  <h3 className="text-sm font-bold text-[color:var(--text-primary)]">
+                    External Examiner Panel Synthesis
+                  </h3>
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
+                    Generate dynamic multi-examiner adversarial questioning.
                   </p>
                 </div>
                 <button
@@ -444,8 +447,8 @@ export default function ThesisWorkspace({
                 </button>
               </div>
 
-              {vivaResults ? (
-                <div className="flex flex-col gap-4">
+              {vivaResults && (
+                <div className="flex flex-col gap-4 animate-fadeIn">
                   <div className="p-4 rounded-2xl border border-[color:var(--accent-border)] bg-[color:var(--accent-subtle)]/40">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)]">
                       Simulated Examiner Persona
@@ -488,18 +491,6 @@ export default function ThesisWorkspace({
                       </div>
                     ))}
                   </div>
-                </div>
-              ) : (
-                <div className="p-12 text-center rounded-2xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-raised)]">
-                  <div className="w-12 h-12 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] flex items-center justify-center mx-auto mb-3 text-xl">
-                    🎓
-                  </div>
-                  <h4 className="text-sm font-bold text-[color:var(--text-primary)] mb-1">
-                    Doctoral Defense Anticipator
-                  </h4>
-                  <p className="text-xs text-[color:var(--text-secondary)] max-w-md mx-auto mb-4">
-                    Click "Launch Examiner Simulation" to generate adversarial questions across your theoretical framing, data validity, and original contribution.
-                  </p>
                 </div>
               )}
             </div>

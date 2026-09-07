@@ -62,7 +62,7 @@ describe("ProposalWorkspace", () => {
     const studySectionBtn = screen.getByRole("button", { name: /7\. Study Section Review/i });
     fireEvent.click(studySectionBtn);
 
-    expect(await screen.findByText(/Study Section Review Simulator/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Federal Grant Study Section Review Panel \(NIH \/ NSF\)/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Run Study Section Simulation →/i })).toBeInTheDocument();
   });
 });
