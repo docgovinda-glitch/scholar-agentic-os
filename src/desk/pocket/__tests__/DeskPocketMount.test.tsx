@@ -29,10 +29,10 @@ describe("DeskPocketMount", () => {
     expect(await screen.findByText(/Everything caught up/)).toBeInTheDocument();
   });
 
-  it("surfaces a load failure as an announced error", async () => {
+  it("falls back to offline cached mode when network fails", async () => {
     listProjects.mockRejectedValue(new Error("Network down."));
     render(<DeskPocketMount projectId={null} />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("Network down.");
+    expect(await screen.findByText(/Offline Mode \(Cached Vault Active\)/i)).toBeInTheDocument();
   });
 
   it("maps a real project into Pocket's project list", async () => {
