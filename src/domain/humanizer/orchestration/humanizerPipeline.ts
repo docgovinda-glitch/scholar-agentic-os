@@ -48,6 +48,8 @@ export interface HumanizerPipelineOptions {
 export interface HumanizerPipelineResult {
   success: boolean;
   finalText: string;
+  candidateText?: string;
+  candidateDocument?: HumanizerDocument;
   candidateState: CandidateState;
   document: HumanizerDocument;
   attemptsCount: number;
@@ -112,6 +114,9 @@ export async function runHumanizerPipeline(
   let attemptNumber = 0;
   let currentRetryPlan: RetryPlan | undefined = undefined;
   let lastReport: HumanizerAuditReport | undefined = undefined;
+  let lastCandidateDoc: HumanizerDocument | undefined = undefined;
+  let lastCandidateText: string | undefined = undefined;
+  let lastImprovements: string[] = [];
 
   // 5. Step 5: Bounded Iterative Rewrite & Audit Loop
   // (Every retry ALWAYS begins from immutableOriginalDoc, never from a rejected candidate)
@@ -159,22 +164,27 @@ export async function runHumanizerPipeline(
       timestamp: new Date().toISOString(),
     });
 
+    const restoredCandidateDoc = restoreDocument(auditedDoc, registry);
+    const restoredCandidateText = renderHumanizerDocument(restoredCandidateDoc, "processed");
+    lastCandidateDoc = restoredCandidateDoc;
+    lastCandidateText = restoredCandidateText;
+    lastImprovements = rewriteResult.improvements || [];
+
     const isAccepted =
       report.finalDecision === "SAFE" ||
       (report.finalDecision === "WARNING" && warningPolicy === "accept");
 
     if (isAccepted) {
       // Step 6: Final Deterministic Restoration
-      const restoredDoc = restoreDocument(auditedDoc, registry);
-      const restoredText = renderHumanizerDocument(restoredDoc, "processed");
-
       // Verify that no un-restored protected tokens remain
-      if (!restoredText.includes("⟦PROTECTED_")) {
+      if (!restoredCandidateText.includes("⟦PROTECTED_")) {
         return {
           success: true,
-          finalText: restoredText,
+          finalText: restoredCandidateText,
+          candidateText: restoredCandidateText,
+          candidateDocument: restoredCandidateDoc,
           candidateState: "REWRITE_VALIDATED",
-          document: restoredDoc,
+          document: restoredCandidateDoc,
           attemptsCount: attemptNumber,
           fallbackUsed: false,
           improvements: rewriteResult.improvements,
@@ -203,6 +213,8 @@ export async function runHumanizerPipeline(
   return {
     success: false,
     finalText: originalSourceText,
+    candidateText: lastCandidateText,
+    candidateDocument: lastCandidateDoc,
     candidateState: "REWRITE_REJECTED",
     document: initialDoc,
     attemptsCount: attemptNumber,
@@ -211,7 +223,7 @@ export async function runHumanizerPipeline(
       lastReport,
       "A safe rewrite could not be produced within the retry budget; original text has been preserved."
     ),
-    improvements: [],
+    improvements: lastImprovements,
     auditReport: lastReport,
     retryHistory,
   };

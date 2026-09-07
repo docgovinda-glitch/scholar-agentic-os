@@ -7,6 +7,8 @@ interface AuditSummaryCardProps {
   candidateState?: CandidateState;
   fallbackUsed?: boolean;
   fallbackReason?: string;
+  hasCandidateText?: boolean;
+  onUseCandidateAnyway?: () => void;
 }
 
 export default function AuditSummaryCard({
@@ -14,6 +16,8 @@ export default function AuditSummaryCard({
   candidateState,
   fallbackUsed,
   fallbackReason,
+  hasCandidateText,
+  onUseCandidateAnyway,
 }: AuditSummaryCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
@@ -80,8 +84,23 @@ export default function AuditSummaryCard({
       {/* Fail-Safe Explanation Notice */}
       {fallbackUsed && effectiveFallbackReason && (
         <div className="mt-3 p-3 bg-amber-500/15 rounded-lg text-xs leading-relaxed text-amber-900 dark:text-amber-200">
-          <p className="font-medium mb-1">Fail-Safe Reason:</p>
-          <p>{effectiveFallbackReason}</p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex-1">
+              <p className="font-semibold mb-1">Fail-Safe Notice:</p>
+              <p>{effectiveFallbackReason}</p>
+            </div>
+            {onUseCandidateAnyway && hasCandidateText && (
+              <button
+                type="button"
+                data-testid="use-candidate-anyway-btn"
+                onClick={onUseCandidateAnyway}
+                className="shrink-0 px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Use Humanized Draft Anyway</span>
+                <span aria-hidden="true">&rarr;</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 

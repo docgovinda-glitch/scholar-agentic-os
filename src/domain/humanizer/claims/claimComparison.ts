@@ -111,7 +111,9 @@ export function compareSingleClaimPair(
       ...baseFinding,
       status: "CAUSALITY_SHIFT",
       severity: "error",
-      reason: `Candidate escalates a ${origCausal.replace("_", " ")} relationship into a direct causal claim.`,
+      reason: origCausal === "none"
+        ? "Candidate escalates a non-causal statement into a direct causal claim."
+        : `Candidate escalates a ${origCausal.replace("_", " ")} relationship into a direct causal claim.`,
     };
   }
 

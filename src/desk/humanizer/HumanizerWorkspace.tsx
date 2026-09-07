@@ -246,6 +246,8 @@ export default function HumanizerWorkspace({
   const [candidateState, setCandidateState] = useState<CandidateState | undefined>(undefined);
   const [fallbackUsed, setFallbackUsed] = useState(false);
   const [fallbackReason, setFallbackReason] = useState<string | undefined>(undefined);
+  const [candidateDraftText, setCandidateDraftText] = useState<string | undefined>(undefined);
+  const [candidateDraftDoc, setCandidateDraftDoc] = useState<HumanizerDocument | undefined>(undefined);
 
   // Phase 8: Long Document Chunks & Sentence Review Units
   const [chunks, setChunks] = useState<DocumentChunk[]>([]);
@@ -326,6 +328,8 @@ export default function HumanizerWorkspace({
     setCandidateState(undefined);
     setFallbackUsed(false);
     setFallbackReason(undefined);
+    setCandidateDraftText(undefined);
+    setCandidateDraftDoc(undefined);
     setReviewUnits([]);
     setChunks([]);
     setSentToManuscript(false);
@@ -448,6 +452,8 @@ export default function HumanizerWorkspace({
         setCandidateState(result.candidateState);
         setFallbackUsed(result.fallbackUsed);
         setFallbackReason(result.fallbackReason);
+        setCandidateDraftText(result.candidateText);
+        setCandidateDraftDoc(result.candidateDocument);
 
         if (result.document) {
           const generatedUnits = generateReviewUnits(result.document, result.document, result.auditReport);
@@ -527,6 +533,27 @@ export default function HumanizerWorkspace({
     setChunks([]);
   }
 
+  // Accept Candidate Draft Anyway (User Override of Fail-Safe)
+  function handleUseCandidateAnyway() {
+    if (!candidateDraftText) return;
+    setHumanizedText(candidateDraftText);
+    if (candidateDraftDoc) {
+      setDocumentState(candidateDraftDoc);
+      const generatedUnits = generateReviewUnits(candidateDraftDoc, candidateDraftDoc, auditReport);
+      setReviewUnits(generatedUnits);
+    }
+    setFallbackUsed(false);
+    setCandidateState("REWRITE_VALIDATED");
+    setMobileTab("humanized");
+    if (projectId) {
+      authedJsonFetch(`/api/projects/${projectId}/humanizer/humanize`, "POST", {
+        text: sourceText,
+        llmResult: candidateDraftText,
+        register: selectedGenre,
+      }).catch(() => {});
+    }
+  }
+
   // Reject Humanized text and keep original
   function handleRejectRewrite() {
     setHumanizedText("");
@@ -534,6 +561,8 @@ export default function HumanizerWorkspace({
     setCandidateState(undefined);
     setFallbackUsed(false);
     setFallbackReason(undefined);
+    setCandidateDraftText(undefined);
+    setCandidateDraftDoc(undefined);
     setReviewUnits([]);
     setChunks([]);
   }
@@ -807,6 +836,8 @@ export default function HumanizerWorkspace({
             candidateState={candidateState}
             fallbackUsed={fallbackUsed}
             fallbackReason={fallbackReason}
+            hasCandidateText={Boolean(candidateDraftText)}
+            onUseCandidateAnyway={handleUseCandidateAnyway}
           />
         )}
 

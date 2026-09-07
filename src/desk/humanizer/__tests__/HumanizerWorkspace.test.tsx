@@ -155,7 +155,8 @@ describe("HumanizerWorkspace (Production Pipeline & Quality Audit Dashboard)", (
     // Completer that violates epistemic fidelity
     (completeWithFailover as any).mockImplementation(async () => {
       return {
-        result: {
+        ok: true,
+        value: {
           text: JSON.stringify({
             rewrittenText: "Evidence proves that compound X causes absolute cure.",
             improvements: [],
@@ -178,8 +179,18 @@ describe("HumanizerWorkspace (Production Pipeline & Quality Audit Dashboard)", (
       expect(screen.getByText(/Safe Rewrite Unavailable — Original Preserved/i)).toBeInTheDocument();
     });
 
-    // Ensure rejected candidate was NOT exposed
+    // Ensure rejected candidate was not exposed by default
     expect(screen.queryByText(/causes absolute cure/i)).not.toBeInTheDocument();
+
+    // User can override the fail-safe using the "Use Humanized Draft Anyway" button
+    const useAnywayBtn = screen.getByTestId("use-candidate-anyway-btn");
+    expect(useAnywayBtn).toBeInTheDocument();
+    fireEvent.click(useAnywayBtn);
+
+    // Humanized draft is now loaded into the editor
+    await waitFor(() => {
+      expect(screen.getByText(/causes absolute cure/i)).toBeInTheDocument();
+    });
   });
 
   it("gracefully succeeds via server fallback when client providers fail or have no keys", async () => {
