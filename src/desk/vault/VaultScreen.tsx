@@ -34,7 +34,9 @@ import VaultSetupScreen from "../setup/VaultSetupScreen";
 import VaultImport from "./VaultImport";
 import VaultDocumentImport from "./VaultDocumentImport";
 import { CitationConfirmationModal } from "./CitationConfirmationModal";
+import VaultItemEditModal from "./VaultItemEditModal";
 import { downloadVaultZip } from "../../services/vault/vaultExportService";
+import { scanVaultRetractions } from "../../services/vault/retractionService";
 
 type VaultPresence = null | "none" | "other-device" | "this-device" | "synced";
 
@@ -250,19 +252,52 @@ function VaultContents({
   const [showDriveModal, setShowDriveModal] = useState(false);
   const [connectedDrives, setConnectedDrives] = useState<CloudDriveAccount[]>([]);
 
-  // Citation editing modal state
+  // Citation & Details editing modal state
   const [editingCitationItem, setEditingCitationItem] = useState<VaultItem | null>(null);
+  const [editingDetailsItem, setEditingDetailsItem] = useState<VaultItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Filtering & Sorting state
   const [filterType, setFilterType] = useState<VaultSourceType | "all">("all");
   const [filterStatus, setFilterStatus] = useState<CitationStatus | "all">("all");
+  const [filterCollection, setFilterCollection] = useState<string>("all");
+  const [filterTag, setFilterTag] = useState<string>("all");
+  const [filterRetractionOnly, setFilterRetractionOnly] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "title">("newest");
   const [selectedStyle, setSelectedStyle] = useState<CitationStyleType>("apa7");
 
+  // Retraction scanning state
+  const [isScanningRetractions, setIsScanningRetractions] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+
   // Drag & drop state
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  // Computed Collections & Tags
+  const collections = useMemo(() => {
+    const set = new Set<string>();
+    items?.forEach((i) => {
+      if (i.collection?.trim()) set.add(i.collection.trim());
+    });
+    return Array.from(set).sort();
+  }, [items]);
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    items?.forEach((i) => {
+      i.tags?.forEach((t) => {
+        if (t?.trim()) set.add(t.trim());
+      });
+    });
+    return Array.from(set).sort();
+  }, [items]);
+
+  const retractedCount = useMemo(() => {
+    return (items || []).filter(
+      (i) => i.retractionStatus === "retracted" || i.retractionStatus === "expression_of_concern"
+    ).length;
+  }, [items]);
 
   useEffect(() => {
     loadItems();
@@ -298,6 +333,28 @@ function VaultContents({
     }
   };
 
+  async function handleScanRetractions() {
+    if (!items || items.length === 0) return;
+    setIsScanningRetractions(true);
+    setScanMessage("Scanning Crossref & Retraction Watch for academic integrity notices…");
+    try {
+      const res = await scanVaultRetractions(userId, items, (curr, total) => {
+        setScanMessage(`Scanning papers for retractions (${curr}/${total})…`);
+      });
+      setItems(res.updatedItems);
+      if (res.retractedCount > 0) {
+        setScanMessage(`Scan complete: ${res.retractedCount} item(s) flagged with retraction or concern notices.`);
+      } else {
+        setScanMessage("Scan complete: No retraction notices found across all scanned items.");
+      }
+      setTimeout(() => setScanMessage(null), 5000);
+    } catch (err: any) {
+      setScanMessage(`Retraction scan error: ${err.message}`);
+    } finally {
+      setIsScanningRetractions(false);
+    }
+  }
+
   const visible = useMemo(() => {
     if (!items) return [];
     let result = searchVaultItems(items, query);
@@ -310,6 +367,22 @@ function VaultContents({
       result = result.filter((item) => item.citationStatus === filterStatus);
     }
 
+    if (filterCollection === "unassigned") {
+      result = result.filter((item) => !item.collection);
+    } else if (filterCollection !== "all") {
+      result = result.filter((item) => item.collection === filterCollection);
+    }
+
+    if (filterTag !== "all") {
+      result = result.filter((item) => item.tags?.includes(filterTag));
+    }
+
+    if (filterRetractionOnly) {
+      result = result.filter(
+        (item) => item.retractionStatus === "retracted" || item.retractionStatus === "expression_of_concern"
+      );
+    }
+
     result.sort((a, b) => {
       if (sortBy === "title") return a.title.localeCompare(b.title);
       const timeA = new Date(a.createdAt).getTime();
@@ -318,7 +391,7 @@ function VaultContents({
     });
 
     return result;
-  }, [items, query, filterType, filterStatus, sortBy]);
+  }, [items, query, filterType, filterStatus, filterCollection, filterTag, filterRetractionOnly, sortBy]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -473,6 +546,22 @@ function VaultContents({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={isScanningRetractions || !items || items.length === 0}
+              onClick={handleScanRetractions}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[color:var(--border-default)] text-[color:var(--text-primary)] hover:border-[color:var(--accent)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              title="Check all items with DOIs against Crossref & Retraction Watch"
+            >
+              <span>🛡️</span>
+              <span>{isScanningRetractions ? "Scanning…" : "Check Retractions"}</span>
+              {retractedCount > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-bold">
+                  {retractedCount}
+                </span>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => setShowDriveModal(true)}
@@ -635,6 +724,135 @@ function VaultContents({
           </div>
         ) : (
           <>
+            {/* Scan / Status Notifications */}
+            {scanMessage && (
+              <div className="mb-4 flex items-center justify-between p-3 rounded-lg bg-[color:var(--surface-inset)] border border-[color:var(--accent-border)] text-xs text-[color:var(--accent)] animate-in fade-in duration-200">
+                <div className="flex items-center gap-2">
+                  <span className="animate-spin">🔄</span>
+                  <span>{scanMessage}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setScanMessage(null)}
+                  className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Retraction Alert Banner */}
+            {retractedCount > 0 && (
+              <div className="mb-4 flex items-center justify-between p-3.5 rounded-[var(--radius-lg)] bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-xs text-rose-900 dark:text-rose-200 shadow-xs animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">⚠️</span>
+                  <span>
+                    <strong>Academic Integrity Alert:</strong> {retractedCount} item(s) in your Knowledge Vault are flagged with official Retractions or Expressions of Concern.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFilterRetractionOnly(!filterRetractionOnly)}
+                  className="font-bold underline ml-3 shrink-0 hover:text-rose-950 dark:hover:text-rose-100 cursor-pointer"
+                >
+                  {filterRetractionOnly ? "Show All Items" : "View Flagged Only"}
+                </button>
+              </div>
+            )}
+
+            {/* Collections Tabs Bar */}
+            {items.length > 0 && (
+              <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <span className="text-[11px] font-semibold text-[color:var(--text-muted)] mr-1 shrink-0">
+                  Collections:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFilterCollection("all")}
+                  className={`px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer shrink-0 ${
+                    filterCollection === "all"
+                      ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold shadow-xs"
+                      : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] border border-[color:var(--border-subtle)]"
+                  }`}
+                >
+                  All ({items.length})
+                </button>
+
+                {collections.map((col) => {
+                  const count = items.filter((i) => i.collection === col).length;
+                  const isSelected = filterCollection === col;
+                  return (
+                    <button
+                      key={col}
+                      type="button"
+                      onClick={() => setFilterCollection(isSelected ? "all" : col)}
+                      className={`px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                        isSelected
+                          ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold shadow-xs"
+                          : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] border border-[color:var(--border-subtle)]"
+                      }`}
+                    >
+                      <span>📁 {col}</span>
+                      <span className={`text-[10px] px-1.5 rounded-full ${isSelected ? "bg-white/20" : "bg-[color:var(--surface-raised)]"}`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {items.some((i) => !i.collection) && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterCollection(filterCollection === "unassigned" ? "all" : "unassigned")}
+                    className={`px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer shrink-0 ${
+                      filterCollection === "unassigned"
+                        ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold"
+                        : "bg-[color:var(--surface-inset)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] border border-[color:var(--border-subtle)]"
+                    }`}
+                  >
+                    Unassigned ({items.filter((i) => !i.collection).length})
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Tags Pills Bar */}
+            {allTags.length > 0 && (
+              <div className="mb-4 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <span className="text-[11px] font-semibold text-[color:var(--text-muted)] mr-1 shrink-0">
+                  Tags:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFilterTag("all")}
+                  className={`text-[11px] px-2 py-0.5 rounded-md transition-colors cursor-pointer shrink-0 ${
+                    filterTag === "all"
+                      ? "bg-[color:var(--surface-hover)] text-[color:var(--accent)] font-bold border border-[color:var(--accent-border)]"
+                      : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                  }`}
+                >
+                  All Tags
+                </button>
+                {allTags.map((t) => {
+                  const isSelected = filterTag === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setFilterTag(isSelected ? "all" : t)}
+                      className={`text-[11px] px-2 py-0.5 rounded-md transition-colors cursor-pointer shrink-0 font-medium ${
+                        isSelected
+                          ? "bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)] font-bold"
+                          : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] border border-[color:var(--border-subtle)]"
+                      }`}
+                    >
+                      #{t}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Search, Filters, and Style Toolbar */}
             <div className="mb-5 flex flex-wrap items-center gap-3">
               <div className="flex-1 min-w-[220px]">
@@ -642,7 +860,7 @@ function VaultContents({
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search across all papers, datasets, notes, and citations…"
+                  placeholder="Search across papers, datasets, tags, collections, and citations…"
                   aria-label="Search your Vault"
                   className="w-full px-3.5 py-2 text-sm border border-[color:var(--border-default)] rounded-[var(--radius-md)] bg-[color:var(--surface-input)] text-[color:var(--text-primary)] shadow-xs"
                 />
@@ -703,7 +921,7 @@ function VaultContents({
                 <p className="text-xs text-[color:var(--text-secondary)] max-w-md mt-1.5">
                   {items.length === 0
                     ? "Upload PDF papers, connect Google Drive/OneDrive, or import BibTeX references to build your long-term research foundation."
-                    : `No materials matched "${query}". Try clearing filters or searching for different terms.`}
+                    : `No materials matched your filters or search terms. Try clearing filters or searching for different terms.`}
                 </p>
               </div>
             ) : (
@@ -712,11 +930,16 @@ function VaultContents({
                   const isConfirmed = item.citationStatus === "confirmed";
                   const isNeedsReview = item.citationStatus === "needs_user_review";
                   const isConfirmingDelete = confirmDeleteId === item.id;
+                  const isRetracted = item.retractionStatus === "retracted" || item.retractionStatus === "expression_of_concern";
 
                   return (
                     <div
                       key={item.id}
-                      className="flex flex-col gap-2.5 p-4 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)] transition-all shadow-xs"
+                      className={`flex flex-col gap-2.5 p-4 rounded-[var(--radius-lg)] border transition-all shadow-xs ${
+                        isRetracted
+                          ? "border-rose-300 dark:border-rose-900 bg-rose-50/30 dark:bg-rose-950/10"
+                          : "border-[color:var(--border-default)] bg-[color:var(--surface-raised)] hover:border-[color:var(--accent-border)]"
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-2.5 min-w-0">
@@ -742,12 +965,31 @@ function VaultContents({
                                   {item.journal}
                                 </span>
                               )}
+                              {item.collection && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--accent)] border border-[color:var(--border-subtle)]">
+                                  📁 {item.collection}
+                                </span>
+                              )}
+                              {(item.tags || []).map((t) => (
+                                <span
+                                  key={t}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--text-muted)] border border-[color:var(--border-subtle)]"
+                                >
+                                  #{t}
+                                </span>
+                              ))}
                             </div>
                           </div>
                         </div>
 
-                        {/* Citation status badge */}
+                        {/* Citation & Retraction status badges */}
                         <div className="shrink-0 flex items-center gap-1.5">
+                          {isRetracted && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                              ⚠️ {item.retractionStatus === "retracted" ? "Retracted" : "Concern"}
+                            </span>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => setEditingCitationItem(item)}
@@ -763,6 +1005,28 @@ function VaultContents({
                           </button>
                         </div>
                       </div>
+
+                      {/* Retraction detail callout */}
+                      {isRetracted && (
+                        <div className="p-2.5 rounded-md bg-rose-100/70 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-[11px] text-rose-900 dark:text-rose-200 flex items-start justify-between gap-2">
+                          <div>
+                            <span className="font-bold">
+                              ⚠️ {item.retractionStatus === "retracted" ? "RETRACTION NOTICE" : "EXPRESSION OF CONCERN"}:
+                            </span>{" "}
+                            {item.retractionDetails?.reason || "Notice registered in academic publication records."}
+                          </div>
+                          {item.retractionDetails?.noticeUrl && (
+                            <a
+                              href={item.retractionDetails.noticeUrl}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="shrink-0 font-bold underline hover:text-rose-950"
+                            >
+                              Notice ↗
+                            </a>
+                          )}
+                        </div>
+                      )}
 
                       {/* Content snippet */}
                       <p className="text-xs text-[color:var(--text-secondary)] line-clamp-2 leading-relaxed bg-[color:var(--surface-inset)] p-2.5 rounded border border-[color:var(--border-subtle)]">
@@ -809,10 +1073,19 @@ function VaultContents({
 
                               <button
                                 type="button"
+                                onClick={() => setEditingDetailsItem(item)}
+                                className="px-2 py-1 text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] rounded transition-colors cursor-pointer flex items-center gap-1"
+                                title="Edit title, collection, and tags"
+                              >
+                                <span>🏷️</span> Details
+                              </button>
+
+                              <button
+                                type="button"
                                 onClick={() => setEditingCitationItem(item)}
                                 className="px-2 py-1 text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
                               >
-                                Edit
+                                Edit Citation
                               </button>
 
                               <button
@@ -834,6 +1107,20 @@ function VaultContents({
           </>
         )}
 
+        {/* Edit Details Modal */}
+        {editingDetailsItem && (
+          <VaultItemEditModal
+            userId={userId}
+            item={editingDetailsItem}
+            existingCollections={collections}
+            allExistingTags={allTags}
+            onSave={(updated) => {
+              setItems((curr) => curr?.map((i) => (i.id === updated.id ? updated : i)) || []);
+              setEditingDetailsItem(null);
+            }}
+            onClose={() => setEditingDetailsItem(null)}
+          />
+        )}
         {/* Cloud Drive Connection Modal */}
         {showDriveModal && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">

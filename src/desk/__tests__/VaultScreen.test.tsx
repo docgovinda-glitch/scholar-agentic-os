@@ -229,6 +229,56 @@ describe("unlocked", () => {
     expect(screen.getByText("Longitudinal effects of microplastics")).toBeInTheDocument();
   });
 
+  it("filters items when clicking a collection tab", async () => {
+    listVaultItems.mockResolvedValue([
+      item({ id: "item-1", title: "Microplastics Paper", collection: "Ecology" } as any),
+      item({ id: "item-2", title: "Quantum Physics Paper", collection: "Physics" } as any),
+    ]);
+    render(<VaultScreen userId="user-1" onClose={vi.fn()} />);
+
+    expect(await screen.findByText("Microplastics Paper")).toBeInTheDocument();
+    expect(screen.getByText("Quantum Physics Paper")).toBeInTheDocument();
+
+    // Click Physics collection tab
+    fireEvent.click(screen.getByRole("button", { name: /Physics/i }));
+
+    expect(screen.getByText("Quantum Physics Paper")).toBeInTheDocument();
+    expect(screen.queryByText("Microplastics Paper")).not.toBeInTheDocument();
+  });
+
+  it("filters items when clicking a tag pill", async () => {
+    listVaultItems.mockResolvedValue([
+      item({ id: "item-1", title: "Microplastics Paper", tags: ["ocean", "pollution"] } as any),
+      item({ id: "item-2", title: "Quantum Physics Paper", tags: ["physics"] } as any),
+    ]);
+    render(<VaultScreen userId="user-1" onClose={vi.fn()} />);
+
+    expect(await screen.findByText("Microplastics Paper")).toBeInTheDocument();
+    expect(screen.getByText("Quantum Physics Paper")).toBeInTheDocument();
+
+    // Click #pollution tag pill
+    fireEvent.click(screen.getByRole("button", { name: "#pollution" }));
+
+    expect(screen.getByText("Microplastics Paper")).toBeInTheDocument();
+    expect(screen.queryByText("Quantum Physics Paper")).not.toBeInTheDocument();
+  });
+
+  it("displays retraction alert banner when a retracted paper is in the vault", async () => {
+    listVaultItems.mockResolvedValue([
+      item({
+        id: "item-retracted",
+        title: "Retracted Paper on Stem Cells",
+        retractionStatus: "retracted",
+        retractionDetails: { reason: "Data falsification", date: "2024-05-01" },
+      } as any),
+    ]);
+    render(<VaultScreen userId="user-1" onClose={vi.fn()} />);
+
+    expect(await screen.findByText(/Academic Integrity Alert:/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 item\(s\) in your Knowledge Vault are flagged with official Retractions/i)).toBeInTheDocument();
+    expect(screen.getByText(/RETRACTION NOTICE/i)).toBeInTheDocument();
+  });
+
   it("locks and returns to the passphrase gate", async () => {
     listVaultItems.mockResolvedValue([]);
     render(<VaultScreen userId="user-1" onClose={vi.fn()} />);
@@ -240,3 +290,4 @@ describe("unlocked", () => {
     expect(await screen.findByRole("heading", { name: "Unlock your Vault" })).toBeInTheDocument();
   });
 });
+

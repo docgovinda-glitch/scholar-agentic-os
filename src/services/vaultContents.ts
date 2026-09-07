@@ -16,6 +16,7 @@ import type { CanonicalReference } from "../citation_compliance/model/reference"
 
 export type VaultSourceType = "file" | "web" | "video" | "reference" | "drive_google" | "drive_onedrive" | "custom" | "text";
 export type CitationStatus = "missing" | "needs_user_review" | "confirmed";
+export type RetractionStatus = "clean" | "retracted" | "expression_of_concern" | "unknown";
 
 export interface VaultItem {
   id: string;
@@ -32,6 +33,14 @@ export interface VaultItem {
   authors?: string[];
   year?: string;
   journal?: string;
+  collection?: string;
+  tags?: string[];
+  retractionStatus?: RetractionStatus;
+  retractionDetails?: {
+    noticeUrl?: string;
+    reason?: string;
+    date?: string;
+  };
   metadata?: Record<string, any>;
   createdAt: string;
   updatedAt?: string;
@@ -194,12 +203,28 @@ export async function addVaultItem(
     authors?: string[];
     year?: string;
     journal?: string;
+    collection?: string;
+    tags?: string[];
+    retractionStatus?: RetractionStatus;
+    retractionDetails?: {
+      noticeUrl?: string;
+      reason?: string;
+      date?: string;
+    };
     metadata?: Record<string, any>;
   }
 ): Promise<VaultItem> {
   if (!isVaultUnlocked()) {
     throw new Error("The Vault is locked.");
   }
+
+  const meta = {
+    ...(fields.metadata || {}),
+    ...(fields.collection ? { collection: fields.collection } : {}),
+    ...(fields.tags ? { tags: fields.tags } : {}),
+    ...(fields.retractionStatus ? { retractionStatus: fields.retractionStatus } : {}),
+    ...(fields.retractionDetails ? { retractionDetails: fields.retractionDetails } : {}),
+  };
 
   const item: VaultItem = {
     id: crypto.randomUUID(),
@@ -216,7 +241,11 @@ export async function addVaultItem(
     authors: fields.authors,
     year: fields.year,
     journal: fields.journal,
-    metadata: fields.metadata || {},
+    collection: fields.collection,
+    tags: fields.tags || [],
+    retractionStatus: fields.retractionStatus || "clean",
+    retractionDetails: fields.retractionDetails,
+    metadata: meta,
     createdAt: new Date().toISOString(),
   };
 
@@ -295,6 +324,10 @@ export async function listVaultItems(userId: string): Promise<VaultItem[]> {
           authors: d.authors || [],
           year: d.year,
           journal: d.journal,
+          collection: d.metadata?.collection,
+          tags: d.metadata?.tags || [],
+          retractionStatus: d.metadata?.retractionStatus || "clean",
+          retractionDetails: d.metadata?.retractionDetails,
           metadata: d.metadata || {},
           createdAt: d.created_at,
           updatedAt: d.updated_at,
@@ -323,7 +356,15 @@ export async function listVaultItems(userId: string): Promise<VaultItem[]> {
           }
         }
         const plain = JSON.parse(plainText);
-        items.push({ id: s.id, createdAt: s.createdAt, ...plain });
+        items.push({
+          id: s.id,
+          createdAt: s.createdAt,
+          tags: plain.tags || plain.metadata?.tags || [],
+          collection: plain.collection || plain.metadata?.collection,
+          retractionStatus: plain.retractionStatus || plain.metadata?.retractionStatus || "clean",
+          retractionDetails: plain.retractionDetails || plain.metadata?.retractionDetails,
+          ...plain,
+        });
       } catch {
         // Dropped rather than failing whole list
       }
@@ -352,6 +393,14 @@ export async function addVaultItems(
     authors?: string[];
     year?: string;
     journal?: string;
+    collection?: string;
+    tags?: string[];
+    retractionStatus?: RetractionStatus;
+    retractionDetails?: {
+      noticeUrl?: string;
+      reason?: string;
+      date?: string;
+    };
     metadata?: Record<string, any>;
   }>
 ): Promise<VaultItem[]> {
@@ -362,23 +411,29 @@ export async function addVaultItems(
   return saved;
 }
 
-/** Updates citation metadata and status for a vault item. */
-export async function updateVaultItemCitation(
+/** Updates arbitrary details (collection, tags, retraction, citation, authors, year, journal) for a vault item. */
+export async function updateVaultItemDetails(
   userId: string,
   id: string,
-  canonicalReference: CanonicalReference,
-  citationStatus: CitationStatus = "confirmed",
-  formattedCitation?: string
+  updates: Partial<Pick<VaultItem, "title" | "collection" | "tags" | "retractionStatus" | "retractionDetails" | "citation" | "citationStatus" | "canonicalReference" | "authors" | "year" | "journal" | "metadata">>
 ): Promise<VaultItem | null> {
   const items = await listVaultItems(userId);
   const existing = items.find((i) => i.id === id);
   if (!existing) return null;
 
+  const mergedMeta = {
+    ...(existing.metadata || {}),
+    ...(updates.metadata || {}),
+    ...(updates.collection !== undefined ? { collection: updates.collection } : {}),
+    ...(updates.tags !== undefined ? { tags: updates.tags } : {}),
+    ...(updates.retractionStatus !== undefined ? { retractionStatus: updates.retractionStatus } : {}),
+    ...(updates.retractionDetails !== undefined ? { retractionDetails: updates.retractionDetails } : {}),
+  };
+
   const updated: VaultItem = {
     ...existing,
-    canonicalReference,
-    citationStatus,
-    citation: formattedCitation || existing.citation,
+    ...updates,
+    metadata: mergedMeta,
     updatedAt: new Date().toISOString(),
   };
 
@@ -389,9 +444,14 @@ export async function updateVaultItemCitation(
       await supabase
         .from("user_vault_items")
         .update({
-          canonical_reference: updated.canonicalReference,
-          citation_status: updated.citationStatus,
+          title: updated.title,
           citation: updated.citation,
+          citation_status: updated.citationStatus,
+          canonical_reference: updated.canonicalReference,
+          authors: updated.authors,
+          year: updated.year,
+          journal: updated.journal,
+          metadata: updated.metadata,
           updated_at: updated.updatedAt,
         })
         .eq("id", id)
@@ -411,6 +471,21 @@ export async function updateVaultItemCitation(
   return updated;
 }
 
+/** Updates citation metadata and status for a vault item. */
+export async function updateVaultItemCitation(
+  userId: string,
+  id: string,
+  canonicalReference: CanonicalReference,
+  citationStatus: CitationStatus = "confirmed",
+  formattedCitation?: string
+): Promise<VaultItem | null> {
+  return updateVaultItemDetails(userId, id, {
+    canonicalReference,
+    citationStatus,
+    citation: formattedCitation,
+  });
+}
+
 /** Deletes a vault item from storage. */
 export async function deleteVaultItem(userId: string, id: string): Promise<void> {
   if (isSupabaseConfigured()) {
@@ -425,7 +500,7 @@ export async function deleteVaultItem(userId: string, id: string): Promise<void>
   } catch {}
 }
 
-/** Client-side substring search over items. */
+/** Client-side search over items with title, content, citation, filename, tags, and collections. */
 export function searchVaultItems(items: VaultItem[], query: string): VaultItem[] {
   const q = query.trim().toLowerCase();
   if (!q) return items;
@@ -435,7 +510,9 @@ export function searchVaultItems(items: VaultItem[], query: string): VaultItem[]
       i.content.toLowerCase().includes(q) ||
       (i.citation ?? "").toLowerCase().includes(q) ||
       (i.filename ?? "").toLowerCase().includes(q) ||
-      (i.externalReference ?? "").toLowerCase().includes(q)
+      (i.externalReference ?? "").toLowerCase().includes(q) ||
+      (i.collection ?? "").toLowerCase().includes(q) ||
+      (i.tags ?? []).some((t) => t.toLowerCase().includes(q))
   );
 }
 
