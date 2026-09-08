@@ -86,4 +86,25 @@ describe("duplicateDetection Service", () => {
     const result = checkForDuplicates(candidate, existingLibrary);
     expect(result.isDuplicate).toBe(false);
   });
+
+  it("treats exact title with conflicting authors as Possible Duplicate, never Definite or Likely", () => {
+    // Existing has: Attention Is All You Need by Vaswani, Ashish
+    const candidateWithDifferentAuthor = {
+      title: "Attention Is All You Need",
+      authors: ["Garcia, Fernando", "Martinez, Elena"],
+      year: "2024",
+    };
+    const result = checkForDuplicates(candidateWithDifferentAuthor, existingLibrary);
+    expect(result.isDuplicate).toBe(true);
+    expect(result.confidence).toBe("possible");
+    expect(result.reason).toContain("different author");
+  });
+
+  it("guarantees title similarity alone NEVER declares a Definite Duplicate", () => {
+    const candidate = {
+      title: "Attention Is All You Need",
+    };
+    const result = checkForDuplicates(candidate, existingLibrary);
+    expect(result.confidence).not.toBe("definite");
+  });
 });

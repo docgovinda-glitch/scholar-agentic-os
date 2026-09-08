@@ -707,7 +707,7 @@ export default function SourceLibraryScreen({
                             </span>
                           ) : (
                             <span className="text-[10px] text-[color:var(--text-muted)] font-medium">
-                              ✓ Verified
+                              Integrity checked
                             </span>
                           )}
                         </div>

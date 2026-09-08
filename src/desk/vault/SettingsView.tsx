@@ -228,16 +228,46 @@ export default function SettingsView({
       </div>
 
       {/* Storage & Privacy Transparency */}
-      <div className="p-5 rounded-[var(--radius-xl)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 flex flex-col gap-2">
+      <div className="p-5 rounded-[var(--radius-xl)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <span className="text-base">🛡️</span>
           <h3 className="text-xs font-bold text-[color:var(--text-primary)] uppercase tracking-wider">
-            Storage & Privacy Architecture
+            Storage &amp; Privacy Architecture
           </h3>
         </div>
         <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
-          Your source files remain in your connected cloud storage (Google Drive or Microsoft OneDrive). We do not maintain a separate copy of your files, upload documents to our own servers, or build a server document repository.
+          Your source files remain in your connected cloud storage. Source Library does not maintain a separate copy of your files.
         </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <div className="p-3 rounded-[var(--radius-md)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] flex flex-col gap-1.5">
+            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+              Source Library Stores:
+            </span>
+            <ul className="text-[11px] text-[color:var(--text-secondary)] space-y-1 list-disc list-inside">
+              <li>Lightweight metadata</li>
+              <li>Project assignments</li>
+              <li>Tags</li>
+              <li>Writing notes</li>
+              <li>Citation data</li>
+              <li>Cloud references</li>
+              <li>Integrity-check metadata</li>
+            </ul>
+          </div>
+
+          <div className="p-3 rounded-[var(--radius-md)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] flex flex-col gap-1.5">
+            <span className="text-[11px] font-bold text-[color:var(--state-danger)] uppercase tracking-wide">
+              Source Library Does Not Store:
+            </span>
+            <ul className="text-[11px] text-[color:var(--text-secondary)] space-y-1 list-disc list-inside">
+              <li>Document binaries</li>
+              <li>Permanent document copies</li>
+              <li>Permanent extracted full text</li>
+              <li>Permanent OCR output</li>
+              <li>Permanent transcription output</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       {/* Reset Library (Quietly placed under settings with double confirmation) */}

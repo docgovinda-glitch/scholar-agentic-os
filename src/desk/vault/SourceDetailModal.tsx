@@ -303,7 +303,7 @@ export default function SourceDetailModal({
               ) : (
                 <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
                   <span>✓</span>
-                  <span>Verified: No known retraction notices found in Crossref registries.</span>
+                  <span>Integrity status: No retraction notices found across checked registries.</span>
                 </div>
               )}
             </div>

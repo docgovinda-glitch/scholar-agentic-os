@@ -648,6 +648,15 @@ export default function AddSourceModal({
                   Zotero · RIS · BibTeX
                 </button>
               </div>
+
+              {/* Local File Guidance Callout */}
+              <div className="p-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-[var(--radius-md)] flex items-start gap-2.5 text-[11px] text-[color:var(--text-secondary)]">
+                <span className="text-sm">💡</span>
+                <div className="leading-relaxed">
+                  <span className="font-bold text-[color:var(--text-primary)]">Have a local PDF or document? </span>
+                  First save the file to Google Drive or OneDrive, then add it to Source Library. Source Library does not become your document storage location.
+                </div>
+              </div>
             </div>
           )}
 

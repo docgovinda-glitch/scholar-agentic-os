@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { requireAuth } from "../src/middleware/auth.ts";
 import { getSupabaseRestConfig, SupabaseTable } from "../src/supabaseRest.ts";
 import type { CanonicalReference } from "../../src/citation_compliance/model/reference.ts";
+import { safeFetchHtml, extractLightweightUrlMetadata } from "../utils/ssrfGuard.ts";
 
 const router = Router();
 const upload = multer({
@@ -232,7 +233,8 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
 
 /**
  * POST /api/vault/parse-url
- * Ingest web articles or online sources
+ * Retrieve lightweight academic metadata from a web source with SSRF protection.
+ * Zero webpage body persistence or logging.
  */
 router.post("/parse-url", async (req: Request, res: Response) => {
   const { url } = req.body as { url?: string };
@@ -246,70 +248,46 @@ router.post("/parse-url", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid protocol" });
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
+    const fetchResult = await safeFetchHtml(url, {
+      timeoutMs: 8000,
+      maxBytes: 2 * 1024 * 1024,
+      maxRedirects: 5,
+    });
 
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "ScholarCore-VaultBot/2.0 (+https://scholar-core.org)",
-        Accept: "text/html,application/xhtml+xml,text/plain",
-      },
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timer));
-
-    if (!response.ok) {
-      return res.status(response.status).json({ error: `Failed to fetch URL: HTTP ${response.status}` });
-    }
-
-    const html = await response.text();
-
-    // Extract title from <title> or OpenGraph
-    let title = url;
-    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
-    if (titleMatch) {
-      title = titleMatch[1].replace(/&[a-z]+;/g, " ").trim();
-    }
-
-    // Extract author / site name
-    let siteName = parsedUrl.hostname;
-    const siteMatch = html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i);
-    if (siteMatch) siteName = siteMatch[1].trim();
-
-    // Clean body text
-    const cleanText = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
-      .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, "")
-      .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, "")
-      .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, "")
-      .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, "")
-      .replace(/<[^>]+>/g, "\n")
-      .replace(/[ \t]+/g, " ")
-      .replace(/\n\s*\n+/g, "\n\n")
-      .trim();
-
-    const snippet = cleanText.slice(0, 50000);
+    const meta = extractLightweightUrlMetadata(fetchResult.body, fetchResult.url);
 
     const canonicalReference: CanonicalReference = {
       id: crypto.randomUUID(),
       kind: "Website",
-      title: title,
-      publisher: siteName,
-      url: url,
+      title: meta.title,
+      publisher: meta.publisher,
+      url: fetchResult.url,
+      authors: meta.authors.map((name) => {
+        const parts = name.split(" ");
+        return { lastName: parts[parts.length - 1] || name, initials: parts[0]?.[0] || "" };
+      }),
+      year: meta.year ? parseInt(meta.year, 10) : undefined,
       accessDate: new Date().toISOString().split("T")[0],
     };
 
+    const authorStr = meta.authors.length > 0 ? `${meta.authors.join(", ")} ` : "";
+    const yearStr = meta.year ? `(${meta.year}). ` : "";
+    const citation = `${authorStr}${yearStr}${meta.title}. Retrieved from ${fetchResult.url}`;
+
     res.json({
       success: true,
-      title,
-      content: snippet,
-      externalReference: url,
+      title: meta.title,
+      authors: meta.authors,
+      year: meta.year,
+      publisher: meta.publisher,
+      externalReference: fetchResult.url,
       sourceType: "web",
       canonicalReference,
-      citation: `${title}. Retrieved from ${url}`,
+      citation,
+      description: meta.description,
     });
   } catch (err: any) {
-    res.status(500).json({ error: `Could not parse web URL: ${err.message}` });
+    res.status(400).json({ error: `Could not parse web URL: ${err.message}` });
   }
 });
 

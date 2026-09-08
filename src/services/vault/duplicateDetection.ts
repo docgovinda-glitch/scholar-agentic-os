@@ -142,34 +142,48 @@ export function checkForDuplicates(
     const itemTitle = normalizeTitle(item.title);
     if (!itemTitle) continue;
 
+    // Check author/year similarity
+    let hasMatchingAuthorOrYear = false;
+    let hasConflictingAuthor = false;
+
+    if (candidate.year && item.year && candidate.year === item.year) {
+      hasMatchingAuthorOrYear = true;
+    }
+    if (candidate.authors && candidate.authors.length > 0 && item.authors && item.authors.length > 0) {
+      const candWords = candidate.authors[0].toLowerCase().replace(/[,.]/g, " ").split(/\s+/).filter((w) => w.length > 1);
+      const itemWords = item.authors[0].toLowerCase().replace(/[,.]/g, " ").split(/\s+/).filter((w) => w.length > 1);
+      const hasSharedWord = candWords.some((w) => itemWords.includes(w));
+
+      if (hasSharedWord) {
+        hasMatchingAuthorOrYear = true;
+      } else if (!hasMatchingAuthorOrYear) {
+        hasConflictingAuthor = true;
+      }
+    }
+
     // Check exact title match
     if (itemTitle === candidateTitle) {
+      if (hasConflictingAuthor) {
+        return {
+          isDuplicate: true,
+          confidence: "possible",
+          similarityPercent: 100,
+          existingItem: item,
+          reason: "Identical title but different author(s) — possible distinct work or homonym paper",
+        };
+      }
       return {
         isDuplicate: true,
         confidence: "likely",
         similarityPercent: 100,
         existingItem: item,
-        reason: "Exact title match",
+        reason: hasMatchingAuthorOrYear
+          ? "Exact title match with matching author/year"
+          : "Exact title match",
       };
     }
 
     const similarity = calculateTitleSimilarity(candidate.title || "", item.title);
-
-    // Check author/year similarity
-    let hasMatchingAuthorOrYear = false;
-    if (candidate.year && item.year && candidate.year === item.year) {
-      hasMatchingAuthorOrYear = true;
-    }
-    if (candidate.authors && candidate.authors.length > 0 && item.authors && item.authors.length > 0) {
-      const firstAuthorCand = candidate.authors[0].toLowerCase();
-      const firstAuthorItem = item.authors[0].toLowerCase();
-      if (
-        firstAuthorCand.includes(firstAuthorItem) ||
-        firstAuthorItem.includes(firstAuthorCand)
-      ) {
-        hasMatchingAuthorOrYear = true;
-      }
-    }
 
     if (!bestMatch || similarity > bestMatch.similarity) {
       bestMatch = { item, similarity, hasMatchingAuthorOrYear };
