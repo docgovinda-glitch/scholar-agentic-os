@@ -128,7 +128,7 @@ export default function VaultItemEditModal({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="font-semibold text-[color:var(--text-primary)]">
-                📁 Collection
+                📁 Project
               </label>
               <button
                 type="button"
@@ -138,7 +138,7 @@ export default function VaultItemEditModal({
                 }}
                 className="text-[11px] text-[color:var(--accent)] hover:underline"
               >
-                {isCreatingCollection ? "Choose existing" : "+ New Collection"}
+                {isCreatingCollection ? "Choose existing" : "+ New Project"}
               </button>
             </div>
 
@@ -147,7 +147,7 @@ export default function VaultItemEditModal({
                 type="text"
                 value={newCollectionInput}
                 onChange={(e) => setNewCollectionInput(e.target.value)}
-                placeholder="e.g., Literature Review 2025"
+                placeholder="e.g., Master's Thesis"
                 autoFocus
                 className="w-full px-3 py-2 border border-[color:var(--accent)] rounded-lg bg-[color:var(--surface-input)] text-[color:var(--text-primary)] text-xs"
               />
@@ -157,7 +157,7 @@ export default function VaultItemEditModal({
                 onChange={(e) => setCollection(e.target.value)}
                 className="w-full px-3 py-2 border border-[color:var(--border-default)] rounded-lg bg-[color:var(--surface-input)] text-[color:var(--text-primary)] text-xs"
               >
-                <option value="">(No collection - Unassigned)</option>
+                <option value="">(No project - Unassigned)</option>
                 {existingCollections.map((col) => (
                   <option key={col} value={col}>
                     📁 {col}

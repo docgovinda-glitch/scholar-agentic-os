@@ -395,7 +395,7 @@ export default function VaultDocumentImport({
     <div className="mb-6 flex flex-col gap-4 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] p-5 shadow-sm">
       <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-3">
         <h3 className="text-sm font-bold text-[color:var(--text-primary)]">
-          Universal Knowledge Ingestion
+          Import Source Reference
         </h3>
         <button
           type="button"

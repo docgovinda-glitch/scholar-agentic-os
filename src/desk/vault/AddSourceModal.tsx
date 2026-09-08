@@ -867,7 +867,7 @@ export default function AddSourceModal({
                           handleAddTag();
                         }
                       }}
-                      placeholder="Add tag (e.g. RAG, AI, Empirical) and press Enter"
+                      placeholder="Add tag (e.g. Methodology, Review, Empirical) and press Enter"
                       className="flex-1 px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
                     />
                     <button
@@ -895,7 +895,7 @@ export default function AddSourceModal({
                       rows={2}
                       value={whySaved}
                       onChange={(e) => setWhySaved(e.target.value)}
-                      placeholder="e.g. This supports my core argument about RAG architectures in Section 2."
+                      placeholder="e.g. This supports my core argument about neural architecture in Section 2."
                       className="px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
                     />
                   </div>

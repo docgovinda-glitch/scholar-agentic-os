@@ -96,20 +96,20 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
         </h1>
         <div className="mt-4 flex flex-col gap-3 text-sm text-[color:var(--text-secondary)]">
           <p>
-            Your Knowledge Vault stays privately in the browser on the device where you created it.
+            Your Source Library stays privately in the browser on the device where you created it.
             It does not sync across devices or browsers in browser-only mode.
           </p>
           <div className="rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] p-3 text-xs">
-            <p className="font-medium text-[color:var(--text-primary)]">Projects vs. Vault:</p>
+            <p className="font-medium text-[color:var(--text-primary)]">Projects vs. Source Library:</p>
             <p className="mt-1">
               Projects: Synced to your Scholar account and accessible anywhere.
             </p>
             <p>
-              Vault (Browser-Only): Kept strictly on the original browser with your passphrase.
+              Source Library (Browser-Only): Kept strictly on the original browser with your passphrase.
             </p>
           </div>
           <p>
-            Enable <strong>Universal Cloud Sync</strong> to seamlessly access all your papers, datasets, and citations on this device.
+            Enable <strong>Cloud Sync</strong> to seamlessly access all your citations and source references on this device.
           </p>
         </div>
         <div className="mt-6 flex gap-3">
@@ -123,7 +123,7 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
             }}
             className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
           >
-            Enable Universal Cloud Sync
+            Enable Cloud Sync
           </button>
           <button
             type="button"
