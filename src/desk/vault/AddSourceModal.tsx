@@ -416,7 +416,7 @@ export default function AddSourceModal({
         <div className="bg-[color:var(--accent-subtle)]/40 border-b border-[color:var(--border-subtle)] px-6 py-2.5 flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
           <span className="text-sm">🛡️</span>
           <span>
-            <strong>Zero server storage:</strong> Your original files remain in your Google Drive, OneDrive, or web link. We store only citation metadata.
+            <strong>Zero document storage:</strong> Your original files remain in your Google Drive, OneDrive, or web link. We store only citation metadata.
           </span>
         </div>
 

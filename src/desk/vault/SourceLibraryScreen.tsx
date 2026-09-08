@@ -360,7 +360,7 @@ export default function SourceLibraryScreen({
                 <span className="text-lg">⚠️</span>
                 <div className="flex-1">
                   <div className="font-bold text-sm">
-                    Academic Integrity Alert: {retractedSources.length} item(s) in your Knowledge Vault are flagged with official Retractions
+                    Academic Integrity Alert: {retractedSources.length} item(s) in your Source Library are flagged with official Retractions
                   </div>
                   <p className="mt-1 text-[11px] leading-relaxed opacity-90">
                     One or more papers in your library have received post-publication alerts.

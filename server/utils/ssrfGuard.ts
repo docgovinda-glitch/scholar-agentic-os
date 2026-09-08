@@ -255,19 +255,35 @@ function netIsIP(host: string): number {
  * Creates a socket lookup function that intercepts DNS resolution during the actual connection
  * to completely eliminate DNS rebinding vulnerabilities (TOCTOU).
  */
-function createRebindingSafeLookup(allowedIps: Set<string>) {
+export function createRebindingSafeLookup(
+  allowedIps: Set<string>,
+  customDnsResolver?: (
+    hostname: string,
+    options: any,
+    callback: (err: Error | null, address: string | any, family: number) => void
+  ) => void
+) {
   return (
     hostname: string,
     options: any,
     callback: (err: Error | null, address: string | any, family: number) => void
   ) => {
-    dns.lookup(hostname, { ...options, all: false }, (err, address, family) => {
+    const resolver = customDnsResolver || dns.lookup;
+    resolver(hostname, { ...options, all: false }, (err, address, family) => {
       if (err) return callback(err, address, family);
 
       const addrStr = typeof address === "string" ? address : address?.address;
       if (!addrStr || isPrivateOrReservedIp(addrStr)) {
         return callback(
           new Error(`DNS Rebinding violation: destination resolved to private IP ${addrStr}`),
+          "",
+          family
+        );
+      }
+
+      if (allowedIps && allowedIps.size > 0 && !allowedIps.has(addrStr)) {
+        return callback(
+          new Error(`DNS Rebinding violation: destination rebounded to unverified IP ${addrStr}`),
           "",
           family
         );

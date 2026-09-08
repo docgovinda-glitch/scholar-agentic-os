@@ -275,7 +275,7 @@ describe("unlocked", () => {
     render(<VaultScreen userId="user-1" onClose={vi.fn()} />);
 
     expect(await screen.findByText(/Academic Integrity Alert:/i)).toBeInTheDocument();
-    expect(screen.getByText(/1 item\(s\) in your Knowledge Vault are flagged with official Retractions/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 item\(s\) in your Source Library are flagged with official Retractions/i)).toBeInTheDocument();
     expect(screen.getByText(/RETRACTION NOTICE/i)).toBeInTheDocument();
   });
 

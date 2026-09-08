@@ -4,6 +4,8 @@ import {
   isPrivateOrReservedIPv6,
   validateSafeUrl,
   extractLightweightUrlMetadata,
+  createRebindingSafeLookup,
+  safeFetchHtml,
 } from "../../utils/ssrfGuard";
 
 describe("SSRF Guard — IP Validation", () => {
@@ -174,5 +176,85 @@ describe("SSRF Guard — Lightweight Metadata Extraction", () => {
     const html = "<title>Rock &amp; Roll &quot;Science&quot; &lt;Paper&gt;</title>";
     const meta = extractLightweightUrlMetadata(html, "https://nature.com/nature/1");
     expect(meta.title).toBe('Rock & Roll "Science" <Paper>');
+  });
+});
+
+describe("SSRF Guard — Connection-Level DNS Rebinding & Socket Defense", () => {
+  it("intercepts socket resolution and throws if DNS resolves to private loopback 127.0.0.1", () => {
+    const customLookup = createRebindingSafeLookup(
+      new Set(["93.184.216.34"]),
+      (_host, _options, cb) => {
+        // Simulated malicious DNS rebinding returning loopback at connection time
+        cb(null, "127.0.0.1", 4);
+      }
+    );
+
+    let errorResult: Error | null = null;
+    customLookup("attacker-rebinding.com", {}, (err) => {
+      errorResult = err;
+    });
+
+    expect(errorResult).not.toBeNull();
+    expect((errorResult as unknown as Error).message).toMatch(/DNS Rebinding violation: destination resolved to private IP 127.0.0.1/i);
+  });
+
+  it("intercepts socket resolution and throws if DNS resolves to cloud metadata 169.254.169.254", () => {
+    const customLookup = createRebindingSafeLookup(
+      new Set(["93.184.216.34"]),
+      (_host, _options, cb) => {
+        cb(null, "169.254.169.254", 4);
+      }
+    );
+
+    let errorResult: Error | null = null;
+    customLookup("attacker-metadata.com", {}, (err) => {
+      errorResult = err;
+    });
+
+    expect(errorResult).not.toBeNull();
+    expect((errorResult as unknown as Error).message).toMatch(/DNS Rebinding violation: destination resolved to private IP 169.254.169.254/i);
+  });
+
+  it("intercepts socket resolution and blocks when IP rebounds to an unverified address", () => {
+    // Initial safe IP was 93.184.216.34, but socket resolution returned another IP 1.2.3.4
+    const customLookup = createRebindingSafeLookup(
+      new Set(["93.184.216.34"]),
+      (_host, _options, cb) => {
+        cb(null, "1.2.3.4", 4);
+      }
+    );
+
+    let errorResult: Error | null = null;
+    customLookup("example.com", {}, (err) => {
+      errorResult = err;
+    });
+
+    expect(errorResult).not.toBeNull();
+    expect((errorResult as unknown as Error).message).toMatch(/destination rebounded to unverified IP 1.2.3.4/i);
+  });
+
+  it("permits connection when socket resolution matches validated public IP", () => {
+    const customLookup = createRebindingSafeLookup(
+      new Set(["93.184.216.34"]),
+      (_host, _options, cb) => {
+        cb(null, "93.184.216.34", 4);
+      }
+    );
+
+    let errorResult: Error | null = null;
+    let resolvedAddress = "";
+    customLookup("example.com", {}, (err, addr) => {
+      errorResult = err;
+      resolvedAddress = addr as string;
+    });
+
+    expect(errorResult).toBeNull();
+    expect(resolvedAddress).toBe("93.184.216.34");
+  });
+
+  it("safeFetchHtml unconditionally rejects local HTTP URLs", async () => {
+    await expect(safeFetchHtml("http://127.0.0.1:9999/admin")).rejects.toThrow(/SSRF Blocked/i);
+    await expect(safeFetchHtml("http://localhost:9999/status")).rejects.toThrow(/SSRF Blocked/i);
+    await expect(safeFetchHtml("http://169.254.169.254/latest")).rejects.toThrow(/SSRF Blocked/i);
   });
 });
