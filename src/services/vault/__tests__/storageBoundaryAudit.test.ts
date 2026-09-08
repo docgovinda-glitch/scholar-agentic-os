@@ -13,7 +13,8 @@ import { extractLightweightUrlMetadata } from "../../../../server/utils/ssrfGuar
 
 describe("Storage Boundary & Zero-Document-Persistence Audit", () => {
   it("guarantees sourceToVaultItemPayload never persists document buffers, binaries, or raw blobs", () => {
-    const candidateWithAccidentalBlobs: any = {
+    // Comprehensive Prohibited Document Payloads:
+    const candidateWithAll9Payloads: any = {
       id: "src-100",
       sourceId: "src-100",
       identity: {
@@ -44,18 +45,21 @@ describe("Storage Boundary & Zero-Document-Persistence Audit", () => {
       integrityStatus: "clean",
       createdAt: new Date().toISOString(),
 
-      // Illegal document blobs that must NEVER reach persistent storage:
-      binary: Buffer.from("%PDF-1.4 simulated binary data"),
-      fileBuffer: Buffer.from("docx raw zip payload"),
-      fullExtractedDocumentText: "50 pages of extracted book text...",
-      ocrDump: "Raw OCR bounding box coordinates and entire page text...",
-      transcriptionDump: "2-hour audio transcription text...",
-      s3Key: "uploads/user-1/paper.pdf",
-      accessToken: "ya29.secret_google_oauth_token_12345",
+      // All 9 Prohibited Document Payload Types:
+      pdfBuffer: Buffer.from("%PDF-1.4 simulated pdf binary data"),
+      docxBuffer: Buffer.from("PK\x03\x04 word docx binary stream"),
+      xlsxBuffer: Buffer.from("PK\x03\x04 excel spreadsheet binary stream"),
+      imagePayload: Buffer.from("\xFF\xD8\xFF\xE0 image binary data"),
+      fullExtractedText: "50 pages of extracted book text that must never be persisted...",
+      ocrOutput: "Raw Tesseract OCR bounding box coordinates and document text...",
+      transcriptionOutput: "2-hour audio transcription document text...",
+      webpageBody: "<html><body>Entire scraped article HTML body...</body></html>",
+      oauthToken: "ya29.secret_google_oauth_token_12345",
       refreshToken: "1//04_refresh_token_abcde",
+      clientSecret: "super-secret-client-secret",
     };
 
-    const payload = sourceToVaultItemPayload(candidateWithAccidentalBlobs);
+    const payload = sourceToVaultItemPayload(candidateWithAll9Payloads);
 
     // Verify allowed lightweight fields
     expect(payload.title).toBe("Empirical Study on Distributed Systems");
@@ -65,21 +69,31 @@ describe("Storage Boundary & Zero-Document-Persistence Audit", () => {
     expect(payload.filename).toBe("Empirical_Paper.pdf");
     expect(payload.storageReference).toBe("gdrive-999");
 
-    // Strictly verify no binaries or sensitive credentials leaked into persistent payload
-    expect((payload as any).binary).toBeUndefined();
-    expect((payload as any).fileBuffer).toBeUndefined();
-    expect((payload as any).fullExtractedDocumentText).toBeUndefined();
-    expect((payload as any).ocrDump).toBeUndefined();
-    expect((payload as any).transcriptionDump).toBeUndefined();
-    expect((payload as any).s3Key).toBeUndefined();
-    expect((payload as any).accessToken).toBeUndefined();
+    // Strictly verify none of the 9 prohibited payloads leaked into database/storage payload:
+    expect((payload as any).pdfBuffer).toBeUndefined();
+    expect((payload as any).docxBuffer).toBeUndefined();
+    expect((payload as any).xlsxBuffer).toBeUndefined();
+    expect((payload as any).imagePayload).toBeUndefined();
+    expect((payload as any).fullExtractedText).toBeUndefined();
+    expect((payload as any).ocrOutput).toBeUndefined();
+    expect((payload as any).transcriptionOutput).toBeUndefined();
+    expect((payload as any).webpageBody).toBeUndefined();
+    expect((payload as any).oauthToken).toBeUndefined();
     expect((payload as any).refreshToken).toBeUndefined();
+    expect((payload as any).clientSecret).toBeUndefined();
 
-    // Verify metadata JSON does not contain binary buffers or auth tokens
-    expect(payload.metadata.binary).toBeUndefined();
-    expect(payload.metadata.fileBuffer).toBeUndefined();
-    expect(payload.metadata.accessToken).toBeUndefined();
+    // Verify nested metadata JSON does not contain any of the 9 prohibited payloads
+    expect(payload.metadata.pdfBuffer).toBeUndefined();
+    expect(payload.metadata.docxBuffer).toBeUndefined();
+    expect(payload.metadata.xlsxBuffer).toBeUndefined();
+    expect(payload.metadata.imagePayload).toBeUndefined();
+    expect(payload.metadata.fullExtractedText).toBeUndefined();
+    expect(payload.metadata.ocrOutput).toBeUndefined();
+    expect(payload.metadata.transcriptionOutput).toBeUndefined();
+    expect(payload.metadata.webpageBody).toBeUndefined();
+    expect(payload.metadata.oauthToken).toBeUndefined();
     expect(payload.metadata.refreshToken).toBeUndefined();
+    expect(payload.metadata.clientSecret).toBeUndefined();
   });
 
   it("guarantees source-library.json index never contains document contents or credentials", () => {
@@ -101,9 +115,15 @@ describe("Storage Boundary & Zero-Document-Persistence Audit", () => {
           integrity: { status: "checked" },
           integrityStatus: "clean",
           createdAt: new Date().toISOString(),
-          // Accidental payloads:
-          binary: "JVBERi0xLjQKJcOkw7zDtsOfC...",
-          fullText: "Massive 20MB document dump...",
+          // Accidental/malicious payloads across all 9 prohibited types:
+          pdfBuffer: "JVBERi0xLjQKJcOkw7zDtsOfC...",
+          docxBuffer: "PK\x03\x04 simulated docx...",
+          xlsxBuffer: "PK\x03\x04 simulated xlsx...",
+          imagePayload: "data:image/png;base64,iVBORw0KGgo...",
+          fullExtractedText: "Massive 20MB document dump...",
+          ocrOutput: "Full OCR page dump with coordinate boxes...",
+          transcriptionOutput: "Full audio transcription text dump...",
+          webpageBody: "<html><body>Entire scraped article body...</body></html>",
           accessToken: "ya29.leak",
           refreshToken: "1//leak",
           clientSecret: "client-secret-leak",
@@ -117,8 +137,15 @@ describe("Storage Boundary & Zero-Document-Persistence Audit", () => {
 
     const json = serializeLibraryIndex(validation.sanitizedIndex!);
     expect(json).not.toContain("JVBERi0xLjQK");
+    expect(json).not.toContain("simulated docx");
+    expect(json).not.toContain("simulated xlsx");
+    expect(json).not.toContain("iVBORw0KGgo");
     expect(json).not.toContain("Massive 20MB document dump");
+    expect(json).not.toContain("Full OCR page dump");
+    expect(json).not.toContain("Full audio transcription text dump");
+    expect(json).not.toContain("Entire scraped article body");
     expect(json).not.toContain("ya29.leak");
+    expect(json).not.toContain("1//leak");
     expect(json).not.toContain("client-secret-leak");
   });
 

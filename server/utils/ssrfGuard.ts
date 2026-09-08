@@ -295,8 +295,18 @@ export function createRebindingSafeLookup(
 }
 
 /**
- * Safely fetches a URL with SSRF protection, strict redirect checks, byte-size caps,
- * timeout enforcement, and memory-only processing.
+ * Safely fetches a URL with SSRF protection, connection-time DNS pinning, strict redirect checks,
+ * byte-size caps, timeout enforcement, and transient in-memory processing.
+ *
+ * GUARANTEE: Fetched webpage content is processed transiently and is NOT:
+ * - persisted
+ * - cached
+ * - logged
+ * - stored in Source records
+ * - stored in source-library.json
+ * - stored in database records
+ * - sent to analytics
+ * It may subsequently become eligible for runtime garbage collection.
  */
 export async function safeFetchHtml(
   rawUrl: string,

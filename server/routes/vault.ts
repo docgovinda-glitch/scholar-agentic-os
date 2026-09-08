@@ -233,8 +233,16 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
 
 /**
  * POST /api/vault/parse-url
- * Retrieve lightweight academic metadata from a web source with SSRF protection.
- * Zero webpage body persistence or logging.
+ * Retrieve lightweight academic metadata from a web source with SSRF & connection-level DNS rebinding defense.
+ * GUARANTEE: Fetched webpage content is processed transiently in memory and is NOT:
+ * - persisted
+ * - cached
+ * - logged
+ * - stored in Source records
+ * - stored in source-library.json
+ * - stored in database records
+ * - sent to analytics
+ * It may subsequently become eligible for standard runtime garbage collection.
  */
 router.post("/parse-url", async (req: Request, res: Response) => {
   const { url } = req.body as { url?: string };
