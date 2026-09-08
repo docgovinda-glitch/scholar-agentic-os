@@ -531,6 +531,7 @@ export default function VaultDocumentImport({
                   type="button"
                   onClick={async () => {
                     setBusy(true);
+                    setError(null);
                     setProgressMsg(`Authenticating with ${selectedDrive === "google_drive" ? "Google Drive (Gmail)" : "Microsoft OneDrive (Outlook)"}…`);
                     try {
                       if (selectedDrive === "google_drive") {
@@ -539,13 +540,15 @@ export default function VaultDocumentImport({
                         await initiateOneDriveAuth(userId);
                       }
                       await loadCloudDrives();
+                    } catch (err: any) {
+                      setError(err.message || "Cloud drive authentication failed. Please configure API credentials or upload files directly.");
                     } finally {
                       setBusy(false);
                       setProgressMsg("");
                     }
                   }}
                   disabled={busy}
-                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs"
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   <span>🔐</span>
                   <span>Authenticate & Connect {selectedDrive === "google_drive" ? "Google Drive" : "Microsoft OneDrive"}</span>

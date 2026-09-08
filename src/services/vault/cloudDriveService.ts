@@ -56,7 +56,18 @@ export async function getConnectedCloudDrives(userId: string): Promise<CloudDriv
   // Fallback / local storage
   try {
     const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${userId}`);
-    return raw ? JSON.parse(raw) : [];
+    const accounts: CloudDriveAccount[] = raw ? JSON.parse(raw) : [];
+    // Purge legacy mock accounts from local storage
+    const valid = accounts.filter(
+      (a) =>
+        a.accountEmail !== "academic.scholar@outlook.com" &&
+        a.accountEmail !== "scholar.researcher@gmail.com" &&
+        a.accountEmail !== "scholar.researcher@outlook.com"
+    );
+    if (valid.length !== accounts.length) {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}`, JSON.stringify(valid));
+    }
+    return valid;
   } catch {
     return [];
   }
@@ -87,7 +98,7 @@ export async function connectCloudDrive(
           provider,
           account_email: details.email,
           account_name: details.name,
-          access_token: details.accessToken || "mock-token",
+          access_token: details.accessToken || null,
           refresh_token: details.refreshToken || null,
         },
         { onConflict: "user_id, provider" }
@@ -127,51 +138,99 @@ export async function disconnectCloudDrive(userId: string, provider: CloudDriveP
 const DRIVE_FILES_PREFIX = "scholar_drive_user_files_";
 
 /**
- * Initiates Google Drive OAuth Authentication (Gmail / Google Workspace).
+ * Initiates real Google Drive OAuth Authentication requesting Google Drive access scopes.
+ * Directs user to the Google Consent Screen (or throws an explicit error if unconfigured).
  */
-export async function initiateGoogleDriveAuth(userId: string): Promise<CloudDriveAccount> {
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: userData } = await supabase.auth.getUser();
-      const email = userData.user?.email || "academic.scholar@gmail.com";
-      const name = userData.user?.user_metadata?.full_name || "Google Scholar Account";
-      return await connectCloudDrive(userId, "google_drive", { email, name });
-    } catch {
-      // Fall through to standard connect
-    }
+export async function initiateGoogleDriveAuth(userId: string): Promise<CloudDriveAccount | void> {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      "Cloud Drive integrations require active authentication service configuration. Please configure Supabase or upload files directly."
+    );
   }
-  return await connectCloudDrive(userId, "google_drive", {
-    email: "scholar.researcher@gmail.com",
-    name: "Google Drive (Gmail)",
+
+  const supabase = getSupabaseClient();
+  const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: currentUrl,
+      scopes: "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file",
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent select_account",
+      },
+    },
   });
+
+  if (error) {
+    throw new Error(
+      `Google Drive OAuth failed: ${error.message}. Ensure Google provider and Drive scopes are enabled in Supabase.`
+    );
+  }
+
+  if (data?.url) {
+    if (typeof window !== "undefined") {
+      // Navigate user to real Google OAuth Consent Screen
+      window.location.href = data.url;
+    }
+    return {
+      id: "oauth-redirect",
+      provider: "google_drive",
+      accountEmail: "pending@oauth",
+      connectedAt: new Date().toISOString(),
+    };
+  }
+
+  throw new Error("Unable to establish Google OAuth redirect. Please check your network and provider settings.");
 }
 
 /**
- * Initiates Microsoft OneDrive OAuth Authentication (Outlook / Microsoft 365).
+ * Initiates real Microsoft OneDrive OAuth Authentication requesting OneDrive access scopes.
+ * Directs user to the Microsoft Consent Screen (or throws an explicit error if unconfigured).
  */
-export async function initiateOneDriveAuth(userId: string): Promise<CloudDriveAccount> {
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: userData } = await supabase.auth.getUser();
-      const email = userData.user?.email?.includes("outlook") || userData.user?.email?.includes("microsoft")
-        ? userData.user.email
-        : "academic.scholar@outlook.com";
-      const name = userData.user?.user_metadata?.full_name || "Microsoft 365 Account";
-      return await connectCloudDrive(userId, "onedrive", { email, name });
-    } catch {
-      // Fall through to standard connect
-    }
+export async function initiateOneDriveAuth(userId: string): Promise<CloudDriveAccount | void> {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      "Cloud Drive integrations require active authentication service configuration. Please configure Supabase or upload files directly."
+    );
   }
-  return await connectCloudDrive(userId, "onedrive", {
-    email: "scholar.researcher@outlook.com",
-    name: "Microsoft OneDrive (Outlook)",
+
+  const supabase = getSupabaseClient();
+  const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "azure",
+    options: {
+      redirectTo: currentUrl,
+      scopes: "openid profile email offline_access Files.Read",
+    },
   });
+
+  if (error) {
+    throw new Error(
+      `Microsoft OneDrive OAuth failed: ${error.message}. Ensure Microsoft Azure provider and Files.Read scopes are enabled in Supabase.`
+    );
+  }
+
+  if (data?.url) {
+    if (typeof window !== "undefined") {
+      // Navigate user to real Microsoft OAuth Consent Screen
+      window.location.href = data.url;
+    }
+    return {
+      id: "oauth-redirect",
+      provider: "onedrive",
+      accountEmail: "pending@oauth",
+      connectedAt: new Date().toISOString(),
+    };
+  }
+
+  throw new Error("Unable to establish Microsoft OAuth redirect. Please check your network and provider settings.");
 }
 
 /**
- * Uploads a document (PDF, Word docx, Excel xlsx, CSV) directly to the user's connected Cloud Drive.
+ * Uploads a document (PDF, Word docx, Excel xlsx, CSV) directly to the user's connected Cloud Drive workspace.
  */
 export async function uploadFileToCloudDrive(
   userId: string,
@@ -198,7 +257,8 @@ export async function uploadFileToCloudDrive(
 }
 
 /**
- * Fetches files from Google Drive / OneDrive (including uploaded files).
+ * Fetches files from Google Drive / OneDrive workspace.
+ * Only returns genuine files synced or uploaded by the user — zero fabricated or mock fixtures.
  */
 export async function fetchDriveFiles(
   provider: CloudDriveProvider,
@@ -213,67 +273,7 @@ export async function fetchDriveFiles(
     } catch {}
   }
 
-  const baseFiles: DriveFileItem[] = provider === "google_drive"
-    ? [
-        {
-          id: "gdrive_doc_1",
-          name: "Deep_Learning_Survey_2025.pdf",
-          mimeType: "application/pdf",
-          size: 2450000,
-          lastModified: new Date().toISOString(),
-        },
-        {
-          id: "gdrive_doc_2",
-          name: "Empirical_Research_Dataset_Q3.xlsx",
-          mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          size: 1120000,
-          lastModified: new Date().toISOString(),
-        },
-        {
-          id: "gdrive_doc_3",
-          name: "Dissertation_Literature_Review.docx",
-          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          size: 890000,
-          lastModified: new Date().toISOString(),
-        },
-        {
-          id: "gdrive_doc_4",
-          name: "Conference_References_Library.bib",
-          mimeType: "text/plain",
-          size: 45000,
-          lastModified: new Date().toISOString(),
-        },
-      ]
-    : [
-        {
-          id: "onedrive_doc_1",
-          name: "Quantum_Computing_Review.pdf",
-          mimeType: "application/pdf",
-          size: 3120000,
-          lastModified: new Date().toISOString(),
-        },
-        {
-          id: "onedrive_doc_2",
-          name: "Clinical_Trial_Participants.csv",
-          mimeType: "text/csv",
-          size: 420000,
-          lastModified: new Date().toISOString(),
-        },
-        {
-          id: "onedrive_doc_3",
-          name: "Methodology_Notes.docx",
-          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          size: 510000,
-          lastModified: new Date().toISOString(),
-        },
-      ];
-
-  const unique = new Map<string, DriveFileItem>();
-  for (const f of [...userUploadedFiles, ...baseFiles]) {
-    if (!unique.has(f.name)) {
-      unique.set(f.name, f);
-    }
-  }
-
-  return Array.from(unique.values());
+  // Strictly return genuine user files — never fabricate mock documents
+  return userUploadedFiles;
 }
+
