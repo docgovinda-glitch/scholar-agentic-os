@@ -1,403 +1,184 @@
-# Knowledge Vault Architecture
+# Source Library Architecture
 
-> **Doc ID:** 43 · **Status:** Design · **Depends on:** `44`, `45`, `46`
-> **Revision:** 4 — Universal Vault v2 Dual Engine (Universal Cloud Sync + Browser-Held Encrypted Storage).
+> **Doc ID:** 43 · **Status:** Complete & Locked · **Depends on:** `44`, `45`, `46`
+> **Revision:** 5 — Source Library: Zero Document Storage, User-Owned Cloud Index (`source-library.json`), & Lightweight Synchronized Metadata.
 
-The user's optional, encrypted or cloud-synced, long-term knowledge corpus.
+**"Save your sources. Find them when you write."**
 
----
-
-## 1. What it is
-
-**The Vault is everything the user has read, written, and collected — searchable,
-for years.**
-
-Not a reference manager (it holds full content, not just metadata). Not a note
-app (it holds source material, not just notes). Not a file store (it is parsed,
-indexed, and semantically searchable).
-
-**Universal Vault v2 Dual Engine:**
-The Vault offers the user two distinct storage and privacy paradigms:
-1. **Universal Cloud Sync (Recommended):** Real-time multi-device synchronized storage backed by Supabase `public.user_vault_items` with Row Level Security (RLS). Automatically synchronizes papers, datasets, cloud drive files (Google Drive & OneDrive), and auto-extracted academic citations across any computer or browser.
-2. **Private Browser-Only Mode (Conflict #7):** Client-held and passphrase-encrypted, stored strictly in browser IndexedDB (`scholar-vault-items:<userId>`) with PBKDF2-SHA256 (100k iterations) and AES-GCM-256 encryption. Only a lightweight existence record (`public.user_vaults`: `{ user_id, label, storage_mode, created_at }`) resides on the server.
-
-For a PhD candidate in year four, the Vault is the answer to *"what did I read
-about this in 2023?"* — a question that is otherwise unanswerable and that
-currently costs researchers real time.
-
-### 1.1 Optional means optional
-
-`REQ-VLT-1` is a load-bearing constraint, not a courtesy:
-
-- Skipping at onboarding leaves every feature working (`REQ-ONB-7`).
-- No module may hard-depend on `app/vault` (`13` §4).
-- Agents holding `read:vault` must function without it.
-- The Vault is re-offered contextually, at most once per 30 days
-  (`25` §10.2).
-
-The architectural test is simple: delete the Vault and every test outside the
-Vault suite must still pass.
+Source Library is the user's lightweight source indexing, organization, and citation layer. It is **not** a document storage service, not a research operating system, and not a vector/RAG platform.
 
 ---
 
-## 2. Content
+## 1. Core Architectural Principle: Zero Document Storage
 
-Everything in `REQ-VLT-2`:
+The fundamental requirement of Source Library is:
 
-| Category | Formats | Processing |
-|---|---|---|
-| Papers and articles | PDF, HTML | Parse, extract references, index |
-| Books and chapters | PDF, EPUB | Parse, chapter segmentation |
-| Lecture notes | PDF, DOCX, PPTX, Markdown | Parse, index |
-| Prior work | DOCX, ODT, PDF, LaTeX | Parse; marked as the user's own |
-| Theses and dissertations | PDF, DOCX | Parse, chapter segmentation |
-| Handwritten notes | Images, PDF scans | OCR (handwriting where possible), index |
-| Images and figures | PNG, JPG, TIFF, SVG | OCR embedded text; caption; visual embedding |
-| Transcripts | TXT, VTT, SRT, DOCX | Index with timestamps |
-| Audio | MP3, WAV, M4A | Local transcription, then index |
-| Video | MP4, MOV | Local transcription, keyframe extraction |
-| Datasets | CSV, XLSX, JSON, Parquet | Schema extraction, statistical summary, index |
-| Lab notes | Any of the above | Parse, timestamp, index |
-| Web pages | URL | Snapshot, parse, index, record capture date |
-| Email and correspondence | EML, MSG | Parse, index (supervisor feedback is research material) |
+**SOURCE LIBRARY NEVER BECOMES A DOCUMENT STORAGE SERVICE.**
 
-### 2.1 The user's own work is special
+Actual user documents remain exclusively in the user's personal cloud storage:
+- **Google Drive**
+- **Microsoft OneDrive**
+- **Original Publisher / Web URLs**
 
-Material marked as the user's own prior work is tracked distinctly. When it is
-drawn into a project it carries origin `imported_own_work` (`32` §3.1), which
-matters for two reasons: self-plagiarism awareness (AG-19), and honest authorship
-reporting.
+The application never permanently stores or hosts:
+- PDF binaries
+- Word (DOC/DOCX) binaries
+- Excel (XLS/XLSX/CSV) binaries
+- Document images or scans
+- Downloaded document files
+- Full extracted document text
+- OCR output containing full document contents
+- Transcription output containing full document contents
+- Document blobs or permanent document caches
+
+Zero user documents are persisted in application S3/object storage, backend persistent filesystems, or database BLOB columns.
 
 ---
 
-## 3. Structure
+## 2. Canonical Persistence: User-Owned Cloud Index
+
+The canonical persistent library index is:
 
 ```
-Vault (per Workspace)
-├── Collections            user-defined, nestable, many-to-many
-├── Documents
-│   ├── Blob               content-addressed, encrypted
-│   ├── CDM                parsed structure
-│   ├── Metadata           bibliographic + user
-│   ├── Annotations        highlights, notes, tags
-│   ├── Extracted refs     the document's own bibliography
-│   └── Derived            embeddings, summaries, entities
-├── Relationships          cites, contradicts, extends, same-topic, same-author
-└── Index                  full-text + vector
+Google Drive / OneDrive
+└── Source Library/
+    └── source-library.json
 ```
 
-### 3.1 Organisation
+Stored directly in the user's designated **Library Storage** provider.
 
-The Vault does not impose a hierarchy. Collections are user-defined and a
-document may be in several; tags are flat; relationships form a graph. This
-matches how research libraries actually accumulate — messily, with items
-belonging to several projects at once — rather than imposing a filesystem
-metaphor that users then fight.
+### 2.1 Index Schema (`schemaVersion: 1`)
 
----
-
-## 4. Ingestion
-
-```
-Add ─▶ Detect ─▶ Deduplicate ─▶ Parse ─▶ Extract ─▶ Enrich ─▶ Index ─▶ Available
-                     │                                  │
-              content hash +                    identifier resolution
-              identifier match                  (Warden-gated, optional)
-```
-
-| Stage | Detail |
-|---|---|
-| **Add** | Drag-drop, folder watch, import from a reference manager, browser share target, mobile share |
-| **Detect** | Format by content, not extension |
-| **Deduplicate** | Content hash first, then identifier, then fuzzy title+author. Offers merge |
-| **Parse** | To CDM. Local, always (`REQ-LOC-1`) |
-| **Extract** | Metadata, the document's own references, structure, entities |
-| **Enrich** | Identifier resolution and citation-count lookup. Optional and Warden-gated as `bibliographic` |
-| **Index** | Full-text and vector. Local |
-
-### 4.1 Bulk ingestion
-
-Importing a decade of reading is the common first action. It must not block the
-product.
-
-| Property | Behaviour |
-|---|---|
-| Background | User continues working |
-| Resumable | Survives quit and crash |
-| Prioritised | Recently added and currently relevant first |
-| Throttled | Respects Resource Monitor limits; yields to interaction |
-| Progress | Per-stage, per-document, with failures listed individually |
-| Partial availability | A document is searchable by metadata before its embeddings finish |
-
-**Time expectations, stated honestly:** 1,000 PDFs on baseline hardware
-(`NFR-HW-1`) is several hours of embedding. The UI says so before starting and
-offers metadata-only indexing as a fast path, with semantic search added later.
-
-### 4.2 Reference manager import
-
-| Source | Imports |
-|---|---|
-| Zotero | Library, collections, tags, notes, attachments, via SQLite or RDF export |
-| Mendeley | Library and PDFs via export |
-| EndNote | XML |
-| BibTeX / RIS | Metadata; attachments where paths resolve |
-| Papers / ReadCube | Export formats |
-
-Structure is preserved: collections become collections, tags become tags. A user
-with a curated Zotero library keeps their curation.
-
----
-
-## 5. Index and retrieval
-
-### 5.1 Two indexes
-
-| Index | Technology | Serves |
-|---|---|---|
-| Full-text | Embedded inverted index (BM25) | Exact terms, names, phrases, identifiers |
-| Vector | Local embedding + ANN | Conceptual similarity |
-
-Both local. Both rebuildable from blobs — the index is derived state, never a
-source of truth (`13` §3).
-
-### 5.2 Embeddings
-
-| Concern | Approach |
-|---|---|
-| Model | Local by default (`41` §4.2). A cloud embedding provider would see the entire Vault |
-| Chunking | Semantic where structure permits; ~512 tokens with overlap otherwise |
-| Storage | Quantised; ~1.5 KB per chunk |
-| Scale | 5,000 documents ≈ 400k chunks ≈ 600 MB |
-| Rebuild | Possible; expensive; only on model change |
-
-**Changing the embedding model invalidates every embedding.** This is stated
-plainly before the user changes it, with the re-embedding time estimated.
-
-### 5.3 Retrieval
-
-Hybrid: keyword and vector results fused with reciprocal rank fusion, then
-reranked. Results are labelled with why they matched — users lose trust in
-semantic search fast when a result's relevance is inexplicable.
-
-| Mode | Use |
-|---|---|
-| Keyword | Names, phrases, identifiers |
-| Semantic | Concepts |
-| Hybrid *(default)* | General |
-| Contextual | "Related to the section I'm writing" — the Knowledge Explorer's highest-value mode |
-| Question | Natural-language question over the Vault |
-
-### 5.4 Performance
-
-| Operation | Target at 5,000 documents |
-|---|---|
-| Keyword search | < 200 ms |
-| Semantic search | < 800 ms (`NFR-PERF-3`) |
-| Hybrid | < 1 s |
-| Contextual (background) | < 3 s |
-| Ingest one PDF | < 30 s including embeddings |
-
----
-
-## 6. Vault → Project
-
-Vault material is not automatically available to a project. It passes through
-the same approval path as external material (`REQ-VLT-5`).
-
-```
-Vault document ──▶ proposed for the project ──▶ user approves ──▶ Approved Corpus
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-08T14:30:00.000Z",
+  "libraryStorageProvider": "google_drive",
+  "totalSources": 42,
+  "projects": ["Master's Thesis", "Policy Report"],
+  "sources": [
+    {
+      "id": "src-uuid",
+      "sourceId": "src-uuid",
+      "identity": {
+        "doi": "10.1038/nature12373",
+        "canonicalUrl": "https://doi.org/10.1038/nature12373",
+        "provider": "google_drive",
+        "fileId": "1a2b3c4d",
+        "fileName": "Paper.pdf"
+      },
+      "metadata": {
+        "title": "Quantum Error Correction",
+        "authors": ["Fowler, Austin G.", "Mariantoni, Matteo"],
+        "year": "2012",
+        "journal": "Physical Review A",
+        "volume": "86",
+        "issue": "3",
+        "pages": "032324",
+        "doi": "10.1038/nature12373",
+        "type": "paper"
+      },
+      "cloudReference": {
+        "provider": "google_drive",
+        "fileId": "1a2b3c4d",
+        "fileName": "Paper.pdf",
+        "webUrl": "https://drive.google.com/open?id=1a2b3c4d"
+      },
+      "projects": ["Master's Thesis"],
+      "tags": ["quantum", "error-correction"],
+      "notes": {
+        "whySaved": "Core citation for surface code thresholds in Section 3.",
+        "keyQuote": "Threshold error rate approaches 1% under circuit noise.",
+        "page": "12"
+      },
+      "writingNotes": {
+        "whySaved": "Core citation for surface code thresholds in Section 3."
+      },
+      "citation": "Fowler, A. G., & Mariantoni, M. (2012). Quantum error correction. Physical Review A, 86(3), 032324.",
+      "citationFormats": {
+        "apa7": "Fowler, A. G., & Mariantoni, M. (2012). Quantum error correction. Physical Review A, 86(3), 032324."
+      },
+      "citationStatus": "confirmed",
+      "integrity": {
+        "status": "checked",
+        "checkedAt": "2026-09-08T12:00:00.000Z",
+        "source": "Crossref",
+        "message": "No retraction notices found across checked registries"
+      },
+      "integrityStatus": "clean",
+      "createdAt": "2026-09-08T12:00:00.000Z",
+      "updatedAt": "2026-09-08T12:00:00.000Z"
+    }
+  ]
+}
 ```
 
-### 6.1 Why approval is required for the user's own library
-
-It looks like unnecessary friction. It is not:
-
-1. **Relevance is not membership.** Having read something does not mean it belongs
-   in this project's evidence base.
-2. **The corpus is the citable set.** `REQ-SRC-8`'s guarantee holds only if there
-   is exactly one path into it.
-3. **The project must survive the Vault.** Copying into the corpus means deleting
-   the Vault does not break a five-year-old project (`20` §2.1).
-4. **Systematic reviews need the screening record.** Vault material must be
-   screened like anything else (`26` Journey 7).
-
-The friction is low in practice: AG-04 proposes relevant Vault material
-contextually, and approval is one action per item.
+### 2.2 Concurrency & Sanitization
+- **Optimistic Concurrency**: Timestamp comparison (`isIndexUpdatePermitted`) prevents stale clients from overwriting newer cloud indexes.
+- **Strict Sanitization**: Automatic scrubbing of any binaries, buffers, extracted text, and OAuth tokens before serialization.
 
 ---
 
-## 7. Curation
+## 3. Server-Side Metadata Persistence (Honest Disclosure)
 
-AG-07 maintains Vault health. It **proposes**; it never deletes.
+For cross-device synchronized user accounts, the backend database table `public.user_vault_items` stores **server-side lightweight metadata only**.
 
-| Task | Behaviour |
-|---|---|
-| Duplicate detection | Proposes merges |
-| Tag suggestion | From content and existing tags |
-| Relationship detection | Citation graph, topic similarity, contradiction |
-| Gap identification | Where the library is thin relative to the user's areas |
-| Stale flagging | Superseded editions, retracted papers, dead URLs |
-| Health report | Unparsed documents, missing metadata, broken attachments |
-
-### 7.1 Retraction monitoring
-
-The Vault periodically re-checks retraction status for identified sources. A
-retracted paper in the Vault produces a notification, and if it is cited in an
-active project, a finding.
-
-This is genuinely valuable and difficult to do manually: papers get retracted
-years after publication, long after the researcher has moved on, and nobody
-re-checks their old reading.
+- **Why it exists**: Enables fast, resilient cross-device synchronization and citation availability during writing stages (drafting, evidence linking, and dissertation chapters) without requiring synchronous cloud drive round-trips on every keypress.
+- **What it stores**:
+  - `title`, `source_type`, `filename`, `external_reference`, `storage_reference`, `citation`, `authors`, `year`, `journal`, `metadata` (tags, projects, writing notes).
+- **What it NEVER stores**:
+  - No document binaries, no full-text dumps, no OCR dumps, no audio transcripts, and no access tokens.
 
 ---
 
-## 8. External sources
+## 4. Security & SSRF Defense
 
-For discovery (AG-05) and enrichment (AG-01, AG-06).
+All outbound URL metadata fetching (`/api/vault/parse-url`) is protected by multi-layer SSRF defenses implemented in `server/utils/ssrfGuard.ts`:
 
-| Source | Provides | Access |
-|---|---|---|
-| Crossref | DOI metadata, references | Open API |
-| OpenAlex | Works, authors, venues, citations | Open API |
-| PubMed / PMC | Biomedical literature | Open API |
-| arXiv | Preprints | Open API |
-| Semantic Scholar | Metadata, citations, influence | API |
-| DOAJ | Open access journals | Open API |
-| Unpaywall | Legal open-access full text | Open API |
-| Retraction Watch / Crossref | Retraction status | Open |
-| OpenAIRE, CORE | Repository aggregation | Open API |
-| DataCite | Datasets | Open API |
-| ORCID | Author disambiguation | Open API |
-| Institutional discovery | Library holdings | Per-institution |
-
-**Rules**
-
-- Every query passes the Warden as `bibliographic`.
-- Every result is attributed to its service.
-- Failure of one service degrades gracefully.
-- Rate limits respected; results cached locally.
-- Full text retrieved only through legal open-access routes; paywalled content is
-  surfaced as metadata with institutional-access guidance.
+1. **Protocol Sanitization**: Only `http:` and `https:` schemes allowed.
+2. **Subnet IP Filter**: Blocks loopback (`127.0.0.0/8`), RFC 1918 private subnets, link-local / cloud metadata (`169.254.0.0/16`, `169.254.169.254`), CGNAT (`100.64.0.0/10`), IPv6 loopback (`::1`), link-local (`fe80::/10`), ULA (`fc00::/7`), and IPv4-mapped IPv6.
+3. **Connection-Time DNS Pinning & Interception**: Injects `createRebindingSafeLookup` into transport socket agent options. The resolved IP is verified at actual connection time; if a destination resolves to a private IP or rebounds to an unverified IP, the socket connection throws before transmitting HTTP headers.
+4. **Hop-by-Hop Redirect Validation**: Every redirect (up to 5) is independently parsed and re-validated through the full verification pipeline.
+5. **Streaming & Size Limits**: 8-second request timeout, 2 MB streaming body limit, and HTML/text content-type enforcement.
+6. **Transient-Only Guarantee**: Fetched HTML is processed in-memory to extract title, authors, and year, and is never persisted, cached, logged, or stored in database or Source records.
 
 ---
 
-## 9. Encryption
+## 5. Scholarly Identity & Duplicate Detection
 
-> **Conflict #7 authoritative implementation** — verified against `src/services/vaultContents.ts`
-> and `src/services/userVault.ts`.
+Scholarly identity is explicitly decoupled from cloud file storage references:
+- **Scholarly Identity**: DOI, canonical URL, bibliographic metadata.
+- **Cloud File Identity**: Provider, fileId, fileName, webUrl.
 
-| Aspect | Approach |
-|---|---|
-| At rest | Each Vault item encrypted independently via `encryptDataAsync` (PBKDF2-SHA256 100k iterations + AES-GCM-256, unique random 16-byte salt and 12-byte IV per item) |
-| Storage | IndexedDB (`scholar-vault-items:<userId>`) — only `{ id, createdAt, ciphertext }` is persisted |
-| Key material | Passphrase held in module-scope memory (`activePassphrase`) for the current tab only; cleared on reload or explicit `lockVault()` |
-| Passphrase verification | SHA-256 hash of passphrase stored in `localStorage` (`scholar-vault-verifier:<userId>`) — device-local, never sent to server |
-| Recovery | Recovery code (Crockford-encoded `SCHL-XXXX-XXXX-XXXX-XXXX`), shown once at creation, never stored server-side; operator cannot recover |
-| Search | Client-side substring search over in-memory decrypted items; no server index, no vector database |
-| Server knowledge | `public.user_vaults`: `{ user_id, label, created_at }` only — zero content, zero ciphertext, zero keys |
-| Sync | Not yet implemented; future sync will transfer opaque ciphertext blobs only |
-
-### 9.1 The searchable-encryption trade-off
-
-Full searchable encryption (encrypted index queried without decryption) is not
-used. Items are decrypted into browser process memory during search.
-
-This is an honest trade-off, documented rather than hidden:
-
-- **Gained:** fast substring search over decrypted items with zero latency and
-  zero server roundtrips.
-- **Given up:** protection against an attacker with live memory access to the
-  running browser tab on an unlocked machine.
-- **Retained:** protection at rest, which is the realistic threat (stolen laptop,
-  backup exposure, cloud sync compromise).
-
-`46` §4 records this in the threat model.
+### Duplicate Detection Rules:
+1. **Definite Duplicate**: Exact normalized DOI match.
+2. **Likely Duplicate**: High title similarity + supporting author/year evidence.
+3. **Possible Duplicate**: Similar title without sufficient identity evidence. (Title similarity alone never produces a definite duplicate).
+4. **Not Duplicate**: Clearly different DOI/title.
 
 ---
 
-## 10. Scale and limits
+## 6. Research Integrity Language
 
-| Dimension | Supported | Degrades |
-|---|---|---|
-| Documents | 5,000 (`NFR-SCALE-1`) | 20,000 with reduced search latency |
-| Single document | 2,000 pages | Larger, with slower parsing |
-| Total size | 50 GB | Bounded by disk |
-| Collections | Unlimited | — |
-| Concurrent ingestion | 4 documents | Configurable |
-
-Beyond 5,000 documents the system warns and suggests splitting into multiple
-workspace Vaults or archiving older material.
+To prevent overstated research certification:
+- Generic `✓ Verified` claims are prohibited.
+- UI status displays:
+  - `Integrity checked`
+  - `Integrity status: No retraction notices found across checked registries.`
+  - `Publication alert: Retraction notice found.`
+- Transparently communicates registry coverage boundaries (Crossref & Retraction Watch).
 
 ---
 
-## 11. Portability
+## 7. User Experience Mental Model
 
-`REQ-VLT-7` and `P9`. The Vault must be usable without Scholar OS.
-
-**Export produces:**
+The product is deliberately calm and focused:
 
 ```
-vault-export/
-├── manifest.json          documents, metadata, relationships, collections
-├── documents/
-│   ├── <id>/
-│   │   ├── original.pdf   the original file, unmodified
-│   │   ├── content.md     parsed content
-│   │   ├── metadata.json
-│   │   └── annotations.json
-├── references.bib         full bibliography
-└── README.md             what this is and how to read it
+SAVE A SOURCE ──▶ ORGANIZE IT ──▶ FIND IT ──▶ CITE IT
 ```
 
-Plain files, open formats, documented schema, no proprietary container. A user
-who abandons Scholar OS keeps a usable library — which is the only version of
-data ownership that means anything.
-
----
-
-## 12. Backup
-
-The Vault is often the most irreplaceable thing a researcher owns.
-
-| Mechanism | Behaviour |
-|---|---|
-| Local snapshot | Incremental, scheduled |
-| External destination | User-configured drive or folder; encrypted |
-| Cloud sync | Optional, E2E encrypted (`44` §5) |
-| Export | Full portable export (§11) |
-| Verification | Periodic restore test; reports when a backup last verified |
-
-**Prompted at:** Vault creation, 100 documents, 500 documents, and every 90 days
-without a verified backup. See `44` §7 for the full backup regime and `RISK-04`.
-
----
-
-## 13. Current state
-
-> **Conflict #7 verified** — the following reflects the actual active implementation.
-
-### 13.1 Implemented (Verified)
-
-| Component | Implementation |
-|---|---|
-| **Universal Dual Engine** (`src/services/userVault.ts`, `src/services/vaultContents.ts`) | Supports both `synced` (Supabase RLS `user_vault_items`) and `local` (IndexedDB AES-GCM-256) |
-| **Vault metadata** (`src/services/userVault.ts`) | `loadVault()`, `createVault()`, `updateVaultStorageMode()`, `resetVault()` |
-| **Vault contents** (`src/services/vaultContents.ts`) | `addVaultItem()`, `listVaultItems()`, `searchVaultItems()`, `lockVault()`, `unlockVault()`, `deleteVaultItem()` |
-| **Multi-format Ingestion** (`src/desk/vault/VaultDocumentImport.tsx`, `server/routes/vault.ts`) | PDFs (with metadata heuristic parsing), DOCX (`mammoth`), XLSX/CSV (`xlsx`), BibTeX/RIS, Plain Text, DOIs (Crossref API), Web URLs & YouTube |
-| **Cloud Drive Integration** (`src/services/vault/cloudDriveService.ts`) | Google Drive & Microsoft OneDrive OAuth2 browsing, search, and import |
-| **Reference Manager Ingestion** (`src/desk/vault/VaultDocumentImport.tsx`) | Zotero API sync and Mendeley BibTeX parsing |
-| **Academic Citation Engine** (`src/services/vault/citationService.ts`) | Multi-style formatting (APA7, IEEE, MLA9, Chicago, Harvard, Vancouver), in-text citations, and BibTeX conversion |
-| **Collections & Tagging** (`src/desk/vault/VaultItemEditModal.tsx`, `src/services/vaultContents.ts`) | User-defined collections, flat tags, metadata editing, and filter toolbar (§3) |
-| **Retraction & Integrity Watch** (`src/services/vault/retractionService.ts`) | Crossref API & title heuristic retraction inspection, alerts, and publisher notice links (§7.1) |
-| **Semantic Vector & Concept Search** (`src/services/vault/semanticSearchService.ts`) | In-browser cosine similarity, BM25 term coverage, concept extraction, and project topic ranking |
-| **In-Browser OCR & Figure Extraction** (`src/services/vault/ocrService.ts`) | Client-side pixel luminance analysis, caption & table detection, and markdown conversion for lab notes & scans |
-| **Passphrase & Recovery** (`src/services/userVault.ts`) | Local SHA-256 verifier in localStorage, `generateRecoveryCode()` Crockford-encoded |
-| **Portable Open Export** (`src/services/vault/vaultExportService.ts`) | `exportVaultAsZip()` produces `.zip` with `manifest.json`, `references.bib`, and `documents/<id>/content.md` (`REQ-VLT-7`) |
-
-### 13.2 Remaining / Future Enhancements
-
-| Target | Status |
-|---|---|
-| Local audio/video speech-to-text transcription (Whisper) | In progress |
-| Automated background Retraction Watch monitoring | In progress |
-| Virtualized list rendering for 5,000+ items | In progress |
+- **Navigation**: Sources · Projects · Settings
+- **Primary Action**: `+ Add Source` (Google Drive, OneDrive, Web URL, DOI lookup, BibTeX/RIS)
+- **Search**: Unified `Search your sources...` across titles, authors, DOI, projects, tags, and notes.
+- **Zero Technical Leakage**: No parser internals (`/Producer`, `Skia`), vector scores, chunking indicators, embeddings, or RAG terminology in the user interface.

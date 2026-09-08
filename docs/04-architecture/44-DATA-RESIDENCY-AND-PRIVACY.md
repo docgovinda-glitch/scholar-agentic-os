@@ -41,8 +41,7 @@ Scholar OS is designed to be **web-first and local-first**, strictly minimizing 
 | `account` | Email, password hash, status | Server (Supabase Auth / Postgres) | Never |
 | `user_byok_keys` | User Gemini, Cerebras, Groq keys | Client Web Crypto Vault only | Only sent directly from client to the user's chosen provider |
 | `platform_keys` | Platform OpenRouter, Gemini keys | Server Envelope Vault only | Only sent from server for authorized platform requests |
-| `user_content` | Drafts, notes, research answers | Client-first (IndexedDB), synced to project record | Only per user-initiated AI actions |
-| `vault_items` | Private Knowledge Vault notes, extracts, citations | **Client IndexedDB only** (AES-GCM-256 encrypted); server stores only existence signal (`label`, `created_at`) | Only via Client AI Resource Pool per explicit user action; **never server-processed** |
+| `vault_items` | Source Library citations, tags, notes | **Synced accounts:** Server Supabase `user_vault_items` (lightweight metadata only). **Browser-only:** Client IndexedDB (AES-GCM-256 encrypted). **Canonical index:** `Source Library/source-library.json` in user's Google Drive/OneDrive. **Zero document binary storage.** | Only via explicit user action; **never server-processed for model training** |
 | `vault_secrets` | Vault passphrase, recovery code | **Client RAM / device localStorage only**; never sent to server in any form | Never |
 | `operational` | Logs, metrics, billing status | Server | Content-free by construction |
 

@@ -80,7 +80,7 @@ still carrying revision-1 assumptions are marked in the index below.
 | [`40-SYSTEM-ARCHITECTURE.md`](04-architecture/40-SYSTEM-ARCHITECTURE.md) | Web application: client, services, data tier, trust boundaries | **2** |
 | [`41-AI-ARCHITECTURE.md`](04-architecture/41-AI-ARCHITECTURE.md) | Model Gateway, providers, routing, the Warden egress boundary | 1† |
 | [`42-MULTI-AGENT-ARCHITECTURE.md`](04-architecture/42-MULTI-AGENT-ARCHITECTURE.md) | The Mesh: agents, contracts, permissions, release channels | 1† |
-| [`43-KNOWLEDGE-VAULT-ARCHITECTURE.md`](04-architecture/43-KNOWLEDGE-VAULT-ARCHITECTURE.md) | Optional long-term corpus: ingestion, indexing, retrieval | 1† |
+| [`43-KNOWLEDGE-VAULT-ARCHITECTURE.md`](04-architecture/43-KNOWLEDGE-VAULT-ARCHITECTURE.md) | Source Library: Zero document storage, cloud index (`source-library.json`), citation layer | **5** |
 | [`44-DATA-RESIDENCY-AND-PRIVACY.md`](04-architecture/44-DATA-RESIDENCY-AND-PRIVACY.md) | **What we hold, who can see it, what leaves for AI processing** | **2** |
 | [`45-DATA-ARCHITECTURE.md`](04-architecture/45-DATA-ARCHITECTURE.md) | Entities, schemas, migration, retention | 1† |
 | [`46-SECURITY-ARCHITECTURE.md`](04-architecture/46-SECURITY-ARCHITECTURE.md) | Threat model, key management, sandboxing, MFA, audit | 1† |
