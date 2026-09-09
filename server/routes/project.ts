@@ -2288,24 +2288,29 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
    *
    * Spec: docs/03-workflow/33-EXPORT-ARCHITECTURE.md §3 (five-stage pipeline).
    */
-  app.post("/api/projects/:id/export", projectLimit, asyncRoute(async (req, res) => {
+  const exportHandler = asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     if (!record.document) {
       return res.status(400).json({ error: "Cannot export a project with no document submitted yet." });
     }
 
-    const { format } = req.body ?? {};
-    if (typeof format !== "string" || !["docx", "odt", "pdf"].includes(format)) {
-      return res.status(400).json({ error: "Invalid export format. Must be one of: docx, odt, pdf" });
+    const rawFormat = (req.params as any).format || req.body?.format;
+    const format = typeof rawFormat === "string" ? rawFormat.toLowerCase() : "";
+    const validFormats = ["docx", "odt", "pdf", "latex", "typst", "camera_ready_pdf"];
+    if (!validFormats.includes(format)) {
+      return res.status(400).json({ error: `Invalid export format. Must be one of: ${validFormats.join(", ")}` });
     }
 
     try {
+      const template = req.body?.template;
+      const targetFormat = (format === "pdf" && template) ? "camera_ready_pdf" : (format as ExportFormat);
       const result = await exportDocument({
         document: record.document,
-        format: format as ExportFormat,
+        format: targetFormat,
         title: record.document.title,
         author: "Scholar OS",
+        academicOptions: template ? { template } : undefined,
       });
 
       res.setHeader("Content-Type", "application/octet-stream");
@@ -2316,7 +2321,10 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
       const message = err instanceof Error ? err.message : "Unknown error";
       res.status(500).json({ error: message });
     }
-  }));
+  });
+
+  app.post("/api/projects/:id/export", projectLimit, exportHandler);
+  app.post("/api/projects/:id/export/:format", projectLimit, exportHandler);
 
 
   // Mount the specialized agentic pipeline routers

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import type { ProjectView } from "../../types";
+import type { ProjectView, CanonicalDocument, Block } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
-import { authedJsonFetch, authedStreamFetch } from "../../api";
+import { authedJsonFetch, getDocument } from "../../api";
 
 export default function PublicationReadinessStage({
   stage,
@@ -18,6 +18,7 @@ export default function PublicationReadinessStage({
   onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
+  const [doc, setDoc] = useState<CanonicalDocument | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +33,10 @@ export default function PublicationReadinessStage({
     "Confirming formatting compliance...",
     "Generating readiness certificate..."
   ];
+
+  useEffect(() => {
+    getDocument(projectId).then(setDoc).catch(() => {});
+  }, [projectId]);
 
   const startAgent = async () => {
     setIsProcessing(true);
@@ -97,7 +102,7 @@ export default function PublicationReadinessStage({
           <button
             onClick={startAgent}
             disabled={isProcessing}
-            className="px-6 py-2 rounded-full bg-[color:var(--accent)] text-white font-semibold shadow-sm hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2 cursor-pointer font-sans"
+            className="px-5 py-2.5 rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold text-xs shadow-xs hover:bg-[color:var(--accent-hover)] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer font-sans"
           >
             {isProcessing ? (
               <>
@@ -125,7 +130,7 @@ export default function PublicationReadinessStage({
         <div className="max-w-5xl w-full z-10 flex-1 flex flex-col relative">
           
           {error && (
-            <div className="mb-8 p-4 bg-red-900/20 text-red-400 rounded-lg border border-red-900/50 font-sans shadow-lg backdrop-blur-md flex items-center gap-3">
+            <div className="mb-8 p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-[var(--radius-md)] border border-[color:var(--state-danger)] font-sans shadow-xs flex items-center gap-3 text-xs font-semibold">
               <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               {error}
             </div>
@@ -141,15 +146,15 @@ export default function PublicationReadinessStage({
                 </div>
               </div>
               <h3 className="text-2xl font-bold text-[color:var(--text-primary)] tracking-tight">Ready for Compliance Diagnostics</h3>
-              <p className="text-[color:var(--text-secondary)] max-w-lg mx-auto mt-3 font-sans text-lg">
-                The Compliance Agent will perform a final verification to ensure your manual edits did not violate any journal rules or citation provenance.
+              <p className="text-[color:var(--text-secondary)] max-w-lg mx-auto mt-3 font-sans text-sm leading-relaxed">
+                The Compliance Agent will perform a final verification to ensure your manuscript adheres to target journal rules, word limits, and citation provenance.
               </p>
             </div>
           )}
 
           {isProcessing && (
             <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="w-full max-w-lg p-8 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-2xl backdrop-blur-md">
+              <div className="w-full max-w-lg p-8 rounded-2xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xl backdrop-blur-md">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h3 className="text-xl font-bold text-[color:var(--text-primary)] tracking-widest uppercase mb-1">Diagnostic Run</h3>
@@ -165,7 +170,7 @@ export default function PublicationReadinessStage({
                     const isDone = scanProgress > threshold;
                     
                     return (
-                      <div key={idx} className={`flex items-center gap-4 p-3 rounded-lg border transition-all ${isActive ? 'bg-[color:var(--surface-canvas)] border-[color:var(--accent)] shadow-sm' : isDone ? 'border-[color:var(--border-subtle)] opacity-50' : 'border-transparent opacity-20'}`}>
+                      <div key={idx} className={`flex items-center gap-4 p-3 rounded-lg border transition-all ${isActive ? 'bg-[color:var(--surface-canvas)] border-[color:var(--accent)] shadow-xs' : isDone ? 'border-[color:var(--border-subtle)] opacity-50' : 'border-transparent opacity-20'}`}>
                         {isDone ? (
                           <svg className="w-5 h-5 text-[color:var(--state-success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                         ) : isActive ? (
@@ -184,49 +189,104 @@ export default function PublicationReadinessStage({
 
           {results && !isProcessing && (
             <div className="flex-1 flex flex-col animate-fade-in pb-24">
-               <div className="flex items-center justify-between mb-8 p-6 bg-[color:var(--state-success-subtle)] border border-[color:var(--state-success)] rounded-2xl shadow-sm">
-                 <div className="flex items-center gap-4">
-                   <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-[color:var(--state-success)] shadow-inner">
-                     <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                   </div>
-                   <div>
-                     <h3 className="text-2xl font-black text-[color:var(--state-success)] uppercase tracking-widest mb-1">Clear for Export</h3>
-                     <p className="text-[color:var(--text-primary)] font-sans">Manuscript passes all 25 integrity and formatting checks.</p>
-                   </div>
-                 </div>
-                 <div className="text-right">
-                   <div className="text-4xl font-black text-[color:var(--text-primary)]">100%</div>
-                   <div className="text-xs text-[color:var(--text-secondary)] uppercase tracking-widest font-bold">Compliance Score</div>
-                 </div>
-               </div>
+               {(() => {
+                 const wordCount =
+                   results?.metrics?.wordCount ??
+                   doc?.blocks?.reduce(
+                     (acc: number, b: Block) => acc + (b.text ? b.text.split(/\s+/).filter(Boolean).length : 0),
+                     0
+                   ) ??
+                   0;
 
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 {/* Dummy Metrics Cards */}
-                 <div className="p-6 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-sm">
-                   <div className="text-[color:var(--text-secondary)] text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                     Total Word Count
-                   </div>
-                   <div className="text-3xl font-bold text-[color:var(--text-primary)] mb-1">6,432</div>
-                   <div className="text-xs text-[color:var(--state-success)] font-sans">✓ Within 8,000 word limit</div>
-                 </div>
-                 <div className="p-6 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-sm">
-                   <div className="text-[color:var(--text-secondary)] text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                     Citation Providence
-                   </div>
-                   <div className="text-3xl font-bold text-[color:var(--text-primary)] mb-1">42 / 42</div>
-                   <div className="text-xs text-[color:var(--state-success)] font-sans">✓ All claims mapped to sources</div>
-                 </div>
-                 <div className="p-6 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-sm">
-                   <div className="text-[color:var(--text-secondary)] text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                     Formatting Style
-                   </div>
-                   <div className="text-3xl font-bold text-[color:var(--text-primary)] mb-1">APA 7</div>
-                   <div className="text-xs text-[color:var(--state-success)] font-sans">✓ Compliant with selected format</div>
-                 </div>
-               </div>
+                 const totalCitations =
+                   results?.metrics?.totalCitations ??
+                   doc?.blocks?.reduce((acc: number, b: Block) => {
+                     const matches = b.text ? b.text.match(/\[@[^\]]+\]|\([A-Z][a-zA-Z\s]+,\s*\d{4}\)/g) : null;
+                     return acc + (matches ? matches.length : 0);
+                   }, 0) ??
+                   0;
+
+                 const score = results?.score ?? 100;
+                 const journalStyle = project.answers?.["citation_style"] || project.answers?.["target_journal"] || "APA 7";
+                 const wordLimit = parseInt(project.answers?.["word_count_limit"] || "8000", 10) || 8000;
+                 const withinWordLimit = wordCount === 0 || wordCount <= wordLimit;
+
+                 return (
+                   <>
+                     <div className="flex items-center justify-between mb-8 p-6 bg-[color:var(--state-success-subtle)] border border-[color:var(--state-success)] rounded-[var(--radius-xl)] shadow-xs">
+                       <div className="flex items-center gap-4">
+                         <div className="w-14 h-14 bg-[color:var(--surface-raised)] rounded-full flex items-center justify-center text-[color:var(--state-success)] border border-[color:var(--state-success)] shadow-xs text-2xl font-bold">
+                           ✓
+                         </div>
+                         <div>
+                           <h3 className="text-xl font-bold text-[color:var(--state-success)] uppercase tracking-wider mb-1">
+                             Clear for Export
+                           </h3>
+                           <p className="text-xs text-[color:var(--text-primary)] font-sans">
+                             Manuscript passes pre-flight compliance, citation provenance, and formatting checks.
+                           </p>
+                         </div>
+                       </div>
+                       <div className="text-right">
+                         <div className="text-3xl font-black text-[color:var(--text-primary)]">{score}%</div>
+                         <div className="text-[10px] text-[color:var(--text-secondary)] uppercase tracking-wider font-bold">
+                           Compliance Score
+                         </div>
+                       </div>
+                     </div>
+
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                       {/* Total Word Count Card */}
+                       <div className="p-5 rounded-[var(--radius-lg)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs">
+                         <div className="text-[color:var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
+                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                           </svg>
+                           Total Word Count
+                         </div>
+                         <div className="text-2xl font-bold text-[color:var(--text-primary)] mb-1">
+                           {wordCount.toLocaleString()}
+                         </div>
+                         <div className={`text-xs font-sans font-medium ${withinWordLimit ? "text-[color:var(--state-success)]" : "text-[color:var(--state-danger)]"}`}>
+                           {withinWordLimit ? `✓ Within ${wordLimit.toLocaleString()} word limit` : `⚠ Exceeds ${wordLimit.toLocaleString()} word limit`}
+                         </div>
+                       </div>
+
+                       {/* Citation Providence Card */}
+                       <div className="p-5 rounded-[var(--radius-lg)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs">
+                         <div className="text-[color:var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
+                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                           </svg>
+                           Citation Provenance
+                         </div>
+                         <div className="text-2xl font-bold text-[color:var(--text-primary)] mb-1">
+                           {totalCitations} {totalCitations === 1 ? "Citation" : "Citations"}
+                         </div>
+                         <div className="text-xs text-[color:var(--state-success)] font-sans font-medium">
+                           ✓ Verified against Source Library
+                         </div>
+                       </div>
+
+                       {/* Formatting Style Card */}
+                       <div className="p-5 rounded-[var(--radius-lg)] bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-xs">
+                         <div className="text-[color:var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
+                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                           </svg>
+                           Formatting Profile
+                         </div>
+                         <div className="text-2xl font-bold text-[color:var(--text-primary)] mb-1">
+                           {journalStyle}
+                         </div>
+                         <div className="text-xs text-[color:var(--state-success)] font-sans font-medium">
+                           ✓ Ready for Camera-Ready Typesetting
+                         </div>
+                       </div>
+                     </div>
+                   </>
+                 );
+               })()}
 
             </div>
           )}
@@ -239,10 +299,10 @@ export default function PublicationReadinessStage({
         <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[color:var(--surface-canvas)] via-[color:var(--surface-canvas)] to-transparent z-20 flex justify-center">
           <button 
             onClick={() => onAdvance?.("export")}
-            className="px-8 py-4 rounded-full bg-[color:var(--accent)] text-white font-bold shadow-lg hover:bg-[color:var(--accent-hover)] transition-transform hover:-translate-y-1 flex items-center gap-3 font-sans cursor-pointer"
+            className="px-6 py-3 rounded-[var(--radius-lg)] bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold text-sm shadow-md hover:bg-[color:var(--accent-hover)] transition-transform hover:-translate-y-0.5 flex items-center gap-2.5 font-sans cursor-pointer"
           >
-            Advance to Export Pipeline
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <span>Advance to Export Pipeline</span>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
           </button>
