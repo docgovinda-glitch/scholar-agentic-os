@@ -48,6 +48,26 @@ export async function getConnectedCloudDrives(userId: string): Promise<CloudDriv
           connectedAt: d.connected_at,
         }));
       }
+
+      // If no integration in database yet, check if active Supabase session has an OAuth provider token
+      if (typeof supabase.auth?.getSession === "function") {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData?.session;
+        if (session && session.user && (session.provider_token || session.user.app_metadata?.provider === "google")) {
+          const providerName = session.user.app_metadata?.provider;
+          const driveProvider: CloudDriveProvider = providerName === "azure" ? "onedrive" : "google_drive";
+          const email = session.user.email || "connected-account";
+          const name = (session.user.user_metadata?.full_name as string) || (session.user.user_metadata?.name as string);
+
+          const autoAccount = await connectCloudDrive(userId, driveProvider, {
+            email,
+            name,
+            accessToken: session.provider_token || undefined,
+            refreshToken: session.provider_refresh_token || undefined,
+          });
+          return [autoAccount];
+        }
+      }
     } catch {
       // Fallback to local storage
     }
