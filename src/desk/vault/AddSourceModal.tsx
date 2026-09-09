@@ -35,7 +35,7 @@ import { authedFetch } from "../api";
 export interface AddSourceModalProps {
   userId: string;
   existingItems: VaultItem[];
-  existingProjects: string[];
+  existingProjects?: string[];
   onClose: () => void;
   onSourceSaved: (savedItem: VaultItem) => void;
 }
@@ -46,7 +46,6 @@ type IntakeMode = "google_drive" | "onedrive" | "url" | "doi" | "bibtex";
 export default function AddSourceModal({
   userId,
   existingItems,
-  existingProjects,
   onClose,
   onSourceSaved,
 }: AddSourceModalProps) {
@@ -72,9 +71,6 @@ export default function AddSourceModal({
   const [doi, setDoi] = useState("");
   const [webUrl, setWebUrl] = useState("");
   const [sourceType, setSourceType] = useState<SourceType>("paper");
-  const [selectedProject, setSelectedProject] = useState(existingProjects[0] || "Thesis");
-  const [newProjectName, setNewProjectName] = useState("");
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [whySaved, setWhySaved] = useState("");
@@ -321,10 +317,6 @@ export default function AddSourceModal({
         .map((a) => a.trim())
         .filter(Boolean);
 
-      const finalProject = isCreatingProject && newProjectName.trim()
-        ? newProjectName.trim()
-        : selectedProject || "General";
-
       const citation = generateAPA7Citation({
         authors,
         year: year.trim() || undefined,
@@ -347,7 +339,7 @@ export default function AddSourceModal({
           type: sourceType,
         },
         cloudReference,
-        projects: [finalProject],
+        projects: [],
         tags,
         notes: {
           whySaved: whySaved.trim() || undefined,
@@ -955,54 +947,6 @@ export default function AddSourceModal({
                       className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
                     />
                   </div>
-                </div>
-
-                {/* Project Assignment */}
-                <div className="flex flex-col gap-1.5 pt-1">
-                  <label htmlFor="project-select-field" className="text-xs font-bold text-[color:var(--text-primary)]">
-                    Project
-                  </label>
-                  {!isCreatingProject ? (
-                    <div className="flex gap-2">
-                      <select
-                        id="project-select-field"
-                        value={selectedProject}
-                        onChange={(e) => setSelectedProject(e.target.value)}
-                        className="flex-1 px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                      >
-                        {existingProjects.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                        {existingProjects.length === 0 && <option value="Thesis">Thesis</option>}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => setIsCreatingProject(true)}
-                        className="px-3 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-xs font-semibold text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
-                      >
-                        + New
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newProjectName}
-                        onChange={(e) => setNewProjectName(e.target.value)}
-                        placeholder="e.g. Capstone Report"
-                        className="flex-1 px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setIsCreatingProject(false)}
-                        className="px-2.5 py-1 text-xs text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {/* Tags */}

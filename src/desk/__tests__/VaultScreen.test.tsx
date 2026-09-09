@@ -229,21 +229,21 @@ describe("unlocked", () => {
     expect(screen.getByText("Longitudinal effects of microplastics")).toBeInTheDocument();
   });
 
-  it("filters items when clicking a collection tab", async () => {
+  it("filters items when clicking a type filter button", async () => {
     listVaultItems.mockResolvedValue([
-      item({ id: "item-1", title: "Microplastics Paper", collection: "Ecology" } as any),
-      item({ id: "item-2", title: "Quantum Physics Paper", collection: "Physics" } as any),
+      item({ id: "item-1", title: "Microplastics Paper", sourceType: "file", metadata: { type: "paper" } } as any),
+      item({ id: "item-2", title: "Quantum Physics Website", sourceType: "web", metadata: { type: "website" } } as any),
     ]);
     render(<VaultScreen userId="user-1" onClose={vi.fn()} />);
 
     expect(await screen.findByText("Microplastics Paper")).toBeInTheDocument();
-    expect(screen.getByText("Quantum Physics Paper")).toBeInTheDocument();
+    expect(screen.getByText("Quantum Physics Website")).toBeInTheDocument();
 
-    // Click Physics collection tab
-    fireEvent.click(screen.getByRole("button", { name: /Physics/i }));
+    // Click Papers filter button
+    fireEvent.click(screen.getByRole("button", { name: /Papers/i }));
 
-    expect(screen.getByText("Quantum Physics Paper")).toBeInTheDocument();
-    expect(screen.queryByText("Microplastics Paper")).not.toBeInTheDocument();
+    expect(screen.getByText("Microplastics Paper")).toBeInTheDocument();
+    expect(screen.queryByText("Quantum Physics Website")).not.toBeInTheDocument();
   });
 
   it("filters items when clicking a tag pill", async () => {

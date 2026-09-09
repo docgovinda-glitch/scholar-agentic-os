@@ -32,7 +32,6 @@ import {
 import { scanVaultRetractions } from "../../services/vault/retractionService";
 import AddSourceModal from "./AddSourceModal";
 import SourceDetailModal from "./SourceDetailModal";
-import ProjectsView from "./ProjectsView";
 import SettingsView from "./SettingsView";
 
 export interface SourceLibraryScreenProps {
@@ -42,7 +41,7 @@ export interface SourceLibraryScreenProps {
   onResetVault?: () => void;
 }
 
-type MainTab = "sources" | "projects" | "settings";
+type MainTab = "sources" | "settings";
 
 export default function SourceLibraryScreen({
   userId,
@@ -55,7 +54,6 @@ export default function SourceLibraryScreen({
   const [activeTab, setActiveTab] = useState<MainTab>("sources");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "paper" | "website" | "other">("all");
-  const [activeProject, setActiveProject] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
 
   // Modals
@@ -114,22 +112,6 @@ export default function SourceLibraryScreen({
     return items.map((item) => vaultItemToSource(item));
   }, [items]);
 
-  // Collect unique projects
-  const allProjects = useMemo(() => {
-    const set = new Set<string>();
-    for (const s of sources) {
-      for (const p of s.projects) {
-        if (p.trim()) set.add(p.trim());
-      }
-    }
-    if (set.size === 0) {
-      set.add("Thesis");
-      set.add("Research Paper");
-      set.add("Blog");
-    }
-    return Array.from(set);
-  }, [sources]);
-
   // Semantic Concept Search map
   const semanticResultsMap = useMemo(() => {
     if (!items || items.length === 0 || !searchQuery.trim() || !isSemanticMode) {
@@ -154,7 +136,6 @@ export default function SourceLibraryScreen({
         const inDoi = s.metadata.doi?.toLowerCase().includes(q);
         const inUrl = s.metadata.url?.toLowerCase().includes(q);
         const inTags = s.tags.some((t) => t.toLowerCase().includes(q));
-        const inProjects = s.projects.some((p) => p.toLowerCase().includes(q));
         const inNotes =
           (s.notes.whySaved && s.notes.whySaved.toLowerCase().includes(q)) ||
           (s.notes.keyQuote && s.notes.keyQuote.toLowerCase().includes(q));
@@ -167,7 +148,6 @@ export default function SourceLibraryScreen({
           !inDoi &&
           !inUrl &&
           !inTags &&
-          !inProjects &&
           !inNotes
         ) {
           return false;
@@ -183,19 +163,14 @@ export default function SourceLibraryScreen({
         }
       }
 
-      // 3. Project filter
-      if (activeProject) {
-        if (!s.projects.includes(activeProject)) return false;
-      }
-
-      // 4. Tag filter
+      // 3. Tag filter
       if (activeTag) {
         if (!s.tags.includes(activeTag)) return false;
       }
 
       return true;
     });
-  }, [sources, searchQuery, filterType, activeProject, activeTag, isSemanticMode, semanticResultsMap]);
+  }, [sources, searchQuery, filterType, activeTag, isSemanticMode, semanticResultsMap]);
 
   // Retraction alert count
   const retractedSources = useMemo(() => {
@@ -312,17 +287,6 @@ export default function SourceLibraryScreen({
             }`}
           >
             Sources ({sources.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("projects")}
-            className={`py-3 border-b-2 transition-colors cursor-pointer ${
-              activeTab === "projects"
-                ? "border-[color:var(--accent)] text-[color:var(--accent)] font-bold"
-                : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
-            }`}
-          >
-            Projects ({allProjects.length})
           </button>
           <button
             type="button"
@@ -510,36 +474,6 @@ export default function SourceLibraryScreen({
                     Websites ({sources.filter((s) => s.metadata.type === "website").length})
                   </button>
                 </div>
-
-                {/* Quick Projects Row */}
-                <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
-                  <span className="text-[11px] font-bold text-[color:var(--text-muted)] uppercase tracking-wider mr-1">
-                    Projects:
-                  </span>
-                  {allProjects.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setActiveProject(activeProject === p ? null : p)}
-                      className={`px-2.5 py-0.5 rounded-[var(--radius-md)] text-xs font-medium transition-colors cursor-pointer ${
-                        activeProject === p
-                          ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold shadow-xs"
-                          : "bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                  {activeProject && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveProject(null)}
-                      className="text-xs text-[color:var(--text-muted)] hover:underline ml-1 cursor-pointer"
-                    >
-                      × Reset
-                    </button>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -564,13 +498,13 @@ export default function SourceLibraryScreen({
               <div className="p-12 text-center rounded-[var(--radius-xl)] border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-raised)] flex flex-col items-center justify-center gap-3 my-4">
                 <span className="text-4xl">📚</span>
                 <h3 className="text-base font-bold text-[color:var(--text-primary)]">
-                  {searchQuery || activeProject || activeTag
+                  {searchQuery || activeTag
                     ? "No sources match your filter"
                     : "Your Source Library is empty"}
                 </h3>
                 <p className="text-xs text-[color:var(--text-secondary)] max-w-sm leading-relaxed">
-                  {searchQuery || activeProject || activeTag
-                    ? "Try adjusting your search terms or clearing project/tag filters."
+                  {searchQuery || activeTag
+                    ? "Try adjusting your search terms or clearing tag filters."
                     : "Nothing in your Vault yet. Save sources from Google Drive, OneDrive, websites, or DOI to organize and cite them when you write."}
                 </p>
                 {/* For backward-compatibility with tests expecting "Nothing in your Vault yet." */}
@@ -761,24 +695,7 @@ export default function SourceLibraryScreen({
           </div>
         )}
 
-        {/* TAB 2: PROJECTS VIEW */}
-        {activeTab === "projects" && (
-          <ProjectsView
-            sources={sources}
-            projects={allProjects}
-            activeProject={activeProject}
-            onSelectProject={(proj) => {
-              setActiveProject(proj);
-              setActiveTab("sources");
-            }}
-            onCreateProject={(newProj) => {
-              setActiveProject(newProj);
-              setActiveTab("sources");
-            }}
-          />
-        )}
-
-        {/* TAB 3: SETTINGS VIEW */}
+        {/* TAB 2: SETTINGS VIEW */}
         {activeTab === "settings" && (
           <SettingsView
             userId={userId}
@@ -794,7 +711,6 @@ export default function SourceLibraryScreen({
         <AddSourceModal
           userId={userId}
           existingItems={items}
-          existingProjects={allProjects}
           onClose={() => setShowAddModal(false)}
           onSourceSaved={(saved) => {
             setItems((prev) => [saved, ...prev]);

@@ -116,11 +116,14 @@ export function vaultItemToSource(item: VaultItem): Source {
 
   // Infer source type
   let type: SourceType = "paper";
-  if (item.sourceType === "web" || item.externalReference?.startsWith("http")) {
+  const rawType = item.sourceType || (item as any).source_type || meta.type;
+  if (rawType === "web" || rawType === "website" || item.externalReference?.startsWith("http")) {
     type = "website";
-  } else if (item.canonicalReference?.kind === "Book") {
+  } else if (item.canonicalReference?.kind === "Book" || rawType === "book") {
     type = "book";
-  } else if (meta.type) {
+  } else if (rawType === "other" || rawType === "dataset" || rawType === "interview" || rawType === "report") {
+    type = "other";
+  } else if (meta.type === "paper" || meta.type === "website" || meta.type === "book" || meta.type === "other") {
     type = meta.type;
   }
 
