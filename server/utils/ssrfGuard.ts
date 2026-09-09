@@ -256,40 +256,63 @@ function netIsIP(host: string): number {
  * to completely eliminate DNS rebinding vulnerabilities (TOCTOU).
  */
 export function createRebindingSafeLookup(
-  allowedIps: Set<string>,
+  allowedIps?: Set<string>,
   customDnsResolver?: (
     hostname: string,
     options: any,
-    callback: (err: Error | null, address: string | any, family: number) => void
+    callback: (err: Error | null, address: any, family?: number) => void
   ) => void
 ) {
   return (
     hostname: string,
     options: any,
-    callback: (err: Error | null, address: string | any, family: number) => void
+    callback: (err: Error | null, address: any, family?: number) => void
   ) => {
     const resolver = customDnsResolver || dns.lookup;
-    resolver(hostname, { ...options, all: false }, (err, address, family) => {
+    const isAll = typeof options === "object" && options?.all === true;
+
+    resolver(hostname, options, (err, address, family) => {
       if (err) return callback(err, address, family);
 
-      const addrStr = typeof address === "string" ? address : address?.address;
-      if (!addrStr || isPrivateOrReservedIp(addrStr)) {
-        return callback(
-          new Error(`DNS Rebinding violation: destination resolved to private IP ${addrStr}`),
-          "",
-          family
-        );
-      }
+      if (isAll && Array.isArray(address)) {
+        for (const item of address) {
+          const addrStr = item.address;
+          if (!addrStr || isPrivateOrReservedIp(addrStr)) {
+            return callback(
+              new Error(`DNS Rebinding violation: destination resolved to private IP ${addrStr}`),
+              [],
+              family
+            );
+          }
+          if (allowedIps && allowedIps.size > 0 && !allowedIps.has(addrStr)) {
+            return callback(
+              new Error(`DNS Rebinding violation: destination rebounded to unverified IP ${addrStr}`),
+              [],
+              family
+            );
+          }
+        }
+        return callback(null, address, family);
+      } else {
+        const addrStr = typeof address === "string" ? address : address?.address;
+        if (!addrStr || isPrivateOrReservedIp(addrStr)) {
+          return callback(
+            new Error(`DNS Rebinding violation: destination resolved to private IP ${addrStr}`),
+            "",
+            family
+          );
+        }
 
-      if (allowedIps && allowedIps.size > 0 && !allowedIps.has(addrStr)) {
-        return callback(
-          new Error(`DNS Rebinding violation: destination rebounded to unverified IP ${addrStr}`),
-          "",
-          family
-        );
-      }
+        if (allowedIps && allowedIps.size > 0 && !allowedIps.has(addrStr)) {
+          return callback(
+            new Error(`DNS Rebinding violation: destination rebounded to unverified IP ${addrStr}`),
+            "",
+            family
+          );
+        }
 
-      callback(null, address, family);
+        return callback(null, address, family);
+      }
     });
   };
 }
