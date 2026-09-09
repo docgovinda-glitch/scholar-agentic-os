@@ -738,6 +738,82 @@ router.post("/mendeley/sync", async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/vault/drive/files
+ * Fetches user's Google Drive files (PDFs, Docs, etc.) directly via Google Drive API
+ */
+router.get("/drive/files", requireAuth, async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (!user?.id) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const config = getSupabaseRestConfig();
+    let accessToken: string | null = (req.headers["x-provider-token"] as string) || null;
+
+    if (!accessToken && config) {
+      const integrationsTable = new SupabaseTable(config, "user_cloud_integrations");
+      const rows = await integrationsTable.select(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.google_drive`);
+      if (rows && rows.length > 0) {
+        accessToken = ((rows[0] as any)?.access_token as string) || null;
+      }
+    }
+
+    // If client supplied fresh provider token and config is present, update user_cloud_integrations
+    if (req.headers["x-provider-token"] && config) {
+      try {
+        const integrationsTable = new SupabaseTable(config, "user_cloud_integrations");
+        await integrationsTable.update(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.google_drive`, {
+          access_token: req.headers["x-provider-token"] as string,
+        });
+      } catch {}
+    }
+
+    if (!accessToken) {
+      return res.status(404).json({ needsAuth: true, error: "Google Drive is not connected." });
+    }
+
+    const driveRes = await fetch(
+      "https://www.googleapis.com/drive/v3/files?pageSize=30&q=trashed=false&fields=files(id,name,mimeType,webViewLink,iconLink,size,modifiedTime)&orderBy=modifiedTime desc",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (driveRes.status === 401 || driveRes.status === 403) {
+      const errBody = await driveRes.json().catch(() => ({}));
+      return res.status(403).json({
+        needsReauth: true,
+        error: "Google Drive file permission not granted. Please re-authenticate with Drive permissions.",
+        details: errBody,
+      });
+    }
+
+    if (!driveRes.ok) {
+      const errText = await driveRes.text();
+      return res.status(driveRes.status).json({ error: `Google Drive API error: ${errText}` });
+    }
+
+    const data = await driveRes.json();
+    return res.json({
+      success: true,
+      files: (data.files || []).map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        mimeType: f.mimeType,
+        webViewLink: f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`,
+        size: f.size ? parseInt(f.size, 10) : undefined,
+        lastModified: f.modifiedTime,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to fetch Google Drive files: ${err.message}` });
+  }
+});
+
+/**
  * POST /api/vault/reset
  * Fully resets the signed-in user's Vault for a clean first-time setup experience.
  */

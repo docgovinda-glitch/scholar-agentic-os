@@ -120,14 +120,23 @@ export default function SettingsView({
             </div>
 
             {isGoogleConnected ? (
-              <button
-                type="button"
-                onClick={() => handleDisconnect("google_drive")}
-                disabled={busy}
-                className="px-3 py-1.5 text-xs font-semibold text-[color:var(--state-danger)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer disabled:opacity-50"
-              >
-                Disconnect
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.open("https://drive.google.com", "_blank")}
+                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--accent)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                >
+                  Open Drive ↗
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDisconnect("google_drive")}
+                  disabled={busy}
+                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--state-danger)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer disabled:opacity-50"
+                >
+                  Disconnect
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
@@ -163,14 +172,23 @@ export default function SettingsView({
             </div>
 
             {isOneDriveConnected ? (
-              <button
-                type="button"
-                onClick={() => handleDisconnect("onedrive")}
-                disabled={busy}
-                className="px-3 py-1.5 text-xs font-semibold text-[color:var(--state-danger)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer disabled:opacity-50"
-              >
-                Disconnect
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.open("https://onedrive.live.com", "_blank")}
+                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--accent)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                >
+                  Open OneDrive ↗
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDisconnect("onedrive")}
+                  disabled={busy}
+                  className="px-3 py-1.5 text-xs font-semibold text-[color:var(--state-danger)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer disabled:opacity-50"
+                >
+                  Disconnect
+                </button>
+              </div>
             ) : (
               <button
                 type="button"

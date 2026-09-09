@@ -27,7 +27,10 @@ import {
   initiateGoogleDriveAuth,
   initiateOneDriveAuth,
   type CloudDriveAccount,
+  type DriveFileItem,
 } from "../../services/vault/cloudDriveService";
+import { isSupabaseConfigured, getSupabaseClient } from "../../services/supabaseClient";
+import { authedFetch } from "../api";
 
 export interface AddSourceModalProps {
   userId: string;
@@ -96,6 +99,47 @@ export default function AddSourceModal({
   const [connectingDrive, setConnectingDrive] = useState<CloudStorageProvider | null>(null);
   const [cloudDrives, setCloudDrives] = useState<CloudDriveAccount[]>([]);
 
+  // Google Drive file picker state
+  const [driveFiles, setDriveFiles] = useState<DriveFileItem[]>([]);
+  const [loadingDriveFiles, setLoadingDriveFiles] = useState(false);
+  const [driveError, setDriveError] = useState<string | null>(null);
+  const [driveSearchQuery, setDriveSearchQuery] = useState("");
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+
+  async function loadDriveFiles() {
+    setLoadingDriveFiles(true);
+    setDriveError(null);
+    try {
+      const headers: Record<string, string> = {};
+      if (isSupabaseConfigured()) {
+        try {
+          const supabase = getSupabaseClient();
+          const { data } = await supabase.auth.getSession();
+          if (data?.session?.provider_token) {
+            headers["x-provider-token"] = data.session.provider_token;
+          }
+        } catch {}
+      }
+
+      const res = await authedFetch("/api/vault/drive/files", { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setDriveFiles(data.files || []);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        if (err.needsReauth) {
+          setDriveError("Google Drive file permissions needed to browse files directly.");
+        } else {
+          setDriveError(err.error || "Could not load Drive files.");
+        }
+      }
+    } catch (e: any) {
+      setDriveError(e.message || "Failed to load Google Drive files.");
+    } finally {
+      setLoadingDriveFiles(false);
+    }
+  }
+
   async function handleSelectGoogleDrive() {
     setMode("google_drive");
     setError(null);
@@ -105,6 +149,8 @@ export default function AddSourceModal({
       const isConnected = drives.some((d) => d.provider === "google_drive");
       if (!isConnected) {
         setConnectingDrive("google_drive");
+      } else {
+        loadDriveFiles();
       }
     } catch {}
   }
@@ -544,21 +590,172 @@ export default function AddSourceModal({
                     </div>
 
                     {connectingDrive === mode ? (
-                      <div className="p-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] flex flex-col gap-2">
+                      <div className="p-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] flex flex-col gap-2.5">
                         <p className="text-xs text-[color:var(--text-secondary)]">
-                          Connect your {mode === "google_drive" ? "Google Account" : "Microsoft 365 Account"} to browse and link your files.
+                          Connect your {mode === "google_drive" ? "Google Account" : "Microsoft 365 Account"} to browse and select your files directly.
                         </p>
-                        <button
-                          type="button"
-                          onClick={() => handleConnectCloud(mode)}
-                          disabled={busy}
-                          className="w-fit px-3 py-1.5 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-semibold hover:bg-[color:var(--accent-hover)] cursor-pointer disabled:opacity-50"
-                        >
-                          🔐 Connect {mode === "google_drive" ? "Google Drive" : "OneDrive"}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleConnectCloud(mode)}
+                            disabled={busy}
+                            className="px-3.5 py-1.5 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-semibold hover:bg-[color:var(--accent-hover)] cursor-pointer disabled:opacity-50"
+                          >
+                            🔐 Connect {mode === "google_drive" ? "Google Drive" : "OneDrive"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => window.open(mode === "google_drive" ? "https://drive.google.com" : "https://onedrive.live.com", "_blank")}
+                            className="px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                          >
+                            Open {mode === "google_drive" ? "Google Drive" : "OneDrive"} ↗
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <>
+                        {mode === "google_drive" && (
+                          <div className="flex flex-col gap-2 p-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)]">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center gap-1.5">
+                                <span>📁</span> Select from your Google Drive
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => window.open("https://drive.google.com", "_blank")}
+                                  className="text-[11px] font-medium text-[color:var(--accent)] hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  Open Drive ↗
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => loadDriveFiles()}
+                                  disabled={loadingDriveFiles}
+                                  className="text-[11px] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] border border-[color:var(--border-default)] px-2 py-0.5 rounded-[var(--radius-sm)] cursor-pointer disabled:opacity-50"
+                                >
+                                  {loadingDriveFiles ? "Refreshing..." : "🔄 Refresh"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {loadingDriveFiles && (
+                              <div className="py-4 text-center text-xs text-[color:var(--text-muted)] flex items-center justify-center gap-2">
+                                <span className="animate-spin text-sm">⏳</span> Loading your Google Drive documents...
+                              </div>
+                            )}
+
+                            {driveError && !loadingDriveFiles && (
+                              <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-md)] flex flex-col gap-1.5">
+                                <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                                  {driveError}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleConnectCloud("google_drive")}
+                                    className="px-2.5 py-1 text-[11px] font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-sm)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
+                                  >
+                                    🔑 Grant Drive File Permissions
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => window.open("https://drive.google.com", "_blank")}
+                                    className="px-2.5 py-1 text-[11px] font-medium text-[color:var(--text-primary)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                                  >
+                                    Open Drive Directly ↗
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {!loadingDriveFiles && !driveError && driveFiles.length > 0 && (
+                              <div className="flex flex-col gap-1.5">
+                                <input
+                                  type="text"
+                                  value={driveSearchQuery}
+                                  onChange={(e) => setDriveSearchQuery(e.target.value)}
+                                  placeholder="Search your Drive files (PDFs, Docs)..."
+                                  className="px-2.5 py-1.5 text-xs bg-[color:var(--surface-canvas)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] focus:outline-hidden"
+                                />
+                                <div className="max-h-40 overflow-y-auto divide-y divide-[color:var(--border-default)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] bg-[color:var(--surface-canvas)]">
+                                  {driveFiles
+                                    .filter((f) => !driveSearchQuery || f.name.toLowerCase().includes(driveSearchQuery.toLowerCase()))
+                                    .map((f) => {
+                                      const isSelected = selectedFileId === f.id || cloudFileLink === f.webViewLink;
+                                      return (
+                                        <button
+                                          key={f.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedFileId(f.id);
+                                            setCloudFileName(f.name);
+                                            setCloudFileLink(f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`);
+                                            setCloudReference({
+                                              provider: "google_drive",
+                                              fileId: f.id,
+                                              fileName: f.name,
+                                              webUrl: f.webViewLink,
+                                            });
+                                          }}
+                                          className={`w-full p-2 text-left text-xs flex items-center justify-between gap-2 hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors ${
+                                            isSelected ? "bg-emerald-500/10 font-semibold" : ""
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2 truncate">
+                                            <span>{f.mimeType?.includes("pdf") ? "📄" : "📝"}</span>
+                                            <span className="truncate text-[color:var(--text-primary)]">{f.name}</span>
+                                          </div>
+                                          {isSelected ? (
+                                            <span className="shrink-0 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                                              ✓ Selected
+                                            </span>
+                                          ) : (
+                                            <span className="shrink-0 text-[10px] text-[color:var(--text-muted)] border border-[color:var(--border-default)] px-1.5 py-0.5 rounded-[var(--radius-sm)]">
+                                              Select
+                                            </span>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                            )}
+
+                            {!loadingDriveFiles && !driveError && driveFiles.length === 0 && (
+                              <p className="text-[11px] text-[color:var(--text-muted)]">
+                                No files found in your Google Drive root. Open Google Drive to locate your paper or paste its link below.
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {cloudFileName && (
+                          <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-[var(--radius-md)] flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 truncate">
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">✓</span>
+                              <div className="truncate">
+                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wider font-semibold block">
+                                  Selected Drive Document
+                                </span>
+                                <span className="text-xs font-semibold text-[color:var(--text-primary)] truncate block">
+                                  {cloudFileName}
+                                </span>
+                              </div>
+                            </div>
+                            {cloudFileLink && (
+                              <a
+                                href={cloudFileLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="shrink-0 text-[11px] text-[color:var(--accent)] hover:underline flex items-center gap-1 font-medium"
+                              >
+                                Preview ↗
+                              </a>
+                            )}
+                          </div>
+                        )}
+
                         <div className="flex flex-col gap-1.5">
                           <label htmlFor="cloud-filename-input" className="text-[11px] font-medium text-[color:var(--text-secondary)]">
                             Document Name / Title

@@ -23,6 +23,7 @@ export interface DriveFileItem {
   downloadUrl?: string;
   thumbnailUrl?: string;
   lastModified?: string;
+  webViewLink?: string;
 }
 
 const STORAGE_KEY_PREFIX = "scholar_cloud_drive_";
@@ -34,6 +35,32 @@ export async function getConnectedCloudDrives(userId: string): Promise<CloudDriv
   if (isSupabaseConfigured()) {
     try {
       const supabase = getSupabaseClient();
+      // Check if active Supabase session has a fresh OAuth provider token to sync into user_cloud_integrations
+      if (typeof supabase.auth?.getSession === "function") {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const session = sessionData?.session;
+          if (session && session.user && session.provider_token) {
+            const providerName = session.user.app_metadata?.provider;
+            const driveProvider: CloudDriveProvider = providerName === "azure" ? "onedrive" : "google_drive";
+            const email = session.user.email || "connected-account";
+            const name = (session.user.user_metadata?.full_name as string) || (session.user.user_metadata?.name as string);
+
+            await supabase.from("user_cloud_integrations").upsert(
+              {
+                user_id: userId,
+                provider: driveProvider,
+                account_email: email,
+                account_name: name,
+                access_token: session.provider_token,
+                refresh_token: session.provider_refresh_token || null,
+              },
+              { onConflict: "user_id, provider" }
+            );
+          }
+        } catch {}
+      }
+
       const { data, error } = await supabase
         .from("user_cloud_integrations")
         .select("id, provider, account_email, account_name, connected_at")
@@ -47,26 +74,6 @@ export async function getConnectedCloudDrives(userId: string): Promise<CloudDriv
           accountName: d.account_name || undefined,
           connectedAt: d.connected_at,
         }));
-      }
-
-      // If no integration in database yet, check if active Supabase session has an OAuth provider token
-      if (typeof supabase.auth?.getSession === "function") {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const session = sessionData?.session;
-        if (session && session.user && (session.provider_token || session.user.app_metadata?.provider === "google")) {
-          const providerName = session.user.app_metadata?.provider;
-          const driveProvider: CloudDriveProvider = providerName === "azure" ? "onedrive" : "google_drive";
-          const email = session.user.email || "connected-account";
-          const name = (session.user.user_metadata?.full_name as string) || (session.user.user_metadata?.name as string);
-
-          const autoAccount = await connectCloudDrive(userId, driveProvider, {
-            email,
-            name,
-            accessToken: session.provider_token || undefined,
-            refreshToken: session.provider_refresh_token || undefined,
-          });
-          return [autoAccount];
-        }
       }
     } catch {
       // Fallback to local storage
