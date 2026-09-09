@@ -143,10 +143,26 @@ export default function AddSourceModal({
       const drives = await getConnectedCloudDrives(userId);
       setCloudDrives(drives);
       const isConnected = drives.some((d) => d.provider === "google_drive");
-      if (!isConnected) {
-        setConnectingDrive("google_drive");
-      } else {
+      if (isConnected) {
+        setConnectingDrive(null);
         loadDriveFiles();
+      } else {
+        let hasGoogleSession = false;
+        if (isSupabaseConfigured()) {
+          try {
+            const supabase = getSupabaseClient();
+            const { data } = await supabase.auth.getSession();
+            if (data?.session?.user?.app_metadata?.provider === "google" || data?.session?.provider_token) {
+              hasGoogleSession = true;
+            }
+          } catch {}
+        }
+        if (hasGoogleSession) {
+          setConnectingDrive(null);
+          loadDriveFiles();
+        } else {
+          setConnectingDrive("google_drive");
+        }
       }
     } catch {}
   }
@@ -769,7 +785,18 @@ export default function AddSourceModal({
                             id="cloud-filelink-input"
                             type="text"
                             value={cloudFileLink}
-                            onChange={(e) => setCloudFileLink(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCloudFileLink(val);
+                              // Auto-extract Google Drive / Docs ID
+                              const driveMatch = val.match(/\/(?:file\/d|document\/d|spreadsheets\/d|presentation\/d)\/([a-zA-Z0-9_-]+)/);
+                              if (driveMatch && driveMatch[1]) {
+                                setCloudFileId(driveMatch[1]);
+                                if (!cloudFileName.trim()) {
+                                  setCloudFileName("Google Drive Research Document");
+                                }
+                              }
+                            }}
                             placeholder="https://drive.google.com/file/d/.../view"
                             className="px-3 py-2 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
                           />

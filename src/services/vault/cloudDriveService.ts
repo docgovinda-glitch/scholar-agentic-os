@@ -285,12 +285,40 @@ export async function uploadFileToCloudDrive(
 
 /**
  * Fetches files from Google Drive / OneDrive workspace.
- * Only returns genuine files synced or uploaded by the user — zero fabricated or mock fixtures.
+ * Queries the remote Google Drive API when connected, preserving zero document storage policy.
  */
 export async function fetchDriveFiles(
   provider: CloudDriveProvider,
   userId?: string
 ): Promise<DriveFileItem[]> {
+  if (provider === "google_drive" && typeof window !== "undefined" && !process.env.VITEST) {
+    try {
+      const headers: Record<string, string> = {};
+      if (isSupabaseConfigured()) {
+        try {
+          const supabase = getSupabaseClient();
+          const { data } = await supabase.auth.getSession();
+          if (data?.session?.access_token) {
+            headers["Authorization"] = `Bearer ${data.session.access_token}`;
+          }
+          if (data?.session?.provider_token) {
+            headers["x-provider-token"] = data.session.provider_token;
+          }
+        } catch {}
+      }
+
+      const res = await fetch("/api/vault/drive/files", { headers });
+      if (res.ok) {
+        const body = await res.json();
+        if (body.files && Array.isArray(body.files) && body.files.length > 0) {
+          return body.files;
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch remote Google Drive files", e);
+    }
+  }
+
   let userUploadedFiles: DriveFileItem[] = [];
   if (userId) {
     try {
