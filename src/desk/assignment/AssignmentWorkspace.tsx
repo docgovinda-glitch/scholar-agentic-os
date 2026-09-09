@@ -128,7 +128,7 @@ function AssignmentWorkspaceInner({
 
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-xs font-bold text-[color:var(--text-primary)] truncate max-w-[200px] md:max-w-xs">
-                {project.answers["assignment_title"] || project.title || "Academic Assignment"}
+                {project.answers["assignment_title"] || project.answers["title"] || "Academic Assignment"}
               </span>
               <span className="hidden lg:inline-flex text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)] bg-[color:var(--accent-subtle)] px-2 py-0.5 rounded-full">
                 {academicLevel === "postgraduate" ? "Postgraduate" : "Undergraduate"}

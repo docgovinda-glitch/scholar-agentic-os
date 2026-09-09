@@ -21,21 +21,23 @@ const CITATION_STYLES = [
 export default function AssignmentUnderstandStage() {
   const {
     projectId,
+    project,
     question,
     academicLevel,
     assignmentType,
     targetWordCount,
     citationStyle,
     assignmentBriefText,
-    courseName,
-    institutionName,
-    deadlineDate,
-    markingRubricText,
-    saveIntake,
+    saveAnswers,
     analysis,
     setAnalysis,
     advanceStage,
   } = useAssignmentWorkspace();
+
+  const courseName = project?.answers?.["course_name"] || "";
+  const institutionName = project?.answers?.["institution"] || "";
+  const deadlineDate = project?.answers?.["deadline"] || "";
+  const markingRubricText = project?.answers?.["marking_rubric"] || "";
 
   const [localQuestion, setLocalQuestion] = useState(question);
   const [localLevel, setLocalLevel] = useState<AcademicLevel>(academicLevel);
@@ -67,7 +69,7 @@ export default function AssignmentUnderstandStage() {
     setAnalysisError(null);
 
     // Save intake details first
-    await saveIntake({
+    await saveAnswers({
       research_topic: localQuestion,
       academic_level: localLevel,
       assignment_type: localType,

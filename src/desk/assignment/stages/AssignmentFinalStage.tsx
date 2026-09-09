@@ -53,7 +53,7 @@ export default function AssignmentFinalStage() {
   };
 
   // Build full document markdown text
-  const fullDocumentMarkdown = `# ${project?.answers["assignment_title"] || project?.title || "Academic Assignment"}
+  const fullDocumentMarkdown = `# ${project?.answers?.["assignment_title"] || project?.answers?.["title"] || "Academic Assignment"}
 
 **Author:** Scholar Core Academic Author  
 **Course:** ${project?.answers["course_name"] || "University Course"}  
@@ -95,7 +95,7 @@ ${outline
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${(project?.title || "Assignment").replace(/\s+/g, "_")}.docx`;
+    a.download = `${(project?.answers?.["assignment_title"] || project?.answers?.["title"] || "Assignment").replace(/\s+/g, "_")}.docx`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -312,7 +312,7 @@ ${outline
           <div className="p-8 rounded-[var(--radius-xl)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] text-xs leading-relaxed font-serif space-y-6 max-h-[650px] overflow-y-auto shadow-sm">
             <div className="text-center pb-6 border-b border-[color:var(--border-subtle)] space-y-2">
               <h1 className="text-xl font-bold font-sans text-[color:var(--text-primary)]">
-                {project?.answers["assignment_title"] || project?.title || "Academic Assignment"}
+                {project?.answers?.["assignment_title"] || project?.answers?.["title"] || "Academic Assignment"}
               </h1>
               <p className="text-xs font-sans text-[color:var(--text-muted)]">
                 {project?.answers["course_name"] || "Academic Course"} • {project?.answers["institution"] || "University"}

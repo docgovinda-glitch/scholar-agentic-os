@@ -115,8 +115,8 @@ export async function syncActiveSessionToRegistry(): Promise<StoredAccountProfil
       name: (user.user_metadata?.full_name as string) || user.email.split("@")[0],
       avatarUrl: user.user_metadata?.avatar_url as string,
       institution: user.user_metadata?.institution as string,
-      sessionToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
+      sessionToken: data.session?.access_token || "",
+      refreshToken: data.session?.refresh_token || "",
       lastActiveAt: new Date().toISOString(),
     };
 

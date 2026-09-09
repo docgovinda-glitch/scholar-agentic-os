@@ -32,14 +32,17 @@ Rather than generic forms, each academic format in Scholar Core operates through
 
 ---
 
-## 🔐 Universal Knowledge Vault & Reference Integrations
+## 🔐 Source Library & Zero Document Storage Architecture
 
-- **Hybrid Semantic Vector Search (RAG)**: Sliding-window paragraph chunking with hybrid BM25 and dense token matching across 100+ page PDFs.
+In compliance with **Revision 2 / Document 43 Rev 5**, Scholar Core operates under a strict **Zero Document Storage Policy**:
+- **Zero Full-Text Retention**: Scholar Core does NOT store full proprietary PDFs, copyrighted manuscripts, or full paper texts on its servers.
+- **Verifiable Citation & Metadata Pointers**: The Source Library retains only structured cryptographic metadata, canonical references, DOIs, URLs, and client-authorized cloud storage pointers.
 - **Reference Manager Integrations**:
   - **Zotero Web API**: Direct two-way sync for collections, tags, and DOI metadata.
   - **Mendeley & BibTeX**: Instant batch parsing of `.bib` records into structured Canonical References.
-  - **Cloud Drives**: Direct one-click ingestion from Google Drive and Microsoft OneDrive.
-  - **DOI & Web Scraping**: Live CrossRef / DataCite metadata lookup and web article content extraction.
+  - **Cloud Drives**: Direct one-click authentication and indexing from Google Drive and Microsoft OneDrive.
+  - **DOI & Web Scraping**: Live CrossRef / DataCite metadata lookup and client-side extraction.
+- **Retraction Scanning**: Automated Crossref and OpenAlex retraction radar for flagging compromised citations in real time.
 
 ---
 
@@ -57,7 +60,8 @@ npm install
 ### Environment Configuration
 Create a `.env` file from `.env.example`:
 ```env
-SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 PORT=3000
 ```

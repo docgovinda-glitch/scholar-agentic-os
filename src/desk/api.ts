@@ -406,7 +406,7 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export function listOutputTypes(): Promise<{ items: OutputTypeSummary[] }> {
-  return originalFetch("/api/atlas/output-types").then((r) => json(r));
+  return originalFetch("/api/atlas/output-types").then((r: Response) => json(r));
 }
 
 export function createProject(outputTypeId: string): Promise<ProjectView> {

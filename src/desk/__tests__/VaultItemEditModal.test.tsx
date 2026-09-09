@@ -102,9 +102,9 @@ describe("VaultItemEditModal", () => {
       />
     );
 
-    // Switch to new collection input
-    fireEvent.click(screen.getByText("+ New Collection"));
-    fireEvent.change(screen.getByPlaceholderText(/e.g., Literature Review/i), {
+    // Switch to new project input
+    fireEvent.click(screen.getByText("+ New Project"));
+    fireEvent.change(screen.getByPlaceholderText(/e.g., Master's Thesis/i), {
       target: { value: "Advanced Quantum" },
     });
 

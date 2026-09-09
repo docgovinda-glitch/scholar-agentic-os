@@ -223,7 +223,16 @@ export function vaultItemToSource(item: VaultItem): Source {
  * Converts a clean Source model into the underlying VaultItem storage payload.
  */
 export function sourceToVaultItemPayload(
-  source: Omit<Source, "id" | "createdAt" | "sourceId">
+  source: Partial<Omit<Source, "id" | "createdAt" | "sourceId">> & {
+    metadata: SourceMetadata;
+    projects: string[];
+    tags: string[];
+    notes: SourceWritingNotes;
+    citation: string;
+    citationStatus?: CitationStatus;
+    integrityStatus?: any;
+    cloudReference?: CloudReference;
+  }
 ): {
   title: string;
   content: string;

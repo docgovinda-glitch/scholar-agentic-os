@@ -472,16 +472,16 @@ export async function compileAcademicPdf(
           [
             {
               stack: [
-                { text: "ABSTRACT", bold: true, fontSize: 9.5, letterSpacing: 1, color: "#0f172a", margin: [0, 0, 0, 4] },
+                { text: "ABSTRACT", bold: true, fontSize: 9.5, color: "#0f172a", margin: [0, 0, 0, 4] },
                 { text: foundAbstract, italics: true, fontSize: 9.5, lineHeight: 1.35, color: "#334155" },
                 ...(keywords.length > 0 ? [
-                  { text: [{ text: "Keywords: ", bold: true, fontSize: 9 }, { text: keywords.join(", "), italics: true, fontSize: 9 }], margin: [0, 6, 0, 0] }
+                  { text: [{ text: "Keywords: ", bold: true, fontSize: 9 }, { text: keywords.join(", "), italics: true, fontSize: 9 }], margin: [0, 6, 0, 0] as [number, number, number, number] }
                 ] : []),
               ],
               fillColor: "#f8fafc",
-              borderColor: ["#cbd5e1", "#cbd5e1", "#cbd5e1", "#cbd5e1"],
-              border: [true, true, true, true],
-              margin: [8, 8, 8, 8],
+              borderColor: ["#cbd5e1", "#cbd5e1", "#cbd5e1", "#cbd5e1"] as [string, string, string, string],
+              border: [true, true, true, true] as [boolean, boolean, boolean, boolean],
+              margin: [8, 8, 8, 8] as [number, number, number, number],
             },
           ],
         ],

@@ -11,7 +11,7 @@
 import { useState, useId } from "react";
 import type { VaultItem } from "../../services/vaultContents";
 import type { CloudStorageProvider, Source, SourceType } from "../../services/vault/sourceTypes";
-import { sourceToVaultItemPayload } from "../../services/vault/sourceTypes";
+import { sourceToVaultItemPayload, vaultItemToSource } from "../../services/vault/sourceTypes";
 import { addVaultItem } from "../../services/vaultContents";
 import {
   checkForDuplicates,
@@ -314,32 +314,7 @@ export default function AddSourceModal({
       });
 
       const saved = await addVaultItem(userId, sourcePayload);
-
-      setSavedSource({
-        id: saved.id,
-        metadata: {
-          title: title.trim(),
-          authors,
-          year: year.trim() || undefined,
-          journal: journal.trim() || undefined,
-          publisher: publisher.trim() || undefined,
-          doi: doi.trim() || undefined,
-          url: webUrl.trim() || cloudReference?.webUrl || undefined,
-          type: sourceType,
-        },
-        cloudReference,
-        projects: [finalProject],
-        tags,
-        notes: {
-          whySaved: whySaved.trim() || undefined,
-          keyQuote: keyQuote.trim() || undefined,
-          page: page.trim() || undefined,
-        },
-        citation,
-        citationStatus: "confirmed",
-        integrityStatus: "clean",
-        createdAt: saved.createdAt,
-      });
+      setSavedSource(vaultItemToSource(saved));
 
       onSourceSaved(saved);
       setStep(3);

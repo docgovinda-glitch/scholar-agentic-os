@@ -29,6 +29,7 @@ import {
   searchVaultSemantically,
   type SemanticSearchResult,
 } from "../../services/vault/semanticSearchService";
+import { scanVaultRetractions } from "../../services/vault/retractionService";
 import AddSourceModal from "./AddSourceModal";
 import SourceDetailModal from "./SourceDetailModal";
 import ProjectsView from "./ProjectsView";
@@ -177,7 +178,7 @@ export default function SourceLibraryScreen({
       if (filterType !== "all") {
         if (filterType === "paper" && s.metadata.type !== "paper") return false;
         if (filterType === "website" && s.metadata.type !== "website") return false;
-        if (filterType === "other" && s.metadata.type === "paper" && s.metadata.type === "website") {
+        if (filterType === "other" && (s.metadata.type === "paper" || s.metadata.type === "website")) {
           return false;
         }
       }

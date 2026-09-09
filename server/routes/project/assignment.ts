@@ -81,15 +81,22 @@ Return ONLY valid JSON matching this exact structure:
   "approvedByUser": false
 }`;
 
-    const analysis = await callOpenRouterJSON<any>({
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
-    });
-
+    const analysis = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Assignment Analysis Agent.",
+      prompt,
+      "openrouter/auto",
+      "analysis"
+    );
+    if (!analysis) return;
     res.json(analysis);
   } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
     console.error("Assignment analysis error:", err);
-    res.status(500).json({ error: err.message || "Failed to analyze assignment" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to analyze assignment" });
+    }
   }
 });
 
@@ -133,15 +140,22 @@ Return ONLY valid JSON matching:
   "approvedByUser": false
 }`;
 
-    const plan = await callOpenRouterJSON<any>({
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-    });
-
+    const plan = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Assignment Research Planning Agent.",
+      prompt,
+      "openrouter/auto",
+      "planning"
+    );
+    if (!plan) return;
     res.json(plan);
   } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
     console.error("Research plan error:", err);
-    res.status(500).json({ error: err.message || "Failed to generate research plan" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to generate research plan" });
+    }
   }
 });
 
@@ -193,15 +207,22 @@ Return ONLY valid JSON matching:
   ]
 }`;
 
-    const data = await callOpenRouterJSON<any>({
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-    });
-
+    const data = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Academic Research Discovery Agent.",
+      prompt,
+      "openrouter/auto",
+      "discovery"
+    );
+    if (!data) return;
     res.json(data);
   } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
     console.error("Assignment research error:", err);
-    res.status(500).json({ error: err.message || "Failed to discover research sources" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to discover research sources" });
+    }
   }
 });
 
@@ -258,15 +279,22 @@ Return ONLY valid JSON matching:
   ]
 }`;
 
-    const data = await callOpenRouterJSON<any>({
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-    });
-
+    const data = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Academic Thinking & Critique Agent.",
+      prompt,
+      "openrouter/auto",
+      "reasoning"
+    );
+    if (!data) return;
     res.json(data);
   } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
     console.error("Thinking synthesis error:", err);
-    res.status(500).json({ error: err.message || "Failed to generate thinking synthesis" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to generate thinking synthesis" });
+    }
   }
 });
 
@@ -275,12 +303,21 @@ router.post("/structure", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
 
+  let thinkingThesis = "";
+  try {
+    const rawThinking = project.answers["assignment_thinking_map"];
+    if (rawThinking) {
+      const parsed = typeof rawThinking === "string" ? JSON.parse(rawThinking) : rawThinking;
+      thinkingThesis = parsed?.customThesis || "";
+    }
+  } catch (_) {}
+
   const {
     question = project.answers["assignment_question"] || "",
     assignmentType = project.answers["assignment_type"] || "essay",
     academicLevel = project.answers["academic_level"] || "undergraduate",
     targetWordCount = project.answers["word_count"] || 2000,
-    thesis = project.answers["assignment_thinking_map"]?.customThesis || "",
+    thesis = thinkingThesis,
   } = req.body || {};
 
   try {
@@ -311,15 +348,22 @@ Return ONLY valid JSON matching:
   ]
 }`;
 
-    const data = await callOpenRouterJSON<any>({
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
-    });
-
+    const data = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Outline & Word Count Planning Agent.",
+      prompt,
+      "openrouter/auto",
+      "planning"
+    );
+    if (!data) return;
     res.json(data);
   } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
     console.error("Structure generation error:", err);
-    res.status(500).json({ error: err.message || "Failed to generate outline structure" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to generate outline structure" });
+    }
   }
 });
 
@@ -365,15 +409,22 @@ CRITICAL RULES:
 3. Maintain rigorous paragraph structure (Topic sentence → Evidence & Explanation → Critical Analysis → Transition).
 4. Provide ONLY the section draft text.`;
 
-    const draft = await callOpenRouterText({
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-    });
-
+    const draft = await callOpenRouterText(
+      req,
+      res,
+      "You are the Scholar Core Grounded Academic Drafting Agent.",
+      prompt,
+      "openrouter/auto",
+      "drafting"
+    );
+    if (!draft) return;
     res.json({ draft });
   } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
     console.error("Section drafting error:", err);
-    res.status(500).json({ error: err.message || "Failed to draft section" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to draft section" });
+    }
   }
 });
 
@@ -437,15 +488,22 @@ Return ONLY valid JSON matching:
   "priorityFixes": ["..."]
 }`;
 
-    const report = await callOpenRouterJSON<any>({
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
-    });
-
+    const report = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Senior Academic Reviewer.",
+      prompt,
+      "openrouter/auto",
+      "verification"
+    );
+    if (!report) return;
     res.json(report);
   } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
     console.error("Assignment review error:", err);
-    res.status(500).json({ error: err.message || "Failed to generate review report" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to generate review report" });
+    }
   }
 });
 
@@ -595,15 +653,22 @@ Return ONLY valid JSON matching:
   }
 }`;
 
-    const data = await callOpenRouterJSON<any>({
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-    });
-
+    const data = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Pedagogical Academic Tutor.",
+      prompt,
+      "openrouter/auto",
+      "chat"
+    );
+    if (!data) return;
     res.json(data);
   } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
     console.error("Tutor chat error:", err);
-    res.status(500).json({ error: err.message || "Failed to process tutor query" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to process tutor query" });
+    }
   }
 });
 
@@ -709,15 +774,22 @@ Return ONLY valid JSON matching:
   }
 }`;
 
-    const data = await callOpenRouterJSON<any>({
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
-    });
-
+    const data = await callOpenRouterJSON(
+      req,
+      res,
+      "You are the Scholar Core Senior Examiner & Rubric Grading Estimator.",
+      prompt,
+      "openrouter/auto",
+      "verification"
+    );
+    if (!data) return;
     res.json(data);
   } catch (err: any) {
+    if (err?.message === "RequireFrontendLLMException") return;
     console.error("Rubric estimation error:", err);
-    res.status(500).json({ error: err.message || "Failed to estimate rubric grade" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Failed to estimate rubric grade" });
+    }
   }
 });
 

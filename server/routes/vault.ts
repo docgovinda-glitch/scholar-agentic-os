@@ -111,14 +111,18 @@ router.post("/parse-file", upload.single("file"), async (req: Request, res: Resp
       if (academicMeta.abstract) metadata.abstract = academicMeta.abstract;
 
       canonicalReference = {
-        id: crypto.randomUUID(),
         kind: "JournalArticle",
         title: title,
-        authors: authors.map((name) => {
-          const parts = name.split(" ");
-          return { lastName: parts[parts.length - 1] || name, initials: parts[0]?.[0] || "" };
+        source: filename,
+        authors: authors.map((name, idx) => {
+          const parts = name.trim().split(" ");
+          return {
+            lastName: parts[parts.length - 1] || name,
+            firstName: parts.slice(0, -1).join(" "),
+            order: idx + 1,
+          };
         }),
-        year: year ? parseInt(year, 10) : undefined,
+        year: year ? String(year) : undefined,
         doi: metadata.doi,
       };
 
@@ -265,16 +269,20 @@ router.post("/parse-url", async (req: Request, res: Response) => {
     const meta = extractLightweightUrlMetadata(fetchResult.body, fetchResult.url);
 
     const canonicalReference: CanonicalReference = {
-      id: crypto.randomUUID(),
       kind: "Website",
       title: meta.title,
+      source: meta.publisher || fetchResult.url,
       publisher: meta.publisher,
       url: fetchResult.url,
-      authors: meta.authors.map((name) => {
-        const parts = name.split(" ");
-        return { lastName: parts[parts.length - 1] || name, initials: parts[0]?.[0] || "" };
+      authors: meta.authors.map((name, idx) => {
+        const parts = name.trim().split(" ");
+        return {
+          lastName: parts[parts.length - 1] || name,
+          firstName: parts.slice(0, -1).join(" "),
+          order: idx + 1,
+        };
       }),
-      year: meta.year ? parseInt(meta.year, 10) : undefined,
+      year: meta.year ? String(meta.year) : undefined,
       accessDate: new Date().toISOString().split("T")[0],
     };
 
@@ -344,14 +352,15 @@ router.post("/lookup-doi", async (req: Request, res: Response) => {
     const abstract = item.abstract ? item.abstract.replace(/<[^>]+>/g, " ").trim() : "";
 
     const canonicalReference: CanonicalReference = {
-      id: crypto.randomUUID(),
       kind: "JournalArticle",
       title,
-      authors: (item.author || []).map((a: any) => ({
+      source: journal || "Crossref",
+      authors: (item.author || []).map((a: any, idx: number) => ({
         lastName: a.family || "",
-        initials: (a.given || "").split(" ").map((s: string) => s[0]).join(""),
+        firstName: a.given || "",
+        order: idx + 1,
       })),
-      year: year ? parseInt(String(year), 10) : undefined,
+      year: year ? String(year) : undefined,
       journal,
       volume,
       issue,
@@ -560,14 +569,15 @@ router.post("/zotero/sync", async (req: Request, res: Response) => {
       const abstract = data.abstractNote || "";
 
       const canonicalReference: CanonicalReference = {
-        id: crypto.randomUUID(),
         kind: data.itemType === "book" ? "Book" : data.itemType === "thesis" ? "Thesis" : "JournalArticle",
         title,
-        authors: (data.creators || []).map((c: any) => ({
+        source: publication || "Zotero",
+        authors: (data.creators || []).map((c: any, idx: number) => ({
           lastName: c.lastName || "",
-          initials: (c.firstName || "").split(" ").map((s: string) => s[0]).join(""),
+          firstName: c.firstName || "",
+          order: idx + 1,
         })),
-        year: year ? parseInt(String(year), 10) : undefined,
+        year: year ? String(year) : undefined,
         journal: publication,
         doi: doi || undefined,
         url: data.url || (doi ? `https://doi.org/${doi}` : undefined),
@@ -639,18 +649,22 @@ router.post("/mendeley/sync", async (req: Request, res: Response) => {
         const abstract = abstractMatch?.[1]?.trim() || "";
 
         const canonicalReference: CanonicalReference = {
-          id: crypto.randomUUID(),
           kind: itemType === "book" ? "Book" : itemType === "phdthesis" ? "Thesis" : "JournalArticle",
           title,
-          authors: authors.map((name) => {
+          source: journal || "BibTeX",
+          authors: authors.map((name, idx) => {
             const parts = name.split(",");
             if (parts.length > 1) {
-              return { lastName: parts[0].trim(), initials: parts[1].trim()[0] || "" };
+              return { lastName: parts[0].trim(), firstName: parts[1].trim(), order: idx + 1 };
             }
-            const spaceParts = name.split(" ");
-            return { lastName: spaceParts[spaceParts.length - 1] || name, initials: spaceParts[0]?.[0] || "" };
+            const spaceParts = name.trim().split(" ");
+            return {
+              lastName: spaceParts[spaceParts.length - 1] || name,
+              firstName: spaceParts.slice(0, -1).join(" "),
+              order: idx + 1,
+            };
           }),
-          year: year ? parseInt(year, 10) : undefined,
+          year: year ? String(year) : undefined,
           journal,
           doi: doi || undefined,
         };
@@ -754,7 +768,8 @@ router.post("/reset", requireAuth, async (req: Request, res: Response) => {
 export function registerVaultRoutes(app: express.Express): void {
   app.use("/api/vault", router);
   // Alias for /api/lookup-doi
-  app.post("/api/lookup-doi", (req, res) => {
-    (router.handle as any)({ ...req, url: "/lookup-doi" }, res);
+  app.post("/api/lookup-doi", (req, res, next) => {
+    req.url = "/lookup-doi";
+    router(req, res, next);
   });
 }

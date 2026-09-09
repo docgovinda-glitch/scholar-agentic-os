@@ -59,17 +59,20 @@ export function formatVaultCitation(
     // Construct minimal CanonicalReference from VaultItem fields
     const vaultItem = item as VaultItem;
     ref = {
-      id: vaultItem.id || crypto.randomUUID(),
       kind: normalizeReferenceKind(vaultItem.sourceType),
       title: vaultItem.title || "Untitled Source",
-      authors: (vaultItem.authors || []).map((name) => {
+      source: vaultItem.journal || vaultItem.title || "Source Library",
+      authors: (vaultItem.authors || []).map((name, idx) => {
         const parts = name.trim().split(" ");
+        const lastName = parts.length > 1 ? parts[parts.length - 1] : name;
+        const firstName = parts.length > 1 ? parts.slice(0, -1).join(" ") : "";
         return {
-          lastName: parts[parts.length - 1] || name,
-          initials: parts[0]?.[0] || "",
+          firstName,
+          lastName,
+          order: idx + 1,
         };
       }),
-      year: vaultItem.year ? parseInt(vaultItem.year, 10) : undefined,
+      year: vaultItem.year ? String(vaultItem.year) : undefined,
       journal: vaultItem.journal,
       url: vaultItem.externalReference,
     };
@@ -108,13 +111,20 @@ export function formatVaultInText(
   } else {
     const vaultItem = item as VaultItem;
     ref = {
-      id: vaultItem.id || crypto.randomUUID(),
       kind: normalizeReferenceKind(vaultItem.sourceType),
       title: vaultItem.title || "Untitled",
-      authors: (vaultItem.authors || []).map((name) => ({
-        lastName: name.trim().split(" ").pop() || name,
-      })),
-      year: vaultItem.year ? parseInt(vaultItem.year, 10) : undefined,
+      source: vaultItem.journal || vaultItem.title || "Source Library",
+      authors: (vaultItem.authors || []).map((name, idx) => {
+        const parts = name.trim().split(" ");
+        const lastName = parts.length > 1 ? parts[parts.length - 1] : name;
+        const firstName = parts.length > 1 ? parts.slice(0, -1).join(" ") : "";
+        return {
+          firstName,
+          lastName,
+          order: idx + 1,
+        };
+      }),
+      year: vaultItem.year ? String(vaultItem.year) : undefined,
     };
   }
 

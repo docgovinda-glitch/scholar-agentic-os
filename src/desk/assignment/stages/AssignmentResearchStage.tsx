@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useAssignmentWorkspace } from "../AssignmentContext";
-import { loadVault } from "../../../services/userVault";
+import { listVaultItems } from "../../../services/vaultContents";
 import { getConnectedCloudDrives } from "../../../services/vault/cloudDriveService";
+import { getSupabaseClient } from "../../../services/supabaseClient";
 import { authedJsonFetch } from "../../api";
 import type { DiscoveredSource } from "../types";
 
@@ -34,18 +35,20 @@ export default function AssignmentResearchStage() {
 
   const loadVaultSources = async () => {
     try {
-      const vaultItems = await loadVault();
+      const { data: userData } = await getSupabaseClient().auth.getUser();
+      const userId = userData?.user?.id || (project as any)?.userId || "default-user";
+      const vaultItems = await listVaultItems(userId);
       if (vaultItems && vaultItems.length > 0) {
         const matches: DiscoveredSource[] = vaultItems.map((item, idx) => ({
           id: `vault-${item.id || idx}`,
           title: item.title,
-          authors: item.canonicalReference?.authors?.map((a) => `${a.family}, ${a.given}`) || ["Vault Author"],
-          year: String(item.canonicalReference?.year || new Date().getFullYear()),
+          authors: item.authors && item.authors.length > 0 ? item.authors : ["Vault Author"],
+          year: String(item.year || new Date().getFullYear()),
           type: "vault",
           relevanceScore: 92,
-          mainFinding: item.content.slice(0, 180) + "…",
-          suggestedUse: "Direct primary/secondary evidence from your personal Knowledge Vault.",
-          citation: item.citation || `${item.title} (${item.canonicalReference?.year || "n.d."})`,
+          mainFinding: item.content ? item.content.slice(0, 180) + "…" : (item.citation || item.title),
+          suggestedUse: "Direct primary/secondary evidence from your personal Source Library.",
+          citation: item.citation || `${item.title} (${item.year || "n.d."})`,
           status: "unreviewed",
           fromVault: true,
         }));

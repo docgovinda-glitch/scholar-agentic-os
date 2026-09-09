@@ -85,7 +85,7 @@ export default function VaultSourcesStage({
 
       // Semantically rank vault items against project research context
       const rankedResults = rankVaultItemsForProject(vaultItems, {
-        title: project.title,
+        title: project.answers?.working_title || project.answers?.assignment_title || project.answers?.title || "Research Project",
         topic: project.answers?.topic || project.answers?.research_topic,
         researchQuestion: project.answers?.research_question || project.answers?.hypothesis,
         methodology: project.answers?.methodology,

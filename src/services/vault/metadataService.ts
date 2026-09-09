@@ -81,34 +81,83 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
 
   try {
     // 1. First try backend endpoint /api/vault/lookup-doi
-    const res = await authedJsonFetch<{
-      success?: boolean;
-      title?: string;
-      authors?: string[];
-      year?: string;
-      journal?: string;
-      citation?: string;
-      error?: string;
-    }>("/api/vault/lookup-doi", "POST", { doi: clean });
+    const res = await authedJsonFetch("/api/vault/lookup-doi", "POST", { doi: clean });
+    if (res.ok) {
+      const data = (await res.json()) as {
+        success?: boolean;
+        title?: string;
+        authors?: string[];
+        year?: string;
+        journal?: string;
+        citation?: string;
+        error?: string;
+      };
 
-    if (res && res.success && res.title) {
-      const authors = res.authors || [];
-      const year = res.year || "";
-      const journal = res.journal || "";
-      const citation =
-        res.citation ||
-        generateAPA7Citation({
-          authors,
-          year,
-          title: res.title,
-          journal,
-          doi: clean,
-        });
+      if (data && data.success && data.title) {
+        const authors = data.authors || [];
+        const year = data.year || "";
+        const journal = data.journal || "";
+        const citation =
+          data.citation ||
+          generateAPA7Citation({
+            authors,
+            year,
+            title: data.title,
+            journal,
+            doi: clean,
+          });
+
+        return {
+          success: true,
+          metadata: {
+            title: data.title,
+            authors,
+            year,
+            journal,
+            doi: clean,
+            url: `https://doi.org/${clean}`,
+            type: "paper",
+          },
+          citation,
+          confidence: "verified",
+        };
+      }
+    }
+  } catch {
+    // Fall back to direct OpenAlex API
+  }
+
+  // 2. OpenAlex free API (CORS enabled, highly reliable)
+  try {
+    const openAlexUrl = `https://api.openalex.org/works/https://doi.org/${clean}`;
+    const res = await fetch(openAlexUrl, {
+      headers: { Accept: "application/json" },
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const title = data.title || "";
+      const authors: string[] = (data.authorships || [])
+        .map((a: any) => a.author?.display_name)
+        .filter(Boolean);
+      const year = data.publication_year ? String(data.publication_year) : "";
+      const journal =
+        data.primary_location?.source?.display_name ||
+        data.host_venue?.name ||
+        "";
+
+      const citation = generateAPA7Citation({
+        authors,
+        year,
+        title,
+        journal,
+        doi: clean,
+      });
 
       return {
         success: true,
         metadata: {
-          title: res.title,
+          title,
           authors,
           year,
           journal,
@@ -121,26 +170,30 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
       };
     }
   } catch {
-    // Fall back to direct OpenAlex API
+    // Fall through to Crossref
   }
 
-  // 2. Direct OpenAlex API fallback
+  // 3. Crossref API
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    const response = await fetch(`https://api.openalex.org/works/https://doi.org/${encodeURIComponent(clean)}`, {
+    const crossrefUrl = `https://api.crossref.org/works/${clean}`;
+    const res = await fetch(crossrefUrl, {
       headers: { Accept: "application/json" },
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timer));
+    });
 
-    if (response.ok) {
-      const work = await response.json();
-      const title = work.display_name || work.title || clean;
-      const authors: string[] = (work.authorships || []).map(
-        (a: any) => a.author?.display_name || ""
-      ).filter(Boolean);
-      const year = work.publication_year ? String(work.publication_year) : "";
-      const journal = work.primary_location?.source?.display_name || "";
+    if (res.ok) {
+      const data = await res.json();
+      const item = data.message;
+      const title = item.title?.[0] || "";
+      const authors: string[] = (item.author || []).map((a: any) => {
+        if (a.given && a.family) return `${a.given} ${a.family}`;
+        return a.family || a.name || "";
+      });
+      const year =
+        item.published?.["date-parts"]?.[0]?.[0]?.toString() ||
+        item["published-print"]?.["date-parts"]?.[0]?.[0]?.toString() ||
+        "";
+      const journal = item["container-title"]?.[0] || "";
+
       const citation = generateAPA7Citation({
         authors,
         year,
@@ -169,27 +222,26 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
   return {
     success: false,
     metadata: {
-      title: `Publication (${clean})`,
+      title: "",
       authors: [],
       doi: clean,
-      url: `https://doi.org/${clean}`,
       type: "paper",
     },
-    citation: `https://doi.org/${clean}`,
+    citation: "",
     confidence: "needs_review",
-    error: `Could not automatically fetch metadata for DOI: ${clean}. You can enter details manually.`,
+    error: `Could not automatically resolve metadata for DOI ${clean}. Please fill in details manually.`,
   };
 }
 
 /**
- * Resolves metadata from a website URL.
+ * Resolves metadata from a web URL.
  */
 export async function resolveUrlMetadata(url: string): Promise<ResolvedMetadataResult> {
   const trimmed = url.trim();
   if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
     return {
       success: false,
-      metadata: { title: "", authors: [] },
+      metadata: { title: "", authors: [], url: trimmed, type: "website" },
       citation: "",
       confidence: "needs_review",
       error: "Please enter a valid URL starting with https://",
@@ -197,41 +249,44 @@ export async function resolveUrlMetadata(url: string): Promise<ResolvedMetadataR
   }
 
   try {
-    const res = await authedJsonFetch<{
-      success?: boolean;
-      title?: string;
-      citation?: string;
-      canonicalReference?: any;
-      error?: string;
-    }>("/api/vault/parse-url", "POST", { url: trimmed });
-
-    if (res && res.success && res.title) {
-      const domain = new URL(trimmed).hostname.replace(/^www\./, "");
-      const title = res.title;
-      const publisher = res.canonicalReference?.publisher || domain;
-      const year = new Date().getFullYear().toString();
-      const citation =
-        res.citation ||
-        generateAPA7Citation({
-          title,
-          publisher,
-          year,
-          url: trimmed,
-        });
-
-      return {
-        success: true,
-        metadata: {
-          title,
-          authors: [],
-          year,
-          publisher,
-          url: trimmed,
-          type: "website",
-        },
-        citation,
-        confidence: "verified",
+    const res = await authedJsonFetch("/api/vault/parse-url", "POST", { url: trimmed });
+    if (res.ok) {
+      const data = (await res.json()) as {
+        success?: boolean;
+        title?: string;
+        citation?: string;
+        canonicalReference?: any;
+        error?: string;
       };
+
+      if (data && data.success && data.title) {
+        const domain = new URL(trimmed).hostname.replace(/^www\./, "");
+        const title = data.title;
+        const publisher = data.canonicalReference?.publisher || domain;
+        const year = new Date().getFullYear().toString();
+        const citation =
+          data.citation ||
+          generateAPA7Citation({
+            title,
+            publisher,
+            year,
+            url: trimmed,
+          });
+
+        return {
+          success: true,
+          metadata: {
+            title,
+            authors: [],
+            year,
+            publisher,
+            url: trimmed,
+            type: "website",
+          },
+          citation,
+          confidence: "verified",
+        };
+      }
     }
   } catch {}
 

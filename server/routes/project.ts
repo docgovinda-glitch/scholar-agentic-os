@@ -77,6 +77,7 @@ import { deleteSourceFromRelational } from "../src/syncRelational";
 
 import { emptyDocument } from "../../src/domain/document/model.ts";
 import type { Block, CanonicalDocument } from "../../src/domain/document/model.ts";
+import { approveEvidence, rejectEvidence } from "../../src/domain/evidence/stateMachine.ts";
 import { addClaim, bindEvidence, removeSource, unsupportedClaims, findConflicts, claimsDependingOnSource, markClaimUnsupported, ClaimGraphError } from "../../src/domain/claim/graph.ts";
 import type { Claim, ClaimEvidenceBinding, ClaimEvidenceGraph, EvidenceSpan, SupportStrength } from "../../src/domain/claim/types.ts";
 import { addSubmission, updateSubmission, deleteSubmission, SubmissionError } from "../../src/domain/submission/submissions.ts";
@@ -1218,7 +1219,7 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     if (evidenceLedger.items.some((i) => i.id === targetId || i.sourceId === targetId)) {
       const item = evidenceLedger.items.find((i) => i.id === targetId || i.sourceId === targetId)!;
       try {
-        evidenceLedger = rejectEvidence(evidenceLedger, item.id, actor);
+        evidenceLedger = rejectEvidence(evidenceLedger, item.id, actor, req.body?.reason || "Rejected by user");
       } catch (_) {}
     }
     const gates = recomputeG2({ ...record, evidenceLedger });
