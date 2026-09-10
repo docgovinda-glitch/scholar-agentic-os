@@ -1,17 +1,18 @@
 /**
- * Add Source Modal — Simple 3-step source intake flow for Source Library.
+ * Add Source Modal — Streamlined 1-Step Fast Intake for Knowledge Vault.
  *
- * STEP 1: Select source location (Google Drive, OneDrive, URL, DOI, or BibTeX/RIS).
- * STEP 2: Review detected metadata, check duplicates, assign project & writing notes.
- * STEP 3: Source saved confirmation with APA 7 citation, [Copy Citation], and [Open Source].
+ * Fast & Direct:
+ * 1. Paste a URL, DOI, BibTeX, or title into a single smart input.
+ * 2. Instant auto-fetch and field population.
+ * 3. 1-click "Save Source" to save directly to Knowledge Vault.
  *
- * User source files stay in Google Drive / OneDrive — zero server-side file copies.
+ * User files stay in their cloud storage or web source — zero file copies.
  */
 
-import { useState, useId } from "react";
+import { useState, useEffect } from "react";
 import type { VaultItem } from "../../services/vaultContents";
-import type { CloudStorageProvider, Source, SourceType } from "../../services/vault/sourceTypes";
-import { sourceToVaultItemPayload, vaultItemToSource } from "../../services/vault/sourceTypes";
+import type { CloudStorageProvider, SourceType } from "../../services/vault/sourceTypes";
+import { sourceToVaultItemPayload } from "../../services/vault/sourceTypes";
 import { addVaultItem } from "../../services/vaultContents";
 import {
   checkForDuplicates,
@@ -22,15 +23,6 @@ import {
   resolveUrlMetadata,
   generateAPA7Citation,
 } from "../../services/vault/metadataService";
-import {
-  getConnectedCloudDrives,
-  initiateGoogleDriveAuth,
-  initiateOneDriveAuth,
-  type CloudDriveAccount,
-  type DriveFileItem,
-} from "../../services/vault/cloudDriveService";
-import { isSupabaseConfigured, getSupabaseClient } from "../../services/supabaseClient";
-import { authedFetch } from "../api";
 
 export interface AddSourceModalProps {
   userId: string;
@@ -40,8 +32,7 @@ export interface AddSourceModalProps {
   onSourceSaved: (savedItem: VaultItem) => void;
 }
 
-type Step = 1 | 2 | 3;
-type IntakeMode = "google_drive" | "onedrive" | "url" | "doi" | "bibtex";
+type IntakeType = "url" | "doi" | "bibtex" | "cloud_drive" | "onedrive" | "manual";
 
 export default function AddSourceModal({
   userId,
@@ -49,20 +40,13 @@ export default function AddSourceModal({
   onClose,
   onSourceSaved,
 }: AddSourceModalProps) {
-  const [step, setStep] = useState<Step>(1);
-  const [mode, setMode] = useState<IntakeMode>("doi");
+  // Smart intake input
+  const [smartInput, setSmartInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fetchStatus, setFetchStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Step 1 inputs
-  const [doiInput, setDoiInput] = useState("");
-  const [urlInput, setUrlInput] = useState("");
-  const [bibtexInput, setBibtexInput] = useState("");
-  const [cloudFileName, setCloudFileName] = useState("");
-  const [cloudFileLink, setCloudFileLink] = useState("");
-  const [cloudFileId, setCloudFileId] = useState("");
-
-  // Step 2 metadata
+  // Core metadata fields
   const [title, setTitle] = useState("");
   const [authorsText, setAuthorsText] = useState("");
   const [year, setYear] = useState("");
@@ -71,11 +55,13 @@ export default function AddSourceModal({
   const [doi, setDoi] = useState("");
   const [webUrl, setWebUrl] = useState("");
   const [sourceType, setSourceType] = useState<SourceType>("paper");
+
+  // Optional collapsible details
+  const [showExtras, setShowExtras] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [whySaved, setWhySaved] = useState("");
   const [keyQuote, setKeyQuote] = useState("");
-  const [page, setPage] = useState("");
   const [cloudReference, setCloudReference] = useState<{
     provider: CloudStorageProvider;
     fileId: string;
@@ -87,238 +73,171 @@ export default function AddSourceModal({
   const [duplicateWarning, setDuplicateWarning] = useState<DuplicateCheckResult | null>(null);
   const [bypassDuplicate, setBypassDuplicate] = useState(false);
 
-  // Step 3 saved result
-  const [savedSource, setSavedSource] = useState<Source | null>(null);
-  const [copiedCitation, setCopiedCitation] = useState(false);
-
-  // Cloud auth prompt state
-  const [connectingDrive, setConnectingDrive] = useState<CloudStorageProvider | null>(null);
-  const [cloudDrives, setCloudDrives] = useState<CloudDriveAccount[]>([]);
-
-  // Google Drive file picker state
-  const [driveFiles, setDriveFiles] = useState<DriveFileItem[]>([]);
-  const [loadingDriveFiles, setLoadingDriveFiles] = useState(false);
-  const [driveError, setDriveError] = useState<string | null>(null);
-  const [driveSearchQuery, setDriveSearchQuery] = useState("");
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-
-  async function loadDriveFiles() {
-    setLoadingDriveFiles(true);
-    setDriveError(null);
-    try {
-      const headers: Record<string, string> = {};
-      if (isSupabaseConfigured()) {
-        try {
-          const supabase = getSupabaseClient();
-          const { data } = await supabase.auth.getSession();
-          if (data?.session?.provider_token) {
-            headers["x-provider-token"] = data.session.provider_token;
-          }
-        } catch {}
-      }
-
-      const res = await authedFetch("/api/vault/drive/files", { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setDriveFiles(data.files || []);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        if (err.needsReauth) {
-          setDriveError("Google Drive file permissions needed to browse files directly.");
-        } else {
-          setDriveError(err.error || "Could not load Drive files.");
-        }
-      }
-    } catch (e: any) {
-      setDriveError(e.message || "Failed to load Google Drive files.");
-    } finally {
-      setLoadingDriveFiles(false);
+  // Detect input type
+  function detectType(val: string): IntakeType {
+    const trimmed = val.trim();
+    if (!trimmed) return "manual";
+    if (trimmed.startsWith("@") && (trimmed.includes("{") || trimmed.includes("="))) {
+      return "bibtex";
     }
-  }
-
-  async function handleSelectGoogleDrive() {
-    setMode("google_drive");
-    setError(null);
-    try {
-      const drives = await getConnectedCloudDrives(userId);
-      setCloudDrives(drives);
-      const isConnected = drives.some((d) => d.provider === "google_drive");
-      if (isConnected) {
-        setConnectingDrive(null);
-        loadDriveFiles();
-      } else {
-        let hasGoogleSession = false;
-        if (isSupabaseConfigured()) {
-          try {
-            const supabase = getSupabaseClient();
-            const { data } = await supabase.auth.getSession();
-            if (data?.session?.user?.app_metadata?.provider === "google" || data?.session?.provider_token) {
-              hasGoogleSession = true;
-            }
-          } catch {}
-        }
-        if (hasGoogleSession) {
-          setConnectingDrive(null);
-          loadDriveFiles();
-        } else {
-          setConnectingDrive("google_drive");
-        }
-      }
-    } catch {}
-  }
-
-  async function handleSelectOneDrive() {
-    setMode("onedrive");
-    setError(null);
-    try {
-      const drives = await getConnectedCloudDrives(userId);
-      setCloudDrives(drives);
-      const isConnected = drives.some((d) => d.provider === "onedrive");
-      if (!isConnected) {
-        setConnectingDrive("onedrive");
-      }
-    } catch {}
-  }
-
-  async function handleConnectCloud(provider: CloudStorageProvider) {
-    setBusy(true);
-    setError(null);
-    try {
-      if (provider === "google_drive") {
-        await initiateGoogleDriveAuth(userId);
-      } else {
-        await initiateOneDriveAuth(userId);
-      }
-      const updated = await getConnectedCloudDrives(userId);
-      setCloudDrives(updated);
-      setConnectingDrive(null);
-    } catch (err: any) {
-      setError(err.message || "Cloud connection failed.");
-    } finally {
-      setBusy(false);
+    if (
+      /^10\.\d{4,9}\/[-._;()/:A-Z0-9]+$/i.test(trimmed) ||
+      /^(?:https?:\/\/)?(?:dx\.)?doi\.org\/10\.\d{4,9}\/[-._;()/:A-Z0-9]+$/i.test(trimmed)
+    ) {
+      return "doi";
     }
+    if (trimmed.includes("drive.google.com") || trimmed.includes("docs.google.com")) {
+      return "cloud_drive";
+    }
+    if (trimmed.includes("onedrive.live.com") || trimmed.includes("sharepoint.com") || trimmed.includes("1drv.ms")) {
+      return "onedrive";
+    }
+    if (/^https?:\/\//i.test(trimmed)) {
+      return "url";
+    }
+    return "manual";
   }
 
-  async function handleProceedFromStep1() {
+  // Parse BibTeX snippet
+  function parseBibtex(raw: string) {
+    const titleMatch = raw.match(/title\s*=\s*[\{"]([^"\}]+)[\}"]/i);
+    const authorMatch = raw.match(/author\s*=\s*[\{"]([^"\}]+)[\}"]/i);
+    const yearMatch = raw.match(/year\s*=\s*[\{"]?(\d{4})[\}"]?/i);
+    const journalMatch = raw.match(/(?:journal|booktitle|publisher)\s*=\s*[\{"]([^"\}]+)[\}"]/i);
+    const doiMatch = raw.match(/doi\s*=\s*[\{"]([^"\}]+)[\}"]/i);
+
+    const parsedTitle = titleMatch?.[1]?.trim() || "";
+    const parsedAuthors = authorMatch?.[1]?.trim() || "";
+    const parsedYear = yearMatch?.[1] || "";
+    const parsedJournal = journalMatch?.[1]?.trim() || "";
+    const parsedDoi = doiMatch?.[1]?.trim() || "";
+
+    if (parsedTitle) setTitle(parsedTitle);
+    if (parsedAuthors) setAuthorsText(parsedAuthors);
+    if (parsedYear) setYear(parsedYear);
+    if (parsedJournal) {
+      setJournal(parsedJournal);
+      setPublisher(parsedJournal);
+    }
+    if (parsedDoi) setDoi(parsedDoi);
+    setSourceType("paper");
+    setFetchStatus("BibTeX reference parsed");
+  }
+
+  // Resolve metadata from smart input
+  async function handleSmartFetch(queryOverride?: string) {
+    const raw = (queryOverride !== undefined ? queryOverride : smartInput).trim();
+    if (!raw) return;
+
+    const kind = detectType(raw);
     setError(null);
+    setFetchStatus(null);
     setBusy(true);
 
     try {
-      if (mode === "doi") {
-        if (!doiInput.trim()) {
-          setError("Please enter a DOI (e.g. 10.1038/nature12373)");
-          setBusy(false);
-          return;
-        }
-        const resolved = await resolveDoiMetadata(doiInput.trim());
-        setTitle(resolved.metadata.title);
-        setAuthorsText(resolved.metadata.authors.join(", "));
-        setYear(resolved.metadata.year || "");
-        setJournal(resolved.metadata.journal || "");
-        setDoi(resolved.metadata.doi || doiInput.trim());
-        setWebUrl(resolved.metadata.url || `https://doi.org/${resolved.metadata.doi || doiInput.trim()}`);
-        setSourceType("paper");
-        setCloudReference(undefined);
+      if (kind === "doi") {
+        setFetchStatus("Resolving DOI via CrossRef / OpenAlex…");
+        const cleanDoi = raw.replace(/^(?:https?:\/\/)?(?:dx\.)?doi\.org\//i, "").trim();
+        const res = await resolveDoiMetadata(cleanDoi);
 
-        // Check duplicates
+        if (res.success && res.metadata.title) {
+          setTitle(res.metadata.title);
+          setAuthorsText((res.metadata.authors || []).join(", "));
+          setYear(res.metadata.year || "");
+          setJournal(res.metadata.journal || "");
+          setDoi(res.metadata.doi || cleanDoi);
+          setWebUrl(res.metadata.url || `https://doi.org/${res.metadata.doi || cleanDoi}`);
+          setSourceType("paper");
+          setFetchStatus("✓ DOI metadata verified");
+
+          const dup = checkForDuplicates(
+            {
+              title: res.metadata.title,
+              doi: res.metadata.doi || cleanDoi,
+              authors: res.metadata.authors,
+              year: res.metadata.year,
+            },
+            existingItems
+          );
+          if (dup.isDuplicate) setDuplicateWarning(dup);
+        } else {
+          setDoi(cleanDoi);
+          setWebUrl(`https://doi.org/${cleanDoi}`);
+          setSourceType("paper");
+          setFetchStatus("DOI recognized — please fill remaining details");
+        }
+      } else if (kind === "url") {
+        setFetchStatus("Fetching article metadata & citations…");
+        const res = await resolveUrlMetadata(raw);
+
+        setTitle(res.metadata.title || "");
+        setAuthorsText((res.metadata.authors || []).join(", "));
+        setYear(res.metadata.year || "");
+        setJournal(res.metadata.journal || res.metadata.publisher || "");
+        setPublisher(res.metadata.publisher || "");
+        setDoi(res.metadata.doi || "");
+        setWebUrl(res.metadata.url || raw);
+        setSourceType(res.metadata.type === "paper" || res.metadata.doi || res.metadata.journal ? "paper" : "website");
+        setFetchStatus(res.confidence === "verified" ? "✓ Metadata verified" : "Source details fetched");
+
         const dup = checkForDuplicates(
           {
-            doi: resolved.metadata.doi || doiInput.trim(),
-            title: resolved.metadata.title,
-            authors: resolved.metadata.authors,
-            year: resolved.metadata.year,
+            title: res.metadata.title,
+            doi: res.metadata.doi,
+            authors: res.metadata.authors,
+            year: res.metadata.year,
           },
           existingItems
         );
         if (dup.isDuplicate) setDuplicateWarning(dup);
-        setStep(2);
-      } else if (mode === "url") {
-        if (!urlInput.trim()) {
-          setError("Please enter a valid website URL");
-          setBusy(false);
-          return;
-        }
-        const resolved = await resolveUrlMetadata(urlInput.trim());
-        setTitle(resolved.metadata.title);
-        setAuthorsText(resolved.metadata.authors.join(", "));
-        setPublisher(resolved.metadata.publisher || "");
-        setWebUrl(resolved.metadata.url || urlInput.trim());
-        setSourceType("website");
-        setCloudReference(undefined);
+      } else if (kind === "bibtex") {
+        parseBibtex(raw);
+      } else if (kind === "cloud_drive" || kind === "onedrive") {
+        const provider: CloudStorageProvider = kind === "cloud_drive" ? "google_drive" : "onedrive";
+        const driveMatch = raw.match(/\/(?:file\/d|document\/d|spreadsheets\/d|presentation\/d)\/([a-zA-Z0-9_-]+)/);
+        const fileId = driveMatch?.[1] || `cloud_${Date.now()}`;
+        const fileName = "Cloud Research Document.pdf";
 
-        const dup = checkForDuplicates({ title: resolved.metadata.title }, existingItems);
-        if (dup.isDuplicate) setDuplicateWarning(dup);
-        setStep(2);
-      } else if (mode === "google_drive" || mode === "onedrive") {
-        const provider: CloudStorageProvider = mode;
-        const fileName = cloudFileName.trim() || "Research Document.pdf";
-        const cleanTitle = fileName.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
-
-        setTitle(cleanTitle);
-        setAuthorsText("");
-        setYear(new Date().getFullYear().toString());
-        setSourceType("paper");
         setCloudReference({
           provider,
-          fileId: cloudFileId.trim() || `cloud_${Date.now()}`,
+          fileId,
           fileName,
-          webUrl: cloudFileLink.trim() || (provider === "google_drive" ? "https://drive.google.com" : "https://onedrive.live.com"),
+          webUrl: raw,
         });
-
-        const dup = checkForDuplicates({ title: cleanTitle }, existingItems);
-        if (dup.isDuplicate) setDuplicateWarning(dup);
-        setStep(2);
-      } else if (mode === "bibtex") {
-        if (!bibtexInput.trim()) {
-          setError("Please paste a BibTeX or RIS reference string");
-          setBusy(false);
-          return;
-        }
-        // Extract basic fields via regex heuristics
-        const titleMatch = bibtexInput.match(/title\s*=\s*[\{"]([^"\}]+)[\}"]/i);
-        const authorMatch = bibtexInput.match(/author\s*=\s*[\{"]([^"\}]+)[\}"]/i);
-        const yearMatch = bibtexInput.match(/year\s*=\s*[\{"]?(\d{4})[\}"]?/i);
-        const journalMatch = bibtexInput.match(/(?:journal|booktitle|publisher)\s*=\s*[\{"]([^"\}]+)[\}"]/i);
-        const doiMatch = bibtexInput.match(/doi\s*=\s*[\{"]([^"\}]+)[\}"]/i);
-
-        const parsedTitle = titleMatch?.[1]?.trim() || "Imported Reference";
-        const parsedAuthors = authorMatch?.[1]?.trim() || "";
-        const parsedYear = yearMatch?.[1] || "";
-        const parsedJournal = journalMatch?.[1]?.trim() || "";
-        const parsedDoi = doiMatch?.[1]?.trim() || "";
-
-        setTitle(parsedTitle);
-        setAuthorsText(parsedAuthors);
-        setYear(parsedYear);
-        setJournal(parsedJournal);
-        setDoi(parsedDoi);
+        if (!title) setTitle("Cloud Research Document");
+        setWebUrl(raw);
         setSourceType("paper");
-        setCloudReference(undefined);
-
-        const dup = checkForDuplicates({ title: parsedTitle, doi: parsedDoi }, existingItems);
-        if (dup.isDuplicate) setDuplicateWarning(dup);
-        setStep(2);
+        setFetchStatus(`✓ Connected to ${provider === "google_drive" ? "Google Drive" : "OneDrive"}`);
+      } else {
+        // Raw title
+        setTitle(raw);
+        setFetchStatus("Title set — add author & year if known");
       }
     } catch (err: any) {
-      setError(err.message || "Could not retrieve source metadata.");
+      setError(err.message || "Failed to retrieve source metadata.");
     } finally {
       setBusy(false);
     }
   }
 
-  function handleAddTag() {
-    const trimmed = tagInput.trim().replace(/^#/, "");
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
-      setTagInput("");
+  // Handle paste directly into the smart input
+  function handleSmartInputPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const pastedText = e.clipboardData.getData("text").trim();
+    if (pastedText) {
+      setSmartInput(pastedText);
+      const kind = detectType(pastedText);
+      if (kind === "url" || kind === "doi" || kind === "bibtex" || kind === "cloud_drive" || kind === "onedrive") {
+        setTimeout(() => {
+          handleSmartFetch(pastedText);
+        }, 50);
+      }
     }
   }
 
-  function handleRemoveTag(tagToRemove: string) {
-    setTags(tags.filter((t) => t !== tagToRemove));
-  }
+  // Handle saving the source directly
+  async function handleSaveSource(e?: React.FormEvent) {
+    if (e) e.preventDefault();
 
-  async function handleSaveSource() {
     if (!title.trim()) {
       setError("Source title is required");
       return;
@@ -360,7 +279,6 @@ export default function AddSourceModal({
         notes: {
           whySaved: whySaved.trim() || undefined,
           keyQuote: keyQuote.trim() || undefined,
-          page: page.trim() || undefined,
         },
         citation,
         citationStatus: "confirmed",
@@ -368,10 +286,8 @@ export default function AddSourceModal({
       });
 
       const saved = await addVaultItem(userId, sourcePayload);
-      setSavedSource(vaultItemToSource(saved));
-
       onSourceSaved(saved);
-      setStep(3);
+      onClose();
     } catch (err: any) {
       setError(err.message || "Failed to save source.");
     } finally {
@@ -379,36 +295,16 @@ export default function AddSourceModal({
     }
   }
 
-  function handleResetForAnother() {
-    setStep(1);
-    setMode("doi");
-    setDoiInput("");
-    setUrlInput("");
-    setBibtexInput("");
-    setCloudFileName("");
-    setCloudFileLink("");
-    setTitle("");
-    setAuthorsText("");
-    setYear("");
-    setJournal("");
-    setPublisher("");
-    setDoi("");
-    setWebUrl("");
-    setTags([]);
-    setWhySaved("");
-    setKeyQuote("");
-    setPage("");
-    setDuplicateWarning(null);
-    setBypassDuplicate(false);
-    setSavedSource(null);
-    setCopiedCitation(false);
+  function handleAddTag() {
+    const trimmed = tagInput.trim().replace(/^#/, "");
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags([...tags, trimmed]);
+      setTagInput("");
+    }
   }
 
-  function handleCopyCitation() {
-    if (!savedSource?.citation) return;
-    navigator.clipboard.writeText(savedSource.citation);
-    setCopiedCitation(true);
-    setTimeout(() => setCopiedCitation(false), 2500);
+  function handleRemoveTag(tagToRemove: string) {
+    setTags(tags.filter((t) => t !== tagToRemove));
   }
 
   return (
@@ -418,18 +314,16 @@ export default function AddSourceModal({
       aria-labelledby="add-source-title"
       className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-150"
     >
-      <div className="w-full max-w-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-xl)] shadow-2xl flex flex-col overflow-hidden my-6">
+      <div className="w-full max-w-lg bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-xl)] shadow-2xl flex flex-col overflow-hidden my-6">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]">
-          <div className="flex items-center gap-2">
-            <h3 id="add-source-title" className="text-base font-bold text-[color:var(--text-primary)]">
-              {step === 1 && "Add Source"}
-              {step === 2 && "Review Source Details"}
-              {step === 3 && "Source Saved"}
-            </h3>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-muted)]">
-              Step {step} of 3
-            </span>
+          <div>
+            <h2 id="add-source-title" className="text-base font-bold text-[color:var(--text-primary)]">
+              Add Source
+            </h2>
+            <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
+              Paste a link, DOI, or title to instantly organize and cite it.
+            </p>
           </div>
           <button
             type="button"
@@ -441,551 +335,193 @@ export default function AddSourceModal({
           </button>
         </div>
 
-        {/* Reassurance storage notice */}
-        <div className="bg-[color:var(--accent-subtle)]/40 border-b border-[color:var(--border-subtle)] px-6 py-2.5 flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
-          <span className="text-sm">🛡️</span>
-          <span>
-            <strong>Zero document storage:</strong> Your original files remain in your Google Drive, OneDrive, or web link. We store only citation metadata.
-          </span>
-        </div>
+        {/* Content Form */}
+        <form onSubmit={handleSaveSource} className="p-6 flex flex-col gap-4">
+          {/* Smart Input Row */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="smart-intake-input" className="text-xs font-bold text-[color:var(--text-primary)]">
+              URL, DOI, or Reference
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="smart-intake-input"
+                type="text"
+                value={smartInput}
+                onChange={(e) => setSmartInput(e.target.value)}
+                onPaste={handleSmartInputPaste}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !title) {
+                    e.preventDefault();
+                    handleSmartFetch();
+                  }
+                }}
+                placeholder="Paste URL (https://...), DOI (10.1038/...), or title..."
+                className="flex-1 px-3.5 py-2.5 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden focus:border-[color:var(--accent)]"
+              />
+              <button
+                type="button"
+                onClick={() => handleSmartFetch()}
+                disabled={busy || !smartInput.trim()}
+                className="px-3.5 py-2.5 bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] text-xs font-semibold rounded-[var(--radius-md)] disabled:opacity-50 cursor-pointer shrink-0 transition-colors"
+              >
+                {busy ? "Fetching…" : "Fetch"}
+              </button>
+            </div>
 
-        {/* Body Content */}
-        <div className="p-6 flex flex-col gap-5 max-h-[75vh] overflow-y-auto">
-          {error && (
-            <div
-              role="alert"
-              className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-[var(--radius-md)] text-xs leading-relaxed flex items-start gap-2"
+            {/* Fetch feedback or error */}
+            {fetchStatus && (
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
+                {fetchStatus}
+              </p>
+            )}
+            {error && (
+              <p className="text-[11px] text-[color:var(--state-danger)] font-medium mt-0.5">
+                {error}
+              </p>
+            )}
+          </div>
+
+          {/* Duplicate Warning */}
+          {duplicateWarning?.isDuplicate && !bypassDuplicate && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 rounded-[var(--radius-md)] text-xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 truncate">
+                <span>⚠️</span>
+                <span className="truncate">
+                  Already in Vault: <strong>"{duplicateWarning.existingItem?.title}"</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBypassDuplicate(true)}
+                className="shrink-0 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-semibold cursor-pointer"
+              >
+                Save Anyway
+              </button>
+            </div>
+          )}
+
+          {/* Core Metadata Fields */}
+          <div className="pt-2 border-t border-[color:var(--border-subtle)] flex flex-col gap-3">
+            {/* Title */}
+            <div className="flex flex-col gap-1">
+              <label htmlFor="source-title" className="text-xs font-bold text-[color:var(--text-primary)]">
+                Title *
+              </label>
+              <input
+                id="source-title"
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Towards a Global International Relations?"
+                className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden focus:border-[color:var(--accent)]"
+              />
+            </div>
+
+            {/* Authors */}
+            <div className="flex flex-col gap-1">
+              <label htmlFor="source-authors" className="text-xs font-bold text-[color:var(--text-primary)]">
+                Authors (comma-separated)
+              </label>
+              <input
+                id="source-authors"
+                type="text"
+                value={authorsText}
+                onChange={(e) => setAuthorsText(e.target.value)}
+                placeholder="e.g. Acharya, Amitav"
+                className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden focus:border-[color:var(--accent)]"
+              />
+            </div>
+
+            {/* Year & Journal/Publisher Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="source-year" className="text-xs font-bold text-[color:var(--text-primary)]">
+                  Publication Year
+                </label>
+                <input
+                  id="source-year"
+                  type="text"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  placeholder="e.g. 2024"
+                  className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden focus:border-[color:var(--accent)]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label htmlFor="source-journal" className="text-xs font-bold text-[color:var(--text-primary)]">
+                  Journal / Publisher
+                </label>
+                <input
+                  id="source-journal"
+                  type="text"
+                  value={journal || publisher}
+                  onChange={(e) => {
+                    setJournal(e.target.value);
+                    setPublisher(e.target.value);
+                  }}
+                  placeholder="e.g. E-International Relations"
+                  className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden focus:border-[color:var(--accent)]"
+                />
+              </div>
+            </div>
+
+            {/* DOI & URL Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="source-doi" className="text-xs font-bold text-[color:var(--text-primary)]">
+                  DOI
+                </label>
+                <input
+                  id="source-doi"
+                  type="text"
+                  value={doi}
+                  onChange={(e) => setDoi(e.target.value)}
+                  placeholder="10.1038/..."
+                  className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden focus:border-[color:var(--accent)]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label htmlFor="source-weburl" className="text-xs font-bold text-[color:var(--text-primary)]">
+                  Link / Web URL
+                </label>
+                <input
+                  id="source-weburl"
+                  type="text"
+                  value={webUrl}
+                  onChange={(e) => setWebUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden focus:border-[color:var(--accent)]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Optional Details Accordion */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setShowExtras(!showExtras)}
+              className="text-xs text-[color:var(--accent)] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
             >
-              <span className="text-sm">⚠️</span>
-              <div className="flex-1">{error}</div>
-            </div>
-          )}
+              <span>{showExtras ? "▼" : "▶"}</span>
+              <span>{showExtras ? "Hide tags and writing notes" : "+ Add tags or notes (optional)"}</span>
+            </button>
 
-          {/* STEP 1: SELECT SOURCE */}
-          {step === 1 && (
-            <div className="flex flex-col gap-4">
-              <p className="text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
-                Where is your source?
-              </p>
-
-              {/* Source Type Selection Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <button
-                  type="button"
-                  onClick={handleSelectGoogleDrive}
-                  className={`p-3 rounded-[var(--radius-lg)] border text-left flex flex-col gap-1.5 transition-all cursor-pointer ${
-                    mode === "google_drive"
-                      ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)]/30 ring-1 ring-[color:var(--accent)]"
-                      : "border-[color:var(--border-default)] hover:border-[color:var(--border-hover)] bg-[color:var(--surface-inset)]"
-                  }`}
-                >
-                  <span className="text-xl">📁</span>
-                  <div>
-                    <div className="text-xs font-bold text-[color:var(--text-primary)]">Google Drive</div>
-                    <div className="text-[11px] text-[color:var(--text-muted)]">Select from cloud</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSelectOneDrive}
-                  className={`p-3 rounded-[var(--radius-lg)] border text-left flex flex-col gap-1.5 transition-all cursor-pointer ${
-                    mode === "onedrive"
-                      ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)]/30 ring-1 ring-[color:var(--accent)]"
-                      : "border-[color:var(--border-default)] hover:border-[color:var(--border-hover)] bg-[color:var(--surface-inset)]"
-                  }`}
-                >
-                  <span className="text-xl">☁️</span>
-                  <div>
-                    <div className="text-xs font-bold text-[color:var(--text-primary)]">OneDrive</div>
-                    <div className="text-[11px] text-[color:var(--text-muted)]">Select from 365</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("doi");
-                    setError(null);
-                  }}
-                  className={`p-3 rounded-[var(--radius-lg)] border text-left flex flex-col gap-1.5 transition-all cursor-pointer ${
-                    mode === "doi"
-                      ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)]/30 ring-1 ring-[color:var(--accent)]"
-                      : "border-[color:var(--border-default)] hover:border-[color:var(--border-hover)] bg-[color:var(--surface-inset)]"
-                  }`}
-                >
-                  <span className="text-xl">🏷️</span>
-                  <div>
-                    <div className="text-xs font-bold text-[color:var(--text-primary)]">DOI Lookup</div>
-                    <div className="text-[11px] text-[color:var(--text-muted)]">Scholarly paper</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("url");
-                    setError(null);
-                  }}
-                  className={`p-3 rounded-[var(--radius-lg)] border text-left flex flex-col gap-1.5 transition-all cursor-pointer ${
-                    mode === "url"
-                      ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)]/30 ring-1 ring-[color:var(--accent)]"
-                      : "border-[color:var(--border-default)] hover:border-[color:var(--border-hover)] bg-[color:var(--surface-inset)]"
-                  }`}
-                >
-                  <span className="text-xl">🔗</span>
-                  <div>
-                    <div className="text-xs font-bold text-[color:var(--text-primary)]">Website / URL</div>
-                    <div className="text-[11px] text-[color:var(--text-muted)]">Article or post</div>
-                  </div>
-                </button>
-              </div>
-
-              {/* Dynamic Input Pane based on mode */}
-              <div className="mt-2 p-4 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] flex flex-col gap-3">
-                {mode === "doi" && (
-                  <div className="flex flex-col gap-2">
-                    <label htmlFor="doi-input-field" className="text-xs font-bold text-[color:var(--text-primary)]">
-                      Publication DOI
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        id="doi-input-field"
-                        type="text"
-                        value={doiInput}
-                        onChange={(e) => setDoiInput(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleProceedFromStep1()}
-                        placeholder="e.g. 10.1038/nature12373 or https://doi.org/10.1145/..."
-                        className="flex-1 px-3 py-2 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden focus:border-[color:var(--accent)]"
-                      />
-                    </div>
-                    <p className="text-[11px] text-[color:var(--text-muted)]">
-                      Instant metadata resolution using Crossref and OpenAlex academic registries.
-                    </p>
-                  </div>
-                )}
-
-                {mode === "url" && (
-                  <div className="flex flex-col gap-2">
-                    <label htmlFor="url-input-field" className="text-xs font-bold text-[color:var(--text-primary)]">
-                      Webpage or Article URL
-                    </label>
-                    <input
-                      id="url-input-field"
-                      type="url"
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleProceedFromStep1()}
-                      placeholder="https://example.com/article/research-analysis"
-                      className="px-3 py-2 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden focus:border-[color:var(--accent)]"
-                    />
-                    <p className="text-[11px] text-[color:var(--text-muted)]">
-                      Extracts clean title, author, and citation information without storing the webpage.
-                    </p>
-                  </div>
-                )}
-
-                {(mode === "google_drive" || mode === "onedrive") && (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-[color:var(--text-primary)]">
-                        {mode === "google_drive" ? "Google Drive Document" : "OneDrive Document"}
-                      </label>
-                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        Files stay in your cloud
-                      </span>
-                    </div>
-
-                    {connectingDrive === mode ? (
-                      <div className="p-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] flex flex-col gap-2.5">
-                        <p className="text-xs text-[color:var(--text-secondary)]">
-                          Connect your {mode === "google_drive" ? "Google Account" : "Microsoft 365 Account"} to browse and select your files directly.
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleConnectCloud(mode)}
-                            disabled={busy}
-                            className="px-3.5 py-1.5 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-semibold hover:bg-[color:var(--accent-hover)] cursor-pointer disabled:opacity-50"
-                          >
-                            🔐 Connect {mode === "google_drive" ? "Google Drive" : "OneDrive"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => window.open(mode === "google_drive" ? "https://drive.google.com" : "https://onedrive.live.com", "_blank")}
-                            className="px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
-                          >
-                            Open {mode === "google_drive" ? "Google Drive" : "OneDrive"} ↗
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {mode === "google_drive" && (
-                          <div className="flex flex-col gap-2 p-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)]">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-semibold text-[color:var(--text-primary)] flex items-center gap-1.5">
-                                <span>📁</span> Select from your Google Drive
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => window.open("https://drive.google.com", "_blank")}
-                                  className="text-[11px] font-medium text-[color:var(--accent)] hover:underline flex items-center gap-1 cursor-pointer"
-                                >
-                                  Open Drive ↗
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => loadDriveFiles()}
-                                  disabled={loadingDriveFiles}
-                                  className="text-[11px] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] border border-[color:var(--border-default)] px-2 py-0.5 rounded-[var(--radius-sm)] cursor-pointer disabled:opacity-50"
-                                >
-                                  {loadingDriveFiles ? "Refreshing..." : "🔄 Refresh"}
-                                </button>
-                              </div>
-                            </div>
-
-                            {loadingDriveFiles && (
-                              <div className="py-4 text-center text-xs text-[color:var(--text-muted)] flex items-center justify-center gap-2">
-                                <span className="animate-spin text-sm">⏳</span> Loading your Google Drive documents...
-                              </div>
-                            )}
-
-                            {driveError && !loadingDriveFiles && (
-                              <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-md)] flex flex-col gap-1.5">
-                                <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                                  {driveError}
-                                </p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleConnectCloud("google_drive")}
-                                    className="px-2.5 py-1 text-[11px] font-semibold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-sm)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
-                                  >
-                                    🔑 Grant Drive File Permissions
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => window.open("https://drive.google.com", "_blank")}
-                                    className="px-2.5 py-1 text-[11px] font-medium text-[color:var(--text-primary)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
-                                  >
-                                    Open Drive Directly ↗
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {!loadingDriveFiles && !driveError && driveFiles.length > 0 && (
-                              <div className="flex flex-col gap-1.5">
-                                <input
-                                  type="text"
-                                  value={driveSearchQuery}
-                                  onChange={(e) => setDriveSearchQuery(e.target.value)}
-                                  placeholder="Search your Drive files (PDFs, Docs)..."
-                                  className="px-2.5 py-1.5 text-xs bg-[color:var(--surface-canvas)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] focus:outline-hidden"
-                                />
-                                <div className="max-h-40 overflow-y-auto divide-y divide-[color:var(--border-default)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] bg-[color:var(--surface-canvas)]">
-                                  {driveFiles
-                                    .filter((f) => !driveSearchQuery || f.name.toLowerCase().includes(driveSearchQuery.toLowerCase()))
-                                    .map((f) => {
-                                      const isSelected = selectedFileId === f.id || cloudFileLink === f.webViewLink;
-                                      return (
-                                        <button
-                                          key={f.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setSelectedFileId(f.id);
-                                            setCloudFileName(f.name);
-                                            setCloudFileLink(f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`);
-                                            setCloudReference({
-                                              provider: "google_drive",
-                                              fileId: f.id,
-                                              fileName: f.name,
-                                              webUrl: f.webViewLink,
-                                            });
-                                          }}
-                                          className={`w-full p-2 text-left text-xs flex items-center justify-between gap-2 hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors ${
-                                            isSelected ? "bg-emerald-500/10 font-semibold" : ""
-                                          }`}
-                                        >
-                                          <div className="flex items-center gap-2 truncate">
-                                            <span>{f.mimeType?.includes("pdf") ? "📄" : "📝"}</span>
-                                            <span className="truncate text-[color:var(--text-primary)]">{f.name}</span>
-                                          </div>
-                                          {isSelected ? (
-                                            <span className="shrink-0 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
-                                              ✓ Selected
-                                            </span>
-                                          ) : (
-                                            <span className="shrink-0 text-[10px] text-[color:var(--text-muted)] border border-[color:var(--border-default)] px-1.5 py-0.5 rounded-[var(--radius-sm)]">
-                                              Select
-                                            </span>
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                </div>
-                              </div>
-                            )}
-
-                            {!loadingDriveFiles && !driveError && driveFiles.length === 0 && (
-                              <p className="text-[11px] text-[color:var(--text-muted)]">
-                                No files found in your Google Drive root. Open Google Drive to locate your paper or paste its link below.
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {cloudFileName && (
-                          <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-[var(--radius-md)] flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 truncate">
-                              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">✓</span>
-                              <div className="truncate">
-                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wider font-semibold block">
-                                  Selected Drive Document
-                                </span>
-                                <span className="text-xs font-semibold text-[color:var(--text-primary)] truncate block">
-                                  {cloudFileName}
-                                </span>
-                              </div>
-                            </div>
-                            {cloudFileLink && (
-                              <a
-                                href={cloudFileLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="shrink-0 text-[11px] text-[color:var(--accent)] hover:underline flex items-center gap-1 font-medium"
-                              >
-                                Preview ↗
-                              </a>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="flex flex-col gap-1.5">
-                          <label htmlFor="cloud-filename-input" className="text-[11px] font-medium text-[color:var(--text-secondary)]">
-                            Document Name / Title
-                          </label>
-                          <input
-                            id="cloud-filename-input"
-                            type="text"
-                            value={cloudFileName}
-                            onChange={(e) => setCloudFileName(e.target.value)}
-                            placeholder="e.g. Deep_Learning_Survey_2026.pdf"
-                            className="px-3 py-2 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                          <label htmlFor="cloud-filelink-input" className="text-[11px] font-medium text-[color:var(--text-secondary)]">
-                            Cloud File URL or Sharing Link
-                          </label>
-                          <input
-                            id="cloud-filelink-input"
-                            type="text"
-                            value={cloudFileLink}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setCloudFileLink(val);
-                              // Auto-extract Google Drive / Docs ID
-                              const driveMatch = val.match(/\/(?:file\/d|document\/d|spreadsheets\/d|presentation\/d)\/([a-zA-Z0-9_-]+)/);
-                              if (driveMatch && driveMatch[1]) {
-                                setCloudFileId(driveMatch[1]);
-                                if (!cloudFileName.trim()) {
-                                  setCloudFileName("Google Drive Research Document");
-                                }
-                              }
-                            }}
-                            placeholder="https://drive.google.com/file/d/.../view"
-                            className="px-3 py-2 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {mode === "bibtex" && (
-                  <div className="flex flex-col gap-2">
-                    <label htmlFor="bibtex-input-area" className="text-xs font-bold text-[color:var(--text-primary)]">
-                      Paste BibTeX or RIS export
-                    </label>
-                    <textarea
-                      id="bibtex-input-area"
-                      rows={4}
-                      value={bibtexInput}
-                      onChange={(e) => setBibtexInput(e.target.value)}
-                      placeholder="@article{author2026, title={...}, author={...}, year={2026}}"
-                      className="px-3 py-2 text-xs font-mono bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Secondary Import Switcher */}
-              <div className="flex items-center justify-between text-xs text-[color:var(--text-muted)] pt-1">
-                <span>Or import reference files:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("bibtex");
-                    setError(null);
-                  }}
-                  className={`hover:underline cursor-pointer font-medium ${
-                    mode === "bibtex" ? "text-[color:var(--accent)] font-bold" : "text-[color:var(--text-secondary)]"
-                  }`}
-                >
-                  Zotero · RIS · BibTeX
-                </button>
-              </div>
-
-              {/* Local File Guidance Callout */}
-              <div className="p-3 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-[var(--radius-md)] flex items-start gap-2.5 text-[11px] text-[color:var(--text-secondary)]">
-                <span className="text-sm">💡</span>
-                <div className="leading-relaxed">
-                  <span className="font-bold text-[color:var(--text-primary)]">Have a local PDF or document? </span>
-                  First save the file to Google Drive or OneDrive, then add it to Source Library. Source Library does not become your document storage location.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: REVIEW METADATA & WRITING NOTES */}
-          {step === 2 && (
-            <div className="flex flex-col gap-4">
-              {/* Duplicate Detection Warning Banner */}
-              {duplicateWarning?.isDuplicate && !bypassDuplicate && (
-                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded-[var(--radius-md)] text-xs flex flex-col gap-2">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <span>⚠️</span>
-                    <span>
-                      {duplicateWarning.confidence === "definite"
-                        ? "Definite Duplicate Detected"
-                        : duplicateWarning.confidence === "likely"
-                        ? "Likely Duplicate Detected"
-                        : "Possible Duplicate Detected"}
-                    </span>
-                    {duplicateWarning.similarityPercent && (
-                      <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full font-mono">
-                        {duplicateWarning.similarityPercent}% match
-                      </span>
-                    )}
-                  </div>
-                  <p>
-                    You already have a matching source in your library:
-                    <br />
-                    <strong>"{duplicateWarning.existingItem?.title}"</strong>
-                    {duplicateWarning.existingItem?.year ? ` (${duplicateWarning.existingItem.year})` : ""}
-                  </p>
-                  <div className="flex gap-2 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => onClose()}
-                      className="px-3 py-1 bg-[color:var(--surface-raised)] border border-amber-500/40 rounded text-xs font-semibold hover:bg-[color:var(--surface-hover)] cursor-pointer"
-                    >
-                      Use Existing Source
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBypassDuplicate(true)}
-                      className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-semibold hover:bg-amber-700 cursor-pointer"
-                    >
-                      Keep Both
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <p className="text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
-                We found this source — verify and organize:
-              </p>
-
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="source-title-input" className="text-xs font-bold text-[color:var(--text-primary)]">
-                    Title *
-                  </label>
-                  <input
-                    id="source-title-input"
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="source-authors-input" className="text-xs font-bold text-[color:var(--text-primary)]">
-                      Authors (comma-separated)
-                    </label>
-                    <input
-                      id="source-authors-input"
-                      type="text"
-                      value={authorsText}
-                      onChange={(e) => setAuthorsText(e.target.value)}
-                      placeholder="e.g. Vaswani, Ashish, Shazeer, Noam"
-                      className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="source-year-input" className="text-xs font-bold text-[color:var(--text-primary)]">
-                      Publication Year
-                    </label>
-                    <input
-                      id="source-year-input"
-                      type="text"
-                      value={year}
-                      onChange={(e) => setYear(e.target.value)}
-                      placeholder="e.g. 2024"
-                      className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="source-journal-input" className="text-xs font-bold text-[color:var(--text-primary)]">
-                      Journal or Publisher
-                    </label>
-                    <input
-                      id="source-journal-input"
-                      type="text"
-                      value={journal || publisher}
-                      onChange={(e) => {
-                        setJournal(e.target.value);
-                        setPublisher(e.target.value);
-                      }}
-                      placeholder="e.g. Nature, Science, IEEE"
-                      className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="source-doi-input" className="text-xs font-bold text-[color:var(--text-primary)]">
-                      DOI
-                    </label>
-                    <input
-                      id="source-doi-input"
-                      type="text"
-                      value={doi}
-                      onChange={(e) => setDoi(e.target.value)}
-                      placeholder="10.1038/..."
-                      className="px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                    />
-                  </div>
-                </div>
-
+            {showExtras && (
+              <div className="mt-3 p-3 bg-[color:var(--surface-inset)]/50 border border-[color:var(--border-subtle)] rounded-[var(--radius-md)] flex flex-col gap-3 animate-in fade-in duration-150">
                 {/* Tags */}
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="tag-input-field" className="text-xs font-bold text-[color:var(--text-primary)]">
+                  <label htmlFor="tag-input-field" className="text-[11px] font-bold text-[color:var(--text-secondary)]">
                     Tags
                   </label>
-                  <div className="flex flex-wrap gap-1.5 mb-1">
+                  <div className="flex flex-wrap gap-1 mb-1">
                     {tags.map((t) => (
                       <span
                         key={t}
-                        className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)]"
+                        className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)]"
                       >
                         #{t}
                         <button
@@ -1010,206 +546,75 @@ export default function AddSourceModal({
                           handleAddTag();
                         }
                       }}
-                      placeholder="Add tag (e.g. Methodology, Review, Empirical) and press Enter"
-                      className="flex-1 px-3 py-2 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
+                      placeholder="Add tag and press enter"
+                      className="flex-1 px-2.5 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] focus:outline-hidden"
                     />
                     <button
                       type="button"
                       onClick={handleAddTag}
-                      className="px-3 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-xs font-semibold hover:bg-[color:var(--surface-hover)] cursor-pointer"
+                      className="px-2.5 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-xs font-semibold rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
                     >
-                      + Add Tag
+                      Add
                     </button>
                   </div>
                 </div>
 
-                {/* Writing Notes */}
-                <div className="p-3.5 rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 flex flex-col gap-2.5">
-                  <span className="text-xs font-bold text-[color:var(--text-primary)]">
-                    ✍️ Writing Notes (For your write-up)
-                  </span>
+                {/* Writing note / why saved */}
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="why-saved-input" className="text-[11px] font-bold text-[color:var(--text-secondary)]">
+                    Why are you saving this source?
+                  </label>
+                  <input
+                    id="why-saved-input"
+                    type="text"
+                    value={whySaved}
+                    onChange={(e) => setWhySaved(e.target.value)}
+                    placeholder="e.g. Supports Section 2 theoretical framework"
+                    className="px-2.5 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] focus:outline-hidden"
+                  />
+                </div>
 
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="why-saved-input" className="text-[11px] text-[color:var(--text-secondary)]">
-                      Why are you saving this source?
-                    </label>
-                    <textarea
-                      id="why-saved-input"
-                      rows={2}
-                      value={whySaved}
-                      onChange={(e) => setWhySaved(e.target.value)}
-                      placeholder="e.g. This supports my core argument about neural architecture in Section 2."
-                      className="px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="col-span-2 flex flex-col gap-1">
-                      <label htmlFor="key-quote-input" className="text-[11px] text-[color:var(--text-secondary)]">
-                        Key Quote
-                      </label>
-                      <input
-                        id="key-quote-input"
-                        type="text"
-                        value={keyQuote}
-                        onChange={(e) => setKeyQuote(e.target.value)}
-                        placeholder="Relevant passage to quote..."
-                        className="px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label htmlFor="page-number-input" className="text-[11px] text-[color:var(--text-secondary)]">
-                        Page #
-                      </label>
-                      <input
-                        id="page-number-input"
-                        type="text"
-                        value={page}
-                        onChange={(e) => setPage(e.target.value)}
-                        placeholder="e.g. 14"
-                        className="px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden"
-                      />
-                    </div>
-                  </div>
+                {/* Key quote */}
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="key-quote-input" className="text-[11px] font-bold text-[color:var(--text-secondary)]">
+                    Key Quote
+                  </label>
+                  <textarea
+                    id="key-quote-input"
+                    rows={2}
+                    value={keyQuote}
+                    onChange={(e) => setKeyQuote(e.target.value)}
+                    placeholder="Relevant excerpt or passage..."
+                    className="px-2.5 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] focus:outline-hidden"
+                  />
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* STEP 3: CONFIRMATION */}
-          {step === 3 && savedSource && (
-            <div className="flex flex-col gap-4 py-2">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl font-bold">
-                  ✓
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-[color:var(--text-primary)]">Source Saved</h4>
-                  <p className="text-xs text-[color:var(--text-muted)]">
-                    Ready to cite and reference in your writing.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-[var(--radius-lg)] border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] flex flex-col gap-2.5">
-                <div className="text-xs font-bold text-[color:var(--text-primary)] leading-snug">
-                  {savedSource.metadata.title}
-                </div>
-                <div className="text-[11px] text-[color:var(--text-secondary)]">
-                  {savedSource.metadata.authors.join(", ")}
-                  {savedSource.metadata.year ? ` (${savedSource.metadata.year})` : ""}
-                </div>
-
-                <div className="mt-1 pt-2 border-t border-[color:var(--border-subtle)] flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold tracking-wider uppercase text-[color:var(--text-muted)]">
-                      APA 7 Citation
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCopyCitation}
-                      className="text-xs text-[color:var(--accent)] hover:underline font-semibold cursor-pointer"
-                    >
-                      {copiedCitation ? "✓ Copied" : "Copy Citation"}
-                    </button>
-                  </div>
-                  <p className="text-xs italic text-[color:var(--text-primary)] font-serif leading-relaxed">
-                    {savedSource.citation}
-                  </p>
-                </div>
-              </div>
-
-              {savedSource.cloudReference?.webUrl && (
-                <div className="flex items-center justify-between text-xs text-[color:var(--text-secondary)] px-1">
-                  <span>Source Location:</span>
-                  <a
-                    href={savedSource.cloudReference.webUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[color:var(--accent)] hover:underline font-medium inline-flex items-center gap-1"
-                  >
-                    <span>{savedSource.cloudReference.provider === "google_drive" ? "Google Drive" : "OneDrive"}</span>
-                    <span>↗</span>
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Footer Navigation */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]">
-          {step === 1 && (
-            <>
+          {/* Footer Actions */}
+          <div className="flex items-center justify-between pt-3 border-t border-[color:var(--border-subtle)]">
+            <span className="text-[11px] text-[color:var(--text-muted)]">
+              🛡️ Zero document storage
+            </span>
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
+                className="px-3 py-2 text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] rounded-[var(--radius-md)] cursor-pointer transition-colors"
               >
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={handleProceedFromStep1}
-                disabled={busy}
-                className="px-5 py-2 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-              >
-                {busy ? "Finding Source…" : "Next →"}
-              </button>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="px-3 py-1.5 text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
-              >
-                ← Back
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveSource}
-                disabled={busy}
-                className="px-5 py-2 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                type="submit"
+                disabled={busy || !title.trim()}
+                className="px-4 py-2 bg-[color:var(--accent-solid)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-bold rounded-[var(--radius-md)] shadow-xs disabled:opacity-50 cursor-pointer transition-colors"
               >
                 {busy ? "Saving…" : "Save Source"}
               </button>
-            </>
-          )}
-
-          {step === 3 && (
-            <>
-              <button
-                type="button"
-                onClick={handleResetForAnother}
-                className="px-4 py-2 text-xs font-semibold text-[color:var(--accent)] hover:underline cursor-pointer"
-              >
-                + Add Another Source
-              </button>
-              <div className="flex gap-2">
-                {savedSource?.cloudReference?.webUrl && (
-                  <a
-                    href={savedSource.cloudReference.webUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3.5 py-2 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-xs font-semibold text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
-                  >
-                    Open Source ↗
-                  </a>
-                )}
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-5 py-2 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] text-xs font-bold hover:bg-[color:var(--accent-hover)] cursor-pointer"
-                >
-                  Done
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -378,8 +378,9 @@ export async function safeFetchHtml(
           method: "GET",
           agent,
           headers: {
-            "User-Agent": "ScholarCore-SourceBot/3.0 (+https://scholar-core.org; privacy-first)",
-            Accept: "text/html,application/xhtml+xml,text/plain;q=0.9",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5",
+            "Accept-Language": "en-US,en;q=0.9",
             Connection: "close",
           },
         },
@@ -478,91 +479,296 @@ export async function safeFetchHtml(
   throw new Error("Redirect resolution failed");
 }
 
+export interface ExtractedUrlMetadata {
+  title: string;
+  publisher?: string;
+  journal?: string;
+  authors: string[];
+  year?: string;
+  doi?: string;
+  description?: string;
+}
+
+/**
+ * Decodes HTML entities from strings.
+ */
+export function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&#([0-9]+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * Extracts lightweight academic metadata from an HTML string without persisting it.
  */
 export function extractLightweightUrlMetadata(
   html: string,
   url: string
-): {
-  title: string;
-  publisher?: string;
-  authors: string[];
-  year?: string;
-  description?: string;
-} {
-  const parsed = new URL(url);
-
-  // 1. Title extraction
-  let title = "";
-  const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
-  const twitterTitle = html.match(/<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i);
-  const tagTitle = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const citationTitle = html.match(/<meta[^>]+name=["']citation_title["'][^>]+content=["']([^"']+)["']/i);
-
-  if (citationTitle?.[1]) title = citationTitle[1].trim();
-  else if (ogTitle?.[1]) title = ogTitle[1].trim();
-  else if (twitterTitle?.[1]) title = twitterTitle[1].trim();
-  else if (tagTitle?.[1]) title = tagTitle[1].trim();
-
-  // Clean HTML entities from title
-  title = title
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!title) {
-    title = parsed.hostname;
+): ExtractedUrlMetadata {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    parsed = new URL("https://example.com");
   }
+  const hostnameClean = parsed.hostname.replace(/^www\./i, "");
 
-  // 2. Publisher / Site name
-  let publisher: string | undefined;
-  const ogSite = html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i);
-  const citPublisher = html.match(/<meta[^>]+name=["']citation_publisher["'][^>]+content=["']([^"']+)["']/i);
-  if (citPublisher?.[1]) publisher = citPublisher[1].trim();
-  else if (ogSite?.[1]) publisher = ogSite[1].trim();
-  else publisher = parsed.hostname;
-
-  // 3. Authors
-  const authors: string[] = [];
-  const authorRegex = /<meta[^>]+(?:name=["'](?:citation_author|author)["'])[^>]+content=["']([^"']+)["']/gi;
-  let match: RegExpExecArray | null;
-  while ((match = authorRegex.exec(html)) !== null) {
-    const author = match[1].trim();
-    if (author && !authors.includes(author)) {
-      authors.push(author);
+  // 1. Collect all <meta> tags regardless of attribute order (content before name/property or vice versa)
+  const metaMap = new Map<string, string[]>();
+  const metaTagRegex = /<meta\s+([^>]+)>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = metaTagRegex.exec(html)) !== null) {
+    const attrs = m[1];
+    const nameMatch = attrs.match(/(?:name|property|http-equiv|itemprop)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    const contentMatch = attrs.match(/content\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    if (nameMatch && contentMatch) {
+      const key = (nameMatch[1] || nameMatch[2] || nameMatch[3] || "").toLowerCase().trim();
+      const val = decodeHtmlEntities(contentMatch[1] || contentMatch[2] || contentMatch[3] || "");
+      if (key && val) {
+        if (!metaMap.has(key)) metaMap.set(key, []);
+        metaMap.get(key)!.push(val);
+      }
     }
   }
 
-  // 4. Year
-  let year: string | undefined;
-  const dateMatch =
-    html.match(/<meta[^>]+name=["'](?:citation_publication_date|citation_date|article:published_time)["'][^>]+content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]+property=["']article:published_time["'][^>]+content=["']([^"']+)["']/i);
-
-  if (dateMatch?.[1]) {
-    const yr = dateMatch[1].match(/\b(19\d\d|20\d\d)\b/);
-    if (yr) year = yr[1];
+  // 2. Parse all JSON-LD blocks (Schema.org)
+  const jsonLdObjects: any[] = [];
+  const scriptRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  while ((m = scriptRegex.exec(html)) !== null) {
+    try {
+      const parsedLd = JSON.parse(m[1].trim());
+      if (Array.isArray(parsedLd)) {
+        jsonLdObjects.push(...parsedLd);
+      } else if (parsedLd && parsedLd["@graph"] && Array.isArray(parsedLd["@graph"])) {
+        jsonLdObjects.push(...parsedLd["@graph"]);
+      } else if (parsedLd) {
+        jsonLdObjects.push(parsedLd);
+      }
+    } catch {}
   }
 
-  // 5. Description / snippet (short only)
+  // Find article/publication JSON-LD item
+  const articleLd =
+    jsonLdObjects.find(
+      (obj) =>
+        obj &&
+        typeof obj === "object" &&
+        /^(Article|NewsArticle|ScholarlyArticle|TechArticle|BlogPosting|Report|Book|CreativeWork)$/i.test(
+          Array.isArray(obj["@type"]) ? obj["@type"][0] : obj["@type"] || ""
+        )
+    ) ||
+    jsonLdObjects.find((obj) => obj && typeof obj === "object" && (obj.headline || obj.author)) ||
+    null;
+
+  // 3. TITLE EXTRACTION
+  let title =
+    metaMap.get("citation_title")?.[0] ||
+    metaMap.get("dc.title")?.[0] ||
+    metaMap.get("dcterms.title")?.[0] ||
+    (articleLd?.headline ? decodeHtmlEntities(articleLd.headline) : undefined) ||
+    metaMap.get("og:title")?.[0] ||
+    metaMap.get("twitter:title")?.[0];
+
+  if (!title) {
+    const tagTitle = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    if (tagTitle?.[1]) {
+      title = decodeHtmlEntities(tagTitle[1]);
+    }
+  }
+
+  if (title) {
+    title = decodeHtmlEntities(title);
+  } else {
+    title = hostnameClean;
+  }
+
+  // 4. JOURNAL / PUBLISHER EXTRACTION
+  let journal: string | undefined =
+    metaMap.get("citation_journal_title")?.[0] ||
+    metaMap.get("citation_journal_abbrev")?.[0] ||
+    (articleLd?.isPartOf?.name ? decodeHtmlEntities(articleLd.isPartOf.name) : undefined) ||
+    (articleLd?.publication?.name ? decodeHtmlEntities(articleLd.publication.name) : undefined) ||
+    metaMap.get("dc.source")?.[0];
+
+  let publisher: string | undefined =
+    metaMap.get("citation_publisher")?.[0] ||
+    (articleLd?.publisher?.name
+      ? decodeHtmlEntities(articleLd.publisher.name)
+      : typeof articleLd?.publisher === "string"
+      ? decodeHtmlEntities(articleLd.publisher)
+      : undefined) ||
+    metaMap.get("og:site_name")?.[0] ||
+    metaMap.get("dc.publisher")?.[0] ||
+    metaMap.get("dcterms.publisher")?.[0];
+
+  if (!publisher) {
+    const copyrightMatch = html.match(
+      /(?:©|&copy;|Copyright)\s*(?:20\d\d|19\d\d)?\s*([A-Za-z0-9\s\-&]+?)(?:[·•|]|$|\.|<\/)/i
+    );
+    if (copyrightMatch?.[1] && copyrightMatch[1].trim().length > 2 && copyrightMatch[1].trim().length < 60) {
+      publisher = decodeHtmlEntities(copyrightMatch[1].trim());
+    } else {
+      publisher = hostnameClean;
+    }
+  }
+
+  // 5. AUTHORS EXTRACTION
+  const authors: string[] = [];
+  const addAuthor = (name: string | undefined | null) => {
+    if (!name) return;
+    let clean = name.trim().replace(/^By\s+/i, "").replace(/\s+/g, " ").trim();
+    if (clean && clean.length > 1 && clean.length < 80 && !authors.includes(clean)) {
+      if (!/^(admin|administrator|editor|webmaster|editorial\s+team|staff|contributor)$/i.test(clean)) {
+        authors.push(clean);
+      }
+    }
+  };
+
+  // 5a. Highwire Press (Google Scholar) citation_author
+  const citAuthors = metaMap.get("citation_author") || [];
+  for (const a of citAuthors) {
+    addAuthor(a);
+  }
+
+  // 5b. Dublin Core creator
+  if (authors.length === 0) {
+    const dcCreators = [
+      ...(metaMap.get("dc.creator") || []),
+      ...(metaMap.get("dcterms.creator") || []),
+      ...(metaMap.get("dc.contributor") || []),
+    ];
+    for (const a of dcCreators) {
+      addAuthor(a);
+    }
+  }
+
+  // 5c. JSON-LD Authors
+  if (authors.length === 0 && articleLd?.author) {
+    const rawLdAuthors = Array.isArray(articleLd.author) ? articleLd.author : [articleLd.author];
+    for (const a of rawLdAuthors) {
+      if (typeof a === "string") {
+        addAuthor(a);
+      } else if (a && typeof a === "object") {
+        const aType = a["@type"];
+        const aName = a.name;
+        // If author is an Organization that matches publisher, don't use it as person author
+        if (aType === "Organization" && publisher && aName && aName.toLowerCase() === publisher.toLowerCase()) {
+          continue;
+        }
+        if (aName) addAuthor(aName);
+      }
+    }
+  }
+
+  // 5d. Meta author / article:author
+  if (authors.length === 0) {
+    const metaAuthors = [
+      ...(metaMap.get("author") || []),
+      ...(metaMap.get("article:author") || []),
+      ...(metaMap.get("og:article:author") || []),
+      ...(metaMap.get("parsely-author") || []),
+      ...(metaMap.get("sailthru.author") || []),
+    ];
+    for (const a of metaAuthors) {
+      if (publisher && a.toLowerCase() === publisher.toLowerCase()) continue;
+      addAuthor(a);
+    }
+  }
+
+  // 5e. Substack / Blog / Editorial subtitle/byline fallback
+  if (authors.length === 0) {
+    const subtitleMatch =
+      html.match(/<h[23][^>]*class=["'][^"']*\bsubtitle\b[^"']*["'][^>]*>([\s\S]*?)<\/h[23]>/i) ||
+      html.match(/<[^>]+class=["'][^"']*\bbyline\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i) ||
+      html.match(/<[^>]+class=["'][^"']*\bauthor-name\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
+    if (subtitleMatch?.[1]) {
+      const candidate = decodeHtmlEntities(subtitleMatch[1].replace(/<[^>]+>/g, "")).trim();
+      if (/^[A-Z][a-zA-Z\.\-']*(?:\s+[A-Z][a-zA-Z\.\-']*){1,4}$/.test(candidate)) {
+        addAuthor(candidate);
+      }
+    }
+  }
+
+  // 5f. Meta description or JSON-LD description fallback if it contains author name
+  if (authors.length === 0) {
+    const desc = metaMap.get("description")?.[0] || articleLd?.description;
+    if (desc && typeof desc === "string" && /^[A-Z][a-zA-Z\.\-']*(?:\s+[A-Z][a-zA-Z\.\-']*){1,3}$/.test(desc.trim())) {
+      addAuthor(desc.trim());
+    }
+  }
+
+  // 6. YEAR EXTRACTION
+  let year: string | undefined;
+  const rawDate =
+    metaMap.get("citation_publication_date")?.[0] ||
+    metaMap.get("citation_date")?.[0] ||
+    metaMap.get("citation_year")?.[0] ||
+    articleLd?.datePublished ||
+    articleLd?.dateCreated ||
+    metaMap.get("article:published_time")?.[0] ||
+    metaMap.get("dc.date")?.[0] ||
+    metaMap.get("dc.date.issued")?.[0] ||
+    metaMap.get("dcterms.date")?.[0] ||
+    metaMap.get("article:modified_time")?.[0];
+
+  if (rawDate) {
+    const yrMatch = String(rawDate).match(/\b(19\d\d|20\d\d)\b/);
+    if (yrMatch) year = yrMatch[1];
+  }
+
+  if (!year) {
+    const timeMatch = html.match(/<time[^>]+datetime=["']([^"']+)["']/i);
+    if (timeMatch?.[1]) {
+      const yrMatch = timeMatch[1].match(/\b(19\d\d|20\d\d)\b/);
+      if (yrMatch) year = yrMatch[1];
+    }
+  }
+
+  if (!year) {
+    // Check URL path: e.g. /2024/05/article or /2017/12/06/
+    const urlYrMatch = url.match(/(?:^|[/-])(19\d\d|20\d\d)(?:[/-]|$)/);
+    if (urlYrMatch) year = urlYrMatch[1];
+  }
+
+  // 7. DOI EXTRACTION
+  let doi: string | undefined;
+  const urlDoiMatch = url.match(/(?:doi\.org\/|doi:|\/)(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+  if (urlDoiMatch) {
+    doi = urlDoiMatch[1];
+  } else {
+    const citDoi =
+      metaMap.get("citation_doi")?.[0] ||
+      metaMap.get("dc.identifier")?.find((id) => /^(?:doi:)?10\./i.test(id));
+    if (citDoi) {
+      doi = citDoi.replace(/^doi:/i, "").trim();
+    }
+  }
+
+  // 8. Description / snippet
   let description: string | undefined;
-  const descMatch =
-    html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i);
-  if (descMatch?.[1]) {
-    description = descMatch[1].slice(0, 300).trim();
+  const descCandidate =
+    metaMap.get("description")?.[0] ||
+    metaMap.get("og:description")?.[0] ||
+    (articleLd?.description ? decodeHtmlEntities(articleLd.description) : undefined);
+  if (descCandidate) {
+    description = descCandidate.slice(0, 300).trim();
   }
 
   return {
     title,
     publisher,
+    journal,
     authors,
     year,
+    doi,
     description,
   };
 }

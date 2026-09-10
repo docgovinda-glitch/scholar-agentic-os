@@ -248,43 +248,88 @@ export async function resolveUrlMetadata(url: string): Promise<ResolvedMetadataR
     };
   }
 
+  // 1. If URL directly contains a DOI, delegate to high-fidelity DOI resolver
+  const directDoiMatch = trimmed.match(/(?:doi\.org\/|doi:)(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+  if (directDoiMatch?.[1]) {
+    const doiResult = await resolveDoiMetadata(directDoiMatch[1]);
+    if (doiResult.success && doiResult.metadata.title) {
+      return doiResult;
+    }
+  }
+
   try {
     const res = await authedJsonFetch("/api/vault/parse-url", "POST", { url: trimmed });
     if (res.ok) {
       const data = (await res.json()) as {
         success?: boolean;
         title?: string;
+        authors?: string[];
+        year?: string;
+        publisher?: string;
+        journal?: string;
+        doi?: string;
+        sourceType?: string;
         citation?: string;
         canonicalReference?: any;
+        description?: string;
         error?: string;
       };
 
       if (data && data.success && data.title) {
+        // If DOI was discovered in page metadata, attempt to enrich with CrossRef/OpenAlex
+        if (data.doi) {
+          try {
+            const enriched = await resolveDoiMetadata(data.doi);
+            if (enriched.success && enriched.metadata.title) {
+              return {
+                ...enriched,
+                metadata: {
+                  ...enriched.metadata,
+                  url: trimmed, // retain user-entered web URL
+                  publisher: enriched.metadata.publisher || data.publisher,
+                },
+              };
+            }
+          } catch {}
+        }
+
         const domain = new URL(trimmed).hostname.replace(/^www\./, "");
         const title = data.title;
-        const publisher = data.canonicalReference?.publisher || domain;
-        const year = new Date().getFullYear().toString();
+        const authors = Array.isArray(data.authors) ? data.authors : [];
+        const year = data.year || "";
+        const journal = data.journal || "";
+        const publisher = data.publisher || data.canonicalReference?.publisher || domain;
+        const doi = data.doi || "";
+        const isPaper = data.sourceType === "paper" || Boolean(doi || journal);
+
         const citation =
-          data.citation ||
           generateAPA7Citation({
             title,
+            authors,
             publisher,
-            year,
+            journal,
+            year: year || undefined,
+            doi: doi || undefined,
             url: trimmed,
           });
+
+        const confidence: "verified" | "needs_review" =
+          authors.length > 0 && Boolean(year) ? "verified" : "needs_review";
 
         return {
           success: true,
           metadata: {
             title,
-            authors: [],
+            authors,
             year,
+            journal,
             publisher,
+            doi,
             url: trimmed,
-            type: "website",
+            type: isPaper ? "paper" : "website",
           },
           citation,
-          confidence: "verified",
+          confidence,
         };
       }
     }
@@ -296,6 +341,7 @@ export async function resolveUrlMetadata(url: string): Promise<ResolvedMetadataR
     metadata: {
       title: domain,
       authors: [],
+      year: "",
       publisher: domain,
       url: trimmed,
       type: "website",

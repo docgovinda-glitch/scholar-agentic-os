@@ -177,6 +177,75 @@ describe("SSRF Guard — Lightweight Metadata Extraction", () => {
     const meta = extractLightweightUrlMetadata(html, "https://nature.com/nature/1");
     expect(meta.title).toBe('Rock & Roll "Science" <Paper>');
   });
+
+  it("handles reversed meta tag attributes (content before property/name)", () => {
+    const html = `
+      <meta content="Reversed Attribute Article" property="og:title">
+      <meta content="Reversed Press" property="og:site_name">
+      <meta content="Alice Wonderland" name="author">
+      <meta content="2023-08-01" name="article:published_time">
+    `;
+    const meta = extractLightweightUrlMetadata(html, "https://example.com/reversed");
+    expect(meta.title).toBe("Reversed Attribute Article");
+    expect(meta.publisher).toBe("Reversed Press");
+    expect(meta.authors).toEqual(["Alice Wonderland"]);
+    expect(meta.year).toBe("2023");
+  });
+
+  it("extracts Highwire Press academic metadata including journal and DOI", () => {
+    const html = `
+      <meta name="citation_title" content="Quantum Error Correction">
+      <meta name="citation_journal_title" content="Physical Review Letters">
+      <meta name="citation_doi" content="10.1103/PhysRevLett.77.3260">
+      <meta name="citation_author" content="Shor, Peter W.">
+      <meta name="citation_publication_date" content="1996/10/14">
+    `;
+    const meta = extractLightweightUrlMetadata(html, "https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.77.3260");
+    expect(meta.title).toBe("Quantum Error Correction");
+    expect(meta.journal).toBe("Physical Review Letters");
+    expect(meta.doi).toBe("10.1103/PhysRevLett.77.3260");
+    expect(meta.authors).toEqual(["Shor, Peter W."]);
+    expect(meta.year).toBe("1996");
+  });
+
+  it("extracts Substack / E-IR metadata from Schema.org JSON-LD and subtitle byline", () => {
+    const html = `
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "NewsArticle",
+        "headline": "Towards a Global International Relations?",
+        "datePublished": "2024-05-15T10:00:00Z",
+        "publisher": {
+          "@type": "Organization",
+          "name": "E-International Relations"
+        }
+      }
+      </script>
+      <h3 class="subtitle">Amitav Acharya</h3>
+    `;
+    const meta = extractLightweightUrlMetadata(html, "https://www.e-ir.org/p/towards-a-global-international-relations");
+    expect(meta.title).toBe("Towards a Global International Relations?");
+    expect(meta.publisher).toBe("E-International Relations");
+    expect(meta.authors).toEqual(["Amitav Acharya"]);
+    expect(meta.year).toBe("2024");
+  });
+
+  it("extracts Dublin Core metadata correctly", () => {
+    const html = `
+      <meta name="dc.title" content="Computing Machinery and Intelligence">
+      <meta name="dc.creator" content="Turing, Alan M.">
+      <meta name="dc.date" content="1950">
+      <meta name="dc.publisher" content="Oxford University Press">
+      <meta name="dc.identifier" content="doi:10.1093/mind/LIX.236.433">
+    `;
+    const meta = extractLightweightUrlMetadata(html, "https://academic.oup.com/mind/article/LIX/236/433/986238");
+    expect(meta.title).toBe("Computing Machinery and Intelligence");
+    expect(meta.authors).toEqual(["Turing, Alan M."]);
+    expect(meta.year).toBe("1950");
+    expect(meta.publisher).toBe("Oxford University Press");
+    expect(meta.doi).toBe("10.1093/mind/LIX.236.433");
+  });
 });
 
 describe("SSRF Guard — Connection-Level DNS Rebinding & Socket Defense", () => {

@@ -268,11 +268,14 @@ router.post("/parse-url", async (req: Request, res: Response) => {
 
     const meta = extractLightweightUrlMetadata(fetchResult.body, fetchResult.url);
 
+    const isPaper = Boolean(meta.doi || meta.journal);
     const canonicalReference: CanonicalReference = {
-      kind: "Website",
+      kind: isPaper ? "JournalArticle" : "Website",
       title: meta.title,
-      source: meta.publisher || fetchResult.url,
+      source: meta.journal || meta.publisher || fetchResult.url,
       publisher: meta.publisher,
+      journal: meta.journal,
+      doi: meta.doi,
       url: fetchResult.url,
       authors: meta.authors.map((name, idx) => {
         const parts = name.trim().split(" ");
@@ -288,7 +291,9 @@ router.post("/parse-url", async (req: Request, res: Response) => {
 
     const authorStr = meta.authors.length > 0 ? `${meta.authors.join(", ")} ` : "";
     const yearStr = meta.year ? `(${meta.year}). ` : "";
-    const citation = `${authorStr}${yearStr}${meta.title}. Retrieved from ${fetchResult.url}`;
+    const sourceStr = meta.journal ? `${meta.journal}. ` : meta.publisher ? `${meta.publisher}. ` : "";
+    const linkStr = meta.doi ? `https://doi.org/${meta.doi}` : fetchResult.url;
+    const citation = `${authorStr}${yearStr}${meta.title}. ${sourceStr}Retrieved from ${linkStr}`.replace(/\s+/g, " ").trim();
 
     res.json({
       success: true,
@@ -296,8 +301,10 @@ router.post("/parse-url", async (req: Request, res: Response) => {
       authors: meta.authors,
       year: meta.year,
       publisher: meta.publisher,
+      journal: meta.journal,
+      doi: meta.doi,
       externalReference: fetchResult.url,
-      sourceType: "web",
+      sourceType: isPaper ? "paper" : "web",
       canonicalReference,
       citation,
       description: meta.description,

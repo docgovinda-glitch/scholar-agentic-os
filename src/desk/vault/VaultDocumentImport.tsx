@@ -264,12 +264,15 @@ export default function VaultDocumentImport({
       if (!res.ok) throw new Error(body.error || "Could not parse that URL.");
       setPreview({
         title: body.title,
-        content: body.content || "",
+        content: body.content || body.description || "",
         citation: body.citation,
         citationStatus: "confirmed",
         canonicalReference: body.canonicalReference,
-        sourceType: "web",
+        sourceType: body.sourceType || "web",
         externalReference: url.trim(),
+        authors: body.authors,
+        year: body.year,
+        journal: body.journal,
       });
     } catch (e) {
       setError((e as Error).message);
