@@ -129,7 +129,7 @@ describe("AddSourceModal — Streamlined 1-Step Intake", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fetch" }));
 
     await waitFor(() => {
-      expect(mockResolveDoiMetadata).toHaveBeenCalledWith("10.48550/arXiv.1706.03762");
+      expect(mockResolveDoiMetadata).toHaveBeenCalledWith("10.48550/arxiv.1706.03762");
     });
 
     await waitFor(() => {

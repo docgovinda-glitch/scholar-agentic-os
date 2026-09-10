@@ -28,6 +28,9 @@ describe("duplicateDetection Service", () => {
     expect(normalizeDoi("https://doi.org/10.1038/nature12373")).toBe("10.1038/nature12373");
     expect(normalizeDoi("http://dx.doi.org/10.1038/nature12373.")).toBe("10.1038/nature12373");
     expect(normalizeDoi(" 10.1038/nature12373 ")).toBe("10.1038/nature12373");
+    expect(normalizeDoi("doi:10.1038/nature12373")).toBe("10.1038/nature12373");
+    expect(normalizeDoi("DOI: 10.1038/nature12373/")).toBe("10.1038/nature12373");
+    expect(normalizeDoi("doi.org/10.1038/nature12373")).toBe("10.1038/nature12373");
   });
 
   it("detects exact DOI match as Definite Duplicate (100%)", () => {

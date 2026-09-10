@@ -24,8 +24,11 @@ export function normalizeDoi(doi?: string): string | null {
   const cleaned = doi
     .trim()
     .toLowerCase()
-    .replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "")
-    .replace(/[\.,;:]$/, "");
+    .replace(/^https?:\/\/(?:(?:dx|www)\.)?doi\.org\//i, "")
+    .replace(/^(?:(?:dx|www)\.)?doi\.org\//i, "")
+    .replace(/^doi:\s*/i, "")
+    .replace(/[\.,;:/\s]+$/, "")
+    .trim();
   return cleaned.length > 0 ? cleaned : null;
 }
 

@@ -16,6 +16,7 @@ import { sourceToVaultItemPayload } from "../../services/vault/sourceTypes";
 import { addVaultItem } from "../../services/vaultContents";
 import {
   checkForDuplicates,
+  normalizeDoi,
   type DuplicateCheckResult,
 } from "../../services/vault/duplicateDetection";
 import {
@@ -80,10 +81,8 @@ export default function AddSourceModal({
     if (trimmed.startsWith("@") && (trimmed.includes("{") || trimmed.includes("="))) {
       return "bibtex";
     }
-    if (
-      /^10\.\d{4,9}\/[-._;()/:A-Z0-9]+$/i.test(trimmed) ||
-      /^(?:https?:\/\/)?(?:dx\.)?doi\.org\/10\.\d{4,9}\/[-._;()/:A-Z0-9]+$/i.test(trimmed)
-    ) {
+    const cleanedDoi = normalizeDoi(trimmed);
+    if (cleanedDoi && /^10\.\d{4,9}\/[-._;()/:A-Z0-9]+$/i.test(cleanedDoi)) {
       return "doi";
     }
     if (trimmed.includes("drive.google.com") || trimmed.includes("docs.google.com")) {
@@ -136,8 +135,8 @@ export default function AddSourceModal({
 
     try {
       if (kind === "doi") {
-        setFetchStatus("Resolving DOI via CrossRef / OpenAlex…");
-        const cleanDoi = raw.replace(/^(?:https?:\/\/)?(?:dx\.)?doi\.org\//i, "").trim();
+        setFetchStatus("Resolving DOI via CrossRef / OpenAlex / DataCite…");
+        const cleanDoi = normalizeDoi(raw) || raw;
         const res = await resolveDoiMetadata(cleanDoi);
 
         if (res.success && res.metadata.title) {

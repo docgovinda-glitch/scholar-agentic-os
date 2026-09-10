@@ -188,11 +188,20 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
         if (a.given && a.family) return `${a.given} ${a.family}`;
         return a.family || a.name || "";
       });
-      const year =
-        item.published?.["date-parts"]?.[0]?.[0]?.toString() ||
-        item["published-print"]?.["date-parts"]?.[0]?.[0]?.toString() ||
-        "";
-      const journal = item["container-title"]?.[0] || "";
+      const dateParts =
+        item["published-print"]?.["date-parts"]?.[0] ||
+        item["published-online"]?.["date-parts"]?.[0] ||
+        item.published?.["date-parts"]?.[0] ||
+        item.issued?.["date-parts"]?.[0] ||
+        item.created?.["date-parts"]?.[0] ||
+        item["journal-issue"]?.published?.["date-parts"]?.[0] ||
+        item["journal-issue"]?.["published-print"]?.["date-parts"]?.[0] ||
+        item["journal-issue"]?.["published-online"]?.["date-parts"]?.[0];
+
+      const year = dateParts?.[0] ? String(dateParts[0]) : "";
+      const journal = Array.isArray(item["container-title"])
+        ? item["container-title"][0]
+        : item["container-title"] || "";
 
       const citation = generateAPA7Citation({
         authors,
@@ -216,6 +225,56 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
         citation,
         confidence: "verified",
       };
+    }
+  } catch {}
+
+  // 4. DataCite API (CORS enabled, covers arXiv, Zenodo, Figshare, institutional repos)
+  try {
+    const dataCiteUrl = `https://api.datacite.org/dois/${clean}`;
+    const res = await fetch(dataCiteUrl, {
+      headers: { Accept: "application/json" },
+    });
+
+    if (res.ok) {
+      const dcData = await res.json();
+      const attr = dcData.data?.attributes;
+      if (attr) {
+        const title = attr.titles?.[0]?.title || "";
+        const authors: string[] = (attr.creators || [])
+          .map((c: any) => c.name || `${c.givenName || ""} ${c.familyName || ""}`.trim())
+          .filter(Boolean);
+        const year = String(
+          attr.publicationYear ||
+            attr.dates?.find(
+              (d: any) => d.dateType === "Issued" || d.dateType === "Created" || d.dateType === "Submitted"
+            )?.date?.slice(0, 4) ||
+            ""
+        );
+        const journal = attr.container?.title || attr.publisher || "";
+
+        const citation = generateAPA7Citation({
+          authors,
+          year,
+          title,
+          journal,
+          doi: clean,
+        });
+
+        return {
+          success: true,
+          metadata: {
+            title,
+            authors,
+            year,
+            journal,
+            doi: clean,
+            url: `https://doi.org/${clean}`,
+            type: "paper",
+          },
+          citation,
+          confidence: "verified",
+        };
+      }
     }
   } catch {}
 
