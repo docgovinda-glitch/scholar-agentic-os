@@ -100,7 +100,7 @@ const CATEGORY_COLOR = {
  * click-to-select interaction in the TipTap-backed editor (docs 22 §5.4's
  * "Select text, ⌘I"). Passage selection from freshly AI-GENERATED manuscript
  * sections IS real, via `seedText`/`seedToken` below (ManuscriptGenerationPanel's
- * "Humanize in Studio" action) — this is a "make the AI-drafted prose read
+ * "Refine in Studio" action) — this is a "make the AI-drafted prose read
  * naturally in the author's voice" pass, not AI-detection-evasion tooling.
  * Absent a seed, the textarea remains the same honest stopgap as
  * plainTextToDocument.ts — paste a passage rather than select one in place.
@@ -167,7 +167,7 @@ export default function StudioPanel({
   }, []);
 
   // Seed the passage box from a freshly generated manuscript section
-  // (ManuscriptGenerationPanel's "Humanize in Studio"). Reacts to a CHANGE in
+  // (ManuscriptGenerationPanel's "Refine in Studio"). Reacts to a CHANGE in
   // seedToken, not to seedText alone, so a parent re-render carrying the same
   // token never clobbers text the user is actively editing.
   useEffect(() => {

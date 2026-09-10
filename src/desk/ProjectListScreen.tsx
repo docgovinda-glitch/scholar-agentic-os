@@ -656,7 +656,7 @@ function EmptyState({ onStart }: { onStart: () => void }) {
   );
 }
 
-/** Curated 6 essential academic formats requested by user */
+/** Curated 5 essential academic formats requested by user */
 const FORMAT_TILES = [
   {
     id: "OT-01",
@@ -697,14 +697,6 @@ const FORMAT_TILES = [
     tag: "Slides & Keynotes",
     description: "Conference slide decks, oral defense scripts & visual narratives.",
     budget: "10 – 35 slides",
-  },
-  {
-    id: "OT-07",
-    label: "Text Humanizer",
-    icon: "✨",
-    tag: "Language & Voice",
-    description: "Stylometric tone calibration, voice profiling & AI text polish.",
-    budget: "Section-by-section",
   },
 ];
 

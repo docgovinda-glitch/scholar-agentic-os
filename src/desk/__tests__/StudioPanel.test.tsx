@@ -145,7 +145,7 @@ describe("Desk — StudioPanel", () => {
     rerender(<StudioPanel sessionId="s1" seedText="Generated section text." seedToken={1} />);
     expect(screen.getByPlaceholderText(/Paste a passage/)).toHaveValue("User's own edit.");
 
-    // A NEW token (e.g. a second "Humanize in Studio" click) re-seeds, even with the same text.
+    // A NEW token (e.g. a second "Refine in Studio" click) re-seeds, even with the same text.
     rerender(<StudioPanel sessionId="s1" seedText="Generated section text." seedToken={2} />);
     expect(screen.getByPlaceholderText(/Paste a passage/)).toHaveValue("Generated section text.");
   });

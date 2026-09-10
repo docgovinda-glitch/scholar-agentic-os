@@ -164,21 +164,6 @@ const FORMAT_FAMILIES = [
       },
     ],
   },
-  {
-    id: "applied_professional",
-    label: "Text Humanizer",
-    icon: "✨",
-    desc: "Language & Voice Studio for AI text polish, tone tuning, and stylometric humanization.",
-    formats: [
-      {
-        id: "OT-07",
-        label: "Text Humanizer",
-        words: "Section-by-section",
-        sections: "Stylometric Analysis → Tone & Voice Calibration → Passive/Active Balance → Provenance Check",
-        bestFor: "Refining AI drafts into natural, authentic, publication-grade academic prose.",
-      },
-    ],
-  },
 ];
 
 const SUGGESTED_TOPICS = [
@@ -455,11 +440,11 @@ export default function ScholarCoreLanding({
             ))}
           </div>
 
-          {/* 6 CURATED ACADEMIC WORKSPACES */}
+          {/* 5 CURATED ACADEMIC WORKSPACES */}
           <div id="formats-explorer" className="w-full scroll-mt-24 pt-4 border-t border-[color:var(--border-subtle)]">
             <div className="text-center max-w-3xl mx-auto mb-8">
               <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--accent)]">
-                6 DEDICATED ACADEMIC WORKSPACES
+                5 DEDICATED ACADEMIC WORKSPACES
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[color:var(--text-primary)] mt-1">
                 Engineered for Every Stage of Scholarship
@@ -469,7 +454,7 @@ export default function ScholarCoreLanding({
               </p>
             </div>
 
-            {/* 6 Curated Workspace Cards Grid */}
+            {/* 5 Curated Workspace Cards Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {FORMAT_FAMILIES.map((fam) => {
                 const fmt = fam.formats[0];

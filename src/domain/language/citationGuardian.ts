@@ -79,7 +79,7 @@ export function maskCitationsAndFormulas(text: string): MaskResult {
 }
 
 /**
- * Restores all masked citations and formulas into humanized text
+ * Restores all masked citations and formulas into transformed text
  */
 export function restoreCitationsAndFormulas(text: string, items: ProtectedItem[]): string {
   let restored = text;

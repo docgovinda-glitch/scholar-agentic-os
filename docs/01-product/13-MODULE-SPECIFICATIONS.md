@@ -359,7 +359,7 @@ exists; everything else remains the intended target.
 | `src/types/documentTypes.ts` | `app/atlas` | **Built** at `src/app/atlas/` (schema, registry, validation, proposal engine) with all 24 of 24 output types populated — see `14` §12 |
 | `src/services/knowledgeVaultService.ts` | `app/vault` | Not started |
 | `src/services/documentExportService.ts` | `app/export` | Not started |
-| **`src/skills/humanizeSkill.ts`** | **`app/studio` + `domain/language`** | **Built.** `src/domain/language/` (6 modules, 35 tests) and `src/app/studio/` (3 modules, 21 tests) implement the full six-stage pipeline per `32` §13. `humanizeSkill.ts` itself is untouched and still referenced by the legacy agent pipeline — retiring it is the next step once a client calls `/api/studio/refine` instead of the skill |
+| **`src/skills/humanizeSkill.ts`** | **`app/studio` + `domain/language`** | **Retired.** Legacy humanize skill and humanizer modules are completely deleted. The Language & Voice Studio (`app/studio` + `domain/language`) provides the six-stage refinement pipeline. |
 
 #### 8.1a What actually exists today (2026-08-03)
 

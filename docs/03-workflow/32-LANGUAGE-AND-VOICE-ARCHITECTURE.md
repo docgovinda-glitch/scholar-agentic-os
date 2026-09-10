@@ -525,7 +525,6 @@ not just specified. Location and what each piece covers:
 | Writing History | §8 is specified; not yet implemented — depends on the same persistence layer as session policy |
 | `domain/language`'s 98% branch coverage target (`13` §6) | Coverage is strong (35 tests across 5 files) but not yet measured against the formal target |
 
-`src/skills/humanizeSkill.ts` is untouched — it is the legacy skill this Studio
-replaces, per `13` §8.1, and is still referenced by the legacy agent pipeline.
-Retiring it is the next migration step once a client surface calls the new
-`/api/studio/refine` route instead.
+Legacy `humanizeSkill.ts` and standalone humanizer modules have been completely retired
+and removed from the codebase. The Language & Voice Studio (`app/studio`) is the
+canonical surface for academic prose refinement.

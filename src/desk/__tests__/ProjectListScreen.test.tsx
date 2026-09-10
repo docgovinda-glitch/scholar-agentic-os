@@ -52,7 +52,6 @@ describe("the document-type format selector", () => {
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Thesis / Dissertation" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Text Humanizer" })).toBeInTheDocument();
   });
 
   it("cannot continue before a format is chosen", async () => {

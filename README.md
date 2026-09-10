@@ -4,7 +4,7 @@
 
 ---
 
-## 🏛️ The 6 Dedicated Academic Workspaces
+## 🏛️ The 5 Dedicated Academic Workspaces
 
 Rather than generic forms, each academic format in Scholar Core operates through its own purpose-built workspace tailored to the exact cognitive process of researchers:
 
@@ -26,9 +26,6 @@ Rather than generic forms, each academic format in Scholar Core operates through
 
 5. **📊 Academic Presentation Workspace (`OT-22`)**:
    - **Visual Narrative & Defense Studio**: *Timing & Constraint Profiler (10m/20m/45m) → Narrative Arc & Hook → Slide Deck Architecture → Word-for-Word Speaker Scripts → Interactive 16:9 Slide Canvas → Marp/PPTX Export → Audience Q&A Anticipator*.
-
-6. **✨ Academic Text Humanizer (`OT-07`)**:
-   - **Side-by-Side Stylometric Studio**: *AI Marker & Cliché Diagnostic → Scholarly Register & Author Persona Calibration → Asymmetric Sentence Burstiness & Rhythm Tuning → Epistemic Hedging → Provenance Grounding Gate*.
 
 ---
 

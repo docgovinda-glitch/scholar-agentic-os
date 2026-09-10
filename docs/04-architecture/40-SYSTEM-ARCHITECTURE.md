@@ -280,7 +280,7 @@ Revision 2 makes the existing codebase an asset rather than a migration target:
 | Agent and skill registries | Carry forward into Mesh |
 | Provider failover with classified errors | Carries forward into Gateway |
 | Export via `docx` | Carries forward into Export |
-| `humanizeSkill` | **Carries forward and expands** into Studio (`32` §13) |
+| `humanizeSkill` | **Retired** in favor of Language & Voice Studio (`32` §13) |
 
 The withdrawn desktop architecture would have discarded most of this. Revision 2
 does not.

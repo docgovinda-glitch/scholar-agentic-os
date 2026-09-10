@@ -270,7 +270,7 @@ Recorded so they are not silently reopened.
 | Should Pocket replicate Desk? | No | `20` §6, `23` §2 |
 | **Do we optimise output against AI detectors?** | **No, permanently** | `01` §7 |
 | **Do we claim output will pass detection?** | **No.** No surface, page, or document may imply it | `02` §9.1 |
-| May the UI use the word "humanize"? | Yes, meaning *read naturally and sound like me*. Not in any detection claim | `02` §9.1 |
+| May the UI use the word "humanize"? | Standalone humanizer is retired; Language & Voice Studio provides natural refinement | `02` §9.1 |
 | Do we measure human-vs-AI authorship? | No. Withdrawn in revision 2 | `32` §8.2 |
 | Do we block export on unreviewed AI text? | No. Withdrawn in revision 2 | `32` §8.2 |
 | Is Writing History mandatory? | No — off by default, user-owned, blocks nothing | `32` §8.4 |

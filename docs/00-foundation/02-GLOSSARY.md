@@ -256,17 +256,11 @@ workflow phase.
 
 ### 9.1 On "humanize"
 
-Revision 1 banned the word outright. Revision 2 permits it in **user-facing UI**
-where it plainly means *make this read naturally and sound like me* — that is
-what users call it and fighting their vocabulary is not useful.
-
-It remains banned in **any framing that promises a detection outcome**.
-"Humanize your writing" is acceptable UI copy for the Studio. "Humanize to bypass
-AI detection" is not, and no surface, marketing page, or documentation may imply
-it. The distinction is the claim being made, not the word.
+Any standalone "Humanizer" workspace or feature has been completely retired and deleted from the platform. The application provides prose refinement strictly through the **Language & Voice Studio** (`app/studio`).
 
 Internal documentation and code use **Refinement** and **Voice Matching**, which
-are more precise.
+are precise and honest. Framing that promises a detection outcome ("Humanize to bypass
+AI detection") is strictly prohibited across all surfaces.
 
 ---
 

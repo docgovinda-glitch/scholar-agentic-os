@@ -6,23 +6,22 @@ import { MemoryRouter } from "react-router-dom";
 import ScholarCoreLanding from "../ScholarCoreLanding";
 
 describe("ScholarCoreLanding", () => {
-  it("renders 6 Dedicated Academic Workspaces above the fold", () => {
+  it("renders 5 Dedicated Academic Workspaces above the fold", () => {
     render(
       <MemoryRouter>
         <ScholarCoreLanding />
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/6 DEDICATED ACADEMIC WORKSPACES/i)).toBeInTheDocument();
+    expect(screen.getByText(/5 DEDICATED ACADEMIC WORKSPACES/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Assignment/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Journal Article/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Thesis \/ Dissertation/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Presentation/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Text Humanizer/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Initialize Assignment →/i)).toBeInTheDocument();
   });
 
-  it("displays exact services across all 6 curated workspace cards", () => {
+  it("displays exact services across all 5 curated workspace cards", () => {
     render(
       <MemoryRouter>
         <ScholarCoreLanding />
@@ -32,7 +31,6 @@ describe("ScholarCoreLanding", () => {
     expect(screen.getByText(/Initialize Journal Article →/i)).toBeInTheDocument();
     expect(screen.getByText(/Initialize Thesis \/ Dissertation →/i)).toBeInTheDocument();
     expect(screen.getByText(/Initialize Presentation →/i)).toBeInTheDocument();
-    expect(screen.getByText(/Initialize Text Humanizer →/i)).toBeInTheDocument();
   });
 
   it("opens the embedded auth modal when clicking an initialize button", () => {

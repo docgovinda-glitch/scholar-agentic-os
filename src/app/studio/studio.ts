@@ -2,7 +2,7 @@
  * app/studio — the Language & Voice Studio orchestrator.
  *
  * Spec: docs/03-workflow/32-LANGUAGE-AND-VOICE-ARCHITECTURE.md §3
- * (the six-stage pipeline) and §13 (this is what humanizeSkill.ts becomes).
+ * (the six-stage pipeline) and §13.
  *
  * Pipeline:
  *   1. ANALYSE   — locate quotations to protect (domain/language/quotations)
