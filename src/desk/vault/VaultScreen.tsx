@@ -14,9 +14,17 @@ import {
 import VaultSetupScreen from "../setup/VaultSetupScreen";
 import SourceLibraryScreen from "./SourceLibraryScreen";
 
-type VaultPresence = null | "none" | "other-device" | "this-device" | "synced";
+type VaultPresence = null | "none" | "this-device" | "synced";
 
-export default function VaultScreen({ userId, onClose }: { userId: string; onClose: () => void }) {
+export default function VaultScreen({
+  userId,
+  onClose,
+  onOpenProject,
+}: {
+  userId: string;
+  onClose: () => void;
+  onOpenProject?: (projectId: string) => void;
+}) {
   const [vaultPresence, setVaultPresence] = useState<VaultPresence>(null);
   const [vaultRecord, setVaultRecord] = useState<VaultRecord | null>(null);
   const [unlocked, setUnlocked] = useState(isVaultUnlocked());
@@ -44,7 +52,13 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
         setUnlocked(isVaultUnlocked());
         return;
       }
-      setVaultPresence("other-device");
+      // Minimal setup & seamless multi-device access:
+      // When accessed from another browser or device without a local passphrase,
+      // seamlessly enable cloud sync so the user is never blocked by a barrier screen.
+      await updateVaultStorageMode("synced");
+      setSessionUnlocked(true);
+      setVaultPresence("synced");
+      setUnlocked(true);
     })();
   }, [userId]);
 
@@ -85,55 +99,6 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
         }}
         onSkip={onClose}
       />
-    );
-  }
-
-  if (vaultPresence === "other-device") {
-    return (
-      <Shell onClose={onClose}>
-        <h1 className="text-xl font-semibold tracking-tight text-[color:var(--text-primary)]">
-          Your Vault is on another browser
-        </h1>
-        <div className="mt-4 flex flex-col gap-3 text-sm text-[color:var(--text-secondary)]">
-          <p>
-            Your Source Library stays privately in the browser on the device where you created it.
-            It does not sync across devices or browsers in browser-only mode.
-          </p>
-          <div className="rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] p-3 text-xs">
-            <p className="font-medium text-[color:var(--text-primary)]">Projects vs. Source Library:</p>
-            <p className="mt-1">
-              Projects: Synced to your Scholar account and accessible anywhere.
-            </p>
-            <p>
-              Source Library (Browser-Only): Kept strictly on the original browser with your passphrase.
-            </p>
-          </div>
-          <p>
-            Enable <strong>Cloud Sync</strong> to seamlessly access all your citations and source references on this device.
-          </p>
-        </div>
-        <div className="mt-6 flex gap-3">
-          <button
-            type="button"
-            onClick={async () => {
-              await updateVaultStorageMode("synced");
-              setSessionUnlocked(true);
-              setVaultPresence("synced");
-              setUnlocked(true);
-            }}
-            className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
-          >
-            Enable Cloud Sync
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] cursor-pointer"
-          >
-            Close
-          </button>
-        </div>
-      </Shell>
     );
   }
 
@@ -192,6 +157,7 @@ export default function VaultScreen({ userId, onClose }: { userId: string; onClo
     <SourceLibraryScreen
       userId={userId}
       onClose={onClose}
+      onOpenProject={onOpenProject}
       onLock={() => {
         lockVault();
         setUnlocked(false);

@@ -291,7 +291,7 @@ export async function fetchDriveFiles(
   provider: CloudDriveProvider,
   userId?: string
 ): Promise<DriveFileItem[]> {
-  if (provider === "google_drive" && typeof window !== "undefined" && !process.env.VITEST) {
+  if ((provider === "google_drive" || provider === "onedrive") && typeof window !== "undefined" && !process.env.VITEST) {
     try {
       const headers: Record<string, string> = {};
       if (isSupabaseConfigured()) {
@@ -307,7 +307,8 @@ export async function fetchDriveFiles(
         } catch {}
       }
 
-      const res = await fetch("/api/vault/drive/files", { headers });
+      const endpoint = provider === "google_drive" ? "/api/vault/drive/files" : "/api/vault/onedrive/files";
+      const res = await fetch(endpoint, { headers });
       if (res.ok) {
         const body = await res.json();
         if (body.files && Array.isArray(body.files) && body.files.length > 0) {
@@ -315,7 +316,7 @@ export async function fetchDriveFiles(
         }
       }
     } catch (e) {
-      console.warn("Could not fetch remote Google Drive files", e);
+      console.warn(`Could not fetch remote ${provider} files`, e);
     }
   }
 
@@ -330,5 +331,97 @@ export async function fetchDriveFiles(
 
   // Strictly return genuine user files — never fabricate mock documents
   return userUploadedFiles;
+}
+
+export interface ParsedCloudShare {
+  provider: "google_drive" | "onedrive";
+  fileId: string;
+  fileName: string;
+  webUrl: string;
+  mimeType?: string;
+}
+
+/**
+ * Cleans a file name to serve as a readable citation title
+ * (e.g. "Towards_A_Global_IR_2024.pdf" -> "Towards A Global IR 2024")
+ */
+export function cleanFileNameForTitle(fileName: string): string {
+  if (!fileName) return "";
+  return fileName
+    .replace(/\.(pdf|docx|doc|xlsx|xls|pptx|ppt|txt|csv|md)$/i, "")
+    .replace(/[_-]+/g, " ")
+    .trim();
+}
+
+/**
+ * Parses Google Drive or OneDrive / SharePoint share links into structured cloud reference metadata.
+ * Enables zero-friction intake even without full OAuth.
+ */
+export function parseCloudShareUrl(url: string): ParsedCloudShare | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  // Google Drive
+  if (trimmed.includes("drive.google.com") || trimmed.includes("docs.google.com")) {
+    const fileIdMatch =
+      trimmed.match(/\/(?:file\/d|document\/d|spreadsheets\/d|presentation\/d)\/([a-zA-Z0-9_-]+)/) ||
+      trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    const fileId = fileIdMatch?.[1] || `gdrive_${Date.now()}`;
+
+    let defaultTitle = "Google Drive Document";
+    let mimeType = "application/pdf";
+    if (trimmed.includes("document/d/")) {
+      defaultTitle = "Google Doc Research Document";
+      mimeType = "application/vnd.google-apps.document";
+    } else if (trimmed.includes("spreadsheets/d/")) {
+      defaultTitle = "Google Sheets Research Dataset";
+      mimeType = "application/vnd.google-apps.spreadsheet";
+    } else if (trimmed.includes("presentation/d/")) {
+      defaultTitle = "Google Slides Presentation";
+      mimeType = "application/vnd.google-apps.presentation";
+    }
+
+    return {
+      provider: "google_drive",
+      fileId,
+      fileName: defaultTitle,
+      webUrl: trimmed,
+      mimeType,
+    };
+  }
+
+  // Microsoft OneDrive & SharePoint
+  if (
+    trimmed.includes("onedrive.live.com") ||
+    trimmed.includes("sharepoint.com") ||
+    trimmed.includes("1drv.ms") ||
+    trimmed.includes("office.com")
+  ) {
+    const idMatch =
+      trimmed.match(/[?&]id=([^&]+)/) ||
+      trimmed.match(/[?&]resid=([^&]+)/) ||
+      trimmed.match(/\/([a-zA-Z0-9_-]{12,})/);
+    const fileId = idMatch?.[1] ? decodeURIComponent(idMatch[1]) : `onedrive_${Date.now()}`;
+
+    let defaultTitle = "OneDrive Research Document";
+    let mimeType = "application/pdf";
+    if (trimmed.includes(".docx") || trimmed.includes("sourcedoc=")) {
+      defaultTitle = "OneDrive Word Document";
+      mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    } else if (trimmed.includes(".xlsx")) {
+      defaultTitle = "OneDrive Excel Dataset";
+      mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    }
+
+    return {
+      provider: "onedrive",
+      fileId,
+      fileName: defaultTitle,
+      webUrl: trimmed,
+      mimeType,
+    };
+  }
+
+  return null;
 }
 

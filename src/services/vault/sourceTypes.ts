@@ -49,6 +49,7 @@ export interface SourceWritingNotes {
   whySaved?: string;
   keyQuote?: string;
   page?: string;
+  keyPoints?: string[];
 }
 
 export interface SourceCitation {
@@ -159,7 +160,11 @@ export function vaultItemToSource(item: VaultItem): Source {
     whySaved: meta.whySaved || (item.content !== item.title ? item.content : "") || "",
     keyQuote: meta.keyQuote || "",
     page: meta.page || "",
+    keyPoints: meta.keyPoints || [],
   };
+  if (!notes.keyPoints && meta.keyPoints) {
+    notes.keyPoints = meta.keyPoints;
+  }
 
   const doi = item.canonicalReference?.doi || meta.doi;
   const url = item.externalReference || meta.url;
@@ -274,7 +279,16 @@ export function sourceToVaultItemPayload(
 
   return {
     title: source.metadata.title,
-    content: source.notes?.whySaved || source.writingNotes?.whySaved || source.metadata.title,
+    content:
+      [
+        source.notes?.whySaved || source.writingNotes?.whySaved,
+        source.notes?.keyPoints && source.notes.keyPoints.length > 0
+          ? `Key Takeaways:\n${source.notes.keyPoints.map((p) => `• ${p}`).join("\n")}`
+          : "",
+        source.notes?.keyQuote ? `Key Quote: "${source.notes.keyQuote}"` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n") || source.metadata.title,
     citation: source.citation,
     citationStatus: source.citationStatus || "confirmed",
     sourceType,
@@ -303,6 +317,7 @@ export function sourceToVaultItemPayload(
       keyQuote: source.notes?.keyQuote || source.writingNotes?.keyQuote,
       page: source.notes?.page || source.writingNotes?.page,
       whySaved: source.notes?.whySaved || source.writingNotes?.whySaved,
+      keyPoints: source.notes?.keyPoints || source.writingNotes?.keyPoints,
       citationFormats: source.citationFormats,
       integrity: source.integrity,
     },

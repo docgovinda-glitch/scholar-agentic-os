@@ -911,6 +911,81 @@ router.get("/drive/files", requireAuth, async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/vault/onedrive/files
+ * Fetches user's Microsoft OneDrive files (PDFs, Docs, etc.) directly via Microsoft Graph API
+ */
+router.get("/onedrive/files", requireAuth, async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (!user?.id) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const config = getSupabaseRestConfig();
+    let accessToken: string | null = (req.headers["x-provider-token"] as string) || null;
+
+    if (!accessToken && config) {
+      const integrationsTable = new SupabaseTable(config, "user_cloud_integrations");
+      const rows = await integrationsTable.select(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.onedrive`);
+      if (rows && rows.length > 0) {
+        accessToken = ((rows[0] as any)?.access_token as string) || null;
+      }
+    }
+
+    if (req.headers["x-provider-token"] && config) {
+      try {
+        const integrationsTable = new SupabaseTable(config, "user_cloud_integrations");
+        await integrationsTable.update(`user_id=eq.${encodeURIComponent(user.id)}&provider=eq.onedrive`, {
+          access_token: req.headers["x-provider-token"] as string,
+        });
+      } catch {}
+    }
+
+    if (!accessToken) {
+      return res.status(404).json({ needsAuth: true, error: "Microsoft OneDrive is not connected." });
+    }
+
+    const graphRes = await fetch(
+      "https://graph.microsoft.com/v1.0/me/drive/root/children?$top=30&$select=id,name,size,lastModifiedDateTime,webUrl,file,folder&$orderby=lastModifiedDateTime desc",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (graphRes.status === 401 || graphRes.status === 403) {
+      const errBody = await graphRes.json().catch(() => ({}));
+      return res.status(403).json({
+        needsReauth: true,
+        error: "Microsoft OneDrive permission not granted. Please re-authenticate.",
+        details: errBody,
+      });
+    }
+
+    if (!graphRes.ok) {
+      const errText = await graphRes.text();
+      return res.status(graphRes.status).json({ error: `Microsoft Graph API error: ${errText}` });
+    }
+
+    const data = await graphRes.json();
+    return res.json({
+      success: true,
+      files: (data.value || []).map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        mimeType: f.file?.mimeType || (f.folder ? "application/vnd.microsoft.folder" : "application/octet-stream"),
+        webViewLink: f.webUrl,
+        size: f.size,
+        lastModified: f.lastModifiedDateTime,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to fetch OneDrive files: ${err.message}` });
+  }
+});
+
+/**
  * POST /api/vault/reset
  * Fully resets the signed-in user's Vault for a clean first-time setup experience.
  */

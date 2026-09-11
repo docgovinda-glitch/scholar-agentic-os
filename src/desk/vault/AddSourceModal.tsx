@@ -2,8 +2,8 @@
  * Add Source Modal — Streamlined 1-Step Fast Intake for Knowledge Vault.
  *
  * Fast & Direct:
- * 1. Paste a URL, DOI, BibTeX, or title into a single smart input.
- * 2. Instant auto-fetch and field population.
+ * 1. Smart Link / DOI / Title intake, OR 1-click Fetch from Google Drive / OneDrive.
+ * 2. Instant auto-fetch, metadata resolution, and citation generation.
  * 3. 1-click "Save Source" to save directly to Knowledge Vault.
  *
  * User files stay in their cloud storage or web source — zero file copies.
@@ -23,29 +23,55 @@ import {
   resolveDoiMetadata,
   resolveUrlMetadata,
   generateAPA7Citation,
+  generateKeyPointsAndNotes,
 } from "../../services/vault/metadataService";
+import {
+  getConnectedCloudDrives,
+  fetchDriveFiles,
+  initiateGoogleDriveAuth,
+  initiateOneDriveAuth,
+  cleanFileNameForTitle,
+  parseCloudShareUrl,
+  type CloudDriveAccount,
+  type DriveFileItem,
+  type CloudDriveProvider,
+} from "../../services/vault/cloudDriveService";
 
 export interface AddSourceModalProps {
   userId: string;
   existingItems: VaultItem[];
   existingProjects?: string[];
+  connectedDrives?: CloudDriveAccount[];
   onClose: () => void;
   onSourceSaved: (savedItem: VaultItem) => void;
 }
 
+type IntakeSourceMode = "smart" | "google_drive" | "onedrive";
 type IntakeType = "url" | "doi" | "bibtex" | "cloud_drive" | "onedrive" | "manual";
 
 export default function AddSourceModal({
   userId,
   existingItems,
+  existingProjects = [],
+  connectedDrives: initialDrives,
   onClose,
   onSourceSaved,
 }: AddSourceModalProps) {
+  // Source intake mode tab
+  const [sourceMode, setSourceMode] = useState<IntakeSourceMode>("smart");
+
   // Smart intake input
   const [smartInput, setSmartInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [fetchStatus, setFetchStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Cloud Drive state
+  const [cloudDrives, setCloudDrives] = useState<CloudDriveAccount[]>(initialDrives || []);
+  const [driveFiles, setDriveFiles] = useState<DriveFileItem[]>([]);
+  const [driveFilter, setDriveFilter] = useState("");
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [directCloudLink, setDirectCloudLink] = useState("");
 
   // Core metadata fields
   const [title, setTitle] = useState("");
@@ -56,6 +82,13 @@ export default function AddSourceModal({
   const [doi, setDoi] = useState("");
   const [webUrl, setWebUrl] = useState("");
   const [sourceType, setSourceType] = useState<SourceType>("paper");
+
+  // Key points & project assignment
+  const [keyPoints, setKeyPoints] = useState<string[]>([]);
+  const [keyPointInput, setKeyPointInput] = useState("");
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [projectInput, setProjectInput] = useState("");
+  const [isAutoExtracting, setIsAutoExtracting] = useState(false);
 
   // Optional collapsible details
   const [showExtras, setShowExtras] = useState(false);
@@ -74,7 +107,49 @@ export default function AddSourceModal({
   const [duplicateWarning, setDuplicateWarning] = useState<DuplicateCheckResult | null>(null);
   const [bypassDuplicate, setBypassDuplicate] = useState(false);
 
-  // Detect input type
+  // Check connection status
+  const isGoogleConnected = cloudDrives.some((d) => d.provider === "google_drive");
+  const isOneDriveConnected = cloudDrives.some((d) => d.provider === "onedrive");
+  const googleAccount = cloudDrives.find((d) => d.provider === "google_drive");
+  const oneDriveAccount = cloudDrives.find((d) => d.provider === "onedrive");
+
+  // Load connected drives on mount if not provided
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const drives = await getConnectedCloudDrives(userId);
+        if (mounted) setCloudDrives(drives);
+      } catch {}
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [userId]);
+
+  // Load files when cloud drive mode is selected
+  useEffect(() => {
+    if (sourceMode === "google_drive" && isGoogleConnected) {
+      loadFilesForProvider("google_drive");
+    } else if (sourceMode === "onedrive" && isOneDriveConnected) {
+      loadFilesForProvider("onedrive");
+    }
+  }, [sourceMode, isGoogleConnected, isOneDriveConnected]);
+
+  async function loadFilesForProvider(provider: CloudDriveProvider) {
+    setDriveLoading(true);
+    setError(null);
+    try {
+      const files = await fetchDriveFiles(provider, userId);
+      setDriveFiles(files);
+    } catch (err: any) {
+      console.warn("Error fetching drive files:", err);
+    } finally {
+      setDriveLoading(false);
+    }
+  }
+
+  // Detect input type for smart input
   function detectType(val: string): IntakeType {
     const trimmed = val.trim();
     if (!trimmed) return "manual";
@@ -88,7 +163,12 @@ export default function AddSourceModal({
     if (trimmed.includes("drive.google.com") || trimmed.includes("docs.google.com")) {
       return "cloud_drive";
     }
-    if (trimmed.includes("onedrive.live.com") || trimmed.includes("sharepoint.com") || trimmed.includes("1drv.ms")) {
+    if (
+      trimmed.includes("onedrive.live.com") ||
+      trimmed.includes("sharepoint.com") ||
+      trimmed.includes("1drv.ms") ||
+      trimmed.includes("office.com")
+    ) {
       return "onedrive";
     }
     if (/^https?:\/\//i.test(trimmed)) {
@@ -121,6 +201,135 @@ export default function AddSourceModal({
     if (parsedDoi) setDoi(parsedDoi);
     setSourceType("paper");
     setFetchStatus("BibTeX reference parsed");
+
+    const takeaways = generateKeyPointsAndNotes({
+      title: parsedTitle,
+      authors: parsedAuthors.split(/[,;&]|\band\b/i).map((a) => a.trim()).filter(Boolean),
+      year: parsedYear,
+      journal: parsedJournal,
+    });
+    applyTakeaways(takeaways);
+  }
+
+  // Helper to apply auto-extracted key points and notes
+  function applyTakeaways(takeaways: {
+    keyPoints?: string[];
+    suggestedTags?: string[];
+    whySaved?: string;
+    keyQuote?: string;
+  }) {
+    if (takeaways.keyPoints && takeaways.keyPoints.length > 0) {
+      setKeyPoints(takeaways.keyPoints);
+    }
+    if (takeaways.suggestedTags && takeaways.suggestedTags.length > 0) {
+      setTags((prev) => Array.from(new Set([...prev, ...(takeaways.suggestedTags || [])])));
+    }
+    if (takeaways.whySaved && !whySaved.trim()) {
+      setWhySaved(takeaways.whySaved);
+    }
+    if (takeaways.keyQuote && !keyQuote.trim()) {
+      setKeyQuote(takeaways.keyQuote);
+    }
+  }
+
+  // Select file from cloud drive list
+  function handleSelectDriveFile(file: DriveFileItem, provider: CloudStorageProvider) {
+    const cleanedTitle = cleanFileNameForTitle(file.name) || file.name;
+    setTitle(cleanedTitle);
+    setWebUrl(file.webViewLink || "");
+    setCloudReference({
+      provider,
+      fileId: file.id,
+      fileName: file.name,
+      webUrl: file.webViewLink,
+    });
+    setSourceType("paper");
+    const provName = provider === "google_drive" ? "Google Drive" : "OneDrive";
+    setFetchStatus(`✓ Selected from ${provName}: ${file.name}`);
+    setError(null);
+
+    const takeaways = generateKeyPointsAndNotes({
+      title: cleanedTitle,
+      rawText: file.name,
+    });
+    applyTakeaways(takeaways);
+
+    // Duplicate check
+    const dup = checkForDuplicates({ title: cleanedTitle }, existingItems);
+    if (dup.isDuplicate) setDuplicateWarning(dup);
+  }
+
+  // Direct cloud link fetch
+  function handleDirectCloudLink(provider: CloudStorageProvider) {
+    const raw = directCloudLink.trim();
+    if (!raw) return;
+
+    const parsed = parseCloudShareUrl(raw);
+    const providerName = provider === "google_drive" ? "Google Drive" : "OneDrive";
+
+    if (parsed) {
+      const cleanedTitle = cleanFileNameForTitle(parsed.fileName) || parsed.fileName;
+      setTitle(cleanedTitle);
+      setWebUrl(parsed.webUrl);
+      setCloudReference({
+        provider: parsed.provider,
+        fileId: parsed.fileId,
+        fileName: parsed.fileName,
+        webUrl: parsed.webUrl,
+      });
+      setSourceType("paper");
+      setFetchStatus(`✓ Linked to ${providerName} file`);
+      setError(null);
+      setDirectCloudLink("");
+
+      const takeaways = generateKeyPointsAndNotes({
+        title: cleanedTitle,
+        rawText: parsed.fileName,
+      });
+      applyTakeaways(takeaways);
+    } else {
+      // Fallback
+      setTitle(`${providerName} Document`);
+      setWebUrl(raw);
+      setCloudReference({
+        provider,
+        fileId: `cloud_${Date.now()}`,
+        fileName: `${providerName} Document.pdf`,
+        webUrl: raw,
+      });
+      setSourceType("paper");
+      setFetchStatus(`✓ Linked to ${providerName}`);
+      setError(null);
+      setDirectCloudLink("");
+
+      const takeaways = generateKeyPointsAndNotes({
+        title: `${providerName} Document`,
+        rawText: raw,
+      });
+      applyTakeaways(takeaways);
+    }
+  }
+
+  // Initiate OAuth connect
+  async function handleConnectDrive(provider: CloudDriveProvider) {
+    setBusy(true);
+    setError(null);
+    try {
+      if (provider === "google_drive") {
+        await initiateGoogleDriveAuth(userId);
+      } else {
+        await initiateOneDriveAuth(userId);
+      }
+      const drives = await getConnectedCloudDrives(userId);
+      setCloudDrives(drives);
+    } catch (err: any) {
+      setError(
+        err.message ||
+          `Unable to connect ${provider === "google_drive" ? "Google Drive" : "OneDrive"}. You can also paste a file link directly below.`
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   // Resolve metadata from smart input
@@ -147,7 +356,8 @@ export default function AddSourceModal({
           setDoi(res.metadata.doi || cleanDoi);
           setWebUrl(res.metadata.url || `https://doi.org/${res.metadata.doi || cleanDoi}`);
           setSourceType("paper");
-          setFetchStatus("✓ DOI metadata verified");
+          applyTakeaways(res);
+          setFetchStatus("✓ DOI verified & key points auto-extracted");
 
           const dup = checkForDuplicates(
             {
@@ -177,7 +387,8 @@ export default function AddSourceModal({
         setDoi(res.metadata.doi || "");
         setWebUrl(res.metadata.url || raw);
         setSourceType(res.metadata.type === "paper" || res.metadata.doi || res.metadata.journal ? "paper" : "website");
-        setFetchStatus(res.confidence === "verified" ? "✓ Metadata verified" : "Source details fetched");
+        applyTakeaways(res);
+        setFetchStatus(res.confidence === "verified" ? "✓ Metadata & key points auto-extracted" : "Source details fetched");
 
         const dup = checkForDuplicates(
           {
@@ -192,10 +403,10 @@ export default function AddSourceModal({
       } else if (kind === "bibtex") {
         parseBibtex(raw);
       } else if (kind === "cloud_drive" || kind === "onedrive") {
+        const parsed = parseCloudShareUrl(raw);
         const provider: CloudStorageProvider = kind === "cloud_drive" ? "google_drive" : "onedrive";
-        const driveMatch = raw.match(/\/(?:file\/d|document\/d|spreadsheets\/d|presentation\/d)\/([a-zA-Z0-9_-]+)/);
-        const fileId = driveMatch?.[1] || `cloud_${Date.now()}`;
-        const fileName = "Cloud Research Document.pdf";
+        const fileId = parsed?.fileId || `cloud_${Date.now()}`;
+        const fileName = parsed?.fileName || (provider === "google_drive" ? "Google Drive Document.pdf" : "OneDrive Document.pdf");
 
         setCloudReference({
           provider,
@@ -203,14 +414,23 @@ export default function AddSourceModal({
           fileName,
           webUrl: raw,
         });
-        if (!title) setTitle("Cloud Research Document");
+        const derivedTitle = cleanFileNameForTitle(fileName) || "Cloud Research Document";
+        if (!title) setTitle(derivedTitle);
         setWebUrl(raw);
         setSourceType("paper");
         setFetchStatus(`✓ Connected to ${provider === "google_drive" ? "Google Drive" : "OneDrive"}`);
+
+        const takeaways = generateKeyPointsAndNotes({
+          title: derivedTitle,
+          rawText: fileName,
+        });
+        applyTakeaways(takeaways);
       } else {
         // Raw title
         setTitle(raw);
         setFetchStatus("Title set — add author & year if known");
+        const takeaways = generateKeyPointsAndNotes({ title: raw });
+        applyTakeaways(takeaways);
       }
     } catch (err: any) {
       setError(err.message || "Failed to retrieve source metadata.");
@@ -230,6 +450,60 @@ export default function AddSourceModal({
           handleSmartFetch(pastedText);
         }, 50);
       }
+    }
+  }
+
+  // Auto-generate key points and notes on demand
+  function handleAutoExtractKeyPoints() {
+    if (!title.trim()) return;
+    setIsAutoExtracting(true);
+    try {
+      const authors = authorsText
+        .split(/[,;&]|\band\b/i)
+        .map((a) => a.trim())
+        .filter(Boolean);
+
+      const takeaways = generateKeyPointsAndNotes({
+        title: title.trim(),
+        authors,
+        journal: (journal || publisher).trim(),
+        year: year.trim(),
+      });
+      applyTakeaways(takeaways);
+      setShowExtras(true);
+      setFetchStatus("✓ Key points and notes extracted for projects");
+    } finally {
+      setIsAutoExtracting(false);
+    }
+  }
+
+  function handleAddKeyPoint() {
+    const trimmed = keyPointInput.trim();
+    if (trimmed && !keyPoints.includes(trimmed)) {
+      setKeyPoints([...keyPoints, trimmed]);
+      setKeyPointInput("");
+    }
+  }
+
+  function handleRemoveKeyPoint(index: number) {
+    setKeyPoints(keyPoints.filter((_, idx) => idx !== index));
+  }
+
+  function handleToggleProject(projectName: string) {
+    const trimmed = projectName.trim();
+    if (!trimmed) return;
+    if (selectedProjects.includes(trimmed)) {
+      setSelectedProjects(selectedProjects.filter((p) => p !== trimmed));
+    } else {
+      setSelectedProjects([...selectedProjects, trimmed]);
+    }
+  }
+
+  function handleAddProject() {
+    const trimmed = projectInput.trim();
+    if (trimmed && !selectedProjects.includes(trimmed)) {
+      setSelectedProjects([...selectedProjects, trimmed]);
+      setProjectInput("");
     }
   }
 
@@ -273,11 +547,12 @@ export default function AddSourceModal({
           type: sourceType,
         },
         cloudReference,
-        projects: [],
+        projects: selectedProjects,
         tags,
         notes: {
           whySaved: whySaved.trim() || undefined,
           keyQuote: keyQuote.trim() || undefined,
+          keyPoints: keyPoints.length > 0 ? keyPoints : undefined,
         },
         citation,
         citationStatus: "confirmed",
@@ -306,6 +581,12 @@ export default function AddSourceModal({
     setTags(tags.filter((t) => t !== tagToRemove));
   }
 
+  // Filter drive files by query
+  const filteredDriveFiles = driveFiles.filter((f) => {
+    if (!driveFilter.trim()) return true;
+    return f.name.toLowerCase().includes(driveFilter.toLowerCase().trim());
+  });
+
   return (
     <div
       role="dialog"
@@ -321,7 +602,7 @@ export default function AddSourceModal({
               Add Source
             </h2>
             <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-              Paste a link, DOI, or title to instantly organize and cite it.
+              Paste a link, DOI, or fetch directly from Google Drive and OneDrive.
             </p>
           </div>
           <button
@@ -334,51 +615,418 @@ export default function AddSourceModal({
           </button>
         </div>
 
+        {/* Source Intake Selector Tabs */}
+        <div className="flex border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/50 px-6 pt-2">
+          <button
+            type="button"
+            onClick={() => setSourceMode("smart")}
+            className={`flex items-center gap-1.5 pb-2.5 pt-1 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
+              sourceMode === "smart"
+                ? "border-[color:var(--accent)] text-[color:var(--accent)] font-bold"
+                : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+            }`}
+          >
+            <span>🔗</span>
+            <span>Link / DOI / Reference</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSourceMode("google_drive")}
+            className={`flex items-center gap-1.5 pb-2.5 pt-1 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
+              sourceMode === "google_drive"
+                ? "border-[color:var(--accent)] text-[color:var(--accent)] font-bold"
+                : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+            }`}
+          >
+            <span className="text-sm">📁</span>
+            <span>Google Drive</span>
+            {isGoogleConnected && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Connected" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSourceMode("onedrive")}
+            className={`flex items-center gap-1.5 pb-2.5 pt-1 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
+              sourceMode === "onedrive"
+                ? "border-[color:var(--accent)] text-[color:var(--accent)] font-bold"
+                : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+            }`}
+          >
+            <span className="text-sm">☁️</span>
+            <span>OneDrive</span>
+            {isOneDriveConnected && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Connected" />
+            )}
+          </button>
+        </div>
+
         {/* Content Form */}
         <form onSubmit={handleSaveSource} className="p-6 flex flex-col gap-4">
-          {/* Smart Input Row */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="smart-intake-input" className="text-xs font-bold text-[color:var(--text-primary)]">
-              URL, DOI, or Reference
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                id="smart-intake-input"
-                type="text"
-                value={smartInput}
-                onChange={(e) => setSmartInput(e.target.value)}
-                onPaste={handleSmartInputPaste}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !title) {
-                    e.preventDefault();
-                    handleSmartFetch();
-                  }
-                }}
-                placeholder="Paste URL (https://...), DOI (10.1038/...), or title..."
-                className="flex-1 px-3.5 py-2.5 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden focus:border-[color:var(--accent)]"
-              />
+          {/* TAB 1: SMART INTAKE */}
+          {sourceMode === "smart" && (
+            <div className="flex flex-col gap-2">
+              <label htmlFor="smart-intake-input" className="text-xs font-bold text-[color:var(--text-primary)]">
+                URL, DOI, or Reference
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="smart-intake-input"
+                  type="text"
+                  value={smartInput}
+                  onChange={(e) => setSmartInput(e.target.value)}
+                  onPaste={handleSmartInputPaste}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !title) {
+                      e.preventDefault();
+                      handleSmartFetch();
+                    }
+                  }}
+                  placeholder="Paste URL (https://...), DOI (10.1038/...), or title..."
+                  className="flex-1 px-3.5 py-2.5 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden focus:border-[color:var(--accent)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSmartFetch()}
+                  disabled={busy || !smartInput.trim()}
+                  className="px-3.5 py-2.5 bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] text-xs font-semibold rounded-[var(--radius-md)] disabled:opacity-50 cursor-pointer shrink-0 transition-colors"
+                >
+                  {busy ? "Fetching…" : "Fetch"}
+                </button>
+              </div>
+
+              {/* Quick Cloud Buttons Row */}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[11px] text-[color:var(--text-muted)]">Or fetch from:</span>
+                <button
+                  type="button"
+                  onClick={() => setSourceMode("google_drive")}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] rounded-[var(--radius-sm)] transition-colors cursor-pointer"
+                >
+                  <span>📁</span>
+                  <span>Google Drive</span>
+                  {isGoogleConnected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSourceMode("onedrive")}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-inset)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-subtle)] rounded-[var(--radius-sm)] transition-colors cursor-pointer"
+                >
+                  <span>☁️</span>
+                  <span>OneDrive</span>
+                  {isOneDriveConnected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: GOOGLE DRIVE INTAKE */}
+          {sourceMode === "google_drive" && (
+            <div className="flex flex-col gap-3 p-3.5 bg-[color:var(--surface-inset)] rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)]">
+              {isGoogleConnected ? (
+                <>
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-[color:var(--text-primary)]">
+                      <span>📁</span>
+                      <span>Google Drive</span>
+                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
+                        Connected ({googleAccount?.accountEmail})
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => loadFilesForProvider("google_drive")}
+                      disabled={driveLoading}
+                      className="text-[11px] text-[color:var(--accent)] hover:underline cursor-pointer"
+                    >
+                      {driveLoading ? "Refreshing…" : "↻ Refresh files"}
+                    </button>
+                  </div>
+
+                  {/* Search filter inside Drive */}
+                  <input
+                    type="text"
+                    value={driveFilter}
+                    onChange={(e) => setDriveFilter(e.target.value)}
+                    placeholder="Search documents, PDFs, or sheets in Drive..."
+                    className="px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
+                  />
+
+                  {/* Drive Files List */}
+                  <div className="max-h-40 overflow-y-auto flex flex-col gap-1 pr-1 border border-[color:var(--border-subtle)] rounded-[var(--radius-md)] bg-[color:var(--surface-raised)] p-1">
+                    {driveLoading ? (
+                      <div className="py-6 text-center text-xs text-[color:var(--text-muted)]">
+                        Loading your Google Drive files…
+                      </div>
+                    ) : filteredDriveFiles.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-[color:var(--text-muted)]">
+                        {driveFilter ? "No matching files found." : "No documents found in Google Drive."}
+                      </div>
+                    ) : (
+                      filteredDriveFiles.map((file) => (
+                        <button
+                          key={file.id}
+                          type="button"
+                          onClick={() => handleSelectDriveFile(file, "google_drive")}
+                          className="flex items-center justify-between p-2 rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] text-left transition-colors cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-2 truncate pr-2">
+                            <span className="text-sm shrink-0">
+                              {file.mimeType?.includes("pdf")
+                                ? "📄"
+                                : file.mimeType?.includes("document")
+                                ? "📝"
+                                : file.mimeType?.includes("spreadsheet")
+                                ? "📊"
+                                : "📁"}
+                            </span>
+                            <span className="text-xs font-medium text-[color:var(--text-primary)] truncate">
+                              {file.name}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-[color:var(--accent)] font-semibold shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            Select Source →
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Direct link option */}
+                  <div className="pt-2 border-t border-[color:var(--border-subtle)] flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={directCloudLink}
+                      onChange={(e) => setDirectCloudLink(e.target.value)}
+                      placeholder="Or paste Drive file link (https://drive.google.com/...)"
+                      className="flex-1 px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleDirectCloudLink("google_drive")}
+                      disabled={!directCloudLink.trim()}
+                      className="px-3 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-xs font-semibold rounded-[var(--radius-md)] disabled:opacity-50 cursor-pointer"
+                    >
+                      Fetch Link
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Google Drive Not Connected Setup Card */
+                <div className="flex flex-col gap-3 py-1">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">📁</span>
+                    <div>
+                      <h3 className="text-xs font-bold text-[color:var(--text-primary)]">Connect Google Drive</h3>
+                      <p className="text-[11px] text-[color:var(--text-muted)]">
+                        Select and cite your research papers, notes, and datasets with zero document storage.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleConnectDrive("google_drive")}
+                    disabled={busy}
+                    className="w-full py-2 bg-[color:var(--accent-solid)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-bold rounded-[var(--radius-md)] flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 transition-colors"
+                  >
+                    <span>📁</span>
+                    <span>{busy ? "Connecting…" : "Connect Google Drive"}</span>
+                  </button>
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-[color:var(--border-subtle)]">
+                    <input
+                      type="text"
+                      value={directCloudLink}
+                      onChange={(e) => setDirectCloudLink(e.target.value)}
+                      placeholder="Or paste Google Drive share link directly..."
+                      className="flex-1 px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleDirectCloudLink("google_drive")}
+                      disabled={!directCloudLink.trim()}
+                      className="px-3 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-xs font-semibold rounded-[var(--radius-md)] disabled:opacity-50 cursor-pointer"
+                    >
+                      Fetch Link
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: MICROSOFT ONEDRIVE INTAKE */}
+          {sourceMode === "onedrive" && (
+            <div className="flex flex-col gap-3 p-3.5 bg-[color:var(--surface-inset)] rounded-[var(--radius-lg)] border border-[color:var(--border-subtle)]">
+              {isOneDriveConnected ? (
+                <>
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-[color:var(--text-primary)]">
+                      <span>☁️</span>
+                      <span>Microsoft OneDrive</span>
+                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-full">
+                        Connected ({oneDriveAccount?.accountEmail})
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => loadFilesForProvider("onedrive")}
+                      disabled={driveLoading}
+                      className="text-[11px] text-[color:var(--accent)] hover:underline cursor-pointer"
+                    >
+                      {driveLoading ? "Refreshing…" : "↻ Refresh files"}
+                    </button>
+                  </div>
+
+                  {/* Search filter inside OneDrive */}
+                  <input
+                    type="text"
+                    value={driveFilter}
+                    onChange={(e) => setDriveFilter(e.target.value)}
+                    placeholder="Search Word documents, PDFs, or datasets in OneDrive..."
+                    className="px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
+                  />
+
+                  {/* OneDrive Files List */}
+                  <div className="max-h-40 overflow-y-auto flex flex-col gap-1 pr-1 border border-[color:var(--border-subtle)] rounded-[var(--radius-md)] bg-[color:var(--surface-raised)] p-1">
+                    {driveLoading ? (
+                      <div className="py-6 text-center text-xs text-[color:var(--text-muted)]">
+                        Loading your OneDrive files…
+                      </div>
+                    ) : filteredDriveFiles.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-[color:var(--text-muted)]">
+                        {driveFilter ? "No matching files found." : "No documents found in OneDrive."}
+                      </div>
+                    ) : (
+                      filteredDriveFiles.map((file) => (
+                        <button
+                          key={file.id}
+                          type="button"
+                          onClick={() => handleSelectDriveFile(file, "onedrive")}
+                          className="flex items-center justify-between p-2 rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] text-left transition-colors cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-2 truncate pr-2">
+                            <span className="text-sm shrink-0">
+                              {file.mimeType?.includes("pdf")
+                                ? "📄"
+                                : file.mimeType?.includes("word") || file.name.endsWith(".docx")
+                                ? "📝"
+                                : file.mimeType?.includes("sheet") || file.name.endsWith(".xlsx")
+                                ? "📊"
+                                : "☁️"}
+                            </span>
+                            <span className="text-xs font-medium text-[color:var(--text-primary)] truncate">
+                              {file.name}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-[color:var(--accent)] font-semibold shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            Select Source →
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Direct link option */}
+                  <div className="pt-2 border-t border-[color:var(--border-subtle)] flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={directCloudLink}
+                      onChange={(e) => setDirectCloudLink(e.target.value)}
+                      placeholder="Or paste OneDrive/SharePoint link (https://1drv.ms/...)"
+                      className="flex-1 px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleDirectCloudLink("onedrive")}
+                      disabled={!directCloudLink.trim()}
+                      className="px-3 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-xs font-semibold rounded-[var(--radius-md)] disabled:opacity-50 cursor-pointer"
+                    >
+                      Fetch Link
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* OneDrive Not Connected Setup Card */
+                <div className="flex flex-col gap-3 py-1">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">☁️</span>
+                    <div>
+                      <h3 className="text-xs font-bold text-[color:var(--text-primary)]">Connect Microsoft OneDrive</h3>
+                      <p className="text-[11px] text-[color:var(--text-muted)]">
+                        Select and cite your Word documents, OneDrive PDFs, and lecture notes with zero file copies.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleConnectDrive("onedrive")}
+                    disabled={busy}
+                    className="w-full py-2 bg-[color:var(--accent-solid)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-bold rounded-[var(--radius-md)] flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 transition-colors"
+                  >
+                    <span>☁️</span>
+                    <span>{busy ? "Connecting…" : "Connect Microsoft OneDrive"}</span>
+                  </button>
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-[color:var(--border-subtle)]">
+                    <input
+                      type="text"
+                      value={directCloudLink}
+                      onChange={(e) => setDirectCloudLink(e.target.value)}
+                      placeholder="Or paste OneDrive / SharePoint share link directly..."
+                      className="flex-1 px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleDirectCloudLink("onedrive")}
+                      disabled={!directCloudLink.trim()}
+                      className="px-3 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-xs font-semibold rounded-[var(--radius-md)] disabled:opacity-50 cursor-pointer"
+                    >
+                      Fetch Link
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Fetch feedback or error */}
+          {fetchStatus && (
+            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+              {fetchStatus}
+            </p>
+          )}
+          {error && (
+            <p className="text-[11px] text-[color:var(--state-danger)] font-medium">
+              {error}
+            </p>
+          )}
+
+          {/* Cloud Reference Attached Chip */}
+          {cloudReference && (
+            <div className="p-2.5 bg-[color:var(--accent-subtle)]/30 border border-[color:var(--border-subtle)] rounded-[var(--radius-md)] flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 truncate">
+                <span>{cloudReference.provider === "google_drive" ? "📁" : "☁️"}</span>
+                <span className="font-semibold text-[color:var(--text-primary)] truncate">
+                  {cloudReference.fileName}
+                </span>
+                <span className="text-[10px] text-[color:var(--text-muted)] uppercase tracking-wide">
+                  ({cloudReference.provider === "google_drive" ? "Google Drive" : "OneDrive"})
+                </span>
+              </div>
               <button
                 type="button"
-                onClick={() => handleSmartFetch()}
-                disabled={busy || !smartInput.trim()}
-                className="px-3.5 py-2.5 bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] text-xs font-semibold rounded-[var(--radius-md)] disabled:opacity-50 cursor-pointer shrink-0 transition-colors"
+                onClick={() => setCloudReference(undefined)}
+                className="text-[11px] text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer shrink-0 ml-2"
               >
-                {busy ? "Fetching…" : "Fetch"}
+                ✕ Detach
               </button>
             </div>
-
-            {/* Fetch feedback or error */}
-            {fetchStatus && (
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
-                {fetchStatus}
-              </p>
-            )}
-            {error && (
-              <p className="text-[11px] text-[color:var(--state-danger)] font-medium mt-0.5">
-                {error}
-              </p>
-            )}
-          </div>
+          )}
 
           {/* Duplicate Warning */}
           {duplicateWarning?.isDuplicate && !bypassDuplicate && (
@@ -503,10 +1151,20 @@ export default function AddSourceModal({
             <button
               type="button"
               onClick={() => setShowExtras(!showExtras)}
-              className="text-xs text-[color:var(--accent)] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+              className="text-xs text-[color:var(--accent)] hover:underline font-semibold flex items-center gap-1.5 cursor-pointer"
             >
               <span>{showExtras ? "▼" : "▶"}</span>
               <span>{showExtras ? "Hide tags and writing notes" : "+ Add tags or notes (optional)"}</span>
+              {keyPoints.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 rounded-full border border-amber-500/30">
+                  ✨ {keyPoints.length} Key {keyPoints.length === 1 ? "Point" : "Points"}
+                </span>
+              )}
+              {selectedProjects.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 text-[10px] font-semibold bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)] rounded-full border border-[color:var(--border-subtle)]">
+                  📁 {selectedProjects.length}
+                </span>
+              )}
             </button>
 
             {showExtras && (
@@ -551,6 +1209,7 @@ export default function AddSourceModal({
                     <button
                       type="button"
                       onClick={handleAddTag}
+                      aria-label="Add tag"
                       className="px-2.5 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-xs font-semibold rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
                     >
                       Add
@@ -587,14 +1246,169 @@ export default function AddSourceModal({
                     className="px-2.5 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] focus:outline-hidden"
                   />
                 </div>
+
+                {/* Key Points & Project Takeaways */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-[color:var(--border-subtle)]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-[11px] font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
+                        <span>💡</span>
+                        <span>Key Points & Project Takeaways</span>
+                      </label>
+                      <p className="text-[10px] text-[color:var(--text-muted)]">
+                        Core arguments and claims auto-fetched or saved for project writing and evidence.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAutoExtractKeyPoints}
+                      disabled={isAutoExtracting || !title.trim()}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-[color:var(--accent)] bg-[color:var(--surface-raised)] hover:bg-[color:var(--surface-hover)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] transition-colors cursor-pointer disabled:opacity-40"
+                    >
+                      <span>✨</span>
+                      <span>{isAutoExtracting ? "Extracting…" : "Auto-extract"}</span>
+                    </button>
+                  </div>
+
+                  {keyPoints.length > 0 && (
+                    <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
+                      {keyPoints.map((kp, idx) => (
+                        <div
+                          key={idx}
+                          className="group flex items-start gap-2 p-2 bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-[var(--radius-sm)] text-xs text-[color:var(--text-primary)]"
+                        >
+                          <span className="text-[color:var(--accent)] font-bold mt-0.5">•</span>
+                          <span className="flex-1 leading-snug">{kp}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveKeyPoint(idx)}
+                            aria-label={`Remove key point ${idx + 1}`}
+                            className="text-[color:var(--text-muted)] hover:text-red-500 opacity-60 group-hover:opacity-100 cursor-pointer shrink-0 ml-1"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={keyPointInput}
+                      onChange={(e) => setKeyPointInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddKeyPoint();
+                        }
+                      }}
+                      placeholder="Add key takeaway or argument and press enter"
+                      className="flex-1 px-2.5 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddKeyPoint}
+                      disabled={!keyPointInput.trim()}
+                      aria-label="Add key point"
+                      className="px-2.5 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-xs font-semibold rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] disabled:opacity-40 cursor-pointer"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Assign to Project(s) */}
+                <div className="flex flex-col gap-1.5 pt-2 border-t border-[color:var(--border-subtle)]">
+                  <label className="text-[11px] font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
+                    <span>📁</span>
+                    <span>Assign to Project(s)</span>
+                  </label>
+                  <p className="text-[10px] text-[color:var(--text-muted)]">
+                    Link this source to one or more active research projects or assignments.
+                  </p>
+
+                  {/* Existing project toggle buttons */}
+                  {existingProjects.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 my-0.5">
+                      {existingProjects.map((p) => {
+                        const isSelected = selectedProjects.includes(p);
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => handleToggleProject(p)}
+                            aria-label={`${isSelected ? "Remove from" : "Assign to"} ${p}`}
+                            className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full border transition-colors cursor-pointer ${
+                              isSelected
+                                ? "bg-[color:var(--accent-solid)] border-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold shadow-2xs"
+                                : "bg-[color:var(--surface-raised)] border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:border-[color:var(--border-strong)]"
+                            }`}
+                          >
+                            <span>{isSelected ? "✓" : "+"}</span>
+                            <span>{p}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Added custom projects */}
+                  {selectedProjects.filter((p) => !existingProjects.includes(p)).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1">
+                      {selectedProjects
+                        .filter((p) => !existingProjects.includes(p))
+                        .map((p) => (
+                          <span
+                            key={p}
+                            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-[color:var(--accent-solid)] border border-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold shadow-2xs"
+                          >
+                            <span>📁 {p}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleProject(p)}
+                              className="hover:opacity-75 cursor-pointer ml-1"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={projectInput}
+                      onChange={(e) => setProjectInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddProject();
+                        }
+                      }}
+                      placeholder="Assign project (e.g. Master's Thesis, Capstone)"
+                      className="flex-1 px-2.5 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddProject}
+                      disabled={!projectInput.trim()}
+                      className="px-2.5 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-xs font-semibold rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] disabled:opacity-40 cursor-pointer"
+                    >
+                      Assign
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
           {/* Footer Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-[color:var(--border-subtle)]">
-            <span className="text-[11px] text-[color:var(--text-muted)]">
-              🛡️ Zero document storage
+            <span className="text-[11px] text-[color:var(--text-muted)] flex items-center gap-1">
+              <span>🛡️</span>
+              <span>Zero document storage</span>
             </span>
             <div className="flex items-center gap-2">
               <button

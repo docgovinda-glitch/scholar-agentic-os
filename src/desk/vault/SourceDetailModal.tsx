@@ -13,6 +13,8 @@ export interface SourceDetailModalProps {
   onClose: () => void;
   onEdit?: (source: Source) => void;
   onDelete?: (sourceId: string) => void;
+  allProjects?: string[];
+  onToggleProject?: (sourceId: string, projectName: string) => void;
 }
 
 export default function SourceDetailModal({
@@ -20,15 +22,27 @@ export default function SourceDetailModal({
   onClose,
   onEdit,
   onDelete,
+  allProjects = [],
+  onToggleProject,
 }: SourceDetailModalProps) {
   const [copied, setCopied] = useState(false);
+  const [copiedKeyPoints, setCopiedKeyPoints] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showAddProjectMenu, setShowAddProjectMenu] = useState(false);
 
   function handleCopyCitation() {
     if (!source.citation) return;
     navigator.clipboard.writeText(source.citation);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleCopyKeyPoints() {
+    const points = source.notes.keyPoints || source.writingNotes?.keyPoints;
+    if (!points || points.length === 0) return;
+    navigator.clipboard.writeText(points.map((p) => `• ${p}`).join("\n"));
+    setCopiedKeyPoints(true);
+    setTimeout(() => setCopiedKeyPoints(false), 2000);
   }
 
   const isRetracted =
@@ -172,23 +186,74 @@ export default function SourceDetailModal({
           {/* Projects & Tags */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-[color:var(--text-primary)] uppercase tracking-wider">
-                Projects
-              </span>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[color:var(--text-primary)] uppercase tracking-wider">
+                  Projects
+                </span>
+                {onToggleProject && allProjects.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddProjectMenu(!showAddProjectMenu)}
+                    className="text-[11px] text-[color:var(--accent)] hover:underline font-semibold cursor-pointer"
+                  >
+                    {showAddProjectMenu ? "Done" : "+ Link Project"}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 items-center">
                 {source.projects && source.projects.length > 0 ? (
                   source.projects.map((p) => (
                     <span
                       key={p}
-                      className="px-2.5 py-1 text-xs font-semibold rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-primary)]"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-primary)]"
                     >
-                      📁 {p}
+                      <span>📁 {p}</span>
+                      {onToggleProject && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleProject(source.id, p)}
+                          className="text-[10px] text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer ml-0.5"
+                          title={`Unlink from ${p}`}
+                        >
+                          ✕
+                        </button>
+                      )}
                     </span>
                   ))
                 ) : (
                   <span className="text-xs text-[color:var(--text-muted)] italic">General (No project)</span>
                 )}
               </div>
+
+              {/* Add Project Quick Menu */}
+              {showAddProjectMenu && onToggleProject && (
+                <div className="p-2.5 rounded-[var(--radius-md)] bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex flex-col gap-1.5 mt-1 animate-in fade-in duration-150">
+                  <span className="text-[10px] font-bold text-[color:var(--text-muted)] uppercase">
+                    Select a project to link/unlink:
+                  </span>
+                  <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                    {allProjects.map((proj) => {
+                      const isLinked = source.projects.includes(proj);
+                      return (
+                        <button
+                          key={proj}
+                          type="button"
+                          onClick={() => onToggleProject(source.id, proj)}
+                          className={`px-2 py-0.5 text-xs rounded border transition-colors cursor-pointer ${
+                            isLinked
+                              ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] border-transparent"
+                              : "bg-[color:var(--surface-raised)] border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:border-[color:var(--accent)]"
+                          }`}
+                        >
+                          {isLinked ? "✓ " : "+ "}
+                          {proj}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -231,6 +296,32 @@ export default function SourceDetailModal({
               </div>
             )}
 
+            {source.notes.keyPoints && source.notes.keyPoints.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[color:var(--text-secondary)]">
+                    Key Points & Project Takeaways:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyKeyPoints}
+                    className="text-[11px] text-[color:var(--accent)] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>{copiedKeyPoints ? "✓" : "📋"}</span>
+                    <span>{copiedKeyPoints ? "Copied" : "Copy Key Points"}</span>
+                  </button>
+                </div>
+                <div className="flex flex-col gap-1.5 bg-[color:var(--surface-inset)] p-3 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)]">
+                  {source.notes.keyPoints.map((kp, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-xs text-[color:var(--text-primary)] leading-relaxed">
+                      <span className="text-[color:var(--accent)] font-bold">•</span>
+                      <span>{kp}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {source.notes.keyQuote && (
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
@@ -247,7 +338,7 @@ export default function SourceDetailModal({
               </div>
             )}
 
-            {!source.notes.whySaved && !source.notes.keyQuote && (
+            {!source.notes.whySaved && !source.notes.keyQuote && (!source.notes.keyPoints || source.notes.keyPoints.length === 0) && (
               <p className="text-xs text-[color:var(--text-muted)] italic">No writing notes added yet.</p>
             )}
           </div>

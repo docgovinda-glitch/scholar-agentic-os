@@ -87,17 +87,19 @@ describe("no Vault yet", () => {
   });
 });
 
-describe("Vault exists on another browser (P1-4: cross-device absence)", () => {
-  it("shows an explanation instead of the create-vault flow when the vault is on another device", async () => {
+describe("Vault accessed on another browser (seamless zero-barrier sync)", () => {
+  it("seamlessly enables cloud sync and shows the library without blocking the user", async () => {
     loadVault.mockResolvedValue({ label: "My Knowledge Vault", createdAt: "2026-01-01" });
     hasVaultPassphraseOnThisDevice.mockResolvedValue(false);
+    listVaultItems.mockResolvedValue([]);
     render(<VaultScreen userId="user-1" onClose={vi.fn()} />);
 
-    expect(await screen.findByText(/Your Vault is on another browser/i)).toBeInTheDocument();
+    // Must NOT show the barrier screen
+    expect(screen.queryByText(/Your Vault is on another browser/i)).not.toBeInTheDocument();
     // Must NOT show the create-vault flow
     expect(screen.queryByText(/long-term library/i)).not.toBeInTheDocument();
-    // Must show the Projects vs Vault explanation
-    expect(screen.getByText(/Projects.*Synced to your Scholar account/is)).toBeInTheDocument();
+    // Seamlessly shows the Source Library
+    expect(await screen.findByText("Your Source Library is empty")).toBeInTheDocument();
   });
 });
 

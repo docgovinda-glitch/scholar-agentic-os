@@ -19,6 +19,11 @@ export interface ResolvedMetadataResult {
   citation: string;
   confidence: "verified" | "needs_review";
   notes?: string;
+  abstract?: string;
+  keyPoints?: string[];
+  suggestedTags?: string[];
+  whySaved?: string;
+  keyQuote?: string;
   error?: string;
 }
 
@@ -107,6 +112,14 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
             doi: clean,
           });
 
+        const takeaways = generateKeyPointsAndNotes({
+          title: data.title,
+          rawText: (data as any).content || (data as any).abstract || "",
+          authors,
+          journal,
+          year,
+        });
+
         return {
           success: true,
           metadata: {
@@ -120,6 +133,10 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
           },
           citation,
           confidence: "verified",
+          keyPoints: takeaways.keyPoints,
+          suggestedTags: takeaways.suggestedTags,
+          whySaved: takeaways.whySaved,
+          keyQuote: takeaways.keyQuote,
         };
       }
     }
@@ -154,6 +171,13 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
         doi: clean,
       });
 
+      const takeaways = generateKeyPointsAndNotes({
+        title,
+        authors,
+        year,
+        journal,
+      });
+
       return {
         success: true,
         metadata: {
@@ -167,6 +191,10 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
         },
         citation,
         confidence: "verified",
+        keyPoints: takeaways.keyPoints,
+        suggestedTags: takeaways.suggestedTags,
+        whySaved: takeaways.whySaved,
+        keyQuote: takeaways.keyQuote,
       };
     }
   } catch {
@@ -211,6 +239,13 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
         doi: clean,
       });
 
+      const takeaways = generateKeyPointsAndNotes({
+        title,
+        authors,
+        year,
+        journal,
+      });
+
       return {
         success: true,
         metadata: {
@@ -224,6 +259,10 @@ export async function resolveDoiMetadata(rawDoi: string): Promise<ResolvedMetada
         },
         citation,
         confidence: "verified",
+        keyPoints: takeaways.keyPoints,
+        suggestedTags: takeaways.suggestedTags,
+        whySaved: takeaways.whySaved,
+        keyQuote: takeaways.keyQuote,
       };
     }
   } catch {}
@@ -375,6 +414,14 @@ export async function resolveUrlMetadata(url: string): Promise<ResolvedMetadataR
         const confidence: "verified" | "needs_review" =
           authors.length > 0 && Boolean(year) ? "verified" : "needs_review";
 
+        const takeaways = generateKeyPointsAndNotes({
+          title,
+          rawText: data.description || "",
+          authors,
+          journal: journal || publisher,
+          year,
+        });
+
         return {
           success: true,
           metadata: {
@@ -389,12 +436,18 @@ export async function resolveUrlMetadata(url: string): Promise<ResolvedMetadataR
           },
           citation,
           confidence,
+          keyPoints: takeaways.keyPoints,
+          suggestedTags: takeaways.suggestedTags,
+          whySaved: takeaways.whySaved,
+          keyQuote: takeaways.keyQuote,
         };
       }
     }
   } catch {}
 
   const domain = new URL(trimmed).hostname.replace(/^www\./, "");
+  const fallbackTakeaways = generateKeyPointsAndNotes({ title: domain });
+
   return {
     success: true,
     metadata: {
@@ -407,5 +460,128 @@ export async function resolveUrlMetadata(url: string): Promise<ResolvedMetadataR
     },
     citation: `${domain}. Retrieved from ${trimmed}`,
     confidence: "needs_review",
+    keyPoints: fallbackTakeaways.keyPoints,
+    suggestedTags: fallbackTakeaways.suggestedTags,
+    whySaved: fallbackTakeaways.whySaved,
+    keyQuote: fallbackTakeaways.keyQuote,
+  };
+}
+
+export interface ExtractedKeyTakeaways {
+  keyPoints: string[];
+  suggestedTags: string[];
+  whySaved: string;
+  keyQuote: string;
+}
+
+const STOP_WORDS = new Set([
+  "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "as", "at",
+  "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "could", "did", "do",
+  "does", "doing", "down", "during", "each", "few", "for", "from", "further", "had", "has", "have", "having",
+  "he", "her", "here", "hers", "herself", "him", "himself", "his", "how", "i", "if", "in", "into", "is", "it",
+  "its", "itself", "just", "me", "more", "most", "my", "myself", "no", "nor", "not", "now", "of", "off", "on",
+  "once", "only", "or", "other", "our", "ours", "ourselves", "out", "over", "own", "same", "she", "should",
+  "so", "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves", "then", "there", "these",
+  "they", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "we", "were", "what",
+  "when", "where", "which", "while", "who", "whom", "why", "with", "would", "you", "your", "yours", "yourself",
+  "towards", "study", "paper", "review", "using", "based", "new", "via", "across", "within", "et", "al", "with",
+  "journal", "article", "vol", "issue", "published", "author"
+]);
+
+/**
+ * Intelligent extractor and synthesizer that generates academic key points,
+ * tags, research purpose (whySaved), and key quote from abstract/metadata.
+ * Ideal for later project drafting, literature reviews, and evidence synthesis.
+ */
+export function generateKeyPointsAndNotes(params: {
+  title: string;
+  rawText?: string;
+  authors?: string[];
+  journal?: string;
+  year?: string;
+}): ExtractedKeyTakeaways {
+  const { title, rawText, authors = [], journal = "", year = "" } = params;
+
+  // 1. Extract topical tags from corpus
+  const textCorpus = `${title} ${rawText || ""} ${journal}`;
+  const words = textCorpus
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 3 && !STOP_WORDS.has(w));
+
+  const wordFreq = new Map<string, number>();
+  for (const w of words) {
+    wordFreq.set(w, (wordFreq.get(w) || 0) + 1);
+  }
+  const topWords = Array.from(wordFreq.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([w]) => w.replace(/^_+|_+$/g, ""));
+  const suggestedTags = Array.from(new Set(topWords));
+
+  // 2. Synthesize Key Points & Takeaways
+  const keyPoints: string[] = [];
+  let keyQuote = "";
+  let whySaved = "";
+
+  const cleanText = (rawText || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (cleanText.length > 35) {
+    const rawSentences = cleanText.match(/[^.!?]+[.!?]+/g) || [cleanText];
+    const sentences = rawSentences.map((s) => s.trim()).filter((s) => s.length > 20);
+
+    const objective = sentences.find((s) =>
+      /investigat|examin|explor|focus|aim|address|propos|develop|analyz|consid/i.test(s)
+    );
+    const findings = sentences.find(
+      (s) =>
+        /find|result|demonstrat|show|indicat|reveal|confirm|suggest|observ|discov/i.test(s) &&
+        s !== objective
+    );
+    const conclusion = sentences.find(
+      (s) =>
+        /conclu|significan|polic|implicat|contribut|highlight|futur|importan/i.test(s) &&
+        s !== objective &&
+        s !== findings
+    );
+
+    if (objective) keyPoints.push(objective);
+    if (findings) keyPoints.push(findings);
+    if (conclusion) keyPoints.push(conclusion);
+
+    // If less than 3 matched, pick additional distinct sentences
+    for (const s of sentences) {
+      if (keyPoints.length >= 3) break;
+      if (!keyPoints.includes(s) && s.length > 25) {
+        keyPoints.push(s);
+      }
+    }
+
+    keyQuote = findings || objective || sentences[0] || "";
+    whySaved = `Core evidence on ${title}${authors.length > 0 ? ` (${authors[0]})` : ""} for project literature and synthesis.`;
+  }
+
+  // Fallback / standard academic structure if text was brief
+  if (keyPoints.length === 0) {
+    keyPoints.push(`Core Research Thesis: Investigates ${title}.`);
+    keyPoints.push(
+      `Analytical Scope: Scholarly study in ${journal || "academic domain"}${year ? ` (${year})` : ""}.`
+    );
+    keyPoints.push(
+      `Project Relevance: Primary reference for literature review, theoretical framework, and evidence extraction.`
+    );
+    whySaved = `Supports project theoretical framework and literature synthesis on ${title}.`;
+    keyQuote = `"${title}"`;
+  }
+
+  return {
+    keyPoints,
+    suggestedTags,
+    whySaved,
+    keyQuote,
   };
 }

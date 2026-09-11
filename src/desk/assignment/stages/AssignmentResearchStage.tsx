@@ -39,19 +39,48 @@ export default function AssignmentResearchStage() {
       const userId = userData?.user?.id || (project as any)?.userId || "default-user";
       const vaultItems = await listVaultItems(userId);
       if (vaultItems && vaultItems.length > 0) {
-        const matches: DiscoveredSource[] = vaultItems.map((item, idx) => ({
-          id: `vault-${item.id || idx}`,
-          title: item.title,
-          authors: item.authors && item.authors.length > 0 ? item.authors : ["Vault Author"],
-          year: String(item.year || new Date().getFullYear()),
-          type: "vault",
-          relevanceScore: 92,
-          mainFinding: item.content ? item.content.slice(0, 180) + "…" : (item.citation || item.title),
-          suggestedUse: "Direct primary/secondary evidence from your personal Source Library.",
-          citation: item.citation || `${item.title} (${item.year || "n.d."})`,
-          status: "unreviewed",
-          fromVault: true,
-        }));
+        // Prioritize vault items tagged with the active project
+        const sortedItems = [...vaultItems].sort((a, b) => {
+          const aProjs = (a.projects || a.metadata?.projects || (a.collection ? [a.collection] : [])).map((p: string) =>
+            p.toLowerCase()
+          );
+          const bProjs = (b.projects || b.metadata?.projects || (b.collection ? [b.collection] : [])).map((p: string) =>
+            p.toLowerCase()
+          );
+          const aMatch = aProjs.some(
+            (p: string) => p.includes(projectId.toLowerCase()) || (question && question.toLowerCase().includes(p))
+          );
+          const bMatch = bProjs.some(
+            (p: string) => p.includes(projectId.toLowerCase()) || (question && question.toLowerCase().includes(p))
+          );
+          if (aMatch && !bMatch) return -1;
+          if (!aMatch && bMatch) return 1;
+          return 0;
+        });
+
+        const matches: DiscoveredSource[] = sortedItems.map((item, idx) => {
+          const keyPoints: string[] = item.metadata?.keyPoints || item.metadata?.notes?.keyPoints || [];
+          const finding =
+            keyPoints.length > 0
+              ? keyPoints.join(" • ")
+              : item.content
+              ? item.content.slice(0, 180) + "…"
+              : item.citation || item.title;
+
+          return {
+            id: `vault-${item.id || idx}`,
+            title: item.title,
+            authors: item.authors && item.authors.length > 0 ? item.authors : ["Vault Author"],
+            year: String(item.year || new Date().getFullYear()),
+            type: "vault",
+            relevanceScore: 94,
+            mainFinding: finding,
+            suggestedUse: "Direct primary/secondary evidence from your personal Source Library.",
+            citation: item.citation || `${item.title} (${item.year || "n.d."})`,
+            status: "unreviewed",
+            fromVault: true,
+          };
+        });
         setVaultMatches(matches);
       }
     } catch (e) {

@@ -349,10 +349,14 @@ function VaultRoute() {
   const navigate = useNavigate();
   const location = useLocation();
   const session = useDeskSession();
-  const userId = session.status === "signed-in" ? session.userId : null;
-  // Guaranteed by RequireAuth (this only renders signed-in) — narrowing only.
-  if (!userId) return null;
-  return <VaultScreen userId={userId} onClose={() => navigate(returnTo(location))} />;
+  if (session.status !== "signed-in") return null;
+  return (
+    <VaultScreen
+      userId={session.userId}
+      onClose={() => navigate(returnTo(location))}
+      onOpenProject={(projectId) => navigate(`/project/${projectId}`)}
+    />
+  );
 }
 
 /**

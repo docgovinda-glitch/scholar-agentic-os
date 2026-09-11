@@ -17,6 +17,8 @@ import {
   deleteVaultItem,
   lockVault,
   updateVaultItemDetails,
+  linkVaultItemToProject,
+  unlinkVaultItemFromProject,
 } from "../../services/vaultContents";
 import type { Source, SourceType } from "../../services/vault/sourceTypes";
 import { vaultItemToSource } from "../../services/vault/sourceTypes";
@@ -30,15 +32,19 @@ import {
   type SemanticSearchResult,
 } from "../../services/vault/semanticSearchService";
 import { scanVaultRetractions } from "../../services/vault/retractionService";
+import { listProjects } from "../api";
 import AddSourceModal from "./AddSourceModal";
 import SourceDetailModal from "./SourceDetailModal";
+import LiteratureMatrixModal from "./LiteratureMatrixModal";
 import SettingsView from "./SettingsView";
+import { generateBatchBibTeX, downloadTextFile } from "../../services/vault/batchExportHelper";
 
 export interface SourceLibraryScreenProps {
   userId: string;
   onClose: () => void;
   onLock?: () => void;
   onResetVault?: () => void;
+  onOpenProject?: (projectId: string) => void;
 }
 
 type MainTab = "sources" | "settings";
@@ -48,6 +54,7 @@ export default function SourceLibraryScreen({
   onClose,
   onLock,
   onResetVault,
+  onOpenProject,
 }: SourceLibraryScreenProps) {
   const [items, setItems] = useState<VaultItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +62,19 @@ export default function SourceLibraryScreen({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "paper" | "website" | "other">("all");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+
+  // Projects integration
+  const [activeProjects, setActiveProjects] = useState<Array<{ id: string; title: string }>>([]);
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>("all");
+  const [expandedKeyPointsIds, setExpandedKeyPointsIds] = useState<Set<string>>(new Set());
+  const [projectMenuSourceId, setProjectMenuSourceId] = useState<string | null>(null);
+  const [customProjectInput, setCustomProjectInput] = useState("");
+  const [copiedKeyPointsId, setCopiedKeyPointsId] = useState<string | null>(null);
+
+  // Multi-source Selection & Literature Matrix
+  const [selectedSourceIds, setSelectedSourceIds] = useState<Set<string>>(new Set());
+  const [showMatrixModal, setShowMatrixModal] = useState(false);
+  const [matrixInitialTab, setMatrixInitialTab] = useState<"matrix" | "narrative" | "ask">("matrix");
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
@@ -74,7 +94,7 @@ export default function SourceLibraryScreen({
   // Semantic/Concept search compatibility flag
   const [isSemanticMode, setIsSemanticMode] = useState(false);
 
-  // Load items and connected accounts
+  // Load items, projects, and connected accounts
   async function loadLibrary() {
     setLoading(true);
     try {
@@ -86,6 +106,23 @@ export default function SourceLibraryScreen({
       setItems([]);
     } finally {
       setLoading(false);
+    }
+
+    try {
+      const projRes = await listProjects();
+      if (projRes?.items) {
+        const mapped = projRes.items.map((p) => ({
+          id: p.projectId,
+          title:
+            p.answers?.title ||
+            p.answers?.working_title ||
+            p.answers?.research_question ||
+            `Project ${p.projectId.slice(0, 6)}`,
+        }));
+        setActiveProjects(mapped);
+      }
+    } catch {
+      // Non-blocking in offline or test environments
     }
   }
 
@@ -112,6 +149,14 @@ export default function SourceLibraryScreen({
     return items.map((item) => vaultItemToSource(item));
   }, [items]);
 
+  // Combined project options from user workspace projects + vault tags
+  const allProjectOptions = useMemo(() => {
+    const set = new Set<string>();
+    activeProjects.forEach((p) => set.add(p.title));
+    sources.forEach((s) => s.projects.forEach((pr) => set.add(pr)));
+    return Array.from(set).filter(Boolean);
+  }, [activeProjects, sources]);
+
   // Semantic Concept Search map
   const semanticResultsMap = useMemo(() => {
     if (!items || items.length === 0 || !searchQuery.trim() || !isSemanticMode) {
@@ -120,6 +165,58 @@ export default function SourceLibraryScreen({
     const semResults = searchVaultSemantically(items, searchQuery);
     return new Map(semResults.map((r) => [r.item.id, r]));
   }, [items, searchQuery, isSemanticMode]);
+
+  // Project link / unlink action
+  async function handleToggleProjectLink(sourceId: string, projectName: string) {
+    const target = items.find((i) => i.id === sourceId);
+    if (!target) return;
+    const currentProjects =
+      target.projects || target.metadata?.projects || (target.collection ? [target.collection] : []);
+    const isLinked = currentProjects.includes(projectName);
+    const updated = isLinked
+      ? await unlinkVaultItemFromProject(userId, sourceId, projectName)
+      : await linkVaultItemToProject(userId, sourceId, projectName);
+    if (updated) {
+      setItems((prev) => prev.map((i) => (i.id === sourceId ? updated : i)));
+      if (selectedDetailSource?.id === sourceId) {
+        setSelectedDetailSource(vaultItemToSource(updated));
+      }
+    }
+  }
+
+  function handleToggleExpandKeyPoints(sourceId: string) {
+    setExpandedKeyPointsIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sourceId)) next.delete(sourceId);
+      else next.add(sourceId);
+      return next;
+    });
+  }
+
+  function handleCopyKeyPoints(source: Source) {
+    const points = source.notes.keyPoints || source.writingNotes?.keyPoints;
+    if (!points || points.length === 0) return;
+    navigator.clipboard.writeText(points.map((p) => `• ${p}`).join("\n"));
+    setCopiedKeyPointsId(source.id);
+    setTimeout(() => setCopiedKeyPointsId(null), 2000);
+  }
+
+  function handleToggleSelectSource(sourceId: string) {
+    setSelectedSourceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sourceId)) next.delete(sourceId);
+      else next.add(sourceId);
+      return next;
+    });
+  }
+
+  function handleSelectAllVisible(allVisibleIds: string[]) {
+    if (selectedSourceIds.size === allVisibleIds.length) {
+      setSelectedSourceIds(new Set());
+    } else {
+      setSelectedSourceIds(new Set(allVisibleIds));
+    }
+  }
 
   // Filtered sources
   const filteredSources = useMemo(() => {
@@ -136,6 +233,8 @@ export default function SourceLibraryScreen({
         const inDoi = s.metadata.doi?.toLowerCase().includes(q);
         const inUrl = s.metadata.url?.toLowerCase().includes(q);
         const inTags = s.tags.some((t) => t.toLowerCase().includes(q));
+        const inProjects = s.projects.some((pr) => pr.toLowerCase().includes(q));
+        const inKeyPoints = s.notes.keyPoints?.some((kp) => kp.toLowerCase().includes(q));
         const inNotes =
           (s.notes.whySaved && s.notes.whySaved.toLowerCase().includes(q)) ||
           (s.notes.keyQuote && s.notes.keyQuote.toLowerCase().includes(q));
@@ -148,6 +247,8 @@ export default function SourceLibraryScreen({
           !inDoi &&
           !inUrl &&
           !inTags &&
+          !inProjects &&
+          !inKeyPoints &&
           !inNotes
         ) {
           return false;
@@ -168,9 +269,19 @@ export default function SourceLibraryScreen({
         if (!s.tags.includes(activeTag)) return false;
       }
 
+      // 4. Project filter
+      if (selectedProjectFilter !== "all") {
+        if (selectedProjectFilter === "unassigned") {
+          if (s.projects.length > 0) return false;
+        } else {
+          const targetProj = selectedProjectFilter.toLowerCase();
+          if (!s.projects.some((p) => p.toLowerCase() === targetProj)) return false;
+        }
+      }
+
       return true;
     });
-  }, [sources, searchQuery, filterType, activeTag, isSemanticMode, semanticResultsMap]);
+  }, [sources, searchQuery, filterType, activeTag, selectedProjectFilter, isSemanticMode, semanticResultsMap]);
 
   // Retraction alert count
   const retractedSources = useMemo(() => {
@@ -436,7 +547,129 @@ export default function SourceLibraryScreen({
                 )}
               </div>
 
-              {/* Filter Pills & Quick Project Bar */}
+              {/* Project Filter Bar */}
+              {allProjectOptions.length > 0 && (
+                <div className="flex flex-col gap-1.5 pt-1">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[color:var(--text-secondary)]">
+                    <span className="flex items-center gap-1.5">
+                      <span>📁</span>
+                      <span>Filter by Project:</span>
+                    </span>
+                    {selectedProjectFilter !== "all" && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProjectFilter("all")}
+                        className="text-[11px] text-[color:var(--accent)] hover:underline font-normal cursor-pointer"
+                      >
+                        Reset project filter
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProjectFilter("all")}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 transition-colors cursor-pointer ${
+                        selectedProjectFilter === "all"
+                          ? "bg-[color:var(--text-primary)] text-[color:var(--surface-canvas)]"
+                          : "bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
+                      }`}
+                    >
+                      All Projects ({sources.length})
+                    </button>
+                    {allProjectOptions.map((proj) => {
+                      const count = sources.filter((s) =>
+                        s.projects.some((p) => p.toLowerCase() === proj.toLowerCase())
+                      ).length;
+                      const isSelected = selectedProjectFilter.toLowerCase() === proj.toLowerCase();
+                      return (
+                        <button
+                          key={proj}
+                          type="button"
+                          onClick={() => setSelectedProjectFilter(proj)}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                            isSelected
+                              ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-xs"
+                              : "bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
+                          }`}
+                        >
+                          <span>📁</span>
+                          <span className="truncate max-w-[160px]">{proj}</span>
+                          <span className="opacity-75 text-[10px]">({count})</span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProjectFilter("unassigned")}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 transition-colors cursor-pointer ${
+                        selectedProjectFilter === "unassigned"
+                          ? "bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] shadow-xs"
+                          : "bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
+                      }`}
+                    >
+                      Unassigned ({sources.filter((s) => s.projects.length === 0).length})
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Active Project Context Banner */}
+              {selectedProjectFilter !== "all" && (
+                <div className="p-3 bg-[color:var(--surface-inset)] border border-[color:var(--accent-border)] rounded-[var(--radius-lg)] flex items-center justify-between text-xs animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📁</span>
+                    <div>
+                      <span className="text-[color:var(--text-secondary)]">Showing sources for project: </span>
+                      <span className="font-bold text-[color:var(--text-primary)]">{selectedProjectFilter}</span>
+                      <span className="text-[color:var(--text-muted)] ml-1">({filteredSources.length} sources)</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {filteredSources.length >= 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const projectItemIds = new Set(filteredSources.map((s) => s.id));
+                          setSelectedSourceIds(projectItemIds);
+                          setMatrixInitialTab("matrix");
+                          setShowMatrixModal(true);
+                        }}
+                        className="px-2.5 py-1 text-xs font-bold bg-[color:var(--accent-subtle)]/40 text-[color:var(--accent)] border border-[color:var(--accent-border)] rounded-[var(--radius-md)] hover:bg-[color:var(--accent-solid)] hover:text-[color:var(--text-inverse)] transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <span>📊</span>
+                        <span>Synthesize Matrix</span>
+                      </button>
+                    )}
+                    {(() => {
+                      const matched = activeProjects.find(
+                        (p) => p.title.toLowerCase() === selectedProjectFilter.toLowerCase()
+                      );
+                      if (matched && onOpenProject) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => onOpenProject(matched.id)}
+                            className="px-2.5 py-1 text-xs font-bold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
+                          >
+                            Open Project Desk ↗
+                          </button>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProjectFilter("all")}
+                      className="text-xs text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] cursor-pointer"
+                    >
+                      ✕ Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Filter Pills & Type Bar */}
               <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
                 {/* Type Filter Pills */}
                 <div className="flex items-center gap-1.5">
@@ -492,19 +725,104 @@ export default function SourceLibraryScreen({
               </div>
             )}
 
+            {/* Sticky Selection Action Bar */}
+            {selectedSourceIds.size > 0 && (
+              <div className="sticky top-0 z-20 p-3 bg-[color:var(--surface-raised)] border-2 border-[color:var(--accent-border)] rounded-[var(--radius-lg)] shadow-lg flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] text-xs font-bold flex items-center justify-center">
+                    {selectedSourceIds.size}
+                  </span>
+                  <span className="text-xs font-bold text-[color:var(--text-primary)]">
+                    {selectedSourceIds.size} {selectedSourceIds.size === 1 ? "source" : "sources"} selected
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMatrixInitialTab("matrix");
+                      setShowMatrixModal(true);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  >
+                    <span>📊</span>
+                    <span>Literature Matrix</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMatrixInitialTab("ask");
+                      setShowMatrixModal(true);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] text-[color:var(--text-primary)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>💬</span>
+                    <span>Ask Selected</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const selectedItems = items.filter((i) => selectedSourceIds.has(i.id));
+                      const bib = generateBatchBibTeX(selectedItems);
+                      downloadTextFile(bib, `selected-references.bib`, "application/x-bibtex;charset=utf-8");
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold bg-[color:var(--surface-canvas)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <span>📥</span>
+                    <span>Export .bib</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSourceIds(new Set())}
+                    className="text-xs text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] px-2 py-1 cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Select All Toggle */}
+            {filteredSources.length > 0 && (
+              <div className="flex items-center justify-between text-xs text-[color:var(--text-secondary)] px-1 -mb-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={filteredSources.length > 0 && selectedSourceIds.size === filteredSources.length}
+                    onChange={() => handleSelectAllVisible(filteredSources.map((s) => s.id))}
+                    className="w-3.5 h-3.5 rounded text-[color:var(--accent)] border-[color:var(--border-default)] cursor-pointer"
+                  />
+                  <span>Select all {filteredSources.length} visible sources</span>
+                </label>
+                {selectedSourceIds.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSourceIds(new Set())}
+                    className="text-xs text-[color:var(--accent)] hover:underline cursor-pointer"
+                  >
+                    Deselect all
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* ================= SOURCES LIST ================= */}
             {filteredSources.length === 0 ? (
               /* Empty State */
               <div className="p-12 text-center rounded-[var(--radius-xl)] border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-raised)] flex flex-col items-center justify-center gap-3 my-4">
                 <span className="text-4xl">📚</span>
                 <h3 className="text-base font-bold text-[color:var(--text-primary)]">
-                  {searchQuery || activeTag
+                  {searchQuery || activeTag || selectedProjectFilter !== "all"
                     ? "No sources match your filter"
                     : "Your Source Library is empty"}
                 </h3>
                 <p className="text-xs text-[color:var(--text-secondary)] max-w-sm leading-relaxed">
-                  {searchQuery || activeTag
-                    ? "Try adjusting your search terms or clearing tag filters."
+                  {searchQuery || activeTag || selectedProjectFilter !== "all"
+                    ? "Try adjusting your search terms, project filter, or clearing tags."
                     : "Nothing in your Vault yet. Save sources from Google Drive, OneDrive, websites, or DOI to organize and cite them when you write."}
                 </p>
                 {/* For backward-compatibility with tests expecting "Nothing in your Vault yet." */}
@@ -528,21 +846,39 @@ export default function SourceLibraryScreen({
                     source.integrityStatus === "retracted" ||
                     source.integrityStatus === "expression_of_concern";
                   const openLink = source.cloudReference?.webUrl || source.metadata.url;
+                  const keyPoints = source.notes.keyPoints || source.writingNotes?.keyPoints || [];
+                  const isKeyPointsExpanded = expandedKeyPointsIds.has(source.id);
+                  const isSelected = selectedSourceIds.has(source.id);
 
                   return (
                     <article
                       key={source.id}
-                      className="p-4 rounded-[var(--radius-xl)] border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] hover:border-[color:var(--border-hover)] transition-all flex flex-col gap-2.5 shadow-xs"
+                      className={`p-4 rounded-[var(--radius-xl)] border transition-all flex flex-col gap-2.5 shadow-xs ${
+                        isSelected
+                          ? "border-[color:var(--accent)] bg-[color:var(--accent-subtle)]/10"
+                          : "border-[color:var(--border-default)] bg-[color:var(--surface-raised)] hover:border-[color:var(--border-hover)]"
+                      }`}
                     >
                       {/* Top Row: Title, Retraction Badge, Open & Copy Actions */}
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleSelectSource(source.id)}
+                              aria-label={`Select ${source.metadata.title}`}
+                              className="w-4 h-4 rounded text-[color:var(--accent)] border-[color:var(--border-default)] cursor-pointer shrink-0"
+                            />
                             <span className="text-base shrink-0">
                               {source.cloudReference?.provider === "google_drive"
                                 ? "📁"
                                 : source.cloudReference?.provider === "onedrive"
                                 ? "☁️"
+                                : source.metadata.type === "website"
+                                ? "🌐"
+                                : source.metadata.type === "book"
+                                ? "📖"
                                 : "📄"}
                             </span>
                             <h3 className="text-sm font-bold text-[color:var(--text-primary)] leading-snug">
@@ -597,6 +933,44 @@ export default function SourceLibraryScreen({
                         </div>
                       </div>
 
+                      {/* Key Points & Findings Takeaway Accordion */}
+                      {keyPoints.length > 0 && (
+                        <div className="bg-[color:var(--surface-inset)]/60 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] p-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleExpandKeyPoints(source.id)}
+                              className="flex items-center gap-1.5 font-semibold text-[color:var(--text-primary)] hover:text-[color:var(--accent)] cursor-pointer"
+                            >
+                              <span>💡</span>
+                              <span>{keyPoints.length} Key Takeaway{keyPoints.length > 1 ? "s" : ""}</span>
+                              <span className="text-[10px] text-[color:var(--text-muted)]">
+                                {isKeyPointsExpanded ? "▲ Hide" : "▼ Show"}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyKeyPoints(source)}
+                              className="text-[10px] font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] cursor-pointer flex items-center gap-1"
+                            >
+                              <span>{copiedKeyPointsId === source.id ? "✓" : "📋"}</span>
+                              <span>{copiedKeyPointsId === source.id ? "Copied" : "Copy Takeaways"}</span>
+                            </button>
+                          </div>
+
+                          {isKeyPointsExpanded && (
+                            <ul className="mt-2 space-y-1.5 pl-1 pt-1.5 border-t border-[color:var(--border-subtle)]/70 text-xs text-[color:var(--text-secondary)] animate-in fade-in duration-150">
+                              {keyPoints.map((pt, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5 leading-relaxed">
+                                  <span className="text-[color:var(--accent)] font-bold shrink-0">•</span>
+                                  <span>{pt}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+
                       {/* Middle Row: Tags, Projects, and Integrity Badge */}
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[color:var(--border-subtle)] text-[11px]">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -604,11 +978,82 @@ export default function SourceLibraryScreen({
                           {source.projects.map((proj) => (
                             <span
                               key={proj}
-                              className="px-2 py-0.5 rounded-[var(--radius-sm)] bg-[color:var(--surface-inset)] font-semibold text-[color:var(--text-primary)] border border-[color:var(--border-subtle)]"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] bg-[color:var(--surface-inset)] font-semibold text-[color:var(--text-primary)] border border-[color:var(--border-subtle)]"
                             >
-                              📁 {proj}
+                              <span
+                                onClick={() => setSelectedProjectFilter(proj)}
+                                className="hover:text-[color:var(--accent)] cursor-pointer"
+                                title={`Filter by ${proj}`}
+                              >
+                                📁 {proj}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleProjectLink(source.id, proj)}
+                                className="text-[10px] text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer ml-0.5"
+                                title={`Remove from ${proj}`}
+                              >
+                                ✕
+                              </button>
                             </span>
                           ))}
+
+                          {/* Quick Link Project Menu */}
+                          <div className="relative inline-block">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setProjectMenuSourceId(
+                                  projectMenuSourceId === source.id ? null : source.id
+                                )
+                              }
+                              className="px-2 py-0.5 rounded-[var(--radius-sm)] bg-[color:var(--surface-inset)] text-[10px] font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--accent)] border border-[color:var(--border-subtle)] hover:border-[color:var(--accent-border)] cursor-pointer"
+                            >
+                              + Link Project
+                            </button>
+                            {projectMenuSourceId === source.id && (
+                              <div className="absolute left-0 bottom-full mb-1 z-30 w-56 p-2 rounded-[var(--radius-md)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] shadow-xl flex flex-col gap-1.5 animate-in fade-in duration-100">
+                                <div className="flex items-center justify-between text-[10px] font-bold text-[color:var(--text-muted)] uppercase">
+                                  <span>Link to project:</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setProjectMenuSourceId(null)}
+                                    className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                                <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
+                                  {allProjectOptions.length === 0 ? (
+                                    <span className="text-xs text-[color:var(--text-muted)] italic p-1">
+                                      No active projects
+                                    </span>
+                                  ) : (
+                                    allProjectOptions.map((proj) => {
+                                      const isLinked = source.projects.some(
+                                        (p) => p.toLowerCase() === proj.toLowerCase()
+                                      );
+                                      return (
+                                        <button
+                                          key={proj}
+                                          type="button"
+                                          onClick={() => handleToggleProjectLink(source.id, proj)}
+                                          className={`text-left px-2 py-1 text-xs rounded transition-colors flex items-center justify-between cursor-pointer ${
+                                            isLinked
+                                              ? "bg-[color:var(--accent-subtle)] text-[color:var(--accent)] font-semibold"
+                                              : "hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)]"
+                                          }`}
+                                        >
+                                          <span className="truncate">{proj}</span>
+                                          {isLinked && <span>✓</span>}
+                                        </button>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
 
                           {/* Tag pills */}
                           {source.tags.map((tag) => (
@@ -711,6 +1156,8 @@ export default function SourceLibraryScreen({
         <AddSourceModal
           userId={userId}
           existingItems={items}
+          existingProjects={allProjectOptions}
+          connectedDrives={connectedDrives}
           onClose={() => setShowAddModal(false)}
           onSourceSaved={(saved) => {
             setItems((prev) => [saved, ...prev]);
@@ -723,9 +1170,29 @@ export default function SourceLibraryScreen({
         <SourceDetailModal
           source={selectedDetailSource}
           onClose={() => setSelectedDetailSource(null)}
+          allProjects={allProjectOptions}
+          onToggleProject={handleToggleProjectLink}
           onDelete={(id) => {
             handleDeleteSource(id);
           }}
+        />
+      )}
+
+      {/* ================= LITERATURE REVIEW MATRIX MODAL ================= */}
+      {showMatrixModal && (
+        <LiteratureMatrixModal
+          items={
+            selectedSourceIds.size > 0
+              ? items.filter((i) => selectedSourceIds.has(i.id))
+              : filteredSources.length > 0
+              ? items.filter((i) => filteredSources.some((f) => f.id === i.id))
+              : items
+          }
+          allItems={items}
+          activeProject={selectedProjectFilter !== "all" ? selectedProjectFilter : undefined}
+          initialTab={matrixInitialTab}
+          onClose={() => setShowMatrixModal(false)}
+          onOpenProject={onOpenProject}
         />
       )}
     </div>

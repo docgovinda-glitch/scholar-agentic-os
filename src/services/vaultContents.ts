@@ -10,7 +10,7 @@
  */
 
 import { decryptDataAsync, encryptDataAsync } from "../utils/crypto";
-import { verifyVaultPassphrase, getVaultStorageMode } from "./userVault";
+import { verifyVaultPassphrase, getVaultStorageMode, hasVaultPassphraseOnThisDevice } from "./userVault";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient";
 import type { CanonicalReference } from "../citation_compliance/model/reference";
 
@@ -34,6 +34,7 @@ export interface VaultItem {
   year?: string;
   journal?: string;
   collection?: string;
+  projects?: string[];
   tags?: string[];
   retractionStatus?: RetractionStatus;
   retractionDetails?: {
@@ -61,6 +62,7 @@ const IDB_STORE = "items";
 
 let activePassphrase: string | null = null;
 let sessionUnlocked: boolean = false;
+let explicitlyLocked: boolean = false;
 
 export function isVaultUnlocked(): boolean {
   return activePassphrase !== null || sessionUnlocked;
@@ -68,13 +70,18 @@ export function isVaultUnlocked(): boolean {
 
 export function setSessionUnlocked(unlocked: boolean, passphrase?: string): void {
   sessionUnlocked = unlocked;
+  if (unlocked) explicitlyLocked = false;
   if (passphrase) activePassphrase = passphrase;
-  if (!unlocked) activePassphrase = null;
+  if (!unlocked) {
+    activePassphrase = null;
+    explicitlyLocked = true;
+  }
 }
 
 export function lockVault(): void {
   activePassphrase = null;
   sessionUnlocked = false;
+  explicitlyLocked = true;
 }
 
 /** Verifies against userVault.ts's device-local verifier before caching anything */
@@ -83,6 +90,7 @@ export async function unlockVault(passphrase: string): Promise<boolean> {
   if (ok) {
     activePassphrase = passphrase;
     sessionUnlocked = true;
+    explicitlyLocked = false;
   }
   return ok;
 }
@@ -204,6 +212,7 @@ export async function addVaultItem(
     year?: string;
     journal?: string;
     collection?: string;
+    projects?: string[];
     tags?: string[];
     retractionStatus?: RetractionStatus;
     retractionDetails?: {
@@ -221,6 +230,7 @@ export async function addVaultItem(
   const meta = {
     ...(fields.metadata || {}),
     ...(fields.collection ? { collection: fields.collection } : {}),
+    ...(fields.projects ? { projects: fields.projects } : {}),
     ...(fields.tags ? { tags: fields.tags } : {}),
     ...(fields.retractionStatus ? { retractionStatus: fields.retractionStatus } : {}),
     ...(fields.retractionDetails ? { retractionDetails: fields.retractionDetails } : {}),
@@ -242,6 +252,7 @@ export async function addVaultItem(
     year: fields.year,
     journal: fields.journal,
     collection: fields.collection,
+    projects: fields.projects || (fields.collection ? [fields.collection] : undefined),
     tags: fields.tags || [],
     retractionStatus: fields.retractionStatus || "clean",
     retractionDetails: fields.retractionDetails,
@@ -294,6 +305,15 @@ export async function addVaultItem(
  * Lists all vault items for the user, newest first.
  */
 export async function listVaultItems(userId: string): Promise<VaultItem[]> {
+  if (!isVaultUnlocked() && !explicitlyLocked) {
+    try {
+      const hasVerifier = await hasVaultPassphraseOnThisDevice();
+      if (!hasVerifier) {
+        sessionUnlocked = true;
+      }
+    } catch {}
+  }
+
   if (!isVaultUnlocked()) {
     throw new Error("The Vault is locked.");
   }
@@ -325,6 +345,7 @@ export async function listVaultItems(userId: string): Promise<VaultItem[]> {
           year: d.year,
           journal: d.journal,
           collection: d.metadata?.collection,
+          projects: d.metadata?.projects || (d.metadata?.collection ? [d.metadata.collection] : undefined),
           tags: d.metadata?.tags || [],
           retractionStatus: d.metadata?.retractionStatus || "clean",
           retractionDetails: d.metadata?.retractionDetails,
@@ -361,6 +382,7 @@ export async function listVaultItems(userId: string): Promise<VaultItem[]> {
           createdAt: s.createdAt,
           tags: plain.tags || plain.metadata?.tags || [],
           collection: plain.collection || plain.metadata?.collection,
+          projects: plain.projects || plain.metadata?.projects || (plain.collection ? [plain.collection] : undefined),
           retractionStatus: plain.retractionStatus || plain.metadata?.retractionStatus || "clean",
           retractionDetails: plain.retractionDetails || plain.metadata?.retractionDetails,
           ...plain,
@@ -394,6 +416,7 @@ export async function addVaultItems(
     year?: string;
     journal?: string;
     collection?: string;
+    projects?: string[];
     tags?: string[];
     retractionStatus?: RetractionStatus;
     retractionDetails?: {
@@ -411,11 +434,11 @@ export async function addVaultItems(
   return saved;
 }
 
-/** Updates arbitrary details (collection, tags, retraction, citation, authors, year, journal) for a vault item. */
+/** Updates arbitrary details (collection, projects, tags, retraction, citation, authors, year, journal) for a vault item. */
 export async function updateVaultItemDetails(
   userId: string,
   id: string,
-  updates: Partial<Pick<VaultItem, "title" | "collection" | "tags" | "retractionStatus" | "retractionDetails" | "citation" | "citationStatus" | "canonicalReference" | "authors" | "year" | "journal" | "metadata">>
+  updates: Partial<Pick<VaultItem, "title" | "collection" | "projects" | "tags" | "retractionStatus" | "retractionDetails" | "citation" | "citationStatus" | "canonicalReference" | "authors" | "year" | "journal" | "metadata">>
 ): Promise<VaultItem | null> {
   const items = await listVaultItems(userId);
   const existing = items.find((i) => i.id === id);
@@ -425,6 +448,7 @@ export async function updateVaultItemDetails(
     ...(existing.metadata || {}),
     ...(updates.metadata || {}),
     ...(updates.collection !== undefined ? { collection: updates.collection } : {}),
+    ...(updates.projects !== undefined ? { projects: updates.projects } : {}),
     ...(updates.tags !== undefined ? { tags: updates.tags } : {}),
     ...(updates.retractionStatus !== undefined ? { retractionStatus: updates.retractionStatus } : {}),
     ...(updates.retractionDetails !== undefined ? { retractionDetails: updates.retractionDetails } : {}),
@@ -469,6 +493,43 @@ export async function updateVaultItemDetails(
   } catch {}
 
   return updated;
+}
+
+/** Links a vault source to a project without overwriting other projects */
+export async function linkVaultItemToProject(
+  userId: string,
+  itemId: string,
+  project: string
+): Promise<VaultItem | null> {
+  const items = await listVaultItems(userId);
+  const existing = items.find((i) => i.id === itemId);
+  if (!existing) return null;
+  const currentProjects: string[] =
+    existing.projects || existing.metadata?.projects || (existing.collection ? [existing.collection] : []);
+  if (currentProjects.includes(project)) return existing;
+  const updatedProjects = [...currentProjects, project];
+  return updateVaultItemDetails(userId, itemId, {
+    projects: updatedProjects,
+    metadata: { ...existing.metadata, projects: updatedProjects },
+  });
+}
+
+/** Unlinks a vault source from a project */
+export async function unlinkVaultItemFromProject(
+  userId: string,
+  itemId: string,
+  project: string
+): Promise<VaultItem | null> {
+  const items = await listVaultItems(userId);
+  const existing = items.find((i) => i.id === itemId);
+  if (!existing) return null;
+  const currentProjects: string[] =
+    existing.projects || existing.metadata?.projects || (existing.collection ? [existing.collection] : []);
+  const updatedProjects = currentProjects.filter((p) => p !== project);
+  return updateVaultItemDetails(userId, itemId, {
+    projects: updatedProjects,
+    metadata: { ...existing.metadata, projects: updatedProjects },
+  });
 }
 
 /** Updates citation metadata and status for a vault item. */

@@ -142,4 +142,16 @@ describe("Vault Server API Routes (/api/vault)", () => {
       expect(res.status).toBe(401);
     });
   });
+
+  describe("GET /api/vault/drive/files & /api/vault/onedrive/files", () => {
+    it("returns 401 for drive files when unauthenticated", async () => {
+      const res = await request(app).get("/api/vault/drive/files");
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 401 for onedrive files when unauthenticated", async () => {
+      const res = await request(app).get("/api/vault/onedrive/files");
+      expect(res.status).toBe(401);
+    });
+  });
 });

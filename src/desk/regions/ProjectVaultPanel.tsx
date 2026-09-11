@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { searchVaultItems, type VaultItem, isVaultUnlocked } from "../../services/vaultContents";
-import { getEvidenceLedger, addManualSource } from "../api";
+import { getEvidenceLedger, addManualSource, extractEvidenceQuote } from "../api";
 
 export default function ProjectVaultPanel({
   projectId,
@@ -17,7 +17,26 @@ export default function ProjectVaultPanel({
   const [evidenceLedgerVaultIds, setEvidenceLedgerVaultIds] = useState<Set<string>>(new Set());
   const [addingEvidenceId, setAddingEvidenceId] = useState<string | null>(null);
   const [copiedCitationId, setCopiedCitationId] = useState<string | null>(null);
+  const [passphraseInput, setPassphraseInput] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Auto-detect if device does not require passphrase or is in synced mode
+    import("../../services/userVault").then(async ({ currentUserId, hasVaultPassphraseOnThisDevice }) => {
+      const uid = await currentUserId();
+      if (uid) setUserId(uid);
+      const hasPassphrase = await hasVaultPassphraseOnThisDevice();
+      if (!hasPassphrase) {
+        const { setSessionUnlocked } = await import("../../services/vaultContents");
+        setSessionUnlocked(true);
+        setUnlocked(true);
+      } else {
+        setUnlocked(isVaultUnlocked());
+      }
+    });
+  }, []);
 
   useEffect(() => {
     // Sync current project evidence ledger to detect which vault items are already added
@@ -41,7 +60,20 @@ export default function ProjectVaultPanel({
             import("../../services/vaultContents").then(({ listVaultItems, searchVaultItems }) => {
               listVaultItems(uid)
                 .then((vaultItems) => {
-                  setItems(searchVaultItems(vaultItems, query));
+                  const filtered = searchVaultItems(vaultItems, query);
+                  // Sort items linked to this project first
+                  const sorted = [...filtered].sort((a, b) => {
+                    const aLinked = (a.projects || a.metadata?.projects || (a.collection ? [a.collection] : [])).some(
+                      (p: string) => p.toLowerCase().includes(projectId.toLowerCase())
+                    );
+                    const bLinked = (b.projects || b.metadata?.projects || (b.collection ? [b.collection] : [])).some(
+                      (p: string) => p.toLowerCase().includes(projectId.toLowerCase())
+                    );
+                    if (aLinked && !bLinked) return -1;
+                    if (!aLinked && bLinked) return 1;
+                    return 0;
+                  });
+                  setItems(sorted);
                 })
                 .catch(console.error);
             });
@@ -49,21 +81,58 @@ export default function ProjectVaultPanel({
         });
       });
     }
-  }, [query, unlocked]);
+  }, [query, unlocked, projectId]);
+
+  const handleInlineUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passphraseInput.trim()) return;
+    setUnlocking(true);
+    setUnlockError(null);
+    try {
+      const { unlockVault } = await import("../../services/vaultContents");
+      const ok = await unlockVault(passphraseInput);
+      if (ok) {
+        setUnlocked(true);
+        setPassphraseInput("");
+      } else {
+        setUnlockError("Incorrect passphrase.");
+      }
+    } catch (err: any) {
+      setUnlockError(err.message || "Failed to unlock.");
+    } finally {
+      setUnlocking(false);
+    }
+  };
 
   if (!unlocked) {
     return (
       <div className="p-4 flex flex-col items-center justify-center text-center text-[color:var(--text-muted)] h-full">
-        <svg className="w-8 h-8 mb-2 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1}
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+        <form onSubmit={handleInlineUnlock} className="flex flex-col gap-2.5 p-4 text-center max-w-xs mx-auto bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] rounded-[var(--radius-lg)] shadow-xs w-full">
+          <div className="w-9 h-9 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--accent)] flex items-center justify-center mx-auto text-sm">
+            🔒
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-[color:var(--text-primary)]">Unlock Knowledge Vault</h4>
+            <p className="text-[11px] text-[color:var(--text-muted)] mt-0.5">
+              Enter your device passphrase to access research sources.
+            </p>
+          </div>
+          <input
+            type="password"
+            placeholder="Vault Passphrase…"
+            value={passphraseInput}
+            onChange={(e) => setPassphraseInput(e.target.value)}
+            className="w-full px-2.5 py-1.5 text-xs bg-[color:var(--surface-sunken)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)]"
           />
-        </svg>
-        <p className="text-sm">Vault is locked.</p>
-        <p className="text-xs mt-1">Unlock your Vault from the Header menu first.</p>
+          {unlockError && <p role="alert" className="text-[10px] text-red-500">{unlockError}</p>}
+          <button
+            type="submit"
+            disabled={!passphraseInput.trim() || unlocking}
+            className="px-3 py-1.5 text-xs font-bold bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-md)] hover:bg-[color:var(--accent-hover)] cursor-pointer disabled:opacity-50 transition-colors"
+          >
+            {unlocking ? "Unlocking…" : "Unlock Vault"}
+          </button>
+        </form>
       </div>
     );
   }
@@ -127,7 +196,7 @@ export default function ProjectVaultPanel({
   const handleAddToEvidence = async (item: VaultItem) => {
     setAddingEvidenceId(item.id);
     try {
-      await addManualSource(projectId, {
+      const ledger = await addManualSource(projectId, {
         title: item.title,
         authors: item.authors || [],
         sourceType: "vault",
@@ -136,6 +205,16 @@ export default function ProjectVaultPanel({
         vaultItemId: item.id,
       });
       setEvidenceLedgerVaultIds((prev) => new Set(prev).add(item.id));
+
+      // Auto-extract key quote if available
+      const keyPoints = item.metadata?.keyPoints || item.metadata?.notes?.keyPoints || [];
+      const quote = item.metadata?.notes?.keyQuote || (keyPoints.length > 0 ? keyPoints[0] : null);
+      if (quote && ledger?.sources) {
+        const createdSource = ledger.sources.find((s: any) => s.vaultItemId === item.id);
+        if (createdSource) {
+          await extractEvidenceQuote(projectId, createdSource.id, quote).catch(() => {});
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -181,6 +260,9 @@ export default function ProjectVaultPanel({
             {items.map((item) => {
               const inEvidence = evidenceLedgerVaultIds.has(item.id);
               const isRetracted = item.retractionStatus === "retracted";
+              const projs: string[] = item.projects || item.metadata?.projects || (item.collection ? [item.collection] : []);
+              const isLinkedToCurrent = projs.some((p: string) => p.toLowerCase().includes(projectId.toLowerCase()));
+              const keyPoints: string[] = item.metadata?.keyPoints || item.metadata?.notes?.keyPoints || [];
 
               return (
                 <li
@@ -188,6 +270,8 @@ export default function ProjectVaultPanel({
                   className={`p-2.5 text-xs rounded border transition-colors ${
                     isRetracted
                       ? "bg-red-500/5 border-red-500/30"
+                      : isLinkedToCurrent
+                      ? "bg-[color:var(--accent-subtle)]/20 border-[color:var(--accent-border)] shadow-2xs"
                       : "bg-[color:var(--surface-raised)] border-[color:var(--border-subtle)] hover:border-[color:var(--border-default)]"
                   }`}
                 >
@@ -195,15 +279,22 @@ export default function ProjectVaultPanel({
                     <div className="font-semibold text-[color:var(--text-primary)] leading-snug line-clamp-2">
                       {item.title}
                     </div>
-                    {isRetracted && (
-                      <span className="shrink-0 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-red-500 text-white rounded">
-                        Retracted
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isLinkedToCurrent && (
+                        <span className="px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded">
+                          Project
+                        </span>
+                      )}
+                      {isRetracted && (
+                        <span className="shrink-0 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-red-500 text-white rounded">
+                          Retracted
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {item.authors && item.authors.length > 0 && (
-                    <div className="text-[color:var(--text-muted)] truncate mt-0.5">
+                    <div className="text-[color:var(--text-muted)] truncate mt-0.5 text-[11px]">
                       {item.authors.join(", ")} {item.year ? `(${item.year})` : ""}
                     </div>
                   )}
@@ -211,6 +302,18 @@ export default function ProjectVaultPanel({
                   {item.journal && (
                     <div className="text-[color:var(--text-secondary)] italic truncate text-[11px] mt-0.5">
                       {item.journal}
+                    </div>
+                  )}
+
+                  {/* Key points takeaways */}
+                  {keyPoints.length > 0 && (
+                    <div className="mt-1.5 space-y-0.5 bg-[color:var(--surface-inset)]/60 p-1.5 rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] text-[11px] text-[color:var(--text-secondary)]">
+                      {keyPoints.slice(0, 2).map((kp, idx) => (
+                        <div key={idx} className="flex items-start gap-1 leading-tight line-clamp-1">
+                          <span className="text-[color:var(--accent)] font-bold">•</span>
+                          <span>{kp}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
 

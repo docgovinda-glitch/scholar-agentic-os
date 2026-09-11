@@ -143,13 +143,41 @@ export default function EvidenceLedgerPanel({
     setVaultLocked(false);
     setVaultError(null);
     listVaultItems(userId)
-      .then(setVaultItems)
-      .catch((e) => setVaultError((e as Error).message));
+      .then((items) => {
+        setVaultLocked(false);
+        setVaultItems(items);
+      })
+      .catch((e) => {
+        if (/locked/i.test((e as Error).message)) {
+          setVaultLocked(true);
+        } else {
+          setVaultError((e as Error).message);
+        }
+      });
   }
 
   function handleAddFromVault(item: VaultItem) {
     run(
-      () => addManualSource(projectId, { title: item.title, authors: [], sourceType: "vault", authorityTier: "D", discoveredVia: "vault", vaultItemId: item.id }),
+      async () => {
+        const l = await addManualSource(projectId, {
+          title: item.title,
+          authors: item.authors || [],
+          sourceType: "vault",
+          authorityTier: "D",
+          discoveredVia: "vault",
+          vaultItemId: item.id,
+        });
+        // Auto extract quote into evidence pipeline if key points or quote exist
+        const keyPoints = item.metadata?.keyPoints || item.metadata?.notes?.keyPoints || [];
+        const quote = item.metadata?.notes?.keyQuote || (keyPoints.length > 0 ? keyPoints[0] : null);
+        if (quote && l.sources) {
+          const created = l.sources.find((s) => s.vaultItemId === item.id);
+          if (created) {
+            return await extractEvidenceQuote(projectId, created.id, quote).catch(() => l);
+          }
+        }
+        return l;
+      },
       (l) => {
         setLedger(l);
         setAddedVaultItemIds((prev) => new Set(prev).add(item.id));
@@ -295,26 +323,57 @@ export default function EvidenceLedgerPanel({
                   className="w-full px-3 py-2 text-sm"
                 />
                 <ul className="mt-2 flex max-h-64 flex-col gap-1.5 overflow-y-auto">
-                  {searchVaultItems(vaultItems, vaultQuery).map((item) => (
-                    <li key={item.id} className="flex items-center justify-between gap-2 rounded border border-[color:var(--border-subtle)] px-2 py-1.5">
-                      <div className="min-w-0">
-                        <p className="truncate text-xs text-[color:var(--text-primary)]">{item.title}</p>
-                        {item.citation && <p className="truncate text-[10px] text-[color:var(--text-muted)]">{item.citation}</p>}
-                      </div>
-                      {addedVaultItemIds.has(item.id) ? (
-                        <span className="shrink-0 text-[10px] text-[color:var(--state-success)]">Added</span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleAddFromVault(item)}
-                          disabled={busy}
-                          className="shrink-0 rounded border border-[color:var(--border-default)] px-2 py-1 text-[10px] cursor-pointer"
-                        >
-                          Add
-                        </button>
-                      )}
-                    </li>
-                  ))}
+                  {searchVaultItems(vaultItems, vaultQuery).map((item) => {
+                    const isProjectItem = (
+                      item.projects ||
+                      item.metadata?.projects ||
+                      (item.collection ? [item.collection] : [])
+                    ).some((p: string) => p.toLowerCase().includes(projectId.toLowerCase()));
+                    const keyPoints = item.metadata?.keyPoints || item.metadata?.notes?.keyPoints || [];
+
+                    return (
+                      <li
+                        key={item.id}
+                        className={`flex items-center justify-between gap-2 rounded border px-2.5 py-2 transition-colors ${
+                          isProjectItem
+                            ? "bg-[color:var(--accent-subtle)]/15 border-[color:var(--accent-border)]"
+                            : "border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <p className="truncate text-xs font-semibold text-[color:var(--text-primary)]">{item.title}</p>
+                            {isProjectItem && (
+                              <span className="shrink-0 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded">
+                                Project
+                              </span>
+                            )}
+                          </div>
+                          {item.citation && (
+                            <p className="truncate text-[10px] text-[color:var(--text-muted)] mt-0.5">{item.citation}</p>
+                          )}
+                          {keyPoints.length > 0 && (
+                            <p className="truncate text-[10px] text-[color:var(--text-secondary)] italic mt-0.5">
+                              💡 "{keyPoints[0]}"
+                            </p>
+                          )}
+                        </div>
+                        {addedVaultItemIds.has(item.id) ? (
+                          <span className="shrink-0 text-[10px] font-semibold text-[color:var(--state-success)]">Added</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleAddFromVault(item)}
+                            disabled={busy}
+                            aria-label="Add"
+                            className="shrink-0 rounded bg-[color:var(--accent-subtle)] text-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] hover:text-[color:var(--text-inverse)] border border-transparent px-2.5 py-1 text-[10px] font-bold cursor-pointer transition-colors"
+                          >
+                            Add
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </>
             )}
