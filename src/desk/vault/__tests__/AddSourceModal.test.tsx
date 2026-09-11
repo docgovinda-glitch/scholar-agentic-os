@@ -38,6 +38,16 @@ vi.mock("../../../services/vault/cloudDriveService", async (importOriginal) => {
   };
 });
 
+const mockListProjects = vi.fn().mockResolvedValue({
+  projects: [
+    { title: "Master's Thesis in AI" },
+    { title: "Global Security Capstone" },
+  ],
+});
+vi.mock("../../api", () => ({
+  listProjects: () => mockListProjects(),
+}));
+
 const { default: AddSourceModal } = await import("../AddSourceModal");
 
 describe("AddSourceModal — Streamlined 1-Step Intake", () => {
@@ -421,6 +431,75 @@ describe("AddSourceModal — Streamlined 1-Step Intake", () => {
     });
   });
 
+  it("automatically infers full metadata (Authors, Year, Publisher, Drive URL) and provides Drive links upon selecting document like Govinda_Shah_CV.docx", async () => {
+    mockFetchDriveFiles.mockResolvedValueOnce([
+      {
+        id: "cv-file-123",
+        name: "Govinda_Shah_CV.docx",
+        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        lastModified: "2026-03-01T10:00:00.000Z",
+      },
+    ]);
+
+    render(
+      <AddSourceModal
+        userId="user-1"
+        existingItems={[]}
+        connectedDrives={[
+          {
+            id: "conn-google-1",
+            provider: "google_drive",
+            accountEmail: "doc.govinda@gmail.com",
+            accountName: "Govinda Shah",
+            connectedAt: "2026-01-01",
+          },
+        ]}
+        onClose={vi.fn()}
+        onSourceSaved={vi.fn()}
+      />
+    );
+
+    // Switch to Google Drive tab
+    const gDriveTab = screen.getAllByRole("button", { name: /Google Drive/i })[0];
+    fireEvent.click(gDriveTab);
+
+    // Wait for Google Drive workspace header link and files to render
+    await waitFor(() => {
+      expect(screen.getByText(/↗ Open Google Drive/i)).toBeInTheDocument();
+      expect(screen.getByText("Govinda_Shah_CV.docx")).toBeInTheDocument();
+    });
+
+    // Check Open in Drive link exists on the file row
+    const openInDriveLink = screen.getByTitle("Open directly in Google Drive") as HTMLAnchorElement;
+    expect(openInDriveLink).toBeInTheDocument();
+    expect(openInDriveLink.href).toContain("drive.google.com");
+
+    // Click "Select Source →" button
+    const selectBtn = screen.getByRole("button", { name: /Select Source →/i });
+    fireEvent.click(selectBtn);
+
+    // Verify all metadata fields are automatically inferred and populated
+    await waitFor(() => {
+      const titleInput = screen.getByLabelText(/^Title/i) as HTMLInputElement;
+      expect(titleInput.value).toBe("Govinda Shah CV");
+
+      const authorsInput = screen.getByLabelText(/Authors/i) as HTMLInputElement;
+      expect(authorsInput.value).toBe("Govinda Shah");
+
+      const yearInput = screen.getByLabelText(/Publication Year/i) as HTMLInputElement;
+      expect(yearInput.value).toBe("2026");
+
+      const journalInput = screen.getByLabelText(/Journal \/ Publisher/i) as HTMLInputElement;
+      expect(journalInput.value).toBe("Curriculum Vitae / Academic Profile");
+
+      const urlInput = screen.getByLabelText(/Link \/ Web URL/i) as HTMLInputElement;
+      expect(urlInput.value).toContain("drive.google.com/file/d/cv-file-123/view");
+
+      // Verify attached chip has active "↗ Open in Google Drive" link
+      expect(screen.getByTitle("Open in Google Drive")).toBeInTheDocument();
+    });
+  });
+
   it("fetches source via direct Google Drive share link", async () => {
     render(
       <AddSourceModal
@@ -579,5 +658,142 @@ describe("AddSourceModal — Streamlined 1-Step Intake", () => {
       expect(onClose).toHaveBeenCalled();
     });
   });
+
+  it("loads user ongoing projects into dropdown selector and assigns to project for in-text citation and references", async () => {
+    mockListProjects.mockResolvedValueOnce({
+      items: [
+        { projectId: "p1", answers: { working_title: "Master's Thesis in AI" } },
+        { projectId: "p2", answers: { working_title: "Global Security Capstone" } },
+      ],
+    });
+    mockAddVaultItem.mockResolvedValueOnce({
+      id: "vault-item-assigned-1",
+      title: "Self-Reflective LLMs",
+      createdAt: "2026-01-01",
+    });
+
+    const onClose = vi.fn();
+    const onSourceSaved = vi.fn();
+
+    render(
+      <AddSourceModal
+        userId="user-1"
+        existingItems={[]}
+        onClose={onClose}
+        onSourceSaved={onSourceSaved}
+      />
+    );
+
+    // Expand writing notes and project assignments accordion
+    const toggleBtn = screen.getByRole("button", { name: /Add tags or notes/i });
+    fireEvent.click(toggleBtn);
+
+    // Check what is rendered
+    expect(screen.getByText(/Thematic Tags/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      const select = screen.getByRole("combobox", { name: /Select an ongoing project/i }) as HTMLSelectElement;
+      expect(select).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /Master's Thesis in AI/i })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /Global Security Capstone/i })).toBeInTheDocument();
+    });
+
+    const select = screen.getByRole("combobox", { name: /Select an ongoing project/i });
+
+    // Select "Master's Thesis in AI" from dropdown
+    fireEvent.change(select, { target: { value: "Master's Thesis in AI" } });
+
+    // Verify assigned summary box shows active citation and references readiness
+    expect(screen.getByText(/✓ Integrated for citations & references/i)).toBeInTheDocument();
+    expect(screen.getByText(/📁 Master's Thesis in AI/i)).toBeInTheDocument();
+
+    // Fill title and save
+    fireEvent.change(screen.getByLabelText(/^Title/i), {
+      target: { value: "Self-Reflective LLMs" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Source" }));
+
+    await waitFor(() => {
+      expect(mockAddVaultItem).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({
+          title: "Self-Reflective LLMs",
+          collection: "Master's Thesis in AI",
+          metadata: expect.objectContaining({
+            projects: ["Master's Thesis in AI"],
+          }),
+        })
+      );
+      expect(onSourceSaved).toHaveBeenCalled();
+    });
+  });
+
+  it("handles Microsoft OneDrive provider unconfigured error gracefully with clear alternative options", async () => {
+    mockInitiateOneDriveAuth.mockResolvedValueOnce({
+      success: false,
+      error:
+        "Microsoft / Azure OneDrive provider is not enabled in Supabase Authentication. You can connect directly by pasting your OneDrive share link or connecting your Microsoft email above without setting up Azure OAuth.",
+    });
+
+    render(
+      <AddSourceModal
+        userId="user-1"
+        existingItems={[]}
+        onClose={vi.fn()}
+        onSourceSaved={vi.fn()}
+      />
+    );
+
+    // Switch to OneDrive tab
+    const oneDriveTab = screen.getAllByRole("button", { name: /OneDrive/i })[0];
+    fireEvent.click(oneDriveTab);
+
+    // Click Connect Microsoft OneDrive (Option 3)
+    const connectOAuthBtn = screen.getByRole("button", { name: /Sign In with Microsoft OAuth/i });
+    fireEvent.click(connectOAuthBtn);
+
+    // Verify friendly error without crashing
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Microsoft Azure OAuth is not enabled in your authentication settings/i)
+      ).toBeInTheDocument();
+      // Verify Option 1 (Paste OneDrive link) is available as zero-setup alternative
+      expect(screen.getByPlaceholderText(/Paste OneDrive or SharePoint link/i)).toBeInTheDocument();
+    });
+  });
+
+  it("renders clear explanatory guidance for Thematic Tags vs Projects", async () => {
+    render(
+      <AddSourceModal
+        userId="user-1"
+        existingItems={[]}
+        onClose={vi.fn()}
+        onSourceSaved={vi.fn()}
+      />
+    );
+
+    // Open notes accordion
+    const toggleBtn = screen.getByRole("button", { name: /Add tags or notes/i });
+    fireEvent.click(toggleBtn);
+
+    // Verify Thematic Tags explanation is visible and distinct from Projects
+    expect(screen.getByText(/Thematic Tags/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Cross-project keywords, methodologies, or research paradigms/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Tags help you categorize and retrieve sources across all research projects/i)
+    ).toBeInTheDocument();
+
+    // Verify Assign to Project(s) section is distinct
+    expect(screen.getByText(/Assign to Ongoing Project\(s\)/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Select from your active research projects or assignments/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Sources assigned to a project become directly available in that workspace/i)
+    ).toBeInTheDocument();
+  });
 });
+
 

@@ -4,6 +4,8 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from "../supabaseClient";
+import type { SourceType, CloudStorageProvider } from "./sourceTypes";
+import { generateKeyPointsAndNotes } from "./metadataService";
 
 export type CloudDriveProvider = "google_drive" | "onedrive" | "dropbox";
 
@@ -235,6 +237,16 @@ export async function initiateOneDriveAuth(userId: string): Promise<CloudDriveAc
   });
 
   if (error) {
+    const errorText = error.message || (error as any).msg || JSON.stringify(error);
+    if (
+      errorText.includes("provider is not enabled") ||
+      errorText.includes("Unsupported provider") ||
+      (error as any).error_code === "validation_failed"
+    ) {
+      throw new Error(
+        "Microsoft Azure OAuth is currently not enabled in your authentication service (Supabase -> Authentication -> Providers -> Azure). You can still paste any OneDrive or SharePoint link below to attach and cite documents directly."
+      );
+    }
     throw new Error(
       `Microsoft OneDrive OAuth failed: ${error.message}. Ensure Microsoft Azure provider and Files.Read scopes are enabled in Supabase.`
     );
@@ -270,6 +282,10 @@ export async function uploadFileToCloudDrive(
     mimeType: file.type || (file.name.endsWith(".pdf") ? "application/pdf" : file.name.endsWith(".docx") ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/octet-stream"),
     size: file.size,
     lastModified: new Date().toISOString(),
+    webViewLink:
+      provider === "google_drive"
+        ? `https://drive.google.com/drive/search?q=${encodeURIComponent(file.name)}`
+        : "https://onedrive.live.com",
   };
 
   try {
@@ -424,4 +440,228 @@ export function parseCloudShareUrl(url: string): ParsedCloudShare | null {
 
   return null;
 }
+
+/**
+ * Constructs a dependable web URL to access or view the file in Google Drive or OneDrive.
+ */
+export function getDriveFileWebUrl(
+  file: DriveFileItem,
+  provider: CloudDriveProvider | CloudStorageProvider
+): string {
+  if (file.webViewLink && file.webViewLink.startsWith("http")) {
+    return file.webViewLink;
+  }
+
+  if (provider === "google_drive") {
+    // If genuine Google file ID (alphanumeric with underscores/hyphens, not local upload token)
+    if (file.id && !file.id.startsWith("drive_upload_") && !file.id.startsWith("gdrive_")) {
+      return `https://drive.google.com/file/d/${file.id}/view?usp=drivesdk`;
+    }
+    // Search Google Drive workspace directly for this document name
+    return `https://drive.google.com/drive/search?q=${encodeURIComponent(file.name)}`;
+  }
+
+  if (provider === "onedrive") {
+    if (file.id && !file.id.startsWith("drive_upload_") && !file.id.startsWith("onedrive_")) {
+      return `https://onedrive.live.com/?id=${encodeURIComponent(file.id)}`;
+    }
+    return "https://onedrive.live.com";
+  }
+
+  return "";
+}
+
+export interface InferredCloudMetadata {
+  title: string;
+  authors: string[];
+  year: string;
+  journal?: string;
+  publisher?: string;
+  sourceType: SourceType;
+  webUrl: string;
+  keyPoints: string[];
+  suggestedTags: string[];
+  whySaved: string;
+  keyQuote: string;
+}
+
+/**
+ * Intelligently extracts and synthesizes comprehensive citation metadata
+ * from a cloud file (e.g. Govinda_Shah_CV.docx, Smith_2024_Towards_Global_IR.pdf).
+ */
+export function inferMetadataFromCloudFile(
+  file: DriveFileItem,
+  provider: CloudDriveProvider | CloudStorageProvider,
+  account?: { accountEmail?: string; accountName?: string }
+): InferredCloudMetadata {
+  const rawFileName = file.name || "Cloud Document";
+  const cleanedTitle = cleanFileNameForTitle(rawFileName) || rawFileName;
+  const webUrl = getDriveFileWebUrl(file, provider);
+
+  // 1. Detect CV / Resume / Curriculum Vitae
+  const isCV = /(?:^|[_\s-])(?:cv|resume|curriculum[_\s-]*vitae)(?:[_\s-]|\.|$)/i.test(rawFileName);
+
+  // 2. Detect Academic Thesis / Dissertation
+  const isThesis = /(?:^|[_\s-])(?:thesis|dissertation)(?:[_\s-]|\.|$)/i.test(rawFileName);
+
+  // 3. Detect Dataset / Spreadsheet
+  const isDataset =
+    file.mimeType?.includes("spreadsheet") ||
+    file.mimeType?.includes("csv") ||
+    /\.(xlsx|xls|csv)$/i.test(rawFileName) ||
+    /(?:^|[_\s-])(?:dataset|data|survey)(?:[_\s-]|\.|$)/i.test(rawFileName);
+
+  // 4. Extract Publication Year
+  // Check 4-digit year in filename first
+  const yearMatch = rawFileName.match(/\b(19\d\d|20\d\d)\b/);
+  let year = yearMatch ? yearMatch[1] : "";
+  if (!year && file.lastModified) {
+    try {
+      const parsedYear = new Date(file.lastModified).getFullYear();
+      if (!isNaN(parsedYear) && parsedYear > 1990 && parsedYear < 2050) {
+        year = String(parsedYear);
+      }
+    } catch {}
+  }
+  if (!year) {
+    year = String(new Date().getFullYear());
+  }
+
+  // 5. Extract Authors
+  const authors: string[] = [];
+
+  if (isCV) {
+    // E.g. "Govinda_Shah_CV.docx" -> prefix before "_CV" is "Govinda_Shah" -> "Govinda Shah"
+    const cvPrefixMatch = rawFileName.match(/^(.+?)[_\s-]+(?:cv|resume|curriculum[_\s-]*vitae)/i);
+    if (cvPrefixMatch && cvPrefixMatch[1].trim()) {
+      const candidate = cvPrefixMatch[1].replace(/[_-]+/g, " ").trim();
+      // Ensure candidate isn't generic like "My" or "Academic"
+      if (!/^(my|new|updated|final|draft|academic|latest)$/i.test(candidate)) {
+        authors.push(candidate);
+      }
+    }
+
+    // If still empty, check account details
+    if (authors.length === 0) {
+      if (account?.accountName && account.accountName.trim()) {
+        authors.push(account.accountName.trim());
+      } else if (account?.accountEmail) {
+        // e.g. "doc.govinda@gmail.com" -> "Govinda"
+        const local = account.accountEmail
+          .split("@")[0]
+          .replace(/^doc[\._-]?/i, "")
+          .replace(/[._-]+/g, " ")
+          .trim();
+        if (local) {
+          const formatted = local
+            .split(" ")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(" ");
+          authors.push(formatted);
+        }
+      }
+    }
+  } else {
+    // Check academic naming patterns:
+    // Pattern A: "Acharya_2014_Rethinking_Global_Order"
+    const academicPatternA = rawFileName.match(/^([A-Z][a-zA-Z]+(?:[_\s]+[A-Z][a-zA-Z]+)*)[_\s-]+(?:19|20)\d{2}[_\s-]+(.+)$/);
+    // Pattern B: "Smith_and_Jones_2022_Paper"
+    const academicPatternB = rawFileName.match(/^([A-Z][a-zA-Z]+)[_\s]+(?:and|&)[_\s]+([A-Z][a-zA-Z]+)[_\s-]+(?:19|20)\d{2}/i);
+
+    if (academicPatternB) {
+      authors.push(academicPatternB[1].replace(/_/g, " ").trim(), academicPatternB[2].replace(/_/g, " ").trim());
+    } else if (academicPatternA) {
+      authors.push(academicPatternA[1].replace(/_/g, " ").trim());
+    } else if (account?.accountName && account.accountName.trim()) {
+      // If user uploaded their own paper/note
+      authors.push(account.accountName.trim());
+    }
+  }
+
+  // Fallback author if empty
+  if (authors.length === 0 && account?.accountName && account.accountName.trim()) {
+    authors.push(account.accountName.trim());
+  }
+
+  // 6. Determine Source Type
+  let sourceType: SourceType = "paper";
+  if (isCV || isDataset) {
+    sourceType = "other";
+  } else if (isThesis) {
+    sourceType = "book";
+  }
+
+  // 7. Determine Journal / Publisher / Venue
+  let journal = "";
+  let publisher = "";
+  const providerDisplay = provider === "google_drive" ? "Google Drive" : "OneDrive";
+
+  if (isCV) {
+    journal = "Curriculum Vitae / Academic Profile";
+    publisher = `${providerDisplay} Workspace`;
+  } else if (isThesis) {
+    journal = "Doctoral Dissertation / Academic Thesis";
+    publisher = `${providerDisplay} Workspace`;
+  } else if (isDataset) {
+    journal = `Research Dataset / ${providerDisplay}`;
+    publisher = `${providerDisplay} Workspace`;
+  } else {
+    journal = `${providerDisplay} Workspace`;
+    publisher = `${providerDisplay} Workspace`;
+  }
+
+  // 8. Generate Key Points, Tags, Why Saved, and Key Quote
+  let keyPoints: string[] = [];
+  let suggestedTags: string[] = [];
+  let whySaved = "";
+  let keyQuote = "";
+
+  if (isCV) {
+    keyPoints = [
+      "Professional & Academic Curriculum Vitae detailing scholarly appointments, research programs, and qualifications.",
+      "Scholarly Contributions: Complete record of journal publications, conference proceedings, grants, and book projects.",
+      "Institutional Affiliations: Teaching portfolio, editorial roles, academic committees, and scholarly collaborations.",
+    ];
+    suggestedTags = ["CV", "Curriculum Vitae", "Academic Profile", "Biography", providerDisplay];
+    whySaved = `Academic credentials and scholarly profile reference for research attribution and project collaboration.`;
+    keyQuote = `"${cleanedTitle}" — ${authors[0] || "Curriculum Vitae"}`;
+  } else if (isThesis) {
+    keyPoints = [
+      "Doctoral / Academic Thesis investigating core theoretical frameworks and empirical research questions.",
+      "Methodological framework, empirical research design, primary source analysis, and findings.",
+      "Scholarly contribution to the literature, theoretical implications, and future research directions.",
+    ];
+    suggestedTags = ["Thesis", "Dissertation", "Research", providerDisplay];
+    whySaved = `Foundational research thesis for literature review, methodology, and theoretical frameworks.`;
+    keyQuote = `"${cleanedTitle}" — Academic Thesis`;
+  } else {
+    // General or academic document
+    const generated = generateKeyPointsAndNotes({
+      title: cleanedTitle,
+      rawText: rawFileName.replace(/[_-]+/g, " "),
+      authors,
+      journal,
+      year,
+    });
+    keyPoints = generated.keyPoints;
+    suggestedTags = Array.from(new Set([...generated.suggestedTags, providerDisplay]));
+    whySaved = generated.whySaved;
+    keyQuote = generated.keyQuote;
+  }
+
+  return {
+    title: cleanedTitle,
+    authors,
+    year,
+    journal,
+    publisher,
+    sourceType,
+    webUrl,
+    keyPoints,
+    suggestedTags,
+    whySaved,
+    keyQuote,
+  };
+}
+
 

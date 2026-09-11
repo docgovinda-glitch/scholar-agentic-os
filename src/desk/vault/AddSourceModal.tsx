@@ -9,11 +9,12 @@
  * User files stay in their cloud storage or web source — zero file copies.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { VaultItem } from "../../services/vaultContents";
 import type { CloudStorageProvider, SourceType } from "../../services/vault/sourceTypes";
 import { sourceToVaultItemPayload } from "../../services/vault/sourceTypes";
 import { addVaultItem } from "../../services/vaultContents";
+import { listProjects } from "../api";
 import {
   checkForDuplicates,
   normalizeDoi,
@@ -30,8 +31,11 @@ import {
   fetchDriveFiles,
   initiateGoogleDriveAuth,
   initiateOneDriveAuth,
+  connectCloudDrive,
   cleanFileNameForTitle,
   parseCloudShareUrl,
+  inferMetadataFromCloudFile,
+  getDriveFileWebUrl,
   type CloudDriveAccount,
   type DriveFileItem,
   type CloudDriveProvider,
@@ -89,6 +93,8 @@ export default function AddSourceModal({
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [projectInput, setProjectInput] = useState("");
   const [isAutoExtracting, setIsAutoExtracting] = useState(false);
+  const [ongoingProjects, setOngoingProjects] = useState<Array<{ id: string; title: string }>>([]);
+  const [oneDriveEmailInput, setOneDriveEmailInput] = useState("");
 
   // Optional collapsible details
   const [showExtras, setShowExtras] = useState(false);
@@ -126,6 +132,43 @@ export default function AddSourceModal({
       mounted = false;
     };
   }, [userId]);
+
+  // Load user's ongoing projects to populate the Project Selector
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await listProjects();
+        if (mounted && res) {
+          const list = (res as any).items || (res as any).projects || [];
+          const mapped = list
+            .map((p: any) => ({
+              id: p.projectId || p.id || p.title,
+              title:
+                p.title ||
+                p.answers?.working_title ||
+                p.answers?.title ||
+                p.answers?.research_question ||
+                p.name ||
+                (p.projectId ? `Project ${p.projectId.slice(0, 6)}` : undefined),
+            }))
+            .filter((p: any) => Boolean(p.title));
+          setOngoingProjects(mapped);
+        }
+      } catch {}
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Combined list of all available projects (from workspace projects + existing vault collections)
+  const allAvailableProjects = useMemo(() => {
+    const set = new Set<string>();
+    (existingProjects || []).forEach((p) => set.add(p));
+    ongoingProjects.forEach((p) => set.add(p.title));
+    return Array.from(set).filter(Boolean);
+  }, [existingProjects, ongoingProjects]);
 
   // Load files when cloud drive mode is selected
   useEffect(() => {
@@ -233,30 +276,53 @@ export default function AddSourceModal({
   }
 
   // Select file from cloud drive list
-  function handleSelectDriveFile(file: DriveFileItem, provider: CloudStorageProvider) {
-    const cleanedTitle = cleanFileNameForTitle(file.name) || file.name;
-    setTitle(cleanedTitle);
-    setWebUrl(file.webViewLink || "");
+  function handleSelectDriveFile(
+    file: DriveFileItem,
+    provider: CloudStorageProvider,
+    openInNewTab: boolean = false
+  ) {
+    const activeAccount = provider === "google_drive" ? googleAccount : oneDriveAccount;
+    const inferred = inferMetadataFromCloudFile(file, provider, {
+      accountEmail: activeAccount?.accountEmail,
+      accountName: activeAccount?.accountName,
+    });
+
+    setTitle(inferred.title);
+    setAuthorsText(inferred.authors.join(", "));
+    setYear(inferred.year);
+    setJournal(inferred.journal || "");
+    setPublisher(inferred.publisher || "");
+    setWebUrl(inferred.webUrl);
+    setSourceType(inferred.sourceType);
     setCloudReference({
       provider,
       fileId: file.id,
       fileName: file.name,
-      webUrl: file.webViewLink,
+      webUrl: inferred.webUrl,
     });
-    setSourceType("paper");
+
     const provName = provider === "google_drive" ? "Google Drive" : "OneDrive";
     setFetchStatus(`✓ Selected from ${provName}: ${file.name}`);
     setError(null);
 
-    const takeaways = generateKeyPointsAndNotes({
-      title: cleanedTitle,
-      rawText: file.name,
+    applyTakeaways({
+      keyPoints: inferred.keyPoints,
+      suggestedTags: inferred.suggestedTags,
+      whySaved: inferred.whySaved,
+      keyQuote: inferred.keyQuote,
     });
-    applyTakeaways(takeaways);
 
     // Duplicate check
-    const dup = checkForDuplicates({ title: cleanedTitle }, existingItems);
+    const dup = checkForDuplicates(
+      { title: inferred.title, authors: inferred.authors, year: inferred.year },
+      existingItems
+    );
     if (dup.isDuplicate) setDuplicateWarning(dup);
+
+    // Open directly in Google Drive / OneDrive if requested
+    if (openInNewTab && inferred.webUrl && typeof window !== "undefined") {
+      window.open(inferred.webUrl, "_blank", "noopener,noreferrer");
+    }
   }
 
   // Direct cloud link fetch
@@ -266,47 +332,79 @@ export default function AddSourceModal({
 
     const parsed = parseCloudShareUrl(raw);
     const providerName = provider === "google_drive" ? "Google Drive" : "OneDrive";
+    const activeAccount = provider === "google_drive" ? googleAccount : oneDriveAccount;
 
     if (parsed) {
-      const cleanedTitle = cleanFileNameForTitle(parsed.fileName) || parsed.fileName;
-      setTitle(cleanedTitle);
-      setWebUrl(parsed.webUrl);
+      const dummyFile: DriveFileItem = {
+        id: parsed.fileId,
+        name: parsed.fileName,
+        mimeType: parsed.mimeType || "application/pdf",
+        webViewLink: parsed.webUrl,
+      };
+      const inferred = inferMetadataFromCloudFile(dummyFile, provider, {
+        accountEmail: activeAccount?.accountEmail,
+        accountName: activeAccount?.accountName,
+      });
+
+      setTitle(inferred.title);
+      setAuthorsText(inferred.authors.join(", "));
+      setYear(inferred.year);
+      setJournal(inferred.journal || "");
+      setPublisher(inferred.publisher || "");
+      setWebUrl(inferred.webUrl);
       setCloudReference({
         provider: parsed.provider,
         fileId: parsed.fileId,
         fileName: parsed.fileName,
         webUrl: parsed.webUrl,
       });
-      setSourceType("paper");
+      setSourceType(inferred.sourceType);
       setFetchStatus(`✓ Linked to ${providerName} file`);
       setError(null);
       setDirectCloudLink("");
 
-      const takeaways = generateKeyPointsAndNotes({
-        title: cleanedTitle,
-        rawText: parsed.fileName,
+      applyTakeaways({
+        keyPoints: inferred.keyPoints,
+        suggestedTags: inferred.suggestedTags,
+        whySaved: inferred.whySaved,
+        keyQuote: inferred.keyQuote,
       });
-      applyTakeaways(takeaways);
     } else {
       // Fallback
-      setTitle(`${providerName} Document`);
-      setWebUrl(raw);
+      const dummyFile: DriveFileItem = {
+        id: `cloud_${Date.now()}`,
+        name: `${providerName} Document.pdf`,
+        mimeType: "application/pdf",
+        webViewLink: raw,
+      };
+      const inferred = inferMetadataFromCloudFile(dummyFile, provider, {
+        accountEmail: activeAccount?.accountEmail,
+        accountName: activeAccount?.accountName,
+      });
+
+      setTitle(inferred.title);
+      setAuthorsText(inferred.authors.join(", "));
+      setYear(inferred.year);
+      setJournal(inferred.journal || "");
+      setPublisher(inferred.publisher || "");
+      setWebUrl(inferred.webUrl);
       setCloudReference({
         provider,
-        fileId: `cloud_${Date.now()}`,
-        fileName: `${providerName} Document.pdf`,
+        fileId: dummyFile.id,
+        fileName: dummyFile.name,
         webUrl: raw,
       });
-      setSourceType("paper");
+      setSourceType(inferred.sourceType);
       setFetchStatus(`✓ Linked to ${providerName}`);
       setError(null);
       setDirectCloudLink("");
 
-      const takeaways = generateKeyPointsAndNotes({
-        title: `${providerName} Document`,
-        rawText: raw,
+      applyTakeaways({
+        keyPoints: inferred.keyPoints,
+        suggestedTags: inferred.suggestedTags,
+        whySaved: inferred.whySaved,
+        keyQuote: inferred.keyQuote,
       });
-      applyTakeaways(takeaways);
     }
   }
 
@@ -315,18 +413,52 @@ export default function AddSourceModal({
     setBusy(true);
     setError(null);
     try {
-      if (provider === "google_drive") {
-        await initiateGoogleDriveAuth(userId);
-      } else {
-        await initiateOneDriveAuth(userId);
+      const res =
+        provider === "google_drive"
+          ? await initiateGoogleDriveAuth(userId)
+          : await initiateOneDriveAuth(userId);
+
+      if (res && (res as any).success === false) {
+        throw new Error((res as any).error || "Provider connection failed");
       }
+
       const drives = await getConnectedCloudDrives(userId);
       setCloudDrives(drives);
     } catch (err: any) {
-      setError(
-        err.message ||
-          `Unable to connect ${provider === "google_drive" ? "Google Drive" : "OneDrive"}. You can also paste a file link directly below.`
-      );
+      const msg = err?.message || (typeof err === "object" ? JSON.stringify(err) : String(err));
+      if (
+        msg.includes("provider is not enabled") ||
+        msg.includes("Unsupported provider") ||
+        msg.includes("validation_failed")
+      ) {
+        setError(
+          "Microsoft Azure OAuth is not enabled in your authentication settings. You can paste any OneDrive or SharePoint file link below to attach and cite documents directly."
+        );
+      } else {
+        setError(
+          err.message ||
+            `Unable to connect ${provider === "google_drive" ? "Google Drive" : "OneDrive"}. You can also paste a file link directly below.`
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Connect OneDrive workspace with email
+  async function handleConnectOneDriveWithEmail() {
+    const email = oneDriveEmailInput.trim();
+    if (!email) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await connectCloudDrive(userId, "onedrive", { email, name: email.split("@")[0] });
+      const drives = await getConnectedCloudDrives(userId);
+      setCloudDrives(drives);
+      setFetchStatus("✓ Connected to OneDrive workspace");
+      setOneDriveEmailInput("");
+    } catch (err: any) {
+      setError(err.message || "Failed to connect OneDrive account");
     } finally {
       setBusy(false);
     }
@@ -407,24 +539,40 @@ export default function AddSourceModal({
         const provider: CloudStorageProvider = kind === "cloud_drive" ? "google_drive" : "onedrive";
         const fileId = parsed?.fileId || `cloud_${Date.now()}`;
         const fileName = parsed?.fileName || (provider === "google_drive" ? "Google Drive Document.pdf" : "OneDrive Document.pdf");
+        const activeAccount = provider === "google_drive" ? googleAccount : oneDriveAccount;
 
+        const dummyFile: DriveFileItem = {
+          id: fileId,
+          name: fileName,
+          mimeType: parsed?.mimeType || "application/pdf",
+          webViewLink: raw,
+        };
+        const inferred = inferMetadataFromCloudFile(dummyFile, provider, {
+          accountEmail: activeAccount?.accountEmail,
+          accountName: activeAccount?.accountName,
+        });
+
+        setTitle(inferred.title);
+        setAuthorsText(inferred.authors.join(", "));
+        setYear(inferred.year);
+        setJournal(inferred.journal || "");
+        setPublisher(inferred.publisher || "");
+        setWebUrl(inferred.webUrl);
+        setSourceType(inferred.sourceType);
         setCloudReference({
           provider,
           fileId,
           fileName,
           webUrl: raw,
         });
-        const derivedTitle = cleanFileNameForTitle(fileName) || "Cloud Research Document";
-        if (!title) setTitle(derivedTitle);
-        setWebUrl(raw);
-        setSourceType("paper");
         setFetchStatus(`✓ Connected to ${provider === "google_drive" ? "Google Drive" : "OneDrive"}`);
 
-        const takeaways = generateKeyPointsAndNotes({
-          title: derivedTitle,
-          rawText: fileName,
+        applyTakeaways({
+          keyPoints: inferred.keyPoints,
+          suggestedTags: inferred.suggestedTags,
+          whySaved: inferred.whySaved,
+          keyQuote: inferred.keyQuote,
         });
-        applyTakeaways(takeaways);
       } else {
         // Raw title
         setTitle(raw);
@@ -735,14 +883,24 @@ export default function AddSourceModal({
                         Connected ({googleAccount?.accountEmail})
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => loadFilesForProvider("google_drive")}
-                      disabled={driveLoading}
-                      className="text-[11px] text-[color:var(--accent)] hover:underline cursor-pointer"
-                    >
-                      {driveLoading ? "Refreshing…" : "↻ Refresh files"}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <a
+                        href="https://drive.google.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-[color:var(--accent)] hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+                      >
+                        <span>↗ Open Google Drive</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => loadFilesForProvider("google_drive")}
+                        disabled={driveLoading}
+                        className="text-[11px] text-[color:var(--accent)] hover:underline cursor-pointer"
+                      >
+                        {driveLoading ? "Refreshing…" : "↻ Refresh files"}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Search filter inside Drive */}
@@ -765,32 +923,69 @@ export default function AddSourceModal({
                         {driveFilter ? "No matching files found." : "No documents found in Google Drive."}
                       </div>
                     ) : (
-                      filteredDriveFiles.map((file) => (
-                        <button
-                          key={file.id}
-                          type="button"
-                          onClick={() => handleSelectDriveFile(file, "google_drive")}
-                          className="flex items-center justify-between p-2 rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] text-left transition-colors cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-2 truncate pr-2">
-                            <span className="text-sm shrink-0">
-                              {file.mimeType?.includes("pdf")
-                                ? "📄"
-                                : file.mimeType?.includes("document")
-                                ? "📝"
-                                : file.mimeType?.includes("spreadsheet")
-                                ? "📊"
-                                : "📁"}
-                            </span>
-                            <span className="text-xs font-medium text-[color:var(--text-primary)] truncate">
-                              {file.name}
-                            </span>
+                      filteredDriveFiles.map((file) => {
+                        const isSelected = cloudReference?.fileId === file.id;
+                        const driveUrl = getDriveFileWebUrl(file, "google_drive");
+
+                        return (
+                          <div
+                            key={file.id}
+                            className={`flex items-center justify-between p-2 rounded-[var(--radius-sm)] transition-colors ${
+                              isSelected
+                                ? "bg-[color:var(--accent-subtle)]/40 border border-[color:var(--accent)]/30"
+                                : "hover:bg-[color:var(--surface-hover)]"
+                            }`}
+                          >
+                            <div
+                              onClick={() => handleSelectDriveFile(file, "google_drive", true)}
+                              className="flex items-center gap-2 truncate pr-2 flex-1 cursor-pointer"
+                              title="Click to select source and open in Google Drive"
+                            >
+                              <span className="text-sm shrink-0">
+                                {file.mimeType?.includes("pdf")
+                                  ? "📄"
+                                  : file.mimeType?.includes("document")
+                                  ? "📝"
+                                  : file.mimeType?.includes("spreadsheet")
+                                  ? "📊"
+                                  : "📁"}
+                              </span>
+                              <span className="text-xs font-medium text-[color:var(--text-primary)] truncate">
+                                {file.name}
+                              </span>
+                              {isSelected && (
+                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full shrink-0">
+                                  ✓ Selected
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <a
+                                href={driveUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="px-2 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded-[var(--radius-sm)] transition-colors flex items-center gap-0.5 cursor-pointer"
+                                title="Open directly in Google Drive"
+                              >
+                                <span>↗ Open in Drive</span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleSelectDriveFile(file, "google_drive", true)}
+                                className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? "bg-[color:var(--accent)] text-white"
+                                    : "text-[color:var(--accent)] hover:bg-[color:var(--accent-subtle)]"
+                                }`}
+                              >
+                                {isSelected ? "Selected ✓" : "Select Source →"}
+                              </button>
+                            </div>
                           </div>
-                          <span className="text-[10px] text-[color:var(--accent)] font-semibold shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                            Select Source →
-                          </span>
-                        </button>
-                      ))
+                        );
+                      })
                     )}
                   </div>
 
@@ -871,14 +1066,24 @@ export default function AddSourceModal({
                         Connected ({oneDriveAccount?.accountEmail})
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => loadFilesForProvider("onedrive")}
-                      disabled={driveLoading}
-                      className="text-[11px] text-[color:var(--accent)] hover:underline cursor-pointer"
-                    >
-                      {driveLoading ? "Refreshing…" : "↻ Refresh files"}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <a
+                        href="https://onedrive.live.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-[color:var(--accent)] hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+                      >
+                        <span>↗ Open OneDrive</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => loadFilesForProvider("onedrive")}
+                        disabled={driveLoading}
+                        className="text-[11px] text-[color:var(--accent)] hover:underline cursor-pointer"
+                      >
+                        {driveLoading ? "Refreshing…" : "↻ Refresh files"}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Search filter inside OneDrive */}
@@ -901,32 +1106,69 @@ export default function AddSourceModal({
                         {driveFilter ? "No matching files found." : "No documents found in OneDrive."}
                       </div>
                     ) : (
-                      filteredDriveFiles.map((file) => (
-                        <button
-                          key={file.id}
-                          type="button"
-                          onClick={() => handleSelectDriveFile(file, "onedrive")}
-                          className="flex items-center justify-between p-2 rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] text-left transition-colors cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-2 truncate pr-2">
-                            <span className="text-sm shrink-0">
-                              {file.mimeType?.includes("pdf")
-                                ? "📄"
-                                : file.mimeType?.includes("word") || file.name.endsWith(".docx")
-                                ? "📝"
-                                : file.mimeType?.includes("sheet") || file.name.endsWith(".xlsx")
-                                ? "📊"
-                                : "☁️"}
-                            </span>
-                            <span className="text-xs font-medium text-[color:var(--text-primary)] truncate">
-                              {file.name}
-                            </span>
+                      filteredDriveFiles.map((file) => {
+                        const isSelected = cloudReference?.fileId === file.id;
+                        const oneDriveUrl = getDriveFileWebUrl(file, "onedrive");
+
+                        return (
+                          <div
+                            key={file.id}
+                            className={`flex items-center justify-between p-2 rounded-[var(--radius-sm)] transition-colors ${
+                              isSelected
+                                ? "bg-[color:var(--accent-subtle)]/40 border border-[color:var(--accent)]/30"
+                                : "hover:bg-[color:var(--surface-hover)]"
+                            }`}
+                          >
+                            <div
+                              onClick={() => handleSelectDriveFile(file, "onedrive", true)}
+                              className="flex items-center gap-2 truncate pr-2 flex-1 cursor-pointer"
+                              title="Click to select source and open in OneDrive"
+                            >
+                              <span className="text-sm shrink-0">
+                                {file.mimeType?.includes("pdf")
+                                  ? "📄"
+                                  : file.mimeType?.includes("word") || file.name.endsWith(".docx")
+                                  ? "📝"
+                                  : file.mimeType?.includes("sheet") || file.name.endsWith(".xlsx")
+                                  ? "📊"
+                                  : "☁️"}
+                              </span>
+                              <span className="text-xs font-medium text-[color:var(--text-primary)] truncate">
+                                {file.name}
+                              </span>
+                              {isSelected && (
+                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full shrink-0">
+                                  ✓ Selected
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <a
+                                href={oneDriveUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="px-2 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded-[var(--radius-sm)] transition-colors flex items-center gap-0.5 cursor-pointer"
+                                title="Open directly in OneDrive"
+                              >
+                                <span>↗ Open in OneDrive</span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleSelectDriveFile(file, "onedrive", true)}
+                                className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? "bg-[color:var(--accent)] text-white"
+                                    : "text-[color:var(--accent)] hover:bg-[color:var(--accent-subtle)]"
+                                }`}
+                              >
+                                {isSelected ? "Selected ✓" : "Select Source →"}
+                              </button>
+                            </div>
                           </div>
-                          <span className="text-[10px] text-[color:var(--accent)] font-semibold shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                            Select Source →
-                          </span>
-                        </button>
-                      ))
+                        );
+                      })
                     )}
                   </div>
 
@@ -957,36 +1199,69 @@ export default function AddSourceModal({
                     <div>
                       <h3 className="text-xs font-bold text-[color:var(--text-primary)]">Connect Microsoft OneDrive</h3>
                       <p className="text-[11px] text-[color:var(--text-muted)]">
-                        Select and cite your Word documents, OneDrive PDFs, and lecture notes with zero file copies.
+                        Select and cite your Word documents, OneDrive PDFs, and research notes with zero file copies.
                       </p>
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleConnectDrive("onedrive")}
-                    disabled={busy}
-                    className="w-full py-2 bg-[color:var(--accent-solid)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-bold rounded-[var(--radius-md)] flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 transition-colors"
-                  >
-                    <span>☁️</span>
-                    <span>{busy ? "Connecting…" : "Connect Microsoft OneDrive"}</span>
-                  </button>
+                  {/* Option A: Direct share link (zero setup required) */}
+                  <div className="p-2.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] flex flex-col gap-1.5">
+                    <label className="text-[11px] font-semibold text-[color:var(--text-primary)]">
+                      Option 1: Paste OneDrive / SharePoint Link (Instant & Zero Setup)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={directCloudLink}
+                        onChange={(e) => setDirectCloudLink(e.target.value)}
+                        placeholder="Paste OneDrive or SharePoint link (https://1drv.ms/...)"
+                        className="flex-1 px-3 py-1.5 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDirectCloudLink("onedrive")}
+                        disabled={!directCloudLink.trim()}
+                        className="px-3 py-1.5 bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white text-xs font-semibold rounded-[var(--radius-sm)] disabled:opacity-50 cursor-pointer"
+                      >
+                        Fetch Link
+                      </button>
+                    </div>
+                  </div>
 
-                  <div className="flex items-center gap-2 pt-1 border-t border-[color:var(--border-subtle)]">
-                    <input
-                      type="text"
-                      value={directCloudLink}
-                      onChange={(e) => setDirectCloudLink(e.target.value)}
-                      placeholder="Or paste OneDrive / SharePoint share link directly..."
-                      className="flex-1 px-3 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
-                    />
+                  {/* Option B: Connect Workspace with Email */}
+                  <div className="p-2.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] flex flex-col gap-1.5">
+                    <label className="text-[11px] font-semibold text-[color:var(--text-primary)]">
+                      Option 2: Connect with Microsoft / Institutional Email
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="email"
+                        value={oneDriveEmailInput}
+                        onChange={(e) => setOneDriveEmailInput(e.target.value)}
+                        placeholder="e.g. researcher@outlook.com or university.edu"
+                        className="flex-1 px-3 py-1.5 text-xs bg-[color:var(--surface-inset)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] focus:outline-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleConnectOneDriveWithEmail}
+                        disabled={busy || !oneDriveEmailInput.trim()}
+                        className="px-3 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] text-xs font-semibold rounded-[var(--radius-sm)] disabled:opacity-50 cursor-pointer"
+                      >
+                        Connect Workspace
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Option C: Supabase OAuth */}
+                  <div className="pt-1">
                     <button
                       type="button"
-                      onClick={() => handleDirectCloudLink("onedrive")}
-                      disabled={!directCloudLink.trim()}
-                      className="px-3 py-1.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-xs font-semibold rounded-[var(--radius-md)] disabled:opacity-50 cursor-pointer"
+                      onClick={() => handleConnectDrive("onedrive")}
+                      disabled={busy}
+                      className="w-full py-2 bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] text-xs font-semibold rounded-[var(--radius-md)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
                     >
-                      Fetch Link
+                      <span>☁️</span>
+                      <span>{busy ? "Connecting…" : "Sign In with Microsoft OAuth"}</span>
                     </button>
                   </div>
                 </div>
@@ -1018,13 +1293,26 @@ export default function AddSourceModal({
                   ({cloudReference.provider === "google_drive" ? "Google Drive" : "OneDrive"})
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setCloudReference(undefined)}
-                className="text-[11px] text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer shrink-0 ml-2"
-              >
-                ✕ Detach
-              </button>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                {cloudReference.webUrl && (
+                  <a
+                    href={cloudReference.webUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 rounded-[var(--radius-sm)] transition-colors cursor-pointer"
+                    title={`Open in ${cloudReference.provider === "google_drive" ? "Google Drive" : "OneDrive"}`}
+                  >
+                    <span>↗ Open in {cloudReference.provider === "google_drive" ? "Google Drive" : "OneDrive"}</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setCloudReference(undefined)}
+                  className="text-[11px] text-[color:var(--text-muted)] hover:text-red-500 cursor-pointer"
+                >
+                  ✕ Detach
+                </button>
+              </div>
             </div>
           )}
 
@@ -1171,9 +1459,18 @@ export default function AddSourceModal({
               <div className="mt-3 p-3 bg-[color:var(--surface-inset)]/50 border border-[color:var(--border-subtle)] rounded-[var(--radius-md)] flex flex-col gap-3 animate-in fade-in duration-150">
                 {/* Tags */}
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="tag-input-field" className="text-[11px] font-bold text-[color:var(--text-secondary)]">
-                    Tags
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="tag-input-field" className="text-[11px] font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
+                      <span>🏷️</span>
+                      <span>Thematic Tags</span>
+                    </label>
+                    <span className="text-[10px] text-[color:var(--text-muted)]">
+                      For library-wide search & AI synthesis
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-[color:var(--text-muted)]">
+                    Cross-project keywords, methodologies, or research paradigms (e.g. <em>#mixed-methods</em>, <em>#climate-policy</em>, <em>#decoloniality</em>). Tags help you categorize and retrieve sources across all research projects.
+                  </p>
                   <div className="flex flex-wrap gap-1 mb-1">
                     {tags.map((t) => (
                       <span
@@ -1203,7 +1500,7 @@ export default function AddSourceModal({
                           handleAddTag();
                         }
                       }}
-                      placeholder="Add tag and press enter"
+                      placeholder="Add tag and press enter (e.g. qualitative-methods, AI-ethics)"
                       className="flex-1 px-2.5 py-1.5 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-sm)] text-[color:var(--text-primary)] focus:outline-hidden"
                     />
                     <button
@@ -1319,19 +1616,53 @@ export default function AddSourceModal({
                 </div>
 
                 {/* Assign to Project(s) */}
-                <div className="flex flex-col gap-1.5 pt-2 border-t border-[color:var(--border-subtle)]">
-                  <label className="text-[11px] font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
-                    <span>📁</span>
-                    <span>Assign to Project(s)</span>
-                  </label>
-                  <p className="text-[10px] text-[color:var(--text-muted)]">
-                    Link this source to one or more active research projects or assignments.
+                <div className="flex flex-col gap-2 pt-2 border-t border-[color:var(--border-subtle)]">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="project-selector-dropdown" className="text-[11px] font-bold text-[color:var(--text-secondary)] flex items-center gap-1.5">
+                      <span>📁</span>
+                      <span>Assign to Ongoing Project(s)</span>
+                    </label>
+                    <span className="text-[10px] text-[color:var(--text-muted)] font-medium">
+                      In-text citations & reference lists
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-[color:var(--text-muted)] leading-relaxed">
+                    Select from your active research projects or assignments. Sources assigned to a project become directly available in that workspace for AI evidence extraction, literature matrix synthesis, in-text citations (e.g. <em>(Author, Year)</em>), and manuscript bibliographies.
                   </p>
 
-                  {/* Existing project toggle buttons */}
-                  {existingProjects.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 my-0.5">
-                      {existingProjects.map((p) => {
+                  {/* Project Selector Dropdown */}
+                  <div className="flex items-center gap-2">
+                    <select
+                      id="project-selector-dropdown"
+                      aria-label="Select an ongoing project"
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleToggleProject(e.target.value);
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 text-xs bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] text-[color:var(--text-primary)] focus:outline-hidden focus:border-[color:var(--accent)] cursor-pointer"
+                    >
+                      <option value="" disabled>
+                        {allAvailableProjects.length > 0
+                          ? "▾ Select an ongoing project to link..."
+                          : "No ongoing projects found — enter a project name below"}
+                      </option>
+                      {allAvailableProjects.map((proj) => {
+                        const isSelected = selectedProjects.includes(proj);
+                        return (
+                          <option key={proj} value={proj}>
+                            {isSelected ? `✓ ${proj} (Assigned)` : `+ ${proj}`}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Ongoing Projects Quick-Toggle Pills */}
+                  {allAvailableProjects.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {allAvailableProjects.map((p) => {
                         const isSelected = selectedProjects.includes(p);
                         return (
                           <button
@@ -1339,10 +1670,10 @@ export default function AddSourceModal({
                             type="button"
                             onClick={() => handleToggleProject(p)}
                             aria-label={`${isSelected ? "Remove from" : "Assign to"} ${p}`}
-                            className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full border transition-colors cursor-pointer ${
+                            className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
                               isSelected
-                                ? "bg-[color:var(--accent-solid)] border-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold shadow-2xs"
-                                : "bg-[color:var(--surface-raised)] border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:border-[color:var(--border-strong)]"
+                                ? "bg-[color:var(--accent)] border-[color:var(--accent)] text-white font-bold shadow-xs"
+                                : "bg-[color:var(--surface-raised)] border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:border-[color:var(--border-strong)] hover:text-[color:var(--text-primary)]"
                             }`}
                           >
                             <span>{isSelected ? "✓" : "+"}</span>
@@ -1353,30 +1684,40 @@ export default function AddSourceModal({
                     </div>
                   )}
 
-                  {/* Added custom projects */}
-                  {selectedProjects.filter((p) => !existingProjects.includes(p)).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-1">
-                      {selectedProjects
-                        .filter((p) => !existingProjects.includes(p))
-                        .map((p) => (
+                  {/* Active Assigned Projects Summary Box */}
+                  {selectedProjects.length > 0 && (
+                    <div className="p-2.5 bg-[color:var(--accent-subtle)]/30 border border-[color:var(--accent)]/30 rounded-[var(--radius-md)] text-xs flex flex-col gap-1.5 animate-in fade-in duration-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[color:var(--accent)] uppercase tracking-wider">
+                          Assigned to {selectedProjects.length} Project{selectedProjects.length > 1 ? "s" : ""}:
+                        </span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                          ✓ Integrated for citations & references
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedProjects.map((p) => (
                           <span
                             key={p}
-                            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-[color:var(--accent-solid)] border border-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold shadow-2xs"
+                            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-[color:var(--accent)] text-white font-medium"
                           >
                             <span>📁 {p}</span>
                             <button
                               type="button"
                               onClick={() => handleToggleProject(p)}
-                              className="hover:opacity-75 cursor-pointer ml-1"
+                              className="hover:opacity-75 cursor-pointer ml-1 font-bold text-xs"
+                              title="Remove project"
                             >
                               ×
                             </button>
                           </span>
                         ))}
+                      </div>
                     </div>
                   )}
 
-                  <div className="flex gap-2">
+                  {/* Custom Project Creation Input */}
+                  <div className="flex gap-2 pt-1">
                     <input
                       type="text"
                       value={projectInput}

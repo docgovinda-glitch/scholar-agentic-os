@@ -34,12 +34,19 @@ Rather than generic forms, each academic format in Scholar Core operates through
 In compliance with **Revision 2 / Document 43 Rev 5**, Scholar Core operates under a strict **Zero Document Storage Policy**:
 - **Zero Full-Text Retention**: Scholar Core does NOT store full proprietary PDFs, copyrighted manuscripts, or full paper texts on its servers.
 - **Verifiable Citation & Metadata Pointers**: The Source Library retains only structured cryptographic metadata, canonical references, DOIs, URLs, and client-authorized cloud storage pointers.
+- **Cloud Drives (Google Drive & Microsoft OneDrive)**:
+  - **Google Drive**: Automatic metadata inference (Authors, Year, Publisher, Doc Type) and direct `↗ Open in Google Drive` navigation.
+  - **Microsoft OneDrive & SharePoint**: Instant zero-setup share link ingestion (`https://1drv.ms/...`), institutional email workspace connect, and graceful Azure OAuth handling.
+- **Project Selector & Thematic Taxonomy**:
+  - **Ongoing Project Selector**: Interactive dropdown and quick-toggle pills (`listProjects()`) linking sources directly to project research workbenches for in-text citations (`(Author, Year)`) and references bibliography generation.
+  - **Thematic Tags**: Cross-project conceptual and methodological taxonomy (`#mixed-methods`, `#climate-policy`) powering library-wide semantic search and AI literature review synthesis.
+- **Literature Review Synthesis Matrix**: Automated comparative matrix extraction, continuous review narrative generation, and grounded multi-source analytical Q&A ("Ask Your Sources").
 - **Reference Manager Integrations**:
   - **Zotero Web API**: Direct two-way sync for collections, tags, and DOI metadata.
   - **Mendeley & BibTeX**: Instant batch parsing of `.bib` records into structured Canonical References.
-  - **Cloud Drives**: Direct one-click authentication and indexing from Google Drive and Microsoft OneDrive.
   - **DOI & Web Scraping**: Live CrossRef / DataCite metadata lookup and client-side extraction.
 - **Retraction Scanning**: Automated Crossref and OpenAlex retraction radar for flagging compromised citations in real time.
+- **Comprehensive Guide**: See [`docs/KNOWLEDGE_VAULT_AND_CLOUD_DRIVE.md`](docs/KNOWLEDGE_VAULT_AND_CLOUD_DRIVE.md) for full configuration and workflow details.
 
 ---
 
