@@ -20,6 +20,79 @@ interface CitationInfo {
   badgeColor: string;
 }
 
+// Clean Monochrome SVG Icons for Academic Formats & Verification
+function AssignmentIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  );
+}
+
+function JournalIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+  );
+}
+
+function ThesisIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
+    </svg>
+  );
+}
+
+function ProposalIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    </svg>
+  );
+}
+
+function PresentationIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+    </svg>
+  );
+}
+
+function ShieldLockIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+    </svg>
+  );
+}
+
+function CheckBadgeIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function CloudServerIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z" />
+    </svg>
+  );
+}
+
+function SearchAuditIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+    </svg>
+  );
+}
+
 const SAMPLE_CITATIONS: Record<number, CitationInfo> = {
   1: {
     id: 1,
@@ -49,7 +122,7 @@ const WORKSPACES = [
   {
     id: "OT-01",
     label: "Assignment",
-    icon: "📝",
+    icon: AssignmentIcon,
     words: "800 – 4k words",
     description: "Coursework essays, reflections, and case studies.",
     pipeline: "Evidence Board → Synthesis → 10-Point Audit",
@@ -57,7 +130,7 @@ const WORKSPACES = [
   {
     id: "OT-10",
     label: "Journal Article",
-    icon: "📄",
+    icon: JournalIcon,
     words: "4k – 10k words",
     description: "Empirical papers with structured peer review pipelines.",
     pipeline: "Lit Matrix → Gap Analysis → IMRaD Drafting",
@@ -65,7 +138,7 @@ const WORKSPACES = [
   {
     id: "OT-09",
     label: "Thesis / Dissertation",
-    icon: "🎓",
+    icon: ThesisIcon,
     words: "10k – 80k words",
     description: "Multi-chapter milestones with viva defense preparation.",
     pipeline: "Theory Framing → Findings → Viva Prep",
@@ -73,7 +146,7 @@ const WORKSPACES = [
   {
     id: "OT-19",
     label: "Research Proposal",
-    icon: "💡",
+    icon: ProposalIcon,
     words: "3k – 15k words",
     description: "Grant applications with funding rubric alignment.",
     pipeline: "Specific Aims → Methodology → Ethics",
@@ -81,18 +154,11 @@ const WORKSPACES = [
   {
     id: "OT-22",
     label: "Presentation",
-    icon: "📊",
+    icon: PresentationIcon,
     words: "10 – 35 slides",
     description: "Conference slide decks and defense speaking scripts.",
     pipeline: "Slide Canvas → Narrative Arc → Defense Q&A",
   },
-];
-
-const SUGGESTED_TOPICS = [
-  "Base Editing Fidelity",
-  "Multi-Agent Discovery",
-  "Decolonial Epistemologies",
-  "Post-Quantum Benchmarks",
 ];
 
 export default function ScholarCoreLanding({
@@ -102,13 +168,13 @@ export default function ScholarCoreLanding({
   const [searchParams] = useSearchParams();
   const [scrolled, setScrolled] = useState(false);
   const [activeCitation, setActiveCitation] = useState<number | null>(1);
+  const [activeDemoTab, setActiveDemoTab] = useState<"provenance" | "matrix" | "audit">("provenance");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Embedded Auth Modal state
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"signin" | "signup" | "switch">("signin");
   const [selectedFormatId, setSelectedFormatId] = useState<string | undefined>(undefined);
-  const [customTopic, setCustomTopic] = useState("");
 
   useEffect(() => {
     const handleScroll = () => {
@@ -143,8 +209,8 @@ export default function ScholarCoreLanding({
 
   return (
     <div className="min-h-screen bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] font-sans antialiased selection:bg-[color:var(--accent-subtle)] relative overflow-x-hidden">
-      {/* Subtle, soft ambient background gradient */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[720px] h-[340px] bg-[color:var(--accent-subtle)]/25 blur-[120px] rounded-full pointer-events-none -z-10" />
+      {/* Subtle, precise technical grid background pattern */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,var(--border-subtle)_1px,transparent_1px),linear-gradient(to_bottom,var(--border-subtle)_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-35 pointer-events-none -z-10" />
 
       {/* Clean Modern Navigation Bar */}
       <header
@@ -156,7 +222,7 @@ export default function ScholarCoreLanding({
       >
         <div className="mx-auto max-w-5xl px-6 flex items-center justify-between">
           <div
-            className="flex items-center gap-2 cursor-pointer select-none group"
+            className="flex items-center gap-2.5 cursor-pointer select-none group"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           >
             <div className="w-7 h-7 rounded-lg bg-[color:var(--accent)] text-white flex items-center justify-center transition-transform group-hover:scale-105">
@@ -266,12 +332,12 @@ export default function ScholarCoreLanding({
       </header>
 
       <main className="pt-24 sm:pt-28 pb-16">
-        {/* HERO SECTION — FOCUSED & SOBER */}
+        {/* HERO SECTION — ACADEMIC AUTHORING WORKSTATION */}
         <section className="px-6 max-w-3xl mx-auto flex flex-col items-center text-center pt-4 sm:pt-6 pb-10">
-          {/* Tagline Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface-raised)]/80 text-[11px] font-semibold text-[color:var(--text-secondary)] mb-4 shadow-2xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--state-success)]" />
-            <span>Academic Research & Writing Workspace</span>
+          {/* Release / Architecture Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] text-[11px] font-mono font-medium text-[color:var(--text-secondary)] mb-4 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--accent)]" />
+            <span>Scholar Core • Evidence-Gated Authoring OS</span>
           </div>
 
           {/* Balanced Main Heading */}
@@ -280,9 +346,9 @@ export default function ScholarCoreLanding({
             <span className="block mt-1 text-[color:var(--accent)]">Structured Thinking. Verifiable Citations.</span>
           </h1>
 
-          {/* Sober, realistic 1-sentence value proposition */}
-          <p className="text-sm sm:text-base text-[color:var(--text-secondary)] max-w-xl mx-auto mb-5 leading-relaxed font-normal" style={{ textWrap: "pretty" }}>
-            Organize literature, construct evidence-backed arguments, and draft with traceable citation provenance.
+          {/* Sober, realistic value proposition */}
+          <p className="text-sm sm:text-base text-[color:var(--text-secondary)] max-w-xl mx-auto mb-6 leading-relaxed font-normal" style={{ textWrap: "pretty" }}>
+            The evidence-gated authoring environment for scholarly manuscripts, doctoral dissertations, and peer-reviewed empirical papers.
           </p>
 
           {/* Dual Action Buttons */}
@@ -303,47 +369,17 @@ export default function ScholarCoreLanding({
             </a>
           </div>
 
-          {/* Compact Topic Launcher */}
-          <div className="w-full max-w-lg p-1 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] shadow-xs flex items-center gap-2">
-            <div className="flex-1 flex items-center gap-2 pl-2.5">
-              <span className="text-[color:var(--accent)] text-xs">✦</span>
-              <input
-                type="text"
-                value={customTopic}
-                onChange={(e) => setCustomTopic(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") openAuth("signup", "OT-10");
-                }}
-                placeholder="Search or enter research topic..."
-                className="w-full bg-transparent text-xs text-[color:var(--text-primary)] outline-none placeholder:text-[color:var(--text-muted)]"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => openAuth("signup", "OT-10")}
-              className="px-3.5 py-1.5 bg-[color:var(--accent)] text-white rounded-lg text-xs font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer shrink-0"
-            >
-              Launch →
-            </button>
-          </div>
-
-          {/* Symmetrical Example Chips */}
-          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-2.5 text-[11px] text-[color:var(--text-muted)]">
-            <span className="mr-0.5 font-medium text-[10px] uppercase tracking-wider">Examples:</span>
-            {SUGGESTED_TOPICS.map((topic) => (
-              <button
-                key={topic}
-                type="button"
-                onClick={() => setCustomTopic(topic)}
-                className="px-2 py-0.5 rounded-full bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] hover:border-[color:var(--border-control)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
-              >
-                {topic}
-              </button>
-            ))}
+          {/* Academic Standards & Toolchain Compatibility Strip */}
+          <div className="mt-4 pt-5 border-t border-[color:var(--border-subtle)] w-full max-w-xl mx-auto flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] font-mono text-[color:var(--text-muted)]">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--text-secondary)]">Supported:</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[color:var(--accent)]" />LaTeX & BibTeX</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[color:var(--accent)]" />Zotero & Mendeley</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[color:var(--accent)]" />Google Drive & OneDrive</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[color:var(--accent)]" />Air-Gapped Local LLM</span>
           </div>
         </section>
 
-        {/* 5 DEDICATED ACADEMIC WORKSPACES — BALANCED 5-COLUMN ROW */}
+        {/* 5 DEDICATED ACADEMIC WORKSPACES — TECHNICAL TAXONOMY GRID */}
         <section id="workspaces" className="px-6 py-10 max-w-5xl mx-auto scroll-mt-20">
           <div className="text-center max-w-xl mx-auto mb-6">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--accent)] block mb-1">
@@ -365,8 +401,10 @@ export default function ScholarCoreLanding({
                 className="p-3.5 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] hover:border-[color:var(--border-control)] transition-all flex flex-col justify-between group last:sm:col-span-2 last:sm:max-w-xs last:sm:w-full last:sm:mx-auto last:lg:max-w-none last:lg:col-span-1"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-base">{ws.icon}</span>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-secondary)] group-hover:text-[color:var(--accent)] group-hover:border-[color:var(--border-control)] transition-colors">
+                      <ws.icon className="w-3.5 h-3.5" />
+                    </div>
                     <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]">
                       {ws.id}
                     </span>
@@ -406,9 +444,9 @@ export default function ScholarCoreLanding({
           </div>
         </section>
 
-        {/* LIVE INTERACTIVE PROVENANCE INSPECTOR */}
+        {/* MULTI-STAGE INTERACTIVE WORKSPACE PREVIEW */}
         <section id="provenance" className="px-6 py-10 max-w-5xl mx-auto scroll-mt-20">
-          <div className="text-center max-w-xl mx-auto mb-6">
+          <div className="text-center max-w-xl mx-auto mb-5">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--accent)] block mb-1">
               Live Interactive Workspace
             </span>
@@ -420,127 +458,299 @@ export default function ScholarCoreLanding({
             </p>
           </div>
 
-          <div className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-xs overflow-hidden">
-            {/* Header bar */}
-            <div className="h-9 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/60 flex items-center justify-between px-3.5 text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[color:var(--state-success)]" />
-                <span className="font-mono text-[10px] text-[color:var(--text-muted)]">
-                  empirical-article-ot10 / results.tex
+          {/* Interactive Stage Tabs Switcher */}
+          <div className="flex items-center justify-center mb-5">
+            <div className="inline-flex p-1 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)] shadow-2xs gap-1">
+              <button
+                type="button"
+                onClick={() => setActiveDemoTab("provenance")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeDemoTab === "provenance"
+                    ? "bg-[color:var(--accent)] text-white shadow-2xs"
+                    : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+                }`}
+              >
+                <SearchAuditIcon className="w-3.5 h-3.5" />
+                <span>1. Provenance Inspector</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveDemoTab("matrix")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeDemoTab === "matrix"
+                    ? "bg-[color:var(--accent)] text-white shadow-2xs"
+                    : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+                }`}
+              >
+                <JournalIcon className="w-3.5 h-3.5" />
+                <span>2. Literature Synthesis Matrix</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveDemoTab("audit")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeDemoTab === "audit"
+                    ? "bg-[color:var(--accent)] text-white shadow-2xs"
+                    : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+                }`}
+              >
+                <CheckBadgeIcon className="w-3.5 h-3.5" />
+                <span>3. Pre-Submission Audit</span>
+              </button>
+            </div>
+          </div>
+
+          {/* TAB 1: LIVE PROVENANCE INSPECTOR */}
+          {activeDemoTab === "provenance" && (
+            <div className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-xs overflow-hidden animate-in fade-in duration-150">
+              {/* Header bar */}
+              <div className="h-9 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/60 flex items-center justify-between px-3.5 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[color:var(--state-success)]" />
+                  <span className="font-mono text-[10px] text-[color:var(--text-muted)]">
+                    empirical-article-ot10 / results.tex
+                  </span>
+                </div>
+                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  Provenance Gate: 5/5 PASSED
                 </span>
               </div>
-              <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                Provenance Gate: 5/5 PASSED
-              </span>
-            </div>
 
-            {/* Symmetrical Two-Pane Body */}
-            <div className="grid md:grid-cols-12">
-              {/* Left Column: Manuscript Draft */}
-              <div className="md:col-span-7 p-5 border-b md:border-b-0 md:border-r border-[color:var(--border-subtle)] flex flex-col justify-between">
-                <div>
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] block mb-1.5">
-                    Manuscript Draft — Section 3.2: Efficacy Metrics
-                  </span>
-                  <div className="space-y-2.5 text-xs text-[color:var(--text-primary)] leading-relaxed">
-                    <p>
-                      High-throughput genomic screening revealed that targeted nucleotide modifications achieved
-                      superior fidelity over traditional endonucleases, with significant reduction in unintended cleavage{" "}
-                      <button
-                        type="button"
-                        onClick={() => setActiveCitation(1)}
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-bold text-[11px] transition-all cursor-pointer ${
-                          activeCitation === 1
-                            ? "bg-[color:var(--accent)] text-white shadow-2xs"
-                            : "bg-[color:var(--accent-subtle)] text-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-white"
-                        }`}
-                      >
-                        [1] Nature Biotech 2024
-                      </button>
-                      .
-                    </p>
-                    <p>
-                      Longitudinal assessment confirmed stable heritability in stem cell repopulation models without
-                      observable off-target translocations{" "}
-                      <button
-                        type="button"
-                        onClick={() => setActiveCitation(2)}
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-bold text-[11px] transition-all cursor-pointer ${
-                          activeCitation === 2
-                            ? "bg-[color:var(--state-info)] text-white shadow-2xs"
-                            : "bg-[color:var(--state-info-subtle)] text-[color:var(--state-info)] hover:bg-[color:var(--state-info)] hover:text-white"
-                        }`}
-                      >
-                        [2] Cell Stem Cell 2023
-                      </button>
-                      , establishing clinical viability.
-                    </p>
+              {/* Symmetrical Two-Pane Body */}
+              <div className="grid md:grid-cols-12">
+                {/* Left Column: Manuscript Draft */}
+                <div className="md:col-span-7 p-5 border-b md:border-b-0 md:border-r border-[color:var(--border-subtle)] flex flex-col justify-between">
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] block mb-1.5">
+                      Manuscript Draft — Section 3.2: Efficacy Metrics
+                    </span>
+                    <div className="space-y-2.5 text-xs text-[color:var(--text-primary)] leading-relaxed">
+                      <p>
+                        High-throughput genomic screening revealed that targeted nucleotide modifications achieved
+                        superior fidelity over traditional endonucleases, with significant reduction in unintended cleavage{" "}
+                        <button
+                          type="button"
+                          onClick={() => setActiveCitation(1)}
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-bold text-[11px] transition-all cursor-pointer ${
+                            activeCitation === 1
+                              ? "bg-[color:var(--accent)] text-white shadow-2xs"
+                              : "bg-[color:var(--accent-subtle)] text-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-white"
+                          }`}
+                        >
+                          [1] Nature Biotech 2024
+                        </button>
+                        .
+                      </p>
+                      <p>
+                        Longitudinal assessment confirmed stable heritability in stem cell repopulation models without
+                        observable off-target translocations{" "}
+                        <button
+                          type="button"
+                          onClick={() => setActiveCitation(2)}
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-bold text-[11px] transition-all cursor-pointer ${
+                            activeCitation === 2
+                              ? "bg-[color:var(--state-info)] text-white shadow-2xs"
+                              : "bg-[color:var(--state-info-subtle)] text-[color:var(--state-info)] hover:bg-[color:var(--state-info)] hover:text-white"
+                          }`}
+                        >
+                          [2] Cell Stem Cell 2023
+                        </button>
+                        , establishing clinical viability.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-3.5 border-t border-[color:var(--border-subtle)] flex items-center justify-between text-[10px] text-[color:var(--text-muted)]">
+                    <span>Citation Resolver: Active</span>
+                    <span className="text-[color:var(--accent)] font-medium">Click tags above to inspect proof</span>
                   </div>
                 </div>
 
-                <div className="pt-3.5 border-t border-[color:var(--border-subtle)] flex items-center justify-between text-[10px] text-[color:var(--text-muted)]">
-                  <span>Citation Resolver: Active</span>
-                  <span className="text-[color:var(--accent)] font-medium">Click tags above to inspect proof</span>
+                {/* Right Column: Knowledge Vault Inspector */}
+                <div className="md:col-span-5 p-5 bg-[color:var(--surface-inset)]/30 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] flex items-center gap-1.5">
+                        <SearchAuditIcon className="w-3.5 h-3.5 text-[color:var(--accent)]" />
+                        <span>Knowledge Vault Provenance Inspector</span>
+                      </span>
+                    </div>
+
+                    {activeCitation && SAMPLE_CITATIONS[activeCitation] ? (
+                      <div className="space-y-2.5 animate-in fade-in duration-150">
+                        <div className="p-3 rounded-lg bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
+                          <div className="flex items-start justify-between gap-1.5 mb-1">
+                            <span className="font-bold text-xs text-[color:var(--text-primary)] leading-snug">
+                              {SAMPLE_CITATIONS[activeCitation].source}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 border ${SAMPLE_CITATIONS[activeCitation].badgeColor}`}>
+                              {SAMPLE_CITATIONS[activeCitation].confidence}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-[color:var(--text-secondary)] mb-2">
+                            {SAMPLE_CITATIONS[activeCitation].journal}
+                          </p>
+
+                          <div className="p-2 rounded bg-[color:var(--surface-inset)]/60 border-l-2 border-[color:var(--accent)]">
+                            <span className="text-[8px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] block mb-0.5">
+                              Verbatim Vault Evidence:
+                            </span>
+                            <p className="text-[11px] italic text-[color:var(--text-primary)] leading-relaxed">
+                              "{SAMPLE_CITATIONS[activeCitation].quote}"
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300">
+                          <span className="font-bold text-xs">✓</span>
+                          <span className="font-semibold text-[10px]">
+                            ZERO Hallucination Confirmed — Provenance Verified
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="pt-3 border-t border-[color:var(--border-subtle)]">
+                    <button
+                      type="button"
+                      onClick={() => openAuth("signup", "OT-10")}
+                      className="w-full py-1.5 rounded-md bg-[color:var(--accent)] text-white text-[11px] font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
+                    >
+                      Run Citation Audit on Your Sources →
+                    </button>
+                  </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Right Column: Knowledge Vault Inspector */}
-              <div className="md:col-span-5 p-5 bg-[color:var(--surface-inset)]/30 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] flex items-center gap-1">
-                      <span>🔍</span>
-                      <span>Knowledge Vault Provenance Inspector</span>
-                    </span>
-                  </div>
-
-                  {activeCitation && SAMPLE_CITATIONS[activeCitation] ? (
-                    <div className="space-y-2.5 animate-in fade-in duration-150">
-                      <div className="p-3 rounded-lg bg-[color:var(--surface-raised)] border border-[color:var(--border-subtle)]">
-                        <div className="flex items-start justify-between gap-1.5 mb-1">
-                          <span className="font-bold text-xs text-[color:var(--text-primary)] leading-snug">
-                            {SAMPLE_CITATIONS[activeCitation].source}
-                          </span>
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 border ${SAMPLE_CITATIONS[activeCitation].badgeColor}`}>
-                            {SAMPLE_CITATIONS[activeCitation].confidence}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-[color:var(--text-secondary)] mb-2">
-                          {SAMPLE_CITATIONS[activeCitation].journal}
-                        </p>
-
-                        <div className="p-2 rounded bg-[color:var(--surface-inset)]/60 border-l-2 border-[color:var(--accent)]">
-                          <span className="text-[8px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] block mb-0.5">
-                            Verbatim Vault Evidence:
-                          </span>
-                          <p className="text-[11px] italic text-[color:var(--text-primary)] leading-relaxed">
-                            "{SAMPLE_CITATIONS[activeCitation].quote}"
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300">
-                        <span className="font-bold text-xs">✓</span>
-                        <span className="font-semibold text-[10px]">
-                          ZERO Hallucination Confirmed — Provenance Verified
-                        </span>
-                      </div>
-                    </div>
-                  ) : null}
+          {/* TAB 2: LITERATURE SYNTHESIS MATRIX */}
+          {activeDemoTab === "matrix" && (
+            <div className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-xs overflow-hidden animate-in fade-in duration-150">
+              <div className="h-9 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/60 flex items-center justify-between px-3.5 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[color:var(--accent)]" />
+                  <span className="font-mono text-[10px] text-[color:var(--text-muted)]">
+                    vault / literature-matrix / synthesis-grid.tsv
+                  </span>
                 </div>
-
-                <div className="pt-3 border-t border-[color:var(--border-subtle)]">
+                <span className="text-[9px] font-mono text-[color:var(--text-secondary)]">
+                  3 Papers Synthesized
+                </span>
+              </div>
+              <div className="overflow-x-auto p-4">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-[color:var(--border-subtle)] text-[10px] uppercase font-bold text-[color:var(--text-muted)] tracking-wider">
+                      <th className="pb-2 font-mono">Study / Author</th>
+                      <th className="pb-2">Methodology</th>
+                      <th className="pb-2">Sample / Corpus</th>
+                      <th className="pb-2">Key Findings</th>
+                      <th className="pb-2 text-right">BibTeX Key</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[color:var(--border-subtle)] text-[11px]">
+                    <tr>
+                      <td className="py-2.5 font-semibold text-[color:var(--text-primary)]">Anzalone et al. (2024)</td>
+                      <td className="py-2.5 text-[color:var(--text-secondary)]">Targeted base editing</td>
+                      <td className="py-2.5 font-mono text-[10px] text-[color:var(--text-muted)]">N=18 Macaca mulatta</td>
+                      <td className="py-2.5 text-[color:var(--text-secondary)]">4.2x translocation reduction vs Cas9 (p&lt;0.001)</td>
+                      <td className="py-2.5 text-right font-mono text-[10px] text-[color:var(--accent)]">@anzalone2024</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 font-semibold text-[color:var(--text-primary)]">Gaudelli et al. (2023)</td>
+                      <td className="py-2.5 text-[color:var(--text-secondary)]">Stem cell prime editing</td>
+                      <td className="py-2.5 font-mono text-[10px] text-[color:var(--text-muted)]">Human CD34+ xenografts</td>
+                      <td className="py-2.5 text-[color:var(--text-secondary)]">Stable conversion without genomic rearrangement</td>
+                      <td className="py-2.5 text-right font-mono text-[10px] text-[color:var(--accent)]">@gaudelli2023</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 font-semibold text-[color:var(--text-primary)]">Newby et al. (2022)</td>
+                      <td className="py-2.5 text-[color:var(--text-secondary)]">In vivo AAV delivery</td>
+                      <td className="py-2.5 font-mono text-[10px] text-[color:var(--text-muted)]">Mouse CNS / liver models</td>
+                      <td className="py-2.5 text-[color:var(--text-secondary)]">Durability sustained through 12-month endpoints</td>
+                      <td className="py-2.5 text-right font-mono text-[10px] text-[color:var(--accent)]">@newby2022</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div className="pt-3.5 mt-2 border-t border-[color:var(--border-subtle)] flex items-center justify-between">
+                  <span className="text-[10px] text-[color:var(--text-muted)] font-mono">Literature Matrix auto-extracts empirical parameters from vault PDFs</span>
                   <button
                     type="button"
                     onClick={() => openAuth("signup", "OT-10")}
-                    className="w-full py-1.5 rounded-md bg-[color:var(--accent)] text-white text-[11px] font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
+                    className="px-3 py-1 rounded bg-[color:var(--accent)] text-white text-[10.5px] font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
                   >
-                    Run Citation Audit on Your Sources →
+                    Generate Matrix for Your Vault →
                   </button>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* TAB 3: PRE-SUBMISSION AUDIT */}
+          {activeDemoTab === "audit" && (
+            <div className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] shadow-xs overflow-hidden animate-in fade-in duration-150">
+              <div className="h-9 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/60 flex items-center justify-between px-3.5 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="font-mono text-[10px] text-[color:var(--text-muted)]">
+                    audit / pre-submission-report.json
+                  </span>
+                </div>
+                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  Ready for Submission
+                </span>
+              </div>
+              <div className="p-5 grid sm:grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/40">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs text-[color:var(--text-primary)]">Citation Grounding</span>
+                    <span className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400">100% MATCH</span>
+                  </div>
+                  <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
+                    All 38 factual assertions are mapped to verbatim indexed passages in the Knowledge Vault.
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/40">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs text-[color:var(--text-primary)]">Paraphrase Drift Gating</span>
+                    <span className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400">DELTA: 0.14</span>
+                  </div>
+                  <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
+                    Zero semantic drift detected between source evidence conclusions and drafted prose.
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/40">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs text-[color:var(--text-primary)]">Bibliographic Recency</span>
+                    <span className="text-[9px] font-mono font-bold text-blue-600 dark:text-blue-400">92% &lt; 3 YRS</span>
+                  </div>
+                  <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
+                    Literature baseline prioritizes high-impact peer-reviewed studies published 2022–2025.
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)]/40">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs text-[color:var(--text-primary)]">Disclosures & Rubric</span>
+                    <span className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400">VERIFIED</span>
+                  </div>
+                  <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
+                    Methods reproducibility disclosures, statistical power calculations, and funding declarations verified.
+                  </p>
+                </div>
+              </div>
+              <div className="px-5 pb-4">
+                <button
+                  type="button"
+                  onClick={() => openAuth("signup", "OT-10")}
+                  className="w-full py-1.5 rounded-md bg-[color:var(--accent)] text-white text-[11px] font-bold hover:bg-[color:var(--accent-hover)] transition-colors cursor-pointer"
+                >
+                  Run 10-Point Audit on Manuscript →
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* THREE SCIENTIFIC GUARANTEES — CLEAN SYMMETRICAL ROW */}
@@ -560,7 +770,9 @@ export default function ScholarCoreLanding({
           <div className="grid md:grid-cols-3 gap-3.5">
             <div className="p-5 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex flex-col justify-between">
               <div>
-                <span className="text-xl mb-2 block">🛡️</span>
+                <div className="w-8 h-8 rounded-lg bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-secondary)] mb-3">
+                  <ShieldLockIcon className="w-4 h-4" />
+                </div>
                 <h3 className="font-bold text-xs text-[color:var(--text-primary)] mb-1">
                   Zero Document Storage
                 </h3>
@@ -572,7 +784,9 @@ export default function ScholarCoreLanding({
 
             <div className="p-5 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex flex-col justify-between">
               <div>
-                <span className="text-xl mb-2 block">🎯</span>
+                <div className="w-8 h-8 rounded-lg bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-secondary)] mb-3">
+                  <CheckBadgeIcon className="w-4 h-4" />
+                </div>
                 <h3 className="font-bold text-xs text-[color:var(--text-primary)] mb-1">
                   Evidence-Gated Drafting
                 </h3>
@@ -584,7 +798,9 @@ export default function ScholarCoreLanding({
 
             <div className="p-5 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex flex-col justify-between">
               <div>
-                <span className="text-xl mb-2 block">☁️</span>
+                <div className="w-8 h-8 rounded-lg bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-secondary)] mb-3">
+                  <CloudServerIcon className="w-4 h-4" />
+                </div>
                 <h3 className="font-bold text-xs text-[color:var(--text-primary)] mb-1">
                   Cloud Drive & Local Privacy
                 </h3>
