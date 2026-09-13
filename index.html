@@ -14,22 +14,14 @@
 
     <!-- Matches the browser chrome to the app surface in both themes.
          Values are --surface-canvas from src/index.css. -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#FAF9F7" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F7F5F0" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#191816" />
 
-    <!-- Inter only.
-         Playfair Display and Rajdhani were dropped here when the design
-         direction retired both faces (docs/06-decisions/60-DESIGN-DIRECTION.md
-         §3.5): --font-serif and --font-display now alias the sans stack, so
-         continuing to fetch them cost two font families of bandwidth on every
-         load while changing nothing on screen.
-         JetBrains Mono is deliberately not fetched — --font-mono falls back to
-         the platform's own monospace, which is already installed everywhere
-         and costs nothing. -->
+    <!-- Typography: Inter for sans-serif structure, JetBrains Mono for monospace technical data -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
 

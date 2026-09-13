@@ -79,7 +79,10 @@ export function RequireAuth() {
   if (session.status === "loading") return <SessionBoundaryFallback status="loading" />;
   if (session.status === "unconfigured") return <SessionBoundaryFallback status="unconfigured" />;
   if (session.status === "signed-out") {
-    if (location.pathname === "/projects" || location.pathname === "/" || !location.pathname) {
+    if (location.pathname === "/projects") {
+      return <Outlet />;
+    }
+    if (location.pathname === "/" || !location.pathname) {
       return <Navigate to="/" replace />;
     }
     const redirect = encodeURIComponent(location.pathname + location.search);

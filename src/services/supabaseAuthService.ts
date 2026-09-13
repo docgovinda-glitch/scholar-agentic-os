@@ -270,13 +270,31 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
     .from("profiles")
     .select("full_name, phone, affiliation, account_status")
     .eq("id", signInData.user.id)
-    .single();
+    .maybeSingle();
 
-  if (profileError || !profile) {
-    return { success: false, error: "Scholar profile not found." };
+  let activeProfile = profile;
+  if (!activeProfile && !profileError) {
+    const defaultUsername = signInData.user.email?.split("@")[0] || "researcher";
+    const { data: createdProfile } = await supabase
+      .from("profiles")
+      .insert({
+        id: signInData.user.id,
+        username: defaultUsername,
+        full_name: "",
+        phone: "",
+        phone_country_code: "",
+        account_status: "active",
+      })
+      .select("full_name, phone, affiliation, account_status")
+      .maybeSingle();
+    activeProfile = createdProfile;
   }
 
-  if (profile.account_status !== 'active') {
+  if (!activeProfile) {
+    return { success: false, error: "Scholar profile could not be loaded." };
+  }
+
+  if (activeProfile.account_status !== 'active') {
     const statusMessages: Record<string, string> = {
       'restricted': 'Your account has been restricted. Please contact support.',
       'suspended': 'Your account has been suspended. Please contact support.',
@@ -428,14 +446,44 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
     return { success: false, error: "Not signed in." };
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("profiles")
     .select("username, full_name, phone, phone_country_code, phone_e164, affiliation, user_type, education_level")
     .eq("id", userData.user.id)
-    .single();
+    .maybeSingle();
+
+  if (!data && !error) {
+    const defaultUsername = userData.user.email?.split("@")[0] || "researcher";
+    const { data: created } = await supabase
+      .from("profiles")
+      .insert({
+        id: userData.user.id,
+        username: defaultUsername,
+        full_name: "",
+        phone: "",
+        phone_country_code: "",
+        account_status: "active",
+      })
+      .select("username, full_name, phone, phone_country_code, phone_e164, affiliation, user_type, education_level")
+      .maybeSingle();
+    data = created;
+  }
 
   if (error || !data) {
-    return { success: false, error: error?.message ?? "Could not load your profile." };
+    return {
+      success: true,
+      profile: {
+        username: userData.user.email?.split("@")[0] || "researcher",
+        fullName: "",
+        email: userData.user.email ?? "",
+        phone: "",
+        phoneCountryCode: "",
+        phoneE164: "",
+        affiliation: "",
+        userType: "",
+        educationLevel: "",
+      },
+    };
   }
   return {
     success: true,

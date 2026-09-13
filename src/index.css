@@ -51,161 +51,148 @@
 :root {
   color-scheme: light;
 
-  /* Surfaces — lightest is the page, each step down is one elevation up.
-     Counter-intuitive but correct for light themes: raised surfaces are
-     lighter than the canvas they sit on. */
-  --surface-canvas:  #FAF9F7; /* page ground — warm paper */
+  /* Surfaces — Sand Off-White baseline (warm, low-strain academic paper ground) */
+  --surface-canvas:  #F7F5F0; /* page ground — Sand Off-White */
   --surface-raised:  #FFFFFF; /* cards, panels, popovers */
-  --surface-inset:   #F1EFEA; /* wells, nested panels, input backgrounds */
-  --surface-sunken:  #E9E6DF; /* deepest recess, track backgrounds */
-  --surface-hover:   #F3F1EC; /* hover on an otherwise transparent row */
+  --surface-inset:   #EFECE6; /* wells, nested panels, input backgrounds */
+  --surface-sunken:  #E5E1D6; /* deepest recess, track backgrounds */
+  --surface-hover:   #EFECE6; /* hover on an otherwise transparent row */
 
-  /* Borders — four weights, none of them glowing.
-     The split between panel edges and control edges is deliberate and is a
-     WCAG distinction, not a stylistic one. 1.4.11 requires 3:1 for "visual
-     information required to identify user interface components" — an input's
-     boundary qualifies; the divider between two panels does not. Holding
-     every border to 3:1 would put a mid-grey rule around all 674 panel edges
-     in this codebase, which is exactly the heaviness this direction removes.
-     Holding none of them to it silently fails form controls. */
-  --border-subtle:   #EAE6DE; /* dividers inside a panel — decorative */
-  --border-default:  #DED9CF; /* panel and card edges — decorative */
-  --border-control:  #918978; /* input/button edges — 3:1 floor, verified */
-  --border-strong:   #7D7565; /* emphasis and hover on a control — 3:1 floor */
+  /* Borders — sharp structural Charcoal borders (#334155) */
+  --border-subtle:   #D1CBC0; /* dividers inside a panel */
+  --border-default:  #334155; /* panel and card edges — Charcoal */
+  --border-control:  #334155; /* input/button edges — 3:1 floor, verified */
+  --border-strong:   #1E293B; /* emphasis and hover on a control — 3:1 floor */
 
-  /* Text — all four verified against canvas, raised, and inset. */
-  --text-primary:    #1C1B19; /* 16.1:1 on canvas — body and headings */
-  --text-secondary:  #55514B; /* 7.6:1 on canvas — labels, secondary copy */
-  --text-muted:      #6E6960; /* 5.3:1 on canvas — hints, metadata, timestamps */
-  --text-inverse:    #FAF9F7; /* on accent / on inverted surfaces */
+  /* Text — high contrast Charcoal hierarchy */
+  --text-primary:    #1E293B; /* deep crisp Charcoal body and headings */
+  --text-secondary:  #334155; /* Charcoal labels, secondary copy */
+  --text-muted:      #475569; /* hints, metadata, timestamps */
+  --text-inverse:    #F7F5F0; /* Sand Off-White on accent / inverted surfaces */
 
-  /* Accent — one, used sparingly: interactive text, selected state, focus.
-     A muted clay, not a saturated blue. Two values because a single one
-     cannot both pass 4.5:1 as text on paper and read as a fill: --accent is
-     the text/icon value, --accent-solid the fill behind --text-inverse. */
-  --accent:          #A8452A; /* 5.6:1 on canvas — links, active nav, icons */
-  --accent-hover:    #8C3720; /* 7.6:1 — hover/active on the above */
-  --accent-solid:    #B44D28; /* button fill; pairs with --text-inverse */
-  --accent-subtle:   #F7EDE8; /* tinted background for selected rows/chips */
-  --accent-border:   #E3C9BC; /* border on a tinted surface */
+  /* Accent — Scientific Monochrome (#334155 Charcoal, zero orange) */
+  --accent:          #334155; /* Charcoal — interactive text, nav, wireframe icons */
+  --accent-hover:    #1E293B; /* Deep Charcoal hover/active */
+  --accent-solid:    #334155; /* Solid Charcoal button fill; pairs with --text-inverse */
+  --accent-subtle:   #EFECE6; /* Subtle Sand tint for selected rows */
+  --accent-border:   #334155; /* Charcoal border on selected surface */
 
-  /* State — conventional, deliberately not brand-coloured (ADR §3.4).
-     Each has a text-weight value (AA on light surfaces) and a subtle fill. */
-  --state-success:        #1F6F43;
-  --state-success-subtle: #E7F2EB;
-  --state-warning:        #8A5A08;
-  --state-warning-subtle: #FBF0DC;
-  --state-danger:         #A32B22;
-  --state-danger-subtle:  #FBEAE8;
-  --state-info:           #1F5C8A;
-  --state-info-subtle:    #E8F1F8;
+  /* State — Monochromatic high-contrast technical state definitions */
+  --state-success:        #334155;
+  --state-success-subtle: #EFECE6;
+  --state-warning:        #334155;
+  --state-warning-subtle: #EFECE6;
+  --state-danger:         #1E293B;
+  --state-danger-subtle:  #EFECE6;
+  --state-info:           #334155;
+  --state-info-subtle:    #EFECE6;
 
-  /* Elevation — soft, warm-tinted, low-spread. No glow. */
-  --shadow-sm: 0 1px 2px rgba(41, 37, 31, 0.05);
-  --shadow-md: 0 2px 8px rgba(41, 37, 31, 0.07), 0 1px 2px rgba(41, 37, 31, 0.04);
-  --shadow-lg: 0 8px 28px rgba(41, 37, 31, 0.10), 0 2px 6px rgba(41, 37, 31, 0.05);
+  /* Elevation — zero drop shadows for sharp technical flatness */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
 
-  /* Motion — state-driven only, every duration under 250ms.
-     Declared here rather than in @theme: Tailwind v4's @theme only recognises
-     known token namespaces (--font-*, --color-*, --spacing-*) and silently
-     drops anything else, so --motion-* would resolve to an empty string. */
+  /* Motion — state-driven only, fast */
   --motion-fast: 120ms;
   --motion-base: 180ms;
   --motion-slow: 220ms;
   --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  /* Geometric Sharpness — 0px radius app-wide */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
 }
 
 /* ----------------------------------------------------------------------------
    3. SEMANTIC COLOUR — DARK
-
-   Applied by system preference, and overridden in both directions by an
-   explicit [data-theme] on the root so a user's toggle always wins.
-
-   Warm dark, matching the light theme's hue family — a neutral-grey dark
-   theme beside a warm light theme reads as two different products.
    ------------------------------------------------------------------------- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --surface-canvas:  #191816;
-    --surface-raised:  #232120;
-    --surface-inset:   #2B2927;
-    --surface-sunken:  #121110;
-    --surface-hover:   #2F2C29;
+    --surface-canvas:  #0F172A;
+    --surface-raised:  #1E293B;
+    --surface-inset:   #243044;
+    --surface-sunken:  #0B0F19;
+    --surface-hover:   #26344B;
 
-    --border-subtle:   #302D2A;
-    --border-default:  #3E3A35;
-    --border-control:  #7E766A;
-    --border-strong:   #948B7D;
+    --border-subtle:   #334155;
+    --border-default:  #475569;
+    --border-control:  #94A3B8;
+    --border-strong:   #CBD5E1;
 
-    --text-primary:    #F4F2EE; /* 15.4:1 on canvas */
-    --text-secondary:  #B6B0A6; /* 7.6:1 on canvas */
-    --text-muted:      #9C958B; /* 5.9:1 on canvas */
-    --text-inverse:    #191816;
+    --text-primary:    #F8FAFC;
+    --text-secondary:  #E2E8F0;
+    --text-muted:      #94A3B8;
+    --text-inverse:    #0F172A;
 
-    --accent:          #E08B67; /* 7.4:1 on canvas */
-    --accent-hover:    #EDA184;
-    --accent-solid:    #D2724A;
-    --accent-subtle:   #2E211B;
-    --accent-border:   #4A3227;
+    --accent:          #F1F5F9;
+    --accent-hover:    #FFFFFF;
+    --accent-solid:    #E2E8F0;
+    --accent-subtle:   #1E293B;
+    --accent-border:   #475569;
 
-    --state-success:        #6FD79B;
-    --state-success-subtle: #17281E;
-    --state-warning:        #E3B15C;
-    --state-warning-subtle: #2B2214;
-    --state-danger:         #F08C82;
-    --state-danger-subtle:  #2E1A18;
-    --state-info:           #7FBCE8;
-    --state-info-subtle:    #16232E;
+    --state-success:        #F1F5F9;
+    --state-success-subtle: #1E293B;
+    --state-warning:        #F1F5F9;
+    --state-warning-subtle: #1E293B;
+    --state-danger:         #FFFFFF;
+    --state-danger-subtle:  #1E293B;
+    --state-info:           #F1F5F9;
+    --state-info-subtle:    #1E293B;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.42), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+
+    --radius-sm: 0px;
+    --radius-md: 0px;
+    --radius-lg: 0px;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --surface-canvas:  #191816;
-  --surface-raised:  #232120;
-  --surface-inset:   #2B2927;
-  --surface-sunken:  #121110;
-  --surface-hover:   #2F2C29;
+  --surface-canvas:  #0F172A;
+  --surface-raised:  #1E293B;
+  --surface-inset:   #243044;
+  --surface-sunken:  #0B0F19;
+  --surface-hover:   #26344B;
 
-  --border-subtle:   #302D2A;
-  --border-default:  #3E3A35;
-  --border-control:  #7E766A;
-  --border-strong:   #948B7D;
+  --border-subtle:   #334155;
+  --border-default:  #475569;
+  --border-control:  #94A3B8;
+  --border-strong:   #CBD5E1;
 
-  --text-primary:    #F4F2EE;
-  --text-secondary:  #B6B0A6;
-  --text-muted:      #9C958B;
-  --text-inverse:    #191816;
+  --text-primary:    #F8FAFC;
+  --text-secondary:  #E2E8F0;
+  --text-muted:      #94A3B8;
+  --text-inverse:    #0F172A;
 
-  --accent:          #E08B67;
-  --accent-hover:    #EDA184;
-  --accent-solid:    #D2724A;
-  --accent-subtle:   #2E211B;
-  --accent-border:   #4A3227;
+  --accent:          #F1F5F9;
+  --accent-hover:    #FFFFFF;
+  --accent-solid:    #E2E8F0;
+  --accent-subtle:   #1E293B;
+  --accent-border:   #475569;
 
-  --state-success:        #6FD79B;
-  --state-success-subtle: #17281E;
-  --state-warning:        #E3B15C;
-  --state-warning-subtle: #2B2214;
-  --state-danger:         #F08C82;
-  --state-danger-subtle:  #2E1A18;
-  --state-info:           #7FBCE8;
-  --state-info-subtle:    #16232E;
+  --state-success:        #F1F5F9;
+  --state-success-subtle: #1E293B;
+  --state-warning:        #F1F5F9;
+  --state-warning-subtle: #1E293B;
+  --state-danger:         #FFFFFF;
+  --state-danger-subtle:  #1E293B;
+  --state-info:           #F1F5F9;
+  --state-info-subtle:    #1E293B;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.42), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
 }
 
 /* ----------------------------------------------------------------------------
