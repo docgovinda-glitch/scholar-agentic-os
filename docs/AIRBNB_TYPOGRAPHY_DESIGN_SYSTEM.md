@@ -41,7 +41,7 @@ The Scholar Workspace design system pivots away from high-contrast brutalist aes
 ## 4. Modal & Dialog Patterns
 
 ### Delete Confirmation Dialog
-- **Affordance**: Each project card displays an accessible circular delete trigger (`w-8 h-8 rounded-full border border-neutral-200/90 text-neutral-400 hover:text-red-600 hover:bg-red-50/70`).
+- **Card Affordance**: Replaced the previous trash can icon with a calm, tactile pill button that strictly writes **`Delete`** in red text (`text-red-600 font-semibold bg-red-50 hover:bg-red-100 border border-red-200 rounded-full px-3 py-1 font-sans`). Zero icons are used.
 - **Typography-Driven Layout**: Stripped all distracting warning icons to maintain visual calm and eliminate unnecessary visual urgency. Information hierarchy is communicated through pure typography.
 - **Dialog Title**: `Delete Project` (`text-xl font-extrabold text-neutral-900 tracking-tight font-sans`).
 - **Tone & Copy**: Clear, refined academic grammar without ambiguity:
