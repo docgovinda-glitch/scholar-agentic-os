@@ -112,6 +112,7 @@ years later by someone asking "why is it like this?"
 | [`61-CLIENT-CONSOLIDATION.md`](06-decisions/61-CLIENT-CONSOLIDATION.md) | Desk becomes the product and the legacy client retires; records the authentication and ownership gap this surfaced, and how it was closed | **2** |
 | [`62-DATABASE-ACCESS.md`](06-decisions/62-DATABASE-ACCESS.md) | Persistence moves to Supabase's HTTPS Data API; why the direct connection failed four ways, and the RLS this made mandatory | **2** |
 | [`63-ACCESS-MODEL.md`](06-decisions/63-ACCESS-MODEL.md) | Institutionally gated access; withdraws `25` §1.2's account-less path as a revision-1 artifact, and keeps local inference as the thing that carried the privacy promise | **2** |
+| [`64-SCIENTIFIC-MONOCHROME.md`](06-decisions/64-SCIENTIFIC-MONOCHROME.md) | Scientific Monochrome 334 155 design system, PostgREST 406 resolution, and Supabase database synchronization | **2** |
 
 **Rev key** — **2**: rewritten for revision 2 · 1†: revision-1 document with
 revision-2 terminology applied; surface and architecture passages still need a
