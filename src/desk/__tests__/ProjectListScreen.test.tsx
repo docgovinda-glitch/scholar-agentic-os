@@ -156,10 +156,10 @@ describe("the search bar & delete confirmation modal", () => {
     const cancelBtn = within(dialog).getByRole("button", { name: "Cancel" });
     expect(cancelBtn).toBeInTheDocument();
 
-    // Primary action: text "Delete" option in red font, without any logo/icon
+    // Primary action: text "Delete" option in Pinterest red font (#E60023), without any logo/icon
     const confirmDeleteBtn = within(dialog).getByRole("button", { name: "Delete" });
     expect(confirmDeleteBtn).toBeInTheDocument();
-    expect(confirmDeleteBtn).toHaveClass("text-red-600");
+    expect(confirmDeleteBtn).toHaveClass("text-[#E60023]");
     expect(confirmDeleteBtn).toHaveTextContent("Delete");
     expect(confirmDeleteBtn.querySelector("svg")).not.toBeInTheDocument();
   });

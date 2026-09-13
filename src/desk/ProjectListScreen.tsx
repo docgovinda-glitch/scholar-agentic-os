@@ -675,26 +675,26 @@ export default function ProjectListScreen({
               Are you sure you want to delete <span className="font-semibold text-neutral-900">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
             </p>
 
-            {/* Action Buttons: Negative option ("Cancel") and Red "Delete" text action */}
+            {/* Action Buttons: Pinterest-style Cancel & Pinterest Red (#E60023) Delete */}
             <div className="flex items-center justify-end gap-3 pt-1 font-sans">
               <button
                 type="button"
                 disabled={deletingId !== null}
                 onClick={() => setProjectToDelete(null)}
-                className="px-5 py-2.5 rounded-full text-sm font-semibold text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-50 active:bg-neutral-100 transition-all cursor-pointer disabled:opacity-50"
+                className="px-5 py-2.5 rounded-full text-sm font-bold text-neutral-800 bg-[#EFEFEF] hover:bg-[#E2E2E2] active:bg-[#D4D4D4] transition-all cursor-pointer disabled:opacity-50 font-sans"
               >
                 Cancel
               </button>
-              {/* Delete text option in red, without logo/glyph or background box */}
+              {/* Delete text option in iconic Pinterest Red (#E60023) */}
               <button
                 type="button"
                 disabled={deletingId !== null}
                 onClick={handleConfirmDelete}
-                className="px-5 py-2.5 rounded-full text-sm font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 active:bg-red-100 transition-all cursor-pointer disabled:opacity-50 font-sans flex items-center justify-center"
+                className="px-5 py-2.5 rounded-full text-sm font-bold text-[#E60023] hover:text-[#AD081B] hover:bg-[#FFEBEF] active:bg-[#FFD6DE] transition-all cursor-pointer disabled:opacity-50 font-sans flex items-center justify-center"
               >
                 {deletingId ? (
                   <>
-                    <span className="w-3.5 h-3.5 border-2 border-red-600 border-t-transparent rounded-full animate-spin mr-2" />
+                    <span className="w-3.5 h-3.5 border-2 border-[#E60023] border-t-transparent rounded-full animate-spin mr-2" />
                     <span>Deleting...</span>
                   </>
                 ) : (
@@ -785,7 +785,7 @@ function ProjectCard({
             e.preventDefault();
             onDelete(e);
           }}
-          className="absolute top-5 right-5 z-20 px-3 py-1 rounded-full text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 active:bg-red-200 border border-red-200 transition-all cursor-pointer shadow-2xs font-sans"
+          className="absolute top-5 right-5 z-20 px-3 py-1 rounded-full text-xs font-bold text-[#E60023] hover:text-[#AD081B] bg-[#FFEBEF] hover:bg-[#FFD6DE] border border-[#E60023]/20 transition-all cursor-pointer shadow-2xs font-sans"
           title="Delete Project"
           aria-label="Delete Project"
         >
