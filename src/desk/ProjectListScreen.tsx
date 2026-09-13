@@ -741,7 +741,7 @@ function ProjectCard({
       >
         <div>
           {/* Card Top Metadata */}
-          <div className="flex items-center justify-between gap-2 mb-3 pr-8">
+          <div className="flex items-center justify-start gap-2 mb-3 pr-20">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-medium text-neutral-700 bg-neutral-100 border border-neutral-200">
               {typeLabel}
             </span>
@@ -784,13 +784,11 @@ function ProjectCard({
             e.preventDefault();
             onDelete(e);
           }}
-          className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-white/95 sm:bg-white border border-neutral-200/90 text-neutral-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50/70 transition-all flex items-center justify-center cursor-pointer shadow-2xs group-hover:border-neutral-300"
+          className="absolute top-5 right-5 z-20 px-3 py-1 rounded-full text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 active:bg-red-200 border border-red-200 transition-all cursor-pointer shadow-2xs font-sans"
           title="Delete Project"
           aria-label="Delete Project"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
+          Delete
         </button>
       )}
     </div>

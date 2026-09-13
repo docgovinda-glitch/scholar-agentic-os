@@ -36,8 +36,8 @@ import { warmServer } from './services/serverWarmup';
 // Start waking the server before rendering, not after the first user action.
 void warmServer();
 
-// Ensure local development serves fresh assets by unregistering any stale Service Worker and clearing cache storage
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+// Ensure all environments serve fresh assets by unregistering any stale Service Worker and clearing cache storage
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
     for (const registration of registrations) {
       registration.unregister();
