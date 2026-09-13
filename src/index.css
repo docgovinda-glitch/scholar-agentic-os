@@ -18,8 +18,8 @@
    ========================================================================= */
 
 @theme {
-  /* Warm, modern geometric sans-serif inspired by Airbnb: Plus Jakarta Sans & Manrope */
-  --font-sans: "Plus Jakarta Sans", "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Warm, modern geometric sans-serif inspired by Airbnb: Airbnb Cereal, Circular Std, Plus Jakarta Sans */
+  --font-sans: "Airbnb Cereal VF", "Airbnb Cereal", "Circular Std", "Circular", "Plus Jakarta Sans", "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-serif: var(--font-sans);
   --font-display: var(--font-sans);
 

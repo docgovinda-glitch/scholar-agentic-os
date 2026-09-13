@@ -42,13 +42,13 @@ The Scholar Workspace design system pivots away from high-contrast brutalist aes
 
 ### Delete Confirmation Dialog
 - **Affordance**: Each project card displays an accessible circular delete trigger (`w-8 h-8 rounded-full border border-neutral-200/90 text-neutral-400 hover:text-red-600 hover:bg-red-50/70`).
-- **Modal Header**: Prominent red delete/trash icon housed in a soft red rounded circle (`w-12 h-12 rounded-full bg-red-50 border border-red-100 text-red-600`).
-- **Dialog Title**: `Delete Project` (`text-lg font-bold text-neutral-900 tracking-tight`).
+- **Typography-Driven Layout**: Stripped all distracting warning icons to maintain visual calm and eliminate unnecessary visual urgency. Information hierarchy is communicated through pure typography.
+- **Dialog Title**: `Delete Project` (`text-xl font-extrabold text-neutral-900 tracking-tight font-sans`).
 - **Tone & Copy**: Clear, refined academic grammar without ambiguity:
   > *"Are you sure you want to delete \"[Project Title]\"? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone."*
 - **Action Buttons**:
-  - **Negative Option**: Dismiss action labeled strictly **`Cancel`** (`bg-white border border-neutral-300 text-neutral-700 hover:bg-neutral-50 rounded-full`).
-  - **Primary Action**: Destructive action labeled strictly **`Delete`** with zero typos (`bg-red-600 hover:bg-red-700 text-white rounded-full font-semibold`).
+  - **Negative Option**: Dismiss action labeled strictly **`Cancel`** (`bg-white border border-neutral-300 text-neutral-700 hover:bg-neutral-50 rounded-full font-semibold`).
+  - **Primary Action**: Destructive action strictly labeled **`Delete`** written in red color (`text-red-600 font-semibold bg-red-50 hover:bg-red-100 border border-red-200 rounded-full`) with zero icons inside.
 - **Interaction & State**: Supports backdrop click and <kbd>Escape</kbd> dismissal. Employs optimistic UI removal for instantaneous visual responsiveness.
 
 ---

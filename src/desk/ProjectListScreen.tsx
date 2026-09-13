@@ -662,33 +662,26 @@ export default function ProjectListScreen({
           onClick={() => !deletingId && setProjectToDelete(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white border border-neutral-200 p-6 shadow-xl relative text-left animate-in zoom-in-95 duration-150"
+            className="w-full max-w-md rounded-3xl bg-white border border-neutral-200/80 p-7 shadow-2xl relative text-left animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Top Red Delete Icon */}
-            <div className="w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center text-red-600 mb-4">
-              <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </div>
-
-            {/* Title */}
-            <h3 id="delete-modal-title" className="text-lg font-bold text-neutral-900 tracking-tight mb-2 font-sans">
+            {/* Title - Airbnb Cereal / Plus Jakarta Sans Extrabold typography */}
+            <h3 id="delete-modal-title" className="text-xl font-extrabold text-neutral-900 tracking-tight mb-2.5 font-sans">
               Delete Project
             </h3>
 
-            {/* Clear, refined academic grammar */}
-            <p className="text-xs text-neutral-600 leading-relaxed mb-6 font-normal">
+            {/* Sub-label - Clean, neutral academic body text */}
+            <p className="text-sm text-neutral-500 leading-relaxed mb-7 font-normal font-sans">
               Are you sure you want to delete <span className="font-semibold text-neutral-900">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
             </p>
 
-            {/* Action Buttons: Negative ("Cancel") and Red Delete ("Delete") */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            {/* Action Buttons: Negative option ("Cancel") and Red "Delete" text action */}
+            <div className="flex items-center justify-end gap-3 pt-1 font-sans">
               <button
                 type="button"
                 disabled={deletingId !== null}
                 onClick={() => setProjectToDelete(null)}
-                className="px-5 py-2.5 rounded-full text-xs font-semibold text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-50 active:bg-neutral-100 transition-all cursor-pointer disabled:opacity-50"
+                className="px-5 py-2.5 rounded-full text-sm font-semibold text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-50 active:bg-neutral-100 transition-all cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -696,20 +689,15 @@ export default function ProjectListScreen({
                 type="button"
                 disabled={deletingId !== null}
                 onClick={handleConfirmDelete}
-                className="px-6 py-2.5 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
+                className="px-6 py-2.5 rounded-full text-sm font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 active:bg-red-200 border border-red-200 transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center justify-center"
               >
                 {deletingId ? (
                   <>
-                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span className="w-3.5 h-3.5 border-2 border-red-600 border-t-transparent rounded-full animate-spin mr-2" />
                     <span>Deleting...</span>
                   </>
                 ) : (
-                  <>
-                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    <span>Delete</span>
-                  </>
+                  <span>Delete</span>
                 )}
               </button>
             </div>
