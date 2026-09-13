@@ -13,10 +13,12 @@ import "@testing-library/jest-dom/vitest";
 const createProject = vi.fn();
 const listOutputTypes = vi.fn();
 const listProjects = vi.fn();
+const deleteProject = vi.fn();
 vi.mock("../api", () => ({
   createProject: (...a: unknown[]) => createProject(...a),
   listOutputTypes: (...a: unknown[]) => listOutputTypes(...a),
   listProjects: (...a: unknown[]) => listProjects(...a),
+  deleteProject: (...a: unknown[]) => deleteProject(...a),
 }));
 vi.mock("../../services/supabaseClient", () => ({
   getSupabaseClient: () => ({ auth: { signOut: vi.fn() } }),
@@ -112,5 +114,78 @@ describe("the Workshop welcome banner", () => {
 
     await screen.findByText("Initialize your first project");
     expect(screen.queryByText("Welcome to your Scholar Workspace")).not.toBeInTheDocument();
+  });
+});
+
+describe("the search bar & delete confirmation modal", () => {
+  const SAMPLE_PROJECT = {
+    projectId: "proj-101",
+    outputTypeId: "OT-01",
+    answers: { title: "Neural Networks in High-Throughput Genomics" },
+    intakeCompleteness: 0.5,
+    hasDocument: false,
+    gates: [{ id: "G0", status: "signed_off" }],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  it("renders the rounded search projects input", async () => {
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    const searchInput = await screen.findByPlaceholderText("Search projects...");
+    expect(searchInput).toBeInTheDocument();
+    expect(searchInput).toHaveClass("!rounded-full");
+  });
+
+  it("opens custom delete modal with red icon, 'Cancel' and strictly 'Delete' button", async () => {
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    const deleteBtn = await screen.findByRole("button", { name: "Delete Project" });
+    fireEvent.click(deleteBtn);
+
+    // Modal pops up
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Delete Project" })).toBeInTheDocument();
+    expect(within(dialog).getByText(/Are you sure you want to delete/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Neural Networks in High-Throughput Genomics/i)).toBeInTheDocument();
+
+    // Secondary negative option: Cancel
+    const cancelBtn = within(dialog).getByRole("button", { name: "Cancel" });
+    expect(cancelBtn).toBeInTheDocument();
+
+    // Primary action: strictly "Delete"
+    const confirmDeleteBtn = within(dialog).getByRole("button", { name: "Delete" });
+    expect(confirmDeleteBtn).toBeInTheDocument();
+  });
+
+  it("cancels deletion when 'Cancel' is pressed", async () => {
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    const deleteBtn = await screen.findByRole("button", { name: "Delete Project" });
+    fireEvent.click(deleteBtn);
+
+    const cancelBtn = screen.getByRole("button", { name: "Cancel" });
+    fireEvent.click(cancelBtn);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(deleteProject).not.toHaveBeenCalled();
+  });
+
+  it("executes deletion when 'Delete' is pressed", async () => {
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    deleteProject.mockResolvedValue(undefined);
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    const deleteBtn = await screen.findByRole("button", { name: "Delete Project" });
+    fireEvent.click(deleteBtn);
+
+    const confirmDeleteBtn = screen.getByRole("button", { name: "Delete" });
+    fireEvent.click(confirmDeleteBtn);
+
+    expect(deleteProject).toHaveBeenCalledWith("proj-101");
   });
 });

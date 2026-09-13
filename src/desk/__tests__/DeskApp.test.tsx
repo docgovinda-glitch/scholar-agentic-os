@@ -53,9 +53,15 @@ vi.mock("../../services/supabaseClient", () => ({
       signOut: vi.fn(),
     },
     from: () => ({
+      insert: () => ({
+        select: () => ({
+          single: async () => ({ data: { username: "u", full_name: "Scholar" }, error: null }),
+          maybeSingle: async () => ({ data: { username: "u", full_name: "Scholar" }, error: null }),
+        }),
+      }),
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: null, error: null }),
+          maybeSingle: async () => ({ data: { username: "u", full_name: "Scholar", phone: "", affiliation: "", user_type: "student", education_level: "undergraduate", field_of_study: "Science" }, error: null }),
           // Account Settings' getProfile() — a generic empty profile is fine
           // here since these tests are about the nav/routing shell, not the
           // form's own content (that's AccountSettingsScreen's own coverage).

@@ -153,16 +153,65 @@ export default function ProjectListScreen({
     }
   }
 
-  async function handleDelete(projectId: string, e: React.MouseEvent) {
+  const [projectToDelete, setProjectToDelete] = useState<ProjectView | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  function promptDelete(project: ProjectView, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this research project?")) return;
+    e.preventDefault();
+    setProjectToDelete(project);
+  }
+
+  async function handleConfirmDelete() {
+    if (!projectToDelete) return;
+    const targetId = projectToDelete.projectId;
+    setDeletingId(targetId);
     setError(null);
+
+    // Optimistically remove from state so the project card immediately disappears
+    const previousProjects = projects;
+    setProjects((curr) => (curr ? curr.filter((p) => p.projectId !== targetId) : []));
+    setProjectToDelete(null);
+
     try {
-      await deleteProject(projectId);
-      load();
+      if (!targetId.startsWith("demo-")) {
+        await deleteProject(targetId);
+      }
+      // Re-fetch project list to keep in sync with server
+      listProjects()
+        .then((r) => setProjects(r.items))
+        .catch(() => {});
     } catch (e) {
-      setError((e as Error).message);
+      console.error("Failed to delete project:", e);
+      setProjects(previousProjects);
+      setError((e as Error).message || "Could not delete project. Please try again.");
+    } finally {
+      setDeletingId(null);
     }
+  }
+
+  // Close delete modal on Escape key
+  useEffect(() => {
+    if (!projectToDelete) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !deletingId) {
+        setProjectToDelete(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [projectToDelete, deletingId]);
+
+  function getProjectTitle(p: ProjectView | null): string {
+    if (!p) return "Project";
+    return (
+      p.answers?.title?.trim() ||
+      p.answers?.research_question?.trim() ||
+      p.answers?.topic?.trim() ||
+      typeMap.get(p.outputTypeId)?.label ||
+      p.outputTypeId ||
+      "Project"
+    );
   }
 
   async function handleSignOut() {
@@ -469,17 +518,31 @@ export default function ProjectListScreen({
 
                 {/* Search Bar */}
                 {projects && projects.length > 0 && (
-                  <div className="relative w-full sm:w-72">
+                  <div className="relative w-full sm:w-80">
                     <input
                       type="text"
                       placeholder="Search projects..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full rounded-full border border-neutral-200 bg-white pl-9 pr-4 py-2 text-xs font-normal text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400 transition-all shadow-2xs"
+                      className="w-full !rounded-full !border !border-neutral-300/90 !bg-white pl-10 pr-9 py-2.5 text-xs font-normal !text-neutral-900 placeholder:!text-neutral-400 outline-none focus:!ring-2 focus:!ring-neutral-900/15 focus:!border-neutral-400 transition-all shadow-xs"
+                      style={{ borderRadius: "9999px", backgroundColor: "#ffffff" }}
                     />
-                    <svg className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <svg className="w-4 h-4 text-neutral-400 absolute left-3.5 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-3 top-2.5 p-1 rounded-full text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors cursor-pointer"
+                        title="Clear search"
+                        aria-label="Clear search"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -579,7 +642,7 @@ export default function ProjectListScreen({
                       project={p}
                       typeSummary={typeMap.get(p.outputTypeId)}
                       onOpen={() => onOpen(p.projectId)}
-                      onDelete={(e) => handleDelete(p.projectId, e)}
+                      onDelete={(e) => promptDelete(p, e)}
                     />
                   ))}
                 </div>
@@ -588,6 +651,71 @@ export default function ProjectListScreen({
           </>
         )}
       </main>
+
+      {/* Delete Confirmation Modal Pop-up */}
+      {projectToDelete && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => !deletingId && setProjectToDelete(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white border border-neutral-200 p-6 shadow-xl relative text-left animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Red Delete Icon */}
+            <div className="w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center text-red-600 mb-4">
+              <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+
+            {/* Title */}
+            <h3 id="delete-modal-title" className="text-lg font-bold text-neutral-900 tracking-tight mb-2 font-sans">
+              Delete Project
+            </h3>
+
+            {/* Clear, refined academic grammar */}
+            <p className="text-xs text-neutral-600 leading-relaxed mb-6 font-normal">
+              Are you sure you want to delete <span className="font-semibold text-neutral-900">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
+            </p>
+
+            {/* Action Buttons: Negative ("Cancel") and Red Delete ("Delete") */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={deletingId !== null}
+                onClick={() => setProjectToDelete(null)}
+                className="px-5 py-2.5 rounded-full text-xs font-semibold text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-50 active:bg-neutral-100 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingId !== null}
+                onClick={handleConfirmDelete}
+                className="px-6 py-2.5 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
+              >
+                {deletingId ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -647,7 +775,7 @@ function ProjectCard({
         {/* Bottom Technical Progress Indicator */}
         <div className="mt-5 pt-4 border-t border-neutral-100">
           <div className="flex justify-between text-xs font-medium text-neutral-600 mb-2">
-            <span>Workflow completion</span>
+            <span>Workflow Completion</span>
             <span className="font-semibold text-neutral-900">{percent}%</span>
           </div>
           <div className="w-full h-2 rounded-full bg-neutral-100 overflow-hidden">
@@ -662,11 +790,17 @@ function ProjectCard({
       {/* Delete button */}
       {onDelete && (
         <button
-          onClick={onDelete}
-          className="absolute top-4 right-4 z-20 w-7 h-7 rounded-full bg-white border border-neutral-200 text-neutral-400 opacity-0 group-hover:opacity-100 hover:bg-neutral-100 hover:text-red-600 transition-all flex items-center justify-center cursor-pointer shadow-xs"
-          title="Delete Manuscript"
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onDelete(e);
+          }}
+          className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-white/95 sm:bg-white border border-neutral-200/90 text-neutral-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50/70 transition-all flex items-center justify-center cursor-pointer shadow-2xs group-hover:border-neutral-300"
+          title="Delete Project"
+          aria-label="Delete Project"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
         </button>

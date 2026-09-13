@@ -1315,11 +1315,11 @@ export function registerProjectRoutes(app: express.Express, projectLimit: expres
     res.json(projectView(record));
   }));
 
-  app.delete("/api/projects/:id", projectLimit, asyncRoute(async (req, res) => {
+  app.delete("/api/projects/:id", requireAuth, projectLimit, asyncRoute(async (req, res) => {
     const record = await loadOwnedProject(store, req, res);
     if (!record) return;
     await store.delete(record.projectId);
-    res.json({});
+    res.json({ success: true, deleted: record.projectId });
   }));
 
   /**

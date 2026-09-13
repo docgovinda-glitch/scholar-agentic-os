@@ -140,9 +140,10 @@
     --shadow-md: none;
     --shadow-lg: none;
 
-    --radius-sm: 0px;
-    --radius-md: 0px;
-    --radius-lg: 0px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-full: 9999px;
   }
 }
 
@@ -184,9 +185,10 @@
   --shadow-md: none;
   --shadow-lg: none;
 
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
 }
 
 /* ----------------------------------------------------------------------------
@@ -299,30 +301,32 @@ h1, h2, h3, h4, h5, h6 {
 /* Form controls.
    Scoped with :not() escape hatches, as before, so components that
    deliberately render a bare/transparent input are not overridden. */
-input[type="text"]:not(.border-0):not(.bg-transparent),
-input[type="date"]:not(.border-0):not(.bg-transparent),
-input[type="email"]:not(.border-0):not(.bg-transparent),
-input[type="password"]:not(.border-0):not(.bg-transparent),
-input[type="search"]:not(.border-0):not(.bg-transparent),
-input[type="number"]:not(.border-0):not(.bg-transparent),
-input[type="tel"]:not(.border-0):not(.bg-transparent),
-input[type="url"]:not(.border-0):not(.bg-transparent),
-select:not(.border-0):not(.bg-transparent),
-textarea:not(.border-0):not(.bg-transparent) {
-  background-color: var(--surface-raised);
-  border: 1px solid var(--border-control); /* 3:1 — WCAG 1.4.11 */
-  color: var(--text-primary);
-  border-radius: var(--radius-md);
-  transition: border-color var(--motion-base) var(--motion-ease),
-              box-shadow var(--motion-base) var(--motion-ease);
-}
+@layer base {
+  input[type="text"]:not(.border-0):not(.bg-transparent),
+  input[type="date"]:not(.border-0):not(.bg-transparent),
+  input[type="email"]:not(.border-0):not(.bg-transparent),
+  input[type="password"]:not(.border-0):not(.bg-transparent),
+  input[type="search"]:not(.border-0):not(.bg-transparent),
+  input[type="number"]:not(.border-0):not(.bg-transparent),
+  input[type="tel"]:not(.border-0):not(.bg-transparent),
+  input[type="url"]:not(.border-0):not(.bg-transparent),
+  select:not(.border-0):not(.bg-transparent),
+  textarea:not(.border-0):not(.bg-transparent) {
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border-control); /* 3:1 — WCAG 1.4.11 */
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    transition: border-color var(--motion-base) var(--motion-ease),
+                box-shadow var(--motion-base) var(--motion-ease);
+  }
 
-input:not(.border-0):not(.bg-transparent):focus,
-select:not(.border-0):not(.bg-transparent):focus,
-textarea:not(.border-0):not(.bg-transparent):focus {
-  border-color: var(--accent);
-  outline: none;
-  box-shadow: 0 0 0 3px var(--accent-subtle);
+  input:not(.border-0):not(.bg-transparent):focus,
+  select:not(.border-0):not(.bg-transparent):focus,
+  textarea:not(.border-0):not(.bg-transparent):focus {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+  }
 }
 
 ::placeholder {
