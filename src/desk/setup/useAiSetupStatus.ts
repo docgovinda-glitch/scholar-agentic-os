@@ -64,17 +64,23 @@ async function resolveStatus(userId: string): Promise<Exclude<AiSetupStatus, "ch
 }
 
 export function useAiSetupStatus(userId: string | null) {
-  const [status, setStatus] = useState<AiSetupStatus>("checking");
+  const [status, setStatus] = useState<AiSetupStatus>(userId ? "checking" : "ready");
 
   const refresh = useCallback(async () => {
-    if (!userId) return setStatus("checking");
+    if (!userId) {
+      setStatus("ready");
+      return;
+    }
     setStatus(await resolveStatus(userId));
   }, [userId]);
 
   useEffect(() => {
     let active = true;
     void (async () => {
-      if (!userId) return;
+      if (!userId) {
+        if (active) setStatus("ready");
+        return;
+      }
       const next = await resolveStatus(userId);
       if (active) setStatus(next);
     })();

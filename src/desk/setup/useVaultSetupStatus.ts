@@ -28,14 +28,18 @@ function wasSkipped(userId: string): boolean {
 }
 
 export function useVaultSetupStatus(userId: string | null, enabled: boolean) {
-  const [status, setStatus] = useState<VaultSetupStatus>("checking");
+  const [status, setStatus] = useState<VaultSetupStatus>(userId ? "checking" : "done");
 
   useEffect(() => {
     let active = true;
     void (async () => {
       // `enabled` keeps this stage from querying — or flashing — while an
       // earlier stage is still unresolved.
-      if (!userId || !enabled) return;
+      if (!userId) {
+        if (active) setStatus("done");
+        return;
+      }
+      if (!enabled) return;
       if (wasSkipped(userId)) {
         if (active) setStatus("done");
         return;
