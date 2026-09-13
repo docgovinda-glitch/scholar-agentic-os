@@ -34,14 +34,23 @@ import { warmServer } from './services/serverWarmup';
  */
 
 // Start waking the server before rendering, not after the first user action.
-//
-// On Render's free plan the instance idles out after ~15 minutes, and the
-// request that wakes it waits tens of seconds for the container to boot. That
-// cost cannot be removed, but it can be moved off the interaction path: by the
-// time someone has read the page and clicked something, the container has
-// usually finished starting. Fire-and-forget by design — warmServer() resolves
-// to a state and never rejects, so nothing here can block or break rendering.
 void warmServer();
+
+// Ensure local development serves fresh assets by unregistering any stale Service Worker and clearing cache storage
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister();
+    }
+  });
+  if ('caches' in window) {
+    caches.keys().then((names) => {
+      for (const name of names) {
+        caches.delete(name);
+      }
+    });
+  }
+}
 
 const AdminApp = lazy(() => import('./admin/AdminApp.tsx'));
 
