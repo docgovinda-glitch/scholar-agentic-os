@@ -36,13 +36,13 @@ export function SessionBoundaryFallback({ status }: { status: "loading" | "uncon
       <div className="max-w-md text-center">
         <h1 className="text-lg font-semibold text-[color:var(--text-primary)]">Sign-in is not configured</h1>
         <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-          This deployment is missing <code className="font-mono text-xs">VITE_SUPABASE_URL</code> and{" "}
-          <code className="font-mono text-xs">VITE_SUPABASE_ANON_KEY</code>. Until they are set, no one can sign in
+          This deployment is missing <code className="px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-800 text-xs font-medium">VITE_SUPABASE_URL</code> and{" "}
+          <code className="px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-800 text-xs font-medium">VITE_SUPABASE_ANON_KEY</code>. Until they are set, no one can sign in
           and your work cannot be saved.
         </p>
         {/* UX7: say what happened, what it means, and what to do. */}
         <p className="mt-3 text-xs text-[color:var(--text-muted)]">
-          See <code className="font-mono">.env.example</code> for both values.
+          See <code className="px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-800 font-medium">.env.example</code> for both values.
         </p>
       </div>
     </Centered>

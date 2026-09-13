@@ -98,6 +98,11 @@ Database schema and security policies are managed via Supabase:
 SUPABASE_ACCESS_TOKEN=<token> npx supabase db push
 ```
 
+## 🎨 Design System & Typography
+
+Scholar Core features a warm, modern, Airbnb-inspired design system with geometric sans-serif typography (`Plus Jakarta Sans` & `Manrope`), generous leading for academic long-form reading, sentence-case tags, and WCAG AA/AAA certified contrast.
+- **Specification Document**: [`docs/AIRBNB_TYPOGRAPHY_DESIGN_SYSTEM.md`](docs/AIRBNB_TYPOGRAPHY_DESIGN_SYSTEM.md)
+
 ---
 
 ## 📄 License & Attribution

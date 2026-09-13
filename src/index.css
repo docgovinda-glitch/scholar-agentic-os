@@ -18,20 +18,13 @@
    ========================================================================= */
 
 @theme {
-  /* One sans family for everything. The Rajdhani display face and the
-     Playfair serif are withdrawn (ADR §3.5) — headings are this face at a
-     heavier weight, which is what "highly readable" actually requires.
-     --font-serif / --font-display are retained as ALIASES of the sans stack
-     so the 16 + 7 files still carrying `.font-serif` / `.font-display`
-     classNames keep rendering correctly while those call sites are removed
-     incrementally. They are no longer distinct typefaces. */
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* Warm, modern geometric sans-serif inspired by Airbnb: Plus Jakarta Sans & Manrope */
+  --font-sans: "Plus Jakarta Sans", "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: var(--font-sans);
   --font-display: var(--font-sans);
 
-  /* Mono is reserved for genuine code, keys, identifiers, and numeric
-     tabular data — never for chrome labels (ADR §3.5). */
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  /* Monospace is completely stripped and aliased globally to the modern geometric sans */
+  --font-mono: var(--font-sans);
 }
 
 /* ----------------------------------------------------------------------------
@@ -87,21 +80,22 @@
   --state-info:           #334155;
   --state-info-subtle:    #EFECE6;
 
-  /* Elevation — zero drop shadows for sharp technical flatness */
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: none;
+  /* Elevation — soft Airbnb-inspired diffuse ambient elevation */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 
-  /* Motion — state-driven only, fast */
+  /* Motion — state-driven, smooth */
   --motion-fast: 120ms;
   --motion-base: 180ms;
   --motion-slow: 220ms;
   --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Geometric Sharpness — 0px radius app-wide */
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
+  /* Soft modern geometry — approachable rounded curves */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
 }
 
 /* ----------------------------------------------------------------------------
