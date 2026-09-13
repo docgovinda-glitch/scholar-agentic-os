@@ -138,7 +138,7 @@ describe("the search bar & delete confirmation modal", () => {
     expect(searchInput).toHaveClass("!rounded-full");
   });
 
-  it("opens custom delete modal with 'Cancel' button and standalone red trash can glyph icon", async () => {
+  it("opens custom delete modal with 'Cancel' button and red 'Delete' text option without logo", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
@@ -156,11 +156,12 @@ describe("the search bar & delete confirmation modal", () => {
     const cancelBtn = within(dialog).getByRole("button", { name: "Cancel" });
     expect(cancelBtn).toBeInTheDocument();
 
-    // Primary action: standalone red trash glyph button without surrounding pill outline
+    // Primary action: text "Delete" option in red font, without any logo/icon
     const confirmDeleteBtn = within(dialog).getByRole("button", { name: "Delete" });
     expect(confirmDeleteBtn).toBeInTheDocument();
     expect(confirmDeleteBtn).toHaveClass("text-red-600");
-    expect(confirmDeleteBtn.querySelector("svg")).toBeInTheDocument();
+    expect(confirmDeleteBtn).toHaveTextContent("Delete");
+    expect(confirmDeleteBtn.querySelector("svg")).not.toBeInTheDocument();
   });
 
   it("cancels deletion when 'Cancel' is pressed", async () => {
