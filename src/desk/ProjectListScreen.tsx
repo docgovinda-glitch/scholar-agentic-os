@@ -685,19 +685,21 @@ export default function ProjectListScreen({
               >
                 Cancel
               </button>
+              {/* Standalone Red Trash Can Glyph Icon (no background box, no border, no pill outline) */}
               <button
                 type="button"
                 disabled={deletingId !== null}
                 onClick={handleConfirmDelete}
-                className="px-6 py-2.5 rounded-full text-sm font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 active:bg-red-200 border border-red-200 transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center justify-center"
+                className="p-2 text-red-600 hover:text-red-700 hover:opacity-80 active:opacity-60 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center"
+                title="Delete"
+                aria-label="Delete"
               >
                 {deletingId ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-red-600 border-t-transparent rounded-full animate-spin mr-2" />
-                    <span>Deleting...</span>
-                  </>
+                  <span className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <span>Delete</span>
+                  <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
                 )}
               </button>
             </div>
