@@ -300,17 +300,17 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
       'suspended': 'Your account has been suspended. Please contact support.',
       'deleted': 'Your account has been deleted.',
     };
-    const statusMessage = statusMessages[profile.account_status as string] || 'Your account is not active.';
+    const statusMessage = statusMessages[activeProfile.account_status as string] || 'Your account is not active.';
     return { success: false, error: statusMessage };
   }
 
   return {
     success: true,
     profile: {
-      fullName: profile.full_name,
+      fullName: activeProfile.full_name,
       email,
-      phone: profile.phone,
-      affiliation: profile.affiliation,
+      phone: activeProfile.phone,
+      affiliation: activeProfile.affiliation,
     },
   };
 }

@@ -192,3 +192,125 @@ describe("the search bar & delete confirmation modal", () => {
     expect(deleteProject).toHaveBeenCalledWith("proj-101");
   });
 });
+
+describe("dual-pane AI agent interface & navigation sidebar", () => {
+  it("renders the fixed left sidebar with branding, full-width New Project, and vertical navigation", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    const onOpenVault = vi.fn();
+    const onOpenAgents = vi.fn();
+    const onOpenAiAccess = vi.fn();
+    const onOpenAccountSettings = vi.fn();
+
+    const { container } = render(
+      <ProjectListScreen
+        onOpen={vi.fn()}
+        userEmail="scholar@research.edu"
+        onOpenVault={onOpenVault}
+        onOpenAgents={onOpenAgents}
+        onOpenAiAccess={onOpenAiAccess}
+        onOpenAccountSettings={onOpenAccountSettings}
+      />
+    );
+
+    // Sidebar exists as an <aside>
+    const aside = container.querySelector("aside");
+    expect(aside).toBeInTheDocument();
+    expect(aside).toHaveClass("flex-shrink-0");
+
+    // Top Section: branding and full-width "+ New Project" button
+    expect(within(aside!).getByText("Scholar Core")).toBeInTheDocument();
+    const sidebarNewBtn = within(aside!).getByRole("button", { name: /\+.*New Project/i });
+    expect(sidebarNewBtn).toBeInTheDocument();
+    expect(sidebarNewBtn).toHaveClass("w-full");
+
+    // Middle Section: wireframe nav links
+    const vaultBtn = within(aside!).getByRole("button", { name: /Knowledge Vault/i });
+    expect(vaultBtn).toBeInTheDocument();
+    fireEvent.click(vaultBtn);
+    expect(onOpenVault).toHaveBeenCalled();
+
+    const agentsBtn = within(aside!).getByRole("button", { name: /Editorial Agents/i });
+    expect(agentsBtn).toBeInTheDocument();
+    fireEvent.click(agentsBtn);
+    expect(onOpenAgents).toHaveBeenCalled();
+
+    const aiAccessBtn = within(aside!).getByRole("button", { name: /AI Access/i });
+    expect(aiAccessBtn).toBeInTheDocument();
+    fireEvent.click(aiAccessBtn);
+    expect(onOpenAiAccess).toHaveBeenCalled();
+
+    // Bottom Section: Settings & User Profile
+    const settingsBtn = within(aside!).getByRole("button", { name: /Settings/i });
+    expect(settingsBtn).toBeInTheDocument();
+    fireEvent.click(settingsBtn);
+    expect(onOpenAccountSettings).toHaveBeenCalled();
+
+    // UserAccountMenu profile card in sidebar
+    expect(within(aside!).getByText("scholar@research.edu")).toBeInTheDocument();
+  });
+
+  it("supports desktop sidebar collapse and expansion toggle", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    const { container } = render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    const aside = container.querySelector("aside");
+    expect(aside).toHaveClass("w-[260px]");
+
+    // Click collapse icon inside sidebar
+    const collapseBtn = screen.getByRole("button", { name: "Collapse sidebar" });
+    fireEvent.click(collapseBtn);
+
+    // Sidebar has collapsed to w-0
+    expect(aside).toHaveClass("w-0");
+
+    // Expand button is now visible in main header
+    const expandBtn = screen.getByRole("button", { name: "Expand sidebar" });
+    expect(expandBtn).toBeInTheDocument();
+
+    // Click to re-expand sidebar
+    fireEvent.click(expandBtn);
+    expect(aside).toHaveClass("w-[260px]");
+  });
+
+  it("opens mobile drawer and closes on backdrop overlay tap", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    const { container } = render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    // Mobile trigger button
+    const mobileMenuTrigger = screen.getByRole("button", { name: "Open navigation" });
+    fireEvent.click(mobileMenuTrigger);
+
+    // Mobile backdrop overlay appears
+    const backdrop = container.querySelector(".fixed.inset-0.z-40.bg-black\\/40");
+    expect(backdrop).toBeInTheDocument();
+
+    // Tapping backdrop closes mobile drawer
+    fireEvent.click(backdrop!);
+    expect(container.querySelector(".fixed.inset-0.z-40.bg-black\\/40")).not.toBeInTheDocument();
+  });
+
+  it("applies flex-shrink-0 to aside, scholar-scrollbar to main, and supports toggle from top-left main header", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    const { container } = render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    const aside = container.querySelector("aside");
+    const main = container.querySelector("main");
+
+    // flex-shrink-0 on aside prevents sidebar from being crushed
+    expect(aside).toHaveClass("flex-shrink-0");
+    // custom agentic scrollbar and scroll container on main
+    expect(main).toHaveClass("scholar-scrollbar");
+    expect(main).toHaveClass("overflow-y-auto");
+
+    // Click toggle button in the top-left of the main header to collapse
+    const toggleBtn = screen.getByRole("button", { name: "Toggle sidebar" });
+    fireEvent.click(toggleBtn);
+    expect(aside).toHaveClass("w-0");
+
+    // Toggle button now has Expand sidebar label; click to expand
+    const expandBtn = screen.getByRole("button", { name: "Expand sidebar" });
+    fireEvent.click(expandBtn);
+    expect(aside).toHaveClass("w-[260px]");
+  });
+});
+
