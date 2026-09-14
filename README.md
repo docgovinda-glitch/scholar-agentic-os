@@ -90,13 +90,29 @@ npm run build
 
 ---
 
+## 🖥️ Modern Dual-Pane AI Agent Workspace
+Scholar Core implements a ChatGPT/Claude-style dual-pane layout for deep academic research and writing:
+- **Left Navigation Pane (`<aside>`)**: 260px fixed width with `flex-shrink-0`, full-width `+ New Project` button, platform links (Knowledge Vault, Editorial Agents, AI Access), Settings, and anchored multi-account profile menu (`dropUp={true}`).
+- **Desktop Collapsibility**: Toggle between full navigation and distraction-free reading mode (`w-0`) via the aside collapse button or top-left panel toggle icon.
+- **Responsive Mobile Drawer**: Slide-over navigation with an interactive backdrop overlay (`fixed inset-0 z-40 bg-black/40`) for natural tap-to-dismiss.
+- **Custom Agentic Scrollbars**: `.scholar-scrollbar` webkit styling with 6px track and subtle thumb mapped to `var(--theme-fg)/20`.
+- **Pinterest-Inspired Destructive Interactions**: Standalone `#E60023` red text `Delete` buttons on project cards and confirmation modals with clear typography and zero distracting glyphs.
+
+---
+
 ## 📦 Database & Migrations
 
 Database schema and security policies are managed via Supabase:
 ```bash
-# Verify and push migrations to Supabase
-SUPABASE_ACCESS_TOKEN=<token> npx supabase db push
+# Push migrations to the linked Supabase project (project ref: gfjhsijrwodjvkisouzw)
+SUPABASE_ACCESS_TOKEN=<your-personal-access-token> npx supabase db push
+
+# Or authenticate interactively via CLI
+npx supabase login
+npx supabase db push
 ```
+
+---
 
 ## 🎨 Design System & Typography
 

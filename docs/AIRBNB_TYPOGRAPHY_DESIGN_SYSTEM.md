@@ -64,18 +64,50 @@ The Scholar Workspace design system pivots away from high-contrast brutalist aes
 
 ---
 
-## 6. Verification Commands
+## 7. Dual-Pane AI Agent Workspace Architecture
+
+Following the structural paradigms of modern AI interfaces (such as ChatGPT and Claude), the Scholar Workspace employs a clean dual-pane layout designed for focused reading and frictionless workflow orchestration:
+
+### 7.1 Root Layout & Flex Container
+- **Non-Scrolling Full Viewport**: The application container is configured as a full-viewport flexbox (`h-screen w-full flex overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-fg)] font-sans`).
+- **Semantic Color Inheritance**: All surfaces, text, borders, and controls dynamically inherit `--theme-bg` (mapped to `--surface-canvas`) and `--theme-fg` (mapped to `--text-primary`), strictly preserving light/dark mode without hardcoded color values.
+
+### 7.2 Left Navigation Sidebar (`<aside>`)
+- **Fixed Width with Flex-Shrink Protection**: Strictly configured with `w-[260px]` and `flex-shrink-0` on desktop, preventing sidebar crushing or deformation when resizing the browser window.
+- **Top Section**: Anchored Scholar Core icon, workspace indicator, collapse button, and a full-width primary `+ New Project` button.
+- **Middle Section**: Vertical list of platform destinations (`Knowledge Vault`, `Editorial Agents`, `AI Access`) featuring clean wireframe glyphs and `hover:bg-[var(--theme-fg)]/5` interaction states.
+- **Bottom Section**: Anchored `Settings` trigger and the `UserAccountMenu` profile card with `dropUp={true}` and `variant="sidebar"`, ensuring profile settings render cleanly above without overflow clipping.
+- **Visual Separator**: 1px subtle divider `border-r border-[var(--theme-fg)]/15`.
+
+### 7.3 Desktop Collapsibility (`isSidebarOpen`)
+- **Distraction-Free Reading Mode**: Controlled by an `isSidebarOpen` state that dynamically collapses the `w-[260px]` aside to `w-0 border-r-0 overflow-hidden` with a smooth 300ms transition.
+- **Header Toggle Icon Button**: A small panel toggle icon in the top-left of the main content area allows users to collapse or re-expand the sidebar at any point without leaving the reading flow.
+
+### 7.4 Mobile Slide-Over Drawer & Clickable Backdrop
+- **Slide-Over Drawer**: Responsive overlay on smaller screens (`max-width: 768px`) with `w-[260px] fixed inset-y-0 left-0 z-50`.
+- **Clickable Backdrop Overlay**: Semi-transparent blurred backdrop (`fixed inset-0 z-40 bg-black/40 backdrop-blur-xs md:hidden`) enabling users to dismiss the drawer by tapping anywhere outside.
+
+### 7.5 Custom Agentic Scrollbars (`.scholar-scrollbar`)
+- Custom webkit styling eliminates bulky native browser scrollbars in favor of a sleek, unobtrusive agentic aesthetic:
+  - **Track**: Transparent 6px track.
+  - **Thumb**: Rounded pill shape mapped to `color-mix(in srgb, var(--theme-fg) 20%, transparent)`, brightening to `35%` on hover.
+  - **Standard Rule**: `scrollbar-width: thin; scrollbar-color: color-mix(...) transparent;`.
+
+---
+
+## 8. Verification Commands
 
 ```bash
-# Verify WCAG contrast compliance
+# Verify WCAG contrast compliance (82 pairings checked)
 node scripts/verify-contrast.mjs
 
 # Verify CSP hash integrity
 node scripts/verify-csp-hash.mjs
 
-# Run component test suites
+# Run component test suites (including dual-pane, collapse, drawer tests)
 npx vitest run src/desk/__tests__/ScholarCoreLanding.test.tsx src/desk/__tests__/ProjectListScreen.test.tsx src/desk/__tests__/DeskApp.test.tsx
 
 # Production build validation
 npm run build
 ```
+
