@@ -52,32 +52,32 @@ export default function CitationIntegrityReport({ document, project }: CitationI
       </header>
 
       {analyzing ? (
-        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md p-12 flex flex-col items-center justify-center text-center shadow-inner">
-          <Search className="w-10 h-10 text-emerald-500 animate-pulse mb-4" />
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Auditing Manuscript</h3>
-          <p className="text-gray-500 dark:text-gray-400 text-sm max-w-sm mt-2">
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-12 flex flex-col items-center justify-center text-center shadow-[var(--shadow-card)] font-sans">
+          <Search className="w-10 h-10 text-[var(--accent-success)] animate-pulse mb-4" />
+          <h3 className="text-lg font-bold text-[var(--text-primary)] font-sans">Auditing Manuscript</h3>
+          <p className="text-[var(--text-secondary)] text-sm max-w-sm mt-2 font-sans">
             Scanning blocks and verifying citation provenance against your cryptographic signatures...
           </p>
         </div>
       ) : unapprovedCitations.length === 0 ? (
-        <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20 backdrop-blur-md p-8 shadow-xl shadow-emerald-900/5 transition-all">
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-8 shadow-[var(--shadow-card)] transition-all font-sans">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            <div className="w-12 h-12 rounded-full bg-[var(--accent-success)]/10 text-[var(--accent-success)] flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-emerald-900 dark:text-emerald-300 mb-2">
+              <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2 font-sans">
                 100% Provenance Verified
               </h3>
-              <p className="text-emerald-800 dark:text-emerald-200/80 leading-relaxed mb-4">
+              <p className="text-[var(--text-secondary)] leading-relaxed mb-4 text-sm font-sans">
                 The manuscript is clean. We verified {approvedCitationsCount} citations across the document. No fabricated requirements, no unapproved manual injections, and no hallucinated evidence were detected.
               </p>
               
-              <div className="flex gap-4 text-sm font-medium">
-                <div className="px-4 py-2 bg-white dark:bg-slate-900 rounded-lg border border-emerald-100 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400">
+              <div className="flex gap-3 text-xs font-semibold">
+                <div className="px-3.5 py-1.5 bg-[var(--bg-canvas)] rounded-full border border-[var(--border-subtle)] text-[var(--accent-success)] font-sans">
                   {approvedCitationsCount} Citations Checked
                 </div>
-                <div className="px-4 py-2 bg-white dark:bg-slate-900 rounded-lg border border-emerald-100 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400">
+                <div className="px-3.5 py-1.5 bg-[var(--bg-canvas)] rounded-full border border-[var(--border-subtle)] text-[var(--text-primary)] font-sans">
                   0 Manual Injections
                 </div>
               </div>
@@ -85,30 +85,31 @@ export default function CitationIntegrityReport({ document, project }: CitationI
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20 backdrop-blur-md p-8 shadow-xl shadow-red-900/5 transition-all">
+        <div className="rounded-2xl border border-red-500/20 bg-[var(--bg-card)] p-8 shadow-[var(--shadow-card)] transition-all font-sans">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+            <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-red-900 dark:text-red-300 mb-2">
+              <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2 font-sans">
                 Integrity Violation Detected
               </h3>
-              <p className="text-red-800 dark:text-red-200/80 leading-relaxed mb-4">
+              <p className="text-[var(--text-secondary)] leading-relaxed mb-4 text-sm font-sans">
                 We detected {unapprovedCitations.length} unapproved citations manually injected into the manuscript. 
                 All evidence must flow through the Reference Review Queue.
               </p>
               
               <ul className="space-y-2 mb-6">
                 {unapprovedCitations.map((cit, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-red-900 dark:text-red-200 bg-red-100/50 dark:bg-red-900/30 px-3 py-2 rounded-md">
-                    <XCircle className="w-4 h-4 text-red-500" />
-                    Unknown marker: <code className="font-mono bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded">{cit}</code>
+                  <li key={i} className="flex items-center gap-2 text-xs text-[var(--text-primary)] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] px-3 py-2 rounded-xl">
+                    <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                    <span>Unknown marker:</span>
+                    <code className="font-mono bg-[var(--border-subtle)]/40 px-1.5 py-0.5 rounded text-[11px]">{cit}</code>
                   </li>
                 ))}
               </ul>
               
-              <button className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium text-sm transition-colors shadow-md shadow-red-500/20">
+              <button className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-full font-medium text-xs transition-transform active:scale-95 shadow-sm cursor-pointer font-sans">
                 Purge Unapproved Injections
               </button>
             </div>

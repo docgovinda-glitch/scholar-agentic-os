@@ -19,12 +19,12 @@ export default function ReferenceReviewQueue({ ledger, claims, busy, onApprove, 
 
   if (proposedItems.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl transition-all duration-500">
-        <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-tr from-emerald-400 to-cyan-400 flex items-center justify-center opacity-80 shadow-[0_0_30px_rgba(52,211,153,0.3)]">
-          <CheckCircle className="w-8 h-8 text-white" />
+      <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] font-sans">
+        <div className="w-16 h-16 mb-4 rounded-full bg-[var(--accent-success)]/10 text-[var(--accent-success)] flex items-center justify-center">
+          <CheckCircle className="w-8 h-8" />
         </div>
-        <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">Review Queue Empty</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
+        <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2 font-sans">Review Queue Empty</h3>
+        <p className="text-sm text-[var(--text-secondary)] max-w-sm font-sans">
           You're all caught up! No new references are waiting for your approval.
         </p>
       </div>
@@ -40,12 +40,12 @@ export default function ReferenceReviewQueue({ ledger, claims, busy, onApprove, 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600 dark:from-blue-400 dark:to-violet-400">
+        <h2 className="text-2xl font-bold text-[var(--text-primary)] font-sans">
           Reference Review Queue
         </h2>
-        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-subtle)]">
           {proposedItems.length} Pending
         </span>
       </div>
@@ -60,40 +60,36 @@ export default function ReferenceReviewQueue({ ledger, claims, busy, onApprove, 
             <div
               key={item.id}
               className={`
-                group relative overflow-hidden rounded-2xl border transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]
+                relative overflow-hidden rounded-2xl border transition-all duration-200
                 ${isExpanded 
-                  ? "bg-white/80 dark:bg-slate-900/80 border-blue-300/50 dark:border-blue-700/50 shadow-xl shadow-blue-900/5 backdrop-blur-md" 
-                  : "bg-white/40 dark:bg-slate-900/40 border-gray-200/50 dark:border-gray-800/50 hover:border-blue-400/30 hover:shadow-lg backdrop-blur-sm"}
+                  ? "bg-[var(--bg-card)] border-[var(--text-primary)]/40 shadow-md" 
+                  : "bg-[var(--bg-card)] border-[var(--border-subtle)] hover:border-[var(--text-primary)]/30 hover:shadow-xs"}
               `}
             >
-              {/* Animated background gradient hint */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
               <div className="relative p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
+                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-[var(--text-secondary)] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] px-2 py-0.5 rounded">
                         <BookOpen className="w-3 h-3" />
                         {source?.sourceType || "Source"}
                       </span>
                       {source?.url && (
-                        <a 
-                          href={source.url} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-0.5"
                         >
-                          View Original <ExternalLink className="w-3 h-3" />
+                          View External <ExternalLink className="w-2.5 h-2.5" />
                         </a>
                       )}
                     </div>
-                    
-                    <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 leading-snug mb-1">
-                      {source?.title || item.sourceId}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
-                      "{item.quote}"
+                    <h4 className="text-base font-bold text-[var(--text-primary)] truncate font-sans">
+                      {source?.title || "Unknown Document"}
+                    </h4>
+                    <p className="text-xs text-[var(--text-secondary)] mt-1">
+                      {source?.authors?.join(", ") || "Unknown Authors"} {source?.year ? `(${source.year})` : ""}
                     </p>
                   </div>
 
@@ -103,28 +99,35 @@ export default function ReferenceReviewQueue({ ledger, claims, busy, onApprove, 
                       setExpandedItemId(isExpanded ? null : item.id);
                       setApproveRationale("");
                     }}
-                    className="shrink-0 p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                    className="p-2 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--text-primary)]/5 text-[var(--text-secondary)] transition-colors cursor-pointer"
                   >
-                    {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
                 </div>
 
-                {isExpanded && (
-                  <div className="mt-5 pt-5 border-t border-gray-200/50 dark:border-gray-700/50 animate-in slide-in-from-top-2 fade-in duration-300">
-                    <div className="mb-6 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-100/50 dark:border-blue-800/30">
-                      <h4 className="text-xs uppercase tracking-wider font-semibold text-blue-800 dark:text-blue-300 mb-2">
-                        Alignment / AI Rationale
-                      </h4>
-                      <p className="text-sm text-gray-700 dark:text-gray-300">
-                        <span className="font-medium text-gray-900 dark:text-gray-100">Proposed for Claim:</span>{" "}
-                        {claim?.text || item.proposedClaimId}
-                      </p>
-                    </div>
+                {claim && (
+                  <div className="mt-4 p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)] block mb-1">
+                      Supports Claim:
+                    </span>
+                    <p className="text-xs text-[var(--text-primary)] font-medium">
+                      "{claim.text}"
+                    </p>
+                  </div>
+                )}
 
-                    <div className="space-y-4">
-                      <div className="flex gap-4">
+                {item.quote && (
+                  <div className="mt-3 text-xs text-[var(--text-secondary)] italic border-l-2 border-[var(--border-subtle)] pl-3">
+                    "{item.quote}"
+                  </div>
+                )}
+
+                {isExpanded && (
+                  <div className="mt-6 pt-5 border-t border-[var(--border-subtle)] space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row gap-4">
                         <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
                             Approval Rationale
                           </label>
                           <input
@@ -132,17 +135,17 @@ export default function ReferenceReviewQueue({ ledger, claims, busy, onApprove, 
                             value={approveRationale}
                             onChange={(e) => setApproveRationale(e.target.value)}
                             placeholder="Why does this reference support the claim?"
-                            className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all"
+                            className="w-full px-3 py-2 text-sm bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-xl focus:ring-2 focus:ring-[var(--border-subtle)] outline-none transition-all"
                           />
                         </div>
-                        <div className="w-48">
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <div className="w-full sm:w-48">
+                          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
                             Support Strength
                           </label>
                           <select
                             value={approveStrength}
                             onChange={(e) => setApproveStrength(e.target.value as SupportStrength)}
-                            className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all"
+                            className="w-full px-3 py-2 text-sm bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-xl focus:ring-2 focus:ring-[var(--border-subtle)] outline-none transition-all"
                           >
                             <option value="strong">Strong</option>
                             <option value="moderate">Moderate</option>
@@ -160,7 +163,7 @@ export default function ReferenceReviewQueue({ ledger, claims, busy, onApprove, 
                             onApprove(item, approveStrength, approveRationale);
                             setExpandedItemId(null);
                           }}
-                          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-medium rounded-lg shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[var(--bg-button-primary)] text-[var(--text-button)] text-sm font-medium rounded-full shadow-sm disabled:opacity-40 disabled:cursor-not-allowed transition-transform active:scale-95 cursor-pointer"
                         >
                           <CheckCircle className="w-4 h-4" />
                           Approve Citation
@@ -172,7 +175,7 @@ export default function ReferenceReviewQueue({ ledger, claims, busy, onApprove, 
                             onReject(item, "Rejected during review.");
                             setExpandedItemId(null);
                           }}
-                          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-800 text-sm font-medium rounded-lg transition-all active:scale-[0.98]"
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-red-500 hover:border-red-500/40 text-sm font-medium rounded-full transition-colors cursor-pointer"
                         >
                           <XCircle className="w-4 h-4" />
                           Reject

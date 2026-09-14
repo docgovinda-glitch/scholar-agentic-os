@@ -81,29 +81,29 @@ export default function Primary({
 
   if (!document || document.blocks.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50 dark:bg-slate-950/50">
+      <div className="flex-1 flex items-center justify-center p-8 bg-[var(--bg-canvas)]">
         <div className="max-w-2xl w-full text-center">
-          <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-gray-200 dark:border-slate-800 rounded-3xl p-10 shadow-2xl shadow-indigo-500/5">
-            <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 mb-3">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-3xl p-10 shadow-[var(--shadow-card)]">
+            <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-3 font-sans">
               Draft your Manuscript
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-8 max-w-lg mx-auto">
+            <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-lg mx-auto font-sans">
               Paste an existing draft below (blank lines separate paragraphs) to start from it, or leave this blank and
               use the editor once you submit.
             </p>
-            <div className="w-full rounded-2xl bg-white/50 dark:bg-black/20 backdrop-blur-sm border border-gray-200 dark:border-gray-800 overflow-hidden shadow-inner transition-all focus-within:ring-2 focus-within:ring-indigo-500/50">
+            <div className="w-full rounded-2xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] overflow-hidden shadow-inner transition-all focus-within:ring-2 focus-within:ring-[var(--border-subtle)]">
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 rows={12}
-                className="w-full bg-transparent border-0 text-gray-800 dark:text-gray-200 text-base p-6 font-serif leading-relaxed focus:outline-none focus:ring-0 placeholder-gray-400/70"
+                className="w-full bg-transparent border-0 text-[var(--text-primary)] text-base p-6 font-serif leading-relaxed focus:outline-none focus:ring-0 placeholder-[var(--text-secondary)]/60"
                 placeholder={"# Paste or type a draft here.\n\nSeparate paragraphs with a blank line."}
               />
             </div>
             <button
               onClick={() => onSubmitPlainText(draft)}
               disabled={submitting}
-              className="mt-8 w-full sm:w-auto px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium text-sm shadow-lg shadow-indigo-500/25 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-8 w-full sm:w-auto px-8 py-3 rounded-full bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 font-medium text-sm transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed font-sans cursor-pointer shadow-sm"
             >
               {submitting ? "Submitting…" : "Initialize Manuscript"}
             </button>
@@ -114,30 +114,30 @@ export default function Primary({
   }
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col bg-[var(--bg-canvas)]">
       <div className="flex-1 overflow-y-auto px-10 py-6 max-w-[75ch] mx-auto w-full">
         <CanonicalDocumentEditor document={document} onSave={onSaveDocument} saving={submitting} />
       </div>
       {/* Citation resolution — turns approved-evidence bracket-ids into real
           in-text citations and a rendered References section. Deterministic, run once near the end of drafting, before export. */}
       {onResolveCitations && (
-        <div className="border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-10 py-4">
+        <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-10 py-4">
           <div className="max-w-[75ch] mx-auto">
             <div className="flex items-center gap-3">
               <button
                 onClick={handleResolveCitations}
                 disabled={resolvingCitations}
-                className="px-3 py-1.5 rounded text-xs border border-[color:var(--color-border-subtle)] text-[color:var(--text-secondary)] disabled:opacity-40 hover:border-[color:var(--color-luminous-blue-dim)]"
+                className="px-3.5 py-1.5 rounded-full text-xs border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] disabled:opacity-40 font-sans cursor-pointer transition-colors"
               >
                 {resolvingCitations ? "Resolving citations…" : "Resolve citations"}
               </button>
-              <span className="text-xs text-[color:var(--text-muted)]">
+              <span className="text-xs text-[var(--text-secondary)]">
                 Turns approved-evidence citation markers into real in-text citations and builds the References section.
               </span>
             </div>
-            {citationError && <p role="alert" className="mt-2 text-[10px] text-red-400">Error: {citationError}</p>}
+            {citationError && <p role="alert" className="mt-2 text-[10px] text-red-500">Error: {citationError}</p>}
             {citationOutcome && (
-              <p className="mt-2 text-[10px] text-[color:var(--text-secondary)]">
+              <p className="mt-2 text-[10px] text-[var(--text-secondary)]">
                 {citationOutcome.citedSourceIds.length === 0
                   ? "Nothing to resolve — no citation markers found."
                   : `Resolved ${citationOutcome.citedSourceIds.length} source(s) into the References section.`}
@@ -151,34 +151,34 @@ export default function Primary({
       {/* Citation integrity report */}
       {project && <CitationIntegrityReport document={document} project={project} />}
       {/* Export controls (docs 33-EXPORT-ARCHITECTURE.md) */}
-      <div className="border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-navy-2)] px-10 py-4">
+      <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-10 py-4">
         <div className="max-w-[75ch] mx-auto">
           <div className="flex items-center gap-3">
-            <span className="text-xs text-[color:var(--text-secondary)]">Export as:</span>
+            <span className="text-xs text-[var(--text-secondary)] font-medium font-sans">Export as:</span>
             <div className="flex gap-2">
               <button
                 onClick={() => handleExport("docx")}
                 disabled={exporting}
-                className="px-3 py-1.5 rounded text-xs bg-[color:var(--color-luminous-blue-dim)] text-white disabled:opacity-40"
+                className="px-3.5 py-1.5 rounded-full text-xs font-medium bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 disabled:opacity-40 font-sans cursor-pointer transition-transform active:scale-95 shadow-xs"
               >
                 {exporting ? "Exporting…" : "DOCX"}
               </button>
               <button
                 onClick={() => handleExport("odt")}
                 disabled={exporting}
-                className="px-3 py-1.5 rounded text-xs border border-[color:var(--color-border-subtle)] text-[color:var(--text-secondary)] disabled:opacity-40 hover:border-[color:var(--color-luminous-blue-dim)]"
+                className="px-3.5 py-1.5 rounded-full text-xs font-medium border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] disabled:opacity-40 font-sans cursor-pointer transition-colors"
               >
                 ODT
               </button>
               <button
                 onClick={() => handleExport("pdf")}
                 disabled={exporting}
-                className="px-3 py-1.5 rounded text-xs border border-[color:var(--color-border-subtle)] text-[color:var(--text-secondary)] disabled:opacity-40 hover:border-[color:var(--color-luminous-blue-dim)]"
+                className="px-3.5 py-1.5 rounded-full text-xs font-medium border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] disabled:opacity-40 font-sans cursor-pointer transition-colors"
               >
                 PDF
               </button>
             </div>
-            {exportError && <span className="text-[10px] text-red-400">Error: {exportError}</span>}
+            {exportError && <span className="text-[10px] text-red-500">Error: {exportError}</span>}
           </div>
         </div>
       </div>

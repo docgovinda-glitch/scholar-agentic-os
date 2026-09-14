@@ -44,8 +44,20 @@
 :root {
   color-scheme: light;
 
+  /* DAY MODE (Sand & Snow) */
+  --bg-sidebar: #F7F5F0;      /* Warm sand */
+  --bg-canvas: #F7F5F0;       /* Warm sand */
+  --bg-card: #FFFFFF;         /* Pure white for elevated elements */
+  --bg-button-primary: #000000; 
+  --text-primary: #111111;
+  --text-secondary: #52525B;  /* Zinc-600 */
+  --text-button: #FFFFFF;
+  --border-subtle: #E4E4E7;   /* Zinc-200 */
+  --accent-success: #10B981;  /* Emerald-500 for "Ready to boot" */
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+
   /* Theme variables for dual-pane ChatGPT-style layout */
-  --theme-bg: var(--surface-canvas);
+  --theme-bg: var(--bg-canvas);
   --theme-fg: var(--text-primary);
   --theme-border: var(--border-subtle);
 
@@ -56,38 +68,38 @@
   --surface-sunken:  #E5E1D6; /* deepest recess, track backgrounds */
   --surface-hover:   #EFECE6; /* hover on an otherwise transparent row */
 
-  /* Borders — sharp structural Charcoal borders (#334155) */
-  --border-subtle:   #D1CBC0; /* dividers inside a panel */
-  --border-default:  #334155; /* panel and card edges — Charcoal */
-  --border-control:  #334155; /* input/button edges — 3:1 floor, verified */
-  --border-strong:   #1E293B; /* emphasis and hover on a control — 3:1 floor */
+  /* Borders */
+  --border-subtle:   #E4E4E7; /* dividers inside a panel */
+  --border-default:  #D4D4D8; /* panel and card edges */
+  --border-control:  #52525B; /* input/button edges */
+  --border-strong:   #111111; /* emphasis and hover on a control */
 
-  /* Text — high contrast Charcoal hierarchy */
-  --text-primary:    #1E293B; /* deep crisp Charcoal body and headings */
-  --text-secondary:  #334155; /* Charcoal labels, secondary copy */
-  --text-muted:      #475569; /* hints, metadata, timestamps */
-  --text-inverse:    #F7F5F0; /* Sand Off-White on accent / inverted surfaces */
+  /* Text — high contrast hierarchy */
+  --text-primary:    #111111; /* deep crisp body and headings */
+  --text-secondary:  #52525B; /* secondary copy, Zinc-600 */
+  --text-muted:      #52525B; /* hints, metadata */
+  --text-inverse:    #FFFFFF; /* White on primary button */
 
-  /* Accent — Scientific Monochrome (#334155 Charcoal, zero orange) */
-  --accent:          #334155; /* Charcoal — interactive text, nav, wireframe icons */
-  --accent-hover:    #1E293B; /* Deep Charcoal hover/active */
-  --accent-solid:    #334155; /* Solid Charcoal button fill; pairs with --text-inverse */
-  --accent-subtle:   #EFECE6; /* Subtle Sand tint for selected rows */
-  --accent-border:   #334155; /* Charcoal border on selected surface */
+  /* Accent — High contrast Monochrome */
+  --accent:          #111111;
+  --accent-hover:    #000000;
+  --accent-solid:    #000000;
+  --accent-subtle:   #EFECE6;
+  --accent-border:   #111111;
 
-  /* State — Monochromatic high-contrast technical state definitions */
-  --state-success:        #334155;
-  --state-success-subtle: #EFECE6;
-  --state-warning:        #334155;
-  --state-warning-subtle: #EFECE6;
-  --state-danger:         #1E293B;
-  --state-danger-subtle:  #EFECE6;
-  --state-info:           #334155;
-  --state-info-subtle:    #EFECE6;
+  /* State */
+  --state-success:        #047857;
+  --state-success-subtle: #ECFDF5;
+  --state-warning:        #92400E;
+  --state-warning-subtle: #FFFBEB;
+  --state-danger:         #B91C1C;
+  --state-danger-subtle:  #FEF2F2;
+  --state-info:           #111111;
+  --state-info-subtle:    #F4F4F5;
 
-  /* Elevation — soft Airbnb-inspired diffuse ambient elevation */
+  /* Elevation — soft diffuse ambient elevation */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 
   /* Motion — state-driven, smooth */
@@ -103,6 +115,68 @@
   --radius-full: 9999px;
 }
 
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* DAY MODE (Sand & Snow) */
+  --bg-sidebar: #F7F5F0;      /* Warm sand */
+  --bg-canvas: #F7F5F0;       /* Warm sand */
+  --bg-card: #FFFFFF;         /* Pure white for elevated elements */
+  --bg-button-primary: #000000; 
+  --text-primary: #111111;
+  --text-secondary: #52525B;  /* Zinc-600 */
+  --text-button: #FFFFFF;
+  --border-subtle: #E4E4E7;   /* Zinc-200 */
+  --accent-success: #10B981;  /* Emerald-500 for "Ready to boot" */
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+
+  /* Theme variables for dual-pane ChatGPT-style layout */
+  --theme-bg: var(--bg-canvas);
+  --theme-fg: var(--text-primary);
+  --theme-border: var(--border-subtle);
+
+  /* Surfaces — Sand Off-White baseline (warm, low-strain academic paper ground) */
+  --surface-canvas:  #F7F5F0; /* page ground — Sand Off-White */
+  --surface-raised:  #FFFFFF; /* cards, panels, popovers */
+  --surface-inset:   #EFECE6; /* wells, nested panels, input backgrounds */
+  --surface-sunken:  #E5E1D6; /* deepest recess, track backgrounds */
+  --surface-hover:   #EFECE6; /* hover on an otherwise transparent row */
+
+  /* Borders */
+  --border-subtle:   #E4E4E7; /* dividers inside a panel */
+  --border-default:  #D4D4D8; /* panel and card edges */
+  --border-control:  #52525B; /* input/button edges */
+  --border-strong:   #111111; /* emphasis and hover on a control */
+
+  /* Text — high contrast hierarchy */
+  --text-primary:    #111111; /* deep crisp body and headings */
+  --text-secondary:  #52525B; /* secondary copy, Zinc-600 */
+  --text-muted:      #52525B; /* hints, metadata */
+  --text-inverse:    #FFFFFF; /* White on primary button */
+
+  /* Accent — High contrast Monochrome */
+  --accent:          #111111;
+  --accent-hover:    #000000;
+  --accent-solid:    #000000;
+  --accent-subtle:   #EFECE6;
+  --accent-border:   #111111;
+
+  /* State */
+  --state-success:        #047857;
+  --state-success-subtle: #ECFDF5;
+  --state-warning:        #92400E;
+  --state-warning-subtle: #FFFBEB;
+  --state-danger:         #B91C1C;
+  --state-danger-subtle:  #FEF2F2;
+  --state-info:           #111111;
+  --state-info-subtle:    #F4F4F5;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+}
+
 /* ----------------------------------------------------------------------------
    3. SEMANTIC COLOUR — DARK
    ------------------------------------------------------------------------- */
@@ -110,40 +184,54 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --theme-bg: var(--surface-canvas);
+    /* NIGHT MODE (ChatGPT Style) */
+    --bg-sidebar: #000000;      /* Pure black */
+    --bg-canvas: #171717;       /* Deep neutral gray */
+    --bg-card: #212121;         /* Slightly lighter gray for elevated elements */
+    --bg-button-primary: #FFFFFF; 
+    --text-primary: #ECECEC;
+    --text-secondary: #9B9B9B;
+    --text-button: #000000;
+    --border-subtle: #333333;
+    --accent-success: #34D399;  /* Emerald-400 */
+    --shadow-card: none;        /* No shadows in dark mode, rely on border/bg-color */
+
+    /* Theme variables for dual-pane ChatGPT-style layout */
+    --theme-bg: var(--bg-canvas);
     --theme-fg: var(--text-primary);
     --theme-border: var(--border-subtle);
 
-    --surface-canvas:  #0F172A;
-    --surface-raised:  #1E293B;
-    --surface-inset:   #243044;
-    --surface-sunken:  #0B0F19;
-    --surface-hover:   #26344B;
+    /* Surfaces — Pure neutral blacks & grays, ZERO navy/blue */
+    --surface-canvas:  #171717; /* Deep neutral gray (ChatGPT canvas) */
+    --surface-raised:  #212121; /* Slightly lighter gray (ChatGPT elevated cards) */
+    --surface-inset:   #1A1A1A; /* Inset wells */
+    --surface-sunken:  #000000; /* Pure black */
+    --surface-hover:   #2A2A2A; /* Subtle hover */
 
-    --border-subtle:   #334155;
-    --border-default:  #475569;
-    --border-control:  #94A3B8;
-    --border-strong:   #CBD5E1;
+    --border-subtle:   #333333;
+    --border-default:  #404040;
+    --border-control:  #737373;
+    --border-strong:   #A3A3A3;
 
-    --text-primary:    #F8FAFC;
-    --text-secondary:  #E2E8F0;
-    --text-muted:      #94A3B8;
-    --text-inverse:    #0F172A;
+    --text-primary:    #ECECEC;
+    --text-secondary:  #9B9B9B;
+    --text-muted:      #8E8E93;
+    --text-inverse:    #000000;
 
-    --accent:          #F1F5F9;
+    --accent:          #ECECEC;
     --accent-hover:    #FFFFFF;
-    --accent-solid:    #E2E8F0;
-    --accent-subtle:   #1E293B;
-    --accent-border:   #475569;
+    --accent-solid:    #FFFFFF;
+    --accent-subtle:   #262626;
+    --accent-border:   #404040;
 
-    --state-success:        #F1F5F9;
-    --state-success-subtle: #1E293B;
-    --state-warning:        #F1F5F9;
-    --state-warning-subtle: #1E293B;
-    --state-danger:         #FFFFFF;
-    --state-danger-subtle:  #1E293B;
-    --state-info:           #F1F5F9;
-    --state-info-subtle:    #1E293B;
+    --state-success:        #34D399;
+    --state-success-subtle: #132A20;
+    --state-warning:        #FBBF24;
+    --state-warning-subtle: #2A2210;
+    --state-danger:         #F87171;
+    --state-danger-subtle:  #2D1515;
+    --state-info:           #ECECEC;
+    --state-info-subtle:    #262626;
 
     --shadow-sm: none;
     --shadow-md: none;
@@ -159,40 +247,54 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --theme-bg: var(--surface-canvas);
+  /* NIGHT MODE (ChatGPT Style) */
+  --bg-sidebar: #000000;      /* Pure black */
+  --bg-canvas: #171717;       /* Deep neutral gray */
+  --bg-card: #212121;         /* Slightly lighter gray for elevated elements */
+  --bg-button-primary: #FFFFFF; 
+  --text-primary: #ECECEC;
+  --text-secondary: #9B9B9B;
+  --text-button: #000000;
+  --border-subtle: #333333;
+  --accent-success: #34D399;  /* Emerald-400 */
+  --shadow-card: none;        /* No shadows in dark mode, rely on border/bg-color */
+
+  /* Theme variables for dual-pane ChatGPT-style layout */
+  --theme-bg: var(--bg-canvas);
   --theme-fg: var(--text-primary);
   --theme-border: var(--border-subtle);
 
-  --surface-canvas:  #0F172A;
-  --surface-raised:  #1E293B;
-  --surface-inset:   #243044;
-  --surface-sunken:  #0B0F19;
-  --surface-hover:   #26344B;
+  /* Surfaces — Pure neutral blacks & grays, ZERO navy/blue */
+  --surface-canvas:  #171717; /* Deep neutral gray (ChatGPT canvas) */
+  --surface-raised:  #212121; /* Slightly lighter gray (ChatGPT elevated cards) */
+  --surface-inset:   #1A1A1A; /* Inset wells */
+  --surface-sunken:  #000000; /* Pure black */
+  --surface-hover:   #2A2A2A; /* Subtle hover */
 
-  --border-subtle:   #334155;
-  --border-default:  #475569;
-  --border-control:  #94A3B8;
-  --border-strong:   #CBD5E1;
+  --border-subtle:   #333333;
+  --border-default:  #404040;
+  --border-control:  #737373;
+  --border-strong:   #A3A3A3;
 
-  --text-primary:    #F8FAFC;
-  --text-secondary:  #E2E8F0;
-  --text-muted:      #94A3B8;
-  --text-inverse:    #0F172A;
+  --text-primary:    #ECECEC;
+  --text-secondary:  #9B9B9B;
+  --text-muted:      #8E8E93;
+  --text-inverse:    #000000;
 
-  --accent:          #F1F5F9;
+  --accent:          #ECECEC;
   --accent-hover:    #FFFFFF;
-  --accent-solid:    #E2E8F0;
-  --accent-subtle:   #1E293B;
-  --accent-border:   #475569;
+  --accent-solid:    #FFFFFF;
+  --accent-subtle:   #262626;
+  --accent-border:   #404040;
 
-  --state-success:        #F1F5F9;
-  --state-success-subtle: #1E293B;
-  --state-warning:        #F1F5F9;
-  --state-warning-subtle: #1E293B;
-  --state-danger:         #FFFFFF;
-  --state-danger-subtle:  #1E293B;
-  --state-info:           #F1F5F9;
-  --state-info-subtle:    #1E293B;
+  --state-success:        #34D399;
+  --state-success-subtle: #132A20;
+  --state-warning:        #FBBF24;
+  --state-warning-subtle: #2A2210;
+  --state-danger:         #F87171;
+  --state-danger-subtle:  #2D1515;
+  --state-info:           #ECECEC;
+  --state-info-subtle:    #262626;
 
   --shadow-sm: none;
   --shadow-md: none;

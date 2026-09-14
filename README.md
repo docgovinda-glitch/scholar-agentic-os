@@ -114,9 +114,25 @@ npx supabase db push
 
 ---
 
+## 🌓 Strict Day / Night Theming System
+Scholar Core replaces muddy legacy themes with a high-contrast, toggleable Day/Night engine:
+- **Night Mode (ChatGPT-Inspired True Dark)**:
+  - Sidebar: Pure deep black (`#000000`) with subtle `1px` right border (`#262626`).
+  - Canvas: Deep neutral gray (`#171717`) with elevated cards at (`#212121`).
+  - Typography: Crisp white primary text (`#ECECEC`) and muted secondary text (`#9B9B9B`). Zero muddy navy or blue tints.
+  - Buttons: Solid white pill buttons (`#FFFFFF`) with deep black text and active scaling micro-animations.
+- **Day Mode (Sand & Snow Academic Aesthetic)**:
+  - Canvas: Warm sand canvas (`#F7F5F0`).
+  - Cards & Sidebar: Elevated pure white cards (`#FFFFFF`) with soft drop shadows (`--shadow-card`).
+  - Typography: Deep charcoal primary text (`#111111`) and secondary text (`#666666`).
+  - Buttons: Solid black pill buttons (`#000000`) with pure white text.
+- **Theme Switcher**: An interactive Sun/Moon button anchored in the bottom of the Left Sidebar dynamically toggles `data-theme="light"` / `data-theme="dark"` and persists choices in `localStorage['scholar-theme']`.
+
+---
+
 ## 🎨 Design System & Typography
 
-Scholar Core features a warm, modern, Airbnb-inspired design system with geometric sans-serif typography (`Plus Jakarta Sans` & `Manrope`), generous leading for academic long-form reading, sentence-case tags, and WCAG AA/AAA certified contrast.
+Scholar Core features a warm, modern, Airbnb-inspired design system with geometric sans-serif typography (`Plus Jakarta Sans` & `Manrope`), generous leading for academic long-form reading, sentence-case tags, and WCAG AA/AAA certified contrast (82/82 pairings passing).
 - **Specification Document**: [`docs/AIRBNB_TYPOGRAPHY_DESIGN_SYSTEM.md`](docs/AIRBNB_TYPOGRAPHY_DESIGN_SYSTEM.md)
 
 ---

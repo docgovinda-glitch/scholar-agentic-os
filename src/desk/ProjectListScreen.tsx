@@ -40,6 +40,47 @@ export default function ProjectListScreen({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Theme toggle state: Sand & Snow Day mode vs True-Dark Night mode
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof document !== "undefined") {
+      const current = document.documentElement.getAttribute("data-theme");
+      if (current === "dark" || current === "light") return current;
+      try {
+        const stored = localStorage.getItem("scholar-theme");
+        if (stored === "dark" || stored === "light") return stored;
+      } catch {}
+      if (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        return "dark";
+      }
+    }
+    return "light";
+  });
+
+  const toggleTheme = useCallback(() => {
+    setTheme((curr) => {
+      const next = curr === "dark" ? "light" : "dark";
+      if (typeof document !== "undefined") {
+        document.documentElement.setAttribute("data-theme", next);
+      }
+      try {
+        localStorage.setItem("scholar-theme", next);
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const observer = new MutationObserver(() => {
+      const val = document.documentElement.getAttribute("data-theme");
+      if (val === "dark" || val === "light") {
+        setTheme(val);
+      }
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (showWelcome) onWelcomeSeen?.();
   }, []);
@@ -232,8 +273,10 @@ export default function ProjectListScreen({
       const label = typeMap.get(p.outputTypeId)?.label || p.outputTypeId;
       return title.toLowerCase().includes(q) || label.toLowerCase().includes(q) || p.outputTypeId.toLowerCase().includes(q);
     });
-  }, [projects, selectedTypeFilter, searchQuery, typeMap]);  return (
-    <div className="h-screen w-full flex overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-fg)] font-sans selection:bg-[var(--theme-fg)] selection:text-[var(--theme-bg)]">
+  }, [projects, selectedTypeFilter, searchQuery, typeMap]);
+
+  return (
+    <div className="h-screen w-full flex overflow-hidden bg-[var(--bg-canvas)] text-[var(--text-primary)] font-sans selection:bg-[var(--text-primary)] selection:text-[var(--bg-canvas)]">
       {/* Mobile Backdrop Overlay */}
       {mobileMenuOpen && (
         <div
@@ -245,7 +288,7 @@ export default function ProjectListScreen({
 
       {/* Left Sidebar (Navigation Pane) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-[var(--border-subtle)] bg-[var(--bg-sidebar)] flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
           mobileMenuOpen
             ? "translate-x-0 w-[260px] shadow-2xl"
             : "-translate-x-full md:translate-x-0 " + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
@@ -254,16 +297,16 @@ export default function ProjectListScreen({
         {/* Top Section */}
         <div className="flex flex-col flex-shrink-0 w-[260px]">
           {/* Logo & Close/Collapse Header */}
-          <div className="p-4 pb-3 flex items-center justify-between border-b border-[var(--theme-fg)]/10">
+          <div className="p-4 pb-3 flex items-center justify-between border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-[var(--theme-fg)] text-[var(--theme-bg)] flex items-center justify-center flex-shrink-0 shadow-xs">
-                <ScholarCoreLogo size="sm" className="text-[var(--theme-bg)]" />
+              <div className="w-8 h-8 rounded-xl bg-[var(--bg-button-primary)] text-[var(--text-button)] flex items-center justify-center flex-shrink-0 shadow-xs">
+                <ScholarCoreLogo size="sm" className="text-[var(--text-button)]" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="font-extrabold text-sm tracking-tight text-[var(--theme-fg)] leading-none truncate font-sans">
+                <span className="font-extrabold text-sm tracking-tight text-[var(--text-primary)] leading-none truncate font-sans">
                   Scholar Core
                 </span>
-                <span className="text-[10px] font-medium text-[var(--theme-fg)]/60 mt-1 tracking-normal font-sans">
+                <span className="text-[10px] font-medium text-[var(--text-secondary)] mt-1 tracking-normal font-sans">
                   Workspace
                 </span>
               </div>
@@ -273,7 +316,7 @@ export default function ProjectListScreen({
             <button
               type="button"
               onClick={() => setIsSidebarOpen(false)}
-              className="hidden md:flex p-1.5 rounded-lg text-[var(--theme-fg)]/60 hover:text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 transition-colors cursor-pointer"
+              className="hidden md:flex p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer"
               title="Collapse sidebar"
               aria-label="Collapse sidebar"
             >
@@ -286,7 +329,7 @@ export default function ProjectListScreen({
             <button
               type="button"
               onClick={() => setMobileMenuOpen(false)}
-              className="md:hidden p-1.5 rounded-lg text-[var(--theme-fg)]/60 hover:text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 transition-colors cursor-pointer"
+              className="md:hidden p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer"
               title="Close navigation"
               aria-label="Close navigation"
             >
@@ -304,7 +347,7 @@ export default function ProjectListScreen({
                 setMobileMenuOpen(false);
                 setChoosing(true);
               }}
-              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-[var(--theme-fg)] text-[var(--theme-bg)] hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group font-sans"
+              className="w-full py-2.5 px-6 rounded-full text-xs font-medium bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 active:scale-95 transition-transform flex items-center justify-center gap-2 cursor-pointer shadow-sm group font-sans"
             >
               <span className="text-base font-bold leading-none">+</span>
               <span>New Project</span>
@@ -314,7 +357,7 @@ export default function ProjectListScreen({
 
         {/* Middle Section (Nav Links) */}
         <div className="flex-1 overflow-y-auto scholar-scrollbar py-2 px-3 flex flex-col gap-1 w-[260px]">
-          <div className="px-2 pt-2 pb-1 text-[10px] font-semibold tracking-wider uppercase text-[var(--theme-fg)]/40 font-sans">
+          <div className="px-2 pt-2 pb-1 text-[10px] font-semibold tracking-wider uppercase text-[var(--text-secondary)]/70 font-sans">
             Platform
           </div>
 
@@ -325,9 +368,9 @@ export default function ProjectListScreen({
                 setMobileMenuOpen(false);
                 onOpenVault();
               }}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-[var(--theme-fg)]/80 hover:text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
             >
-              <svg className="w-4 h-4 flex-shrink-0 text-[var(--theme-fg)]/60 group-hover:text-[var(--theme-fg)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <svg className="w-4 h-4 flex-shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
               <span>Knowledge Vault</span>
@@ -341,9 +384,9 @@ export default function ProjectListScreen({
                 setMobileMenuOpen(false);
                 onOpenAgents();
               }}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-[var(--theme-fg)]/80 hover:text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
             >
-              <svg className="w-4 h-4 flex-shrink-0 text-[var(--theme-fg)]/60 group-hover:text-[var(--theme-fg)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <svg className="w-4 h-4 flex-shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
               <span>Editorial Agents</span>
@@ -358,9 +401,9 @@ export default function ProjectListScreen({
                 onOpenAiAccess();
               }}
               aria-label="Manage AI Access"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-[var(--theme-fg)]/80 hover:text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
             >
-              <svg className="w-4 h-4 flex-shrink-0 text-[var(--theme-fg)]/60 group-hover:text-[var(--theme-fg)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <svg className="w-4 h-4 flex-shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
               </svg>
               <span>AI Access</span>
@@ -369,24 +412,46 @@ export default function ProjectListScreen({
         </div>
 
         {/* Bottom Section */}
-        <div className="flex-shrink-0 p-3 border-t border-[var(--theme-fg)]/10 flex flex-col gap-2 w-[260px]">
-          {onOpenAccountSettings && (
+        <div className="flex-shrink-0 p-3 border-t border-[var(--border-subtle)] flex flex-col gap-2 w-[260px]">
+          {/* Action Row: Settings + Day/Night Theme Toggle */}
+          <div className="flex items-center justify-between gap-1.5">
+            {onOpenAccountSettings && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenAccountSettings();
+                }}
+                aria-label="Account Settings"
+                className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer text-left group font-sans"
+              >
+                <svg className="w-4 h-4 flex-shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>Settings</span>
+              </button>
+            )}
+
+            {/* Sun / Moon Theme Toggle */}
             <button
               type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenAccountSettings();
-              }}
-              aria-label="Account Settings"
-              className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-[var(--theme-fg)]/80 hover:text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === "dark" ? "Day" : "Night"} mode`}
+              title={`Switch to ${theme === "dark" ? "Day (Sand & Snow)" : "Night (ChatGPT)"} mode`}
+              className="p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 border border-[var(--border-subtle)] transition-all cursor-pointer flex-shrink-0"
             >
-              <svg className="w-4 h-4 flex-shrink-0 text-[var(--theme-fg)]/60 group-hover:text-[var(--theme-fg)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span>Settings</span>
+              {theme === "dark" ? (
+                <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
             </button>
-          )}
+          </div>
 
           {/* Multi-Account User Dropdown */}
           <UserAccountMenu
@@ -401,15 +466,15 @@ export default function ProjectListScreen({
       </aside>
 
       {/* Main Content Area (Right Pane) */}
-      <main className="flex-1 h-full overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-fg)] scholar-scrollbar relative flex flex-col">
+      <main className="flex-1 h-full overflow-y-auto bg-[var(--bg-canvas)] text-[var(--text-primary)] scholar-scrollbar relative flex flex-col">
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
-        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[var(--theme-bg)]/85 backdrop-blur-md border-b border-[var(--theme-fg)]/10">
+        <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[var(--bg-canvas)]/85 backdrop-blur-md border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-3">
             {/* Mobile Drawer Trigger Button */}
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-2 rounded-xl border border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 shadow-2xs cursor-pointer"
+              className="md:hidden p-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 shadow-[var(--shadow-card)] cursor-pointer"
               aria-label="Open navigation"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -421,7 +486,7 @@ export default function ProjectListScreen({
             <button
               type="button"
               onClick={() => setIsSidebarOpen((prev) => !prev)}
-              className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 text-xs font-medium shadow-2xs cursor-pointer transition-all animate-in fade-in"
+              className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 text-xs font-medium shadow-[var(--shadow-card)] cursor-pointer transition-all animate-in fade-in"
               title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
               aria-label={isSidebarOpen ? "Toggle sidebar" : "Expand sidebar"}
             >
@@ -438,8 +503,8 @@ export default function ProjectListScreen({
             </button>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[var(--theme-fg)] tracking-tight font-sans">Scholar Workspace</span>
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-[var(--theme-fg)]/15 text-[var(--theme-fg)]/60 bg-[var(--theme-fg)]/5 font-sans">
+              <span className="text-xs font-semibold text-[var(--text-primary)] tracking-tight font-sans">Scholar Workspace</span>
+              <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--bg-card)] font-sans">
                 Command Center
               </span>
             </div>
@@ -450,29 +515,27 @@ export default function ProjectListScreen({
             <button
               type="button"
               onClick={() => setChoosing(true)}
-              className="md:hidden px-3 py-1.5 rounded-full text-xs font-semibold bg-[var(--theme-fg)] text-[var(--theme-bg)] hover:opacity-90 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer font-sans"
+              className="md:hidden px-4 py-1.5 rounded-full text-xs font-medium bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 shadow-sm transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer font-sans"
             >
               <span className="font-bold">+</span>
               <span>New</span>
             </button>
           )}
-        </div>
-
-        {/* Centered Reading Column (mimics focused AI chat window) */}
+        </div>        {/* Centered Reading Column (mimics focused AI chat window) */}
         <div className="max-w-4xl mx-auto px-6 py-8 w-full flex-1">
           {/* Onboarding welcome banner */}
           {welcomeVisible && (
             <div
               role="status"
-              className="mb-8 rounded-2xl border border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] p-5 flex items-start justify-between gap-4 shadow-sm"
+              className="mb-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 flex items-start justify-between gap-4 shadow-[var(--shadow-card)]"
             >
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-[var(--theme-fg)] text-[var(--theme-bg)] flex items-center justify-center flex-shrink-0 shadow-xs">
-                  <ScholarCoreLogo size="sm" className="text-[var(--theme-bg)]" />
+                <div className="w-10 h-10 rounded-xl bg-[var(--bg-button-primary)] text-[var(--text-button)] flex items-center justify-center flex-shrink-0 shadow-xs">
+                  <ScholarCoreLogo size="sm" className="text-[var(--text-button)]" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-[var(--theme-fg)] font-sans">Welcome to your Scholar Workspace</p>
-                  <p className="text-xs text-[var(--theme-fg)]/60 mt-1 font-normal leading-relaxed font-sans">
+                  <p className="text-sm font-bold text-[var(--text-primary)] font-sans">Welcome to your Scholar Workspace</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-1 font-normal leading-relaxed font-sans">
                     Select an academic workspace to begin, upload reference PDFs to your Vault, or configure your editorial agents.
                   </p>
                 </div>
@@ -480,7 +543,7 @@ export default function ProjectListScreen({
               <button
                 aria-label="Dismiss"
                 onClick={() => setWelcomeVisible(false)}
-                className="p-1.5 rounded-full text-[var(--theme-fg)]/40 hover:text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 transition-colors cursor-pointer"
+                className="p-1.5 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -513,57 +576,60 @@ export default function ProjectListScreen({
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-medium text-[var(--theme-fg)]/70 px-3 py-0.5 rounded-full bg-[var(--theme-fg)]/5 border border-[var(--theme-fg)]/15 font-sans">
+                      <span className="text-xs font-medium text-[var(--text-secondary)] px-3 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] font-sans">
                         Scholar Workspace
                       </span>
                     </div>
-                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--theme-fg)] font-sans">
+                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans">
                       Scholar Workspace
                     </h1>
-                    <p className="text-sm text-[var(--theme-fg)]/60 mt-1.5 font-normal leading-relaxed max-w-2xl font-sans">
+                    <p className="text-sm text-[var(--text-secondary)] mt-1.5 font-normal leading-relaxed max-w-2xl font-sans">
                       Select a dedicated academic workspace to initialize, or continue your active research projects below.
                     </p>
                   </div>
                   {projects && projects.length > 0 && (
                     <button
                       onClick={() => setChoosing(true)}
-                      className="px-6 py-2.5 rounded-full text-xs font-semibold bg-[var(--theme-fg)] text-[var(--theme-bg)] hover:opacity-90 shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto font-sans"
+                      className="px-6 py-2.5 rounded-full text-xs font-medium bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto font-sans"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                       </svg>
-                      New Project
+                      <span>+ New Project</span>
                     </button>
                   )}
                 </div>
 
-                {/* Quick-Launch Workspace Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                {/* Quick-Launch Workspace Cards ("Snow on Sand") */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   {FORMAT_TILES.map((tile) => (
                     <div
                       key={tile.id}
                       onClick={() => handleCreate(tile.id)}
-                      className="p-4 rounded-2xl border border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] hover:border-[var(--theme-fg)]/30 hover:bg-[var(--theme-fg)]/2 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between group text-left font-sans"
+                      className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-[var(--shadow-card)] hover:border-[var(--text-primary)]/40 hover:scale-[1.01] transition-all duration-200 cursor-pointer flex flex-col justify-between group text-left font-sans min-h-[220px]"
                     >
                       <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="w-8 h-8 rounded-xl bg-[var(--theme-fg)]/5 text-[var(--theme-fg)] flex items-center justify-center transition-colors group-hover:bg-[var(--theme-fg)] group-hover:text-[var(--theme-bg)]">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="w-9 h-9 rounded-xl bg-[var(--bg-canvas)] text-[var(--text-primary)] flex items-center justify-center transition-colors group-hover:bg-[var(--bg-button-primary)] group-hover:text-[var(--text-button)] border border-[var(--border-subtle)]">
                             <FormatIcon id={tile.id} className="w-4 h-4" />
                           </div>
-                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-[var(--theme-fg)]/15 text-[var(--theme-fg)]/60 bg-[var(--theme-fg)]/5">
+                          <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--bg-canvas)]">
                             {tile.id}
                           </span>
                         </div>
-                        <h4 className="font-bold text-sm text-[var(--theme-fg)] leading-tight mb-1 font-sans">
+                        <h4 className="font-bold text-base text-[var(--text-primary)] leading-tight mb-1 font-sans">
                           {tile.label}
                         </h4>
-                        <p className="text-xs text-[var(--theme-fg)]/60 font-normal line-clamp-2 leading-relaxed font-sans">
+                        <p className="text-xs text-[var(--text-secondary)] font-normal line-clamp-2 leading-relaxed font-sans mb-2">
                           {tile.tag}
                         </p>
+                        <span className="text-[11px] font-semibold text-[var(--accent-success)] inline-block">
+                          Ready to boot
+                        </span>
                       </div>
-                      <div className="mt-4 pt-3 border-t border-[var(--theme-fg)]/10 flex items-center justify-between text-xs font-medium text-[var(--theme-fg)]/70 group-hover:text-[var(--theme-fg)] transition-colors">
+                      <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
                         <span>Start {tile.label.split(" ")[0]}</span>
-                        <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                        <span className="transition-transform group-hover:translate-x-1">→</span>
                       </div>
                     </div>
                   ))}
@@ -572,13 +638,13 @@ export default function ProjectListScreen({
 
               {/* Active Projects Section with Live Search & Filter Tabs */}
               <section>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-[var(--theme-fg)]/15">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-[var(--border-subtle)]">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--theme-fg)] font-sans">
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
                       Active Projects
                     </h2>
                     {projects && (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border border-[var(--theme-fg)]/15 text-[var(--theme-fg)]/70 bg-[var(--theme-bg)] font-sans">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] font-sans">
                         {filteredProjects.length} of {projects.length}
                       </span>
                     )}
@@ -592,17 +658,17 @@ export default function ProjectListScreen({
                         placeholder="Search projects..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full !rounded-full !border !border-[var(--theme-fg)]/20 !bg-[var(--theme-bg)] pl-10 pr-9 py-2.5 text-xs font-normal !text-[var(--theme-fg)] placeholder:!text-[var(--theme-fg)]/40 outline-none focus:!ring-2 focus:!ring-[var(--theme-fg)]/15 focus:!border-[var(--theme-fg)]/40 transition-all shadow-xs"
-                        style={{ borderRadius: "9999px", backgroundColor: "var(--theme-bg)" }}
+                        className="w-full !rounded-full !border !border-[var(--border-subtle)] !bg-[var(--bg-card)] pl-10 pr-9 py-2.5 text-xs font-normal !text-[var(--text-primary)] placeholder:!text-[var(--text-secondary)] outline-none focus:!ring-2 focus:!ring-[var(--text-primary)]/15 focus:!border-[var(--text-primary)]/40 transition-all shadow-[var(--shadow-card)]"
+                        style={{ borderRadius: "9999px", backgroundColor: "var(--bg-card)" }}
                       />
-                      <svg className="w-4 h-4 text-[var(--theme-fg)]/40 absolute left-3.5 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <svg className="w-4 h-4 text-[var(--text-secondary)] absolute left-3.5 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                       {searchQuery && (
                         <button
                           type="button"
                           onClick={() => setSearchQuery("")}
-                          className="absolute right-3 top-2.5 p-1 rounded-full text-[var(--theme-fg)]/40 hover:text-[var(--theme-fg)] hover:bg-[var(--theme-fg)]/5 transition-colors cursor-pointer"
+                          className="absolute right-3 top-2.5 p-1 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer"
                           title="Clear search"
                           aria-label="Clear search"
                         >
@@ -623,13 +689,13 @@ export default function ProjectListScreen({
                       onClick={() => setSelectedTypeFilter("all")}
                       className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 border font-sans ${
                         selectedTypeFilter === "all"
-                          ? "bg-[var(--theme-fg)] text-[var(--theme-bg)] border-[var(--theme-fg)] shadow-xs"
-                          : "bg-[var(--theme-bg)] text-[var(--theme-fg)]/70 border-[var(--theme-fg)]/15 hover:bg-[var(--theme-fg)]/5"
+                          ? "bg-[var(--bg-button-primary)] text-[var(--text-button)] border-[var(--bg-button-primary)] shadow-xs"
+                          : "bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--text-primary)]/5 shadow-[var(--shadow-card)]"
                       }`}
                     >
                       <span>All</span>
                       <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded-full ${
-                        selectedTypeFilter === "all" ? "bg-[var(--theme-bg)]/20 text-[var(--theme-bg)]" : "bg-[var(--theme-fg)]/5 text-[var(--theme-fg)]/70"
+                        selectedTypeFilter === "all" ? "bg-[var(--text-button)]/20 text-[var(--text-button)]" : "bg-[var(--bg-canvas)] text-[var(--text-secondary)]"
                       }`}>
                         {projects.length}
                       </span>
@@ -646,8 +712,8 @@ export default function ProjectListScreen({
                           onClick={() => setSelectedTypeFilter(tile.id)}
                           className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 border font-sans ${
                             isActive
-                              ? "bg-[var(--theme-fg)] text-[var(--theme-bg)] border-[var(--theme-fg)] shadow-xs"
-                              : "bg-[var(--theme-bg)] text-[var(--theme-fg)]/70 border-[var(--theme-fg)]/15 hover:bg-[var(--theme-fg)]/5"
+                              ? "bg-[var(--bg-button-primary)] text-[var(--text-button)] border-[var(--bg-button-primary)] shadow-xs"
+                              : "bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--text-primary)]/5 shadow-[var(--shadow-card)]"
                           }`}
                         >
                           <span className="w-3.5 h-3.5 flex items-center justify-center">
@@ -656,7 +722,7 @@ export default function ProjectListScreen({
                           <span>{tile.label}</span>
                           {count > 0 && (
                             <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded-full ${
-                              isActive ? "bg-[var(--theme-bg)]/20 text-[var(--theme-bg)]" : "bg-[var(--theme-fg)]/5 text-[var(--theme-fg)]/70"
+                              isActive ? "bg-[var(--text-button)]/20 text-[var(--text-button)]" : "bg-[var(--bg-canvas)] text-[var(--text-secondary)]"
                             }`}>
                               {count}
                             </span>
@@ -669,35 +735,35 @@ export default function ProjectListScreen({
 
                 {projects === null ? (
                   error ? (
-                    <div className="flex flex-col justify-center items-center py-20 text-center border border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] rounded-2xl p-8 shadow-xs">
+                    <div className="flex flex-col justify-center items-center py-20 text-center border border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-2xl p-8 shadow-[var(--shadow-card)]">
                       <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mb-4">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                       </div>
-                      <p className="text-sm font-bold text-[var(--theme-fg)] mb-1 font-sans">Failed to load manuscripts</p>
-                      <p className="text-xs text-[var(--theme-fg)]/60 max-w-sm mb-4 font-normal leading-relaxed font-sans">{error}</p>
+                      <p className="text-sm font-bold text-[var(--text-primary)] mb-1 font-sans">Failed to load manuscripts</p>
+                      <p className="text-xs text-[var(--text-secondary)] max-w-sm mb-4 font-normal leading-relaxed font-sans">{error}</p>
                       <button
                         onClick={load}
-                        className="px-5 py-2.5 rounded-full bg-[var(--theme-fg)] text-[var(--theme-bg)] text-xs font-semibold hover:opacity-90 transition-all cursor-pointer shadow-xs font-sans"
+                        className="px-6 py-2.5 rounded-full bg-[var(--bg-button-primary)] text-[var(--text-button)] text-xs font-medium hover:opacity-90 transition-transform active:scale-95 cursor-pointer shadow-xs font-sans"
                       >
                         Retry Connection
                       </button>
                     </div>
                   ) : (
-                    <div className="flex flex-col justify-center items-center py-24 border border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] rounded-2xl shadow-xs">
-                      <div className="w-8 h-8 border-2 border-[var(--theme-fg)] border-t-transparent rounded-full animate-spin mb-4" />
-                      <span className="text-xs font-medium text-[var(--theme-fg)]/70 font-sans">Loading manuscripts...</span>
+                    <div className="flex flex-col justify-center items-center py-24 border border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-2xl shadow-[var(--shadow-card)]">
+                      <div className="w-8 h-8 border-2 border-[var(--text-primary)] border-t-transparent rounded-full animate-spin mb-4" />
+                      <span className="text-xs font-medium text-[var(--text-secondary)] font-sans">Loading manuscripts...</span>
                     </div>
                   )
                 ) : projects.length === 0 ? (
                   <EmptyState onStart={() => setChoosing(true)} />
                 ) : filteredProjects.length === 0 ? (
-                  <div className="p-12 text-center rounded-2xl border border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] shadow-xs">
-                    <p className="text-sm font-semibold text-[var(--theme-fg)] font-sans">No manuscripts match "{searchQuery}"</p>
+                  <div className="p-12 text-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
+                    <p className="text-sm font-semibold text-[var(--text-primary)] font-sans">No manuscripts match "{searchQuery}"</p>
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="mt-3 text-xs font-semibold text-[var(--theme-fg)] underline cursor-pointer font-sans"
+                      className="mt-3 text-xs font-medium text-[var(--text-primary)] underline cursor-pointer font-sans"
                     >
                       Clear search filter
                     </button>
@@ -731,17 +797,17 @@ export default function ProjectListScreen({
           onClick={() => !deletingId && setProjectToDelete(null)}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-[var(--theme-bg)] border border-[var(--theme-fg)]/15 p-7 shadow-2xl relative text-left animate-in zoom-in-95 duration-150"
+            className="w-full max-w-md rounded-3xl bg-[var(--bg-card)] border border-[var(--border-subtle)] p-7 shadow-2xl relative text-left animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Title - Airbnb Cereal / Plus Jakarta Sans Extrabold typography */}
-            <h3 id="delete-modal-title" className="text-xl font-extrabold text-[var(--theme-fg)] tracking-tight mb-2.5 font-sans">
+            {/* Title */}
+            <h3 id="delete-modal-title" className="text-xl font-extrabold text-[var(--text-primary)] tracking-tight mb-2.5 font-sans">
               Delete Project
             </h3>
 
-            {/* Sub-label - Clean, neutral academic body text */}
-            <p className="text-sm text-[var(--theme-fg)]/60 leading-relaxed mb-7 font-normal font-sans">
-              Are you sure you want to delete <span className="font-semibold text-[var(--theme-fg)]">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
+            {/* Sub-label */}
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-7 font-normal font-sans">
+              Are you sure you want to delete <span className="font-semibold text-[var(--text-primary)]">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
             </p>
 
             {/* Action Buttons: Pinterest-style Cancel & Pinterest Red (#E60023) Delete */}
@@ -750,7 +816,7 @@ export default function ProjectListScreen({
                 type="button"
                 disabled={deletingId !== null}
                 onClick={() => setProjectToDelete(null)}
-                className="px-5 py-2.5 rounded-full text-sm font-bold text-[var(--theme-fg)]/80 bg-[var(--theme-fg)]/10 hover:bg-[var(--theme-fg)]/15 active:bg-[var(--theme-fg)]/20 transition-all cursor-pointer disabled:opacity-50 font-sans"
+                className="px-5 py-2.5 rounded-full text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-canvas)] hover:bg-[var(--text-primary)]/10 border border-[var(--border-subtle)] transition-all cursor-pointer disabled:opacity-50 font-sans"
               >
                 Cancel
               </button>
@@ -759,7 +825,7 @@ export default function ProjectListScreen({
                 type="button"
                 disabled={deletingId !== null}
                 onClick={handleConfirmDelete}
-                className="px-5 py-2.5 rounded-full text-sm font-bold text-[#E60023] hover:text-[#AD081B] hover:bg-[#FFEBEF] active:bg-[#FFD6DE] transition-all cursor-pointer disabled:opacity-50 font-sans flex items-center justify-center"
+                className="px-5 py-2.5 rounded-full text-sm font-bold text-[#E60023] hover:text-[#AD081B] bg-[#FFEBEF] dark:bg-[#E60023]/15 hover:bg-[#FFD6DE] dark:hover:bg-[#E60023]/25 transition-all cursor-pointer disabled:opacity-50 font-sans flex items-center justify-center"
               >
                 {deletingId ? (
                   <>
@@ -807,38 +873,38 @@ function ProjectCard({
     <div className="relative group font-sans">
       <button
         onClick={onOpen}
-        className="w-full text-left p-6 rounded-2xl border border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] hover:border-[var(--theme-fg)]/30 hover:shadow-md transition-all duration-200 flex flex-col justify-between cursor-pointer min-h-[210px]"
+        className="w-full text-left p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] hover:border-[var(--text-primary)]/40 hover:scale-[1.01] transition-all duration-200 flex flex-col justify-between cursor-pointer min-h-[220px]"
       >
         <div>
           {/* Card Top Metadata */}
           <div className="flex items-center justify-start gap-2 mb-3 pr-20">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium text-[var(--theme-fg)]/80 bg-[var(--theme-fg)]/5 border border-[var(--theme-fg)]/15">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
               {typeLabel}
             </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium text-[var(--theme-fg)]/60 bg-[var(--theme-fg)]/5 border border-[var(--theme-fg)]/10">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium text-[var(--text-secondary)]/80 bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
               {project.hasDocument ? "Drafting stage" : "Evidence intake"}
             </span>
           </div>
 
           {/* Project Title */}
-          <h3 className="text-base font-bold text-[var(--theme-fg)] font-sans leading-snug line-clamp-2 mb-2">
+          <h3 className="text-base font-bold text-[var(--text-primary)] font-sans leading-snug line-clamp-2 mb-2">
             {displayTitle}
           </h3>
 
-          <p className="text-xs text-[var(--theme-fg)]/60 font-normal leading-relaxed font-sans">
+          <p className="text-xs text-[var(--text-secondary)] font-normal leading-relaxed font-sans">
             {signedOff} of {totalGates} quality gates verified
           </p>
         </div>
 
         {/* Bottom Technical Progress Indicator */}
-        <div className="mt-5 pt-4 border-t border-[var(--theme-fg)]/10">
-          <div className="flex justify-between text-xs font-medium text-[var(--theme-fg)]/70 mb-2">
+        <div className="mt-5 pt-4 border-t border-[var(--border-subtle)]">
+          <div className="flex justify-between text-xs font-medium text-[var(--text-secondary)] mb-2">
             <span>Workflow Completion</span>
-            <span className="font-semibold text-[var(--theme-fg)]">{percent}%</span>
+            <span className="font-semibold text-[var(--text-primary)]">{percent}%</span>
           </div>
-          <div className="w-full h-2 rounded-full bg-[var(--theme-fg)]/10 overflow-hidden">
+          <div className="w-full h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
             <div
-              className="h-full bg-[var(--theme-fg)] rounded-full transition-all duration-300"
+              className="h-full bg-[var(--text-primary)] rounded-full transition-all duration-300"
               style={{ width: `${percent}%` }}
             />
           </div>
@@ -854,7 +920,7 @@ function ProjectCard({
             e.preventDefault();
             onDelete(e);
           }}
-          className="absolute top-5 right-5 z-20 px-3 py-1 rounded-full text-xs font-bold text-[#E60023] hover:text-[#AD081B] bg-[#FFEBEF] hover:bg-[#FFD6DE] border border-[#E60023]/20 transition-all cursor-pointer shadow-2xs font-sans"
+          className="absolute top-5 right-5 z-20 px-3 py-1 rounded-full text-xs font-bold text-[#E60023] hover:text-[#AD081B] bg-[#FFEBEF] dark:bg-[#E60023]/15 hover:bg-[#FFD6DE] dark:hover:bg-[#E60023]/25 border border-[#E60023]/20 transition-all cursor-pointer shadow-2xs font-sans"
           title="Delete Project"
           aria-label="Delete Project"
         >
@@ -867,24 +933,22 @@ function ProjectCard({
 
 function EmptyState({ onStart }: { onStart: () => void }) {
   return (
-    <div className="rounded-3xl border border-dashed border-[var(--theme-fg)]/20 bg-[var(--theme-bg)] px-6 py-16 text-center flex flex-col items-center shadow-2xs font-sans">
-      <div className="w-14 h-14 rounded-2xl bg-[var(--theme-fg)] text-[var(--theme-bg)] flex items-center justify-center mb-5 shadow-xs">
-        <ScholarCoreLogo size="md" className="text-[var(--theme-bg)]" />
+    <div className="rounded-3xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-16 text-center flex flex-col items-center shadow-[var(--shadow-card)] font-sans">
+      <div className="w-14 h-14 rounded-2xl bg-[var(--bg-button-primary)] text-[var(--text-button)] flex items-center justify-center mb-5 shadow-xs">
+        <ScholarCoreLogo size="md" className="text-[var(--text-button)]" />
       </div>
-      <h3 className="text-2xl font-extrabold text-[var(--theme-fg)] font-sans mb-2 tracking-tight">
+      <h3 className="text-2xl font-extrabold text-[var(--text-primary)] font-sans mb-2 tracking-tight">
         Initialize your first project
       </h3>
-      <p className="max-w-md text-sm text-[var(--theme-fg)]/60 font-normal mb-6 leading-relaxed font-sans">
+      <p className="max-w-md text-sm text-[var(--text-secondary)] font-normal mb-6 leading-relaxed font-sans">
         Choose from curated academic workspaces, connect your Knowledge Vault, and let the multi-agent editorial board assist you.
       </p>
       <button
         onClick={onStart}
-        className="rounded-full bg-[var(--theme-fg)] px-7 py-3 text-xs font-semibold text-[var(--theme-bg)] hover:opacity-90 flex items-center gap-2 cursor-pointer shadow-sm transition-all font-sans"
+        className="rounded-full bg-[var(--bg-button-primary)] px-6 py-2.5 text-xs font-medium text-[var(--text-button)] hover:opacity-90 flex items-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-95 font-sans"
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        New Project
+        <span className="font-bold text-sm">+</span>
+        <span>New Project</span>
       </button>
     </div>
   );
@@ -994,26 +1058,26 @@ function ChooseOutputType({
     <div className="max-w-4xl mx-auto py-6 animate-fade-in font-sans">
       <button
         onClick={onCancel}
-        className="mb-8 inline-flex items-center gap-2 text-xs font-medium text-[var(--theme-fg)]/80 hover:text-[var(--theme-fg)] transition-all px-4 py-2 rounded-full bg-[var(--theme-bg)] border border-[var(--theme-fg)]/15 hover:border-[var(--theme-fg)]/30 shadow-2xs cursor-pointer font-sans"
+        className="mb-8 inline-flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-[var(--text-primary)]/40 shadow-[var(--shadow-card)] cursor-pointer font-sans"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
         </svg>
-        Return to Command Center
+        <span>Return to Command Center</span>
       </button>
 
       <div className="mb-8">
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--theme-fg)] font-sans mb-1.5">
+        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans mb-1.5">
           Select Output Format
         </h2>
-        <p className="text-sm text-[var(--theme-fg)]/60 font-normal leading-relaxed font-sans">
+        <p className="text-sm text-[var(--text-secondary)] font-normal leading-relaxed font-sans">
           Select the dedicated academic workspace to initialize for your research project.
         </p>
       </div>
 
       {!types ? (
-        <div className="flex items-center justify-center py-20 border border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] rounded-2xl shadow-xs">
-          <div className="w-8 h-8 border-2 border-[var(--theme-fg)] border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center justify-center py-20 border border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-2xl shadow-[var(--shadow-card)]">
+          <div className="w-8 h-8 border-2 border-[var(--text-primary)] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <div className="space-y-6">
@@ -1039,7 +1103,7 @@ function ChooseOutputType({
             ))}
           </select>
 
-          {/* Interactive Format Tiles Grid */}
+          {/* Interactive Format Tiles Grid ("Snow on Sand") */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FORMAT_TILES.map((tile) => {
               const isSelected = selected === tile.id;
@@ -1049,43 +1113,46 @@ function ChooseOutputType({
                   key={tile.id}
                   onClick={() => setSelected(tile.id)}
                   onDoubleClick={() => onPick(tile.id)}
-                  className={`p-5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group text-left font-sans ${
+                  className={`bg-[var(--bg-card)] border rounded-2xl p-6 shadow-[var(--shadow-card)] transition-all duration-200 cursor-pointer flex flex-col justify-between group text-left font-sans min-h-[220px] ${
                     isSelected
-                      ? "border-2 border-[var(--theme-fg)] bg-[var(--theme-fg)]/5 shadow-sm ring-2 ring-[var(--theme-fg)]/10"
-                      : "border border-[var(--theme-fg)]/15 bg-[var(--theme-bg)] hover:border-[var(--theme-fg)]/30 hover:shadow-md"
+                      ? "border-2 border-[var(--text-primary)] ring-2 ring-[var(--text-primary)]/10"
+                      : "border-[var(--border-subtle)] hover:border-[var(--text-primary)]/40 hover:scale-[1.01]"
                   }`}
                 >
                   <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="w-9 h-9 rounded-xl bg-[var(--theme-fg)]/5 text-[var(--theme-fg)] flex items-center justify-center transition-colors group-hover:bg-[var(--theme-fg)] group-hover:text-[var(--theme-bg)]">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-9 h-9 rounded-xl bg-[var(--bg-canvas)] text-[var(--text-primary)] flex items-center justify-center transition-colors group-hover:bg-[var(--bg-button-primary)] group-hover:text-[var(--text-button)] border border-[var(--border-subtle)]">
                         <FormatIcon id={tile.id} className="w-4 h-4" />
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-[var(--theme-fg)]/15 text-[var(--theme-fg)]/60 bg-[var(--theme-fg)]/5">
+                        <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--bg-canvas)]">
                           {tile.id}
                         </span>
                         {isSelected && (
-                          <span className="text-xs font-semibold text-[var(--theme-fg)] px-2 py-0.5 rounded-full bg-[var(--theme-fg)]/10 font-sans">
+                          <span className="text-xs font-semibold text-[var(--text-primary)] px-2 py-0.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-sans">
                             Selected
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <h3 className="font-bold text-base text-[var(--theme-fg)] font-sans mb-1">
+                    <h3 className="font-bold text-base text-[var(--text-primary)] font-sans mb-1">
                       {tile.label}
                     </h3>
-                    <span className="inline-block text-xs font-medium text-[var(--theme-fg)]/60 mb-2 font-sans">
+                    <span className="inline-block text-xs font-medium text-[var(--text-secondary)] mb-2 font-sans">
                       {tile.tag}
                     </span>
-                    <p className="text-xs text-[var(--theme-fg)]/70 font-normal leading-relaxed mb-4 font-sans">
+                    <p className="text-xs text-[var(--text-secondary)] font-normal leading-relaxed mb-3 font-sans">
                       {tile.description}
                     </p>
+                    <span className="text-[11px] font-semibold text-[var(--accent-success)] inline-block mb-3">
+                      Ready to boot
+                    </span>
                   </div>
 
-                  <div className="pt-3 border-t border-[var(--theme-fg)]/10 flex items-center justify-between text-xs text-[var(--theme-fg)]/60 font-medium font-sans">
+                  <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--text-secondary)] font-medium font-sans">
                     <span>Target: {tile.budget}</span>
-                    <span className="text-[var(--theme-fg)] font-semibold">Ready</span>
+                    <span className="text-[var(--accent-success)] font-semibold">Available</span>
                   </div>
                 </div>
               );
@@ -1093,23 +1160,21 @@ function ChooseOutputType({
           </div>
 
           {/* Action Bar */}
-          <div className="pt-4 border-t border-[var(--theme-fg)]/15 flex items-center justify-end font-sans">
+          <div className="pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end font-sans">
             <button
               onClick={() => onPick(selected)}
               disabled={!selected || creating}
-              className="w-full sm:w-auto rounded-full bg-[var(--theme-fg)] px-8 py-3 text-xs font-semibold text-[var(--theme-bg)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-all font-sans"
+              className="w-full sm:w-auto rounded-full bg-[var(--bg-button-primary)] px-6 py-2.5 text-xs font-medium text-[var(--text-button)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-95 font-sans"
             >
               {creating ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-[var(--theme-bg)]/30 border-t-[var(--theme-bg)] rounded-full animate-spin" />
-                  Initializing Workspace...
+                  <div className="w-3.5 h-3.5 border-2 border-[var(--text-button)]/30 border-t-[var(--text-button)] rounded-full animate-spin" />
+                  <span>Initializing Workspace...</span>
                 </>
               ) : (
                 <>
-                  {selected ? `Boot ${FORMAT_TILES.find((t) => t.id === selected)?.label || "Workspace"}` : "Select a Format to Boot"}
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
+                  <span>{selected ? `Boot ${FORMAT_TILES.find((t) => t.id === selected)?.label || "Workspace"}` : "Select a Format to Boot"}</span>
+                  <span aria-hidden="true" className="text-sm font-bold">→</span>
                 </>
               )}
             </button>
@@ -1118,15 +1183,15 @@ function ChooseOutputType({
       )}
 
       {/* Footer info banner */}
-      <footer className="mt-12 py-4 px-4 text-center text-xs text-[var(--theme-fg)]/60 border-t border-[var(--theme-fg)]/15 font-sans">
+      <footer className="mt-12 py-4 px-4 text-center text-xs text-[var(--text-secondary)] border-t border-[var(--border-subtle)] font-sans">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 font-normal">
           <span className="flex items-center gap-1.5">
-            <strong className="font-semibold text-[var(--theme-fg)]">Projects</strong>
+            <strong className="font-semibold text-[var(--text-primary)]">Projects</strong>
             <span>— synced to account</span>
           </span>
-          <span aria-hidden="true" className="hidden sm:inline text-[var(--theme-fg)]/30">·</span>
+          <span aria-hidden="true" className="hidden sm:inline text-[var(--text-secondary)]/40">·</span>
           <span className="flex items-center gap-1.5">
-            <strong className="font-semibold text-[var(--theme-fg)]">Private Vault</strong>
+            <strong className="font-semibold text-[var(--text-primary)]">Private Vault</strong>
             <span>— client-side encrypted</span>
           </span>
         </div>

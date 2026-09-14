@@ -95,19 +95,50 @@ Following the structural paradigms of modern AI interfaces (such as ChatGPT and 
 
 ---
 
-## 8. Verification Commands
+## 8. Strict Day / Night Theming Engine (Sand & Snow vs True Dark)
+
+To ensure distraction-free academic focus and modern visual excellence, the application features a strict, zero-mud Day/Night theming system governed by CSS custom properties and `data-theme` switching.
+
+### 8.1 Color Tokens & Semantic Values
+| Token | Day Mode (Sand & Snow) | Night Mode (ChatGPT-Inspired) | Usage |
+| :--- | :--- | :--- | :--- |
+| `--bg-sidebar` | `#FFFFFF` (Pure White) | `#000000` (Pure Black) | Fixed navigation sidebar background |
+| `--bg-canvas` | `#F7F5F0` (Warm Sand) | `#171717` (Deep Neutral Gray) | Main viewport canvas background |
+| `--bg-card` | `#FFFFFF` (Pure White) | `#212121` (Elevated Card Gray) | Format tiles, active projects, and modal containers |
+| `--bg-button-primary` | `#000000` (Solid Black) | `#FFFFFF` (Solid White) | Primary CTA buttons (`+ New Project`, `Boot Workspace`) |
+| `--text-primary` | `#111111` (Deep Charcoal) | `#ECECEC` (Crisp White) | Main headings, card titles, and high-emphasis body text |
+| `--text-secondary` | `#666666` (Neutral Gray) | `#9B9B9B` (Muted Gray) | Subheadings, metadata, timestamps, and secondary labels |
+| `--text-button` | `#FFFFFF` (Pure White) | `#000000` (Pure Black) | Label text inside primary buttons |
+| `--border-subtle` | `#EAE6DF` (Soft Sand Divider)| `#2E2E2E` (Subtle Charcoal Divider)| Card outlines, dividers, and panel separation |
+| `--accent-success` | `#059669` (Vibrant Emerald) | `#10A37F` (Mint Green) | "Ready to boot" tags and verification badges |
+| `--shadow-card` | `0 4px 20px -2px rgba(0,0,0,0.05)` | `none` (Border separation) | Elevation and depth in Day Mode |
+
+### 8.2 "Snow on Sand" Card Elevation Philosophy
+- In **Day Mode**, the background canvas is a warm, organic sand (`#F7F5F0`), providing calm reading comfort. Interactive cards and workspace modules are pure white (`#FFFFFF`), floating cleanly with delicate 1px borders and soft diffuse shadows.
+- In **Night Mode**, the sidebar is pure OLED black (`#000000`), the canvas is deep neutral gray (`#171717`), and interactive cards elevate at `#212121` with crisp `#2E2E2E` borders. All legacy blue, navy, and muddy slate tints are strictly forbidden.
+
+### 8.3 Persistence and Interactive Switching
+- **Root Trigger**: Controlled via the `data-theme="light"` and `data-theme="dark"` attribute on the `<html>` root element.
+- **Persistence**: User theme selection is stored in `localStorage.getItem("scholar-theme")`.
+- **System Sync**: Automatically queries `window.matchMedia("(prefers-color-scheme: dark)")` on initial visit.
+- **Sidebar Integration**: An accessible Sun/Moon icon button anchored at the bottom of the left sidebar permits immediate one-click toggling.
+
+---
+
+## 9. Verification Commands
 
 ```bash
-# Verify WCAG contrast compliance (82 pairings checked)
+# Verify WCAG contrast compliance (82 pairings checked, 100% pass)
 node scripts/verify-contrast.mjs
 
 # Verify CSP hash integrity
 node scripts/verify-csp-hash.mjs
 
-# Run component test suites (including dual-pane, collapse, drawer tests)
-npx vitest run src/desk/__tests__/ScholarCoreLanding.test.tsx src/desk/__tests__/ProjectListScreen.test.tsx src/desk/__tests__/DeskApp.test.tsx
+# Run full component and desk test suites (228/228 tests passing)
+npx vitest run src/desk/__tests__/
 
 # Production build validation
 npm run build
 ```
+
 

@@ -56,8 +56,9 @@ function from(table: string) {
     };
   }
   if (table === "profiles") {
+    const profileRes = async () => ({ data: { username: "scholar", full_name: "Scholar Student", user_type: "student", education_level: "undergrad", affiliation: "University" }, error: null });
     return {
-      select: () => ({ eq: () => ({ single: async () => ({ data: { username: "scholar", full_name: "Scholar Student", user_type: "student", education_level: "undergrad", affiliation: "University" }, error: null }) }) }),
+      select: () => ({ eq: () => ({ single: profileRes, maybeSingle: profileRes }) }),
     };
   }
   throw new Error(`Unmocked table: ${table}`);
