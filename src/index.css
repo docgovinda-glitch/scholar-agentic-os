@@ -645,6 +645,10 @@ button:disabled {
     scroll-behavior: auto !important;
   }
   .hover-lift:hover { transform: none; }
+  .ai-logo-container,
+  .ai-logo-spin {
+    animation: none !important;
+  }
 }
 
 /* Manuscript editor (src/desk/editor/CanonicalDocumentEditor.tsx) — matches
@@ -702,4 +706,48 @@ button:disabled {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--theme-fg) 20%, transparent) transparent;
 }
+
+/* ============================================================================
+   AI BREATHING & DYNAMIC GLOW LOGO ANIMATIONS
+   Hardware-accelerated (transform & filter) 60fps animations
+   ========================================================================= */
+
+@keyframes ai-spin-continuous {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ai-breathe-glow {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 3px rgba(255, 122, 0, 0.45))
+            drop-shadow(0 0 8px rgba(224, 40, 117, 0.3));
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 7px rgba(255, 122, 0, 0.85))
+            drop-shadow(0 0 16px rgba(224, 40, 117, 0.6));
+  }
+}
+
+.ai-logo-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  will-change: transform, filter;
+  animation: ai-breathe-glow 3.5s ease-in-out infinite;
+}
+
+.ai-logo-spin {
+  transform-origin: center center;
+  will-change: transform;
+  animation: ai-spin-continuous 14s linear infinite;
+  backface-visibility: hidden;
+}
+
 

@@ -130,6 +130,17 @@ Scholar Core replaces muddy legacy themes with a high-contrast, toggleable Day/N
 
 ---
 
+## 🌀 Animated AI Breathing & Rotating Logo Core
+Scholar Core features an animated "AI Breathing" brand mark inspired by modern intelligence interfaces (ChatGPT, Claude):
+- **Core Asset**: `cognitive_authority_veena_logo_v7b_colored_details.png` (4-armed spiraling knowledge motif with vibrant warm orange `#FF7A00` core and magenta `#E02875` details).
+- **Continuous 360° Rotation**: Hardware-accelerated linear rotation (`14s linear infinite`) for perpetual motion without stutter or pause.
+- **AI Breathing Pulse**: Enclosing flex container scales gently between `scale(1.0)` and `scale(1.08)` across a `3.5s ease-in-out` breathing cycle.
+- **Dynamic Aura Glow**: Multi-layered ambient drop-shadow in warm orange and magenta hues that synchronously expands and dims with each breath.
+- **Accessibility & Motion Preference**: Automatically respects `prefers-reduced-motion: reduce` by halting transforms and filter animations.
+
+
+---
+
 ## 🎨 Design System & Typography
 
 Scholar Core features a warm, modern, Airbnb-inspired design system with geometric sans-serif typography (`Plus Jakarta Sans` & `Manrope`), generous leading for academic long-form reading, sentence-case tags, and WCAG AA/AAA certified contrast (82/82 pairings passing).

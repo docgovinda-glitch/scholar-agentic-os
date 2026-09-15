@@ -125,7 +125,20 @@ To ensure distraction-free academic focus and modern visual excellence, the appl
 
 ---
 
-## 9. Verification Commands
+## 9. Animated AI Breathing Logo System
+
+### 9.1 Brand Mark Architecture
+The Scholar Core brand mark replaces static SVG nodes with an animated "AI Breathing" Veena core:
+- **Asset**: `cognitive_authority_veena_logo_v7b_colored_details.png` (4-armed spiraling knowledge motif with vibrant warm orange `#FF7A00` core and magenta `#E02875` details).
+- **Two-Tier Animation Model**:
+  - **Outer Flex Wrapper (`.ai-logo-container`)**: Manages scale breathing (`scale(1.0)` to `scale(1.08)`) and ambient multi-tier glow drop-shadow over a 3.5s `ease-in-out` infinite loop.
+  - **Inner Image (`.ai-logo-spin`)**: Handles continuous 360-degree rotation around its center over a 14s `linear` infinite loop.
+- **Hardware Acceleration**: Driven strictly by GPU-accelerated CSS properties (`transform`, `filter`) with `will-change: transform, filter` to maintain a steady 60fps refresh rate with zero layout reflow.
+- **Accessibility Safeguards**: Automatically disabled under `@media (prefers-reduced-motion: reduce)`.
+
+---
+
+## 10. Verification Commands
 
 ```bash
 # Verify WCAG contrast compliance (82 pairings checked, 100% pass)
@@ -140,5 +153,6 @@ npx vitest run src/desk/__tests__/
 # Production build validation
 npm run build
 ```
+
 
 

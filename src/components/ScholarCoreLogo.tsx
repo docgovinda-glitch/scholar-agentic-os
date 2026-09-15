@@ -1,12 +1,11 @@
 /**
- * SCHOLAR CORE logo component — reusable across all surfaces.
+ * SCHOLAR CORE logo component — reusable across all headers, navigation, and workspaces.
  *
- * Renders as SVG so it scales cleanly at all sizes and can be
- * incorporated into headers, navigation, favicons, and marketing.
- *
- * Logo design principle: represents knowledge/research/connection/intelligence
- * without generic AI imagery. Uses a stylized "network node" concept with
- * a knowledge-book element.
+ * Renders the animated "AI Breathing" Veena core logo:
+ * - Image asset: cognitive_authority_veena_logo_v7b_colored_details.png
+ * - Continuous 360-degree linear rotation (14s)
+ * - Pulsing/Breathing scale container (1.0 -> 1.08, 3.5s)
+ * - Dynamic warm orange (#FF7A00) & magenta (#E02875) ambient aura glow
  */
 
 interface ScholarCoreLogoProps {
@@ -31,48 +30,39 @@ export default function ScholarCoreLogo({
   };
   const { mark, text, gap } = sizes[size];
 
-  // SVG mark: stylized "knowledge network" — three connected nodes forming
-  // a book/page shape, representing research connections and intelligence.
-  const markSvg = (
-    <svg
-      width={mark}
-      height={mark}
-      viewBox="0 0 48 48"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="flex-shrink-0"
+  // Animated AI Breathing & Rotating Veena Logo Mark
+  const logoMark = (
+    <div
+      className="ai-logo-container relative flex items-center justify-center flex-shrink-0"
+      style={{ width: `${mark}px`, height: `${mark}px` }}
+      data-testid="scholar-core-animated-logo"
     >
-      {/* Background circle — subtle frame */}
-      <circle cx="24" cy="24" r="23" fill="currentColor" opacity="0.05" />
-
-      {/* Left node — represents knowledge/sources */}
-      <circle cx="16" cy="24" r="4" fill="currentColor" />
-
-      {/* Center node — represents research/synthesis */}
-      <circle cx="24" cy="16" r="4" fill="currentColor" />
-
-      {/* Right node — represents creation/output */}
-      <circle cx="32" cy="24" r="4" fill="currentColor" />
-
-      {/* Connection lines — represents workflow connection */}
-      <line x1="19" y1="21" x2="22" y2="18" stroke="currentColor" strokeWidth="1.5" opacity="0.7" />
-      <line x1="27" y1="18" x2="30" y2="21" stroke="currentColor" strokeWidth="1.5" opacity="0.7" />
-      <line x1="30" y1="27" x2="27" y2="30" stroke="currentColor" strokeWidth="1.5" opacity="0.7" />
-      <line x1="22" y1="30" x2="19" y2="27" stroke="currentColor" strokeWidth="1.5" opacity="0.7" />
-
-      {/* Center accent — page/book element */}
-      <rect x="21" y="32" width="6" height="8" rx="0.5" fill="currentColor" opacity="0.5" />
-    </svg>
+      <img
+        src="cognitive_authority_veena_logo_v7b_colored_details.png"
+        alt="Scholar Core Logo"
+        width={mark}
+        height={mark}
+        className="ai-logo-spin object-contain select-none pointer-events-none rounded-full"
+        style={{ width: `${mark}px`, height: `${mark}px` }}
+        loading="eager"
+        onError={(e) => {
+          const target = e.currentTarget;
+          if (!target.src.startsWith(window.location.origin + '/cognitive_authority_veena_logo_v7b_colored_details.png')) {
+            target.src = '/cognitive_authority_veena_logo_v7b_colored_details.png';
+          }
+        }}
+      />
+    </div>
   );
 
   if (!withText) {
-    return <div className={className}>{markSvg}</div>;
+    return <div className={`inline-flex items-center justify-center ${className}`}>{logoMark}</div>;
   }
 
   return (
     <div className={`flex items-center gap-[${gap}px] ${className}`}>
-      {markSvg}
-      <div className="flex flex-col leading-tight">
+      {logoMark}
+      <div className="flex flex-col leading-tight select-none">
         <span
           className="font-bold tracking-tight text-[color:var(--text-primary)]"
           style={{ fontSize: `${text}px` }}
