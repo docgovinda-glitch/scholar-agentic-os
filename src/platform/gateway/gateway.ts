@@ -18,6 +18,7 @@ import {
   type FailoverOptions,
   type FailoverResult,
 } from "../../services/providerFailover";
+import { getCloudProvider } from "../../config/providerCatalog";
 
 export { GatewayDenied } from "./types";
 export type { CompletionRequest, CompletionResult, CandidateProvider } from "./types";
@@ -136,22 +137,9 @@ export async function stream(
 export interface CompleteWithFailoverOptions
   extends Omit<FailoverOptions, "candidates" | "displayNames"> {
   candidates: CandidateProvider[];
+  displayNames?: Record<string, string>;
 }
 
-/**
- * Turns whatever a single-candidate call (complete()/stream()) threw into
- * the failover orchestrator's vocabulary. Shared by completeWithFailover()
- * and streamWithFailover() so the two never drift on this translation.
- *
- * A GatewayDenied is translated rather than thrown directly: never worth
- * retrying the SAME provider (consent/policy does not change between two
- * calls a second apart), but whether it's worth trying the NEXT provider
- * depends on which kind of denial it was. A hard "deny" (e.g. restricted
- * content) is provider-independent — every provider will refuse it
- * identically — so failover would just burn attempts. An "ask" is
- * per-provider consent, so a different provider that already has consent
- * recorded genuinely might succeed where this one didn't.
- */
 function toProviderCallError(providerId: string, err: unknown): ProviderCallError {
   if (err instanceof GatewayDenied) {
     return new ProviderCallError(providerId, {
@@ -171,57 +159,63 @@ function toProviderCallError(providerId: string, err: unknown): ProviderCallErro
   return new ProviderCallError(providerId, classifyThrownError(err));
 }
 
+function getCandidateKey(c: CandidateProvider, index: number): string {
+  return `${c.provider}::${c.model || "default"}::${index}`;
+}
+
+function buildCandidateMaps(candidates: CandidateProvider[]) {
+  const byKey = new Map<string, CandidateProvider>();
+  const keys: string[] = [];
+  const displayNames: Record<string, string> = {};
+
+  candidates.forEach((c, index) => {
+    const key = getCandidateKey(c, index);
+    byKey.set(key, c);
+    keys.push(key);
+    const spec = getCloudProvider(c.provider);
+    const name = spec?.name || c.provider;
+    displayNames[key] = c.model ? `${name} (${c.model})` : name;
+  });
+
+  return { byKey, keys, displayNames };
+}
+
 /**
  * Complete against the first candidate provider that succeeds, in order,
- * with retry/backoff/cooldown handled by services/providerFailover.ts. Each
- * candidate still goes through the full Warden gate individually — see
- * toProviderCallError()'s doc comment for why a deny/ask is handled
- * differently.
+ * with retry/backoff/cooldown handled by services/providerFailover.ts.
  */
 export async function completeWithFailover(
   req: Omit<CompletionRequest, "provider" | "apiKey" | "model">,
   options: CompleteWithFailoverOptions,
   policy: EgressPolicy = defaultPolicy()
 ): Promise<FailoverResult<CompletionResult>> {
-  const byProvider = new Map(options.candidates.map((c) => [c.provider, c]));
+  const { byKey, keys, displayNames } = buildCandidateMaps(options.candidates);
 
   return executeWithFailover(
-    async (providerId) => {
-      const candidate = byProvider.get(providerId);
+    async (candidateKey) => {
+      const candidate = byKey.get(candidateKey);
       if (!candidate) {
-        throw new Error(`completeWithFailover: no candidate configured for provider "${providerId}".`);
+        throw new Error(`completeWithFailover: no candidate configured for key "${candidateKey}".`);
       }
       try {
         return await complete(
-          { ...req, provider: providerId, apiKey: candidate.apiKey, model: candidate.model },
+          { ...req, provider: candidate.provider, apiKey: candidate.apiKey, model: candidate.model },
           policy
         );
       } catch (err) {
-        throw toProviderCallError(providerId, err);
+        throw toProviderCallError(candidate.provider, err);
       }
     },
     {
       ...options,
-      candidates: options.candidates.map((c) => c.provider),
+      candidates: keys,
+      displayNames: { ...displayNames, ...(options.displayNames || {}) },
     }
   );
 }
 
 /**
- * Stream against the first candidate provider that succeeds. Same
- * failover/backoff/cooldown machinery as completeWithFailover(), but only
- * ever retries or switches provider BEFORE any chunk has been delivered to
- * `onChunk` — every adapter's stream() validates the HTTP response before
- * it starts parsing SSE lines, so a failure that lands here always means
- * nothing was written yet. A failure genuinely mid-stream (the connection
- * drops after chunks were already delivered) is not retried transparently:
- * doing so would either duplicate already-delivered text or require the
- * continuation-prompt machinery in services/providerFailover.ts's
- * buildContinuationRequest(), which is designed for a client visibly
- * resuming a stream, not a server-side retry-from-scratch. That failure
- * simply propagates as this call's failure, same as the legacy proxy this
- * migrates (server/routes/ai.ts's /api/stream-generate never retried once
- * response chunks had started flowing either).
+ * Stream against the first candidate provider that succeeds.
  */
 export async function streamWithFailover(
   req: Omit<CompletionRequest, "provider" | "apiKey" | "model">,
@@ -229,27 +223,28 @@ export async function streamWithFailover(
   options: CompleteWithFailoverOptions,
   policy: EgressPolicy = defaultPolicy()
 ): Promise<FailoverResult<CompletionResult>> {
-  const byProvider = new Map(options.candidates.map((c) => [c.provider, c]));
+  const { byKey, keys, displayNames } = buildCandidateMaps(options.candidates);
 
   return executeWithFailover(
-    async (providerId) => {
-      const candidate = byProvider.get(providerId);
+    async (candidateKey) => {
+      const candidate = byKey.get(candidateKey);
       if (!candidate) {
-        throw new Error(`streamWithFailover: no candidate configured for provider "${providerId}".`);
+        throw new Error(`streamWithFailover: no candidate configured for key "${candidateKey}".`);
       }
       try {
         return await stream(
-          { ...req, provider: providerId, apiKey: candidate.apiKey, model: candidate.model },
+          { ...req, provider: candidate.provider, apiKey: candidate.apiKey, model: candidate.model },
           onChunk,
           policy
         );
       } catch (err) {
-        throw toProviderCallError(providerId, err);
+        throw toProviderCallError(candidate.provider, err);
       }
     },
     {
       ...options,
-      candidates: options.candidates.map((c) => c.provider),
+      candidates: keys,
+      displayNames: { ...displayNames, ...(options.displayNames || {}) },
     }
   );
 }

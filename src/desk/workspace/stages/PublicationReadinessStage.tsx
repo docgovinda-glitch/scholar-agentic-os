@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { ProjectView, CanonicalDocument, Block } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
-import { authedJsonFetch, getDocument } from "../../api";
+import { authedJsonFetch, getDocument, saveIntakeAnswers } from "../../api";
 
 export default function PublicationReadinessStage({
   stage,
@@ -20,7 +20,14 @@ export default function PublicationReadinessStage({
   const def = STAGE_MAP.get(stage);
   const [doc, setDoc] = useState<CanonicalDocument | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<any | null>(null);
+  const [results, setResults] = useState<any | null>(() => {
+    try {
+      const saved = project.answers?.publication_readiness;
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [error, setError] = useState<string | null>(null);
   const [scanProgress, setScanProgress] = useState(0);
   const [activeTask, setActiveTask] = useState<string | null>(null);
@@ -40,7 +47,6 @@ export default function PublicationReadinessStage({
 
   const startAgent = async () => {
     setIsProcessing(true);
-    setResults(null);
     setError(null);
     setScanProgress(0);
 
@@ -66,6 +72,9 @@ export default function PublicationReadinessStage({
       const resJson = await response.json();
       const { data } = resJson;
       setResults(data);
+      saveIntakeAnswers(projectId, {
+        publication_readiness: JSON.stringify(data),
+      }).catch(() => {});
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

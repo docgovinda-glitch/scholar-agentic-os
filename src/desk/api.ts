@@ -13,6 +13,7 @@
 import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient";
 import { routeDecision, type RoutingDecision, type RoutingTaskType } from "./aiAccess/aiAccessApi";
 import { completeWithFailover, streamWithFailover, type CandidateProvider } from "../platform/gateway/gateway";
+import { defaultPolicy, recordConsent } from "../platform/warden/warden";
 import type {
   Author,
   CanonicalDocument,
@@ -293,6 +294,8 @@ function routingTaskTypeToTaskClass(taskType: RoutingTaskType): "drafting" | "re
 }
 
 import { resolveClientCandidates } from "../services/clientRouter";
+import { getCloudProvider } from "../config/providerCatalog";
+import { startExecutionScope, updateExecutionScope, endExecutionScope } from "../services/executionState";
 
 export async function executeAgenticLLM(
   systemPrompt: string,
@@ -345,12 +348,44 @@ export async function executeAgenticLLM(
   if (candidates.length === 0) {
     throw new Error(
       clientDecision?.reasoning ||
-      "No AI providers are available on this device for this task. " +
+      "No AI providers are currently available on this device satisfying task requirements. " +
       "Connect a provider in AI Access settings or run a local AI runtime."
     );
   }
 
   const taskClass = routingTaskTypeToTaskClass(taskType);
+  const executionId = `exec-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const initialCandidate = candidates[0];
+  const initialSpec = getCloudProvider(initialCandidate.provider);
+  startExecutionScope(
+    executionId,
+    initialCandidate.provider,
+    initialSpec?.name || initialCandidate.provider,
+    initialCandidate.model
+  );
+
+  const handleFailoverEvent = (event: any) => {
+    if (event.type === "switch") {
+      const nextCandidate = candidates.find(
+        (c) => c.provider === event.providerId || `${c.provider}::${c.model}`.startsWith(event.providerId)
+      );
+      const spec = nextCandidate ? getCloudProvider(nextCandidate.provider) : undefined;
+      updateExecutionScope(executionId, {
+        providerId: event.providerId,
+        providerName: spec?.name || event.providerId,
+        modelId: nextCandidate?.model,
+        isFallback: true,
+        status: "fallback",
+        message: event.userMessage,
+      });
+    } else if (event.type === "success") {
+      updateExecutionScope(executionId, {
+        status: "executing",
+        message: event.userMessage,
+      });
+    }
+    onFailoverEvent?.(event);
+  };
 
   // Use completeWithFailover from the gateway
   const req = {
@@ -362,32 +397,56 @@ export async function executeAgenticLLM(
     segments: [],
   };
 
-  if (onChunk) {
-    let full = "";
-    const result = await streamWithFailover(
-      req,
-      (chunk) => {
-        full += chunk;
-        onChunk(chunk);
-      },
-      {
-        candidates,
-        onEvent: onFailoverEvent,
+  // Consent is inherent to user-configured BYOK providers
+  let policy = defaultPolicy();
+  for (const c of candidates) {
+    if (c.apiKey) {
+      policy = recordConsent(policy, c.provider);
+    }
+  }
+
+  try {
+    if (onChunk) {
+      let full = "";
+      const result = await streamWithFailover(
+        req,
+        (chunk) => {
+          full += chunk;
+          onChunk(chunk);
+        },
+        {
+          candidates,
+          onEvent: handleFailoverEvent,
+        },
+        policy
+      );
+      if (!result.ok) {
+        const errMsg = (result as any).error?.message || "AI generation is temporarily unavailable.";
+        endExecutionScope(executionId, "error", errMsg);
+        throw new Error(errMsg);
       }
-    );
-    if (!result.ok) {
-      throw new Error("Agentic generation failed: " + (result as any).error?.message);
+      endExecutionScope(executionId, "success");
+      return full;
+    } else {
+      const result = await completeWithFailover(
+        req,
+        {
+          candidates,
+          onEvent: handleFailoverEvent,
+        },
+        policy
+      );
+      if (!result.ok) {
+        const errMsg = (result as any).error?.message || "AI generation is temporarily unavailable.";
+        endExecutionScope(executionId, "error", errMsg);
+        throw new Error(errMsg);
+      }
+      endExecutionScope(executionId, "success");
+      return typeof result.value === "string" ? result.value : result.value.text;
     }
-    return full;
-  } else {
-    const result = await completeWithFailover(req, {
-      candidates,
-      onEvent: onFailoverEvent,
-    });
-    if (!result.ok) {
-      throw new Error("Agentic generation failed: " + (result as any).error?.message);
-    }
-    return result.value;
+  } catch (err) {
+    endExecutionScope(executionId, "error", (err as Error).message);
+    throw err;
   }
 }
 

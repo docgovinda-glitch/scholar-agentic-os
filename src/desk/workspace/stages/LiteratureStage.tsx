@@ -259,6 +259,30 @@ export default function LiteratureStage({
     }
   };
 
+  const retryDiscovery = () => {
+    // Transactional recovery:
+    // 1. Preserve existing discovered items in `results`, along with all current exclusions
+    // 2. Reset subagent statuses from Halted/Failed back to Ready/Waiting
+    // 3. Clear the error state
+    setError(null);
+    setSourceAgent("Ready");
+    setAnalysisAgent("Ready");
+    setEvidenceAgent("Ready");
+    setKnowledgeAgent("Ready");
+    // 4. Log transactional recovery checkpoint
+    setLogs((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString() + "retry_checkpoint",
+        timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+        level: "info",
+        message: `> Recovering execution branch: Preserving ${results?.length || 0} existing sources, restoring sub-agent pipeline...`,
+      },
+    ]);
+    // 5. Restart discovery for remaining/uncompleted work
+    startDiscovery(Boolean(results && results.length > 0));
+  };
+
   const handleRemoveItem = (item: LiteratureItem) => {
     const nextDois = item.doi ? [...removedDois, item.doi] : removedDois;
     const nextIds = item.id ? [...removedIds, item.id] : removedIds;
@@ -440,7 +464,7 @@ export default function LiteratureStage({
           <div className="p-4 bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] rounded-xl border border-[color:var(--state-danger)] text-sm flex items-center justify-between">
             <span>⚠️ {error}</span>
             <button
-              onClick={() => startDiscovery(false)}
+              onClick={() => retryDiscovery()}
               className="px-3 py-1 bg-[color:var(--state-danger)] text-white text-xs font-bold rounded-lg hover:opacity-90 cursor-pointer"
             >
               Retry

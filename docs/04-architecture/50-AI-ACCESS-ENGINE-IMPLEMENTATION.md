@@ -664,3 +664,52 @@ and would not have caught a missing `requireScopeInline` call).
 `AdminApp.test.tsx` (new, 7: login/not-found/authorized routing, failed
 and successful sign-in, sign-out). `quotaEngine.test.ts`/
 `creditEngine.test.ts` extended for `weeklyCredits`/`weekly_limit_exceeded`.
+
+---
+
+## 10. Dynamic Account Discovery, In-Provider Fallback & Resilient Agentic Execution
+
+> **Revision Note (September 2026 Audit & Remediation):**
+> Following a comprehensive system audit of stale model assumptions and failure modes, hardcoded model catalogs across routing, gateway adapters, and agent stages were replaced with account-level dynamic discovery, capability-driven routing, in-provider failover, and transactional state recovery.
+
+### 10.1 Architecture Principles
+1. **Dynamic Account-Level Discovery as Source of Truth (`src/services/modelDiscovery.ts`):**
+   - Direct query to provider `/models` endpoints over secure HTTPS using the exact authorization path as inference.
+   - Non-reversible, blind 32-bit hash fingerprinting (`computeKeyFingerprint`) for session caching without leaking raw keys.
+   - Conservative capability normalization extracting context window, structured JSON, tool use, and vision strictly from provider metadata.
+   - Clear distinction between live account discovery (`source: "live_discovery"`) and emergency static fallback (`source: "compatibility_fallback"`). Live discovered candidates receive a `+35` scoring bonus.
+
+2. **Policy-Driven Candidate Resolution & `TaskRequirement` Contracts (`src/services/clientRouter.ts`):**
+   - Centralized task contract defining mandatory capabilities (`requiresStructuredOutput`, `minContextWindow`, `reasoningIntensity`, `vision`).
+   - Models not satisfying mandatory task criteria are pruned before candidate ranking to eliminate silent semantic degradation.
+   - Explicit rejection error messages explaining missing criteria when no models qualify.
+
+3. **Session Dead-Model Blacklisting vs. Provider-Health State Machine:**
+   - HTTP 404 / `model_not_found` immediately blacklists the specific `provider:model` for the current session without disabling the provider.
+   - The provider state machine tracks status across `"healthy"`, `"degraded"`, `"rate_limited"`, `"auth_failed"`, and `"outage"`.
+   - Cooldowns for HTTP 429 (`Retry-After`) and HTTP 401/403 are shared across all simultaneous agent executions to prevent retry storms.
+
+4. **Composite Provider/Model Keys & Dynamic In-Provider Failover (`src/platform/gateway/`):**
+   - Candidates are identified by composite keys: `${provider}::${model}::${index}`.
+   - When a model fails with 404, the gateway transparently invokes `getDynamicModelFallbacks()` to attempt other live discovered models on that same provider before crossing provider boundaries.
+
+5. **Request-Scoped Execution State & Active Model Status (`src/services/executionState.ts`):**
+   - Each agentic execution runs inside an isolated scope (`startExecutionScope`, `updateExecutionScope`, `endExecutionScope`).
+   - Listeners support scope filtering (`filterScopeId`) to completely prevent crosstalk between concurrent agent runs.
+   - Active Model badge in the Desk workspace top bar pulses green (primary healthy), amber ("BACKUP ACTIVE"), or red (exhaustion).
+
+6. **Stage-Wide Transactional Checkpoint & Retry Preservation:**
+   - **Literature Discovery:** Retains search parameters, paper results, user exclusions (`removedDois`, `removedIds`), and matrix state on retry.
+   - **Evidence Extraction:** State initialized from `project.answers.extracted_evidence` and preserved across errors.
+   - **Draft Assembly:** State initialized from `project.answers.assembled_draft` and preserved across retries.
+   - **Peer Review:** Critiques preserved via `fetchCritiques()`.
+   - **Publication Readiness:** Journal checklists and scores persisted in `project.answers.publication_readiness`.
+
+7. **Proactive 8-Step Diagnostics Engine (`src/services/aiDiagnostics.ts`):**
+   - Integrated into AI Access Settings: Provider Connectivity $\rightarrow$ Credential Format $\rightarrow$ Account Model Discovery $\rightarrow$ Model Availability $\rightarrow$ Capability Validation $\rightarrow$ Test Generation $\rightarrow$ Structured Output Test $\rightarrow$ Health Assessment.
+
+8. **Credential Boundary & Data-Sovereignty Warden Integration:**
+   - Keys are encrypted with AES-GCM under a device-local secret in `localStorage`.
+   - Zero raw keys in diagnostic logs, error payloads, or telemetry.
+   - Inherent Warden egress consent registered for user-configured BYOK providers in `executeAgenticLLM` to allow uninterrupted execution while preserving data sovereignty.
+

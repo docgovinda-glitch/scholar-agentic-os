@@ -65,7 +65,6 @@ export default function PeerReviewStage({
 
   const startAgent = async () => {
     setIsProcessing(true);
-    setResults(null);
     setError(null);
     setScanProgress(0);
 
@@ -93,6 +92,7 @@ export default function PeerReviewStage({
       );
     } catch (err: any) {
       setError(err.message);
+      fetchCritiques();
     } finally {
       clearInterval(interval);
       setScanProgress(100);

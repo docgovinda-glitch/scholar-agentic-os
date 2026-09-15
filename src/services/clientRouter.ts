@@ -10,7 +10,7 @@
  * 3. User Privacy Mode (local-only, privacy-first, balanced, cloud-allowed)
  * 4. Provider Capability Match (modality, token limit, schema fidelity)
  * 5. Availability & Quota Status (active, rate-limited, cooling down)
- * 6. Provider Health & Historical Reliability
+ * 6. Provider Health & Historical Reliability (Health State Machine)
  * 7. Default Policy Ranking
  *
  * Strictly operates on the client using local credentials and runtimes without
@@ -20,7 +20,16 @@
 import { getCloudProvider, CLOUD_PROVIDERS } from "../config/providerCatalog";
 import { LOCAL_RUNNERS } from "../config/localRunnerCatalog";
 import { probeRunner, type ProbeResult } from "./localRunnerProbe";
-import { providersWithStoredKey, readProviderKey } from "./userAiSettings";
+import { providersWithStoredKey, readProviderKey, loadUserAiSettings } from "./userAiSettings";
+import {
+  getCachedDiscoveredModels,
+  normalizeCapabilities,
+  isModelBlacklisted,
+  isProviderAvailable,
+  getProviderHealth,
+  type DiscoveredModel,
+} from "./modelDiscovery";
+import { getDefaultModelId } from "../config/modelCatalog";
 import type { CandidateProvider } from "../platform/gateway/types";
 
 export type PrivacyMode = "local-only" | "privacy-first" | "balanced" | "cloud-allowed";
@@ -59,13 +68,15 @@ export function setUserAiPreferences(prefs: Partial<UserAiPreferences>): void {
   }
 }
 
-export type RoutingTaskType = "simple" | "multimodal" | "reasoning" | "coding" | "long-context";
+export type RoutingTaskType = "simple" | "multimodal" | "reasoning" | "coding" | "long-context" | "literatureDiscovery";
 
 export interface TaskRequirement {
   taskType: RoutingTaskType;
   requiresStructuredOutput?: boolean;
   minContextWindow?: number;
   reasoningIntensity?: "high" | "medium" | "standard";
+  toolCalling?: boolean;
+  vision?: boolean;
 }
 
 export interface ClientRoutingCandidate extends CandidateProvider {
@@ -78,6 +89,7 @@ export interface ClientRoutingCandidate extends CandidateProvider {
 export interface ClientRoutingDecision {
   ok: boolean;
   choice?: ClientRoutingCandidate;
+  primary?: ClientRoutingCandidate;
   fallbacks: ClientRoutingCandidate[];
   allCandidates: ClientRoutingCandidate[];
   reasoning: string;
@@ -94,17 +106,45 @@ export interface ClientRoutingOptions {
  */
 export function getTaskRequirements(taskType: RoutingTaskType): TaskRequirement {
   switch (taskType) {
+    case "literatureDiscovery":
     case "reasoning":
-      return { taskType, requiresStructuredOutput: true, minContextWindow: 8192, reasoningIntensity: "high" };
+      return {
+        taskType,
+        requiresStructuredOutput: true,
+        minContextWindow: 8192,
+        reasoningIntensity: "high",
+        toolCalling: true,
+      };
     case "long-context":
-      return { taskType, requiresStructuredOutput: false, minContextWindow: 65536, reasoningIntensity: "medium" };
+      return {
+        taskType,
+        requiresStructuredOutput: false,
+        minContextWindow: 65536,
+        reasoningIntensity: "medium",
+      };
     case "coding":
-      return { taskType, requiresStructuredOutput: false, minContextWindow: 8192, reasoningIntensity: "high" };
+      return {
+        taskType,
+        requiresStructuredOutput: false,
+        minContextWindow: 8192,
+        reasoningIntensity: "high",
+      };
     case "multimodal":
-      return { taskType, requiresStructuredOutput: false, minContextWindow: 8192, reasoningIntensity: "medium" };
+      return {
+        taskType,
+        requiresStructuredOutput: false,
+        minContextWindow: 8192,
+        reasoningIntensity: "medium",
+        vision: true,
+      };
     case "simple":
     default:
-      return { taskType, requiresStructuredOutput: false, minContextWindow: 4096, reasoningIntensity: "standard" };
+      return {
+        taskType,
+        requiresStructuredOutput: false,
+        minContextWindow: 4096,
+        reasoningIntensity: "standard",
+      };
   }
 }
 
@@ -129,7 +169,9 @@ export async function resolveClientCandidates(
       try {
         const probe = await probeRunner(runner);
         if (probe.reachable && probe.models.length > 0) {
-          const model = probe.models[0];
+          const validModels = probe.models.filter((m) => !isModelBlacklisted(runner.id, m));
+          if (validModels.length === 0) continue;
+          const model = validModels[0];
           let score = 50; // base score for reachable local model
           let reasoning = `Local runtime (${runner.name}) available on device.`;
 
@@ -137,7 +179,6 @@ export async function resolveClientCandidates(
             score += 40; // prioritize local in privacy modes
           }
 
-          // Penalize if task exceeds typical local context (unless specific large model detected)
           if (reqs.minContextWindow && reqs.minContextWindow > 32768) {
             score -= 20;
             reasoning += " (Task requires large context window; local performance may vary)";
@@ -161,10 +202,19 @@ export async function resolveClientCandidates(
 
   // 2. Discover configured Cloud Providers (Free & Paid BYOK)
   if (privacyMode !== "local-only") {
-    const configuredProviderIds = providersWithStoredKey();
+    const userAiSettings = await loadUserAiSettings().catch(() => null);
+    const configuredProviderIds = Array.from(
+      new Set([
+        ...providersWithStoredKey(),
+        ...(userAiSettings?.provider ? [userAiSettings.provider] : []),
+      ])
+    );
 
     for (const providerId of configuredProviderIds) {
       if (disabled.has(providerId)) continue;
+      // Check health state machine: skip if in auth_failure (401/403) or hard offline
+      if (!isProviderAvailable(providerId)) continue;
+
       const key = await readProviderKey(providerId);
       if (!key) continue;
 
@@ -172,43 +222,126 @@ export async function resolveClientCandidates(
       if (!spec) continue;
 
       const tier: "free" | "byok" = spec.freeTier === "free" || spec.freeTier === "freemium" ? "free" : "byok";
-      const model = spec.models?.[0] || undefined;
+
+      // Resolve available models: live discovered cache first, then compatibility fallback
+      const cachedDiscovered = getCachedDiscoveredModels(providerId, key) || [];
+      let availableModels =
+        cachedDiscovered.length > 0
+          ? cachedDiscovered.map((m) => m.id)
+          : spec.models && spec.models.length > 0
+          ? spec.models
+          : [spec.defaultModel];
+
+      // Exclude session-blacklisted dead models
+      availableModels = availableModels.filter((m) => !isModelBlacklisted(providerId, m));
+      if (availableModels.length === 0) continue;
+
+      // Check user's preferred model for this provider
+      const userPreferredForProvider = userAiSettings?.preferences?.[`${providerId}Model`];
+      let primaryModel: string | undefined = undefined;
+
+      if (userPreferredForProvider && availableModels.includes(userPreferredForProvider)) {
+        const prefItem = cachedDiscovered.find((d) => d.id === userPreferredForProvider || d.modelId === userPreferredForProvider);
+        const prefCaps = prefItem?.capabilities ?? normalizeCapabilities(providerId, userPreferredForProvider).capabilities;
+        const prefCtx = prefItem?.contextWindow ?? normalizeCapabilities(providerId, userPreferredForProvider).contextWindow;
+
+        const prefValid =
+          (!reqs.requiresStructuredOutput || prefCaps.includes("structuredOutput")) &&
+          (!reqs.minContextWindow || (prefCtx ?? 0) >= reqs.minContextWindow) &&
+          (!reqs.vision || prefCaps.includes("vision"));
+
+        if (prefValid) {
+          primaryModel = userPreferredForProvider;
+        }
+      }
+
+      if (!primaryModel) {
+        // Capability-aware selection
+        const matchingModels = availableModels.filter((m) => {
+          const discoveredItem = cachedDiscovered.find((d) => d.id === m || d.modelId === m);
+          const capabilities = discoveredItem?.capabilities ?? normalizeCapabilities(providerId, m).capabilities;
+          const contextWindow = discoveredItem?.contextWindow ?? normalizeCapabilities(providerId, m).contextWindow;
+
+          if (reqs.requiresStructuredOutput && !capabilities.includes("structuredOutput")) return false;
+          if (reqs.minContextWindow && (contextWindow ?? 0) < reqs.minContextWindow) return false;
+          if (reqs.vision && !capabilities.includes("vision")) return false;
+          return true;
+        });
+
+        if (matchingModels.length === 0) {
+          // No model on this provider satisfies mandatory task requirements; do not route to incapable model
+          continue;
+        }
+        primaryModel = matchingModels[0];
+      }
 
       let score = 40; // base score for cloud BYOK
       let reasoning = `${spec.name} configured with user-held API key.`;
 
-      // Scoring based on task requirements
-      if (reqs.reasoningIntensity === "high") {
-        if (["anthropic", "openai", "deepseek", "gemini", "groq"].includes(providerId)) {
-          score += 25;
-          reasoning = `${spec.name} offers high reasoning capability for this task.`;
-        }
+      // Live discovered model priority bonus over unverified compatibility fallbacks
+      const isLive = cachedDiscovered.some(
+        (d) => d.source === "live_discovery" && (d.id === primaryModel || d.modelId === primaryModel)
+      );
+      if (isLive) {
+        score += 35; // Verified live discovery strictly outranks emergency fallbacks
       }
 
-      if (reqs.minContextWindow && reqs.minContextWindow > 32768) {
-        if (["gemini", "anthropic", "openai"].includes(providerId)) {
-          score += 30;
-          reasoning = `${spec.name} satisfies the large context window requirement.`;
-        }
+      // Scoring based on task requirements & provider capabilities
+      const discoveredItem = cachedDiscovered.find((d) => d.id === primaryModel || d.modelId === primaryModel);
+      const capabilities = discoveredItem?.capabilities ?? normalizeCapabilities(providerId, primaryModel).capabilities;
+      if (reqs.reasoningIntensity === "high" && capabilities.includes("reasoning")) {
+        score += 25;
+        reasoning = `${spec.name} (${primaryModel}) satisfies high reasoning requirement.`;
+      }
+
+      if (reqs.requiresStructuredOutput && capabilities.includes("structuredOutput")) {
+        score += 15;
       }
 
       if (privacyMode === "privacy-first") {
-        score -= 15; // lower than local in privacy-first mode, but still available as fallback
+        score -= 15;
       } else if (privacyMode === "balanced") {
         if (tier === "free") {
-          score += 15; // favor free tier over paid BYOK in balanced mode
+          score += 15;
         }
       }
 
+      // Check provider health degradation
+      const health = getProviderHealth(providerId);
+      if (health.status === "degraded") {
+        score -= 20;
+      }
+
+      // Primary candidate for this provider
       candidates.push({
         provider: providerId,
-        model,
+        model: primaryModel,
         apiKey: key,
         tier,
-        label: `${spec.name}${model ? ` (${model})` : ""}`,
+        label: `${spec.name}${primaryModel ? ` (${primaryModel})` : ""}`,
         reasoning,
         score,
       });
+
+      // Secondary fallback model on the same provider (satisfying requirements)
+      const secondaryModel = availableModels.find((m) => {
+        if (m === primaryModel) return false;
+        const disc = cachedDiscovered.find((d) => d.id === m || d.modelId === m);
+        const caps = disc?.capabilities ?? normalizeCapabilities(providerId, m).capabilities;
+        if (reqs.requiresStructuredOutput && !caps.includes("structuredOutput")) return false;
+        return true;
+      });
+      if (secondaryModel) {
+        candidates.push({
+          provider: providerId,
+          model: secondaryModel,
+          apiKey: key,
+          tier,
+          label: `${spec.name} (${secondaryModel} - Backup)`,
+          reasoning: `Secondary in-provider model for ${spec.name}.`,
+          score: score - 25,
+        });
+      }
     }
   }
 
@@ -219,7 +352,9 @@ export async function resolveClientCandidates(
     if (match) {
       match.score += 100;
       match.reasoning = `Explicitly bound to ${match.label} in AI preferences.`;
-      if (binding.modelId) match.model = binding.modelId;
+      if (binding.modelId && !isModelBlacklisted(binding.providerId, binding.modelId)) {
+        match.model = binding.modelId;
+      }
     }
   }
 
@@ -229,25 +364,38 @@ export async function resolveClientCandidates(
     if (match) {
       match.score += 80;
       match.reasoning = `Preferred provider ${match.label} selected from AI preferences.`;
-      if (prefs.preferredModelId) match.model = prefs.preferredModelId;
+      if (prefs.preferredModelId && !isModelBlacklisted(prefs.preferredProviderId, prefs.preferredModelId)) {
+        match.model = prefs.preferredModelId;
+      }
     }
   }
 
   // 5. Apply Manual Override if actively supplied
   const activeOverride = options.manualOverride;
   if (activeOverride) {
+    const isOverrideModelBlacklisted = activeOverride.modelId
+      ? isModelBlacklisted(activeOverride.providerId, activeOverride.modelId)
+      : false;
+
     const existing = candidates.find((c) => c.provider === activeOverride.providerId);
     if (existing) {
       existing.score += 500;
       existing.reasoning = `Manual model override: ${existing.label}.`;
-      if (activeOverride.modelId) existing.model = activeOverride.modelId;
+      if (activeOverride.modelId && !isOverrideModelBlacklisted) {
+        existing.model = activeOverride.modelId;
+      }
     } else {
       const key = await readProviderKey(activeOverride.providerId);
-      if (key) {
+      if (key && isProviderAvailable(activeOverride.providerId)) {
         const spec = getCloudProvider(activeOverride.providerId);
+        const model =
+          activeOverride.modelId && !isOverrideModelBlacklisted
+            ? activeOverride.modelId
+            : getDefaultModelId(activeOverride.providerId);
+
         candidates.unshift({
           provider: activeOverride.providerId,
-          model: activeOverride.modelId || spec?.models?.[0],
+          model,
           apiKey: key,
           tier: spec?.freeTier === "free" ? "free" : "byok",
           label: spec ? `${spec.name} (Manual)` : activeOverride.providerId,
@@ -262,14 +410,28 @@ export async function resolveClientCandidates(
   candidates.sort((a, b) => b.score - a.score);
 
   if (candidates.length === 0) {
+    const missingDetails: string[] = [];
+    if (reqs.requiresStructuredOutput) missingDetails.push("structured JSON output");
+    if (reqs.minContextWindow && reqs.minContextWindow > 8192) missingDetails.push(`min ${reqs.minContextWindow} context tokens`);
+    if (reqs.vision) missingDetails.push("vision / multimodal input");
+    if (reqs.reasoningIntensity === "high") missingDetails.push("high-intensity reasoning");
+
+    const reqSummary = missingDetails.length > 0 ? ` (task requires: ${missingDetails.join(", ")})` : "";
+
+    let failReason = "";
+    if (privacyMode === "local-only") {
+      failReason = "No local AI runtimes (Ollama/LM Studio) are reachable on localhost. Ensure your local runner is active and CORS is configured, or adjust privacy mode.";
+    } else if (providersWithStoredKey().length > 0) {
+      failReason = `No connected AI model satisfies the minimum requirements for this stage${reqSummary}. All connected models either lack required capabilities or are temporarily in cooldown. Connect a compatible provider or select a different model in AI Access settings.`;
+    } else {
+      failReason = "No AI providers are configured or available on this device satisfying task requirements. Connect a provider in AI Access settings or start a local runner.";
+    }
+
     return {
       ok: false,
       fallbacks: [],
       allCandidates: [],
-      reasoning:
-        privacyMode === "local-only"
-          ? "No local AI runtimes (Ollama/LM Studio) are reachable on localhost. Ensure your local runner is active and CORS is configured, or adjust privacy mode."
-          : "No AI providers are configured or reachable on this device. Connect a provider in AI Access settings or start a local runner.",
+      reasoning: failReason,
     };
   }
 
@@ -277,6 +439,7 @@ export async function resolveClientCandidates(
   return {
     ok: true,
     choice,
+    primary: choice,
     fallbacks,
     allCandidates: candidates,
     reasoning: choice.reasoning,

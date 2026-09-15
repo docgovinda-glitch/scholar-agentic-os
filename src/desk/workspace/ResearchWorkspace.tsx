@@ -9,6 +9,7 @@ import PlaceholderStage from "./stages/PlaceholderStage";
 import { useAiAccess } from "../aiAccess/useAiAccess";
 import Tray from "../regions/Tray";
 import AiExhaustedModal from "./AiExhaustedModal";
+import { subscribeExecutionState, type ExecutionScope } from "../../services/executionState";
 
 function ResearchWorkspaceInner({
   onClose,
@@ -53,6 +54,14 @@ function ResearchWorkspaceInner({
   const defaultModelText = defaultProvider 
     ? (defaultProvider.selectedModel ? `${defaultProvider.name} - ${defaultProvider.selectedModel}` : defaultProvider.name) 
     : "Automatic";
+
+  const [liveExecution, setLiveExecution] = useState<ExecutionScope | null>(null);
+
+  React.useEffect(() => {
+    return subscribeExecutionState((scope) => {
+      setLiveExecution(scope);
+    });
+  }, []);
 
   if (error) {
     return (
@@ -155,9 +164,26 @@ function ResearchWorkspaceInner({
               
               <div className="flex items-center gap-4 px-4 py-1.5 bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] rounded-lg mr-2">
                 <div className="flex flex-col">
-                  <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Active Model</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] uppercase tracking-wider font-bold text-[color:var(--text-muted)]">Active Model</span>
+                    {liveExecution?.isFallbackActive && (
+                      <span className="px-1.5 py-0.5 text-[8px] font-bold tracking-wide bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded animate-pulse border border-amber-500/30">
+                        BACKUP ACTIVE
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        liveExecution?.status === "error"
+                          ? "bg-rose-500"
+                          : liveExecution?.isFallbackActive
+                          ? "bg-amber-500 animate-pulse"
+                          : liveExecution?.status === "running"
+                          ? "bg-emerald-500 animate-pulse"
+                          : "bg-emerald-500"
+                      }`}
+                    />
                     <select
                       className="bg-transparent text-[11px] font-semibold text-[color:var(--text-primary)] border-none p-0 cursor-pointer focus:ring-0 outline-none w-32 truncate appearance-none hover:bg-[color:var(--surface-hover)] rounded px-1 -ml-1"
                       value={manualModelOverride ? `${manualModelOverride.providerId}:${manualModelOverride.modelId || ""}` : "automatic"}
@@ -169,9 +195,17 @@ function ResearchWorkspaceInner({
                           setManualModelOverride({ providerId, modelId: modelId || undefined });
                         }
                       }}
-                      title="Select a specific AI model or let the Scholar AI Engine decide (Automatic)"
+                      title={
+                        liveExecution?.isFallbackActive
+                          ? `Backup Active: ${liveExecution.activeProvider} (${liveExecution.activeModel})`
+                          : "Select a specific AI model or let the Scholar AI Engine decide (Automatic)"
+                      }
                     >
-                      <option value="automatic">{defaultModelText} (Default)</option>
+                      <option value="automatic">
+                        {liveExecution && liveExecution.status === "running"
+                          ? `${liveExecution.activeProvider} - ${liveExecution.activeModel} (Live)`
+                          : `${defaultModelText} (Default)`}
+                      </option>
                       {connected.length > 0 && <optgroup label="Connected Providers">
                         {connected.map((p) => {
                           const displayName = p.selectedModel ? `${p.name} - ${p.selectedModel}` : p.name;
@@ -294,7 +328,14 @@ function ResearchWorkspaceInner({
             )}
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider">Active Model</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[color:var(--text-muted)] uppercase tracking-wider">Active Model</label>
+                {liveExecution?.isFallbackActive && (
+                  <span className="px-1.5 py-0.5 text-[8px] font-bold tracking-wide bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded animate-pulse border border-amber-500/30">
+                    BACKUP ACTIVE
+                  </span>
+                )}
+              </div>
               <select
                 className="w-full bg-[color:var(--surface-sunken)] border border-[color:var(--border-subtle)] text-[color:var(--text-primary)] rounded-xl p-3"
                 value={manualModelOverride ? `${manualModelOverride.providerId}:${manualModelOverride.modelId || ""}` : "automatic"}
@@ -308,7 +349,11 @@ function ResearchWorkspaceInner({
                   setMobileMenuOpen(false);
                 }}
               >
-                <option value="automatic">{defaultModelText} (Default)</option>
+                <option value="automatic">
+                  {liveExecution && liveExecution.status === "running"
+                    ? `${liveExecution.activeProvider} - ${liveExecution.activeModel} (Live)`
+                    : `${defaultModelText} (Default)`}
+                </option>
                 {connected.length > 0 && <optgroup label="Connected Providers">
                   {connected.map((p) => {
                     const displayName = p.selectedModel ? `${p.name} - ${p.selectedModel}` : p.name;

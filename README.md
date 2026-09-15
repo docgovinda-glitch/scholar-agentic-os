@@ -50,6 +50,20 @@ In compliance with **Revision 2 / Document 43 Rev 5**, Scholar Core operates und
 
 ---
 
+## 🧠 Resilient AI Infrastructure & Multi-Provider Engine
+
+Scholar Core eliminates fragile hardcoded model lists in favor of an enterprise-grade, dynamic AI orchestration layer:
+- **Dynamic Account-Level Discovery (`/models`)**: Live discovery of models actually accessible to the user's specific account (Groq, Gemini, OpenRouter, Anthropic, OpenAI) with zero hardcoded model lock-in.
+- **Defensive Capability Normalization**: Derives context window, structured JSON, tool use, and vision strictly from provider metadata rather than fragile model-name heuristics.
+- **Composite Routing & Dynamic In-Provider Failover**: Automatic in-provider failover (`${provider}::${model}`) upon 404 / retirement before crossing provider boundaries.
+- **Provider Health State Machine & Session Blacklisting**: Model 404s blacklist only the broken model, keeping the provider healthy. Shared bounded exponential backoff for HTTP 429 rate limits prevents retry storms across concurrent agents.
+- **Request-Scoped Execution & Active Model Badges**: Each agent run executes in an isolated scope with live UI status badges (`Primary Model`, `BACKUP ACTIVE`, `Exhausted`) preventing concurrent agent crosstalk.
+- **Stage-Wide Transactional Retry**: Automatic checkpoint and resume semantics across Literature Discovery, Evidence Extraction, Draft Assembly, Peer Review, and Publication Readiness.
+- **Proactive 8-Step Diagnostics Engine**: Integrated live health, DNS, credential format, discovery, model availability, probe generation, and structured output verification.
+- **Zero Plaintext Secret Storage**: Web Crypto AES-GCM local encryption with blind 32-bit hash fingerprinting (`fp_...`) ensuring API keys never appear in storage, logs, telemetry, or diagnostic output.
+
+---
+
 ## 🚀 Quick Start & Development
 
 ### Prerequisites

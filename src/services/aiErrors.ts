@@ -159,8 +159,8 @@ export function classifyHttpError(
       kind: "model_not_found",
       label: KIND_LABELS.model_not_found,
       message:
-        "The selected model name is not available on this account. Providers rename and retire models regularly.",
-      remedy: "Press 'Refresh models' to load the list this key can actually use, then pick one.",
+        "The selected AI model is currently unavailable on this account. Providers update, rename, and retire models regularly.",
+      remedy: "The system will automatically try backup models. You can also run AI Diagnostics in settings to refresh models.",
       retryable: false,
       failoverWorthwhile: true,
     };

@@ -32,6 +32,12 @@ import {
 } from "../../config/providerCatalog";
 import { getLocalRunner, runnerChatUrl, type LocalRunnerSpec } from "../../config/localRunnerCatalog";
 import type { CompletionRequest, ProviderAdapter } from "./types";
+import {
+  blacklistModel,
+  getCachedDiscoveredModels,
+  isModelBlacklisted,
+  recordProviderFailure,
+} from "../../services/modelDiscovery";
 
 /**
  * A local runtime runs on the CALLER's own machine — there is no third-party
@@ -58,11 +64,6 @@ async function fetchLocalWithTimeout(url: string, init: RequestInit): Promise<Re
   }
 }
 
-/**
- * Unlike a cloud provider, a local runner has no catalog default model —
- * which model is even loaded is discovered at request time (see
- * src/desk/regions/localStudioExecution.ts), never guessed here.
- */
 function requireLocalModel(runnerId: string, model: string | undefined): string {
   if (!model) {
     throw new Error(`No model specified for local runner "${runnerId}" — discover an installed model before completing.`);
@@ -72,10 +73,7 @@ function requireLocalModel(runnerId: string, model: string | undefined): string 
 
 /**
  * Reads a `text/event-stream` response body, yielding each `data:` line's
- * payload (prefix stripped, trimmed). Deliberately minimal — a single-line
- * JSON payload per event, which is what every provider adapted here
- * actually sends; the full SSE spec's multi-line `data:` fields and
- * `id:`/`retry:` fields are not needed for any of them.
+ * payload (prefix stripped, trimmed).
  */
 async function* readSSE(response: Response): AsyncGenerator<string> {
   if (!response.body) return;
@@ -98,33 +96,58 @@ async function* readSSE(response: Response): AsyncGenerator<string> {
 }
 
 /**
- * Carries the HTTP status and raw body of a failed provider request, so a
- * caller that wants to classify the failure (gateway.ts's
- * completeWithFailover, via aiErrors.ts's classifyHttpError) can do so
- * precisely instead of treating every adapter failure as an opaque, equally
- * bad "unknown" error.
+ * Carries the HTTP status, raw body, and retryAfterMs of a failed provider request.
  */
 export class AdapterHttpError extends Error {
   constructor(
     public readonly providerId: string,
     public readonly status: number,
-    public readonly detail: string
+    public readonly detail: string,
+    public readonly retryAfterMs?: number
   ) {
     super(`${providerId} request failed (${status}): ${detail.slice(0, 300)}`);
     this.name = "AdapterHttpError";
   }
 }
 
-async function throwForBadResponse(id: string, response: Response): Promise<never> {
+async function throwForBadResponse(id: string, response: Response, model?: string): Promise<never> {
   const detail = await response.text().catch(() => "");
-  throw new AdapterHttpError(id, response.status, detail);
+  let retryAfterMs: number | undefined = undefined;
+  const rawRetry = response.headers?.get?.("retry-after");
+  if (rawRetry) {
+    const s = Number(rawRetry);
+    if (!Number.isNaN(s) && s > 0) {
+      retryAfterMs = s * 1000;
+    }
+  }
+
+  // Update provider health state machine
+  if (response.status === 401 || response.status === 403) {
+    recordProviderFailure(id, "invalid_key", undefined, detail);
+  } else if (response.status === 429) {
+    recordProviderFailure(id, "rate_limit", retryAfterMs, detail);
+  } else if (response.status >= 500) {
+    recordProviderFailure(id, "server_error", undefined, detail);
+  } else if (response.status === 404 && model) {
+    blacklistModel(id, model, "HTTP 404 model not found");
+  }
+
+  throw new AdapterHttpError(id, response.status, detail, retryAfterMs);
+}
+
+function getDynamicModelFallbacks(providerId: string, currentModel: string, spec: CloudProviderSpec): string[] {
+  blacklistModel(providerId, currentModel, "model_not_found");
+  const cached = getCachedDiscoveredModels(providerId) || [];
+  const discovered = cached.map((m) => m.id);
+  const candidates = discovered.length > 0 ? discovered : spec.models && spec.models.length > 0 ? spec.models : [spec.defaultModel];
+  return candidates.filter((m) => m !== currentModel && !isModelBlacklisted(providerId, m));
 }
 
 class OpenAICompatibleAdapter implements ProviderAdapter {
   constructor(public id: string, private spec: CloudProviderSpec) {}
 
-  private buildBody(req: CompletionRequest, stream: boolean) {
-    const model = req.model || this.spec.defaultModel;
+  private buildBody(req: CompletionRequest, stream: boolean, modelOverride?: string) {
+    const model = modelOverride || req.model || this.spec.defaultModel;
     
     let systemMessage: any = undefined;
     if (req.systemPrompt) {
@@ -161,30 +184,61 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
     let model = req.model || this.spec.defaultModel;
     const url = chatUrl(this.spec);
     const headers = { "Content-Type": "application/json", ...buildAuthHeaders(this.spec, req.apiKey) };
-    let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false) });
+    let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, model), signal: req.signal });
     
-    // Auto-fallback if model not found on Groq (e.g. llama-3.3-70b-versatile -> llama-3.1-8b-instant)
-    if (!response.ok && response.status === 404 && this.id === "groq" && model !== "llama-3.1-8b-instant") {
-      const fallbackBody = this.buildBody({ ...req, model: "llama-3.1-8b-instant" }, false);
-      const retryRes = await fetch(url, { method: "POST", headers, body: fallbackBody });
-      if (retryRes.ok) {
-        response = retryRes;
-        model = "llama-3.1-8b-instant";
+    // Controlled fallback on 404 (model not found)
+    if (!response.ok && response.status === 404) {
+      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
+      for (const fbModel of fallbacks) {
+        const fallbackBody = this.buildBody(req, false, fbModel);
+        const retryRes = await fetch(url, { method: "POST", headers, body: fallbackBody, signal: req.signal });
+        if (retryRes.ok) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+        if (retryRes.status !== 404) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
       }
     }
 
-    if (!response.ok) return throwForBadResponse(this.id, response);
+    if (!response.ok) return throwForBadResponse(this.id, response, model);
     const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
     const text = data.choices?.[0]?.message?.content ?? "";
     return { text, model };
   }
 
   async stream(req: CompletionRequest, onChunk: (delta: string) => void): Promise<{ text: string; model: string }> {
-    const model = req.model || this.spec.defaultModel;
+    let model = req.model || this.spec.defaultModel;
     const url = chatUrl(this.spec);
     const headers = { "Content-Type": "application/json", Accept: "text/event-stream", ...buildAuthHeaders(this.spec, req.apiKey) };
-    const response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true) });
-    if (!response.ok) return throwForBadResponse(this.id, response);
+    let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, model), signal: req.signal });
+
+    // Controlled fallback on 404 (model not found)
+    if (!response.ok && response.status === 404) {
+      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
+      for (const fbModel of fallbacks) {
+        const fallbackBody = this.buildBody(req, true, fbModel);
+        const retryRes = await fetch(url, { method: "POST", headers, body: fallbackBody, signal: req.signal });
+        if (retryRes.ok) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+        if (retryRes.status !== 404) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
+      }
+    }
+
+    if (!response.ok) return throwForBadResponse(this.id, response, model);
 
     let text = "";
     for await (const data of readSSE(response)) {
@@ -197,7 +251,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
           onChunk(delta);
         }
       } catch {
-        // A malformed or unexpected line (e.g. a keep-alive comment) — skip it rather than aborting the whole stream.
+        // A malformed or unexpected line — skip it rather than aborting the whole stream.
       }
     }
     return { text, model };
@@ -207,8 +261,8 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
 class AnthropicAdapter implements ProviderAdapter {
   constructor(public id: string, private spec: CloudProviderSpec) {}
 
-  private buildBody(req: CompletionRequest, stream: boolean) {
-    const model = req.model || this.spec.defaultModel;
+  private buildBody(req: CompletionRequest, stream: boolean, modelOverride?: string) {
+    const model = modelOverride || req.model || this.spec.defaultModel;
     return JSON.stringify({
       model,
       max_tokens: req.maxTokens ?? 4096,
@@ -220,11 +274,30 @@ class AnthropicAdapter implements ProviderAdapter {
   }
 
   async complete(req: CompletionRequest): Promise<{ text: string; model: string }> {
-    const model = req.model || this.spec.defaultModel;
+    let model = req.model || this.spec.defaultModel;
     const url = chatUrl(this.spec);
     const headers = { "Content-Type": "application/json", ...buildAuthHeaders(this.spec, req.apiKey) };
-    const response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false) });
-    if (!response.ok) return throwForBadResponse(this.id, response);
+    let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, model), signal: req.signal });
+
+    if (!response.ok && response.status === 404) {
+      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
+      for (const fbModel of fallbacks) {
+        const retryRes = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, fbModel), signal: req.signal });
+        if (retryRes.ok) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+        if (retryRes.status !== 404) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
+      }
+    }
+
+    if (!response.ok) return throwForBadResponse(this.id, response, model);
     const data = (await response.json()) as { content?: { text?: string }[] };
     const content = Array.isArray(data?.content) ? data.content : [];
     const text = content.map((c) => c.text ?? "").join("");
@@ -232,11 +305,30 @@ class AnthropicAdapter implements ProviderAdapter {
   }
 
   async stream(req: CompletionRequest, onChunk: (delta: string) => void): Promise<{ text: string; model: string }> {
-    const model = req.model || this.spec.defaultModel;
+    let model = req.model || this.spec.defaultModel;
     const url = chatUrl(this.spec);
     const headers = { "Content-Type": "application/json", Accept: "text/event-stream", ...buildAuthHeaders(this.spec, req.apiKey) };
-    const response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true) });
-    if (!response.ok) return throwForBadResponse(this.id, response);
+    let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, model), signal: req.signal });
+
+    if (!response.ok && response.status === 404) {
+      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
+      for (const fbModel of fallbacks) {
+        const retryRes = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, fbModel), signal: req.signal });
+        if (retryRes.ok) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+        if (retryRes.status !== 404) {
+          response = retryRes;
+          model = fbModel;
+          break;
+        }
+        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
+      }
+    }
+
+    if (!response.ok) return throwForBadResponse(this.id, response, model);
 
     let text = "";
     for await (const data of readSSE(response)) {
@@ -247,18 +339,12 @@ class AnthropicAdapter implements ProviderAdapter {
           onChunk(parsed.delta.text);
         }
       } catch {
-        // Non-JSON or unrelated event (e.g. "message_start") — skip.
+        // Non-JSON or unrelated event — skip.
       }
     }
     return { text, model };
   }
 }
-
-const GEMINI_CONTROLLED_FALLBACK_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-];
 
 class GeminiAdapter implements ProviderAdapter {
   public id = "gemini";
@@ -303,18 +389,19 @@ class GeminiAdapter implements ProviderAdapter {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.buildBody(req)),
+      signal: req.signal,
     });
 
-    // Controlled fallback ONLY on 404 (model not found / unavailable on this key/project).
-    // Do NOT fallback on 401 (bad key), 403, 429 (rate limit), or 400 (bad prompt).
+    // Dynamic Controlled fallback on 404
     if (!response.ok && response.status === 404) {
-      const fallbacks = GEMINI_CONTROLLED_FALLBACK_MODELS.filter((m) => m !== model);
+      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
       for (const fbModel of fallbacks) {
         const fbUrl = `${baseUrl}/models/${fbModel}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
         const retryRes = await fetch(fbUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(this.buildBody(req)),
+          signal: req.signal,
         });
         if (retryRes.ok) {
           response = retryRes;
@@ -326,10 +413,11 @@ class GeminiAdapter implements ProviderAdapter {
           model = fbModel;
           break;
         }
+        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
       }
     }
 
-    if (!response.ok) return throwForBadResponse(this.id, response);
+    if (!response.ok) return throwForBadResponse(this.id, response, model);
     const data = (await response.json()) as any;
     return { text: this.extractText(data), model };
   }
@@ -342,17 +430,19 @@ class GeminiAdapter implements ProviderAdapter {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.buildBody(req)),
+      signal: req.signal,
     });
 
-    // Controlled fallback ONLY on 404
+    // Dynamic Controlled fallback on 404
     if (!response.ok && response.status === 404) {
-      const fallbacks = GEMINI_CONTROLLED_FALLBACK_MODELS.filter((m) => m !== model);
+      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
       for (const fbModel of fallbacks) {
         const fbUrl = `${baseUrl}/models/${fbModel}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
         const retryRes = await fetch(fbUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(this.buildBody(req)),
+          signal: req.signal,
         });
         if (retryRes.ok) {
           response = retryRes;
@@ -364,10 +454,11 @@ class GeminiAdapter implements ProviderAdapter {
           model = fbModel;
           break;
         }
+        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
       }
     }
 
-    if (!response.ok) return throwForBadResponse(this.id, response);
+    if (!response.ok) return throwForBadResponse(this.id, response, model);
 
     let text = "";
     for await (const data of readSSE(response)) {
@@ -401,63 +492,12 @@ class CohereAdapter implements ProviderAdapter {
       temperature: req.temperature ?? 0.5,
     });
     const response = await fetch(url, { method: "POST", headers, body });
-    if (!response.ok) return throwForBadResponse(this.id, response);
+    if (!response.ok) return throwForBadResponse(this.id, response, model);
     const data = (await response.json()) as { text?: string };
     return { text: (data.text ?? "").trim(), model };
   }
-
-  // No stream() — see this file's module comment for why.
 }
 
-/**
- * Ollama's native chat API (`/api/chat`) — distinct from every cloud adapter
- * above in one load-bearing way: no auth header, ever. A local runtime
- * authenticates with nothing, and this class never builds one — the whole
- * point of "local" is that no credential exists to leak.
- */
-class OllamaAdapter implements ProviderAdapter {
-  constructor(public id: string, private spec: LocalRunnerSpec) {}
-
-  private buildBody(req: CompletionRequest, model: string) {
-    return JSON.stringify({
-      model,
-      messages: [
-        ...(req.systemPrompt ? [{ role: "system", content: req.systemPrompt }] : []),
-        { role: "user", content: req.userPrompt },
-      ],
-      stream: false,
-      options: { temperature: req.temperature ?? 0.3 },
-    });
-  }
-
-  async complete(req: CompletionRequest): Promise<{ text: string; model: string }> {
-    const model = requireLocalModel(this.id, req.model);
-    const url = runnerChatUrl(this.spec);
-    const response = await fetchLocalWithTimeout(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: this.buildBody(req, model),
-    });
-    if (!response.ok) return throwForBadResponse(this.id, response);
-    const data = (await response.json()) as { message?: { content?: string } };
-    return { text: data.message?.content ?? "", model };
-  }
-
-  // No stream() — Studio's refine() (the only caller today) never calls
-  // gateway.stream(); an untested speculative streaming parser is worse
-  // than the honest gap (see this file's module comment on Cohere).
-}
-
-/**
- * The eight non-Ollama local runners (LM Studio, Jan, LocalAI, llama.cpp,
- * KoboldCPP, vLLM, Text Generation WebUI, OmniRoute) all speak the same
- * OpenAI-compatible wire format a cloud OpenAI-compatible provider does —
- * the request/response shape here deliberately mirrors
- * OpenAICompatibleAdapter above for exactly that reason. What's genuinely
- * different is the target: `runnerChatUrl` (this device's localhost, from
- * localRunnerCatalog.ts) instead of `chatUrl` (a cloud host), and no auth
- * header at all, ever.
- */
 class LocalOpenAICompatibleAdapter implements ProviderAdapter {
   constructor(public id: string, private spec: LocalRunnerSpec) {}
 
@@ -482,12 +522,39 @@ class LocalOpenAICompatibleAdapter implements ProviderAdapter {
       headers: { "Content-Type": "application/json" },
       body: this.buildBody(req, model),
     });
-    if (!response.ok) return throwForBadResponse(this.id, response);
+    if (!response.ok) return throwForBadResponse(this.id, response, model);
     const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
     return { text: data.choices?.[0]?.message?.content ?? "", model };
   }
+}
 
-  // No stream() — see OllamaAdapter's note above; the same reasoning applies.
+class OllamaAdapter implements ProviderAdapter {
+  constructor(public id: string, private spec: LocalRunnerSpec) {}
+
+  private buildBody(req: CompletionRequest, model: string) {
+    return JSON.stringify({
+      model,
+      messages: [
+        ...(req.systemPrompt ? [{ role: "system", content: req.systemPrompt }] : []),
+        { role: "user", content: req.userPrompt },
+      ],
+      stream: false,
+      options: { temperature: req.temperature ?? 0.3 },
+    });
+  }
+
+  async complete(req: CompletionRequest): Promise<{ text: string; model: string }> {
+    const model = requireLocalModel(this.id, req.model);
+    const url = runnerChatUrl(this.spec);
+    const response = await fetchLocalWithTimeout(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: this.buildBody(req, model),
+    });
+    if (!response.ok) return throwForBadResponse(this.id, response, model);
+    const data = (await response.json()) as { message?: { content?: string } };
+    return { text: data.message?.content ?? "", model };
+  }
 }
 
 /** Build the adapter for a given provider id, or undefined if unsupported. */

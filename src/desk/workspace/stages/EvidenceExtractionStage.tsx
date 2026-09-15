@@ -29,13 +29,19 @@ export default function EvidenceExtractionStage({
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [results, setResults] = useState<EvidenceItem[] | null>(() => {
+    try {
+      const saved = project.answers?.extracted_evidence;
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<EvidenceItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const startExtraction = async () => {
     setIsProcessing(true);
-    setResults(null);
     setError(null);
     setLogs([
       {

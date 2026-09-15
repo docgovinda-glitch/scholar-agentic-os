@@ -21,15 +21,21 @@ export default function DraftStage({
 }) {
   const def = STAGE_MAP.get(stage);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [results, setResults] = useState<any | null>(() => {
+    try {
+      const saved = project.answers?.assembled_draft;
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { chapterId } = useResearchWorkspace();
 
   const startAgent = async () => {
     setIsProcessing(true);
-    setResults(null);
     setError(null);
     setLogs([
       {

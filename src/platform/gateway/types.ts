@@ -38,6 +38,8 @@ export interface CompletionRequest {
   local?: boolean;
   /** True when Universal Context Caching is requested. */
   caching?: boolean;
+  /** Optional cancellation signal to cleanly abort HTTP network calls */
+  signal?: AbortSignal;
 }
 
 export interface CompletionResult {

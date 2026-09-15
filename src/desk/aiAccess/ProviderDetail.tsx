@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { providerAccessFacts, type CloudProviderSpec } from "../../config/providerCatalog";
-import { getDefaultModelId, getModelsForProvider } from "../../config/modelCatalog";
+import { getDefaultModelId, getModelsForProvider, type ModelSpec } from "../../config/modelCatalog";
 import ModelSelectField from "./ModelSelectField";
 import type { ConnectionTier, ProviderView } from "./useAiAccess";
+import { discoverProviderModels, getCachedDiscoveredModels, type DiscoveredModel } from "../../services/modelDiscovery";
+import { runProviderDiagnostics, type DiagnosticReport } from "../../services/aiDiagnostics";
+import { readProviderKey } from "../../services/userAiSettings";
 
 /**
  * The configuration surface for ONE cloud provider.
@@ -49,6 +52,84 @@ export default function ProviderDetail({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [makeDefault, setMakeDefault] = useState(!view.connected);
+
+  const [discoveredModels, setDiscoveredModels] = useState<DiscoveredModel[]>(() => getCachedDiscoveredModels(spec.id) || []);
+  const [discovering, setDiscovering] = useState(false);
+  const [discoveryMsg, setDiscoveryMsg] = useState<string | null>(null);
+
+  const [diagnosticsRunning, setDiagnosticsRunning] = useState(false);
+  const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
+
+  // Combine catalog models with dynamically discovered models
+  const effectiveModels: ModelSpec[] = [...models];
+  for (const dm of discoveredModels) {
+    const mId = dm.modelId || dm.id;
+    const existingIdx = effectiveModels.findIndex((m) => m.modelId === mId);
+    const specEntry: ModelSpec = {
+      id: `${spec.id}:${mId}`,
+      providerId: spec.id,
+      modelId: mId,
+      displayName: `${dm.displayName || mId} (Live Discovered)`,
+      status: "current",
+      accessModes: tier === "free" ? ["free", "byok"] : ["byok"],
+      capabilities: dm.capabilities,
+      contextWindow: dm.contextWindow ?? null,
+      inputModalities: ["text"],
+      outputModalities: ["text"],
+      relativeQuality: "balanced",
+      relativeSpeed: "fast",
+      pricing: null,
+      lastVerified: new Date().toISOString().split("T")[0],
+      verified: true,
+      notes: dm.source === "live_discovery" ? "Discovered live from provider account" : "Discovered metadata",
+    };
+    if (existingIdx >= 0) {
+      effectiveModels[existingIdx] = {
+        ...effectiveModels[existingIdx],
+        ...specEntry,
+        displayName: `${effectiveModels[existingIdx].displayName} (Live Discovered)`,
+      };
+    } else {
+      effectiveModels.unshift(specEntry);
+    }
+  }
+
+  async function handleRefreshModels() {
+    setDiscovering(true);
+    setDiscoveryMsg(null);
+    try {
+      const key = apiKey.trim() || (await readProviderKey(spec.id));
+      if (!key) {
+        setDiscoveryMsg("Please enter an API key to discover models for this account.");
+        return;
+      }
+      const discoResult = await discoverProviderModels(spec.id, key, baseUrl.trim() || undefined, true);
+      if (discoResult.ok && discoResult.models.length > 0) {
+        setDiscoveredModels(discoResult.models);
+        setDiscoveryMsg(`Discovered ${discoResult.models.length} model(s) for your account.`);
+      } else {
+        setDiscoveryMsg(discoResult.error || "No live models returned from /models. Using catalog fallbacks.");
+      }
+    } catch (e: any) {
+      setDiscoveryMsg(`Discovery notice: ${e.message}`);
+    } finally {
+      setDiscovering(false);
+    }
+  }
+
+  async function handleRunDiagnostics() {
+    setDiagnosticsRunning(true);
+    setDiagnosticReport(null);
+    try {
+      const key = apiKey.trim() || (await readProviderKey(spec.id));
+      const report = await runProviderDiagnostics(spec.id, key || "", model, baseUrl.trim() || undefined);
+      setDiagnosticReport(report);
+    } catch (e: any) {
+      setError(`Diagnostics failed: ${e.message}`);
+    } finally {
+      setDiagnosticsRunning(false);
+    }
+  }
 
   async function handleConnect() {
     setBusy(true);
@@ -158,10 +239,28 @@ export default function ProviderDetail({
         </Step>
 
         <Step n={3} title="Choose a model">
-          <ModelSelectField id={`model-${spec.id}`} models={models} value={model} onChange={setModel} />
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-[color:var(--text-muted)]">
+              {effectiveModels.length} models available ({discoveredModels.length} live discovered)
+            </span>
+            <button
+              type="button"
+              onClick={() => void handleRefreshModels()}
+              disabled={discovering}
+              className="text-xs font-semibold text-[color:var(--accent-solid)] hover:underline disabled:opacity-50 cursor-pointer"
+            >
+              {discovering ? "Scanning /models…" : "↻ Discover Models"}
+            </button>
+          </div>
+          {discoveryMsg && (
+            <p className="mb-2 text-xs text-[color:var(--text-secondary)] bg-[color:var(--surface-sunken)] p-2 rounded border border-[color:var(--border-subtle)]">
+              {discoveryMsg}
+            </p>
+          )}
+          <ModelSelectField id={`model-${spec.id}`} models={effectiveModels} value={model} onChange={setModel} />
           <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-            {models.length > 0
-              ? "Deprecated or unverified entries are labeled — pick Advanced to type any model id this provider accepts."
+            {effectiveModels.length > 0
+              ? "Live discovered and verified models are prioritized. Advanced allows specifying any model ID."
               : "No catalogued models for this provider yet — type any model id this provider accepts."}
           </p>
           {view.connected && (
@@ -180,19 +279,66 @@ export default function ProviderDetail({
             <input type="checkbox" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />
             Make this my default provider
           </label>
-          <button
-            type="button"
-            onClick={() => void handleConnect()}
-            disabled={busy || !apiKey.trim()}
-            className="mt-3 rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] disabled:opacity-60"
-          >
-            {busy ? "Testing…" : view.connected ? "Test and update" : "Test and connect"}
-          </button>
+          <div className="flex items-center gap-3 mt-3">
+            <button
+              type="button"
+              onClick={() => void handleConnect()}
+              disabled={busy || !apiKey.trim()}
+              className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] disabled:opacity-60"
+            >
+              {busy ? "Testing…" : view.connected ? "Test and update" : "Test and connect"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleRunDiagnostics()}
+              disabled={diagnosticsRunning || (!view.connected && !apiKey.trim())}
+              className="rounded-[var(--radius-md)] border border-[color:var(--border-control)] px-3 py-2 text-sm font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-50 cursor-pointer"
+            >
+              {diagnosticsRunning ? "Running Diagnostics…" : "Run Full Diagnostics"}
+            </button>
+          </div>
           <p className="mt-1 text-xs text-[color:var(--text-muted)]">
             We send one request to {spec.name} to check the key works before saving it. Nothing is saved if it fails.
           </p>
         </Step>
       </ol>
+
+      {/* Diagnostics Report */}
+      {diagnosticReport && (
+        <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 space-y-3 shadow-sm">
+          <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-2">
+            <div className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${
+                diagnosticReport.overallStatus === "healthy"
+                  ? "bg-emerald-500"
+                  : diagnosticReport.overallStatus === "degraded"
+                  ? "bg-amber-500"
+                  : "bg-rose-500"
+              }`} />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-primary)]">
+                AI Diagnostics — {diagnosticReport.overallStatus.toUpperCase()}
+              </h4>
+            </div>
+            <span className="text-[10px] text-[color:var(--text-muted)] font-mono">{diagnosticReport.timestamp}</span>
+          </div>
+          <div className="space-y-1.5">
+            {diagnosticReport.steps.map((step, idx) => (
+              <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-[color:var(--border-subtle)] last:border-0">
+                <div className="flex items-center gap-2">
+                  <span>
+                    {step.status === "pass" ? "✅" : step.status === "warn" ? "⚠️" : step.status === "fail" ? "❌" : "⏭️"}
+                  </span>
+                  <span className="font-medium text-[color:var(--text-primary)]">{step.name}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[color:var(--text-secondary)]">{step.details}</span>
+                  {step.durationMs ? <span className="ml-2 text-[10px] font-mono text-[color:var(--text-muted)]">({step.durationMs}ms)</span> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="rounded-[var(--radius-md)] border border-[color:var(--state-danger)] bg-[color:var(--state-danger-subtle)] px-3 py-2 text-sm text-[color:var(--state-danger)]">
@@ -216,6 +362,14 @@ export default function ProviderDetail({
               Make default
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => void handleRunDiagnostics()}
+            disabled={diagnosticsRunning}
+            className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]"
+          >
+            {diagnosticsRunning ? "Diagnosing…" : "Run Diagnostics"}
+          </button>
           <button
             type="button"
             onClick={() => void onDisconnect()}
