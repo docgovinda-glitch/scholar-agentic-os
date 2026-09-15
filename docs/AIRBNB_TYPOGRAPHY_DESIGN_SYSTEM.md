@@ -136,9 +136,17 @@ The Scholar Core brand mark replaces static SVG nodes with an animated "AI Breat
 - **Hardware Acceleration**: Driven strictly by GPU-accelerated CSS properties (`transform`, `filter`) with `will-change: transform, filter` to maintain a steady 60fps refresh rate with zero layout reflow.
 - **Accessibility Safeguards**: Automatically disabled under `@media (prefers-reduced-motion: reduce)`.
 
+### 9.2 Active State AI Processing Loader Overlay
+- **Dark Viewport Backdrop**: `background-color: rgba(0, 0, 0, 0.8)` with `backdrop-filter: blur(6px)` covering the viewport (`fixed inset-0 z-[99999]`).
+- **Rapid Active Processing Spin**: `.ai-loader-spin` rotates 360° over `2.5s linear infinite` for immediate kinetic feedback.
+- **Breathing Processing Core**: `.ai-loader-breathe` scales from `scale(1.0)` to `scale(1.05)` with warm orange (`#FF7A00`) and magenta (`#E02875`) drop-shadow pulses (`1.8s ease-in-out infinite`).
+- **Contextual Hooks & State**: Managed by `LoadingProvider` and singleton `globalLoading` across route transitions, `Suspense` chunk loading, API queries, and auth form submissions.
+- **Non-Blocking Clean Transitions**: Smooth `300ms` fade-out with `pointer-events: none` ensures users are never blocked after completion.
+
 ---
 
 ## 10. Verification Commands
+
 
 ```bash
 # Verify WCAG contrast compliance (82 pairings checked, 100% pass)

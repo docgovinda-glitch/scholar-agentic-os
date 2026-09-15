@@ -22,6 +22,8 @@ import { useDeskSession } from "./useDeskSession";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 import type { SectionId } from "./aiAccess/AiAccessPage";
 import GlobalLoader from "./components/GlobalLoader";
+import GlobalLoadingOverlay from "./components/GlobalLoadingOverlay";
+import { LoadingProvider } from "./context/LoadingContext";
 
 // Lazy loaded heavy screens
 const AccountSettingsScreen = lazy(() => import("./account/AccountSettingsScreen"));
@@ -410,40 +412,43 @@ function AgentsRoute() {
  */
 export default function DeskApp() {
   return (
-    <Suspense fallback={<GlobalLoader />}>
-      <Routes>
-        <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
-        <Route path="/signin" element={<PublicOnly><SignInRoute /></PublicOnly>} />
-        <Route path="/signup" element={<PublicOnly><SignUpRoute /></PublicOnly>} />
-        <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />
-        <Route path="/signup/resend" element={<PublicOnly><ResendVerificationRoute /></PublicOnly>} />
-        <Route path="/reset-password" element={<PublicOnly><ForgotRoute /></PublicOnly>} />
-        <Route
-          path="/reset-password/confirm"
-          element={
-            <RequireRecovery>
-              <RecoverRoute />
-            </RequireRecovery>
-          }
-        />
-        <Route path="/verify-email" element={<VerifyEmailRoute />} />
-        <Route path="/*" element={<RequireAuth />}>
-          <Route path="onboarding" element={<OnboardingRoute />} />
-          <Route element={<RequireOnboarding />}>
-            <Route element={<OnboardingGate />}>
-              <Route path="projects" element={<ProjectsIndexRoute />} />
-              <Route path="projects/:projectId" element={<ProjectRoute />} />
-              <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
-              <Route path="settings" element={<SettingsRoute />} />
-              <Route path="vault" element={<VaultRoute />} />
-              <Route path="ai-access" element={<AiAccessRoute />} />
-              <Route path="ai-access/:section" element={<AiAccessRoute />} />
-              <Route path="agents" element={<AgentsRoute />} />
-              <Route path="*" element={<Navigate to="/projects" replace />} />
+    <LoadingProvider>
+      <GlobalLoadingOverlay />
+      <Suspense fallback={<GlobalLoader />}>
+        <Routes>
+          <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
+          <Route path="/signin" element={<PublicOnly><SignInRoute /></PublicOnly>} />
+          <Route path="/signup" element={<PublicOnly><SignUpRoute /></PublicOnly>} />
+          <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />
+          <Route path="/signup/resend" element={<PublicOnly><ResendVerificationRoute /></PublicOnly>} />
+          <Route path="/reset-password" element={<PublicOnly><ForgotRoute /></PublicOnly>} />
+          <Route
+            path="/reset-password/confirm"
+            element={
+              <RequireRecovery>
+                <RecoverRoute />
+              </RequireRecovery>
+            }
+          />
+          <Route path="/verify-email" element={<VerifyEmailRoute />} />
+          <Route path="/*" element={<RequireAuth />}>
+            <Route path="onboarding" element={<OnboardingRoute />} />
+            <Route element={<RequireOnboarding />}>
+              <Route element={<OnboardingGate />}>
+                <Route path="projects" element={<ProjectsIndexRoute />} />
+                <Route path="projects/:projectId" element={<ProjectRoute />} />
+                <Route path="projects/:projectId/:view" element={<ProjectRoute />} />
+                <Route path="settings" element={<SettingsRoute />} />
+                <Route path="vault" element={<VaultRoute />} />
+                <Route path="ai-access" element={<AiAccessRoute />} />
+                <Route path="ai-access/:section" element={<AiAccessRoute />} />
+                <Route path="agents" element={<AgentsRoute />} />
+                <Route path="*" element={<Navigate to="/projects" replace />} />
+              </Route>
             </Route>
           </Route>
-        </Route>
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </LoadingProvider>
   );
 }

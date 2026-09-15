@@ -152,6 +152,17 @@ Scholar Core features an animated "AI Breathing" brand mark inspired by modern i
 - **Dynamic Aura Glow**: Multi-layered ambient drop-shadow in warm orange and magenta hues that synchronously expands and dims with each breath.
 - **Accessibility & Motion Preference**: Automatically respects `prefers-reduced-motion: reduce` by halting transforms and filter animations.
 
+---
+
+## ⚡ Active State AI Processing Loader Overlay
+Scholar Core provides an intelligent, global active processing loader that dynamically mounts during page transitions, API data fetching, and form submissions:
+- **Full-Viewport Dark Overlay**: High-fidelity dark backdrop (`rgba(0,0,0,0.8)`) with `backdrop-filter: blur(6px)` covering the viewport (`fixed inset-0 z-[99999]`).
+- **Rapid 360° Spin**: Fast, active processing rotation over `2.5s linear infinite` (`.ai-loader-spin`).
+- **Breathing AI Core**: Scaled container (`scale(1.0)` to `scale(1.05)`) with an active warm orange (`#FF7A00`) and magenta (`#E02875`) drop-shadow pulse (`1.8s ease-in-out infinite`, `.ai-loader-breathe`).
+- **Zero-Flicker State Management**: Orchestrated by `LoadingProvider` and singleton `globalLoading` with a 150ms debounce on API requests, preventing micro-flashes on instant cached calls.
+- **Smooth 300ms Transitions**: Fades in with `opacity: 1` and `pointer-events: auto`, and smoothly unmounts after a 300ms fade-out with `pointer-events: none` to prevent blocking interactions.
+
+
 
 ---
 
