@@ -172,31 +172,16 @@ export default function UserAccountMenu({
         <div
           className={`absolute ${
             dropUp ? "bottom-full left-0 mb-2 w-full" : "right-0 mt-2 w-72"
-          } rounded-2xl bg-[var(--theme-bg)] border border-[var(--theme-fg)]/15 shadow-xl p-3 z-50 text-xs animate-in fade-in duration-150`}
+          } rounded-2xl bg-[var(--theme-bg)] border border-[var(--theme-fg)]/15 shadow-xl p-2 z-50 text-xs animate-in fade-in duration-150`}
         >
-          {/* Active Account Info */}
-          <div className="px-3.5 py-2.5 bg-[var(--theme-fg)]/5 rounded-xl border border-[var(--theme-fg)]/10 mb-2.5">
-            <span className="text-[11px] font-medium text-[var(--theme-fg)]/60 block">
-              Signed in as
-            </span>
-            <span className="font-semibold text-xs text-[var(--theme-fg)] truncate block mt-0.5">
-              {displayName}
-            </span>
-            {userEmail && (
-              <span className="text-[11px] text-[var(--theme-fg)]/60 truncate block mt-0.5">
-                {userEmail}
-              </span>
-            )}
-          </div>
-
           {error && (
             <div className="mb-2 p-2 bg-red-50/80 border border-red-200 text-red-700 text-xs rounded-xl">
               {error}
             </div>
           )}
 
-          {/* Minimal Navigation Links: Settings, Help */}
-          <div className="flex flex-col gap-0.5 mb-2">
+          {/* Categorized Primary Navigation: Settings, Help */}
+          <div className="flex flex-col gap-0.5 mb-1.5">
             {onOpenAccountSettings && (
               <button
                 type="button"
@@ -233,14 +218,14 @@ export default function UserAccountMenu({
             </button>
           </div>
 
-          {/* Other Linked Accounts (Switch Accounts Section) */}
-          <div className="border-t border-[var(--theme-fg)]/10 pt-2 pb-1">
-            <div className="flex items-center justify-between px-3 py-1 text-xs font-medium text-[var(--theme-fg)]/60">
+          {/* Categorized Users / Switch Accounts Section */}
+          <div className="border-t border-[var(--theme-fg)]/10 pt-1.5 pb-1">
+            <div className="flex items-center justify-between px-3 py-1 text-[11px] font-semibold text-[var(--theme-fg)]/60 uppercase tracking-wider">
               <span>Switch Accounts</span>
-              {otherAccounts.length > 0 && <span className="text-[11px] text-[var(--theme-fg)]/40">{otherAccounts.length} saved</span>}
+              {otherAccounts.length > 0 && <span className="text-[10px] text-[var(--theme-fg)]/40 font-normal">{otherAccounts.length} saved</span>}
             </div>
 
-            {otherAccounts.length > 0 ? (
+            {otherAccounts.length > 0 && (
               <div className="flex flex-col gap-1 my-1 max-h-32 overflow-y-auto scholar-scrollbar">
                 {otherAccounts.map((acc) => (
                   <div
@@ -275,10 +260,6 @@ export default function UserAccountMenu({
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="px-3 py-1 text-xs text-[var(--theme-fg)]/40 font-normal">
-                No other accounts linked yet.
-              </p>
             )}
 
             <button
@@ -287,7 +268,7 @@ export default function UserAccountMenu({
                 setOpen(false);
                 setAddAccountOpen(true);
               }}
-              className="w-full text-left px-3 py-2 rounded-xl text-[var(--theme-fg)]/80 hover:bg-[var(--theme-fg)]/5 font-medium text-xs transition-colors cursor-pointer flex items-center gap-2 mt-1"
+              className="w-full text-left px-3 py-1.5 rounded-xl text-[var(--theme-fg)]/80 hover:bg-[var(--theme-fg)]/5 font-medium text-xs transition-colors cursor-pointer flex items-center gap-2"
             >
               <span>+ Add another account</span>
             </button>
