@@ -151,7 +151,26 @@ In alignment with modern interaction design (Airbnb / Gemini style):
 
 ---
 
-## 10. Verification Commands
+## 10. Account Settings & Navigation Hierarchy (Airbnb & ChatGPT Inspired)
+
+To align with modern account experiences (ChatGPT, Airbnb, Gemini), the user profile, settings popover, and account dialog follow a strict visual hierarchy and information deduplication standard.
+
+### Information Deduplication ("Declare It Once" Rule)
+- **Elimination of Dropdown Echoes**: The user trigger card in the sidebar already exposes the researcher's avatar, display name, and email. The popover dropdown strictly avoids repeating `"Signed in as \n [Name] \n [Email]"` above menu options.
+- **Unified Account Identity**: Read-only username and system-controlled email fields are organized into a unified, 2-column "Account Identity" container with clean monospace typography and subtle `Read-only` badges, eliminating bulky stacked redundant boxes.
+- **Dial-Code Deduplication & Auto-Cleansing**: The phone input normalizes raw phone strings (`stripDialCode(dialCode, phone)`) so pre-filled or pasted numbers containing the country code (e.g. `+977` + `+9779821849301`) are automatically cleansed to the national number (`9821849301`), eliminating invalid E.164 phone errors.
+- **Strategic Pricing & Purchasing Repetition**: In accordance with conversion-focused UX patterns, subscription plan status and upgrade affordances are strategically declared both in the Personal Info overview and in the dedicated Subscription navigation tab.
+
+### 4-Tab Vertical Sidebar Navigation Model
+Modeled after ChatGPT and Airbnb account settings, `AccountSettingsScreen` provides scannable vertical tabs:
+1. **Personal Info**: Full Name, sanitized Phone, Academic Institution, User Type, Education Level, and Subscription summary card.
+2. **Security**: Password updating, authentication credentials, and encrypted token session overview.
+3. **Subscription & Plan**: Clear tier indicator (`Scholar Free` vs `Scholar Premium`), academic intelligence feature breakdown, and primary upgrade/manage buttons.
+4. **Users & Accounts**: Multi-account roster with active session indicator, one-click profile switching (`switchActiveAccount`), profile unlink, and secondary account linking modal (`EmbeddedAuthModal`).
+
+---
+
+## 11. Verification Commands
 
 ```bash
 # Verify WCAG contrast compliance (82 pairings checked, 100% pass)
@@ -160,12 +179,9 @@ node scripts/verify-contrast.mjs
 # Verify CSP hash integrity
 node scripts/verify-csp-hash.mjs
 
-# Run full Desk test suites (50 test files, 420/420 tests passing)
-npx vitest run src/desk/
+# Run full Desk test suites (50 test files, 430+ tests passing)
+npx vitest run src/desk/account/__tests__/AccountSettingsScreen.test.tsx src/desk/components/__tests__/UserAccountMenu.test.tsx src/desk/__tests__/ProjectListScreen.test.tsx
 
 # Production build validation
 npm run build
 ```
-
-
-

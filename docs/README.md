@@ -63,6 +63,8 @@ still carrying revision-1 assumptions are marked in the index below.
 | [`23-MOBILE-WEB-UX-SPECIFICATION.md`](02-experience/23-MOBILE-WEB-UX-SPECIFICATION.md) | **Pocket**: four jobs, approval queue, touch, PWA | **2** |
 | [`25-ONBOARDING-ARCHITECTURE.md`](02-experience/25-ONBOARDING-ARCHITECTURE.md) | Onboarding stages, AI setup, optional Vault, Workshop | 1† |
 | [`26-USER-JOURNEY-MAPS.md`](02-experience/26-USER-JOURNEY-MAPS.md) | Nine end-to-end journeys with failure branches | 1† |
+| [`ACCOUNT_SETTINGS_AND_NAVIGATION.md`](ACCOUNT_SETTINGS_AND_NAVIGATION.md) | **Account Settings**: vertical tabs, deduplication, and multi-user switching | **2** |
+| [`AIRBNB_TYPOGRAPHY_DESIGN_SYSTEM.md`](AIRBNB_TYPOGRAPHY_DESIGN_SYSTEM.md) | **Design System**: typography, soft radii, and navigation layout | **2** |
 
 ### 03 — Workflow
 
