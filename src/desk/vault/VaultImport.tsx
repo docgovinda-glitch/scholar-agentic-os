@@ -160,9 +160,17 @@ export default function VaultImport({
                 type="button"
                 onClick={handleConfirm}
                 disabled={busy}
-                className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-3.5 py-2 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer"
+                aria-busy={busy}
+                className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-3.5 py-2 text-sm font-medium text-[color:var(--text-inverse)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55 cursor-pointer inline-flex items-center justify-center gap-2"
               >
-                {busy ? "Adding…" : `Add ${preview.items.length} to Vault`}
+                {busy ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    <span>Adding…</span>
+                  </>
+                ) : (
+                  `Add ${preview.items.length} to Vault`
+                )}
               </button>
             )}
             <button

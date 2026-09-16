@@ -30,10 +30,10 @@ export default function GlobalLoadingOverlay({
     if (isLoading) {
       setShouldRender(true);
     } else {
-      // Allow the 300ms CSS fade-out transition to finish before unmounting from DOM
+      // Allow the 180ms snappy CSS fade-out transition to finish before unmounting from DOM
       const timer = setTimeout(() => {
         setShouldRender(false);
-      }, 300);
+      }, 180);
       return () => clearTimeout(timer);
     }
   }, [isLoading]);

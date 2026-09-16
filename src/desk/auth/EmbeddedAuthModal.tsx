@@ -378,9 +378,19 @@ export default function EmbeddedAuthModal({
             <button
               type="submit"
               disabled={busy || !email.trim() || !password}
-              className="mt-1 w-full py-3 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-lg)] text-sm font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-all disabled:opacity-50 cursor-pointer"
+              aria-busy={busy}
+              className="mt-1 w-full py-3 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] rounded-[var(--radius-lg)] text-sm font-bold shadow-md hover:bg-[color:var(--accent-hover)] transition-all disabled:opacity-50 cursor-pointer inline-flex items-center justify-center gap-2"
             >
-              {busy ? "Authenticating…" : mode === "signin" ? "Sign In to Scholar Core" : "Create Free Account"}
+              {busy ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  <span>Authenticating…</span>
+                </>
+              ) : mode === "signin" ? (
+                "Sign In to Scholar Core"
+              ) : (
+                "Create Free Account"
+              )}
             </button>
 
             <div className="flex items-center gap-3 my-1">

@@ -14,7 +14,6 @@ import {
 } from "../../services/supabaseAuthService";
 import { useDeskSession } from "../useDeskSession";
 import { SessionBoundaryFallback } from "../DeskAuthGate";
-import { globalLoading } from "../context/LoadingContext";
 import CaptchaWidget from "./CaptchaWidget";
 import {
   AuthError,
@@ -190,7 +189,6 @@ function SignInScreen({
     event.preventDefault();
     setBusy(true);
     setError(null);
-    const opId = globalLoading.startLoading("signin");
     try {
       const result = await signIn({ username: username.trim(), password, captchaToken: captchaToken || undefined });
       if (result.success) return; // useDeskSession flips to "signed-in"; PublicOnly (DeskAuthGate.tsx) notices and navigates away.
@@ -200,7 +198,6 @@ function SignInScreen({
       setError((e as Error).message);
     } finally {
       setBusy(false);
-      globalLoading.stopLoading(opId);
     }
   }
 
@@ -399,22 +396,17 @@ function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onB
         return;
       }
 
-      const opId = globalLoading.startLoading("signup");
-      try {
-        const result = await signUp({
-          ...fields,
-          username,
-          email,
-          captchaToken: captchaToken || undefined,
-        });
-        if (!result.success) {
-          setError(result.error ?? "Registration failed.");
-          return;
-        }
-        onDone(email);
-      } finally {
-        globalLoading.stopLoading(opId);
+      const result = await signUp({
+        ...fields,
+        username,
+        email,
+        captchaToken: captchaToken || undefined,
+      });
+      if (!result.success) {
+        setError(result.error ?? "Registration failed.");
+        return;
       }
+      onDone(email);
     } catch (e) {
       setError((e as Error).message);
     } finally {

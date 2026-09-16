@@ -80,10 +80,12 @@ export default function SourceLibraryScreen({
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDetailSource, setSelectedDetailSource] = useState<Source | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingSourceId, setDeletingSourceId] = useState<string | null>(null);
   const [copiedCitationId, setCopiedCitationId] = useState<string | null>(null);
 
   // Backward-compatibility inline add form (used by automated integration tests)
   const [showInlineAdd, setShowInlineAdd] = useState(false);
+  const [inlineSaving, setInlineSaving] = useState(false);
   const [inlineTitle, setInlineTitle] = useState("");
   const [inlineContent, setInlineContent] = useState("");
   const [inlineCitation, setInlineCitation] = useState("");
@@ -298,30 +300,41 @@ export default function SourceLibraryScreen({
   }
 
   async function handleDeleteSource(sourceId: string) {
-    await deleteVaultItem(userId, sourceId);
-    setItems((prev) => prev.filter((i) => i.id !== sourceId));
-    setConfirmDeleteId(null);
-    if (selectedDetailSource?.id === sourceId) {
-      setSelectedDetailSource(null);
+    if (deletingSourceId) return;
+    setDeletingSourceId(sourceId);
+    try {
+      await deleteVaultItem(userId, sourceId);
+      setItems((prev) => prev.filter((i) => i.id !== sourceId));
+      setConfirmDeleteId(null);
+      if (selectedDetailSource?.id === sourceId) {
+        setSelectedDetailSource(null);
+      }
+    } finally {
+      setDeletingSourceId(null);
     }
   }
 
   async function handleInlineSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!inlineTitle.trim() || !inlineContent.trim()) return;
+    if (!inlineTitle.trim() || !inlineContent.trim() || inlineSaving) return;
 
-    const saved = await addVaultItem(userId, {
-      title: inlineTitle.trim(),
-      content: inlineContent.trim(),
-      citation: inlineCitation.trim() || undefined,
-      citationStatus: "needs_user_review",
-    });
+    setInlineSaving(true);
+    try {
+      const saved = await addVaultItem(userId, {
+        title: inlineTitle.trim(),
+        content: inlineContent.trim(),
+        citation: inlineCitation.trim() || undefined,
+        citationStatus: "needs_user_review",
+      });
 
-    setItems((prev) => [saved, ...prev]);
-    setInlineTitle("");
-    setInlineContent("");
-    setInlineCitation("");
-    setShowInlineAdd(false);
+      setItems((prev) => [saved, ...prev]);
+      setInlineTitle("");
+      setInlineContent("");
+      setInlineCitation("");
+      setShowInlineAdd(false);
+    } finally {
+      setInlineSaving(false);
+    }
   }
 
   return (
@@ -515,10 +528,18 @@ export default function SourceLibraryScreen({
                 <div className="flex justify-end gap-2">
                   <button
                     type="submit"
-                    disabled={!inlineTitle.trim() || !inlineContent.trim()}
-                    className="px-4 py-1.5 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] text-xs font-bold rounded-[var(--radius-md)] disabled:opacity-50 cursor-pointer"
+                    disabled={!inlineTitle.trim() || !inlineContent.trim() || inlineSaving}
+                    aria-busy={inlineSaving}
+                    className="px-4 py-1.5 bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] text-xs font-bold rounded-[var(--radius-md)] disabled:opacity-50 cursor-pointer inline-flex items-center justify-center gap-1.5"
                   >
-                    Save to Vault
+                    {inlineSaving ? (
+                      <>
+                        <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                        <span>Saving…</span>
+                      </>
+                    ) : (
+                      "Save to Vault"
+                    )}
                   </button>
                 </div>
               </form>
@@ -1109,15 +1130,25 @@ export default function SourceLibraryScreen({
                             </span>
                             <button
                               type="button"
+                              disabled={deletingSourceId === source.id}
+                              aria-busy={deletingSourceId === source.id}
                               onClick={() => handleDeleteSource(source.id)}
-                              className="px-2 py-0.5 bg-[color:var(--state-danger)] text-white font-bold rounded hover:opacity-90 cursor-pointer"
+                              className="px-2 py-0.5 bg-[color:var(--state-danger)] text-white font-bold rounded hover:opacity-90 cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
                             >
-                              Delete
+                              {deletingSourceId === source.id ? (
+                                <>
+                                  <span className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                                  <span>Deleting…</span>
+                                </>
+                              ) : (
+                                "Delete"
+                              )}
                             </button>
                             <button
                               type="button"
+                              disabled={deletingSourceId === source.id}
                               onClick={() => setConfirmDeleteId(null)}
-                              className="px-2 py-0.5 text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] cursor-pointer"
+                              className="px-2 py-0.5 text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] cursor-pointer disabled:opacity-40"
                             >
                               Cancel
                             </button>

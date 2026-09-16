@@ -176,8 +176,12 @@ export default function ProjectListScreen({
     return map;
   }, [types]);
 
+  const [creatingFormatId, setCreatingFormatId] = useState<string | null>(null);
+
   async function handleCreate(outputTypeId: string) {
+    if (creating) return;
     setCreating(true);
+    setCreatingFormatId(outputTypeId);
     setError(null);
     try {
       const project = await createProject(outputTypeId);
@@ -185,6 +189,7 @@ export default function ProjectListScreen({
     } catch (e) {
       setError((e as Error).message);
       setCreating(false);
+      setCreatingFormatId(null);
     }
   }
 
@@ -198,27 +203,23 @@ export default function ProjectListScreen({
   }
 
   async function handleConfirmDelete() {
-    if (!projectToDelete) return;
+    if (!projectToDelete || deletingId) return;
     const targetId = projectToDelete.projectId;
     setDeletingId(targetId);
     setError(null);
-
-    // Optimistically remove from state so the project card immediately disappears
-    const previousProjects = projects;
-    setProjects((curr) => (curr ? curr.filter((p) => p.projectId !== targetId) : []));
-    setProjectToDelete(null);
 
     try {
       if (!targetId.startsWith("demo-")) {
         await deleteProject(targetId);
       }
-      // Re-fetch project list to keep in sync with server
+      setProjects((curr) => (curr ? curr.filter((p) => p.projectId !== targetId) : []));
+      setProjectToDelete(null);
+      // Re-sync project list with server in background
       listProjects()
         .then((r) => setProjects(r.items))
         .catch(() => {});
     } catch (e) {
       console.error("Failed to delete project:", e);
-      setProjects(previousProjects);
       setError((e as Error).message || "Could not delete project. Please try again.");
     } finally {
       setDeletingId(null);
@@ -602,37 +603,60 @@ export default function ProjectListScreen({
 
                 {/* Quick-Launch Workspace Cards ("Snow on Sand") */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  {FORMAT_TILES.map((tile) => (
-                    <div
-                      key={tile.id}
-                      onClick={() => handleCreate(tile.id)}
-                      className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-[var(--shadow-card)] hover:border-[var(--text-primary)]/40 hover:scale-[1.01] transition-all duration-200 cursor-pointer flex flex-col justify-between group text-left font-sans min-h-[220px]"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="w-9 h-9 rounded-xl bg-[var(--bg-canvas)] text-[var(--text-primary)] flex items-center justify-center transition-colors group-hover:bg-[var(--bg-button-primary)] group-hover:text-[var(--text-button)] border border-[var(--border-subtle)]">
-                            <FormatIcon id={tile.id} className="w-4 h-4" />
+                  {FORMAT_TILES.map((tile) => {
+                    const isBootingThis = creatingFormatId === tile.id;
+                    const isOtherBooting = creating && !isBootingThis;
+                    return (
+                      <div
+                        key={tile.id}
+                        onClick={() => !creating && handleCreate(tile.id)}
+                        className={`bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-[var(--shadow-card)] transition-all duration-200 flex flex-col justify-between text-left font-sans min-h-[220px] ${
+                          isOtherBooting
+                            ? "opacity-50 cursor-not-allowed"
+                            : isBootingThis
+                            ? "border-[var(--text-primary)] shadow-md cursor-wait"
+                            : "hover:border-[var(--text-primary)]/40 hover:scale-[1.01] cursor-pointer group"
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="w-9 h-9 rounded-xl bg-[var(--bg-canvas)] text-[var(--text-primary)] flex items-center justify-center transition-colors group-hover:bg-[var(--bg-button-primary)] group-hover:text-[var(--text-button)] border border-[var(--border-subtle)]">
+                              {isBootingThis ? (
+                                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <FormatIcon id={tile.id} className="w-4 h-4" />
+                              )}
+                            </div>
+                            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--bg-canvas)]">
+                              {tile.id}
+                            </span>
                           </div>
-                          <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--bg-canvas)]">
-                            {tile.id}
+                          <h4 className="font-bold text-base text-[var(--text-primary)] leading-tight mb-1 font-sans">
+                            {tile.label}
+                          </h4>
+                          <p className="text-xs text-[var(--text-secondary)] font-normal line-clamp-2 leading-relaxed font-sans mb-2">
+                            {tile.tag}
+                          </p>
+                          <span className="text-[11px] font-semibold text-[var(--accent-success)] inline-block">
+                            {isBootingThis ? "Initializing workspace…" : "Ready to boot"}
                           </span>
                         </div>
-                        <h4 className="font-bold text-base text-[var(--text-primary)] leading-tight mb-1 font-sans">
-                          {tile.label}
-                        </h4>
-                        <p className="text-xs text-[var(--text-secondary)] font-normal line-clamp-2 leading-relaxed font-sans mb-2">
-                          {tile.tag}
-                        </p>
-                        <span className="text-[11px] font-semibold text-[var(--accent-success)] inline-block">
-                          Ready to boot
-                        </span>
+                        <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
+                          {isBootingThis ? (
+                            <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold">
+                              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              <span>Booting…</span>
+                            </div>
+                          ) : (
+                            <>
+                              <span>Start {tile.label.split(" ")[0]}</span>
+                              <span className="transition-transform group-hover:translate-x-1">→</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
-                        <span>Start {tile.label.split(" ")[0]}</span>
-                        <span className="transition-transform group-hover:translate-x-1">→</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
 

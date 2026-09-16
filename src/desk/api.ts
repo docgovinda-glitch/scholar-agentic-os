@@ -53,7 +53,6 @@ export class UnauthenticatedError extends Error {
 }
 
 import { originalFetch } from "./originalFetch";
-import { globalLoading } from "./context/LoadingContext";
 
 /**
  * Authorization header for the current Supabase session.
@@ -70,26 +69,10 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-/** GET/DELETE with credentials attached. Automatically attaches to the active AI core loader. */
+/** GET/DELETE with credentials attached. Uses localized indicators at call sites without blocking the viewport. */
 export async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  const isTest = typeof process !== "undefined" && process.env.NODE_ENV === "test";
-  const skip = (init as any)?.skipLoading || isTest;
-  let opId: string | undefined;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  if (!skip) {
-    timer = setTimeout(() => {
-      opId = globalLoading.startLoading();
-    }, 150);
-  }
-
-  try {
-    const headers = { ...(init.headers as Record<string, string> | undefined), ...(await authHeaders()) };
-    return await originalFetch(input, { ...init, headers });
-  } finally {
-    if (timer) clearTimeout(timer);
-    if (opId) globalLoading.stopLoading(opId);
-  }
+  const headers = { ...(init.headers as Record<string, string> | undefined), ...(await authHeaders()) };
+  return await originalFetch(input, { ...init, headers });
 }
 
 /** POST/PUT/PATCH with a JSON body. */

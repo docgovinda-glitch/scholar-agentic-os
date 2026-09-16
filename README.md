@@ -92,7 +92,7 @@ npm run dev
 
 ### Running Test Suites
 ```bash
-# Run all 40 Desk test suites (342 unit & integration tests)
+# Run all 50 Desk test suites (420 unit & integration tests)
 npx vitest run src/desk/
 ```
 
@@ -144,23 +144,25 @@ Scholar Core replaces muddy legacy themes with a high-contrast, toggleable Day/N
 
 ---
 
-## 🌀 Animated AI Breathing & Rotating Logo Core
-Scholar Core features an animated "AI Breathing" brand mark inspired by modern intelligence interfaces (ChatGPT, Claude):
+## 🌀 Snappy Mechanical AI Logo & Brand Mark
+Scholar Core features an animated "AI Breathing" brand mark tuned for high-velocity, responsive mechanical motion:
 - **Core Asset**: `cognitive_authority_veena_logo_v7b_colored_details.png` (4-armed spiraling knowledge motif with vibrant warm orange `#FF7A00` core and magenta `#E02875` details).
-- **Continuous 360° Rotation**: Hardware-accelerated linear rotation (`14s linear infinite`) for perpetual motion without stutter or pause.
-- **AI Breathing Pulse**: Enclosing flex container scales gently between `scale(1.0)` and `scale(1.08)` across a `3.5s ease-in-out` breathing cycle.
-- **Dynamic Aura Glow**: Multi-layered ambient drop-shadow in warm orange and magenta hues that synchronously expands and dims with each breath.
+- **Fast 360° Rotation**: Hardware-accelerated rotation over **240ms** using a snappy mechanical easing curve (`cubic-bezier(0.2, 0.8, 0.2, 1)`).
+- **Snappy Breathing Pulse**: Enclosing flex container scales between `scale(1.0)` and `scale(1.08)` across a **260ms** cycle (`cubic-bezier(0.2, 0.8, 0.2, 1)`).
+- **Dynamic Aura Glow**: Multi-layered ambient drop-shadow in warm orange and magenta hues that synchronously pulses with the core.
 - **Accessibility & Motion Preference**: Automatically respects `prefers-reduced-motion: reduce` by halting transforms and filter animations.
 
 ---
 
-## ⚡ Active State AI Processing Loader Overlay
-Scholar Core provides an intelligent, global active processing loader that dynamically mounts during page transitions, API data fetching, and form submissions:
-- **Full-Viewport Dark Overlay**: High-fidelity dark backdrop (`rgba(0,0,0,0.8)`) with `backdrop-filter: blur(6px)` covering the viewport (`fixed inset-0 z-[99999]`).
-- **Rapid 360° Spin**: Fast, active processing rotation over `2.5s linear infinite` (`.ai-loader-spin`).
-- **Breathing AI Core**: Scaled container (`scale(1.0)` to `scale(1.05)`) with an active warm orange (`#FF7A00`) and magenta (`#E02875`) drop-shadow pulse (`1.8s ease-in-out infinite`, `.ai-loader-breathe`).
-- **Zero-Flicker State Management**: Orchestrated by `LoadingProvider` and singleton `globalLoading` with a 150ms debounce on API requests, preventing micro-flashes on instant cached calls.
-- **Smooth 300ms Transitions**: Fades in with `opacity: 1` and `pointer-events: auto`, and smoothly unmounts after a 300ms fade-out with `pointer-events: none` to prevent blocking interactions.
+## ⚡ Contextual Inline Action Loaders (Zero Viewport Lockouts)
+Scholar Core adopts an Airbnb / Gemini-style localized loading architecture:
+- **Zero Global Viewport Lockouts**: Network queries and Supabase mutations (`authedFetch`) bypass full-screen backdrops, keeping the entire application viewport interactive.
+- **Button-Absorbed Loading States**: Action points (sign-in, registration, project creation, deletion confirmation, source quick-add, and vault imports) transition the active button into an inline spinner (`animate-spin` circle) with `aria-busy` and disabled states.
+- **Non-Blocking Component Suspense**: Lazy-loaded route fallbacks render localized inline spinners (`role="status"`, `aria-live="polite"`) rather than blocking overlays.
+- **Snappy Active Processing Transitions**:
+  - `.ai-loader-spin`: 220ms `cubic-bezier(0.2, 0.8, 0.2, 1)`.
+  - `.ai-loader-breathe`: 200ms `cubic-bezier(0.2, 0.8, 0.2, 1)`.
+  - `.ai-loading-overlay`: 180ms unmount fade duration with `pointer-events: none`.
 
 
 

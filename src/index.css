@@ -742,18 +742,18 @@ button:disabled {
   justify-content: center;
   transform-origin: center center;
   will-change: transform, filter;
-  animation: ai-breathe-glow 3.5s ease-in-out infinite;
+  animation: ai-breathe-glow 260ms cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
 .ai-logo-spin {
   transform-origin: center center;
   will-change: transform;
-  animation: ai-spin-continuous 14s linear infinite;
+  animation: ai-spin-continuous 240ms cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
   backface-visibility: hidden;
 }
 
 /* ============================================================================
-   ACTIVE STATE AI LOADER ANIMATIONS (2-3s fast processing spin & breathing core)
+   ACTIVE STATE AI LOADER ANIMATIONS (Snappy 180-240ms mechanical transitions)
    ========================================================================= */
 
 @keyframes ai-loader-spin {
@@ -781,7 +781,7 @@ button:disabled {
 .ai-loader-spin {
   transform-origin: center center;
   will-change: transform;
-  animation: ai-loader-spin 2.5s linear infinite;
+  animation: ai-loader-spin 220ms cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
   backface-visibility: hidden;
 }
 
@@ -791,7 +791,7 @@ button:disabled {
   justify-content: center;
   transform-origin: center center;
   will-change: transform, filter;
-  animation: ai-loader-breathe 1.8s ease-in-out infinite;
+  animation: ai-loader-breathe 200ms cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
 /* Full-viewport dark overlay background with centered active core */
@@ -805,7 +805,7 @@ button:disabled {
   background-color: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), visibility 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 180ms cubic-bezier(0.2, 0.8, 0.2, 1), visibility 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .ai-loading-overlay.is-visible {

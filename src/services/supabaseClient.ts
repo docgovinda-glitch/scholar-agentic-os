@@ -28,6 +28,9 @@ let client: SupabaseClient | null = null;
  * hosting-and-topology.md §6 since there's no server startup to check at).
  */
 export function getSupabaseClient(): SupabaseClient {
+  if (typeof window !== "undefined" && (window as any).__mockSupabaseClient) {
+    return (window as any).__mockSupabaseClient;
+  }
   if (!isSupabaseConfigured()) {
     throw new Error(
       "Supabase is not configured: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY " +

@@ -418,9 +418,17 @@ export default function SettingsView({
                 type="button"
                 onClick={() => handleToggleStorageMode("synced")}
                 disabled={modeLoading}
-                className="w-full py-1.5 text-xs font-semibold text-[color:var(--accent)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors"
+                aria-busy={modeLoading}
+                className="w-full py-1.5 text-xs font-semibold text-[color:var(--accent)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5"
               >
-                {modeLoading ? "Switching…" : "Enable Cloud Sync"}
+                {modeLoading ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    <span>Switching…</span>
+                  </>
+                ) : (
+                  "Enable Cloud Sync"
+                )}
               </button>
             )}
           </div>
@@ -451,9 +459,17 @@ export default function SettingsView({
                 type="button"
                 onClick={() => handleToggleStorageMode("local")}
                 disabled={modeLoading}
-                className="w-full py-1.5 text-xs font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors"
+                aria-busy={modeLoading}
+                className="w-full py-1.5 text-xs font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-[var(--radius-md)] hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5"
               >
-                {modeLoading ? "Switching…" : "Switch to Local Mode"}
+                {modeLoading ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    <span>Switching…</span>
+                  </>
+                ) : (
+                  "Switch to Local Mode"
+                )}
               </button>
             )}
           </div>

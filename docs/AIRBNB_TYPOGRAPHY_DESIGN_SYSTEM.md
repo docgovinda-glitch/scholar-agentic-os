@@ -125,28 +125,33 @@ To ensure distraction-free academic focus and modern visual excellence, the appl
 
 ---
 
-## 9. Animated AI Breathing Logo System
+## 9. Snappy AI Brand Mark & Contextual Loading Architecture
 
-### 9.1 Brand Mark Architecture
-The Scholar Core brand mark replaces static SVG nodes with an animated "AI Breathing" Veena core:
+### 9.1 Accelerated Brand Mark Animation
+The Scholar Core brand mark features an animated "AI Breathing" Veena core tuned for responsive, snappy mechanical motion:
 - **Asset**: `cognitive_authority_veena_logo_v7b_colored_details.png` (4-armed spiraling knowledge motif with vibrant warm orange `#FF7A00` core and magenta `#E02875` details).
-- **Two-Tier Animation Model**:
-  - **Outer Flex Wrapper (`.ai-logo-container`)**: Manages scale breathing (`scale(1.0)` to `scale(1.08)`) and ambient multi-tier glow drop-shadow over a 3.5s `ease-in-out` infinite loop.
-  - **Inner Image (`.ai-logo-spin`)**: Handles continuous 360-degree rotation around its center over a 14s `linear` infinite loop.
+- **Two-Tier Snappy Mechanical Model**:
+  - **Outer Flex Wrapper (`.ai-logo-container`)**: Fast scale breathing (`scale(1.0)` to `scale(1.08)`) with ambient glow over a **260ms** `cubic-bezier(0.2, 0.8, 0.2, 1)` infinite loop.
+  - **Inner Image (`.ai-logo-spin`)**: Continuous 360-degree rotation with crisp mechanical pacing over a **240ms** `cubic-bezier(0.2, 0.8, 0.2, 1)` loop.
 - **Hardware Acceleration**: Driven strictly by GPU-accelerated CSS properties (`transform`, `filter`) with `will-change: transform, filter` to maintain a steady 60fps refresh rate with zero layout reflow.
 - **Accessibility Safeguards**: Automatically disabled under `@media (prefers-reduced-motion: reduce)`.
 
-### 9.2 Active State AI Processing Loader Overlay
-- **Dark Viewport Backdrop**: `background-color: rgba(0, 0, 0, 0.8)` with `backdrop-filter: blur(6px)` covering the viewport (`fixed inset-0 z-[99999]`).
-- **Rapid Active Processing Spin**: `.ai-loader-spin` rotates 360° over `2.5s linear infinite` for immediate kinetic feedback.
-- **Breathing Processing Core**: `.ai-loader-breathe` scales from `scale(1.0)` to `scale(1.05)` with warm orange (`#FF7A00`) and magenta (`#E02875`) drop-shadow pulses (`1.8s ease-in-out infinite`).
-- **Contextual Hooks & State**: Managed by `LoadingProvider` and singleton `globalLoading` across route transitions, `Suspense` chunk loading, API queries, and auth form submissions.
-- **Non-Blocking Clean Transitions**: Smooth `300ms` fade-out with `pointer-events: none` ensures users are never blocked after completion.
+### 9.2 Contextual Inline Action Loaders (Zero Global Viewport Lockouts)
+In alignment with modern interaction design (Airbnb / Gemini style):
+- **Bypassed Global Viewport Lockouts**: `authedFetch` in `src/desk/api.ts` directly executes requests without triggering full-screen blackouts (`rgba(0, 0, 0, 0.8)`), keeping the viewport and surrounding UI completely interactive.
+- **Localized Component Suspense**: `GlobalLoader` renders a non-blocking, inline flex container with accessible `role="status"` and `aria-live="polite"` spinners rather than blocking overlays.
+- **Button-State Absorption**: Data mutations and interaction triggers (project deletions, project creations, source library additions, vault imports, authentication submissions, and settings updates) absorb their pending state into the active button:
+  - An inline spinning indicator appears directly inside the button (`w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin`).
+  - Button sets `disabled` and `aria-busy="true"`.
+  - Contextual action label adjusts dynamically (e.g., "Sign in" → "Signing in…", "Delete" → "Deleting…", "Save Source" → "Saving…").
+- **Snappy Active AI Loader Timings**:
+  - `.ai-loader-spin`: 220ms `cubic-bezier(0.2, 0.8, 0.2, 1)`.
+  - `.ai-loader-breathe`: 200ms `cubic-bezier(0.2, 0.8, 0.2, 1)`.
+  - `.ai-loading-overlay`: 180ms fade-out with `pointer-events: none`.
 
 ---
 
 ## 10. Verification Commands
-
 
 ```bash
 # Verify WCAG contrast compliance (82 pairings checked, 100% pass)
@@ -155,8 +160,8 @@ node scripts/verify-contrast.mjs
 # Verify CSP hash integrity
 node scripts/verify-csp-hash.mjs
 
-# Run full component and desk test suites (228/228 tests passing)
-npx vitest run src/desk/__tests__/
+# Run full Desk test suites (50 test files, 420/420 tests passing)
+npx vitest run src/desk/
 
 # Production build validation
 npm run build

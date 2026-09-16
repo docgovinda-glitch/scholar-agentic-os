@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient } from "../../services/supabaseClient";
+import { getProfile } from "../../services/supabaseAuthService";
 import {
   getSavedAccounts,
   switchActiveAccount,
@@ -10,18 +11,22 @@ import EmbeddedAuthModal from "../auth/EmbeddedAuthModal";
 
 export interface UserAccountMenuProps {
   userEmail: string | null;
+  userFullName?: string | null;
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
+  onOpenHelp?: () => void;
   dropUp?: boolean;
   variant?: "bar" | "sidebar";
 }
 
 export default function UserAccountMenu({
   userEmail,
+  userFullName,
   onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
+  onOpenHelp,
   dropUp = false,
   variant = "bar",
 }: UserAccountMenuProps) {
@@ -30,7 +35,29 @@ export default function UserAccountMenu({
   const [savedAccounts, setSavedAccounts] = useState<StoredAccountProfile[]>([]);
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fullName, setFullName] = useState<string | null>(userFullName || null);
+  const [username, setUsername] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (userFullName) {
+      setFullName(userFullName);
+    }
+    getProfile()
+      .then((res) => {
+        if (!active) return;
+        if (res.success && res.profile) {
+          if (res.profile.fullName) setFullName(res.profile.fullName);
+          if (res.profile.username) setUsername(res.profile.username);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [userFullName, userEmail]);
 
   useEffect(() => {
     setSavedAccounts(getSavedAccounts());
@@ -71,7 +98,9 @@ export default function UserAccountMenu({
   }
 
   const otherAccounts = savedAccounts.filter((a) => a.email !== userEmail);
-  const initial = userEmail ? userEmail.charAt(0).toUpperCase() : "U";
+  const displayName = fullName || (username ? `@${username}` : (userEmail ? userEmail.split("@")[0] : "Researcher"));
+  const secondaryIdentifier = userEmail || (username ? `@${username}` : "Scholar Profile");
+  const initial = (fullName ? fullName.charAt(0) : (userEmail ? userEmail.charAt(0) : "U")).toUpperCase();
 
   return (
     <div className="relative w-full" ref={menuRef}>
@@ -88,10 +117,10 @@ export default function UserAccountMenu({
             </span>
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-semibold text-[var(--theme-fg)] truncate leading-tight">
-                {userEmail || "Researcher"}
+                {displayName}
               </span>
-              <span className="text-[10px] text-[var(--theme-fg)]/60 leading-none mt-0.5 font-normal">
-                Scholar Profile
+              <span className="text-[10px] text-[var(--theme-fg)]/60 leading-none mt-0.5 font-normal truncate">
+                {secondaryIdentifier}
               </span>
             </div>
           </div>
@@ -116,9 +145,14 @@ export default function UserAccountMenu({
           <span className="w-5 h-5 rounded-full bg-[var(--theme-fg)] text-[var(--theme-bg)] flex items-center justify-center font-semibold text-[11px] shadow-2xs">
             {initial}
           </span>
-          <span className="max-w-[130px] truncate hidden sm:inline font-medium text-[var(--theme-fg)]">
-            {userEmail || "Researcher"}
-          </span>
+          <div className="flex flex-col text-left max-w-[150px] hidden sm:flex leading-tight">
+            <span className="truncate font-medium text-[var(--theme-fg)] text-xs">
+              {displayName}
+            </span>
+            <span className="truncate text-[9px] text-[var(--theme-fg)]/60 font-normal">
+              {secondaryIdentifier}
+            </span>
+          </div>
           <svg
             className={`w-3.5 h-3.5 text-[var(--theme-fg)]/60 transition-transform duration-200 ${
               open ? "rotate-180" : ""
@@ -146,8 +180,13 @@ export default function UserAccountMenu({
               Signed in as
             </span>
             <span className="font-semibold text-xs text-[var(--theme-fg)] truncate block mt-0.5">
-              {userEmail || "Researcher Account"}
+              {displayName}
             </span>
+            {userEmail && (
+              <span className="text-[11px] text-[var(--theme-fg)]/60 truncate block mt-0.5">
+                {userEmail}
+              </span>
+            )}
           </div>
 
           {error && (
@@ -156,7 +195,7 @@ export default function UserAccountMenu({
             </div>
           )}
 
-          {/* Standard Navigation Links */}
+          {/* Minimal Navigation Links: Settings, Help */}
           <div className="flex flex-col gap-0.5 mb-2">
             {onOpenAccountSettings && (
               <button
@@ -171,41 +210,27 @@ export default function UserAccountMenu({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                Account Settings
+                <span>Settings</span>
               </button>
             )}
 
-            {onOpenVault && (
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onOpenVault();
-                }}
-                className="w-full text-left px-3 py-2 rounded-xl hover:bg-[var(--theme-fg)]/5 font-medium text-[var(--theme-fg)]/80 hover:text-[var(--theme-fg)] transition-colors cursor-pointer flex items-center gap-2.5"
-              >
-                <svg className="w-4 h-4 flex-shrink-0 text-[var(--theme-fg)]/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                Private Knowledge Vault
-              </button>
-            )}
-
-            {onOpenAiAccess && (
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onOpenAiAccess();
-                }}
-                className="w-full text-left px-3 py-2 rounded-xl hover:bg-[var(--theme-fg)]/5 font-medium text-[var(--theme-fg)]/80 hover:text-[var(--theme-fg)] transition-colors cursor-pointer flex items-center gap-2.5"
-              >
-                <svg className="w-4 h-4 flex-shrink-0 text-[var(--theme-fg)]/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                AI Access & BYOK
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                if (onOpenHelp) {
+                  onOpenHelp();
+                } else {
+                  window.open("https://github.com/docgovinda-glitch/scholar-agentic-os#readme", "_blank", "noopener,noreferrer");
+                }
+              }}
+              className="w-full text-left px-3 py-2 rounded-xl hover:bg-[var(--theme-fg)]/5 font-medium text-[var(--theme-fg)]/80 hover:text-[var(--theme-fg)] transition-colors cursor-pointer flex items-center gap-2.5"
+            >
+              <svg className="w-4 h-4 flex-shrink-0 text-[var(--theme-fg)]/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.451 1.827v.75M12 18h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Help & Support</span>
+            </button>
           </div>
 
           {/* Other Linked Accounts (Switch Accounts Section) */}

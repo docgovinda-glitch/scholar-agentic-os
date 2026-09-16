@@ -265,3 +265,46 @@ describe("AccountSettingsScreen — password", () => {
     expect(screen.getByLabelText("Confirm new password")).toHaveValue("");
   });
 });
+
+describe("AccountSettingsScreen — tabbed navigation and username immutability", () => {
+  it("renders with Personal Info tab selected by default and displays subtle username note", async () => {
+    render(<AccountSettingsScreen onClose={() => {}} />);
+    await screen.findByLabelText("Full name");
+
+    const personalTab = screen.getByRole("tab", { name: /Personal Info/i });
+    const securityTab = screen.getByRole("tab", { name: /Security/i });
+
+    expect(personalTab).toHaveAttribute("aria-selected", "true");
+    expect(securityTab).toHaveAttribute("aria-selected", "false");
+
+    const usernameInput = screen.getByLabelText("Username");
+    expect(usernameInput).toBeDisabled();
+    expect(usernameInput).toHaveAttribute("readOnly");
+    expect(screen.getByText("Username cannot be changed.")).toBeInTheDocument();
+  });
+
+  it("switches to Security tab and updates aria-selected states when clicked", async () => {
+    render(<AccountSettingsScreen onClose={() => {}} />);
+    await screen.findByLabelText("Full name");
+
+    const personalTab = screen.getByRole("tab", { name: /Personal Info/i });
+    const securityTab = screen.getByRole("tab", { name: /Security/i });
+
+    fireEvent.click(securityTab);
+    expect(securityTab).toHaveAttribute("aria-selected", "true");
+    expect(personalTab).toHaveAttribute("aria-selected", "false");
+
+    // Switching back
+    fireEvent.click(personalTab);
+    expect(personalTab).toHaveAttribute("aria-selected", "true");
+    expect(securityTab).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("closes modal when Escape key is pressed", async () => {
+    const onClose = vi.fn();
+    render(<AccountSettingsScreen onClose={onClose} />);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+  });
+});
