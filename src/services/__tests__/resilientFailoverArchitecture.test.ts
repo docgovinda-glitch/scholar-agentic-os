@@ -599,4 +599,101 @@ describe("Resilient AI Routing & Failover Architecture (25 Invariants)", () => {
       expect(entry.operationId).toBe("audit-test-op");
     }
   });
+
+  // 26. Gemini HTTP 400 with API_KEY_INVALID -> classified as invalid_key, fails over to backup
+  it("26. classifies Gemini HTTP 400 API_KEY_INVALID as invalid_key with failoverWorthwhile=true and fails over", async () => {
+    const geminiErrorBody = JSON.stringify({
+      error: {
+        code: 400,
+        message: "API key not valid. Please pass a valid API key.",
+        status: "INVALID_ARGUMENT",
+        details: [{ reason: "API_KEY_INVALID" }],
+      },
+    });
+
+    const classified = classifyHttpError(400, geminiErrorBody);
+    expect(classified.kind).toBe("invalid_key");
+    expect(classified.failoverWorthwhile).toBe(true);
+
+    const candidates = ["gemini::gemini-2.5-flash::0", "groq::openai/gpt-oss-120b::1"];
+    let groqCalled = false;
+
+    const task = async (id: string) => {
+      if (id.startsWith("gemini")) {
+        throw { classified };
+      }
+      groqCalled = true;
+      return "groq-success";
+    };
+
+    const result = await executeWithFailover(task, { candidates });
+    expect(result.ok).toBe(true);
+    expect(groqCalled).toBe(true);
+  });
+
+  // 27. Regional restriction (HTTP 400 / unsupported location) -> classified as unsupported_provider with failoverWorthwhile=true
+  it("27. classifies region restriction as unsupported_provider with failoverWorthwhile=true and fails over", async () => {
+    const regionErrorBody = JSON.stringify({
+      error: {
+        code: 400,
+        message: "User location is not supported for the API use.",
+        status: "FAILED_PRECONDITION",
+      },
+    });
+
+    const classified = classifyHttpError(400, regionErrorBody);
+    expect(classified.kind).toBe("unsupported_provider");
+    expect(classified.failoverWorthwhile).toBe(true);
+
+    const candidates = ["gemini::gemini-2.5-flash::0", "groq::openai/gpt-oss-120b::1"];
+    let backupCalled = false;
+
+    const task = async (id: string) => {
+      if (id.startsWith("gemini")) {
+        throw { classified };
+      }
+      backupCalled = true;
+      return "backup-success";
+    };
+
+    const result = await executeWithFailover(task, { candidates });
+    expect(result.ok).toBe(true);
+    expect(backupCalled).toBe(true);
+  });
+
+  // 28. Opaque HTTP 400 from primary provider in Title Generation fails over seamlessly to backup candidate
+  it("28. fails over to backup candidate on opaque HTTP 400 without crashing workflow", async () => {
+    const candidates = ["gemini::gemini-2.5-flash::0", "groq::openai/gpt-oss-120b::1"];
+    const events: string[] = [];
+
+    const task = async (id: string) => {
+      if (id.startsWith("gemini")) {
+        // Opaque HTTP 400 with empty or generic rejection
+        const error = classifyHttpError(400, "");
+        throw { classified: error };
+      }
+      return JSON.stringify({
+        data: [
+          {
+            id: "title-1",
+            title_text: "Vedic Cosmic Order and Astrological Rhythms",
+            subtitle_text: "A Conceptual Synthesis",
+            rationale: "Aligns with Rta and Rashi research inquiry.",
+            status: "proposed",
+          },
+        ],
+      });
+    };
+
+    const result = await executeWithFailover(task, {
+      candidates,
+      onEvent: (e) => events.push(e.type),
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain("Vedic Cosmic Order");
+    }
+    expect(events).toContain("switch");
+  });
 });

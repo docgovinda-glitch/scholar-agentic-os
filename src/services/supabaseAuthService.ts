@@ -266,11 +266,13 @@ export async function signIn(input: SignInInput): Promise<SignInResult> {
     return { success: false, error: "Incorrect password. Please try again." };
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const profileQuery = supabase
     .from("profiles")
     .select("full_name, phone, affiliation, account_status")
-    .eq("id", signInData.user.id)
-    .maybeSingle();
+    .eq("id", signInData.user.id);
+  const { data: profile, error: profileError } = typeof (profileQuery as any).maybeSingle === "function"
+    ? await (profileQuery as any).maybeSingle()
+    : await (profileQuery as any).single();
 
   let activeProfile = profile;
   if (!activeProfile && !profileError) {
@@ -446,11 +448,13 @@ export async function getProfile(): Promise<{ success: true; profile: ProfileFie
     return { success: false, error: "Not signed in." };
   }
 
-  let { data, error } = await supabase
+  const profileQuery = supabase
     .from("profiles")
     .select("username, full_name, phone, phone_country_code, phone_e164, affiliation, user_type, education_level")
-    .eq("id", userData.user.id)
-    .maybeSingle();
+    .eq("id", userData.user.id);
+  let { data, error } = typeof (profileQuery as any).maybeSingle === "function"
+    ? await (profileQuery as any).maybeSingle()
+    : await (profileQuery as any).single();
 
   if (!data && !error) {
     const defaultUsername = userData.user.email?.split("@")[0] || "researcher";

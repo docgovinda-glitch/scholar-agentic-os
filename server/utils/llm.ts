@@ -79,18 +79,14 @@ export async function isServerAiAuthorized(req: any): Promise<boolean> {
   if (!policy.isServerAiAuthorized) return false;
 
   const userId = req.user?.id;
-  if (userId) {
-    try {
-      const entitlement = await getEntitlement(userId);
-      if (entitlement && !isEntitlementActive(entitlement)) {
-        return false;
-      }
-    } catch (_) {
-      // Allow fallback if entitlements table not reachable
-    }
-  }
+  if (!userId) return false;
 
-  return true;
+  try {
+    const entitlement = await getEntitlement(userId);
+    return isEntitlementActive(entitlement);
+  } catch (_) {
+    return false;
+  }
 }
 
 function handleFrontendLLMOverride(req: any) {

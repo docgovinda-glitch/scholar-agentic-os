@@ -228,13 +228,48 @@ export function classifyHttpError(
     retryAfterMs,
   };
 
-  if (status === 401 || status === 403 || lower.includes("invalid_api_key") || lower.includes("api key not valid")) {
+  const isAuthFailure =
+    status === 401 ||
+    status === 403 ||
+    lower.includes("invalid_api_key") ||
+    lower.includes("api_key_invalid") ||
+    lower.includes("api key not valid") ||
+    lower.includes("api key invalid") ||
+    lower.includes("api_key_expired") ||
+    lower.includes("api key expired") ||
+    lower.includes("api_key_service_blocked") ||
+    lower.includes("api key blocked") ||
+    lower.includes("api key not found") ||
+    lower.includes("unregistered callers") ||
+    (status === 400 && (lower.includes("api_key") || lower.includes("api key") || lower.includes("api consumer identity")));
+
+  if (isAuthFailure) {
     return {
       ...base,
       kind: "invalid_key",
       label: KIND_LABELS.invalid_key,
-      message: sanitizedProviderMsg || "The API key was rejected by the provider (HTTP 401/403).",
+      message: sanitizedProviderMsg || "The API key was rejected by the provider.",
       remedy: "Open the provider's dashboard, generate a fresh key, and paste it in again.",
+      retryable: false,
+      failoverWorthwhile: true,
+    };
+  }
+
+  // Geographic / regional restriction (e.g. Gemini blocking Nepal or certain cloud IPs)
+  const isRegionBlocked =
+    lower.includes("user location is not supported") ||
+    lower.includes("location is not supported") ||
+    lower.includes("country is not supported") ||
+    lower.includes("region is not supported") ||
+    lower.includes("unsupported location");
+
+  if (isRegionBlocked) {
+    return {
+      ...base,
+      kind: "unsupported_provider",
+      label: "Region Restricted",
+      message: "This provider is not available in your current geographic region.",
+      remedy: "Switch to a globally accessible provider like Groq or run a local model.",
       retryable: false,
       failoverWorthwhile: true,
     };
@@ -314,9 +349,18 @@ export function classifyHttpError(
 
   if (status >= 400) {
     const isCapabilityMismatch =
-      /unsupported|not supported|unknown field|parameter|response_format|json_schema|system prompt|feature not enabled/i.test(
+      /unsupported|not supported|unknown field|parameter|response_format|json_schema|system prompt|feature not enabled|temperature|max_tokens|top_p/i.test(
         detail || ""
       );
+
+    const isClientMalformedError =
+      /field required|unexpected token|invalid json|json syntax|malformed payload|syntax error|bad json|missing required/i.test(
+        detail || ""
+      );
+
+    // If it's a capability mismatch or an opaque/empty provider rejection without client syntax error, failover is worthwhile.
+    // Genuine malformed client payloads (e.g. missing field, broken JSON) fail identically everywhere and should not burn keys.
+    const failoverWorthwhile = isCapabilityMismatch || (!isClientMalformedError && (!detail || detail.trim() === ""));
 
     return {
       ...base,
@@ -327,7 +371,7 @@ export function classifyHttpError(
         : `The provider rejected the request (status ${status}).`,
       remedy: detail ? "See the provider's message in the diagnostics log below." : null,
       retryable: false,
-      failoverWorthwhile: isCapabilityMismatch,
+      failoverWorthwhile,
     };
   }
 

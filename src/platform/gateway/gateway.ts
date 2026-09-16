@@ -35,7 +35,10 @@ function estimateTokens(text: string): number {
  * comment for what callers are responsible for.
  */
 function evaluateAndResolvePrompt(req: CompletionRequest, policy: EgressPolicy): string {
-  const segments = req.segments ?? [{ label: "userPrompt", text: req.userPrompt }];
+  const segments =
+    req.segments && req.segments.length > 0
+      ? req.segments
+      : [{ label: "userPrompt", text: req.userPrompt }];
   const evaluation = evaluate(
     {
       provider: req.provider,

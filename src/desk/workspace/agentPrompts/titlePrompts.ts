@@ -30,8 +30,28 @@ Return ONLY valid JSON in this exact format:
   ]
 }`;
 
-  const context = JSON.stringify(projectAnswers);
-  const userPrompt = `Context: ${context}`;
+  const workingTitle =
+    projectAnswers.working_title ||
+    projectAnswers.title ||
+    "Academic Research Project";
+
+  const selectedGap =
+    projectAnswers.selected_gap ||
+    projectAnswers.research_gap ||
+    projectAnswers.gap ||
+    "Core domain inquiry and evidence synthesis";
+
+  const context = JSON.stringify({
+    working_title: workingTitle,
+    selected_gap: selectedGap,
+    ...projectAnswers,
+  });
+
+  const userPrompt = `Synthesize compelling, publication-ready academic research titles for the following study:
+Working Title: ${workingTitle}
+Selected Research Gap: ${selectedGap}
+Project Metadata:
+${context}`;
 
   return { systemPrompt, userPrompt };
 }

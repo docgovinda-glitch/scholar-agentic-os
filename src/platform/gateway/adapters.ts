@@ -129,8 +129,8 @@ export async function checkModelUnavailable(response: Response): Promise<{ isUna
   }
 }
 
-async function throwForBadResponse(id: string, response: Response, model?: string): Promise<never> {
-  const detail = await response.text().catch(() => "");
+async function throwForBadResponse(id: string, response: Response, model?: string, cachedDetail?: string): Promise<never> {
+  const detail = cachedDetail !== undefined && cachedDetail !== "" ? cachedDetail : (await response.text().catch(() => ""));
   let retryAfterMs: number | undefined = undefined;
   const rawRetry = response.headers?.get?.("retry-after");
   if (rawRetry) {
@@ -141,7 +141,12 @@ async function throwForBadResponse(id: string, response: Response, model?: strin
   }
 
   // Update provider health state machine
-  if (response.status === 401 || response.status === 403) {
+  const isAuth =
+    response.status === 401 ||
+    response.status === 403 ||
+    (response.status === 400 && /api[_-]?key|credential|unauthorized/i.test(detail));
+
+  if (isAuth) {
     recordProviderFailure(id, "invalid_key", undefined, detail);
   } else if (response.status === 429) {
     recordProviderFailure(id, "rate_limit", retryAfterMs, detail);
@@ -205,9 +210,11 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
     const headers = { "Content-Type": "application/json", ...buildAuthHeaders(this.spec, req.apiKey) };
     let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, model), signal: req.signal });
     
+    let lastDetail = "";
     // Controlled in-provider fallback on model unavailability (404 or 400/422 decommissioned)
     if (!response.ok) {
       const check = await checkModelUnavailable(response);
+      lastDetail = check.detail;
       if (check.isUnavailable) {
         quarantineModel(this.id, model, check.detail || "model_unavailable");
         const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
@@ -217,9 +224,11 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
           if (retryRes.ok) {
             response = retryRes;
             model = fbModel;
+            lastDetail = "";
             break;
           }
           const checkRetry = await checkModelUnavailable(retryRes);
+          lastDetail = checkRetry.detail;
           if (!checkRetry.isUnavailable) {
             response = retryRes;
             model = fbModel;
@@ -230,7 +239,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
       }
     }
 
-    if (!response.ok) return throwForBadResponse(this.id, response, model);
+    if (!response.ok) return throwForBadResponse(this.id, response, model, lastDetail);
     const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
     const text = data.choices?.[0]?.message?.content ?? "";
     return { text, model };
@@ -242,9 +251,11 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
     const headers = { "Content-Type": "application/json", Accept: "text/event-stream", ...buildAuthHeaders(this.spec, req.apiKey) };
     let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, model), signal: req.signal });
 
+    let lastDetail = "";
     // Controlled in-provider fallback on model unavailability (404 or 400/422 decommissioned)
     if (!response.ok) {
       const check = await checkModelUnavailable(response);
+      lastDetail = check.detail;
       if (check.isUnavailable) {
         quarantineModel(this.id, model, check.detail || "model_unavailable");
         const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
@@ -254,9 +265,11 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
           if (retryRes.ok) {
             response = retryRes;
             model = fbModel;
+            lastDetail = "";
             break;
           }
           const checkRetry = await checkModelUnavailable(retryRes);
+          lastDetail = checkRetry.detail;
           if (!checkRetry.isUnavailable) {
             response = retryRes;
             model = fbModel;
@@ -267,7 +280,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
       }
     }
 
-    if (!response.ok) return throwForBadResponse(this.id, response, model);
+    if (!response.ok) return throwForBadResponse(this.id, response, model, lastDetail);
 
     let text = "";
     for await (const data of readSSE(response)) {
@@ -308,8 +321,10 @@ class AnthropicAdapter implements ProviderAdapter {
     const headers = { "Content-Type": "application/json", ...buildAuthHeaders(this.spec, req.apiKey) };
     let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, model), signal: req.signal });
 
+    let lastDetail = "";
     if (!response.ok) {
       const check = await checkModelUnavailable(response);
+      lastDetail = check.detail;
       if (check.isUnavailable) {
         quarantineModel(this.id, model, check.detail || "model_unavailable");
         const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
@@ -318,9 +333,11 @@ class AnthropicAdapter implements ProviderAdapter {
           if (retryRes.ok) {
             response = retryRes;
             model = fbModel;
+            lastDetail = "";
             break;
           }
           const checkRetry = await checkModelUnavailable(retryRes);
+          lastDetail = checkRetry.detail;
           if (!checkRetry.isUnavailable) {
             response = retryRes;
             model = fbModel;
@@ -331,7 +348,7 @@ class AnthropicAdapter implements ProviderAdapter {
       }
     }
 
-    if (!response.ok) return throwForBadResponse(this.id, response, model);
+    if (!response.ok) return throwForBadResponse(this.id, response, model, lastDetail);
     const data = (await response.json()) as { content?: { text?: string }[] };
     const content = Array.isArray(data?.content) ? data.content : [];
     const text = content.map((c) => c.text ?? "").join("");
@@ -344,8 +361,10 @@ class AnthropicAdapter implements ProviderAdapter {
     const headers = { "Content-Type": "application/json", Accept: "text/event-stream", ...buildAuthHeaders(this.spec, req.apiKey) };
     let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, model), signal: req.signal });
 
+    let lastDetail = "";
     if (!response.ok) {
       const check = await checkModelUnavailable(response);
+      lastDetail = check.detail;
       if (check.isUnavailable) {
         quarantineModel(this.id, model, check.detail || "model_unavailable");
         const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
@@ -354,9 +373,11 @@ class AnthropicAdapter implements ProviderAdapter {
           if (retryRes.ok) {
             response = retryRes;
             model = fbModel;
+            lastDetail = "";
             break;
           }
           const checkRetry = await checkModelUnavailable(retryRes);
+          lastDetail = checkRetry.detail;
           if (!checkRetry.isUnavailable) {
             response = retryRes;
             model = fbModel;
@@ -367,7 +388,7 @@ class AnthropicAdapter implements ProviderAdapter {
       }
     }
 
-    if (!response.ok) return throwForBadResponse(this.id, response, model);
+    if (!response.ok) return throwForBadResponse(this.id, response, model, lastDetail);
 
     let text = "";
     for await (const data of readSSE(response)) {
@@ -390,9 +411,10 @@ class GeminiAdapter implements ProviderAdapter {
   constructor(private spec: CloudProviderSpec) {}
 
   private buildBody(req: CompletionRequest) {
+    const userPrompt = req.userPrompt && req.userPrompt.trim() ? req.userPrompt : "Proceed with research task.";
     return {
-      contents: [{ role: "user", parts: [{ text: req.userPrompt }] }],
-      ...(req.systemPrompt ? { systemInstruction: { parts: [{ text: req.systemPrompt }] } } : {}),
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      ...(req.systemPrompt && req.systemPrompt.trim() ? { systemInstruction: { parts: [{ text: req.systemPrompt }] } } : {}),
       generationConfig: {
         temperature: req.temperature ?? 0.3,
         ...(req.maxTokens ? { maxOutputTokens: req.maxTokens } : {}),
@@ -421,7 +443,7 @@ class GeminiAdapter implements ProviderAdapter {
   }
 
   async complete(req: CompletionRequest): Promise<{ text: string; model: string }> {
-    let model = req.model || this.spec.defaultModel;
+    let model = (req.model || this.spec.defaultModel).replace(/^models\//, "");
     const baseUrl = resolveBaseUrl(this.spec);
     const url = `${baseUrl}/models/${model}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
     let response = await fetch(url, {
@@ -431,14 +453,17 @@ class GeminiAdapter implements ProviderAdapter {
       signal: req.signal,
     });
 
+    let lastDetail = "";
     // Dynamic Controlled fallback on model unavailability (404 or 400/422 decommissioned)
     if (!response.ok) {
       const check = await checkModelUnavailable(response);
+      lastDetail = check.detail;
       if (check.isUnavailable) {
         quarantineModel(this.id, model, check.detail || "model_unavailable");
         const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
         for (const fbModel of fallbacks) {
-          const fbUrl = `${baseUrl}/models/${fbModel}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
+          const cleanFb = fbModel.replace(/^models\//, "");
+          const fbUrl = `${baseUrl}/models/${cleanFb}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
           const retryRes = await fetch(fbUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -447,27 +472,29 @@ class GeminiAdapter implements ProviderAdapter {
           });
           if (retryRes.ok) {
             response = retryRes;
-            model = fbModel;
+            model = cleanFb;
+            lastDetail = "";
             break;
           }
           const checkRetry = await checkModelUnavailable(retryRes);
+          lastDetail = checkRetry.detail;
           if (!checkRetry.isUnavailable) {
             response = retryRes;
-            model = fbModel;
+            model = cleanFb;
             break;
           }
-          quarantineModel(this.id, fbModel, checkRetry.detail || "model_unavailable");
+          quarantineModel(this.id, cleanFb, checkRetry.detail || "model_unavailable");
         }
       }
     }
 
-    if (!response.ok) return throwForBadResponse(this.id, response, model);
+    if (!response.ok) return throwForBadResponse(this.id, response, model, lastDetail);
     const data = (await response.json()) as any;
     return { text: this.extractText(data), model };
   }
 
   async stream(req: CompletionRequest, onChunk: (delta: string) => void): Promise<{ text: string; model: string }> {
-    let model = req.model || this.spec.defaultModel;
+    let model = (req.model || this.spec.defaultModel).replace(/^models\//, "");
     const baseUrl = resolveBaseUrl(this.spec);
     const url = `${baseUrl}/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
     let response = await fetch(url, {
@@ -477,14 +504,17 @@ class GeminiAdapter implements ProviderAdapter {
       signal: req.signal,
     });
 
+    let lastDetail = "";
     // Dynamic Controlled fallback on model unavailability (404 or 400/422 decommissioned)
     if (!response.ok) {
       const check = await checkModelUnavailable(response);
+      lastDetail = check.detail;
       if (check.isUnavailable) {
         quarantineModel(this.id, model, check.detail || "model_unavailable");
         const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
         for (const fbModel of fallbacks) {
-          const fbUrl = `${baseUrl}/models/${fbModel}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
+          const cleanFb = fbModel.replace(/^models\//, "");
+          const fbUrl = `${baseUrl}/models/${cleanFb}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
           const retryRes = await fetch(fbUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -493,21 +523,23 @@ class GeminiAdapter implements ProviderAdapter {
           });
           if (retryRes.ok) {
             response = retryRes;
-            model = fbModel;
+            model = cleanFb;
+            lastDetail = "";
             break;
           }
           const checkRetry = await checkModelUnavailable(retryRes);
+          lastDetail = checkRetry.detail;
           if (!checkRetry.isUnavailable) {
             response = retryRes;
-            model = fbModel;
+            model = cleanFb;
             break;
           }
-          quarantineModel(this.id, fbModel, checkRetry.detail || "model_unavailable");
+          quarantineModel(this.id, cleanFb, checkRetry.detail || "model_unavailable");
         }
       }
     }
 
-    if (!response.ok) return throwForBadResponse(this.id, response, model);
+    if (!response.ok) return throwForBadResponse(this.id, response, model, lastDetail);
 
     let text = "";
     for await (const data of readSSE(response)) {
