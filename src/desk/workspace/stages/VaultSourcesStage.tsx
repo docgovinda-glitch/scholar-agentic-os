@@ -67,18 +67,18 @@ export default function VaultSourcesStage({
             id: Date.now().toString() + "empty",
             timestamp: new Date().toLocaleTimeString([], { hour12: false }),
             level: "info",
-            message: `Vault is empty or locked. Skipping source discovery and advancing...`,
+            message: `Vault is empty or locked. Skipping source discovery and advancing to Vault Approval...`,
           },
         ]);
         setResults([]);
         const updatedProject = await saveIntakeAnswers(projectId, {
           ...project.answers,
           pending_vault_sources: "[]",
+          current_stage: "source_approval_vault",
         });
         onSaved(updatedProject);
         if (onAdvance) {
-          // Advance immediately to next stage since there's nothing to approve
-          setTimeout(() => onAdvance("source_approval"), 1000);
+          onAdvance("source_approval_vault");
         }
         return;
       }

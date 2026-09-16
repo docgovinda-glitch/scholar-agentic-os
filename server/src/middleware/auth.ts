@@ -36,8 +36,8 @@
 import type { Request, Response, NextFunction } from "express";
 import { getSupabaseRestConfig, SupabaseTable } from "../supabaseRest";
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const getSupabaseUrl = () => process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const getSupabaseServiceRole = () => process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 /** Abandon a hung identity-provider call rather than holding the request open. */
 const VERIFY_TIMEOUT_MS = 8000;
@@ -61,7 +61,10 @@ export interface VerifyResult {
  * should be assertable without standing up Express.
  */
 export async function verifyAccessToken(token: string): Promise<VerifyResult> {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseServiceRole = getSupabaseServiceRole();
+
+  if (!supabaseUrl || !supabaseServiceRole) {
     return { ok: false, reason: "unconfigured" };
   }
 
@@ -69,11 +72,11 @@ export async function verifyAccessToken(token: string): Promise<VerifyResult> {
   const timer = setTimeout(() => controller.abort(), VERIFY_TIMEOUT_MS);
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: {
         // `apikey` authenticates this service to GoTrue; the bearer token is
         // the end user's. Both are required — the endpoint rejects either alone.
-        apikey: SUPABASE_SERVICE_ROLE,
+        apikey: supabaseServiceRole,
         Authorization: `Bearer ${token}`,
       },
       signal: controller.signal,

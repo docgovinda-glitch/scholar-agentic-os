@@ -61,6 +61,13 @@ export function ResearchProvider({
   const [fallbackToast, setFallbackToast] = useState<string | null>(null);
 
   const currentStage = initialStage ?? "definition";
+  const latestStageRef = React.useRef<ResearchStage | null>(initialStage);
+
+  useEffect(() => {
+    if (initialStage) {
+      latestStageRef.current = initialStage;
+    }
+  }, [initialStage]);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -69,6 +76,15 @@ export function ResearchProvider({
       const [rub, doc] = proj.hasDocument 
         ? await Promise.all([getRubric(projectId), getDocument(projectId)])
         : [null, null];
+
+      // Prevent stale remote state from overwriting a newly selected in-flight stage
+      if (latestStageRef.current && proj.answers?.["current_stage"] !== latestStageRef.current) {
+        proj.answers = {
+          ...(proj.answers || {}),
+          current_stage: latestStageRef.current,
+        };
+      }
+
       setProject(proj);
       setDocument(doc);
       setRubric(rub);
@@ -126,19 +142,63 @@ export function ResearchProvider({
 
   const stageStatuses = computeStageStatuses(project);
 
-  const setStage = useCallback((stage: ResearchStage, options?: { replace?: boolean }) => {
-    saveIntakeAnswers(projectId, { current_stage: stage }).catch(() => {});
+  const setStage = useCallback(async (stage: ResearchStage, options?: { replace?: boolean }) => {
+    if (!isResearchStage(stage)) {
+      const msg = `[ResearchNavigation] Blocked invalid stage navigation to: "${String(stage)}". Stage must exist in STAGE_MAP.`;
+      console.error(msg);
+      setError(msg);
+      return;
+    }
+
+    const previousStage = currentStage;
+    const previousAnswers = project?.answers;
+
+    latestStageRef.current = stage;
+    setProject((prev) => (prev ? { ...prev, answers: { ...prev.answers, current_stage: stage } } : prev));
     onStageChangeCallback(stage, options);
-  }, [onStageChangeCallback, projectId]);
+
+    try {
+      const updated = await saveIntakeAnswers(projectId, { current_stage: stage });
+      setProject(updated);
+    } catch (err: any) {
+      console.error("[ResearchNavigation] Failed to persist stage change, reconciling state:", err);
+      latestStageRef.current = previousStage;
+      setProject((prev) => (prev ? { ...prev, answers: previousAnswers || prev.answers } : prev));
+      onStageChangeCallback(previousStage);
+      setError(`Failed to switch to stage "${stage}". Reverted to "${previousStage}".`);
+    }
+  }, [currentStage, onStageChangeCallback, project?.answers, projectId]);
 
   useEffect(() => {
     setGlobalManualModelOverride(manualModelOverride);
   }, [manualModelOverride]);
 
-  const advanceStage = useCallback((nextStage: ResearchStage) => {
-    saveIntakeAnswers(projectId, { current_stage: nextStage }).catch(() => {});
+  const advanceStage = useCallback(async (nextStage: ResearchStage) => {
+    if (!isResearchStage(nextStage)) {
+      const msg = `[ResearchNavigation] Blocked invalid stage advance to: "${String(nextStage)}". Stage must exist in STAGE_MAP.`;
+      console.error(msg);
+      setError(msg);
+      return;
+    }
+
+    const previousStage = currentStage;
+    const previousAnswers = project?.answers;
+
+    latestStageRef.current = nextStage;
+    setProject((prev) => (prev ? { ...prev, answers: { ...prev.answers, current_stage: nextStage } } : prev));
     onStageChangeCallback(nextStage);
-  }, [onStageChangeCallback, projectId]);
+
+    try {
+      const updated = await saveIntakeAnswers(projectId, { current_stage: nextStage });
+      setProject(updated);
+    } catch (err: any) {
+      console.error("[ResearchNavigation] Failed to persist stage progression, reconciling state:", err);
+      latestStageRef.current = previousStage;
+      setProject((prev) => (prev ? { ...prev, answers: previousAnswers || prev.answers } : prev));
+      onStageChangeCallback(previousStage);
+      setError(`Failed to advance to stage "${nextStage}". Reverted to "${previousStage}".`);
+    }
+  }, [currentStage, onStageChangeCallback, project?.answers, projectId]);
 
   const [chapterId, setChapterId] = useState<string | null>(null);
 

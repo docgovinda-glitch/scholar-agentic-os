@@ -16,14 +16,14 @@ export function computeStageStatuses(project: ProjectView | null): Record<Resear
   const a = project.answers || {};
 
   // Phase I Artifacts
-  const defComplete = !!a["core_problem"];
-  const litComplete = !!a["literature_review"] || !!a["literature_sources"];
-  const gapIdComplete = !!a["gap_identified"] || !!a["gaps"];
-  const gapSelComplete = !!a["gap_selected"];
-  const titleSelComplete = !!a["title_options"] && a["title_options"].length > 0;
-  const titleLockComplete = !!a["working_title"] || !!a["title"];
+  const defComplete = !!a["core_problem"] || !!a["definition"] || (!!a["research_area"] && !!a["article_type"]);
+  const litComplete = !!a["discovered_literature"] || !!a["literature_review"] || !!a["literature_sources"];
+  const gapIdComplete = !!a["identified_gaps"] || !!a["gap_identified"] || !!a["gaps"];
+  const gapSelComplete = !!a["selected_gap"] || !!a["selected_gaps"] || !!a["gap_selected"];
+  const titleSelComplete = !!(a["title_options"] && a["title_options"].length > 0) || !!a["generated_titles"];
+  const titleLockComplete = (a["title_locked"] === "true" || a["title_lock"] === "completed") && !!(a["working_title"] || a["title"]);
   
-  const phase1Complete = defComplete && litComplete && gapIdComplete && gapSelComplete && titleSelComplete && titleLockComplete;
+  const phase1Complete = titleLockComplete && defComplete && litComplete && gapIdComplete && gapSelComplete && titleSelComplete;
 
   const res: Record<ResearchStage, StageStatus> = { ...allLocked };
 

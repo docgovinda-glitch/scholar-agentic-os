@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
-import { saveIntakeAnswers } from "../../api";
+import { executeTitleLockAndProceed } from "../titleLockContract";
 
 export default function TitleLockStage({
   stage,
@@ -24,6 +24,8 @@ export default function TitleLockStage({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isTitleLocked = project.answers?.["title_locked"] === "true";
+
   // Sync if it changes externally
   useEffect(() => {
     setTitle(project.answers?.["working_title"] || "");
@@ -33,17 +35,13 @@ export default function TitleLockStage({
     setIsSaving(true);
     setError(null);
     try {
-      const newAnswers = {
-        ...project.answers,
-        working_title: title,
-        title_locked: "true",
-      };
-      
-      const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-      onSaved(updatedProject);
-      if (onAdvance) {
-        onAdvance("vault_sources");
-      }
+      await executeTitleLockAndProceed({
+        projectId,
+        title,
+        existingAnswers: project.answers,
+        onSaved,
+        onAdvance: (dest) => onAdvance?.(dest),
+      });
     } catch (err: any) {
       setError(err.message || "Failed to lock title.");
     } finally {
@@ -123,11 +121,9 @@ export default function TitleLockStage({
                 Locking this snapshot will establish the absolute ground truth for Phase 2 extraction agents.
               </p>
               <button 
-                onClick={handleLockTitle}
-                disabled={isSaving || !title.trim() || project.answers?.["title_locked"] === "true"}
-                className={`shrink-0 px-8 py-3 rounded-lg font-bold text-white shadow-md flex items-center justify-center gap-2 disabled:opacity-50 transition-colors ${
-                  project.answers?.["title_locked"] === "true" ? "bg-green-600" : "bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)]"
-                }`}
+                onClick={isTitleLocked ? () => onAdvance?.("vault_sources") : handleLockTitle}
+                disabled={isSaving || (!isTitleLocked && !title.trim())}
+                className="shrink-0 px-8 py-3 rounded-lg font-bold text-white shadow-md flex items-center justify-center gap-2 disabled:opacity-50 transition-colors bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] cursor-pointer"
               >
                 {isSaving ? (
                   <>
@@ -136,8 +132,10 @@ export default function TitleLockStage({
                     </svg>
                     Locking...
                   </>
-                ) : project.answers?.["title_locked"] === "true" ? (
-                  "✓ Dossier Locked"
+                ) : isTitleLocked ? (
+                  <>
+                    <span>Proceed to Evidence (Phase II) →</span>
+                  </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

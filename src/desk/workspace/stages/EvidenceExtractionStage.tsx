@@ -111,9 +111,9 @@ export default function EvidenceExtractionStage({
               },
             ]);
             
-            setTimeout(() => {
-              if (onAdvance) onAdvance("evidence_review");
-            }, 2000);
+            if (onAdvance) {
+              onAdvance("external_research");
+            }
           } else if (event === "error") {
             throw new Error(data.message || "Agent encountered an error during evidence extraction.");
           }

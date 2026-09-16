@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
@@ -7,6 +7,7 @@ import { saveIntakeAnswers, executeAgenticLLM } from "../../api";
 import { buildTitlePrompts } from "../agentPrompts/titlePrompts";
 import { parseJsonFromLlm } from "../../../utils/jsonParser";
 import { AllAiResourcesExhaustedModal } from "../../aiAccess/AllAiResourcesExhaustedModal";
+import { executeTitleLockAndProceed } from "../titleLockContract";
 
 interface TitleItem {
   id: string;
@@ -50,6 +51,12 @@ export default function TitleSelectionStage({
   const [selectedTitleText, setSelectedTitleText] = useState(project.answers?.["working_title"] || "");
   const [customTitleInput, setCustomTitleInput] = useState("");
   const [isCustomMode, setIsCustomMode] = useState(false);
+
+  useEffect(() => {
+    if (project.answers?.["working_title"]) {
+      setSelectedTitleText(project.answers["working_title"]);
+    }
+  }, [project.answers?.["working_title"]]);
 
   const startTitleGeneration = async () => {
     setIsProcessing(true);
@@ -168,15 +175,13 @@ export default function TitleSelectionStage({
     setError(null);
 
     try {
-      const newAnswers = {
-        ...project.answers,
-        working_title: selectedTitleText.trim(),
-        title_locked: "true",
-        current_stage: "vault_sources",
-      };
-
-      const updatedProject = await saveIntakeAnswers(projectId, newAnswers as Record<string, string>);
-      onSaved(updatedProject);
+      await executeTitleLockAndProceed({
+        projectId,
+        title: selectedTitleText,
+        existingAnswers: project.answers,
+        onSaved,
+        onAdvance: (dest) => onAdvance?.(dest),
+      });
 
       setLogs((prev) => [
         ...prev,
@@ -187,10 +192,6 @@ export default function TitleSelectionStage({
           message: `✓ Title officially locked: "${selectedTitleText.trim()}". Proceeding to Evidence extraction.`,
         },
       ]);
-
-      if (onAdvance) {
-        onAdvance("vault_sources");
-      }
     } catch (err: any) {
       setError(err.message || "Failed to lock title.");
     } finally {
@@ -218,14 +219,14 @@ export default function TitleSelectionStage({
           </div>
         </div>
 
-        {selectedTitleText && !isTitleLocked && (
+        {(selectedTitleText || isTitleLocked) && (
           <button
             type="button"
-            onClick={handleLockTitleAndProceed}
-            disabled={isSaving || !selectedTitleText.trim()}
+            onClick={isTitleLocked ? () => onAdvance?.("vault_sources") : handleLockTitleAndProceed}
+            disabled={isSaving || (!isTitleLocked && !selectedTitleText.trim())}
             className="px-6 py-2.5 rounded-lg bg-[color:var(--accent)] text-white font-bold text-xs hover:bg-[color:var(--accent-hover)] transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            {isSaving ? "Locking Title..." : "Lock Title & Proceed to Evidence →"}
+            {isSaving ? "Locking Title..." : isTitleLocked ? "Proceed to Evidence (Phase II) →" : "Lock Title & Proceed to Evidence →"}
           </button>
         )}
       </div>
@@ -326,14 +327,14 @@ export default function TitleSelectionStage({
                 <p className="text-xs text-[color:var(--text-secondary)]">
                   Locking establishes the permanent ground truth for evidence extraction and drafting.
                 </p>
-                {!isTitleLocked && (
+                {(selectedTitleText || isTitleLocked) && (
                   <button
                     type="button"
-                    onClick={handleLockTitleAndProceed}
-                    disabled={isSaving || !selectedTitleText.trim()}
+                    onClick={isTitleLocked ? () => onAdvance?.("vault_sources") : handleLockTitleAndProceed}
+                    disabled={isSaving || (!isTitleLocked && !selectedTitleText.trim())}
                     className="px-8 py-3 rounded-xl bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
                   >
-                    {isSaving ? "Locking Title..." : "Lock Title & Proceed to Evidence →"}
+                    {isSaving ? "Locking Title..." : isTitleLocked ? "Proceed to Evidence (Phase II) →" : "Lock Title & Proceed to Evidence →"}
                   </button>
                 )}
               </div>
