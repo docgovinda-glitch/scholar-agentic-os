@@ -144,11 +144,11 @@ Scholar Core replaces muddy legacy themes with a high-contrast, toggleable Day/N
 
 ---
 
-## 🌀 Snappy Mechanical AI Logo & Brand Mark
-Scholar Core features an animated "AI Breathing" brand mark tuned for high-velocity, responsive mechanical motion:
+## 🌀 Smooth Animated AI Logo & Brand Mark
+Scholar Core features an animated "AI Breathing" brand mark tuned for smooth, fluid, organic motion:
 - **Core Asset**: `cognitive_authority_veena_logo_v7b_colored_details.png` (4-armed spiraling knowledge motif with vibrant warm orange `#FF7A00` core and magenta `#E02875` details).
-- **Fast 360° Rotation**: Hardware-accelerated rotation over **240ms** using a snappy mechanical easing curve (`cubic-bezier(0.2, 0.8, 0.2, 1)`).
-- **Snappy Breathing Pulse**: Enclosing flex container scales between `scale(1.0)` and `scale(1.08)` across a **260ms** cycle (`cubic-bezier(0.2, 0.8, 0.2, 1)`).
+- **Continuous 360° Rotation**: Hardware-accelerated rotation over **4s** using buttery-smooth `linear` easing with zero stutter.
+- **Gentle Breathing Pulse**: Enclosing flex container scales between `scale(1.0)` and `scale(1.08)` across a soothing **3s** `ease-in-out` cycle.
 - **Dynamic Aura Glow**: Multi-layered ambient drop-shadow in warm orange and magenta hues that synchronously pulses with the core.
 - **Accessibility & Motion Preference**: Automatically respects `prefers-reduced-motion: reduce` by halting transforms and filter animations.
 
@@ -159,9 +159,9 @@ Scholar Core adopts an Airbnb / Gemini-style localized loading architecture:
 - **Zero Global Viewport Lockouts**: Network queries and Supabase mutations (`authedFetch`) bypass full-screen backdrops, keeping the entire application viewport interactive.
 - **Button-Absorbed Loading States**: Action points (sign-in, registration, project creation, deletion confirmation, source quick-add, and vault imports) transition the active button into an inline spinner (`animate-spin` circle) with `aria-busy` and disabled states.
 - **Non-Blocking Component Suspense**: Lazy-loaded route fallbacks render localized inline spinners (`role="status"`, `aria-live="polite"`) rather than blocking overlays.
-- **Snappy Active Processing Transitions**:
-  - `.ai-loader-spin`: 220ms `cubic-bezier(0.2, 0.8, 0.2, 1)`.
-  - `.ai-loader-breathe`: 200ms `cubic-bezier(0.2, 0.8, 0.2, 1)`.
+- **Smooth Active Processing Transitions**:
+  - `.ai-loader-spin`: 1.8s `linear`.
+  - `.ai-loader-breathe`: 1.8s `ease-in-out`.
   - `.ai-loading-overlay`: 180ms unmount fade duration with `pointer-events: none`.
 
 

@@ -125,14 +125,14 @@ To ensure distraction-free academic focus and modern visual excellence, the appl
 
 ---
 
-## 9. Snappy AI Brand Mark & Contextual Loading Architecture
+## 9. Smooth AI Brand Mark & Contextual Loading Architecture
 
-### 9.1 Accelerated Brand Mark Animation
-The Scholar Core brand mark features an animated "AI Breathing" Veena core tuned for responsive, snappy mechanical motion:
+### 9.1 Smooth Brand Mark Animation
+The Scholar Core brand mark features an animated "AI Breathing" Veena core tuned for smooth, fluid, organic motion:
 - **Asset**: `cognitive_authority_veena_logo_v7b_colored_details.png` (4-armed spiraling knowledge motif with vibrant warm orange `#FF7A00` core and magenta `#E02875` details).
-- **Two-Tier Snappy Mechanical Model**:
-  - **Outer Flex Wrapper (`.ai-logo-container`)**: Fast scale breathing (`scale(1.0)` to `scale(1.08)`) with ambient glow over a **260ms** `cubic-bezier(0.2, 0.8, 0.2, 1)` infinite loop.
-  - **Inner Image (`.ai-logo-spin`)**: Continuous 360-degree rotation with crisp mechanical pacing over a **240ms** `cubic-bezier(0.2, 0.8, 0.2, 1)` loop.
+- **Two-Tier Fluid Model**:
+  - **Outer Flex Wrapper (`.ai-logo-container`)**: Gentle, organic scale breathing (`scale(1.0)` to `scale(1.08)`) with ambient glow over a **3s** `ease-in-out` infinite loop.
+  - **Inner Image (`.ai-logo-spin`)**: Continuous, buttery-smooth 360-degree rotation over a **4s** `linear` loop with zero stutter or jarring reset.
 - **Hardware Acceleration**: Driven strictly by GPU-accelerated CSS properties (`transform`, `filter`) with `will-change: transform, filter` to maintain a steady 60fps refresh rate with zero layout reflow.
 - **Accessibility Safeguards**: Automatically disabled under `@media (prefers-reduced-motion: reduce)`.
 
@@ -144,9 +144,9 @@ In alignment with modern interaction design (Airbnb / Gemini style):
   - An inline spinning indicator appears directly inside the button (`w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin`).
   - Button sets `disabled` and `aria-busy="true"`.
   - Contextual action label adjusts dynamically (e.g., "Sign in" → "Signing in…", "Delete" → "Deleting…", "Save Source" → "Saving…").
-- **Snappy Active AI Loader Timings**:
-  - `.ai-loader-spin`: 220ms `cubic-bezier(0.2, 0.8, 0.2, 1)`.
-  - `.ai-loader-breathe`: 200ms `cubic-bezier(0.2, 0.8, 0.2, 1)`.
+- **Smooth Active AI Loader Timings**:
+  - `.ai-loader-spin`: 1.8s `linear`.
+  - `.ai-loader-breathe`: 1.8s `ease-in-out`.
   - `.ai-loading-overlay`: 180ms fade-out with `pointer-events: none`.
 
 ---
