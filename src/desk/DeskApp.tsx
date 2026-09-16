@@ -22,7 +22,6 @@ import { useDeskSession } from "./useDeskSession";
 import { useDeviceClass } from "../hooks/useDeviceClass";
 import type { SectionId } from "./aiAccess/AiAccessPage";
 import GlobalLoader from "./components/GlobalLoader";
-import GlobalLoadingOverlay from "./components/GlobalLoadingOverlay";
 import { LoadingProvider } from "./context/LoadingContext";
 
 // Lazy loaded heavy screens
@@ -413,7 +412,6 @@ function AgentsRoute() {
 export default function DeskApp() {
   return (
     <LoadingProvider>
-      <GlobalLoadingOverlay />
       <Suspense fallback={<GlobalLoader />}>
         <Routes>
           <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
