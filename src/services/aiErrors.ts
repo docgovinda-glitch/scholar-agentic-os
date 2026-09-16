@@ -61,6 +61,10 @@ export interface ClassifiedAIError {
    * everywhere, so failing over just burns quota on every key in turn).
    */
   failoverWorthwhile: boolean;
+  /** Provider error code (e.g. model_decommissioned, rate_limit_exceeded) when structured */
+  providerErrorCode?: string;
+  /** Clean provider message extracted from structured response */
+  providerMessage?: string;
   /** From a Retry-After header when present, in milliseconds */
   retryAfterMs?: number;
 }
@@ -93,40 +97,156 @@ export function parseRetryAfter(headerValue: string | null | undefined): number 
   return undefined;
 }
 
+export interface ParsedProviderError {
+  errorCode?: string;
+  errorType?: string;
+  errorMessage?: string;
+  rawJson?: any;
+}
+
 /**
- * Classify a response that actually reached a server.
+ * Safely extracts structured error fields from provider JSON error payloads
+ * across OpenAI, Groq, Anthropic, and Google Gemini.
+ */
+export function parseProviderErrorBody(detail?: string): ParsedProviderError {
+  if (!detail || typeof detail !== "string") return {};
+  const trimmed = detail.trim();
+  if (!trimmed.startsWith("{")) return { errorMessage: detail };
+  try {
+    const json = JSON.parse(trimmed);
+    const errObj = json.error || json;
+    const errorCode = typeof errObj.code === "string" ? errObj.code : (errObj.status || (typeof json.code === "string" ? json.code : undefined));
+    const errorType = errObj.type || json.type;
+    const errorMessage = typeof errObj.message === "string" ? errObj.message : (typeof json.message === "string" ? json.message : undefined);
+    return { errorCode, errorType, errorMessage, rawJson: json };
+  } catch {
+    return { errorMessage: detail };
+  }
+}
+
+/**
+ * Inspects HTTP status, structured provider error codes, and contextual error details
+ * to determine if an error is specifically due to model unavailability or decommissioning.
  *
- * `body` is the raw response text — several providers return 429 for both
- * "too many requests per minute" (retry shortly, same key is fine) and
- * "you are out of credit" (retrying will never help), and the only way to
- * tell them apart is the message text, so we inspect it.
+ * Invariant: Does NOT classify generic HTTP 400/404/422 as model failures without
+ * structured model code or contextual decommission matches.
+ */
+export function isModelUnavailableError(status: number, detail?: string, code?: string): boolean {
+  const parsed = parseProviderErrorBody(detail);
+  const effectiveCode = (code || parsed.errorCode || "").toLowerCase();
+  const effectiveType = (parsed.errorType || "").toLowerCase();
+  const message = (parsed.errorMessage || detail || "").toLowerCase();
+
+  // Explicit provider error codes for retired / decommissioned / missing models
+  if (
+    effectiveCode === "model_decommissioned" ||
+    effectiveCode === "model_not_found" ||
+    effectiveCode === "invalid_model" ||
+    effectiveCode === "model_retired" ||
+    effectiveCode === "model_disabled"
+  ) {
+    return true;
+  }
+
+  // 404 with contextual model indications (careful not to classify generic route 404 as model failure)
+  if (status === 404) {
+    if (
+      message.includes("model") ||
+      message.includes("not found") ||
+      message.includes("does not exist") ||
+      effectiveCode.includes("not_found") ||
+      effectiveType.includes("not_found")
+    ) {
+      return true;
+    }
+  }
+
+  // 400, 404, or 422 with contextual decommission / availability keywords
+  if (status === 400 || status === 404 || status === 422) {
+    const isDecommissionMatch =
+      message.includes("decommissioned") ||
+      message.includes("is not found") ||
+      message.includes("not found on this account") ||
+      message.includes("deprecated model") ||
+      message.includes("model is deprecated") ||
+      message.includes("model has been disabled") ||
+      message.includes("no longer available") ||
+      message.includes("has been retired") ||
+      message.includes("model was shut down") ||
+      message.includes("unknown model") ||
+      (message.includes("model") && message.includes("does not exist"));
+
+    if (isDecommissionMatch) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Sanitizes sensitive strings (API keys, authorization tokens, bearer headers)
+ * from error messages and log outputs.
+ */
+export function sanitizeSecretStrings(text?: string): string {
+  if (!text) return "";
+  return text
+    .replace(/(?:gsk_|sk-|AIza)[a-zA-Z0-9_\-]{6,}/gi, "[REDACTED_API_KEY]")
+    .replace(/(?:bearer\s+)[a-zA-Z0-9._\-]{6,}/gi, "Bearer [REDACTED_TOKEN]")
+    .replace(/(?:key\s+|token\s+)[a-zA-Z0-9_\-]{8,}/gi, "key [REDACTED_SECRET]");
+}
+
+/**
+ * Classifies an HTTP status and raw response body from a provider call.
  */
 export function classifyHttpError(
   status: number,
-  body: string,
+  detail?: string,
   headers?: Headers | null
 ): ClassifiedAIError {
-  const detail = (body || "").slice(0, 800);
-  const lower = detail.toLowerCase();
-  const retryAfterMs = parseRetryAfter(headers?.get("retry-after"));
+  const truncatedDetail = detail ? detail.slice(0, 800) : detail;
+  const sanitizedDetail = truncatedDetail ? sanitizeSecretStrings(truncatedDetail) : truncatedDetail;
+  const bodyText = (sanitizedDetail || "").slice(0, 800);
+  const lower = bodyText.toLowerCase();
+  const retryAfterMs = headers
+    ? parseRetryAfter(headers.get("retry-after"))
+    : parseRetryAfter(detail);
+  const parsed = parseProviderErrorBody(detail);
+  const sanitizedProviderMsg = parsed.errorMessage ? sanitizeSecretStrings(parsed.errorMessage) : undefined;
 
-  const base = { status, detail, retryAfterMs };
+  const base: ClassifiedAIError = {
+    kind: "unknown",
+    label: KIND_LABELS.unknown,
+    message: sanitizedDetail ? sanitizedDetail.slice(0, 200) : `HTTP ${status}`,
+    remedy: null,
+    status,
+    detail: sanitizedDetail,
+    providerErrorCode: parsed.errorCode,
+    providerMessage: sanitizedProviderMsg || sanitizedDetail,
+    retryable: false,
+    failoverWorthwhile: false,
+    retryAfterMs,
+  };
 
-  if (status === 401 || status === 403) {
+  if (status === 401 || status === 403 || lower.includes("invalid_api_key") || lower.includes("api key not valid")) {
     return {
       ...base,
       kind: "invalid_key",
       label: KIND_LABELS.invalid_key,
-      message:
-        "The provider rejected this API key. It may be mistyped, revoked, or issued for a different product.",
+      message: sanitizedProviderMsg || "The API key was rejected by the provider (HTTP 401/403).",
       remedy: "Open the provider's dashboard, generate a fresh key, and paste it in again.",
       retryable: false,
       failoverWorthwhile: true,
     };
   }
 
-  if (status === 402 || lower.includes("insufficient_quota") || lower.includes("insufficient credit") ||
-      lower.includes("exceeded your current quota") || lower.includes("billing")) {
+  if (
+    status === 402 ||
+    lower.includes("insufficient_quota") ||
+    lower.includes("insufficient credit") ||
+    lower.includes("exceeded your current quota") ||
+    lower.includes("billing")
+  ) {
     return {
       ...base,
       kind: "insufficient_quota",
@@ -138,29 +258,31 @@ export function classifyHttpError(
     };
   }
 
-  if (status === 429) {
+  if (status === 429 || lower.includes("rate_limit") || lower.includes("resource_exhausted")) {
+    const isQuotaExhausted = /quota|insufficient_quota|billing|credit/i.test(detail || "");
     return {
       ...base,
-      kind: "rate_limit",
-      label: KIND_LABELS.rate_limit,
-      message: retryAfterMs
-        ? `Too many requests — the provider asked to wait about ${Math.ceil(retryAfterMs / 1000)}s.`
-        : "Too many requests in a short window. This usually clears on its own within a minute.",
-      remedy: "Nothing to fix — another saved provider will be used automatically in the meantime.",
-      retryable: true,
+      kind: isQuotaExhausted ? "insufficient_quota" : "rate_limit",
+      label: isQuotaExhausted ? KIND_LABELS.insufficient_quota : KIND_LABELS.rate_limit,
+      message: isQuotaExhausted
+        ? "This account has exhausted its included quota or credits."
+        : "The provider's rate limit was exceeded (HTTP 429).",
+      remedy: isQuotaExhausted
+        ? "Add credits on the provider's billing dashboard or switch to another provider."
+        : "The system will automatically back off or switch to a backup provider.",
+      retryable: !isQuotaExhausted,
       failoverWorthwhile: true,
     };
   }
 
-  if (status === 404 || lower.includes("model_not_found") || lower.includes("does not exist") ||
-      lower.includes("unknown model")) {
+  // Model unavailability / decommissioning check takes precedence over generic 400 / 404
+  if (isModelUnavailableError(status, detail)) {
     return {
       ...base,
       kind: "model_not_found",
       label: KIND_LABELS.model_not_found,
-      message:
-        "The selected AI model is currently unavailable on this account. Providers update, rename, and retire models regularly.",
-      remedy: "The system will automatically try backup models. You can also run AI Diagnostics in settings to refresh models.",
+      message: parsed.errorMessage || "The selected AI model is decommissioned or unavailable on this provider account.",
+      remedy: "Refresh models in AI Access settings, or switch to another verified model or provider.",
       retryable: false,
       failoverWorthwhile: true,
     };
@@ -183,7 +305,7 @@ export function classifyHttpError(
       ...base,
       kind: "server_error",
       label: KIND_LABELS.server_error,
-      message: "The provider's own servers returned an error. This is on their side, not yours.",
+      message: "The provider's own servers returned an error (HTTP 5xx). This is on their side, not yours.",
       remedy: "Nothing to fix — another saved provider will be used automatically.",
       retryable: true,
       failoverWorthwhile: true,

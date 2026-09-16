@@ -34,10 +34,13 @@ import { getLocalRunner, runnerChatUrl, type LocalRunnerSpec } from "../../confi
 import type { CompletionRequest, ProviderAdapter } from "./types";
 import {
   blacklistModel,
+  quarantineModel,
+  isModelQuarantined,
   getCachedDiscoveredModels,
   isModelBlacklisted,
   recordProviderFailure,
 } from "../../services/modelDiscovery";
+import { isModelUnavailableError } from "../../services/aiErrors";
 
 /**
  * A local runtime runs on the CALLER's own machine — there is no third-party
@@ -110,6 +113,22 @@ export class AdapterHttpError extends Error {
   }
 }
 
+export async function checkModelUnavailable(response: Response): Promise<{ isUnavailable: boolean; detail: string }> {
+  try {
+    const clone = response.clone();
+    const text = await clone.text();
+    return {
+      isUnavailable: isModelUnavailableError(response.status, text),
+      detail: text,
+    };
+  } catch {
+    return {
+      isUnavailable: response.status === 404,
+      detail: "",
+    };
+  }
+}
+
 async function throwForBadResponse(id: string, response: Response, model?: string): Promise<never> {
   const detail = await response.text().catch(() => "");
   let retryAfterMs: number | undefined = undefined;
@@ -128,19 +147,19 @@ async function throwForBadResponse(id: string, response: Response, model?: strin
     recordProviderFailure(id, "rate_limit", retryAfterMs, detail);
   } else if (response.status >= 500) {
     recordProviderFailure(id, "server_error", undefined, detail);
-  } else if (response.status === 404 && model) {
-    blacklistModel(id, model, "HTTP 404 model not found");
+  } else if (model && isModelUnavailableError(response.status, detail)) {
+    quarantineModel(id, model, `HTTP ${response.status} model decommissioned/unavailable: ${detail.slice(0, 100)}`);
   }
 
   throw new AdapterHttpError(id, response.status, detail, retryAfterMs);
 }
 
 function getDynamicModelFallbacks(providerId: string, currentModel: string, spec: CloudProviderSpec): string[] {
-  blacklistModel(providerId, currentModel, "model_not_found");
+  quarantineModel(providerId, currentModel, "model_not_found");
   const cached = getCachedDiscoveredModels(providerId) || [];
   const discovered = cached.map((m) => m.id);
   const candidates = discovered.length > 0 ? discovered : spec.models && spec.models.length > 0 ? spec.models : [spec.defaultModel];
-  return candidates.filter((m) => m !== currentModel && !isModelBlacklisted(providerId, m));
+  return candidates.filter((m) => m !== currentModel && !isModelQuarantined(providerId, m));
 }
 
 class OpenAICompatibleAdapter implements ProviderAdapter {
@@ -186,23 +205,28 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
     const headers = { "Content-Type": "application/json", ...buildAuthHeaders(this.spec, req.apiKey) };
     let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, model), signal: req.signal });
     
-    // Controlled fallback on 404 (model not found)
-    if (!response.ok && response.status === 404) {
-      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
-      for (const fbModel of fallbacks) {
-        const fallbackBody = this.buildBody(req, false, fbModel);
-        const retryRes = await fetch(url, { method: "POST", headers, body: fallbackBody, signal: req.signal });
-        if (retryRes.ok) {
-          response = retryRes;
-          model = fbModel;
-          break;
+    // Controlled in-provider fallback on model unavailability (404 or 400/422 decommissioned)
+    if (!response.ok) {
+      const check = await checkModelUnavailable(response);
+      if (check.isUnavailable) {
+        quarantineModel(this.id, model, check.detail || "model_unavailable");
+        const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
+        for (const fbModel of fallbacks) {
+          const fallbackBody = this.buildBody(req, false, fbModel);
+          const retryRes = await fetch(url, { method: "POST", headers, body: fallbackBody, signal: req.signal });
+          if (retryRes.ok) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          const checkRetry = await checkModelUnavailable(retryRes);
+          if (!checkRetry.isUnavailable) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          quarantineModel(this.id, fbModel, checkRetry.detail || "model_unavailable");
         }
-        if (retryRes.status !== 404) {
-          response = retryRes;
-          model = fbModel;
-          break;
-        }
-        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
       }
     }
 
@@ -218,23 +242,28 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
     const headers = { "Content-Type": "application/json", Accept: "text/event-stream", ...buildAuthHeaders(this.spec, req.apiKey) };
     let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, model), signal: req.signal });
 
-    // Controlled fallback on 404 (model not found)
-    if (!response.ok && response.status === 404) {
-      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
-      for (const fbModel of fallbacks) {
-        const fallbackBody = this.buildBody(req, true, fbModel);
-        const retryRes = await fetch(url, { method: "POST", headers, body: fallbackBody, signal: req.signal });
-        if (retryRes.ok) {
-          response = retryRes;
-          model = fbModel;
-          break;
+    // Controlled in-provider fallback on model unavailability (404 or 400/422 decommissioned)
+    if (!response.ok) {
+      const check = await checkModelUnavailable(response);
+      if (check.isUnavailable) {
+        quarantineModel(this.id, model, check.detail || "model_unavailable");
+        const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
+        for (const fbModel of fallbacks) {
+          const fallbackBody = this.buildBody(req, true, fbModel);
+          const retryRes = await fetch(url, { method: "POST", headers, body: fallbackBody, signal: req.signal });
+          if (retryRes.ok) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          const checkRetry = await checkModelUnavailable(retryRes);
+          if (!checkRetry.isUnavailable) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          quarantineModel(this.id, fbModel, checkRetry.detail || "model_unavailable");
         }
-        if (retryRes.status !== 404) {
-          response = retryRes;
-          model = fbModel;
-          break;
-        }
-        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
       }
     }
 
@@ -279,21 +308,26 @@ class AnthropicAdapter implements ProviderAdapter {
     const headers = { "Content-Type": "application/json", ...buildAuthHeaders(this.spec, req.apiKey) };
     let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, model), signal: req.signal });
 
-    if (!response.ok && response.status === 404) {
-      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
-      for (const fbModel of fallbacks) {
-        const retryRes = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, fbModel), signal: req.signal });
-        if (retryRes.ok) {
-          response = retryRes;
-          model = fbModel;
-          break;
+    if (!response.ok) {
+      const check = await checkModelUnavailable(response);
+      if (check.isUnavailable) {
+        quarantineModel(this.id, model, check.detail || "model_unavailable");
+        const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
+        for (const fbModel of fallbacks) {
+          const retryRes = await fetch(url, { method: "POST", headers, body: this.buildBody(req, false, fbModel), signal: req.signal });
+          if (retryRes.ok) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          const checkRetry = await checkModelUnavailable(retryRes);
+          if (!checkRetry.isUnavailable) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          quarantineModel(this.id, fbModel, checkRetry.detail || "model_unavailable");
         }
-        if (retryRes.status !== 404) {
-          response = retryRes;
-          model = fbModel;
-          break;
-        }
-        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
       }
     }
 
@@ -310,21 +344,26 @@ class AnthropicAdapter implements ProviderAdapter {
     const headers = { "Content-Type": "application/json", Accept: "text/event-stream", ...buildAuthHeaders(this.spec, req.apiKey) };
     let response = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, model), signal: req.signal });
 
-    if (!response.ok && response.status === 404) {
-      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
-      for (const fbModel of fallbacks) {
-        const retryRes = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, fbModel), signal: req.signal });
-        if (retryRes.ok) {
-          response = retryRes;
-          model = fbModel;
-          break;
+    if (!response.ok) {
+      const check = await checkModelUnavailable(response);
+      if (check.isUnavailable) {
+        quarantineModel(this.id, model, check.detail || "model_unavailable");
+        const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
+        for (const fbModel of fallbacks) {
+          const retryRes = await fetch(url, { method: "POST", headers, body: this.buildBody(req, true, fbModel), signal: req.signal });
+          if (retryRes.ok) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          const checkRetry = await checkModelUnavailable(retryRes);
+          if (!checkRetry.isUnavailable) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          quarantineModel(this.id, fbModel, checkRetry.detail || "model_unavailable");
         }
-        if (retryRes.status !== 404) {
-          response = retryRes;
-          model = fbModel;
-          break;
-        }
-        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
       }
     }
 
@@ -392,28 +431,33 @@ class GeminiAdapter implements ProviderAdapter {
       signal: req.signal,
     });
 
-    // Dynamic Controlled fallback on 404
-    if (!response.ok && response.status === 404) {
-      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
-      for (const fbModel of fallbacks) {
-        const fbUrl = `${baseUrl}/models/${fbModel}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
-        const retryRes = await fetch(fbUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(this.buildBody(req)),
-          signal: req.signal,
-        });
-        if (retryRes.ok) {
-          response = retryRes;
-          model = fbModel;
-          break;
+    // Dynamic Controlled fallback on model unavailability (404 or 400/422 decommissioned)
+    if (!response.ok) {
+      const check = await checkModelUnavailable(response);
+      if (check.isUnavailable) {
+        quarantineModel(this.id, model, check.detail || "model_unavailable");
+        const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
+        for (const fbModel of fallbacks) {
+          const fbUrl = `${baseUrl}/models/${fbModel}:generateContent?key=${encodeURIComponent(req.apiKey)}`;
+          const retryRes = await fetch(fbUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(this.buildBody(req)),
+            signal: req.signal,
+          });
+          if (retryRes.ok) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          const checkRetry = await checkModelUnavailable(retryRes);
+          if (!checkRetry.isUnavailable) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          quarantineModel(this.id, fbModel, checkRetry.detail || "model_unavailable");
         }
-        if (retryRes.status !== 404) {
-          response = retryRes;
-          model = fbModel;
-          break;
-        }
-        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
       }
     }
 
@@ -433,28 +477,33 @@ class GeminiAdapter implements ProviderAdapter {
       signal: req.signal,
     });
 
-    // Dynamic Controlled fallback on 404
-    if (!response.ok && response.status === 404) {
-      const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
-      for (const fbModel of fallbacks) {
-        const fbUrl = `${baseUrl}/models/${fbModel}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
-        const retryRes = await fetch(fbUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(this.buildBody(req)),
-          signal: req.signal,
-        });
-        if (retryRes.ok) {
-          response = retryRes;
-          model = fbModel;
-          break;
+    // Dynamic Controlled fallback on model unavailability (404 or 400/422 decommissioned)
+    if (!response.ok) {
+      const check = await checkModelUnavailable(response);
+      if (check.isUnavailable) {
+        quarantineModel(this.id, model, check.detail || "model_unavailable");
+        const fallbacks = getDynamicModelFallbacks(this.id, model, this.spec);
+        for (const fbModel of fallbacks) {
+          const fbUrl = `${baseUrl}/models/${fbModel}:streamGenerateContent?alt=sse&key=${encodeURIComponent(req.apiKey)}`;
+          const retryRes = await fetch(fbUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(this.buildBody(req)),
+            signal: req.signal,
+          });
+          if (retryRes.ok) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          const checkRetry = await checkModelUnavailable(retryRes);
+          if (!checkRetry.isUnavailable) {
+            response = retryRes;
+            model = fbModel;
+            break;
+          }
+          quarantineModel(this.id, fbModel, checkRetry.detail || "model_unavailable");
         }
-        if (retryRes.status !== 404) {
-          response = retryRes;
-          model = fbModel;
-          break;
-        }
-        blacklistModel(this.id, fbModel, "HTTP 404 model not found");
       }
     }
 

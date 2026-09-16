@@ -398,7 +398,7 @@ describe("Desk — StudioPanel", () => {
         if (url === "/api/ai-access/route") {
           return {
             status: 200,
-            body: { ok: true, choice: { tier: "free", providerId: "gemini", modelId: "gemini-2.0-flash", reasoning: "Using gemini's free tier — no cost to you." }, fallbacks: [] },
+            body: { ok: true, choice: { tier: "free", providerId: "gemini", modelId: "gemini-2.5-flash", reasoning: "Using gemini's free tier — no cost to you." }, fallbacks: [] },
           };
         }
         throw new Error(`Unmocked: ${url}`);

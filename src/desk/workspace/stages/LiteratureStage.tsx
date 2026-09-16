@@ -164,10 +164,19 @@ export default function LiteratureStage({
               {
                 id: Date.now().toString() + Math.random(),
                 timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-                level: "warning",
-                message: `⚠️ ${failoverEvt.userMessage}`,
+                level: failoverEvt.type === "success" ? "success" : "warning",
+                message: failoverEvt.type === "success" ? failoverEvt.userMessage : `⚠️ ${failoverEvt.userMessage}`,
               },
             ]);
+          }
+          if (failoverEvt.type === "switch") {
+            setSourceAgent("Switching Model...");
+            setAnalysisAgent("Retrying with backup...");
+          } else if (failoverEvt.type === "retry") {
+            setSourceAgent("Retrying...");
+          } else if (failoverEvt.type === "success") {
+            setSourceAgent("Analyzing Literature Corpus...");
+            setAnalysisAgent("Synthesizing Context...");
           }
         }
       );

@@ -491,18 +491,7 @@ the legacy streaming proxy this replaces had the same limitation (its own
 retry loop only wrapped stream *initiation*, never resumed a partially
 delivered response either).
 
-**A genuine, documented loss:** the legacy `/api/stream-generate`'s Gemini
-branch retries not just the same model, but a whole fallback *chain* of
-model names (`gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-1.5-flash` →
-`gemini-1.5-pro`) if one is unavailable. `completeWithFailover()`/
-`streamWithFailover()`'s `CandidateProvider[]` is keyed one-per-provider-id
-(a `Map`, so two candidates both named `"gemini"` collapse to the last one)
-— it cannot represent "same provider, ordered list of models" today. Under
-the flag, Gemini calls get same-model retry (429/503/504, via
-`services/aiErrors.ts`'s classification) but not the multi-model fallback
-chain. This is a real capability gap, not an oversight papered over —
-extending `CandidateProvider` to support an ordered model list per provider
-is follow-up work if this is needed in practice.
+**Resolved capability:** With the composite candidate architecture (`provider::model::index`), `completeWithFailover()` and `streamWithFailover()` now fully support multiple models on the same provider (e.g. `gemini-2.5-flash` → `gemini-2.5-pro`, or `openai/gpt-oss-120b` → `openai/gpt-oss-20b`) without collapsing candidate keys. Decommissioned models automatically trigger candidate replacement and session quarantine.
 
 **taskType reuse:** callers already send a free-form `taskType` string
 (`src/types.ts`'s `AIRequest.taskType`) purely for client-side usage

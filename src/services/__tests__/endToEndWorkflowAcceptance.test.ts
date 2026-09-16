@@ -60,7 +60,7 @@ describe("System-Level Acceptance Test: Full End-to-End User Journey", () => {
         return new Response(
           JSON.stringify({
             data: [
-              { id: "llama-3.3-70b-versatile", context_window: 131072 },
+              { id: "openai/gpt-oss-20b", context_window: 131072 },
               { id: "openai/gpt-oss-120b", context_window: 131072 },
             ],
           }),
@@ -300,5 +300,90 @@ describe("System-Level Acceptance Test: Full End-to-End User Journey", () => {
     expect(mergedCollection.some((p) => p.id === "paper-1")).toBe(false);
 
     unsubscribe();
+  });
+
+  it("recovers seamlessly when Groq returns HTTP 400 model_decommissioned during Literature Discovery", async () => {
+    // 1. Setup user with Groq API key and discovery containing retired model and active backup
+    await storeProviderKey("groq", "gsk-production-test-key");
+
+    const events: any[] = [];
+    let decommissionCallCount = 0;
+    let backupCallCount = 0;
+
+    // Mock gateway completeWithFailover to simulate live provider call failing with exact Groq 400
+    vi.spyOn(gateway, "completeWithFailover").mockImplementation(async (req: any, opts: any) => {
+      // Simulate primary attempt with decommissioned model
+      decommissionCallCount++;
+
+      // Trigger failover switch event to backup model
+      opts.onEvent?.({
+        type: "switch",
+        providerId: "groq::openai/gpt-oss-120b::1",
+        userMessage: "Primary AI model unavailable: Groq (llama-3.3-70b-versatile) (Model decommissioned or unavailable [model_decommissioned]). Automatically switching to backup model (Groq (openai/gpt-oss-120b))…",
+      });
+
+      backupCallCount++;
+      return {
+        ok: true,
+        value: {
+          text: JSON.stringify({
+            data: [
+              {
+                id: "groq-paper-1",
+                title: "Scalable Inference on Open LLM Clusters",
+                authors: ["Dr. Researcher"],
+                year: 2026,
+                doi: "10.1000/groq.2026.01",
+                themes: ["Inference Speed", "Agentic Architecture"],
+              },
+            ],
+          }),
+          model: "openai/gpt-oss-120b",
+        },
+        providerId: "groq",
+        usedFallback: true,
+        attempts: [
+          {
+            providerId: "groq",
+            error: {
+              kind: "model_not_found",
+              label: "Model Unavailable",
+              status: 400,
+              providerErrorCode: "model_decommissioned",
+              message: "The model `llama-3.3-70b-versatile` has been decommissioned and is no longer available.",
+              remedy: "Refresh models in AI Access settings, or switch to another verified model or provider.",
+              retryable: false,
+              failoverWorthwhile: true,
+            },
+          },
+        ],
+      } as any;
+    });
+
+    const prompts = buildLiteraturePrompts({
+      workingTitle: "Evaluating Model Decommissioning in Agentic Systems",
+      researchArea: "Software Engineering & Distributed Systems",
+      projectAnswers: {},
+      isBroadened: false,
+    });
+
+    const result = await executeAgenticLLM(
+      prompts.systemPrompt,
+      prompts.userPrompt,
+      "literatureDiscovery",
+      undefined,
+      (evt) => events.push(evt)
+    );
+
+    expect(result).toBeDefined();
+    const parsed = JSON.parse(result);
+    expect(parsed.data.length).toBe(1);
+    expect(parsed.data[0].title).toBe("Scalable Inference on Open LLM Clusters");
+
+    // Verify failover switch occurred
+    expect(events.some((e) => e.type === "switch")).toBe(true);
+    const switchEvt = events.find((e) => e.type === "switch");
+    expect(switchEvt.userMessage).toContain("model_decommissioned");
+    expect(switchEvt.userMessage).toContain("openai/gpt-oss-120b");
   });
 });

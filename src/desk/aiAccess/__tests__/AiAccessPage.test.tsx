@@ -181,7 +181,7 @@ describe("Per-provider configuration", () => {
     // not an <input> a user has to already know a model id to fill in.
     const select = screen.getByRole("combobox");
     const optionValues = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
-    expect(optionValues).toContain("llama-3.3-70b-versatile");
+    expect(optionValues).toContain("openai/gpt-oss-120b");
     expect(screen.queryByPlaceholderText(/Exact model id/i)).not.toBeInTheDocument();
 
     // Checking Advanced swaps in the free-text field, pre-filled with the
@@ -189,7 +189,7 @@ describe("Per-provider configuration", () => {
     fireEvent.click(advancedToggle);
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     const customInput = screen.getByPlaceholderText(/Exact model id/i) as HTMLInputElement;
-    expect(customInput.value).toBe("llama-3.3-70b-versatile");
+    expect(customInput.value).toBe("openai/gpt-oss-120b");
   });
 
   it("labels a deprecated model in the dropdown rather than presenting it as current", async () => {

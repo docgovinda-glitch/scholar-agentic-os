@@ -198,7 +198,7 @@ describe("aiArchitectureE2E: Request-Scoped Execution State Isolation", () => {
       events.push(scope ? { ...scope } : null);
     });
 
-    startExecutionScope("exec-test-sub", "gemini", "Gemini", "gemini-1.5-flash");
+    startExecutionScope("exec-test-sub", "gemini", "Gemini", "gemini-2.5-flash");
     updateExecutionScope("exec-test-sub", {
       status: "running",
       message: "Processing tokens...",

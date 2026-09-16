@@ -203,56 +203,8 @@ export const MODEL_CATALOG: ModelSpec[] = [
     relativeQuality: "lightweight",
     relativeSpeed: "fast",
   }),
-  model({
-    providerId: "gemini",
-    modelId: "gemini-1.5-flash",
-    displayName: "Gemini 1.5 Flash",
-    capabilities: ["reasoning", "longContext", "vision", "documentAnalysis", "structuredOutput", "toolCalling", "fastGeneration"],
-    contextWindow: 1_048_576,
-    inputModalities: ["text", "image", "document"],
-    relativeQuality: "balanced",
-    relativeSpeed: "fast",
-  }),
-  model({
-    providerId: "gemini",
-    modelId: "gemini-1.5-pro",
-    displayName: "Gemini 1.5 Pro",
-    capabilities: ["reasoning", "longContext", "vision", "documentAnalysis", "structuredOutput", "toolCalling", "coding"],
-    contextWindow: 2_097_152,
-    inputModalities: ["text", "image", "document"],
-    relativeQuality: "flagship",
-    relativeSpeed: "moderate",
-  }),
-  model({
-    providerId: "gemini",
-    modelId: "gemini-2.0-flash",
-    displayName: "Gemini 2.0 Flash",
-    capabilities: ["reasoning", "longContext", "vision", "fastGeneration"],
-    contextWindow: 1_048_576,
-    inputModalities: ["text", "image", "document"],
-    relativeQuality: "balanced",
-    relativeSpeed: "fast",
-  }),
 
-  // ─── Groq — verified 2026-08-13 (console.groq.com/docs/models) ───
-  model({
-    providerId: "groq",
-    modelId: "llama-3.3-70b-versatile",
-    displayName: "Llama 3.3 70B Versatile",
-    capabilities: ["fastGeneration"],
-    contextWindow: 131_072,
-    relativeQuality: "balanced",
-    relativeSpeed: "fast",
-  }),
-  model({
-    providerId: "groq",
-    modelId: "llama-3.1-8b-instant",
-    displayName: "Llama 3.1 8B Instant",
-    capabilities: ["fastGeneration"],
-    contextWindow: 131_072,
-    relativeQuality: "lightweight",
-    relativeSpeed: "fast",
-  }),
+  // ─── Groq — verified (console.groq.com/docs/models) ───
   model({
     providerId: "groq",
     modelId: "openai/gpt-oss-120b",
@@ -1052,7 +1004,7 @@ export const MODEL_CATALOG: ModelSpec[] = [
 
   carried("vercelgateway", "openai/gpt-4o-mini", "GPT-4o mini (via Vercel AI Gateway)"),
   carried("vercelgateway", "anthropic/claude-3-5-haiku", "Claude 3.5 Haiku (via Vercel AI Gateway)"),
-  carried("vercelgateway", "google/gemini-2.0-flash", "Gemini 2.0 Flash (via Vercel AI Gateway)"),
+  carried("vercelgateway", "google/gemini-2.5-flash", "Gemini 2.5 Flash (via Vercel AI Gateway)"),
 
   carried("minimax", "MiniMax-Text-01", "MiniMax Text-01"),
   carried("minimax", "abab6.5s-chat", "abab6.5s Chat"),
@@ -1065,6 +1017,8 @@ const CATALOG_BY_PROVIDER: Record<string, ModelSpec[]> = {};
 for (const m of MODEL_CATALOG) {
   (CATALOG_BY_PROVIDER[m.providerId] ??= []).push(m);
 }
+
+export const ALL_MODELS: ModelSpec[] = MODEL_CATALOG;
 
 /** Every catalogued model for a provider, optionally narrowed to one reachable under a given access mode. */
 export function getModelsForProvider(providerId: string, accessMode?: AccessMode): ModelSpec[] {

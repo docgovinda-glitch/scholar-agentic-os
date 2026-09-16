@@ -750,9 +750,9 @@ describe("POST /api/studio/refine — Premium metering", () => {
       ],
       providers: [
         { id: "openai", metadata: { defaultModel: "gpt-4o-mini" }, premium_enabled: true },
-        { id: "gemini", metadata: { defaultModel: "gemini-2.0-flash" }, premium_enabled: true },
+        { id: "gemini", metadata: { defaultModel: "gemini-2.5-flash" }, premium_enabled: true },
       ],
-      resources: [RESOURCE("r1", "openai", "gpt-4o-mini"), RESOURCE("r2", "gemini", "gemini-2.0-flash")],
+      resources: [RESOURCE("r1", "openai", "gpt-4o-mini"), RESOURCE("r2", "gemini", "gemini-2.5-flash")],
       health: [
         { provider_id: "openai", status: "healthy" },
         { provider_id: "gemini", status: "healthy" },

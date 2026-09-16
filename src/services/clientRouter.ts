@@ -23,11 +23,14 @@ import { probeRunner, type ProbeResult } from "./localRunnerProbe";
 import { providersWithStoredKey, readProviderKey, loadUserAiSettings } from "./userAiSettings";
 import {
   getCachedDiscoveredModels,
+  discoverProviderModels,
   normalizeCapabilities,
   isModelBlacklisted,
+  isModelQuarantined,
   isProviderAvailable,
   getProviderHealth,
   type DiscoveredModel,
+  type CandidateAvailabilityState,
 } from "./modelDiscovery";
 import { getDefaultModelId } from "../config/modelCatalog";
 import type { CandidateProvider } from "../platform/gateway/types";
@@ -169,7 +172,13 @@ export async function resolveClientCandidates(
       try {
         const probe = await probeRunner(runner);
         if (probe.reachable && probe.models.length > 0) {
-          const validModels = probe.models.filter((m) => !isModelBlacklisted(runner.id, m));
+          const validModels = probe.models.filter((m) => {
+            if (isModelBlacklisted(runner.id, m)) return false;
+            const caps = normalizeCapabilities(runner.id, m).capabilities;
+            if (reqs.vision && !caps.includes("vision")) return false;
+            if (reqs.requiresStructuredOutput && !caps.includes("structuredOutput")) return false;
+            return true;
+          });
           if (validModels.length === 0) continue;
           const model = validModels[0];
           let score = 50; // base score for reachable local model
@@ -223,8 +232,17 @@ export async function resolveClientCandidates(
 
       const tier: "free" | "byok" = spec.freeTier === "free" || spec.freeTier === "freemium" ? "free" : "byok";
 
-      // Resolve available models: live discovered cache first, then compatibility fallback
-      const cachedDiscovered = getCachedDiscoveredModels(providerId, key) || [];
+      // Resolve available models: live discovered cache first, then self-heal discovery if missing, then compatibility fallback
+      let cachedDiscovered = getCachedDiscoveredModels(providerId, key) || [];
+
+      // If no cached models exist for this configured credential, synchronously discover to establish trusted candidate set
+      if (cachedDiscovered.length === 0) {
+        const discovery = await discoverProviderModels(providerId, key).catch(() => null);
+        if (discovery && discovery.ok && discovery.models.length > 0) {
+          cachedDiscovered = discovery.models;
+        }
+      }
+
       let availableModels =
         cachedDiscovered.length > 0
           ? cachedDiscovered.map((m) => m.id)
@@ -232,8 +250,8 @@ export async function resolveClientCandidates(
           ? spec.models
           : [spec.defaultModel];
 
-      // Exclude session-blacklisted dead models
-      availableModels = availableModels.filter((m) => !isModelBlacklisted(providerId, m));
+      // Exclude session-quarantined dead models
+      availableModels = availableModels.filter((m) => !isModelQuarantined(providerId, m));
       if (availableModels.length === 0) continue;
 
       // Check user's preferred model for this provider
@@ -278,12 +296,16 @@ export async function resolveClientCandidates(
       let score = 40; // base score for cloud BYOK
       let reasoning = `${spec.name} configured with user-held API key.`;
 
-      // Live discovered model priority bonus over unverified compatibility fallbacks
+      // Live discovered model priority invariant: VERIFIED_LIVE strictly outranks UNVERIFIED_COMPATIBILITY
       const isLive = cachedDiscovered.some(
         (d) => d.source === "live_discovery" && (d.id === primaryModel || d.modelId === primaryModel)
       );
-      if (isLive) {
-        score += 35; // Verified live discovery strictly outranks emergency fallbacks
+      const candidateState: CandidateAvailabilityState = isLive ? "VERIFIED_LIVE" : "UNVERIFIED_COMPATIBILITY";
+      if (candidateState === "VERIFIED_LIVE") {
+        score += 50; // Verified live discovery receives high priority
+      } else {
+        score -= 20; // Unverified compatibility fallback receives demoted score
+        reasoning += " (Unverified compatibility fallback)";
       }
 
       // Scoring based on task requirements & provider capabilities
@@ -326,20 +348,24 @@ export async function resolveClientCandidates(
       // Secondary fallback model on the same provider (satisfying requirements)
       const secondaryModel = availableModels.find((m) => {
         if (m === primaryModel) return false;
+        if (isModelQuarantined(providerId, m)) return false;
         const disc = cachedDiscovered.find((d) => d.id === m || d.modelId === m);
         const caps = disc?.capabilities ?? normalizeCapabilities(providerId, m).capabilities;
         if (reqs.requiresStructuredOutput && !caps.includes("structuredOutput")) return false;
         return true;
       });
       if (secondaryModel) {
+        const isSecLive = cachedDiscovered.some(
+          (d) => d.source === "live_discovery" && (d.id === secondaryModel || d.modelId === secondaryModel)
+        );
         candidates.push({
           provider: providerId,
           model: secondaryModel,
           apiKey: key,
           tier,
           label: `${spec.name} (${secondaryModel} - Backup)`,
-          reasoning: `Secondary in-provider model for ${spec.name}.`,
-          score: score - 25,
+          reasoning: `Secondary in-provider model for ${spec.name} (${isSecLive ? "Verified Live" : "Compatibility Fallback"}).`,
+          score: score - (isSecLive ? 15 : 35),
         });
       }
     }

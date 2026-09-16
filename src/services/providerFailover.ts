@@ -15,7 +15,63 @@ import {
   recordProviderFailure,
   recordProviderSuccess,
   clearAllProviderHealth,
+  quarantineModel,
+  isModelQuarantined,
 } from "./modelDiscovery";
+
+export interface FailoverAuditEntry {
+  timestamp: string;
+  operationId: string;
+  stageId?: string;
+  providerId: string;
+  modelId: string;
+  failureKind: string;
+  httpStatus?: number;
+  providerErrorCode?: string;
+  providerMessage?: string;
+  retryable: boolean;
+  failoverWorthwhile: boolean;
+  quarantined: boolean;
+  nextCandidate?: string;
+  attemptNumber: number;
+  finalOutcome?: "success" | "switched" | "exhausted" | "terminal_error";
+}
+
+const failoverAuditLog: FailoverAuditEntry[] = [];
+
+export function getFailoverAuditLog(): FailoverAuditEntry[] {
+  return [...failoverAuditLog];
+}
+
+export function clearFailoverAuditLog(): void {
+  failoverAuditLog.length = 0;
+}
+
+export function formatFailoverReason(classified: ClassifiedAIError): string {
+  if (classified.kind === "rate_limit" || classified.kind === "insufficient_quota") {
+    return `Rate limit/quota exceeded (HTTP 429)`;
+  }
+  if (classified.kind === "invalid_key") {
+    return `Authentication failed (HTTP ${classified.status || "401/403"})`;
+  }
+  if (classified.kind === "model_not_found") {
+    const code = classified.providerErrorCode ? ` [${classified.providerErrorCode}]` : "";
+    return `Model decommissioned or unavailable${code}`;
+  }
+  if (classified.kind === "timeout") {
+    return `Request timed out`;
+  }
+  if (classified.kind === "cors_blocked" || classified.kind === "network_unreachable") {
+    return `Network/connectivity error`;
+  }
+  if (classified.kind === "server_error") {
+    return `Provider server error (HTTP 5xx)`;
+  }
+  if (classified.status) {
+    return `Provider error (HTTP ${classified.status})`;
+  }
+  return classified.message || "Provider unavailable";
+}
 
 export interface FailoverEvent {
   type: "attempt" | "retry" | "switch" | "success" | "exhausted";
@@ -32,12 +88,18 @@ export interface FailoverOptions {
   candidates: string[];
   /** Retries against the same provider before moving on */
   maxRetriesPerProvider?: number;
+  /** Maximum number of distinct candidates to attempt before exhausting (candidate budget) */
+  maxCandidatesToTry?: number;
   /** Upper bound on any single backoff wait */
   maxBackoffMs?: number;
   onEvent?: (event: FailoverEvent) => void;
   signal?: AbortSignal;
   /** Display names for messages; falls back to the raw id */
   displayNames?: Record<string, string>;
+  /** Unique operation ID for audit logging */
+  operationId?: string;
+  /** Current stage ID (e.g. literatureDiscovery) */
+  stageId?: string;
 }
 
 export interface FailoverSuccess<T> {
@@ -180,6 +242,13 @@ function severityRank(error: ClassifiedAIError): number {
   }
 }
 
+function extractModelId(key: string): string {
+  if (key.includes("::")) {
+    return key.split("::")[1] || key;
+  }
+  return key;
+}
+
 /**
  * Run `task` against the first provider that succeeds.
  */
@@ -189,15 +258,26 @@ export async function executeWithFailover<T>(
 ): Promise<FailoverResult<T>> {
   const {
     maxRetriesPerProvider = 2,
+    maxCandidatesToTry = 6,
     maxBackoffMs = 8000,
     onEvent,
     signal,
     displayNames = {},
+    operationId = `op-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    stageId,
   } = options;
 
   const nameOf = (id: string) => displayNames[id] || id;
-  const candidates = orderCandidates(options.candidates);
+  const rawCandidates = orderCandidates(options.candidates);
   const attempts: Array<{ providerId: string; error: ClassifiedAIError }> = [];
+
+  // Filter out any models currently under runtime quarantine, unless no other candidates exist
+  const unquarantined = rawCandidates.filter((id) => {
+    const base = baseProviderId(id);
+    const model = extractModelId(id);
+    return !isModelQuarantined(base, model);
+  });
+  const candidates = unquarantined.length > 0 ? unquarantined : rawCandidates;
 
   if (candidates.length === 0) {
     return {
@@ -214,13 +294,38 @@ export async function executeWithFailover<T>(
     };
   }
 
+  const attemptedCandidates = new Set<string>();
+  const MAX_OVERALL_DISPATCHES = 12; // Safety ceiling against runaway loops
+  let totalDispatches = 0;
+  let candidateAttempts = 0;
+
   for (let index = 0; index < candidates.length; index++) {
+    if (totalDispatches >= MAX_OVERALL_DISPATCHES) {
+      break;
+    }
     const candidateId = candidates[index];
     const baseId = baseProviderId(candidateId);
+    const modelId = extractModelId(candidateId);
+    const candidateKey = `${baseId}::${modelId}`;
+
+    // Loop prevention: skip candidate if already attempted in this operation
+    if (attemptedCandidates.has(candidateKey)) {
+      continue;
+    }
+
+    // Distinct candidate budget check: prevents trying more candidates than maxCandidatesToTry
+    if (++candidateAttempts > maxCandidatesToTry) {
+      break;
+    }
+    attemptedCandidates.add(candidateKey);
+
     let attempt = 0;
 
     while (attempt <= maxRetriesPerProvider) {
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      if (++totalDispatches > MAX_OVERALL_DISPATCHES) {
+        break;
+      }
 
       onEvent?.({ type: "attempt", providerId: candidateId, attempt: attempt + 1 });
 
@@ -232,6 +337,21 @@ export async function executeWithFailover<T>(
           providerId: candidateId,
           userMessage: candidateId !== options.candidates[0] ? `✓ Backup model connected (${nameOf(candidateId)})` : undefined,
         });
+
+        failoverAuditLog.push({
+          timestamp: new Date().toISOString(),
+          operationId,
+          stageId,
+          providerId: baseId,
+          modelId,
+          failureKind: "none",
+          retryable: false,
+          failoverWorthwhile: false,
+          quarantined: false,
+          attemptNumber: totalDispatches,
+          finalOutcome: "success",
+        });
+
         return {
           ok: true,
           value,
@@ -245,6 +365,8 @@ export async function executeWithFailover<T>(
         const classified: ClassifiedAIError =
           raw instanceof ProviderCallError
             ? raw.classified
+            : raw && typeof raw === "object" && "classified" in raw && (raw as any).classified
+            ? (raw as any).classified
             : {
                 kind: "unknown",
                 label: "Unexpected error",
@@ -261,9 +383,15 @@ export async function executeWithFailover<T>(
           setCooldown(candidateId, classified.retryAfterMs ?? 60_000);
         }
 
-        // Auth errors (401/403): do NOT retry same candidate
+        // Auth errors (401/403) and decommissioned models: do NOT retry same candidate
         const isAuthFailure = classified.kind === "invalid_key";
-        const canRetrySame = !isAuthFailure && classified.retryable && attempt < maxRetriesPerProvider;
+        const isModelFailure = classified.kind === "model_not_found";
+
+        if (isModelFailure) {
+          quarantineModel(baseId, modelId, classified.message);
+        }
+
+        const canRetrySame = !isAuthFailure && !isModelFailure && classified.retryable && attempt < maxRetriesPerProvider;
 
         if (canRetrySame) {
           const backoff = Math.min(maxBackoffMs, classified.retryAfterMs ?? 1000 * Math.pow(2, attempt));
@@ -280,18 +408,45 @@ export async function executeWithFailover<T>(
           continue;
         }
 
-        if (!classified.failoverWorthwhile) {
+        // Find next viable candidate not yet attempted
+        let nextIndex = index + 1;
+        while (nextIndex < candidates.length && attemptedCandidates.has(`${baseProviderId(candidates[nextIndex])}::${extractModelId(candidates[nextIndex])}`)) {
+          nextIndex++;
+        }
+        const next = candidates[nextIndex];
+
+        failoverAuditLog.push({
+          timestamp: new Date().toISOString(),
+          operationId,
+          stageId,
+          providerId: baseId,
+          modelId,
+          failureKind: classified.kind,
+          httpStatus: classified.status,
+          providerErrorCode: classified.providerErrorCode,
+          providerMessage: classified.providerMessage,
+          retryable: canRetrySame,
+          failoverWorthwhile: classified.failoverWorthwhile,
+          quarantined: isModelFailure,
+          nextCandidate: next,
+          attemptNumber: totalDispatches,
+          finalOutcome: next ? "switched" : classified.failoverWorthwhile ? "exhausted" : "terminal_error",
+        });
+
+        if (!classified.failoverWorthwhile && !isModelFailure) {
           onEvent?.({ type: "exhausted", providerId: candidateId, error: classified });
           return { ok: false, error: classified, attempts };
         }
 
-        const next = candidates[index + 1];
         if (next) {
+          const isPrimary = index === 0;
+          const reasonText = formatFailoverReason(classified);
+          const prefix = isPrimary ? "Primary AI model" : "Backup AI model";
           onEvent?.({
             type: "switch",
             providerId: next,
             error: classified,
-            userMessage: `Primary AI model unavailable (${nameOf(candidateId)}). Automatically switching to backup model (${nameOf(next)})…`,
+            userMessage: `${prefix} unavailable: ${nameOf(candidateId)} (${reasonText}). Automatically switching to backup model (${nameOf(next)})…`,
           });
         }
         break; // Move to the next candidate

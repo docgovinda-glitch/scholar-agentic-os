@@ -169,7 +169,7 @@ describe("modelDiscovery: Capability Normalization & Conservative Rules", () => 
     const caps2 = normalizeDiscoveredCapabilities("groq", "deepseek-r1-distill-llama-70b", {});
     expect(caps2).toContain("reasoning");
 
-    const caps3 = normalizeDiscoveredCapabilities("gemini", "gemini-1.5-pro", {});
+    const caps3 = normalizeDiscoveredCapabilities("gemini", "gemini-2.5-pro", {});
     expect(caps3).toContain("longContext");
     expect(caps3).toContain("structuredOutput");
   });

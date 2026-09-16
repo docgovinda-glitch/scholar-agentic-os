@@ -434,6 +434,8 @@ export async function executeAgenticLLM(
         {
           candidates,
           onEvent: handleFailoverEvent,
+          operationId: executionId,
+          stageId: taskType,
         },
         policy
       );
@@ -450,6 +452,8 @@ export async function executeAgenticLLM(
         {
           candidates,
           onEvent: handleFailoverEvent,
+          operationId: executionId,
+          stageId: taskType,
         },
         policy
       );
