@@ -314,4 +314,119 @@ describe("platform/gateway/adapters: local runners", () => {
     expect(getAdapter("ollama")!.stream).toBeUndefined();
     expect(getAdapter("lmstudio")!.stream).toBeUndefined();
   });
+
+  describe("Defensive Prompt Normalization & Model Prefixing", () => {
+    it("Gemini — strips models/ prefix from model identifier", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: "response" }] } }] }),
+      });
+      global.fetch = fetchMock;
+
+      const adapter = getAdapter("gemini")!;
+      await adapter.complete({
+        provider: "gemini",
+        apiKey: "AIza-test",
+        taskClass: "drafting",
+        model: "models/gemini-2.5-flash",
+        userPrompt: "test prompt",
+        segments: [],
+      });
+
+      const [url] = fetchMock.mock.calls[0];
+      expect(url).toContain("/models/gemini-2.5-flash:generateContent");
+      expect(url).not.toContain("/models/models/");
+    });
+
+    it("Gemini — guarantees non-empty userPrompt part even if userPrompt is empty string", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: "ok" }] } }] }),
+      });
+      global.fetch = fetchMock;
+
+      const adapter = getAdapter("gemini")!;
+      await adapter.complete({
+        provider: "gemini",
+        apiKey: "AIza-test",
+        taskClass: "drafting",
+        userPrompt: "",
+        segments: [],
+      });
+
+      const init = fetchMock.mock.calls[0][1];
+      const body = JSON.parse(init.body);
+      expect(body.contents[0].parts[0].text).toBeTruthy();
+      expect(body.contents[0].parts[0].text.length).toBeGreaterThan(0);
+    });
+
+    it("Gemini — omits systemInstruction when systemPrompt is empty or absent", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: "ok" }] } }] }),
+      });
+      global.fetch = fetchMock;
+
+      const adapter = getAdapter("gemini")!;
+      await adapter.complete({
+        provider: "gemini",
+        apiKey: "AIza-test",
+        taskClass: "drafting",
+        userPrompt: "prompt",
+        systemPrompt: "   ",
+        segments: [],
+      });
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.systemInstruction).toBeUndefined();
+    });
+
+    it("Gemini — includes systemInstruction when systemPrompt is populated", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: "ok" }] } }] }),
+      });
+      global.fetch = fetchMock;
+
+      const adapter = getAdapter("gemini")!;
+      await adapter.complete({
+        provider: "gemini",
+        apiKey: "AIza-test",
+        taskClass: "drafting",
+        userPrompt: "prompt",
+        systemPrompt: "System instruction text",
+        segments: [],
+      });
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.systemInstruction?.parts?.[0]?.text).toBe("System instruction text");
+    });
+
+    it("OpenAI & Anthropic — preserves error payload for both JSON and non-JSON errors", async () => {
+      const errorJson = JSON.stringify({ error: { message: "Detailed JSON failure message", type: "invalid_request_error" } });
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => errorJson,
+        clone() { return this; },
+      });
+
+      const groqAdapter = getAdapter("groq")!;
+      await expect(
+        groqAdapter.complete({ provider: "groq", apiKey: "gsk", taskClass: "drafting", userPrompt: "hi", segments: [] })
+      ).rejects.toThrow("Detailed JSON failure message");
+
+      // Non-JSON error
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        text: async () => "<html>Bad Gateway from Cloudflare</html>",
+        clone() { return this; },
+      });
+
+      await expect(
+        groqAdapter.complete({ provider: "groq", apiKey: "gsk", taskClass: "drafting", userPrompt: "hi", segments: [] })
+      ).rejects.toThrow("Bad Gateway from Cloudflare");
+    });
+  });
 });

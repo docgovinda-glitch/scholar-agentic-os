@@ -111,13 +111,20 @@ export interface ParsedProviderError {
 export function parseProviderErrorBody(detail?: string): ParsedProviderError {
   if (!detail || typeof detail !== "string") return {};
   const trimmed = detail.trim();
-  if (!trimmed.startsWith("{")) return { errorMessage: detail };
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return { errorMessage: detail };
   try {
     const json = JSON.parse(trimmed);
-    const errObj = json.error || json;
-    const errorCode = typeof errObj.code === "string" ? errObj.code : (errObj.status || (typeof json.code === "string" ? json.code : undefined));
-    const errorType = errObj.type || json.type;
-    const errorMessage = typeof errObj.message === "string" ? errObj.message : (typeof json.message === "string" ? json.message : undefined);
+    const errObj = Array.isArray(json) ? json[0]?.error || json[0] : (json.error || json);
+    const reason = Array.isArray(errObj?.details)
+      ? errObj.details.find((d: any) => typeof d?.reason === "string")?.reason
+      : undefined;
+    const errorCode = typeof errObj?.code === "string"
+      ? errObj.code
+      : (reason || errObj?.status || (typeof json.code === "string" ? json.code : undefined));
+    const errorType = errObj?.type || json.type || reason;
+    const errorMessage = typeof errObj?.message === "string"
+      ? errObj.message
+      : (typeof json.message === "string" ? json.message : undefined);
     return { errorCode, errorType, errorMessage, rawJson: json };
   } catch {
     return { errorMessage: detail };
@@ -228,9 +235,13 @@ export function classifyHttpError(
     retryAfterMs,
   };
 
+  const parsedCode = (parsed.errorCode || "").toLowerCase();
   const isAuthFailure =
     status === 401 ||
     status === 403 ||
+    parsedCode === "api_key_invalid" ||
+    parsedCode === "invalid_api_key" ||
+    parsedCode === "unregistered_callers" ||
     lower.includes("invalid_api_key") ||
     lower.includes("api_key_invalid") ||
     lower.includes("api key not valid") ||

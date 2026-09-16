@@ -172,9 +172,10 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
 
   private buildBody(req: CompletionRequest, stream: boolean, modelOverride?: string) {
     const model = modelOverride || req.model || this.spec.defaultModel;
+    const userPrompt = req.userPrompt && req.userPrompt.trim() ? req.userPrompt : "Proceed with research task.";
     
     let systemMessage: any = undefined;
-    if (req.systemPrompt) {
+    if (req.systemPrompt && req.systemPrompt.trim()) {
       if (this.id === "openrouter" && req.caching) {
         systemMessage = {
           role: "system",
@@ -195,7 +196,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
       model,
       messages: [
         ...(systemMessage ? [systemMessage] : []),
-        { role: "user", content: req.userPrompt },
+        { role: "user", content: userPrompt },
       ],
       temperature: req.temperature ?? 0.3,
       ...(req.maxTokens ? { max_tokens: req.maxTokens } : {}),
@@ -305,11 +306,12 @@ class AnthropicAdapter implements ProviderAdapter {
 
   private buildBody(req: CompletionRequest, stream: boolean, modelOverride?: string) {
     const model = modelOverride || req.model || this.spec.defaultModel;
+    const userPrompt = req.userPrompt && req.userPrompt.trim() ? req.userPrompt : "Proceed with research task.";
     return JSON.stringify({
       model,
       max_tokens: req.maxTokens ?? 4096,
-      system: req.systemPrompt,
-      messages: [{ role: "user", content: req.userPrompt }],
+      ...(req.systemPrompt && req.systemPrompt.trim() ? { system: req.systemPrompt } : {}),
+      messages: [{ role: "user", content: userPrompt }],
       temperature: req.temperature ?? 0.3,
       ...(stream ? { stream: true } : {}),
     });
