@@ -957,6 +957,7 @@ export { router as agenticRouter };
 // ---------------------------------------------------------
 
 // ---------------------------------------------------------
+// ---------------------------------------------------------
 // PUT endpoints for human editor overrides
 // ---------------------------------------------------------
 
@@ -964,58 +965,62 @@ router.put("/manuscript", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const config = getSupabaseRestConfig();
-  if (!config) return res.status(500).json({ error: "Supabase not configured" });
 
   try {
-    
-    const table = new SupabaseTable(config, "manuscript_sections");
-    const vTable = new SupabaseTable(config, "manuscript_versions");
-    
-    // First, save the old versions
-    try {
-      const oldSections = await table.request(`?project_id=eq.${project.projectId}`);
-      if (Array.isArray(oldSections)) {
-        for (const old of oldSections) {
-          await vTable.request("", {
+    const updates = Array.isArray(req.body) ? req.body : [req.body];
+
+    // 1. If Supabase is configured, snapshot and update
+    if (config) {
+      try {
+        const table = new SupabaseTable(config, "manuscript_sections");
+        const vTable = new SupabaseTable(config, "manuscript_versions");
+        const oldSections = await table.request(`?project_id=eq.${project.projectId}`);
+        if (Array.isArray(oldSections)) {
+          for (const old of oldSections) {
+            await vTable.request("", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                project_id: project.projectId,
+                section_name: old.section_name,
+                content: old.content
+              })
+            });
+          }
+        }
+
+        for (const sec of updates) {
+          await table.request("", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates" },
             body: JSON.stringify({
               project_id: project.projectId,
-              section_name: old.section_name,
-              content: old.content
+              section_name: sec.section_name || sec.section || "Full Manuscript",
+              content: sec.content || "",
+              status: sec.status || "Edited",
+              word_count: typeof sec.content === "string" ? sec.content.split(/\s+/).filter(Boolean).length : 0
             })
           });
         }
+      } catch (e) {
+        console.warn("Could not save to Supabase manuscript_sections:", e);
       }
-    } catch (e) {
-      console.error("Failed to snapshot manuscript versions", e);
     }
 
-    const updates = Array.isArray(req.body) ? req.body : [req.body];
-    for (const sec of updates) {
-      await table.request("", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates" },
-        body: JSON.stringify({
-          project_id: project.projectId,
-          section_name: sec.section_name,
-          content: sec.content,
-          status: sec.status || "Edited",
-          word_count: sec.content.split(/\s+/).length
-        })
-      });
-    }
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
-    res.end();
+    // 2. Always persist to local projectStore answers
+    const combinedContent = updates.map((s: any) => s.content || "").join("\n\n");
+    const nextAnswers = {
+      ...project.answers,
+      manuscript_draft: JSON.stringify(updates),
+      assembled_draft: combinedContent,
+      current_stage: "final_editor",
+    };
+    await getProjectStore().save({ ...project, answers: nextAnswers });
+
+    res.json({ ok: true, message: "Manuscript saved successfully" });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
-    }
+    res.status(500).json({ error: message });
   }
 });
 
@@ -1023,23 +1028,20 @@ router.put("/evidence", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const config = getSupabaseRestConfig();
-  if (!config) return res.status(500).json({ error: "Supabase not configured" });
 
   try {
-    const table = new SupabaseTable(config, "project_evidence");
-    // Implementation for explicit evidence update if needed
-    // ...
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
-    res.end();
+    if (config) {
+      try {
+        const table = new SupabaseTable(config, "project_evidence");
+        // Implementation for explicit evidence update if needed
+      } catch (e) {
+        console.warn("Could not update Supabase project_evidence:", e);
+      }
+    }
+    res.json({ ok: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
-    }
+    res.status(500).json({ error: message });
   }
 });
 
@@ -1047,26 +1049,39 @@ router.put("/critiques/:critiqueId/waive", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const config = getSupabaseRestConfig();
-  if (!config) return res.status(500).json({ error: "Supabase not configured" });
 
   try {
-    const table = new SupabaseTable(config, "peer_review_critiques");
-    await table.request(`?id=eq.${req.params.critiqueId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ waived: true })
-    });
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
-    res.end();
+    if (config) {
+      try {
+        const table = new SupabaseTable(config, "peer_review_critiques");
+        await table.request(`?id=eq.${req.params.critiqueId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ waived: true })
+        });
+      } catch (e) {
+        console.warn("Could not waive critique in Supabase:", e);
+      }
+    }
+
+    // Also update project.answers.peer_review_critique locally if present
+    if (project.answers?.peer_review_critique) {
+      try {
+        const critiques = JSON.parse(project.answers.peer_review_critique);
+        if (Array.isArray(critiques)) {
+          const updated = critiques.map((c: any) => c.id === req.params.critiqueId ? { ...c, waived: true } : c);
+          await getProjectStore().save({
+            ...project,
+            answers: { ...project.answers, peer_review_critique: JSON.stringify(updated) }
+          });
+        }
+      } catch (_) {}
+    }
+
+    res.json({ ok: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
-    }
+    res.status(500).json({ error: message });
   }
 });
 
@@ -1078,45 +1093,50 @@ router.get("/manuscript", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const config = getSupabaseRestConfig();
-  if (!config) return res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: [] })}\n\n`);
-    res.end();
+
   try {
-    
-    const table = new SupabaseTable(config, "manuscript_sections");
-    const vTable = new SupabaseTable(config, "manuscript_versions");
-    
-    // First, save the old versions
-    try {
-      const oldSections = await table.request(`?project_id=eq.${project.projectId}`);
-      if (Array.isArray(oldSections)) {
-        for (const old of oldSections) {
-          await vTable.request("", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              project_id: project.projectId,
-              section_name: old.section_name,
-              content: old.content
-            })
-          });
+    let data: any[] = [];
+
+    // 1. Try Supabase if configured
+    if (config) {
+      try {
+        const table = new SupabaseTable(config, "manuscript_sections");
+        const sections = await table.request(`?project_id=eq.${project.projectId}&order=id.asc`);
+        if (Array.isArray(sections) && sections.length > 0) {
+          data = sections;
         }
+      } catch (e) {
+        console.warn("Could not query Supabase manuscript_sections:", e);
       }
-    } catch (e) {
-      console.error("Failed to snapshot manuscript versions", e);
     }
 
-    const data = await table.request(`?project_id=eq.${project.projectId}`);
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data })}\n\n`);
-    res.end();
+    // 2. Fall back to local projectStore answers (manuscript_draft or assembled_draft)
+    if (data.length === 0) {
+      const rawDraft = project.answers?.manuscript_draft || project.answers?.assembled_draft;
+      if (rawDraft) {
+        try {
+          const parsed = typeof rawDraft === "string" ? JSON.parse(rawDraft) : rawDraft;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            data = parsed.map((s: any) => ({
+              section_name: s.section || s.section_name || "Section",
+              content: s.content || "",
+              status: s.status || "Drafted"
+            }));
+          } else if (typeof rawDraft === "string" && rawDraft.trim().length > 0) {
+            data = [{ section_name: "Full Manuscript", content: rawDraft, status: "Drafted" }];
+          }
+        } catch (_) {
+          if (typeof rawDraft === "string" && rawDraft.trim().length > 0) {
+            data = [{ section_name: "Full Manuscript", content: rawDraft, status: "Drafted" }];
+          }
+        }
+      }
+    }
+
+    res.json({ ok: true, data });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
-    }
+    res.status(500).json({ error: message });
   }
 });
 
@@ -1124,22 +1144,28 @@ router.get("/evidence", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const config = getSupabaseRestConfig();
-  if (!config) return res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: [] })}\n\n`);
-    res.end();
+
   try {
-    const table = new SupabaseTable(config, "project_evidence");
-    const data = await table.request(`?project_id=eq.${project.projectId}`);
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data })}\n\n`);
-    res.end();
+    let data: any[] = [];
+    if (config) {
+      try {
+        const table = new SupabaseTable(config, "project_evidence");
+        const resData = await table.request(`?project_id=eq.${project.projectId}`);
+        if (Array.isArray(resData)) data = resData;
+      } catch (e) {
+        console.warn("Could not query Supabase project_evidence:", e);
+      }
+    }
+    if (data.length === 0 && project.answers?.extracted_evidence) {
+      try {
+        const parsed = JSON.parse(project.answers.extracted_evidence);
+        if (Array.isArray(parsed)) data = parsed;
+      } catch (_) {}
+    }
+    res.json({ ok: true, data });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
-    }
+    res.status(500).json({ error: message });
   }
 });
 
@@ -1147,21 +1173,27 @@ router.get("/critiques", async (req, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
   const config = getSupabaseRestConfig();
-  if (!config) return res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: [] })}\n\n`);
-    res.end();
+
   try {
-    const table = new SupabaseTable(config, "peer_review_critiques");
-    const data = await table.request(`?project_id=eq.${project.projectId}`);
-    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data })}\n\n`);
-    res.end();
+    let data: any[] = [];
+    if (config) {
+      try {
+        const table = new SupabaseTable(config, "peer_review_critiques");
+        const resData = await table.request(`?project_id=eq.${project.projectId}`);
+        if (Array.isArray(resData)) data = resData;
+      } catch (e) {
+        console.warn("Could not query Supabase peer_review_critiques:", e);
+      }
+    }
+    if (data.length === 0 && project.answers?.peer_review_critique) {
+      try {
+        const parsed = JSON.parse(project.answers.peer_review_critique);
+        if (Array.isArray(parsed)) data = parsed;
+      } catch (_) {}
+    }
+    res.json({ ok: true, data });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
-    if (!res.headersSent) {
-      res.status(500).json({ error: message });
-    } else {
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-      res.end();
-    }
+    res.status(500).json({ error: message });
   }
 });

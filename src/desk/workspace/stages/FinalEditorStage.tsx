@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
@@ -18,10 +18,31 @@ export default function FinalEditorStage({
   onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
-  const [content, setContent] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Hydrate content immediately from project answers if present
+  const [content, setContent] = useState(() => {
+    const raw = project?.answers?.manuscript_draft || project?.answers?.assembled_draft;
+    if (raw) {
+      try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((s: any) => `## ${s.section_name || s.section || "Section"}\n\n${s.content || ""}`).join("\n\n");
+        } else if (typeof raw === "string") {
+          return raw;
+        }
+      } catch (_) {
+        if (typeof raw === "string") return raw;
+      }
+    }
+    return "";
+  });
+
+  const [wordCount, setWordCount] = useState(() => {
+    return content ? content.split(/\s+/).filter(Boolean).length : 0;
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [wordCount, setWordCount] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -29,13 +50,14 @@ export default function FinalEditorStage({
       try {
         const response = await authedFetch(`/api/projects/${projectId}/agent/manuscript`);
         if (!response.ok) {
-           let msg = "Failed to load manuscript.";
-           try { const body = await response.json(); if (body.error) msg = body.error; } catch (e) {}
-           throw new Error(msg);
+          let msg = "Failed to load manuscript.";
+          try { const body = await response.json(); if (body.error) msg = body.error; } catch (e) {}
+          throw new Error(msg);
         }
-        const { data } = await response.json();
-        if (isMounted && data && Array.isArray(data)) {
-          const compiled = data.map((s: any) => `## ${s.section_name}\n\n${s.content}`).join("\n\n");
+        const resJson = await response.json();
+        const data = resJson.data;
+        if (isMounted && data && Array.isArray(data) && data.length > 0) {
+          const compiled = data.map((s: any) => `## ${s.section_name || s.section || "Section"}\n\n${s.content || ""}`).join("\n\n");
           setContent(compiled);
           setWordCount(compiled.split(/\s+/).filter(Boolean).length);
         }
@@ -56,6 +78,22 @@ export default function FinalEditorStage({
     setWordCount(newContent.split(/\s+/).filter(Boolean).length);
   };
 
+  const insertFormatting = (prefix: string, suffix: string = "") => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = content.substring(start, end);
+    const replacement = `${prefix}${selectedText || "text"}${suffix}`;
+    const newContent = content.substring(0, start) + replacement + content.substring(end);
+    setContent(newContent);
+    setWordCount(newContent.split(/\s+/).filter(Boolean).length);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + prefix.length, start + prefix.length + (selectedText.length || 4));
+    }, 0);
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     setError(null);
@@ -69,8 +107,18 @@ export default function FinalEditorStage({
           status: "Edited"
         })
       });
-      if (!response.ok) throw new Error("Failed to save changes to database");
-      onSaved({ ...project });
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => null);
+        throw new Error(errJson?.error || "Failed to save changes to database");
+      }
+      onSaved({
+        ...project,
+        answers: {
+          ...project.answers,
+          assembled_draft: content,
+          current_stage: "final_editor",
+        },
+      });
       if (onAdvance) {
         onAdvance("publication_readiness");
       }
@@ -120,19 +168,55 @@ export default function FinalEditorStage({
           <div className="bg-[color:var(--surface-raised)] rounded-2xl border border-[color:var(--border-subtle)] shadow-xl flex-1 flex flex-col overflow-hidden">
             <div className="bg-[color:var(--surface-sunken)] p-3 border-b border-[color:var(--border-subtle)] flex items-center justify-between">
               <div className="flex items-center gap-1">
-                <button className="w-8 h-8 flex items-center justify-center hover:bg-[color:var(--surface-canvas)] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors font-serif font-bold">B</button>
-                <button className="w-8 h-8 flex items-center justify-center hover:bg-[color:var(--surface-canvas)] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors font-serif italic">I</button>
-                <button className="w-8 h-8 flex items-center justify-center hover:bg-[color:var(--surface-canvas)] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors font-serif underline">U</button>
+                <button 
+                  type="button"
+                  onClick={() => insertFormatting("**", "**")}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-[color:var(--surface-canvas)] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors font-serif font-bold cursor-pointer"
+                  title="Bold (**text**)"
+                >
+                  B
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => insertFormatting("*", "*")}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-[color:var(--surface-canvas)] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors font-serif italic cursor-pointer"
+                  title="Italic (*text*)"
+                >
+                  I
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => insertFormatting("<u>", "</u>")}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-[color:var(--surface-canvas)] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors font-serif underline cursor-pointer"
+                  title="Underline (<u>text</u>)"
+                >
+                  U
+                </button>
                 <div className="w-px h-5 bg-[color:var(--border-subtle)] mx-2"></div>
-                <button className="w-8 h-8 flex items-center justify-center hover:bg-[color:var(--surface-canvas)] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors font-sans text-xs font-bold">H1</button>
-                <button className="w-8 h-8 flex items-center justify-center hover:bg-[color:var(--surface-canvas)] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors font-sans text-xs font-bold">H2</button>
+                <button 
+                  type="button"
+                  onClick={() => insertFormatting("# ", "")}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-[color:var(--surface-canvas)] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors font-sans text-xs font-bold cursor-pointer"
+                  title="Heading 1 (# Heading)"
+                >
+                  H1
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => insertFormatting("## ", "")}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-[color:var(--surface-canvas)] rounded text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors font-sans text-xs font-bold cursor-pointer"
+                  title="Heading 2 (## Heading)"
+                >
+                  H2
+                </button>
               </div>
               <div className="text-[color:var(--text-muted)] text-xs uppercase tracking-widest font-bold">
                 {wordCount} Words
               </div>
             </div>
             <textarea
-              className="flex-1 p-8 w-full resize-none focus:outline-none focus:ring-0 font-serif text-lg leading-loose text-[color:var(--text-primary)] bg-transparent"
+              ref={textareaRef}
+              className="flex-1 p-8 w-full resize-none focus:outline-none focus:ring-0 font-serif text-lg leading-loose text-[color:var(--text-primary)] bg-transparent min-h-[400px]"
               value={content}
               onChange={handleContentChange}
               placeholder="Your manuscript draft will appear here for final editing..."

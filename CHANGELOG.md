@@ -37,4 +37,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Draft Persistence Gap**: Fixed `/draft` endpoint in `server/routes/project/agentic.ts` to persist generated manuscript sections directly into `project.answers.manuscript_draft`.
 - **Silent Stream Stalls in `authedStreamFetch`**: Added JSON and non-SSE HTTP response handling to prevent unhandled promise rejections and UI freezes.
 - **Model Unavailable Failover Diagnostics**: Expanded `isModelUnavailableError` regex patterns on HTTP 400 responses so missing or retired models trigger automatic failover rather than halting execution.
+- **Final Editor JSON Parsing & REST Protocol**: Converted relational GET/PUT endpoints (`/manuscript`, `/evidence`, `/critiques`) to return standard JSON rather than SSE text chunks, enabled instant draft hydration from `project.answers` in `FinalEditorStage`, and made formatting toolbar buttons functional.
 
