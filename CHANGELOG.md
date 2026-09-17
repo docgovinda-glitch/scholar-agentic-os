@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-17
 
 ### Added
+- **Workspace Dashboard Airbnb Typography & Input Grid Alignment Overhaul (`ProjectListScreen.tsx`)**:
+  - **Punchy Airbnb Header Typography**: Decreased header size and increased weight for a confident, modern editorial tone: `text-3xl font-bold tracking-tight text-[var(--text-primary)]`.
+  - **Grid-Aligned Prompt Bar**: Removed `max-w-3xl` restriction and applied `w-full`, forcing the prompt bar to stretch and align flush with the left and right boundaries of the template card grid. Upgraded text to `text-base font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]`.
+  - **Airbnb Template Card Typography & Proportions**: Scaled card titles to punchier, tighter typography (`text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5`) and descriptions to `text-sm font-normal text-[var(--text-secondary)] leading-snug`. Calibrated grid gutters to `gap-5` across both the dashboard and format selector (`grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5`).
+  - **Active Projects Header & Search Alignment**: Standardized the section header to `text-2xl font-bold tracking-tight text-[var(--text-primary)] mb-5` and refined search bar alignment.
 - **Workspace Dashboard Master Alignment, Grid Un-squishing & Dark Mode Contrast Overhaul (`ProjectListScreen.tsx`, `index.css`)**:
   - **Master Container & Flush-Left Alignment**: Wrapped the Header, AI Prompt Bar, Template Cards, and Active Projects in a unified, left-aligned container (`max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-10`), eliminating center-floating misalignment.
   - **Left-Aligned Header**: Streamlined the H1 inquiry (*"What would you like to write today?"*) to `text-4xl font-semibold tracking-tight text-gray-900 dark:text-gray-50 text-left`.
