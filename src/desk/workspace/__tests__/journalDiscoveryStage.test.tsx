@@ -54,6 +54,11 @@ const mockProjectWithCharter: ProjectView = {
     ]),
     manual_synthesis: "Lead investigator directive: emphasize 35% packet drop resilience boundary.",
   },
+  authors: [],
+  intakeCompleteness: 0.9,
+  hasDocument: false,
+  hasJournalRequirements: false,
+  gates: [],
 };
 
 describe("Stage 15: Journal Discovery (JournalDiscoveryStage)", () => {
