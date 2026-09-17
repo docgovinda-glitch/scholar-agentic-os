@@ -214,8 +214,39 @@ export async function authedStreamFetch(input: string, method: string, body: unk
           }
         }
       } catch (err: any) {
-        onEvent("error", { message: err.message });
+        try {
+          await Promise.resolve(onEvent("error", { message: err.message }));
+        } catch (_) {}
+        throw err;
       }
+      return;
+    }
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+
+  if (!res.ok) {
+    let errMsg = `Request failed (${res.status})`;
+    try {
+      const errJson = await res.json();
+      errMsg = errJson.error || errJson.message || errMsg;
+    } catch (_) {
+      const errText = await res.text().catch(() => "");
+      if (errText) errMsg = errText.slice(0, 300);
+    }
+    await Promise.resolve(onEvent("error", { message: errMsg }));
+    throw new Error(errMsg);
+  }
+
+  if (contentType.includes("application/json")) {
+    const json = await res.json().catch(() => null);
+    if (json) {
+      if (json.ok === false || json.error) {
+        const errMsg = json.error || json.message || "Request returned an error.";
+        await Promise.resolve(onEvent("error", { message: errMsg }));
+        throw new Error(errMsg);
+      }
+      await Promise.resolve(onEvent("done", json));
       return;
     }
   }

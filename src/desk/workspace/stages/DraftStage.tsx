@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useResearchWorkspace } from "../ResearchContext";
 import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
-import { authedJsonFetch, authedStreamFetch } from "../../api";
+import { authedJsonFetch, authedStreamFetch, saveIntakeAnswers } from "../../api";
 
 export default function DraftStage({
   stage,
@@ -23,7 +23,7 @@ export default function DraftStage({
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [results, setResults] = useState<any | null>(() => {
     try {
-      const saved = project.answers?.assembled_draft;
+      const saved = project.answers?.manuscript_draft || project.answers?.assembled_draft;
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -32,9 +32,25 @@ export default function DraftStage({
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const logIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearTimer = () => {
+    if (logIntervalRef.current) {
+      clearInterval(logIntervalRef.current);
+      logIntervalRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearTimer();
+    };
+  }, []);
+
   const { chapterId } = useResearchWorkspace();
 
   const startAgent = async () => {
+    clearTimer();
     setIsProcessing(true);
     setError(null);
     setLogs([
@@ -48,7 +64,7 @@ export default function DraftStage({
 
     const logsArray = ["Assembling evidence matrix and journal requirements...", "Drafting Introduction based on identified gaps...", "Synthesizing Literature Review from Vault sources...", "Writing Methodology section...", "Constructing Discussion and Conclusion..."];
 
-    const logInterval = setInterval(() => {
+    logIntervalRef.current = setInterval(() => {
       setLogs((prev) => [
         ...prev,
         {
@@ -77,11 +93,18 @@ export default function DraftStage({
               },
             ]);
           } else if (event === "done") {
-            clearInterval(logInterval);
+            clearTimer();
             setResults(data.data);
             
             try {
-              onSaved({ ...project });
+              const newAnswers = {
+                ...project.answers,
+                manuscript_draft: JSON.stringify(data.data),
+                assembled_draft: JSON.stringify(data.data),
+              };
+              saveIntakeAnswers(projectId, newAnswers as Record<string, string>)
+                .then((updated) => onSaved(updated))
+                .catch(() => onSaved({ ...project, answers: newAnswers }));
             } catch (saveErr) {
               console.error("Failed to update project view", saveErr);
             }
@@ -102,11 +125,23 @@ export default function DraftStage({
               }
             }, 3000);
           } else if (event === "error") {
-            throw new Error(data.message || "Agent encountered an error.");
+            clearTimer();
+            const errText = data.message || "Agent encountered an error.";
+            setError(errText);
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "err",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "error",
+                message: errText,
+              },
+            ]);
           }
         }
       );
     } catch (err: any) {
+      clearTimer();
       setError(err.message);
       setLogs((prev) => [
         ...prev,
@@ -118,6 +153,7 @@ export default function DraftStage({
         },
       ]);
     } finally {
+      clearTimer();
       setIsProcessing(false);
     }
   };

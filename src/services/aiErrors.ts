@@ -194,7 +194,10 @@ export function isModelUnavailableError(status: number, detail?: string, code?: 
       message.includes("not a text generation model") ||
       message.includes("unsupported model") ||
       (message.includes("model") && message.includes("does not exist")) ||
-      (message.includes("model") && message.includes("not supported for this endpoint"));
+      (message.includes("model") && message.includes("not found")) ||
+      (message.includes("model") && message.includes("not supported for this endpoint")) ||
+      message.includes("does not exist or you do not have access to it") ||
+      message.includes("invalid model");
 
     if (isDecommissionOrIncompatibleMatch) {
       return true;
@@ -386,12 +389,16 @@ export function classifyHttpError(
     // Genuine malformed client payloads (e.g. missing field, broken JSON) fail identically everywhere and should not burn keys.
     const failoverWorthwhile = isCapabilityMismatch || (!isClientMalformedError && (!detail || detail.trim() === ""));
 
+    const providerDetailMsg = parsed.errorMessage || (detail && detail.trim().length > 0 ? detail.trim().slice(0, 300) : null);
+
     return {
       ...base,
       kind: "bad_request",
       label: isCapabilityMismatch ? "Provider capability mismatch" : KIND_LABELS.bad_request,
       message: isCapabilityMismatch
         ? `The provider does not support a parameter or capability required for this task.`
+        : providerDetailMsg
+        ? `The provider rejected the request (status ${status}): ${providerDetailMsg}`
         : `The provider rejected the request (status ${status}).`,
       remedy: detail ? "See the provider's message in the diagnostics log below." : null,
       retryable: false,

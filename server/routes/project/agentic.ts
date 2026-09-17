@@ -596,6 +596,16 @@ Return ONLY valid JSON in this exact format:
       }
     }
 
+    // Always persist into project answers so it is retained even if Supabase is offline
+    if (result.data && Array.isArray(result.data)) {
+      const nextAnswers = {
+        ...project.answers,
+        manuscript_draft: JSON.stringify(result.data),
+        current_stage: "drafting",
+      };
+      await getProjectStore().save({ ...project, answers: nextAnswers });
+    }
+
     res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: result.data })}\n\n`);
     res.end();
   } catch (err: unknown) {
@@ -796,24 +806,65 @@ router.post("/final-editor", async (req: express.Request<{ id: string }>, res) =
 router.post("/draft-preview", async (req: express.Request<{ id: string }>, res) => {
   const project = await getProjectSafe(req, res);
   if (!project) return;
-  const config = getSupabaseRestConfig();
-  if (!config) return res.status(500).json({ error: "Supabase not configured" });
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders?.();
+
+  res.write(`event: log\ndata: ${JSON.stringify({ message: "Assembling manuscript sections..." })}\n\n`);
 
   try {
-    const table = new SupabaseTable(config, "manuscript_sections");
-    const data = await table.request(`?project_id=eq.${project.projectId}`);
-    
-    let content = "Draft not generated yet.";
+    let content = "";
     let pages = 0;
-    if (Array.isArray(data) && data.length > 0) {
-      content = data.map(s => `## ${s.section_name}\n\n${s.content}`).join("\n\n");
-      pages = Math.ceil(content.split(/\s+/).length / 250); // ~250 words per page
+
+    // 1. First attempt to load from Supabase if configured
+    const config = getSupabaseRestConfig();
+    if (config) {
+      try {
+        const table = new SupabaseTable(config, "manuscript_sections");
+        const data = await table.request(`?project_id=eq.${project.projectId}`);
+        if (Array.isArray(data) && data.length > 0) {
+          content = data.map((s: any) => `## ${s.section_name || s.section || "Untitled Section"}\n\n${s.content || ""}`).join("\n\n");
+          pages = Math.ceil(content.split(/\s+/).length / 250);
+        }
+      } catch (e) {
+        console.warn("Could not query Supabase manuscript_sections:", e);
+      }
     }
-    
-    res.json({ ok: true, data: { content, pages, status: "Ready" }});
+
+    // 2. Fall back to local projectStore answers (manuscript_draft or assembled_draft)
+    if (!content) {
+      const rawDraft = project.answers?.manuscript_draft || project.answers?.assembled_draft;
+      if (rawDraft) {
+        try {
+          const parsed = typeof rawDraft === "string" ? JSON.parse(rawDraft) : rawDraft;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            content = parsed.map((s: any) => `## ${s.section || s.section_name || "Untitled Section"}\n\n${s.content || ""}`).join("\n\n");
+            pages = Math.ceil(content.split(/\s+/).length / 250);
+          } else if (typeof rawDraft === "string" && rawDraft.trim().length > 0) {
+            content = rawDraft;
+            pages = Math.ceil(content.split(/\s+/).length / 250);
+          }
+        } catch {
+          if (typeof rawDraft === "string" && rawDraft.trim().length > 0) {
+            content = rawDraft;
+            pages = Math.ceil(content.split(/\s+/).length / 250);
+          }
+        }
+      }
+    }
+
+    if (!content) {
+      content = "Draft not generated yet. Please navigate to Stage 17 (Drafting) to generate your first draft.";
+      pages = 0;
+    }
+
+    res.write(`event: log\ndata: ${JSON.stringify({ message: `Rendering preview (${pages} pages)...` })}\n\n`);
+    res.write(`event: done\ndata: ${JSON.stringify({ ok: true, data: { content, pages, status: "Ready" } })}\n\n`);
+    res.end();
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message === "RequireFrontendLLMException") return;
     if (!res.headersSent) {
       res.status(500).json({ error: message });
     } else {

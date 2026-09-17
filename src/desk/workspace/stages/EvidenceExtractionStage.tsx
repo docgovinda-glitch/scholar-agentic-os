@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
@@ -40,7 +40,23 @@ export default function EvidenceExtractionStage({
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const logIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearTimer = () => {
+    if (logIntervalRef.current) {
+      clearInterval(logIntervalRef.current);
+      logIntervalRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearTimer();
+    };
+  }, []);
+
   const startExtraction = async () => {
+    clearTimer();
     setIsProcessing(true);
     setError(null);
     setLogs([
@@ -52,7 +68,7 @@ export default function EvidenceExtractionStage({
       },
     ]);
 
-    const logInterval = setInterval(() => {
+    logIntervalRef.current = setInterval(() => {
       setLogs((prev) => [
         ...prev,
         {
@@ -87,7 +103,7 @@ export default function EvidenceExtractionStage({
               },
             ]);
           } else if (event === "done") {
-            clearInterval(logInterval);
+            clearTimer();
             setResults(data.data);
             
             try {
@@ -115,12 +131,23 @@ export default function EvidenceExtractionStage({
               onAdvance("external_research");
             }
           } else if (event === "error") {
-            throw new Error(data.message || "Agent encountered an error during evidence extraction.");
+            clearTimer();
+            const errText = data.message || "Agent encountered an error during evidence extraction.";
+            setError(errText);
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "err",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "error",
+                message: errText,
+              },
+            ]);
           }
         }
       );
     } catch (err: any) {
-      clearInterval(logInterval);
+      clearTimer();
       setError(err.message);
       setLogs((prev) => [
         ...prev,
@@ -132,6 +159,7 @@ export default function EvidenceExtractionStage({
         },
       ]);
     } finally {
+      clearTimer();
       setIsProcessing(false);
     }
   };

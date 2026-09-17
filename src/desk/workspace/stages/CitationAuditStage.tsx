@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import AgentTerminal, { LogEntry } from "../AgentTerminal";
@@ -19,7 +19,23 @@ export default function CitationAuditStage({
   const [results, setResults] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const logIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearTimer = () => {
+    if (logIntervalRef.current) {
+      clearInterval(logIntervalRef.current);
+      logIntervalRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearTimer();
+    };
+  }, []);
+
   const startAgent = async () => {
+    clearTimer();
     setIsProcessing(true);
     setResults(null);
     setError(null);
@@ -34,7 +50,7 @@ export default function CitationAuditStage({
 
     const logsArray = ["Mapping all inline citations to Vault sources...", "Verifying claims against extracted source evidence...", "Checking formatting against journal requirements...", "Flagging hallucinated or unsupported claims...", "Validating bibliography completeness..."];
 
-    const logInterval = setInterval(() => {
+    logIntervalRef.current = setInterval(() => {
       setLogs((prev) => [
         ...prev,
         {
@@ -63,7 +79,7 @@ export default function CitationAuditStage({
               },
             ]);
           } else if (event === "done") {
-            clearInterval(logInterval);
+            clearTimer();
             setResults(data.data);
             
             setLogs((prev) => [
@@ -82,11 +98,23 @@ export default function CitationAuditStage({
               }
             }, 3500);
           } else if (event === "error") {
-            throw new Error(data.message || "Agent encountered an error.");
+            clearTimer();
+            const errText = data.message || "Agent encountered an error.";
+            setError(errText);
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "err",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "error",
+                message: errText,
+              },
+            ]);
           }
         }
       );
     } catch (err: any) {
+      clearTimer();
       setError(err.message);
       setLogs((prev) => [
         ...prev,
@@ -98,6 +126,7 @@ export default function CitationAuditStage({
         },
       ]);
     } finally {
+      clearTimer();
       setIsProcessing(false);
     }
   };

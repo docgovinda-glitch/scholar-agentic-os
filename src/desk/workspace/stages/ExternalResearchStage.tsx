@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ProjectView } from "../../types";
 import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
@@ -36,7 +36,23 @@ export default function ExternalResearchStage({
   const [results, setResults] = useState<ExternalSource[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const logIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearTimer = () => {
+    if (logIntervalRef.current) {
+      clearInterval(logIntervalRef.current);
+      logIntervalRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearTimer();
+    };
+  }, []);
+
   const startSearch = async () => {
+    clearTimer();
     setIsProcessing(true);
     setResults(null);
     setError(null);
@@ -49,7 +65,7 @@ export default function ExternalResearchStage({
       },
     ]);
 
-    const logInterval = setInterval(() => {
+    logIntervalRef.current = setInterval(() => {
       setLogs((prev) => [
         ...prev,
         {
@@ -84,7 +100,7 @@ export default function ExternalResearchStage({
               },
             ]);
           } else if (event === "done") {
-            clearInterval(logInterval);
+            if (logInterval) clearInterval(logInterval);
             setResults(data.data);
             
             try {
@@ -98,6 +114,7 @@ export default function ExternalResearchStage({
               console.error("Failed to save pending external sources", saveErr);
             }
 
+            clearTimer();
             setLogs((prev) => [
               ...prev,
               {
@@ -114,11 +131,23 @@ export default function ExternalResearchStage({
               }
             }, 2500);
           } else if (event === "error") {
-            throw new Error(data.message || "Agent encountered an error searching external databases.");
+            clearTimer();
+            const errText = data.message || "Agent encountered an error searching external databases.";
+            setError(errText);
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + "err",
+                timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+                level: "error",
+                message: errText,
+              },
+            ]);
           }
         }
       );
     } catch (err: any) {
+      clearTimer();
       setError(err.message);
       setLogs((prev) => [
         ...prev,
@@ -130,6 +159,7 @@ export default function ExternalResearchStage({
         },
       ]);
     } finally {
+      clearTimer();
       setIsProcessing(false);
     }
   };
