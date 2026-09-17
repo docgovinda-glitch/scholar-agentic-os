@@ -10,7 +10,7 @@ import {
 import EmbeddedAuthModal from "../auth/EmbeddedAuthModal";
 
 export interface UserAccountMenuProps {
-  userEmail: string | null;
+  userEmail?: string | null;
   userFullName?: string | null;
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;

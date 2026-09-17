@@ -104,7 +104,7 @@ export default function Header({
         )}
         {onOpenAccountSettings && (
           <UserAccountMenu
-            userEmail={userEmail}
+            userEmail={userEmail ?? null}
             onOpenAccountSettings={onOpenAccountSettings}
             onOpenVault={onOpenVault}
             onOpenAiAccess={onOpenAiAccess}

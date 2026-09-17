@@ -92,12 +92,14 @@ describe("modelDiscovery: Discovery Cache & Account Privacy", () => {
     const rawApiKey = "sk-live-super-secret-key-1234567890abcdef";
     const models: DiscoveredModel[] = [
       {
+        id: "gpt-4.5-preview",
         modelId: "gpt-4.5-preview",
+        providerId: "openai",
         displayName: "GPT-4.5 Preview",
         contextWindow: 128000,
         capabilities: ["reasoning", "structuredOutput"],
-        source: "live_api",
-        discoveredAt: new Date().toISOString(),
+        source: "live_discovery",
+        verifiedAt: new Date().toISOString(),
       },
     ];
 
@@ -117,12 +119,14 @@ describe("modelDiscovery: Discovery Cache & Account Privacy", () => {
     const keyB = "sk-proj-account-B-2222222222222222222";
     const models: DiscoveredModel[] = [
       {
+        id: "custom-fine-tuned",
         modelId: "custom-fine-tuned",
+        providerId: "openai",
         displayName: "Custom Model",
         contextWindow: 32000,
         capabilities: ["structuredOutput"],
-        source: "live_api",
-        discoveredAt: new Date().toISOString(),
+        source: "live_discovery",
+        verifiedAt: new Date().toISOString(),
       },
     ];
 
@@ -137,12 +141,14 @@ describe("modelDiscovery: Discovery Cache & Account Privacy", () => {
     const key = "sk-proj-ttl-test-key-1234567890";
     const models: DiscoveredModel[] = [
       {
+        id: "test-model",
         modelId: "test-model",
+        providerId: "openai",
         displayName: "Test Model",
         contextWindow: 8000,
         capabilities: [],
-        source: "live_api",
-        discoveredAt: new Date().toISOString(),
+        source: "live_discovery",
+        verifiedAt: new Date().toISOString(),
       },
     ];
 

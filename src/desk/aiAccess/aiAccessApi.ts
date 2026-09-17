@@ -162,7 +162,7 @@ export const withdrawPremiumRequest = () =>
 
 /** Mirrors server/src/aiEngine/omniRouter.ts's Tier/TaskType — duplicated rather than imported since that module lives server-side only. */
 export type RoutingTier = "local" | "free" | "byok" | "premium";
-export type RoutingTaskType = "simple" | "multimodal" | "reasoning" | "coding" | "long-context";
+export type RoutingTaskType = "simple" | "multimodal" | "reasoning" | "coding" | "long-context" | "literatureDiscovery";
 
 export interface RoutingChoice {
   tier: RoutingTier;
