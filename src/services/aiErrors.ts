@@ -144,13 +144,15 @@ export function isModelUnavailableError(status: number, detail?: string, code?: 
   const effectiveType = (parsed.errorType || "").toLowerCase();
   const message = (parsed.errorMessage || detail || "").toLowerCase();
 
-  // Explicit provider error codes for retired / decommissioned / missing models
+  // Explicit provider error codes for retired / decommissioned / missing / terms models
   if (
     effectiveCode === "model_decommissioned" ||
     effectiveCode === "model_not_found" ||
     effectiveCode === "invalid_model" ||
     effectiveCode === "model_retired" ||
-    effectiveCode === "model_disabled"
+    effectiveCode === "model_disabled" ||
+    effectiveCode === "model_terms_required" ||
+    effectiveCode === "terms_required"
   ) {
     return true;
   }
@@ -168,9 +170,9 @@ export function isModelUnavailableError(status: number, detail?: string, code?: 
     }
   }
 
-  // 400, 404, or 422 with contextual decommission / availability keywords
+  // 400, 404, or 422 with contextual decommission / availability / model-incompatibility keywords
   if (status === 400 || status === 404 || status === 422) {
-    const isDecommissionMatch =
+    const isDecommissionOrIncompatibleMatch =
       message.includes("decommissioned") ||
       message.includes("is not found") ||
       message.includes("not found on this account") ||
@@ -181,9 +183,20 @@ export function isModelUnavailableError(status: number, detail?: string, code?: 
       message.includes("has been retired") ||
       message.includes("model was shut down") ||
       message.includes("unknown model") ||
-      (message.includes("model") && message.includes("does not exist"));
+      message.includes("does not support chat completions") ||
+      message.includes("do not support chat completions") ||
+      message.includes("classification models do not support") ||
+      message.includes("does not support streaming") ||
+      message.includes("do not support streaming") ||
+      message.includes("does not support json output") ||
+      message.includes("do not support json output") ||
+      message.includes("requires terms acceptance") ||
+      message.includes("not a text generation model") ||
+      message.includes("unsupported model") ||
+      (message.includes("model") && message.includes("does not exist")) ||
+      (message.includes("model") && message.includes("not supported for this endpoint"));
 
-    if (isDecommissionMatch) {
+    if (isDecommissionOrIncompatibleMatch) {
       return true;
     }
   }
@@ -360,7 +373,7 @@ export function classifyHttpError(
 
   if (status >= 400) {
     const isCapabilityMismatch =
-      /unsupported|not supported|unknown field|parameter|response_format|json_schema|system prompt|feature not enabled|temperature|max_tokens|top_p/i.test(
+      /unsupported|not supported|do(?:es)? not support|cannot be used with|unknown field|parameter|response_format|json_schema|system prompt|feature not enabled|temperature|max_tokens|top_p|classification model|chat completions/i.test(
         detail || ""
       );
 

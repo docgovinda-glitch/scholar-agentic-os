@@ -64,6 +64,102 @@ function computeKeyFingerprint(key: string): string {
 }
 
 /* -------------------------------------------------------------------------
+ * Generative Chat Model Verification Predicate
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Strict predicate to ensure only true generative chat/completion models are
+ * discovered and routed for LLM generation tasks.
+ *
+ * Filters out:
+ * - Safety / moderation / prompt injection classifiers (prompt-guard, safeguard, etc.)
+ * - Audio, speech-to-text, and TTS models (whisper, orpheus, tts, etc.)
+ * - Text embedding and reranking models (embedding, embed, bge, rerank, etc.)
+ * - Image / video diffusion models (dall-e, stable-diffusion, imagen, flux, etc.)
+ */
+export function isGenerativeChatModel(providerId: string, modelId: string, rawMeta?: any): boolean {
+  if (!modelId) return false;
+  const idLower = modelId.toLowerCase().trim();
+
+  // 1. Metadata-based classification if provided by provider API
+  const metaType = String(rawMeta?.type || rawMeta?.task || rawMeta?.pipeline_tag || "").toLowerCase();
+  if (metaType) {
+    if (
+      metaType.includes("classification") ||
+      metaType.includes("audio") ||
+      metaType.includes("embedding") ||
+      metaType.includes("tts") ||
+      metaType.includes("translation") ||
+      metaType.includes("image")
+    ) {
+      if (!metaType.includes("chat") && !metaType.includes("text-generation") && !metaType.includes("instruct")) {
+        return false;
+      }
+    }
+  }
+
+  // 2. Safety / Moderation / Prompt-Guard Classifiers
+  if (
+    idLower.includes("prompt-guard") ||
+    idLower.includes("prompt_guard") ||
+    idLower.includes("safeguard") ||
+    idLower.includes("safe-guard") ||
+    idLower.includes("llama-guard") ||
+    idLower.includes("guard-3") ||
+    idLower.includes("guard-2") ||
+    idLower.includes("moderation") ||
+    idLower.includes("shield") ||
+    idLower.includes("classifier") ||
+    idLower.includes("safety-") ||
+    idLower.includes("safety_")
+  ) {
+    return false;
+  }
+
+  // 3. Audio / Speech-to-Text / TTS / Voice
+  if (
+    idLower.includes("whisper") ||
+    idLower.includes("orpheus") ||
+    idLower.includes("tts") ||
+    idLower.includes("speech") ||
+    idLower.includes("voice") ||
+    idLower.includes("audio") ||
+    idLower.includes("transcribe") ||
+    idLower.includes("transcription") ||
+    idLower.includes("elevenlabs")
+  ) {
+    return false;
+  }
+
+  // 4. Embeddings & Rerankers
+  if (
+    idLower.includes("embedding") ||
+    idLower.includes("embed") ||
+    idLower.includes("rerank") ||
+    idLower.includes("bge-") ||
+    idLower.includes("bge_") ||
+    idLower.includes("cross-encoder") ||
+    idLower.includes("colbert")
+  ) {
+    return false;
+  }
+
+  // 5. Image & Video Generation
+  if (
+    idLower.includes("dall-e") ||
+    idLower.includes("stable-diffusion") ||
+    idLower.includes("imagen") ||
+    idLower.includes("flux") ||
+    idLower.includes("midjourney") ||
+    idLower.includes("video-generate")
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/* -------------------------------------------------------------------------
  * Model Capability Normalization
  * ---------------------------------------------------------------------- */
 export function normalizeCapabilities(
@@ -71,6 +167,11 @@ export function normalizeCapabilities(
   modelId: string,
   rawMeta?: any
 ): { capabilities: NormalizedCapability[]; contextWindow?: number } {
+  // Non-generative models have 0 capabilities for research agent tasks
+  if (!isGenerativeChatModel(providerId, modelId, rawMeta)) {
+    return { capabilities: [], contextWindow: 0 };
+  }
+
   const caps = new Set<NormalizedCapability>();
   const idLower = modelId.toLowerCase();
   let contextWindow = 128_000;
@@ -516,9 +617,13 @@ export function getCachedDiscoveredModels(
       return null;
     }
 
-    // Filter out blacklisted models from cached output
+    // Filter out blacklisted models and non-generative models from cached output
     return parsed.models
-      .filter((m) => !isModelBlacklisted(providerId, m.id || m.modelId || ""))
+      .filter(
+        (m) =>
+          !isModelBlacklisted(providerId, m.id || m.modelId || "") &&
+          isGenerativeChatModel(providerId, m.id || m.modelId || "", m)
+      )
       .map((m) => ({ ...m, modelId: m.modelId || m.id }));
   } catch {
     return null;
@@ -648,6 +753,7 @@ export async function discoverProviderModels(
           const methods = Array.isArray(item?.supportedGenerationMethods) ? item.supportedGenerationMethods : [];
           if (!name) continue;
           if (methods.length > 0 && !methods.includes("generateContent")) continue;
+          if (!isGenerativeChatModel(providerId, name, item)) continue;
 
           const { capabilities, contextWindow } = normalizeCapabilities(providerId, name, item);
           discoveredList.push({
@@ -667,6 +773,7 @@ export async function discoverProviderModels(
         for (const item of rawList) {
           const id = typeof item === "string" ? item : item?.id;
           if (!id || typeof id !== "string") continue;
+          if (!isGenerativeChatModel(providerId, id, item)) continue;
 
           const { capabilities, contextWindow } = normalizeCapabilities(providerId, id, item);
           discoveredList.push({

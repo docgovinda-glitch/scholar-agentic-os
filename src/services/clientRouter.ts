@@ -29,6 +29,7 @@ import {
   isModelQuarantined,
   isProviderAvailable,
   getProviderHealth,
+  isGenerativeChatModel,
   type DiscoveredModel,
   type CandidateAvailabilityState,
 } from "./modelDiscovery";
@@ -250,8 +251,10 @@ export async function resolveClientCandidates(
           ? spec.models
           : [spec.defaultModel];
 
-      // Exclude session-quarantined dead models
-      availableModels = availableModels.filter((m) => !isModelQuarantined(providerId, m));
+      // Exclude session-quarantined dead models and non-generative models
+      availableModels = availableModels.filter(
+        (m) => !isModelQuarantined(providerId, m) && isGenerativeChatModel(providerId, m)
+      );
       if (availableModels.length === 0) continue;
 
       // Check user's preferred model for this provider
@@ -290,6 +293,25 @@ export async function resolveClientCandidates(
           // No model on this provider satisfies mandatory task requirements; do not route to incapable model
           continue;
         }
+
+        // Prioritize default model, high reasoning, and capability tier
+        matchingModels.sort((a, b) => {
+          if (a === spec.defaultModel) return -1;
+          if (b === spec.defaultModel) return 1;
+
+          const capsA = cachedDiscovered.find((d) => d.id === a || d.modelId === a)?.capabilities ?? normalizeCapabilities(providerId, a).capabilities;
+          const capsB = cachedDiscovered.find((d) => d.id === b || d.modelId === b)?.capabilities ?? normalizeCapabilities(providerId, b).capabilities;
+
+          if (reqs.reasoningIntensity === "high") {
+            const hasA = capsA.includes("reasoning");
+            const hasB = capsB.includes("reasoning");
+            if (hasA && !hasB) return -1;
+            if (!hasA && hasB) return 1;
+          }
+
+          return 0;
+        });
+
         primaryModel = matchingModels[0];
       }
 
@@ -345,8 +367,8 @@ export async function resolveClientCandidates(
         score,
       });
 
-      // Secondary fallback model on the same provider (satisfying requirements)
-      const secondaryModel = availableModels.find((m) => {
+      // Secondary fallback models on the same provider (satisfying requirements)
+      const secondaryCandidates = availableModels.filter((m) => {
         if (m === primaryModel) return false;
         if (isModelQuarantined(providerId, m)) return false;
         const disc = cachedDiscovered.find((d) => d.id === m || d.modelId === m);
@@ -354,7 +376,8 @@ export async function resolveClientCandidates(
         if (reqs.requiresStructuredOutput && !caps.includes("structuredOutput")) return false;
         return true;
       });
-      if (secondaryModel) {
+
+      for (const secondaryModel of secondaryCandidates.slice(0, 2)) {
         const isSecLive = cachedDiscovered.some(
           (d) => d.source === "live_discovery" && (d.id === secondaryModel || d.modelId === secondaryModel)
         );

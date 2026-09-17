@@ -181,4 +181,57 @@ describe("modelDiscovery: Capability Normalization & Conservative Rules", () => 
     expect(caps).not.toContain("vision");
     expect(caps).toContain("fastGeneration");
   });
+
+  it("filters out non-generative models from receiving capabilities", () => {
+    // Prompt guard models
+    expect(normalizeDiscoveredCapabilities("groq", "meta-llama/llama-prompt-guard-2-22m")).toEqual([]);
+    expect(normalizeDiscoveredCapabilities("groq", "meta-llama/llama-prompt-guard-2-86m")).toEqual([]);
+    // Safeguard moderation models
+    expect(normalizeDiscoveredCapabilities("groq", "openai/gpt-oss-safeguard-20b")).toEqual([]);
+    // Audio / Speech models
+    expect(normalizeDiscoveredCapabilities("groq", "whisper-large-v3")).toEqual([]);
+    expect(normalizeDiscoveredCapabilities("groq", "whisper-large-v3-turbo")).toEqual([]);
+    expect(normalizeDiscoveredCapabilities("groq", "canopylabs/orpheus-v1-english")).toEqual([]);
+    expect(normalizeDiscoveredCapabilities("gemini", "gemini-2.5-flash-preview-tts")).toEqual([]);
+    // Embedding models
+    expect(normalizeDiscoveredCapabilities("gemini", "text-embedding-004")).toEqual([]);
+  });
+
+  it("sanitizes existing cached non-generative models when reading from localStorage", () => {
+    const key = "gsk_test_key_abc123";
+    const modelsWithJunk: DiscoveredModel[] = [
+      {
+        id: "openai/gpt-oss-120b",
+        providerId: "groq",
+        displayName: "GPT-OSS 120B",
+        capabilities: ["reasoning", "structuredOutput"],
+        source: "live_discovery",
+        verifiedAt: new Date().toISOString(),
+      },
+      {
+        id: "meta-llama/llama-prompt-guard-2-22m",
+        providerId: "groq",
+        displayName: "Prompt Guard 22M",
+        capabilities: ["structuredOutput"],
+        source: "live_discovery",
+        verifiedAt: new Date().toISOString(),
+      },
+      {
+        id: "whisper-large-v3",
+        providerId: "groq",
+        displayName: "Whisper Large",
+        capabilities: ["fastGeneration"],
+        source: "live_discovery",
+        verifiedAt: new Date().toISOString(),
+      },
+    ];
+
+    cacheDiscoveredModels("groq", key, modelsWithJunk);
+    const retrieved = getCachedDiscoveredModels("groq", key);
+    expect(retrieved).not.toBeNull();
+    // Non-generative models (prompt guard, whisper) MUST be purged
+    expect(retrieved).toHaveLength(1);
+    expect(retrieved![0].id).toBe("openai/gpt-oss-120b");
+  });
 });
+

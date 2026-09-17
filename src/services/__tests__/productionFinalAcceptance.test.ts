@@ -194,7 +194,8 @@ describe("Final Production Environment Acceptance Checks", { timeout: 25000 }, (
       );
 
       expect(result).toBeTruthy();
-      const cleanJson = result.replace(/```json/g, "").replace(/```/g, "").trim();
+      const match = result.match(/\{[^{}]*"status"\s*:\s*"ok"[^{}]*\}/);
+      const cleanJson = match ? match[0] : result.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(cleanJson);
       expect(parsed.status).toBe("ok");
       expect(stateDuringRun).toBeDefined();

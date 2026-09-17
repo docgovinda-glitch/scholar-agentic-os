@@ -386,4 +386,64 @@ describe("System-Level Acceptance Test: Full End-to-End User Journey", () => {
     expect(switchEvt.userMessage).toContain("model_decommissioned");
     expect(switchEvt.userMessage).toContain("openai/gpt-oss-120b");
   });
+
+  it("filters out non-generative prompt-guard models from Groq discovery and fails over cleanly to a valid LLM on 429", async () => {
+    await storeProviderKey("groq", "gsk-prompt-guard-test-key");
+
+    // Mock Groq returning the exact 13 live models discovered in production
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("api.groq.com/openai/v1/models")) {
+        return new Response(
+          JSON.stringify({
+            data: [
+              { id: "allam-2-7b" },
+              { id: "openai/gpt-oss-20b" },
+              { id: "groq/compound-mini" },
+              { id: "canopylabs/orpheus-arabic-saudi" },
+              { id: "openai/gpt-oss-safeguard-20b" },
+              { id: "whisper-large-v3-turbo" },
+              { id: "qwen/qwen3.8-27b" },
+              { id: "openai/gpt-oss-120b" },
+              { id: "whisper-large-v3" },
+              { id: "groq/compound" },
+              { id: "canopylabs/orpheus-v1-english" },
+              { id: "meta-llama/llama-prompt-guard-2-86m" },
+              { id: "meta-llama/llama-prompt-guard-2-22m" },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(JSON.stringify({ data: [] }), { status: 200 });
+    });
+
+    // 1. Run live discovery
+    const discovery = await discoverProviderModels("groq", "gsk-prompt-guard-test-key", undefined, true);
+    expect(discovery.ok).toBe(true);
+
+    // Non-generative models must NOT be in the discovered list
+    const modelIds = discovery.models.map((m) => m.id);
+    expect(modelIds).not.toContain("meta-llama/llama-prompt-guard-2-22m");
+    expect(modelIds).not.toContain("meta-llama/llama-prompt-guard-2-86m");
+    expect(modelIds).not.toContain("whisper-large-v3");
+    expect(modelIds).not.toContain("whisper-large-v3-turbo");
+    expect(modelIds).not.toContain("canopylabs/orpheus-v1-english");
+    expect(modelIds).not.toContain("openai/gpt-oss-safeguard-20b");
+
+    // Real generative models must be present
+    expect(modelIds).toContain("openai/gpt-oss-120b");
+    expect(modelIds).toContain("openai/gpt-oss-20b");
+    expect(modelIds).toContain("qwen/qwen3.8-27b");
+
+    // 2. Candidate resolution for literature discovery
+    const candidates = await resolveClientCandidates("literatureDiscovery");
+    expect(candidates.ok).toBe(true);
+    const candidateModels = candidates.allCandidates.map((c) => c.model);
+    expect(candidateModels).not.toContain("meta-llama/llama-prompt-guard-2-22m");
+    expect(candidateModels).not.toContain("meta-llama/llama-prompt-guard-2-86m");
+    expect(candidateModels).toContain("openai/gpt-oss-120b");
+    expect(candidateModels).toContain("openai/gpt-oss-20b");
+  });
 });
+

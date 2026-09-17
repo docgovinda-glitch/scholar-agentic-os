@@ -39,6 +39,7 @@ import {
   getCachedDiscoveredModels,
   isModelBlacklisted,
   recordProviderFailure,
+  isGenerativeChatModel,
 } from "../../services/modelDiscovery";
 import { isModelUnavailableError } from "../../services/aiErrors";
 
@@ -164,7 +165,9 @@ function getDynamicModelFallbacks(providerId: string, currentModel: string, spec
   const cached = getCachedDiscoveredModels(providerId) || [];
   const discovered = cached.map((m) => m.id);
   const candidates = discovered.length > 0 ? discovered : spec.models && spec.models.length > 0 ? spec.models : [spec.defaultModel];
-  return candidates.filter((m) => m !== currentModel && !isModelQuarantined(providerId, m));
+  return candidates.filter(
+    (m) => m !== currentModel && !isModelQuarantined(providerId, m) && isGenerativeChatModel(providerId, m)
+  );
 }
 
 class OpenAICompatibleAdapter implements ProviderAdapter {

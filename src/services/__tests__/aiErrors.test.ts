@@ -97,6 +97,64 @@ describe("classifyHttpError — distinguishes causes that need different actions
   it("truncates a huge error body so one bad response cannot bloat stored state", () => {
     expect(classifyHttpError(500, "x".repeat(5000)).detail!.length).toBeLessThanOrEqual(800);
   });
+
+  it("classifies text classification streaming rejections (prompt-guard) as model_not_found with failoverWorthwhile: true", () => {
+    const errorBody = JSON.stringify({
+      error: {
+        message: "text classification models do not support streaming",
+        type: "invalid_request_error",
+      },
+    });
+    const result = classifyHttpError(400, errorBody);
+
+    expect(result.kind).toBe("model_not_found");
+    expect(result.failoverWorthwhile).toBe(true);
+    expect(result.retryable).toBe(false);
+  });
+
+  it("classifies JSON output rejections on unsupported models as model_not_found with failoverWorthwhile: true", () => {
+    const errorBody = JSON.stringify({
+      error: {
+        message: "This model does not support JSON output",
+        type: "invalid_request_error",
+        param: "response_format",
+      },
+    });
+    const result = classifyHttpError(400, errorBody);
+
+    expect(result.kind).toBe("model_not_found");
+    expect(result.failoverWorthwhile).toBe(true);
+    expect(result.retryable).toBe(false);
+  });
+
+  it("classifies non-chat models (whisper) rejections as model_not_found with failoverWorthwhile: true", () => {
+    const errorBody = JSON.stringify({
+      error: {
+        message: "The model `whisper-large-v3-turbo` does not support chat completions",
+        type: "invalid_request_error",
+      },
+    });
+    const result = classifyHttpError(400, errorBody);
+
+    expect(result.kind).toBe("model_not_found");
+    expect(result.failoverWorthwhile).toBe(true);
+    expect(result.retryable).toBe(false);
+  });
+
+  it("classifies model terms required rejections as model_not_found with failoverWorthwhile: true", () => {
+    const errorBody = JSON.stringify({
+      error: {
+        message: "The model `canopylabs/orpheus-v1-english` requires terms acceptance",
+        type: "invalid_request_error",
+        code: "model_terms_required",
+      },
+    });
+    const result = classifyHttpError(400, errorBody);
+
+    expect(result.kind).toBe("model_not_found");
+    expect(result.failoverWorthwhile).toBe(true);
+    expect(result.retryable).toBe(false);
+  });
 });
 
 describe("parseRetryAfter", () => {
