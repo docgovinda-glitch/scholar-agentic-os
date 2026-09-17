@@ -4,15 +4,8 @@ import { getAiAccessStatus } from "../aiAccess/aiAccessApi";
 import { EDUCATION_LEVELS, USER_TYPES } from "../../config/accountSchema";
 import { Field, PhoneField, SelectField } from "../auth/AuthLayout";
 import { e164Problem, DEFAULT_COUNTRY_ISO2, findCountry } from "../../config/countries";
-import {
-  getSavedAccounts,
-  switchActiveAccount,
-  removeSavedAccount,
-  type StoredAccountProfile,
-} from "../../services/auth/multiAccountService";
-import EmbeddedAuthModal from "../auth/EmbeddedAuthModal";
 
-export type SettingsTab = "personal" | "security" | "subscription" | "users";
+export type SettingsTab = "personal" | "security" | "subscription";
 
 /**
  * Strips a duplicated dial code from a phone string if already present,
@@ -38,7 +31,6 @@ export function stripDialCode(dialCode: string, rawPhone: string): string {
  * Tab 1: Personal Info (Account Identity, Full Name, Phone, and Academic Profile).
  * Tab 2: Security (Password management and authentication controls).
  * Tab 3: Subscription (Plan status, conversion & purchasing details).
- * Tab 4: Users & Accounts (Multi-account switching and linked user profiles).
  */
 export default function AccountSettingsScreen({
   onClose,
@@ -74,11 +66,6 @@ export default function AccountSettingsScreen({
 
   const [isPremium, setIsPremium] = useState(false);
 
-  // Multi-account management
-  const [savedAccounts, setSavedAccounts] = useState<StoredAccountProfile[]>([]);
-  const [switchingUser, setSwitchingUser] = useState(false);
-  const [addAccountOpen, setAddAccountOpen] = useState(false);
-
   useEffect(() => {
     getProfile()
       .then((result) => {
@@ -101,8 +88,6 @@ export default function AccountSettingsScreen({
     getAiAccessStatus()
       .then((status) => setIsPremium(Boolean(status.entitlement?.active)))
       .catch(() => setIsPremium(false));
-
-    setSavedAccounts(getSavedAccounts());
   }, []);
 
   useEffect(() => {
@@ -170,20 +155,6 @@ export default function AccountSettingsScreen({
       setPasswordBusy(false);
     }
   }
-
-  async function handleSwitchAccount(userId: string) {
-    setSwitchingUser(true);
-    try {
-      const res = await switchActiveAccount(userId);
-      if (res.success) {
-        window.location.reload();
-      }
-    } finally {
-      setSwitchingUser(false);
-    }
-  }
-
-  const otherAccounts = savedAccounts.filter((a) => a.email !== profile?.email);
 
   return (
     <div
@@ -292,33 +263,6 @@ export default function AccountSettingsScreen({
               <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${isPremium ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-[color:var(--surface-raised)] text-[color:var(--text-muted)]"}`}>
                 {isPremium ? "PRO" : "FREE"}
               </span>
-            </button>
-
-            {/* Tab 4: Users & Accounts */}
-            <button
-              type="button"
-              role="tab"
-              id="tab-users"
-              aria-selected={activeTab === "users"}
-              aria-controls="tabpanel-users"
-              onClick={() => setActiveTab("users")}
-              className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer text-left w-full whitespace-nowrap ${
-                activeTab === "users"
-                  ? "bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] font-semibold shadow-2xs"
-                  : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]/60"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                </svg>
-                <span>Users & Accounts</span>
-              </div>
-              {otherAccounts.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[color:var(--surface-raised)] text-[color:var(--text-secondary)]">
-                  {otherAccounts.length + 1}
-                </span>
-              )}
             </button>
           </nav>
 
@@ -641,130 +585,9 @@ export default function AccountSettingsScreen({
                 </div>
               </div>
             </div>
-
-            {/* Tab 4: Users & Accounts (Multi-Account Navigation) */}
-            <div
-              role="tabpanel"
-              id="tabpanel-users"
-              aria-labelledby="tab-users"
-              className={activeTab === "users" ? "space-y-6 animate-in fade-in duration-150" : "hidden"}
-            >
-              <div>
-                <h2 className="text-base font-semibold text-[color:var(--text-primary)]">Users & Accounts</h2>
-                <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-                  Switch between registered scholar accounts or link an institutional profile.
-                </p>
-              </div>
-
-              {/* Active Profile Summary */}
-              <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[color:var(--accent-solid)] text-[color:var(--text-inverse)] font-bold text-sm flex items-center justify-center shadow-xs">
-                      {(fullName || profile?.email || "U").charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-semibold text-[color:var(--text-primary)]">
-                          {fullName || profile?.username || "Active Researcher"}
-                        </h4>
-                        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                          Current
-                        </span>
-                      </div>
-                      <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
-                        {profile?.email}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Other Linked Profiles */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
-                    Linked Accounts
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setAddAccountOpen(true)}
-                    className="text-xs font-semibold text-[color:var(--accent)] hover:underline cursor-pointer"
-                  >
-                    + Link another account
-                  </button>
-                </div>
-
-                {otherAccounts.length > 0 ? (
-                  <div className="space-y-2">
-                    {otherAccounts.map((acc) => (
-                      <div
-                        key={acc.userId}
-                        className="flex items-center justify-between p-3 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]/60 hover:bg-[color:var(--surface-hover)] transition-colors"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] font-bold text-xs flex items-center justify-center">
-                            {acc.email.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-xs font-medium text-[color:var(--text-primary)] truncate block">
-                              {acc.email}
-                            </span>
-                            {acc.institution && (
-                              <span className="text-[11px] text-[color:var(--text-muted)] truncate block">
-                                {acc.institution}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={switchingUser}
-                            onClick={() => void handleSwitchAccount(acc.userId)}
-                            className="px-3 py-1.5 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] text-xs font-semibold text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] cursor-pointer transition-colors"
-                          >
-                            Switch
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              removeSavedAccount(acc.userId);
-                              setSavedAccounts(getSavedAccounts());
-                            }}
-                            className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 cursor-pointer transition-colors"
-                            title="Remove account"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-[color:var(--border-subtle)] p-6 text-center text-xs text-[color:var(--text-muted)]">
-                    No secondary accounts linked. Link an institutional or personal account to switch between research identities without signing out.
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         </div>
       </div>
-
-      {/* Embedded Auth Modal for Linking Another Account */}
-      {addAccountOpen && (
-        <EmbeddedAuthModal
-          isOpen={addAccountOpen}
-          onClose={() => {
-            setAddAccountOpen(false);
-            setSavedAccounts(getSavedAccounts());
-          }}
-          initialMode="signin"
-          initialMessage="Sign into your second account to link it to Scholar."
-        />
-      )}
     </div>
   );
 }

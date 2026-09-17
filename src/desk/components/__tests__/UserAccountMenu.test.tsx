@@ -17,15 +17,20 @@ vi.mock("../../../services/supabaseClient", () => ({
   }),
 }));
 
+const getSavedAccounts = vi.fn().mockReturnValue([]);
+const switchActiveAccount = vi.fn().mockResolvedValue({ success: true });
+const removeSavedAccount = vi.fn();
+
 vi.mock("../../../services/auth/multiAccountService", () => ({
-  getSavedAccounts: () => [],
-  switchActiveAccount: vi.fn().mockResolvedValue({ success: true }),
-  removeSavedAccount: vi.fn(),
+  getSavedAccounts: () => getSavedAccounts(),
+  switchActiveAccount: (...args: unknown[]) => switchActiveAccount(...args),
+  removeSavedAccount: (...args: unknown[]) => removeSavedAccount(...args),
 }));
 
 import UserAccountMenu from "../UserAccountMenu";
 
 beforeEach(() => {
+  getSavedAccounts.mockReset().mockReturnValue([]);
   getProfile.mockReset().mockResolvedValue({
     success: true,
     profile: {
@@ -113,5 +118,26 @@ describe("UserAccountMenu — Task 2: Minimal Dropdown Menu", () => {
     // Clicking Settings closes and invokes handler
     fireEvent.click(screen.getByRole("button", { name: /Settings/i }));
     expect(onOpenAccountSettings).toHaveBeenCalled();
+  });
+
+  it("consolidates multi-account functionality (+ Add another account, switch, and sign out)", async () => {
+    getSavedAccounts.mockReturnValue([
+      { userId: "u2", email: "second@example.com", institution: "MIT", token: "tok" },
+    ]);
+
+    render(
+      <UserAccountMenu
+        userEmail="ada@example.com"
+        userFullName="Ada Lovelace"
+        variant="sidebar"
+      />
+    );
+
+    const trigger = screen.getByRole("button", { name: /Ada Lovelace/i });
+    fireEvent.click(trigger);
+
+    expect(screen.getByText("+ Add another account")).toBeInTheDocument();
+    expect(screen.getByText("second@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sign Out/i })).toBeInTheDocument();
   });
 });

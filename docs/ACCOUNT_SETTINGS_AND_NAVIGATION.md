@@ -13,6 +13,8 @@ In dense multi-agent academic tools, repeated UI elements and redundant status b
 | UI Area | Redundancy Eliminated | Modernized Experience |
 | :--- | :--- | :--- |
 | **Sidebar User Card & Popover** | Dropdown previously rendered a bulky `"Signed in as [Name] [Email]"` card repeating the trigger card. | Popover menu drops redundant user repetition and renders clean, categorized action groups (`Settings`, `Help`, `Switch Accounts`, `Sign Out`). |
+| **Multi-Account Redundancy** | Multi-account management was previously duplicated across both the profile popover and a dedicated settings tab. | **Consolidated exclusively into `UserAccountMenu.tsx`**: Adding, switching, removing accounts, and signing out live strictly in the popover. The redundant "Users & Accounts" tab in `AccountSettingsScreen.tsx` has been eliminated. |
+| **Settings Taxonomy** | Dropdown menu button and navigation paths were inconsistent. | The menu button simply says **"Settings"** and opens directly to the **Personal Info** tab (`initialTab="personal"`), providing an immediate, predictable mental model. |
 | **Username vs Email** | For single-sign-on or email accounts where username defaults to email, two stacked read-only inputs appeared. | Rendered in a unified 2-column "Account Identity" container with clear `Read-only` badges and monospace font. |
 | **Dial Code & E.164 Cleansing** | Pre-filled phone numbers storing country codes (e.g. `+977` + `+9779821849301`) caused E.164 validation failure. | Automated cleansing via `stripDialCode(dialCode, phone)` ensures phone numbers are always normalized to local numbers with dial code prefix applied cleanly once. |
 | **Section Headings & Legacy Text** | Tab titles were repetitively echoed with negative framing ("not related to AI configuration"). | Replaced with clean, helpful context headers emphasizing academic identity and credential security. |
@@ -27,9 +29,9 @@ Per design system guidelines, while general interface elements follow the strict
 
 ---
 
-## 3. Account Settings Navigation Structure
+## 3. Account Settings Navigation Structure (3-Tab Model)
 
-`AccountSettingsScreen` employs a 4-tab vertical navigation pattern:
+`AccountSettingsScreen` employs a streamlined 3-tab vertical navigation pattern:
 
 ```mermaid
 graph LR
@@ -37,7 +39,6 @@ graph LR
     Nav --> Tab1[👤 Personal Info]
     Nav --> Tab2[🔒 Security]
     Nav --> Tab3[✦ Subscription]
-    Nav --> Tab4[👥 Users & Accounts]
     
     Tab1 --> Identity[Account Identity: Username & Email]
     Tab1 --> Profile[Full Name, Normalized Phone, Affiliation, Education]
@@ -49,21 +50,16 @@ graph LR
     Tab3 --> Tier[Current Plan Status]
     Tab3 --> Features[Academic Intelligence Benefits]
     Tab3 --> UpgradeBtn[Upgrade / Manage Plan CTA]
-    
-    Tab4 --> ActiveUser[Current Active Profile]
-    Tab4 --> LinkedRoster[Linked Multi-Account List]
-    Tab4 --> QuickSwitch[One-Click Account Switcher]
-    Tab4 --> LinkNew[Embedded Secondary Auth Modal]
 ```
 
 ---
 
-## 4. Multi-Account Switching & Session Registry
+## 4. Multi-Account Switching & Session Registry (Exclusively in UserAccountMenu)
 
-The multi-account architecture (`src/services/auth/multiAccountService.ts`) enables researchers with multiple affiliations (e.g. personal research, university `.edu`, institutional laboratory) to seamlessly toggle accounts without full sign-outs:
+The multi-account architecture (`src/services/auth/multiAccountService.ts`) enables researchers with multiple affiliations (e.g. personal research, university `.edu`, institutional laboratory) to seamlessly toggle accounts without full sign-outs. Following the "Declare It Once" standard, this functionality lives **exclusively within `UserAccountMenu.tsx`**:
 - **Local Multi-Account Store**: Cached in `scholar_multi_accounts_registry_v1`.
 - **Instant Profile Switcher**: `switchActiveAccount(userId)` swaps active session tokens with zero data loss.
-- **Embedded Secondary Auth**: Researchers can link secondary accounts through `EmbeddedAuthModal` directly within settings without navigating away.
+- **Embedded Secondary Auth**: Researchers can link secondary accounts through `EmbeddedAuthModal` directly from the popover without modal nesting or settings clutter.
 
 ---
 

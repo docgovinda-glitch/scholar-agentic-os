@@ -307,4 +307,19 @@ describe("AccountSettingsScreen — tabbed navigation and username immutability"
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("strictly enforces 3 tabs and eliminates redundant Users & Accounts tab", async () => {
+    render(<AccountSettingsScreen onClose={() => {}} />);
+    await screen.findByLabelText("Full name");
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(3);
+
+    expect(screen.getByRole("tab", { name: /Personal Info/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Security/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Subscription/i })).toBeInTheDocument();
+
+    expect(screen.queryByRole("tab", { name: /Users & Accounts/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Switch between registered scholar accounts")).not.toBeInTheDocument();
+  });
 });

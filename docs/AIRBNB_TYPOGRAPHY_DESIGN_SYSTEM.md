@@ -161,12 +161,13 @@ To align with modern account experiences (ChatGPT, Airbnb, Gemini), the user pro
 - **Dial-Code Deduplication & Auto-Cleansing**: The phone input normalizes raw phone strings (`stripDialCode(dialCode, phone)`) so pre-filled or pasted numbers containing the country code (e.g. `+977` + `+9779821849301`) are automatically cleansed to the national number (`9821849301`), eliminating invalid E.164 phone errors.
 - **Strategic Pricing & Purchasing Repetition**: In accordance with conversion-focused UX patterns, subscription plan status and upgrade affordances are strategically declared both in the Personal Info overview and in the dedicated Subscription navigation tab.
 
-### 4-Tab Vertical Sidebar Navigation Model
+### 3-Tab Vertical Sidebar Navigation Model
 Modeled after ChatGPT and Airbnb account settings, `AccountSettingsScreen` provides scannable vertical tabs:
 1. **Personal Info**: Full Name, sanitized Phone, Academic Institution, User Type, Education Level, and Subscription summary card.
 2. **Security**: Password updating, authentication credentials, and encrypted token session overview.
 3. **Subscription & Plan**: Clear tier indicator (`Scholar Free` vs `Scholar Premium`), academic intelligence feature breakdown, and primary upgrade/manage buttons.
-4. **Users & Accounts**: Multi-account roster with active session indicator, one-click profile switching (`switchActiveAccount`), profile unlink, and secondary account linking modal (`EmbeddedAuthModal`).
+
+> **Consolidated Multi-Account Action**: Following the "Declare It Once" standard, all multi-account functionality (account addition, profile switching, removal, and sign-out) lives **exclusively within the `UserAccountMenu.tsx` popover**. The settings modal button cleanly reads **"Settings"** and opens directly to **Personal Info**, eliminating redundant modal tabs.
 
 ---
 
