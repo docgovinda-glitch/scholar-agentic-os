@@ -62,6 +62,7 @@ export default function ProjectListScreen({
       const next = curr === "dark" ? "light" : "dark";
       if (typeof document !== "undefined") {
         document.documentElement.setAttribute("data-theme", next);
+        document.documentElement.classList.toggle("dark", next === "dark");
       }
       try {
         localStorage.setItem("scholar-theme", next);
@@ -72,15 +73,17 @@ export default function ProjectListScreen({
 
   useEffect(() => {
     if (typeof document === "undefined") return;
+    document.documentElement.classList.toggle("dark", theme === "dark");
     const observer = new MutationObserver(() => {
       const val = document.documentElement.getAttribute("data-theme");
       if (val === "dark" || val === "light") {
         setTheme(val);
+        document.documentElement.classList.toggle("dark", val === "dark");
       }
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     return () => observer.disconnect();
-  }, []);
+  }, [theme]);
 
   useEffect(() => {
     if (showWelcome) onWelcomeSeen?.();
@@ -507,21 +510,21 @@ export default function ProjectListScreen({
             </button>
 
           </div>
-        </div>        {/* Centered Reading Column (mimics focused AI chat window) */}
-        <div className="max-w-4xl mx-auto px-6 py-8 w-full flex-1">
+        </div>        {/* Centered Reading Column */}
+        <div className="max-w-6xl mx-auto px-6 py-8 w-full flex-1">
           {/* Onboarding welcome banner */}
           {welcomeVisible && (
             <div
               role="status"
-              className="mb-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 flex items-start justify-between gap-4 shadow-[var(--shadow-card)]"
+              className="mb-8 rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] p-5 flex items-start justify-between gap-4 shadow-sm"
             >
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-[var(--bg-button-primary)] text-[var(--text-button)] flex items-center justify-center flex-shrink-0 shadow-xs">
-                  <ScholarCoreLogo size="sm" className="text-[var(--text-button)]" />
+                <div className="w-10 h-10 rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center justify-center flex-shrink-0 shadow-xs">
+                  <ScholarCoreLogo size="sm" className="text-white dark:text-gray-900" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-[var(--text-primary)] font-sans">Welcome to your Scholar Workspace</p>
-                  <p className="text-xs text-[var(--text-secondary)] mt-1 font-normal leading-relaxed font-sans">
+                  <p className="text-sm font-bold text-gray-900 dark:text-gray-100 font-sans">Welcome to your Scholar Workspace</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-normal leading-relaxed font-sans">
                     Select an academic workspace to begin, upload reference PDFs to your Vault, or configure your editorial agents.
                   </p>
                 </div>
@@ -529,7 +532,7 @@ export default function ProjectListScreen({
               <button
                 aria-label="Dismiss"
                 onClick={() => setWelcomeVisible(false)}
-                className="p-1.5 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer"
+                className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -556,30 +559,30 @@ export default function ProjectListScreen({
               onCancel={() => setChoosing(false)}
             />
           ) : (
-            <>
+            <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-10">
               {/* Workspace Header & AI Prompt Bar */}
-              <section className="mb-12">
-                <div className="mb-8">
-                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans mb-4">
-                    What would you like to write today?
-                  </h1>
-                  <input
-                    type="text"
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && aiPrompt.trim() && !creating) {
-                        e.preventDefault();
-                        handleCreate("OT-10");
-                      }
-                    }}
-                    placeholder="Start a literature review, brainstorm an outline, or drop a syllabus here..."
-                    className="w-full max-w-3xl px-6 py-4 mb-8 rounded-full bg-white border border-gray-200 shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-gray-100 text-gray-700 text-lg"
-                  />
-                </div>
+              <div className="w-full flex flex-col items-start text-left">
+                <h1 className="text-4xl font-semibold tracking-tight text-gray-900 dark:text-gray-50 text-left mb-4">
+                  What would you like to write today?
+                </h1>
+                <input
+                  type="text"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && aiPrompt.trim() && !creating) {
+                      e.preventDefault();
+                      handleCreate("OT-10");
+                    }
+                  }}
+                  placeholder="Start a literature review, brainstorm an outline, or drop a syllabus here..."
+                  className="w-full max-w-3xl px-6 py-5 rounded-2xl bg-white dark:bg-[#171717] border border-gray-200 dark:border-neutral-800 shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-gray-100 dark:focus:ring-neutral-800 text-gray-700 dark:text-gray-200 text-lg placeholder-gray-400 dark:placeholder-gray-500"
+                />
+              </div>
 
-                {/* Tactile Apple-Style Template Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {/* Tactile Apple-Style Template Cards Grid */}
+              <div className="w-full">
+                <div className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {FORMAT_TILES.map((tile) => {
                     const isBootingThis = creatingFormatId === tile.id;
                     const isOtherBooting = creating && !isBootingThis;
@@ -589,42 +592,42 @@ export default function ProjectListScreen({
                         type="button"
                         onClick={() => !creating && handleCreate(tile.id)}
                         disabled={isOtherBooting}
-                        className={`rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 cursor-pointer p-6 flex flex-col gap-2 text-left ${
+                        className={`bg-white dark:bg-[#171717] border border-gray-100 dark:border-neutral-800 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col gap-2 text-left ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
-                            ? "ring-2 ring-gray-900 cursor-wait"
+                            ? "ring-2 ring-gray-900 dark:ring-gray-100 cursor-wait"
                             : ""
                         }`}
                       >
-                        <div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-900 flex items-center justify-center mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-neutral-800/80 text-gray-900 dark:text-gray-100 flex items-center justify-center mb-2">
                           {isBootingThis ? (
                             <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                           ) : (
                             <FormatIcon id={tile.id} className="w-5 h-5" />
                           )}
                         </div>
-                        <h3 className="font-bold text-base text-gray-900 leading-tight">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 leading-tight">
                           {tile.label}
                         </h3>
-                        <p className="text-xs text-gray-500 font-normal leading-relaxed">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
                           {tile.description}
                         </p>
                       </button>
                     );
                   })}
                 </div>
-              </section>
+              </div>
 
               {/* Active Projects Section with Live Search & Filter Tabs */}
-              <section>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-[var(--border-subtle)]">
+              <section className="w-full text-left">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-gray-200 dark:border-neutral-800 w-full">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-50 font-sans">
                       Active Projects
                     </h2>
                     {projects && (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] font-sans">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border border-gray-200 dark:border-neutral-800 text-gray-600 dark:text-gray-400 bg-white dark:bg-[#171717] shadow-sm font-sans">
                         {filteredProjects.length} of {projects.length}
                       </span>
                     )}
@@ -638,17 +641,16 @@ export default function ProjectListScreen({
                         placeholder="Search projects..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full !rounded-full !border !border-[var(--border-subtle)] !bg-[var(--bg-card)] pl-10 pr-9 py-2.5 text-xs font-normal !text-[var(--text-primary)] placeholder:!text-[var(--text-secondary)] outline-none focus:!ring-2 focus:!ring-[var(--text-primary)]/15 focus:!border-[var(--text-primary)]/40 transition-all shadow-[var(--shadow-card)]"
-                        style={{ borderRadius: "9999px", backgroundColor: "var(--bg-card)" }}
+                        className="w-full !rounded-full !border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] pl-10 pr-9 py-2.5 text-xs font-normal text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:!ring-2 focus:ring-gray-200 dark:focus:ring-neutral-700 transition-all shadow-sm"
                       />
-                      <svg className="w-4 h-4 text-[var(--text-secondary)] absolute left-3.5 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute left-3.5 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                       {searchQuery && (
                         <button
                           type="button"
                           onClick={() => setSearchQuery("")}
-                          className="absolute right-3 top-2.5 p-1 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer"
+                          className="absolute right-3 top-2.5 p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                           title="Clear search"
                           aria-label="Clear search"
                         >
@@ -669,13 +671,13 @@ export default function ProjectListScreen({
                       onClick={() => setSelectedTypeFilter("all")}
                       className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 border font-sans ${
                         selectedTypeFilter === "all"
-                          ? "bg-[var(--bg-button-primary)] text-[var(--text-button)] border-[var(--bg-button-primary)] shadow-xs"
-                          : "bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--text-primary)]/5 shadow-[var(--shadow-card)]"
+                          ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100 shadow-xs"
+                          : "bg-white dark:bg-[#171717] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800 shadow-sm"
                       }`}
                     >
                       <span>All</span>
                       <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded-full ${
-                        selectedTypeFilter === "all" ? "bg-[var(--text-button)]/20 text-[var(--text-button)]" : "bg-[var(--bg-canvas)] text-[var(--text-secondary)]"
+                        selectedTypeFilter === "all" ? "bg-white/20 dark:bg-black/20 text-white dark:text-gray-900" : "bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-gray-400"
                       }`}>
                         {projects.length}
                       </span>
@@ -692,8 +694,8 @@ export default function ProjectListScreen({
                           onClick={() => setSelectedTypeFilter(tile.id)}
                           className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 border font-sans ${
                             isActive
-                              ? "bg-[var(--bg-button-primary)] text-[var(--text-button)] border-[var(--bg-button-primary)] shadow-xs"
-                              : "bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--text-primary)]/5 shadow-[var(--shadow-card)]"
+                              ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100 shadow-xs"
+                              : "bg-white dark:bg-[#171717] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800 shadow-sm"
                           }`}
                         >
                           <span className="w-3.5 h-3.5 flex items-center justify-center">
@@ -702,7 +704,7 @@ export default function ProjectListScreen({
                           <span>{tile.label}</span>
                           {count > 0 && (
                             <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded-full ${
-                              isActive ? "bg-[var(--text-button)]/20 text-[var(--text-button)]" : "bg-[var(--bg-canvas)] text-[var(--text-secondary)]"
+                              isActive ? "bg-white/20 dark:bg-black/20 text-white dark:text-gray-900" : "bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-gray-400"
                             }`}>
                               {count}
                             </span>
@@ -715,35 +717,35 @@ export default function ProjectListScreen({
 
                 {projects === null ? (
                   error ? (
-                    <div className="flex flex-col justify-center items-center py-20 text-center border border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-2xl p-8 shadow-[var(--shadow-card)]">
+                    <div className="flex flex-col justify-center items-center py-20 text-center border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl p-8 shadow-sm">
                       <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mb-4">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                       </div>
-                      <p className="text-sm font-bold text-[var(--text-primary)] mb-1 font-sans">Failed to load manuscripts</p>
-                      <p className="text-xs text-[var(--text-secondary)] max-w-sm mb-4 font-normal leading-relaxed font-sans">{error}</p>
+                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 font-sans">Failed to load manuscripts</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mb-4 font-normal leading-relaxed font-sans">{error}</p>
                       <button
                         onClick={load}
-                        className="px-6 py-2.5 rounded-full bg-[var(--bg-button-primary)] text-[var(--text-button)] text-xs font-medium hover:opacity-90 transition-transform active:scale-95 cursor-pointer shadow-xs font-sans"
+                        className="px-6 py-2.5 rounded-full bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs font-medium hover:opacity-90 transition-transform active:scale-95 cursor-pointer shadow-xs font-sans"
                       >
                         Retry Connection
                       </button>
                     </div>
                   ) : (
-                    <div className="flex flex-col justify-center items-center py-24 border border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-2xl shadow-[var(--shadow-card)]">
-                      <div className="w-8 h-8 border-2 border-[var(--text-primary)] border-t-transparent rounded-full animate-spin mb-4" />
-                      <span className="text-xs font-medium text-[var(--text-secondary)] font-sans">Loading manuscripts...</span>
+                    <div className="flex flex-col justify-center items-center py-24 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl shadow-sm">
+                      <div className="w-8 h-8 border-2 border-gray-900 dark:border-gray-100 border-t-transparent rounded-full animate-spin mb-4" />
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 font-sans">Loading manuscripts...</span>
                     </div>
                   )
                 ) : projects.length === 0 ? (
                   <EmptyState onStart={() => setChoosing(true)} />
                 ) : filteredProjects.length === 0 ? (
-                  <div className="p-12 text-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
-                    <p className="text-sm font-semibold text-[var(--text-primary)] font-sans">No manuscripts match "{searchQuery}"</p>
+                  <div className="p-12 text-center rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] shadow-sm">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 font-sans">No manuscripts match "{searchQuery}"</p>
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="mt-3 text-xs font-medium text-[var(--text-primary)] underline cursor-pointer font-sans"
+                      className="mt-3 text-xs font-medium text-gray-900 dark:text-gray-100 underline cursor-pointer font-sans"
                     >
                       Clear search filter
                     </button>
@@ -762,7 +764,7 @@ export default function ProjectListScreen({
                   </div>
                 )}
               </section>
-            </>
+            </div>
           )}
         </div>
       </main>
@@ -777,26 +779,26 @@ export default function ProjectListScreen({
           onClick={() => !deletingId && setProjectToDelete(null)}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-[var(--bg-card)] border border-[var(--border-subtle)] p-7 shadow-2xl relative text-left animate-in zoom-in-95 duration-150"
+            className="w-full max-w-md rounded-3xl bg-white dark:bg-[#171717] border border-gray-200 dark:border-neutral-800 p-7 shadow-2xl relative text-left animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Title */}
-            <h3 id="delete-modal-title" className="text-xl font-extrabold text-[var(--text-primary)] tracking-tight mb-2.5 font-sans">
+            <h3 id="delete-modal-title" className="text-xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight mb-2.5 font-sans">
               Delete Project
             </h3>
 
             {/* Sub-label */}
-            <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-7 font-normal font-sans">
-              Are you sure you want to delete <span className="font-semibold text-[var(--text-primary)]">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
+            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-7 font-normal font-sans">
+              Are you sure you want to delete <span className="font-semibold text-gray-900 dark:text-gray-100">"{getProjectTitle(projectToDelete)}"</span>? All associated notes, drafts, and evidence will be permanently removed. This action cannot be undone.
             </p>
 
-            {/* Action Buttons: Pinterest-style Cancel & Pinterest Red (#E60023) Delete */}
+            {/* Action Buttons */}
             <div className="flex items-center justify-end gap-3 pt-1 font-sans">
               <button
                 type="button"
                 disabled={deletingId !== null}
                 onClick={() => setProjectToDelete(null)}
-                className="px-5 py-2.5 rounded-full text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-canvas)] hover:bg-[var(--text-primary)]/10 border border-[var(--border-subtle)] transition-all cursor-pointer disabled:opacity-50 font-sans"
+                className="px-5 py-2.5 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-700 border border-gray-200 dark:border-neutral-700 transition-all cursor-pointer disabled:opacity-50 font-sans"
               >
                 Cancel
               </button>
@@ -853,38 +855,38 @@ function ProjectCard({
     <div className="relative group font-sans">
       <button
         onClick={onOpen}
-        className="w-full text-left p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] hover:border-[var(--text-primary)]/40 hover:scale-[1.01] transition-all duration-200 flex flex-col justify-between cursor-pointer min-h-[220px]"
+        className="w-full text-left p-6 rounded-2xl border border-gray-100 dark:border-neutral-800 bg-white dark:bg-[#171717] shadow-sm hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 hover:border-gray-300 dark:hover:border-neutral-700 transition-all duration-200 flex flex-col justify-between cursor-pointer min-h-[220px]"
       >
         <div>
           {/* Card Top Metadata */}
           <div className="flex items-center justify-start gap-2 mb-3 pr-20">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-neutral-800/80 border border-gray-200 dark:border-neutral-700">
               {typeLabel}
             </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium text-[var(--text-secondary)]/80 bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-neutral-800/80 border border-gray-200 dark:border-neutral-700">
               {project.hasDocument ? "Drafting stage" : "Evidence intake"}
             </span>
           </div>
 
           {/* Project Title */}
-          <h3 className="text-base font-bold text-[var(--text-primary)] font-sans leading-snug line-clamp-2 mb-2">
+          <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 font-sans leading-snug line-clamp-2 mb-2">
             {displayTitle}
           </h3>
 
-          <p className="text-xs text-[var(--text-secondary)] font-normal leading-relaxed font-sans">
+          <p className="text-xs text-gray-500 dark:text-gray-400 font-normal leading-relaxed font-sans">
             {signedOff} of {totalGates} quality gates verified
           </p>
         </div>
 
         {/* Bottom Technical Progress Indicator */}
-        <div className="mt-5 pt-4 border-t border-[var(--border-subtle)]">
-          <div className="flex justify-between text-xs font-medium text-[var(--text-secondary)] mb-2">
+        <div className="mt-5 pt-4 border-t border-gray-100 dark:border-neutral-800 w-full">
+          <div className="flex justify-between text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
             <span>Workflow Completion</span>
-            <span className="font-semibold text-[var(--text-primary)]">{percent}%</span>
+            <span className="font-semibold text-gray-900 dark:text-gray-100">{percent}%</span>
           </div>
-          <div className="w-full h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+          <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-neutral-800 overflow-hidden">
             <div
-              className="h-full bg-[var(--text-primary)] rounded-full transition-all duration-300"
+              className="h-full bg-gray-900 dark:bg-gray-100 rounded-full transition-all duration-300"
               style={{ width: `${percent}%` }}
             />
           </div>
@@ -913,19 +915,19 @@ function ProjectCard({
 
 function EmptyState({ onStart }: { onStart: () => void }) {
   return (
-    <div className="rounded-3xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-16 text-center flex flex-col items-center shadow-[var(--shadow-card)] font-sans">
-      <div className="w-14 h-14 rounded-2xl bg-[var(--bg-button-primary)] text-[var(--text-button)] flex items-center justify-center mb-5 shadow-xs">
-        <ScholarCoreLogo size="md" className="text-[var(--text-button)]" />
+    <div className="rounded-3xl border border-dashed border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] px-6 py-16 text-center flex flex-col items-center shadow-sm font-sans">
+      <div className="w-14 h-14 rounded-2xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center justify-center mb-5 shadow-xs">
+        <ScholarCoreLogo size="md" className="text-white dark:text-gray-900" />
       </div>
-      <h3 className="text-2xl font-extrabold text-[var(--text-primary)] font-sans mb-2 tracking-tight">
+      <h3 className="text-2xl font-extrabold text-gray-900 dark:text-gray-100 font-sans mb-2 tracking-tight">
         Initialize your first project
       </h3>
-      <p className="max-w-md text-sm text-[var(--text-secondary)] font-normal mb-6 leading-relaxed font-sans">
+      <p className="max-w-md text-sm text-gray-500 dark:text-gray-400 font-normal mb-6 leading-relaxed font-sans">
         Choose from curated academic workspaces, connect your Knowledge Vault, and let the multi-agent editorial board assist you.
       </p>
       <button
         onClick={onStart}
-        className="rounded-full bg-[var(--bg-button-primary)] px-6 py-2.5 text-xs font-medium text-[var(--text-button)] hover:opacity-90 flex items-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-95 font-sans"
+        className="rounded-full bg-gray-900 dark:bg-gray-100 px-6 py-2.5 text-xs font-medium text-white dark:text-gray-900 hover:opacity-90 flex items-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-95 font-sans"
       >
         <span className="font-bold text-sm">+</span>
         <span>New Project</span>
@@ -1035,10 +1037,10 @@ function ChooseOutputType({
   }, [types, selected]);
 
   return (
-    <div className="max-w-4xl mx-auto py-6 animate-fade-in font-sans">
+    <div className="max-w-6xl mx-auto py-6 animate-fade-in font-sans">
       <button
         onClick={onCancel}
-        className="mb-8 inline-flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-[var(--text-primary)]/40 shadow-[var(--shadow-card)] cursor-pointer font-sans"
+        className="mb-8 inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-all px-4 py-2 rounded-full bg-white dark:bg-[#171717] border border-gray-200 dark:border-neutral-800 shadow-sm cursor-pointer font-sans"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -1047,14 +1049,14 @@ function ChooseOutputType({
       </button>
 
       <div className="mb-8">
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans mb-1.5">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-50 font-sans mb-1.5">
           Select Output Format
         </h2>
       </div>
 
       {!types ? (
-        <div className="flex items-center justify-center py-20 border border-[var(--border-subtle)] bg-[var(--bg-card)] rounded-2xl shadow-[var(--shadow-card)]">
-          <div className="w-8 h-8 border-2 border-[var(--text-primary)] border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center justify-center py-20 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl shadow-sm">
+          <div className="w-8 h-8 border-2 border-gray-900 dark:border-gray-100 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <div className="space-y-6">
@@ -1081,7 +1083,7 @@ function ChooseOutputType({
           </select>
 
           {/* Interactive Format Tiles Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {FORMAT_TILES.map((tile) => {
               const isSelected = selected === tile.id;
 
@@ -1090,19 +1092,19 @@ function ChooseOutputType({
                   key={tile.id}
                   onClick={() => setSelected(tile.id)}
                   onDoubleClick={() => onPick(tile.id)}
-                  className={`rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 cursor-pointer p-6 flex flex-col gap-2 text-left ${
+                  className={`bg-white dark:bg-[#171717] border border-gray-100 dark:border-neutral-800 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col gap-2 text-left ${
                     isSelected
-                      ? "ring-2 ring-gray-900 border-gray-900"
+                      ? "ring-2 ring-gray-900 dark:ring-gray-100 border-gray-900 dark:border-gray-100"
                       : ""
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-900 flex items-center justify-center mb-2">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-neutral-800/80 text-gray-900 dark:text-gray-100 flex items-center justify-center mb-2">
                     <FormatIcon id={tile.id} className="w-5 h-5" />
                   </div>
-                  <h3 className="font-bold text-base text-gray-900 leading-tight">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 leading-tight">
                     {tile.label}
                   </h3>
-                  <p className="text-xs text-gray-500 font-normal leading-relaxed">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
                     {tile.description}
                   </p>
                 </div>
@@ -1111,15 +1113,15 @@ function ChooseOutputType({
           </div>
 
           {/* Action Bar */}
-          <div className="pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end font-sans">
+          <div className="pt-4 border-t border-gray-200 dark:border-neutral-800 flex items-center justify-end font-sans">
             <button
               onClick={() => onPick(selected)}
               disabled={!selected || creating}
-              className="w-full sm:w-auto rounded-full bg-[var(--bg-button-primary)] px-6 py-2.5 text-xs font-medium text-[var(--text-button)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-95 font-sans"
+              className="w-full sm:w-auto rounded-full bg-gray-900 dark:bg-gray-100 px-6 py-2.5 text-xs font-medium text-white dark:text-gray-900 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-95 font-sans"
             >
               {creating ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-[var(--text-button)]/30 border-t-[var(--text-button)] rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   <span>Initializing Workspace...</span>
                 </>
               ) : (
@@ -1134,15 +1136,15 @@ function ChooseOutputType({
       )}
 
       {/* Footer info banner */}
-      <footer className="mt-12 py-4 px-4 text-center text-xs text-[var(--text-secondary)] border-t border-[var(--border-subtle)] font-sans">
+      <footer className="mt-12 py-4 px-4 text-center text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-neutral-800 font-sans">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 font-normal">
           <span className="flex items-center gap-1.5">
-            <strong className="font-semibold text-[var(--text-primary)]">Projects</strong>
+            <strong className="font-semibold text-gray-900 dark:text-gray-100">Projects</strong>
             <span>— synced to account</span>
           </span>
-          <span aria-hidden="true" className="hidden sm:inline text-[var(--text-secondary)]/40">·</span>
+          <span aria-hidden="true" className="hidden sm:inline text-gray-300 dark:text-neutral-700">·</span>
           <span className="flex items-center gap-1.5">
-            <strong className="font-semibold text-[var(--text-primary)]">Private Vault</strong>
+            <strong className="font-semibold text-gray-900 dark:text-gray-100">Private Vault</strong>
             <span>— client-side encrypted</span>
           </span>
         </div>
