@@ -31,6 +31,10 @@ interface ResearchContextValue {
 
 const ResearchContext = createContext<ResearchContextValue | null>(null);
 
+export function useOptionalResearchWorkspace() {
+  return useContext(ResearchContext);
+}
+
 export function useResearchWorkspace() {
   const context = useContext(ResearchContext);
   if (!context) {

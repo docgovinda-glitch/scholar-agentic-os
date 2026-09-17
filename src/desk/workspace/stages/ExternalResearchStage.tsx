@@ -100,7 +100,7 @@ export default function ExternalResearchStage({
               },
             ]);
           } else if (event === "done") {
-            if (logInterval) clearInterval(logInterval);
+            clearTimer();
             setResults(data.data);
             
             try {
