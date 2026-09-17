@@ -23,7 +23,7 @@
  *    stale caches actually get cleaned up promptly instead of lingering.
  */
 
-const CACHE_NAME = 'scholar-os-v2';
+const CACHE_NAME = 'scholar-os-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

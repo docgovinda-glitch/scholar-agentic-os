@@ -266,186 +266,164 @@ export default function AccountSettingsScreen({
             </button>
           </nav>
 
-          {/* Tab Content Panel */}
-          <div className="flex-1 p-5 md:p-6 overflow-y-auto scholar-scrollbar">
-            {loadError && (
-              <p role="alert" className="mb-4 rounded-[var(--radius-md)] border border-[color:var(--state-danger)] bg-[color:var(--state-danger-subtle)] px-3 py-2 text-sm text-[color:var(--state-danger)]">
-                {loadError}
-              </p>
-            )}
-
-            {/* Tab 1: Personal Info */}
-            <div
-              role="tabpanel"
-              id="tabpanel-personal"
-              aria-labelledby="tab-personal"
-              className={activeTab === "personal" ? "space-y-6 animate-in fade-in duration-150" : "hidden"}
-            >
-              <div>
-                <h2 className="text-base font-semibold text-[color:var(--text-primary)]">Personal Info</h2>
-                <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-                  Manage your academic identity, institution, and contact details.
+          {/* Tab Content & Action Wrapper */}
+          <div className="flex-1 flex flex-col min-h-0 bg-[color:var(--surface-canvas)]">
+            <div className="flex-1 p-5 md:p-6 overflow-y-auto scholar-scrollbar">
+              {loadError && (
+                <p role="alert" className="mb-4 rounded-[var(--radius-md)] border border-[color:var(--state-danger)] bg-[color:var(--state-danger-subtle)] px-3 py-2 text-sm text-[color:var(--state-danger)]">
+                  {loadError}
                 </p>
-              </div>
+              )}
 
-              {profile && (
-                <div className="space-y-5">
-                  {/* Account Identity Card (Username & Email - declared once in a clean unified card) */}
-                  <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]/50 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
-                          Account Identity
-                        </span>
-                        <span className="text-[10px] font-medium text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] px-2 py-0.5 rounded">
-                          Read-only
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-[color:var(--text-muted)] hidden sm:inline">Credentials cannot be edited</span>
-                    </div>
+              {/* Tab 1: Personal Info */}
+              <div
+                role="tabpanel"
+                id="tabpanel-personal"
+                aria-labelledby="tab-personal"
+                className={activeTab === "personal" ? "space-y-5 animate-in fade-in duration-150" : "hidden"}
+              >
+                <div>
+                  <h2 className="text-base font-semibold text-[color:var(--text-primary)]">Personal Info</h2>
+                  <p className="mt-1 text-xs text-[color:var(--text-muted)]">
+                    Manage your academic identity, institution, and contact details.
+                  </p>
+                </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      {/* Username - Strictly Read-only / Disabled */}
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-medium text-[color:var(--text-secondary)]" htmlFor="account-username">
-                            Username
-                          </label>
-                          <span className="text-[10px] font-medium text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] px-1.5 py-0.2 rounded">
+                {profile && (
+                  <form
+                    id="account-profile-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void handleSaveProfile();
+                    }}
+                    className="space-y-4"
+                  >
+                    {/* Account Identity Card (Username & Email - declared once in a clean unified card) */}
+                    <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)]/50 p-3.5">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
+                            Account Identity
+                          </span>
+                          <span className="text-[10px] font-medium text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] px-2 py-0.5 rounded">
                             Read-only
                           </span>
                         </div>
-                        <input
-                          id="account-username"
-                          value={profile.username}
-                          disabled
-                          readOnly
-                          aria-readonly="true"
-                          className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs font-mono text-[color:var(--text-muted)] cursor-not-allowed opacity-80"
+                        <span className="text-[11px] text-[color:var(--text-muted)] hidden sm:inline">Credentials cannot be edited</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Username - Strictly Read-only / Disabled */}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-medium text-[color:var(--text-secondary)]" htmlFor="account-username">
+                              Username
+                            </label>
+                            <span className="text-[10px] font-medium text-[color:var(--text-muted)] bg-[color:var(--surface-inset)] border border-[color:var(--border-subtle)] px-1.5 py-0.2 rounded">
+                              Read-only
+                            </span>
+                          </div>
+                          <input
+                            id="account-username"
+                            value={profile.username}
+                            disabled
+                            readOnly
+                            aria-readonly="true"
+                            className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs font-mono text-[color:var(--text-muted)] cursor-not-allowed opacity-80"
+                          />
+                          <p className="text-[11px] text-[color:var(--text-muted)] flex items-center gap-1 mt-0.5">
+                            <svg className="w-3.5 h-3.5 flex-shrink-0 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                            </svg>
+                            <span>Username cannot be changed.</span>
+                          </p>
+                        </div>
+
+                        {/* Email - System Controlled */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-medium text-[color:var(--text-secondary)]" htmlFor="account-email">
+                            Email
+                          </label>
+                          <input
+                            id="account-email"
+                            value={profile.email}
+                            disabled
+                            readOnly
+                            aria-readonly="true"
+                            className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs font-mono text-[color:var(--text-muted)] cursor-not-allowed opacity-80"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Profile Fields Section */}
+                    <div className="space-y-3.5">
+                      {/* Full Name - User Editable */}
+                      <Field id="account-full-name" label="Full name" value={fullName} onChange={setFullName} />
+
+                      {/* Phone - Dial Code Deduplication prevents invalid error */}
+                      <PhoneField
+                        idPrefix="account-phone"
+                        countryCode={phoneCountryCode}
+                        onCountryCodeChange={(code) => {
+                          setPhoneCountryCode(code);
+                          setPhone(stripDialCode(code, phone));
+                        }}
+                        number={phone}
+                        onNumberChange={handlePhoneChange}
+                        error={phoneProblem}
+                      />
+
+                      {/* Institution */}
+                      <Field id="account-affiliation" label="Institution" value={affiliation} onChange={setAffiliation} required={false} />
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        {/* User Type */}
+                        <SelectField id="account-userType" label="User Type" value={userType} onChange={setUserType} options={USER_TYPES} />
+
+                        {/* Level of Education */}
+                        <SelectField
+                          id="account-educationLevel"
+                          label="Level of Education"
+                          value={educationLevel}
+                          onChange={setEducationLevel}
+                          options={EDUCATION_LEVELS}
                         />
-                        <p className="text-[11px] text-[color:var(--text-muted)] flex items-center gap-1 mt-0.5">
-                          <svg className="w-3.5 h-3.5 flex-shrink-0 text-[color:var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                          </svg>
-                          <span>Username cannot be changed.</span>
+                      </div>
+                    </div>
+
+                    {/* Strategic Repetition of Subscription & Purchasing Info */}
+                    <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3.5 mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xs font-semibold text-[color:var(--text-primary)]">Subscription</h3>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPremium ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"}`}>
+                            Current Plan: <span className="font-medium">{isPremium ? "Premium" : "Free"}</span>
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-[color:var(--text-muted)]">
+                          {isPremium ? "Full access to multi-agent editorial intelligence." : "Upgrade for unlimited AI routing and deep research tools."}
                         </p>
                       </div>
-
-                      {/* Email - System Controlled */}
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-medium text-[color:var(--text-secondary)]" htmlFor="account-email">
-                          Email
-                        </label>
-                        <input
-                          id="account-email"
-                          value={profile.email}
-                          disabled
-                          readOnly
-                          aria-readonly="true"
-                          className="w-full rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] px-3 py-2 text-xs font-mono text-[color:var(--text-muted)] cursor-not-allowed opacity-80"
-                        />
-                      </div>
+                      <button
+                        type="button"
+                        onClick={onManagePremium}
+                        disabled={!onManagePremium}
+                        className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] px-3 py-1.5 text-xs font-semibold text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60 cursor-pointer whitespace-nowrap transition-colors"
+                      >
+                        {isPremium ? "Manage Premium Plan" : "Upgrade to Premium"}
+                      </button>
                     </div>
+                  </form>
+                )}
+
+                {!profile && !loadError && (
+                  <div className="mt-4 flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
+                    <span className="w-3.5 h-3.5 border-2 border-[color:var(--accent)] border-t-transparent rounded-full animate-spin" />
+                    <span>Loading profile…</span>
                   </div>
-
-                  {/* Profile Fields Section */}
-                  <div className="space-y-4">
-                    {/* Full Name - User Editable */}
-                    <Field id="account-full-name" label="Full name" value={fullName} onChange={setFullName} />
-
-                    {/* Phone - Dial Code Deduplication prevents invalid error */}
-                    <PhoneField
-                      idPrefix="account-phone"
-                      countryCode={phoneCountryCode}
-                      onCountryCodeChange={(code) => {
-                        setPhoneCountryCode(code);
-                        setPhone(stripDialCode(code, phone));
-                      }}
-                      number={phone}
-                      onNumberChange={handlePhoneChange}
-                      error={phoneProblem}
-                    />
-
-                    {/* Institution */}
-                    <Field id="account-affiliation" label="Institution" value={affiliation} onChange={setAffiliation} required={false} />
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* User Type */}
-                      <SelectField id="account-userType" label="User Type" value={userType} onChange={setUserType} options={USER_TYPES} />
-
-                      {/* Level of Education */}
-                      <SelectField
-                        id="account-educationLevel"
-                        label="Level of Education"
-                        value={educationLevel}
-                        onChange={setEducationLevel}
-                        options={EDUCATION_LEVELS}
-                      />
-                    </div>
-                  </div>
-
-                  {saveError && (
-                    <p role="alert" className="text-sm text-[color:var(--state-danger)]">
-                      {saveError}
-                    </p>
-                  )}
-                  {saved && (
-                    <p role="status" className="text-sm text-[color:var(--state-success)]">
-                      Saved.
-                    </p>
-                  )}
-
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={() => void handleSaveProfile()}
-                      disabled={saving || phoneProblem !== null}
-                      aria-busy={saving}
-                      className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] disabled:opacity-60 cursor-pointer inline-flex items-center justify-center gap-2 shadow-xs transition-colors"
-                    >
-                      {saving ? (
-                        <>
-                          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                          <span>Saving…</span>
-                        </>
-                      ) : (
-                        "Save changes"
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Strategic Repetition of Subscription & Purchasing Info */}
-                  <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">Subscription</h3>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPremium ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"}`}>
-                          Current Plan: <span className="font-medium">{isPremium ? "Premium" : "Free"}</span>
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-                        {isPremium ? "Full access to multi-agent editorial intelligence." : "Upgrade for unlimited AI routing and deep research tools."}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={onManagePremium}
-                      disabled={!onManagePremium}
-                      className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] px-3.5 py-1.5 text-xs font-semibold text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-60 cursor-pointer whitespace-nowrap transition-colors"
-                    >
-                      {isPremium ? "Manage Premium Plan" : "Upgrade to Premium"}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {!profile && !loadError && (
-                <div className="mt-4 flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
-                  <span className="w-3.5 h-3.5 border-2 border-[color:var(--accent)] border-t-transparent rounded-full animate-spin" />
-                  <span>Loading profile…</span>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
             {/* Tab 2: Security */}
             <div
@@ -585,6 +563,58 @@ export default function AccountSettingsScreen({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Pinned Sticky Modal Footer for Personal Info */}
+          {activeTab === "personal" && profile && (
+              <footer className="flex items-center justify-between px-6 py-3.5 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] flex-shrink-0">
+                <div className="flex items-center gap-2 min-h-[22px]">
+                  {saveError && (
+                    <p role="alert" className="text-xs text-[color:var(--state-danger)] flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span>{saveError}</span>
+                    </p>
+                  )}
+                  {saved && (
+                    <p role="status" className="text-xs text-[color:var(--state-success)] font-medium flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span>Saved.</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    form="account-profile-form"
+                    onClick={() => void handleSaveProfile()}
+                    disabled={saving || phoneProblem !== null}
+                    aria-busy={saving}
+                    className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-1.5 text-xs font-semibold text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)] disabled:opacity-60 cursor-pointer inline-flex items-center justify-center gap-2 shadow-xs transition-colors"
+                  >
+                    {saving ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                        <span>Saving…</span>
+                      </>
+                    ) : (
+                      "Save changes"
+                    )}
+                  </button>
+                </div>
+              </footer>
+            )}
           </div>
         </div>
       </div>

@@ -63,9 +63,20 @@ The multi-account architecture (`src/services/auth/multiAccountService.ts`) enab
 
 ---
 
-## 5. Verification & Testing
+## 5. Sticky Footer & Viewport Resilience
+
+To ensure maximum usability across diverse screen resolutions (including 13-inch and 14-inch laptops like MacBook Air), `AccountSettingsScreen` adopts a **pinned sticky footer pattern**:
+- **Always-Visible Save Action**: The `Save changes` button and live status indicators (`Saved.`, error messages) are pinned in a dedicated footer bar (`flex-shrink-0 border-t border-[color:var(--border-subtle)]`).
+- **No Below-the-Fold Clipping**: Form inputs scroll independently inside `overflow-y-auto`, ensuring primary save actions and status messages are never clipped below the fold.
+- **Enter-to-Submit**: The profile form is wrapped in a `<form id="account-profile-form">` with `onSubmit` wired to `handleSaveProfile()`, allowing instant keyboard submission from any input.
+- **Service Worker Cache Busting**: Service worker cache updated to `scholar-os-v3` to ensure instant asset invalidation across client browsers.
+
+---
+
+## 6. Verification & Testing
 
 All components and workflows are covered by comprehensive unit tests:
-- `AccountSettingsScreen.test.tsx`: 21 tests covering identity immutability, dial-code sanitization, tab switching, and password validation.
-- `UserAccountMenu.test.tsx`: 4 tests validating profile display, menu options, and pricing absence in the minimal dropdown.
+- `AccountSettingsScreen.test.tsx`: 22 tests covering identity immutability, dial-code sanitization, tab switching, password validation, and sticky save actions.
+- `UserAccountMenu.test.tsx`: 5 tests validating profile display, menu options, consolidated multi-account actions, and pricing absence in the minimal dropdown.
 - `ProjectListScreen.test.tsx`: 15 tests verifying sidebar layout, responsive navigation, and footer settings integration.
+- Full suite passing: 212 test files, 2,397 tests passing with 0 failures.
