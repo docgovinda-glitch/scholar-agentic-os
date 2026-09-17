@@ -63,16 +63,20 @@ function renderPage() {
 }
 
 describe("AI Access navigation", () => {
-  it("offers a section per tier rather than one long page", async () => {
+  it("offers 4 action-oriented tabs: Overview, Providers, Subscription, Preferences", async () => {
     renderPage();
-    for (const label of ["Overview", "Local AI", "Free AI", "Pro / BYOK", "Premium", "Models", "Settings"]) {
+    for (const label of ["Overview", "Providers", "Subscription", "Preferences"]) {
       expect(await screen.findByRole("button", { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("button", { name: "Local AI" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Free AI" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pro / BYOK" })).not.toBeInTheDocument();
   });
 
-  it("lists every local runner in the catalogue, not just Ollama and a generic 'custom'", async () => {
+  it("lists every local runner in the catalogue under Providers", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Local AI" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Local Runners" }));
 
     for (const runner of LOCAL_RUNNERS) {
       expect(await screen.findByText(runner.name)).toBeInTheDocument();
@@ -80,19 +84,17 @@ describe("AI Access navigation", () => {
     expect(LOCAL_RUNNERS.length).toBeGreaterThanOrEqual(8);
   });
 
-  it("offers at least 30 genuinely free-to-use providers under Free AI", async () => {
+  it("offers at least 30 genuinely free-to-use providers under Providers", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Free AI" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
 
-    // The count the request asked for, asserted against the catalogue that
-    // actually drives the list rather than a hardcoded number in the UI.
     expect(freeProviders().length).toBeGreaterThanOrEqual(30);
     await waitFor(() => expect(screen.getByPlaceholderText(/Search \d+ providers/)).toBeInTheDocument());
   });
 
-  it("lists every cloud provider under Pro / BYOK, including free-tier ones a user may hold a paid key for", async () => {
+  it("lists cloud providers under Providers, including free-tier and pro", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Pro / BYOK" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     expect(await screen.findByText("OpenAI")).toBeInTheDocument();
     expect(await screen.findByText("Google Gemini")).toBeInTheDocument();
     expect(CLOUD_PROVIDERS.length).toBeGreaterThanOrEqual(35);
@@ -102,7 +104,8 @@ describe("AI Access navigation", () => {
 describe("Manual hardware entry", () => {
   it("is always available, independent of whether auto-detection found anything", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Local AI" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Local Runners" }));
 
     expect(await screen.findByText("Not detected yet.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Enter your hardware manually" })).toBeInTheDocument();
@@ -112,7 +115,8 @@ describe("Manual hardware entry", () => {
   it("saves only the fields the user filled in, and reloads the hardware summary", async () => {
     const hardwareModule = await import("../../../services/hardwareProfiler");
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Local AI" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Local Runners" }));
 
     fireEvent.change(screen.getByLabelText("RAM (GB)"), { target: { value: "32" } });
     const save = screen.getByRole("button", { name: "Save my hardware" });
@@ -133,7 +137,8 @@ describe("Manual hardware entry", () => {
 describe("Local runner configuration", () => {
   it("keeps the free-text model field behind an Advanced toggle before anything is detected, matching the cloud dropdown's opt-in framing", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Local AI" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Local Runners" }));
     fireEvent.click(await screen.findByText("Ollama"));
 
     expect(await screen.findByText(/Detect models first, or check Advanced/i)).toBeInTheDocument();
@@ -149,7 +154,7 @@ describe("Local runner configuration", () => {
 describe("Per-provider configuration", () => {
   it("opens a configuration surface for the chosen provider, naming that provider — not a shared generic form", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Free AI" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
 
     // Provider-specific: its own steps, its own key page, its own name.
@@ -161,7 +166,7 @@ describe("Per-provider configuration", () => {
 
   it("states cost, key, account and limit facts for the provider", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Free AI" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
 
     expect(await screen.findByText("Free tier")).toBeInTheDocument();
@@ -171,7 +176,7 @@ describe("Per-provider configuration", () => {
 
   it("offers a real model dropdown for a provider, not a free-text field, with Advanced as an opt-in escape hatch", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Free AI" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
 
     const advancedToggle = await screen.findByRole("checkbox", { name: /Advanced: use a custom model ID/i });
@@ -194,7 +199,7 @@ describe("Per-provider configuration", () => {
 
   it("labels a deprecated model in the dropdown rather than presenting it as current", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Pro / BYOK" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Anthropic Claude"));
 
     const select = (await screen.findByRole("combobox")) as HTMLSelectElement;
@@ -207,7 +212,7 @@ describe("Per-provider configuration", () => {
     const store = await import("../../../services/userAiSettings");
     renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Free AI" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
     fireEvent.change(screen.getByPlaceholderText(/Paste your key/i), { target: { value: "gsk_test_key" } });
     fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
@@ -225,7 +230,7 @@ describe("Per-provider configuration", () => {
     vi.mocked(api.verifyProviderKey).mockResolvedValueOnce({ ok: false, error: "That key was rejected by the provider." });
     renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Free AI" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Providers" }));
     fireEvent.click(await screen.findByText("Groq"));
     fireEvent.change(screen.getByPlaceholderText(/Paste your key/i), { target: { value: "bad" } });
     fireEvent.click(screen.getByRole("button", { name: /Test and connect/i }));
@@ -253,10 +258,10 @@ describe("Multiple simultaneous connections", () => {
   });
 });
 
-describe("Premium", () => {
+describe("Subscription", () => {
   it("never asks for an API key, and reports status as server-decided", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Premium" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Subscription" }));
 
     expect(await screen.findByText(/Subscription status: Not subscribed/i)).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/Paste your key/i)).not.toBeInTheDocument();
@@ -275,7 +280,7 @@ describe("Premium", () => {
       resources: [{ id: "r1", label: "Advanced writing", description: "Best quality drafting", capabilities: ["reasoning"] }],
     });
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Premium" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Subscription" }));
 
     expect(await screen.findByText(/Subscription status: Active/i)).toBeInTheDocument();
     expect(await screen.findByText("Advanced writing")).toBeInTheDocument();
@@ -290,7 +295,7 @@ describe("Premium", () => {
       { id: "premium_basic", name: "Premium Basic", description: "For everyday writing", monthlyCredits: 5000, weeklyCredits: null, dailyCredits: 200, perTaskMaxCredits: 50, concurrencyLimit: 2 },
     ]);
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Premium" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Subscription" }));
 
     fireEvent.click(await screen.findByLabelText(/Premium Basic/i));
     fireEvent.click(screen.getByRole("button", { name: /Request Premium/i }));
@@ -311,7 +316,7 @@ describe("Error handling", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/Request failed \(503\)/);
     // The page still renders its catalogue rather than blanking.
-    expect(await screen.findByRole("button", { name: "Free AI" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Providers" })).toBeInTheDocument();
   });
 
   it("allows retrying live status when an error occurs", async () => {

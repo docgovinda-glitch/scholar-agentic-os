@@ -24,6 +24,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Night Mode (ChatGPT-Inspired)**: Pure OLED black sidebar (`#000000`), deep neutral gray canvas (`#171717`), elevated cards (`#212121`), subtle 1px border separation (`#333333`), and inverted action buttons. Zero muddy navy or blue tinting.
 - **Pinned Sticky Modal Footer**: Always-visible action footer in `AccountSettingsScreen` preventing save button cutoff across smaller laptop viewports.
 - **Enter-to-Submit**: Form submission integration allowing immediate profile saves on <kbd>Enter</kbd> keypress.
+- **AI Access Modal Modernization & Cognitive Load Reduction**:
+  - **Condensation from 7 Tabs to 4 Action-Oriented Tabs**:
+    - `Overview`: High-level connection counts, quick-access summary tiles, and active connections.
+    - `Providers`: Merged Local AI, Free AI, and Pro / BYOK into a single unified provider directory.
+    - `Subscription`: Replaced "Premium" with clear self-service plan requesting and allowance inspection.
+    - `Preferences`: Consolidated Models and Settings into three clean vertical sections (Routing, Active Models, Privacy & Security).
+  - **Sidebar Architecture & Typography**: Stripped away all secondary subtitle text hints and applied `font-semibold` and `tracking-tight` to active navigation items.
+  - **Responsive 3-Column Providers Grid**:
+    - Replaced heavy vertical lists with a clean `grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4` CSS grid.
+    - Implemented segmented pill filtering (`[ All ] [ Local Runners ] [ Cloud Providers ]`) plus instant search.
+    - Designed minimal cards displaying strictly Provider Logo, Provider Name, and small tier badge (`Free`, `Pro`, `Local`, `Connected`) — completely removing explanatory text clutter.
+  - **Unified Connection Workflow**:
+    - Provider cards trigger a unified setup slide-over drawer modal with backdrop blur.
+    - Added in-modal tier switching (`[ Free Tier ] [ Pro / BYOK Key ]`) for freemium providers to configure keys without UI route splitting.
+  - **Preferences Consolidation & Hoverable Tooltip**:
+    - Structured into Routing (Default / Fallback dropdowns), Active Models (model mapping), and Privacy & Security (Local AI only checkbox).
+    - Encapsulated the 3 heavy encryption bullets inside an accessible hoverable `(?)` popover tooltip to prevent vertical fatigue.
+- **Strict Theme Preservation**: Kept `index.css` variables, background colors, and standard theme layouts completely untouched outside the modal refactor.
 - **Smooth Day/Night Theme Transition**: Added global transitions (`background-color 0.3s ease-in-out, color 0.3s ease-in-out, border-color 0.3s ease-in-out`) targeting `body, main, aside` in `src/index.css` for a gentle visual crossfade without layout jitter.
 
 ### Changed

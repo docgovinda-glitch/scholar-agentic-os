@@ -27,7 +27,7 @@ import { readProviderKey } from "../../services/userAiSettings";
 export default function ProviderDetail({
   view,
   spec,
-  tier,
+  tier: tierProp,
   onConnect,
   onDisconnect,
   onSetModel,
@@ -36,14 +36,15 @@ export default function ProviderDetail({
 }: {
   view: ProviderView;
   spec: CloudProviderSpec;
-  tier: ConnectionTier;
-  onConnect: (input: { apiKey: string; model: string; baseUrl?: string; makeDefault: boolean }) => Promise<{ ok: boolean; error?: string; modelsDetected?: number }>;
+  tier?: ConnectionTier;
+  onConnect: (input: { apiKey: string; model: string; baseUrl?: string; makeDefault: boolean; tier?: ConnectionTier }) => Promise<{ ok: boolean; error?: string; modelsDetected?: number }>;
   onDisconnect: () => Promise<void>;
   onSetModel: (model: string) => Promise<void>;
   onMakeDefault: () => Promise<void>;
   onBack: () => void;
 }) {
   const facts = providerAccessFacts(spec);
+  const [tier, setTier] = useState<ConnectionTier>(() => tierProp ?? view.tier ?? (facts.usableWithoutPaying ? "free" : "byok"));
   const models = getModelsForProvider(spec.id, tier === "free" ? "free" : "byok");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(view.selectedModel ?? getDefaultModelId(spec.id));
@@ -140,7 +141,7 @@ export default function ProviderDetail({
         setError("This provider needs a custom address — see the note under the field.");
         return;
       }
-      const outcome = await onConnect({ apiKey: apiKey.trim(), model: model.trim(), baseUrl: baseUrl.trim() || undefined, makeDefault });
+      const outcome = await onConnect({ apiKey: apiKey.trim(), model: model.trim(), baseUrl: baseUrl.trim() || undefined, makeDefault, tier });
       if (!outcome.ok) {
         setError(outcome.error ?? "Could not connect.");
         return;
@@ -179,6 +180,43 @@ export default function ProviderDetail({
       </header>
 
       <FactRow facts={facts} tier={tier} connected={view.connected} />
+
+      {facts.usableWithoutPaying && (
+        <div className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3.5">
+          <span className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mb-2">
+            Select Connection Tier
+          </span>
+          <div className="inline-flex rounded-[var(--radius-sm)] border border-[color:var(--border-control)] bg-[color:var(--surface-inset)] p-1">
+            <button
+              type="button"
+              onClick={() => setTier("free")}
+              className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-colors ${
+                tier === "free"
+                  ? "bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] shadow-xs font-semibold"
+                  : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+              }`}
+            >
+              Free Tier
+            </button>
+            <button
+              type="button"
+              onClick={() => setTier("byok")}
+              className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium transition-colors ${
+                tier === "byok"
+                  ? "bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] shadow-xs font-semibold"
+                  : "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+              }`}
+            >
+              Pro / BYOK Key
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-[color:var(--text-muted)]">
+            {tier === "free"
+              ? "Use with your free account. Subject to provider rate limits."
+              : "Use your paid key with your own custom quota and higher limits."}
+          </p>
+        </div>
+      )}
 
       {view.connected ? (
         <section className="rounded-[var(--radius-md)] border border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] p-4">

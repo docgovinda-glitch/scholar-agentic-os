@@ -407,9 +407,9 @@ describe("Desk — AI Access", () => {
     await screen.findByRole("heading", { name: "AI Access" });
     expect(window.location.pathname).toBe("/ai-access");
 
-    fireEvent.click(screen.getByRole("button", { name: "Local AI" }));
-    expect(await screen.findByRole("heading", { name: "Local AI" })).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/ai-access/local");
+    fireEvent.click(screen.getByRole("button", { name: "Providers" }));
+    expect(await screen.findByRole("heading", { name: "Providers" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/ai-access/providers");
 
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe("/ai-access"));

@@ -41,10 +41,19 @@ const AgentsScreen = lazy(() => import("./agents/AgentsScreen"));
 import type { AssignmentStage } from "./assignment/types";
 import { ASSIGNMENT_STAGES } from "./assignment/types";
 
-const SECTION_IDS: readonly SectionId[] = ["overview", "local", "free", "byok", "premium", "models", "settings"];
+const SECTION_IDS: readonly SectionId[] = ["overview", "providers", "subscription", "preferences"];
 
 function isSectionId(value: string | undefined): value is SectionId {
   return SECTION_IDS.includes(value as SectionId);
+}
+
+function normalizeSectionId(sec?: string): SectionId {
+  if (!sec) return "overview";
+  if (sec === "overview") return "overview";
+  if (sec === "providers" || sec === "local" || sec === "free" || sec === "byok") return "providers";
+  if (sec === "subscription" || sec === "premium") return "subscription";
+  if (sec === "preferences" || sec === "models" || sec === "settings") return "preferences";
+  return "overview";
 }
 
 const DESK_SHELL_VIEWS: readonly DeskShellView[] = ["definition", "requirements", "document", "evidence", "manuscript", "progress", "submissions"];
@@ -340,7 +349,7 @@ function SettingsRoute() {
   return (
     <AccountSettingsScreen
       onClose={() => navigate(returnTo(location))}
-      onManagePremium={() => navigate("/ai-access/premium", { replace: true })}
+      onManagePremium={() => navigate("/ai-access/subscription", { replace: true })}
     />
   );
 }
@@ -372,7 +381,7 @@ function AiAccessRoute() {
   const navigate = useNavigate();
   const location = useLocation();
   const { section } = useParams<{ section?: string }>();
-  const activeSection = isSectionId(section) ? section : "overview";
+  const activeSection = normalizeSectionId(section);
   return (
     <AiAccessPage
       onClose={() => navigate(returnTo(location))}
