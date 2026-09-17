@@ -191,6 +191,7 @@ export default function DeskShell({
         onOpenAccountSettings={onOpenAccountSettings}
         onOpenVault={onOpenVault}
         onOpenAiAccess={onOpenAiAccess}
+        userEmail={session.status === "signed-in" ? session.email : null}
       />
       <nav aria-label="Project view" className="flex gap-1 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4">
         {(["definition", "requirements", "document", "evidence", "manuscript", "progress", "submissions"] as const).map((v) => (

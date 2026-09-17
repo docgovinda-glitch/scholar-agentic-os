@@ -2,6 +2,7 @@ import type { ProjectView } from "../types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
 import { useState } from "react";
 import GlobalSearchModal from "./GlobalSearchModal";
+import UserAccountMenu from "../components/UserAccountMenu";
 
 /**
  * Region A (docs 22 §2).
@@ -11,10 +12,8 @@ import GlobalSearchModal from "./GlobalSearchModal";
  * ?project=<id> in the URL" note this carried no longer applies. AI
  * configuration lives entirely under "AI Access" (the single source of truth
  * for it — there is no separate AI Settings anymore); "Account Settings" is
- * profile/account fields only. Search stays visibly present but explicitly
- * labelled not-yet-built, rather than being a dead control that looks live
- * (22 §6.2's "never a silent no-op") — there is no corpus/citations API yet
- * for it to search.
+ * accessed strictly via the user profile popover. Search stays visibly
+ * present but explicitly labelled not-yet-built.
  */
 export default function Header({
   project,
@@ -24,6 +23,7 @@ export default function Header({
   onOpenVault,
   onOpenAiAccess,
   onToggleRail,
+  userEmail,
 }: {
   project: ProjectView;
   outputTypeLabel: string;
@@ -32,6 +32,7 @@ export default function Header({
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
   onToggleRail?: () => void;
+  userEmail?: string | null;
 }) {
   const current = project.gates.find((g) => g.status !== "signed_off") ?? project.gates[project.gates.length - 1];
   const [searchOpen, setSearchOpen] = useState(false);
@@ -101,18 +102,14 @@ export default function Header({
             AI Access
           </button>
         )}
-        {onOpenAccountSettings ? (
-          <button
-            type="button"
-            onClick={onOpenAccountSettings}
-            className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
-          >
-            Account Settings
-          </button>
-        ) : (
-          <span title="Not yet built" className="cursor-not-allowed">
-            Account Settings
-          </span>
+        {onOpenAccountSettings && (
+          <UserAccountMenu
+            userEmail={userEmail}
+            onOpenAccountSettings={onOpenAccountSettings}
+            onOpenVault={onOpenVault}
+            onOpenAiAccess={onOpenAiAccess}
+            variant="bar"
+          />
         )}
       </div>
     </header>

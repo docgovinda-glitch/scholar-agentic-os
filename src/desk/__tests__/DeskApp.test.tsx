@@ -344,7 +344,7 @@ describe("Desk — account settings", () => {
     renderDeskApp();
 
     // Open user profile popover to access Settings
-    const profileBtn = await screen.findByRole("button", { name: /scholar/i });
+    const profileBtn = await screen.findByRole("button", { name: /scholar@example\.com/i });
     fireEvent.click(profileBtn);
 
     const settingsBtn = await screen.findByRole("button", { name: /^Settings$/i });
@@ -366,7 +366,12 @@ describe("Desk — account settings", () => {
     ]);
     renderDeskApp();
 
-    fireEvent.click(await screen.findByRole("button", { name: /Account Settings|Settings/i }));
+    // Open user profile popover in Header to access Settings
+    const profileBtn = await screen.findByRole("button", { name: /scholar@example\.com/i });
+    fireEvent.click(profileBtn);
+
+    const settingsBtn = await screen.findByRole("button", { name: /^Settings$/i });
+    fireEvent.click(settingsBtn);
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));

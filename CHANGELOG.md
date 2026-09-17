@@ -17,8 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **"Declare It Once" Settings & Account Deduplication**:
-  - Removed all redundant "Settings" buttons from sidebar bottom actions and workspace navigation.
-  - Consolidated Settings access strictly and exclusively through the User Profile popover menu (`UserAccountMenu`).
+  - Removed all standalone "Settings" and "Account Settings" links and buttons from navigation bars (including `Header.tsx` and `ResearchWorkspace.tsx`).
+  - Integrated `UserAccountMenu` directly into the project top navigation (`Header.tsx`), ensuring "Account Settings" is strictly and exclusively triggered via the User Profile Popover across the entire platform.
   - Streamlined `AccountSettingsScreen` to 3 core tabs (Personal Info, Security, Subscription), removing redundant multi-account switching logic from the modal.
 - **Dual-Pane Layout Implementation**:
   - Restructured `ProjectListScreen.tsx` into a full-viewport flex container (`h-screen w-full flex overflow-hidden`).
@@ -30,6 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Resolved modal viewport overflow clipping on 13-inch and 14-inch laptop screens.
-- Eliminated redundant settings navigation buttons from sidebar bottom row.
+- Eliminated redundant standalone settings navigation buttons and links across all sidebars and top headers.
 - Sanitized international phone inputs with automated dial-code deduplication.
 
