@@ -49,7 +49,7 @@ Scholar OS operates on two complementary abstraction layers:
 ```
 
 - **Macro Governance Layer (8 Gates `G0`–`G7`)**: Cross-cutting lifecycle milestones, audit points, and human sign-off checkpoints.
-- **Interactive Workspace Layer (5 Phases / 25 Stages)**: The authoritative day-to-day execution environment for Journal Article (`OT-10`) research.
+- **Interactive Workspace Layer (5 Phases / 25 Stages)**: The authoritative day-to-day execution environment for Journal Article (`OT-10`) research. See [`docs/03-workflow/35-JOURNAL-ARTICLE-WORKSPACE-STAGES.md`](35-JOURNAL-ARTICLE-WORKSPACE-STAGES.md) for full 25-stage specifications, phase badges, grounding ribbons, and test suites.
 - **Navigation Invariant**: Gates do **not** silently restrict stage navigation, and stages do **not** dictate gate sign-offs. Stage availability is governed by interactive workspace rules, while gates report macro governance readiness derived from verified project artifacts.
 
 ### 1.2 What gates are not

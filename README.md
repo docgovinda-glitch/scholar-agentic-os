@@ -92,8 +92,14 @@ npm run dev
 
 ### Running Test Suites
 ```bash
-# Run all 50 Desk test suites (420 unit & integration tests)
+# Run all Desk test suites
 npx vitest run src/desk/
+
+# Run 26 Journal Article Workspace test suites (176 tests)
+npx vitest run src/desk/workspace/__tests__/
+
+# Verify strict WCAG contrast and CSP security
+npm run lint
 ```
 
 ### Production Build
@@ -101,6 +107,23 @@ npx vitest run src/desk/
 # Build Vite frontend and bundled Node server
 npm run build
 ```
+
+---
+
+## 🔬 5-Phase, 25-Stage Journal Article Workspace (`OT-10`)
+
+Scholar Core structures peer-reviewed journal manuscript production into **5 distinct phases** across **25 sequential stages** (see [`docs/03-workflow/35-JOURNAL-ARTICLE-WORKSPACE-STAGES.md`](docs/03-workflow/35-JOURNAL-ARTICLE-WORKSPACE-STAGES.md)):
+
+- **Phase I: Conceptualization & Gap Definition (Stages 1–6)**: Definition, literature discovery, gap identification, gap selection, working title selection, and immutable title lock.
+- **Phase II: Evidence Extraction & Review (Stages 7–14)**: Primary vault sources, vault source approval, primary dataset ingestion, structured evidence extraction, external research, external approval, claims analysis, and 4-pillar evidentiary dossier review.
+- **Phase III: Manuscript Drafting (Stages 15–20)**: Journal discovery, journal submission requirements, section-by-section drafting, citation provenance audit, originality check, and unified manuscript draft preview.
+- **Phase IV: Peer Review (Stages 21–22)**: 7-Lens Academic Critique Matrix (Methodology, Novelty, Structure, Evidence, Clarity, Impact, Ethics) with triage/waiver workflow, and side-by-side Before/After diff patch revision studio.
+- **Phase V: Publication (Stages 23–25)**: Publication Markdown Studio with academic toolbar and live preview, 6-pillar submission compliance gate, and multi-format camera-ready export (PDF, LaTeX, Typst, Word DOCX, dossier bundle).
+
+### Core Workspace Invariants
+- **Deliberate Researcher Action**: Zero artificial `setTimeout` auto-advances. All stage progressions require explicit researcher interaction in sticky action docks.
+- **Grounding Foundation Ribbons**: Every stage displays standardized top ribbons showing active Phase Badges, locked titles, selected gaps, target journals, and evidence counters.
+- **Resilient Offline Synthesis**: Intelligent local fallback engines ensure smooth, uninterrupted workflows even if remote AI streaming drops.
 
 ---
 

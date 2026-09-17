@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-17
 
 ### Added
+- **25-Stage Publication-Grade Journal Article Workspace (`OT-10`)**:
+  - **Phase I: Conceptualization & Gap Definition (Stages 1–6)**: Overhauled `definition`, `literature`, `gap_identification`, `gap_selection`, `title_selection`, and `title_lock` with research domain grounding, candidate gap matrices, title taxonomies, and immutable project title locking.
+  - **Phase II: Evidence Extraction & Review (Stages 7–14)**: Built evidentiary pipeline across `vault_sources`, `source_approval_vault`, `additional_data`, `evidence_extraction`, `external_research`, `source_approval_external`, `evidence_analysis`, and `manual_review` 4-pillar dossier sign-off.
+  - **Phase III: Manuscript Drafting (Stages 15–20)**: Implemented venue matching and requirements extraction in `journal_discovery` and `journal_requirements`, section-by-section draft generation in `draft`, provenance checks in `citation_audit`, originality analysis in `originality_check`, and unified manuscript assembly in `draft_preview`.
+  - **Phase IV: Peer Review (Stages 21–22)**: Designed the 7-Lens Academic Critique Matrix (`peer_review`) covering Methodology, Novelty, Structure, Evidence, Clarity, Impact, and Ethics with waiver/triage actions, and side-by-side Before/After diff patch revision studio (`revision`).
+  - **Phase V: Publication & Camera-Ready Export (Stages 23–25)**: Created the full-featured Publication Markdown Studio (`final_editor`) with formatting toolbar and split preview, pre-flight 6-pillar submission compliance gate (`publication_readiness`), and multi-format camera-ready export engine (`export`) supporting PDF, LaTeX bundle, Typst, Word DOCX, and publication dossier zip.
+- **Deliberate Advancement Invariant**: Eliminated all artificial `setTimeout` auto-advances across all 25 stages, ensuring transitions occur strictly through intentional researcher interaction in sticky action docks.
+- **Grounding Foundation Ribbons**: Standardized top ribbons across every stage connecting active UI synthesis to upstream anchors (locked title, target journal, selected gap, evidence counts).
+- **Resilient Offline Synthesis Engines**: Domain-aware local synthesis fallbacks for every stage ensuring uninterrupted workflows when network streams or AI providers disconnect.
+- **Comprehensive Workspace Test Coverage**: Added 26 dedicated test suites with 176 unit and integration tests under `src/desk/workspace/__tests__/`.
 - **Dual-Pane Agentic Workspace Layout**: Left navigation sidebar and scrollable main content canvas optimized for high-density academic research workflows.
 - **Strict Day/Night CSS Engine**:
   - **Day Mode (Sand & Snow)**: Warm sand/off-white background (`#F7F5F0`), pure white cards (`#FFFFFF`) with subtle elevation, deep charcoal text (`#111111`).
