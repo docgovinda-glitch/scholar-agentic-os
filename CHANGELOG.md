@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-17
 
 ### Added
+- **Workspace Dashboard Apple-Inspired Aesthetic Overhaul (`ProjectListScreen.tsx`)**:
+  - **Conversational Header**: Replaced repetitive "Scholar Workspace" header and tag clutter with the warm, human inquiry: *"What would you like to write today?"*.
+  - **Clutter Removal**: Removed technical breadcrumbs, redundant pill badges, and subtitle jargon mentioning "initialize", as well as the duplicate secondary `+ New Project` button in the canvas area to keep project initialization centralized in the primary sidebar.
+  - **Full-Width AI Prompt Bar**: Inserted a distraction-free, tactile input bar (`w-full max-w-3xl px-6 py-4 rounded-full`) with gentle focus rings and placeholder prompt (*"Start a literature review, brainstorm an outline, or drop a syllabus here..."*).
+  - **Apple-Style Tactile Template Cards**: Redesigned template cards into continuous-geometry interactive tiles (`rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 cursor-pointer p-6` with dark mode support).
+  - **Human-Centric Content Focus**: Purged all technical serial codes ("OT-01", "OT-10", "OT-22"), green "Ready to boot" status indicators, and separated footer action links, displaying strictly the format icon, title, and description wrapped in an accessible `<button>`.
 - **25-Stage Publication-Grade Journal Article Workspace (`OT-10`)**:
   - **Phase I: Conceptualization & Gap Definition (Stages 1–6)**: Overhauled `definition`, `literature`, `gap_identification`, `gap_selection`, `title_selection`, and `title_lock` with research domain grounding, candidate gap matrices, title taxonomies, and immutable project title locking.
   - **Phase II: Evidence Extraction & Review (Stages 7–14)**: Built evidentiary pipeline across `vault_sources`, `source_approval_vault`, `additional_data`, `evidence_extraction`, `external_research`, `source_approval_external`, `evidence_analysis`, and `manual_review` 4-pillar dossier sign-off.

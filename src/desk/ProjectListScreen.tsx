@@ -39,6 +39,7 @@ export default function ProjectListScreen({
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
 
   // Theme toggle state: Sand & Snow Day mode vs True-Dark Night mode
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -574,89 +575,62 @@ export default function ProjectListScreen({
             />
           ) : (
             <>
-              {/* Workspace Categories (Quick-Launch Dedicated Workspaces) */}
+              {/* Workspace Header & AI Prompt Bar */}
               <section className="mb-12">
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-medium text-[var(--text-secondary)] px-3 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] font-sans">
-                        Scholar Workspace
-                      </span>
-                    </div>
-                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans">
-                      Scholar Workspace
-                    </h1>
-                    <p className="text-sm text-[var(--text-secondary)] mt-1.5 font-normal leading-relaxed max-w-2xl font-sans">
-                      Select a dedicated academic workspace to initialize, or continue your active research projects below.
-                    </p>
+                <div className="mb-8">
+                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans">
+                    What would you like to write today?
+                  </h1>
+                  <div className="mt-6 w-full max-w-3xl">
+                    <input
+                      type="text"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && aiPrompt.trim() && !creating) {
+                          e.preventDefault();
+                          handleCreate("OT-10");
+                        }
+                      }}
+                      placeholder="Start a literature review, brainstorm an outline, or drop a syllabus here..."
+                      className="w-full max-w-3xl px-6 py-4 rounded-full bg-white border border-gray-200 shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-gray-100 text-gray-700 text-lg dark:bg-[#212121] dark:border-[#333333] dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:ring-neutral-800/60 font-sans"
+                    />
                   </div>
-                  {projects && projects.length > 0 && (
-                    <button
-                      onClick={() => setChoosing(true)}
-                      className="px-6 py-2.5 rounded-full text-xs font-medium bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto font-sans"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                      </svg>
-                      <span>+ New Project</span>
-                    </button>
-                  )}
                 </div>
 
-                {/* Quick-Launch Workspace Cards ("Snow on Sand") */}
+                {/* Tactile Apple-Style Template Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   {FORMAT_TILES.map((tile) => {
                     const isBootingThis = creatingFormatId === tile.id;
                     const isOtherBooting = creating && !isBootingThis;
                     return (
-                      <div
+                      <button
                         key={tile.id}
+                        type="button"
                         onClick={() => !creating && handleCreate(tile.id)}
-                        className={`bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-6 shadow-[var(--shadow-card)] transition-all duration-200 flex flex-col justify-between text-left font-sans min-h-[220px] ${
+                        disabled={isOtherBooting}
+                        className={`rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 cursor-pointer p-6 dark:bg-[#212121] dark:border-[#333333] dark:hover:border-neutral-700 dark:hover:shadow-neutral-950/50 flex flex-col justify-start text-left font-sans group ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
-                            ? "border-[var(--text-primary)] shadow-md cursor-wait"
-                            : "hover:border-[var(--text-primary)]/40 hover:scale-[1.01] cursor-pointer group"
+                            ? "ring-2 ring-gray-900 dark:ring-white cursor-wait"
+                            : ""
                         }`}
                       >
-                        <div>
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="w-9 h-9 rounded-xl bg-[var(--bg-canvas)] text-[var(--text-primary)] flex items-center justify-center transition-colors group-hover:bg-[var(--bg-button-primary)] group-hover:text-[var(--text-button)] border border-[var(--border-subtle)]">
-                              {isBootingThis ? (
-                                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <FormatIcon id={tile.id} className="w-4 h-4" />
-                              )}
-                            </div>
-                            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--bg-canvas)]">
-                              {tile.id}
-                            </span>
-                          </div>
-                          <h4 className="font-bold text-base text-[var(--text-primary)] leading-tight mb-1 font-sans">
-                            {tile.label}
-                          </h4>
-                          <p className="text-xs text-[var(--text-secondary)] font-normal line-clamp-2 leading-relaxed font-sans mb-2">
-                            {tile.tag}
-                          </p>
-                          <span className="text-[11px] font-semibold text-[var(--accent-success)] inline-block">
-                            {isBootingThis ? "Initializing workspace…" : "Ready to boot"}
-                          </span>
-                        </div>
-                        <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-neutral-800 text-gray-900 dark:text-white flex items-center justify-center mb-4 transition-colors group-hover:bg-gray-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-black">
                           {isBootingThis ? (
-                            <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold">
-                              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              <span>Booting…</span>
-                            </div>
+                            <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                           ) : (
-                            <>
-                              <span>Start {tile.label.split(" ")[0]}</span>
-                              <span className="transition-transform group-hover:translate-x-1">→</span>
-                            </>
+                            <FormatIcon id={tile.id} className="w-5 h-5" />
                           )}
                         </div>
-                      </div>
+                        <h3 className="font-bold text-base text-gray-900 dark:text-white leading-tight mb-1.5 font-sans">
+                          {tile.label}
+                        </h3>
+                        <p className="text-xs text-gray-500 dark:text-neutral-400 font-normal leading-relaxed font-sans">
+                          {tile.description}
+                        </p>
+                      </button>
                     );
                   })}
                 </div>
