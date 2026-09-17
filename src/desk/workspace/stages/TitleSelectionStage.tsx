@@ -117,10 +117,15 @@ export default function TitleSelectionStage({
       setResults(data);
 
       // 4. Immediate checkpoint persistence of generated titles
-      saveIntakeAnswers(projectId, {
-        generated_titles: JSON.stringify(data),
-        current_stage: "title_selection",
-      }).catch(() => {});
+      try {
+        const updated = await saveIntakeAnswers(projectId, {
+          generated_titles: JSON.stringify(data),
+          current_stage: "title_selection",
+        });
+        onSaved?.(updated);
+      } catch (saveErr) {
+        console.warn("[TitleSelectionStage] Failed to persist answers:", saveErr);
+      }
 
       setLogs((prev) => [
         ...prev,
@@ -162,7 +167,7 @@ export default function TitleSelectionStage({
     saveIntakeAnswers(projectId, {
       working_title: full,
       current_stage: "title_selection",
-    }).catch(() => {});
+    }).then((updated) => onSaved?.(updated)).catch(() => {});
   };
 
   const handleLockTitleAndProceed = async () => {

@@ -26,7 +26,7 @@ export default function GapIdentificationStage({
   onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
-  const { project } = useResearchWorkspace();
+  const { project, setProject } = useResearchWorkspace();
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -128,10 +128,15 @@ export default function GapIdentificationStage({
       setGaps(data);
 
       // 4. Immediate discrete checkpoint persistence
-      saveIntakeAnswers(projectId, {
-        identified_gaps: JSON.stringify(data),
-        current_stage: "gap_identification",
-      }).catch(() => {});
+      try {
+        const updated = await saveIntakeAnswers(projectId, {
+          identified_gaps: JSON.stringify(data),
+          current_stage: "gap_identification",
+        });
+        setProject(updated);
+      } catch (saveErr) {
+        console.warn("[GapIdentificationStage] Failed to persist answers:", saveErr);
+      }
 
       setLogs((prev) => [
         ...prev,
@@ -190,7 +195,7 @@ export default function GapIdentificationStage({
           </div>
         </div>
 
-        {gaps && gaps.length > 0 && !isProcessing && (
+        {gaps !== null && !isProcessing && (
           <button
             type="button"
             onClick={() => onAdvance?.("gap_selection")}

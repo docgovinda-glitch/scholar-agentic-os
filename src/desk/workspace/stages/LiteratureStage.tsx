@@ -31,7 +31,7 @@ export default function LiteratureStage({
   onAdvance?: (stage: string) => void;
 }) {
   const def = STAGE_MAP.get(stage);
-  const { project } = useResearchWorkspace();
+  const { project, setProject } = useResearchWorkspace();
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -209,11 +209,16 @@ export default function LiteratureStage({
       setResults(updatedList);
 
       // 4. Immediate discrete checkpoint persistence to authoritative project answers
-      saveIntakeAnswers(projectId, {
-        discovered_literature: JSON.stringify(updatedList),
-        removed_literature: JSON.stringify({ removedDois, removedIds, removedTitles }),
-        current_stage: "literature",
-      }).catch(() => {});
+      try {
+        const updatedProject = await saveIntakeAnswers(projectId, {
+          discovered_literature: JSON.stringify(updatedList),
+          removed_literature: JSON.stringify({ removedDois, removedIds, removedTitles }),
+          current_stage: "literature",
+        });
+        setProject(updatedProject);
+      } catch (saveErr) {
+        console.warn("[LiteratureStage] Failed to persist answers:", saveErr);
+      }
 
       const totalCount = updatedList.length;
       setSourcesDiscovered(totalCount);
@@ -348,7 +353,7 @@ export default function LiteratureStage({
 
         {/* Global Action Header Buttons */}
         <div className="flex items-center gap-3">
-          {results && results.length > 0 && !isProcessing && (
+          {results !== null && !isProcessing && (
             <>
               <button
                 type="button"

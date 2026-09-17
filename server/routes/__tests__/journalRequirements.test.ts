@@ -27,6 +27,7 @@ beforeEach(() => {
 });
 
 async function createJournalArticle(): Promise<string> {
+  __setEnabledOutputTypesForTests(["OT-10"]);
   const res = await request(app).post("/api/projects").send({ outputTypeId: "OT-10" });
   expect(res.status).toBe(201);
   return res.body.projectId;
