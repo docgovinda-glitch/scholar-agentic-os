@@ -111,6 +111,7 @@ Scholar Core implements a ChatGPT/Claude-style dual-pane layout for deep academi
 - **Responsive Mobile Drawer**: Slide-over navigation with an interactive backdrop overlay (`fixed inset-0 z-40 bg-black/40`) for natural tap-to-dismiss.
 - **Custom Agentic Scrollbars**: `.scholar-scrollbar` webkit styling with 6px track and subtle thumb mapped to `var(--theme-fg)/20`.
 - **Pinterest-Inspired Destructive Interactions**: Standalone `#E60023` red text `Delete` buttons on project cards and confirmation modals with clear typography and zero distracting glyphs.
+- **Declare It Once Account Model**: Streamlined 3-tab settings modal (Personal Info, Security, Subscription) with multi-account linking, profile switching, and sign-out consolidated exclusively into the profile menu popover. See [`docs/ACCOUNT_SETTINGS_AND_NAVIGATION.md`](docs/ACCOUNT_SETTINGS_AND_NAVIGATION.md).
 
 ---
 
