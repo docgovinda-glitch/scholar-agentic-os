@@ -16,13 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enter-to-Submit**: Form submission integration allowing immediate profile saves on <kbd>Enter</kbd> keypress.
 
 ### Changed
-- **"Declare It Once" Account Deduplication**:
-  - Consolidated all multi-account management (adding, switching, and signing out) exclusively into `UserAccountMenu` popover.
-  - Eliminated redundant "Users & Accounts" tab from `AccountSettingsScreen`, streamlining modal navigation to 3 distinct tabs (Personal Info, Security, Subscription).
-- **Service Worker Cache**: Bumped service worker cache to `scholar-os-v3` to enforce instant cache invalidation and clean client activation.
+- **"Declare It Once" Settings & Account Deduplication**:
+  - Removed all redundant "Settings" buttons from sidebar bottom actions and workspace navigation.
+  - Consolidated Settings access strictly and exclusively through the User Profile popover menu (`UserAccountMenu`).
+  - Streamlined `AccountSettingsScreen` to 3 core tabs (Personal Info, Security, Subscription), removing redundant multi-account switching logic from the modal.
+- **Dual-Pane Layout Implementation**:
+  - Restructured `ProjectListScreen.tsx` into a full-viewport flex container (`h-screen w-full flex overflow-hidden`).
+  - Fixed left sidebar (`<aside>`) housing branding, full-width "+ New Project" button, workspace navigation, Day/Night toggle, and anchored user profile menu at the bottom.
+  - Centered right-hand scrollable canvas (`<main>`) wrapping project categories in a focused `max-w-4xl` layout.
+- **Force Cache Busting & Service Worker Upgrade**:
+  - Upgraded service worker cache in `sw.js` to `scholar-os-v3` with immediate `self.skipWaiting()` and `self.clients.claim()` invocation to drop stale PWA caches on deploy.
 - **WCAG Contrast Compliance**: Verified all 82 contrast pairings across both light and dark themes using `scripts/verify-contrast.mjs`.
 
 ### Fixed
 - Resolved modal viewport overflow clipping on 13-inch and 14-inch laptop screens.
 - Eliminated redundant settings navigation buttons from sidebar bottom row.
 - Sanitized international phone inputs with automated dial-code deduplication.
+
