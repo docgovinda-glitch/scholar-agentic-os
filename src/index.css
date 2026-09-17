@@ -385,6 +385,11 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Smooth Day/Night Theme Transition */
+body, main, aside {
+  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out, border-color 0.3s ease-in-out;
+}
+
 /* Headings: the sans face at a heavier weight and tighter tracking.
    No `!important` and no colour declaration here — the previous revision's
    `color: #1A365D !important` on h2/h3/h4 silently overrode every heading
