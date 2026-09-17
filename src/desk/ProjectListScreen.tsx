@@ -506,25 +506,7 @@ export default function ProjectListScreen({
               {!isSidebarOpen && <span>Open Sidebar</span>}
             </button>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[var(--text-primary)] tracking-tight font-sans">Scholar Workspace</span>
-              <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--bg-card)] font-sans">
-                Command Center
-              </span>
-            </div>
           </div>
-
-          {/* Mobile Quick Action */}
-          {projects && projects.length > 0 && !choosing && (
-            <button
-              type="button"
-              onClick={() => setChoosing(true)}
-              className="md:hidden px-4 py-1.5 rounded-full text-xs font-medium bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 shadow-sm transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer font-sans"
-            >
-              <span className="font-bold">+</span>
-              <span>New</span>
-            </button>
-          )}
         </div>        {/* Centered Reading Column (mimics focused AI chat window) */}
         <div className="max-w-4xl mx-auto px-6 py-8 w-full flex-1">
           {/* Onboarding welcome banner */}
@@ -578,24 +560,22 @@ export default function ProjectListScreen({
               {/* Workspace Header & AI Prompt Bar */}
               <section className="mb-12">
                 <div className="mb-8">
-                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans">
+                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans mb-4">
                     What would you like to write today?
                   </h1>
-                  <div className="mt-6 w-full max-w-3xl">
-                    <input
-                      type="text"
-                      value={aiPrompt}
-                      onChange={(e) => setAiPrompt(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && aiPrompt.trim() && !creating) {
-                          e.preventDefault();
-                          handleCreate("OT-10");
-                        }
-                      }}
-                      placeholder="Start a literature review, brainstorm an outline, or drop a syllabus here..."
-                      className="w-full max-w-3xl px-6 py-4 rounded-full bg-white border border-gray-200 shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-gray-100 text-gray-700 text-lg dark:bg-[#212121] dark:border-[#333333] dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:ring-neutral-800/60 font-sans"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && aiPrompt.trim() && !creating) {
+                        e.preventDefault();
+                        handleCreate("OT-10");
+                      }
+                    }}
+                    placeholder="Start a literature review, brainstorm an outline, or drop a syllabus here..."
+                    className="w-full max-w-3xl px-6 py-4 mb-8 rounded-full bg-white border border-gray-200 shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-gray-100 text-gray-700 text-lg"
+                  />
                 </div>
 
                 {/* Tactile Apple-Style Template Cards Grid */}
@@ -609,25 +589,25 @@ export default function ProjectListScreen({
                         type="button"
                         onClick={() => !creating && handleCreate(tile.id)}
                         disabled={isOtherBooting}
-                        className={`rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 cursor-pointer p-6 dark:bg-[#212121] dark:border-[#333333] dark:hover:border-neutral-700 dark:hover:shadow-neutral-950/50 flex flex-col justify-start text-left font-sans group ${
+                        className={`rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 cursor-pointer p-6 flex flex-col gap-2 text-left ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
-                            ? "ring-2 ring-gray-900 dark:ring-white cursor-wait"
+                            ? "ring-2 ring-gray-900 cursor-wait"
                             : ""
                         }`}
                       >
-                        <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-neutral-800 text-gray-900 dark:text-white flex items-center justify-center mb-4 transition-colors group-hover:bg-gray-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-black">
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-900 flex items-center justify-center mb-2">
                           {isBootingThis ? (
                             <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                           ) : (
                             <FormatIcon id={tile.id} className="w-5 h-5" />
                           )}
                         </div>
-                        <h3 className="font-bold text-base text-gray-900 dark:text-white leading-tight mb-1.5 font-sans">
+                        <h3 className="font-bold text-base text-gray-900 leading-tight">
                           {tile.label}
                         </h3>
-                        <p className="text-xs text-gray-500 dark:text-neutral-400 font-normal leading-relaxed font-sans">
+                        <p className="text-xs text-gray-500 font-normal leading-relaxed">
                           {tile.description}
                         </p>
                       </button>
@@ -1070,9 +1050,6 @@ function ChooseOutputType({
         <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans mb-1.5">
           Select Output Format
         </h2>
-        <p className="text-sm text-[var(--text-secondary)] font-normal leading-relaxed font-sans">
-          Select the dedicated academic workspace to initialize for your research project.
-        </p>
       </div>
 
       {!types ? (
@@ -1103,7 +1080,7 @@ function ChooseOutputType({
             ))}
           </select>
 
-          {/* Interactive Format Tiles Grid ("Snow on Sand") */}
+          {/* Interactive Format Tiles Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FORMAT_TILES.map((tile) => {
               const isSelected = selected === tile.id;
@@ -1113,47 +1090,21 @@ function ChooseOutputType({
                   key={tile.id}
                   onClick={() => setSelected(tile.id)}
                   onDoubleClick={() => onPick(tile.id)}
-                  className={`bg-[var(--bg-card)] border rounded-2xl p-6 shadow-[var(--shadow-card)] transition-all duration-200 cursor-pointer flex flex-col justify-between group text-left font-sans min-h-[220px] ${
+                  className={`rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 cursor-pointer p-6 flex flex-col gap-2 text-left ${
                     isSelected
-                      ? "border-2 border-[var(--text-primary)] ring-2 ring-[var(--text-primary)]/10"
-                      : "border-[var(--border-subtle)] hover:border-[var(--text-primary)]/40 hover:scale-[1.01]"
+                      ? "ring-2 ring-gray-900 border-gray-900"
+                      : ""
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="w-9 h-9 rounded-xl bg-[var(--bg-canvas)] text-[var(--text-primary)] flex items-center justify-center transition-colors group-hover:bg-[var(--bg-button-primary)] group-hover:text-[var(--text-button)] border border-[var(--border-subtle)]">
-                        <FormatIcon id={tile.id} className="w-4 h-4" />
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--bg-canvas)]">
-                          {tile.id}
-                        </span>
-                        {isSelected && (
-                          <span className="text-xs font-semibold text-[var(--text-primary)] px-2 py-0.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-sans">
-                            Selected
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <h3 className="font-bold text-base text-[var(--text-primary)] font-sans mb-1">
-                      {tile.label}
-                    </h3>
-                    <span className="inline-block text-xs font-medium text-[var(--text-secondary)] mb-2 font-sans">
-                      {tile.tag}
-                    </span>
-                    <p className="text-xs text-[var(--text-secondary)] font-normal leading-relaxed mb-3 font-sans">
-                      {tile.description}
-                    </p>
-                    <span className="text-[11px] font-semibold text-[var(--accent-success)] inline-block mb-3">
-                      Ready to boot
-                    </span>
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-900 flex items-center justify-center mb-2">
+                    <FormatIcon id={tile.id} className="w-5 h-5" />
                   </div>
-
-                  <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--text-secondary)] font-medium font-sans">
-                    <span>Target: {tile.budget}</span>
-                    <span className="text-[var(--accent-success)] font-semibold">Available</span>
-                  </div>
+                  <h3 className="font-bold text-base text-gray-900 leading-tight">
+                    {tile.label}
+                  </h3>
+                  <p className="text-xs text-gray-500 font-normal leading-relaxed">
+                    {tile.description}
+                  </p>
                 </div>
               );
             })}
