@@ -105,8 +105,8 @@ describe("UserAccountMenu — Task 2: Minimal Dropdown Menu", () => {
     const trigger = screen.getByRole("button", { name: /Ada Lovelace/i });
     fireEvent.click(trigger);
 
-    // Minimal options present
-    expect(screen.getByRole("button", { name: /Settings/i })).toBeInTheDocument();
+    // Minimal options present (Settings relocated to sidebar; Help & Support and Sign Out remain)
+    expect(screen.queryByRole("button", { name: /Settings/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Help & Support/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Sign Out/i })).toBeInTheDocument();
 
@@ -114,10 +114,6 @@ describe("UserAccountMenu — Task 2: Minimal Dropdown Menu", () => {
     expect(screen.queryByText(/See plans and pricing/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/subscription/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/pricing/i)).not.toBeInTheDocument();
-
-    // Clicking Settings closes and invokes handler
-    fireEvent.click(screen.getByRole("button", { name: /Settings/i }));
-    expect(onOpenAccountSettings).toHaveBeenCalled();
   });
 
   it("consolidates multi-account functionality (+ Add another account, switch, and sign out)", async () => {

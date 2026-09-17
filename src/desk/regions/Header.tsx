@@ -102,14 +102,18 @@ export default function Header({
             AI Access
           </button>
         )}
-        {onOpenAccountSettings && (
-          <UserAccountMenu
-            userEmail={userEmail ?? null}
-            onOpenAccountSettings={onOpenAccountSettings}
-            onOpenVault={onOpenVault}
-            onOpenAiAccess={onOpenAiAccess}
-            variant="bar"
-          />
+        {onOpenAccountSettings ? (
+          <button
+            type="button"
+            onClick={onOpenAccountSettings}
+            className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+          >
+            Account Settings
+          </button>
+        ) : (
+          <span title="Not yet built" className="cursor-not-allowed">
+            Account Settings
+          </span>
         )}
       </div>
     </header>

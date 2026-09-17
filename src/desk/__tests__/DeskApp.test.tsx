@@ -343,10 +343,7 @@ describe("Desk — account settings", () => {
     mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
     renderDeskApp();
 
-    // Open user profile popover to access Settings
-    const profileBtn = await screen.findByRole("button", { name: /scholar@example\.com/i });
-    fireEvent.click(profileBtn);
-
+    // Click standalone Settings button in sidebar
     const settingsBtn = await screen.findByRole("button", { name: /^Settings$/i });
     fireEvent.click(settingsBtn);
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
@@ -366,12 +363,8 @@ describe("Desk — account settings", () => {
     ]);
     renderDeskApp();
 
-    // Open user profile popover in Header to access Settings
-    const profileBtn = await screen.findByRole("button", { name: /scholar@example\.com/i });
-    fireEvent.click(profileBtn);
-
-    const settingsBtn = await screen.findByRole("button", { name: /^Settings$/i });
-    fireEvent.click(settingsBtn);
+    // Click Account Settings in Header
+    fireEvent.click(await screen.findByRole("button", { name: /Account Settings|Settings/i }));
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));

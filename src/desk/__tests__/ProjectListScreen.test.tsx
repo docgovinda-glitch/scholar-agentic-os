@@ -239,10 +239,8 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     fireEvent.click(aiAccessBtn);
     expect(onOpenAiAccess).toHaveBeenCalled();
 
-    // Bottom Section: Settings accessible via User Profile menu popover
-    const profileBtn = within(aside!).getByRole("button", { name: /scholar/i });
-    fireEvent.click(profileBtn);
-    const settingsBtn = await screen.findByRole("button", { name: /^Settings$/i });
+    // Bottom Section: Settings accessible as standalone item in sidebar above user profile block
+    const settingsBtn = within(aside!).getByRole("button", { name: /^Settings$/i });
     expect(settingsBtn).toBeInTheDocument();
     fireEvent.click(settingsBtn);
     expect(onOpenAccountSettings).toHaveBeenCalled();

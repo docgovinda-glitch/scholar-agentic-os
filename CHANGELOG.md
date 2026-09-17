@@ -16,13 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enter-to-Submit**: Form submission integration allowing immediate profile saves on <kbd>Enter</kbd> keypress.
 
 ### Changed
-- **"Declare It Once" Settings & Account Deduplication**:
-  - Removed all standalone "Settings" and "Account Settings" links and buttons from navigation bars (including `Header.tsx` and `ResearchWorkspace.tsx`).
-  - Integrated `UserAccountMenu` directly into the project top navigation (`Header.tsx`), ensuring "Account Settings" is strictly and exclusively triggered via the User Profile Popover across the entire platform.
-  - Streamlined `AccountSettingsScreen` to 3 core tabs (Personal Info, Security, Subscription), removing redundant multi-account switching logic from the modal.
+- **Settings Navigation Architecture**:
+  - Relocated "Settings" back as a standalone navigation item in the lower section of the sidebar (`ProjectListScreen.tsx`), positioned directly above the user profile block with standard gear icon and text.
+  - Removed "Settings" from the User Profile Popover (`UserAccountMenu.tsx`), retaining "Help & Support" and multi-account switching cleanly inside the popover.
+  - Reverted bulky wide "Day mode [Light]" toggle to a minimal, clean icon-only button (sun/moon icon) placed unobtrusively alongside Settings in the sidebar action row.
 - **Dual-Pane Layout Implementation**:
   - Restructured `ProjectListScreen.tsx` into a full-viewport flex container (`h-screen w-full flex overflow-hidden`).
-  - Fixed left sidebar (`<aside>`) housing branding, full-width "+ New Project" button, workspace navigation, Day/Night toggle, and anchored user profile menu at the bottom.
+  - Fixed left sidebar (`<aside>`) housing branding, full-width "+ New Project" button, workspace navigation, action row with Settings and minimal Day/Night toggle, and anchored user profile menu at the bottom.
   - Centered right-hand scrollable canvas (`<main>`) wrapping project categories in a focused `max-w-4xl` layout.
 - **Force Cache Busting & Service Worker Upgrade**:
   - Upgraded service worker cache in `sw.js` to `scholar-os-v3` with immediate `self.skipWaiting()` and `self.clients.claim()` invocation to drop stale PWA caches on deploy.
