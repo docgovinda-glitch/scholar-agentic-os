@@ -1,11 +1,174 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createProject, listOutputTypes, listProjects, deleteProject } from "./api";
+import { createProject, listOutputTypes, listProjects, deleteProject, saveIntakeAnswers } from "./api";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
 import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import UserAccountMenu from "./components/UserAccountMenu";
+
+/** Curated 4 essential academic formats */
+export const FORMAT_TILES = [
+  {
+    id: "OT-01",
+    label: "Assignment",
+    tag: "Coursework & Essays",
+    description: "Dedicated 8–phase thinking, evidence board & grounded drafting.",
+    budget: "800 – 4,000 words",
+  },
+  {
+    id: "OT-10",
+    label: "Journal Article",
+    tag: "Peer-Reviewed Papers",
+    description: "25–stage empirical research pipeline with multi-agent peer review.",
+    budget: "4,000 – 10,000 words",
+  },
+  {
+    id: "OT-19",
+    label: "Research Proposal",
+    tag: "Grants & Funding",
+    description: "Competitive grant applications with strict agency rubric alignment.",
+    budget: "3,000 – 15,000 words",
+  },
+  {
+    id: "OT-22",
+    label: "Presentation",
+    tag: "Slides & Keynotes",
+    description: "Conference slide decks, oral defense scripts & visual narratives.",
+    budget: "10 – 35 slides",
+  },
+];
+
+export interface ChatBlueprint {
+  formatId: string;
+  formatLabel: string;
+  proposedTitle: string;
+  fieldDomain: string;
+  researchGap: string;
+  phases: { name: string; description: string }[];
+  recommendedCitations: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: "user" | "assistant";
+  text: string;
+  timestamp: string;
+  attachedFile?: string | null;
+  blueprint?: ChatBlueprint;
+}
+
+export const STARTER_PROMPT_CHIPS = [
+  {
+    icon: "🔬",
+    label: "CRISPR Base Editing Review",
+    query: "Synthesize recent clinical advances in CRISPR base editing and off-target translocation mitigation.",
+    formatId: "OT-10",
+  },
+  {
+    icon: "📝",
+    label: "LLM Reasoning Benchmark",
+    query: "Structure an empirical study benchmarking chain-of-thought latency and reasoning fidelity in dense transformer architectures.",
+    formatId: "OT-10",
+  },
+  {
+    icon: "💡",
+    label: "Clean Energy Microgrid Proposal",
+    query: "Draft a research grant proposal for decentralized autonomous control in islanded renewable microgrids.",
+    formatId: "OT-19",
+  },
+  {
+    icon: "📊",
+    label: "Clinical Trial Slide Deck",
+    query: "Create an academic presentation deck summarizing Phase II oncology biomarker endpoints and patient survival rates.",
+    formatId: "OT-22",
+  },
+];
+
+export function generateScholarResponse(
+  prompt: string,
+  formatOverride?: string | null,
+  attachedFile?: string | null
+): { greeting: string; blueprint: ChatBlueprint } {
+  const p = prompt.toLowerCase();
+
+  let formatId = "OT-10";
+  let formatLabel = "Journal Article";
+
+  if (formatOverride) {
+    formatId = formatOverride;
+    const tile = FORMAT_TILES.find((t) => t.id === formatOverride);
+    if (tile) formatLabel = tile.label;
+  } else if (p.includes("proposal") || p.includes("grant") || p.includes("nsf") || p.includes("nih") || p.includes("funding")) {
+    formatId = "OT-19";
+    formatLabel = "Research Proposal";
+  } else if (p.includes("presentation") || p.includes("slides") || p.includes("deck") || p.includes("talk") || p.includes("keynote")) {
+    formatId = "OT-22";
+    formatLabel = "Presentation";
+  } else if (p.includes("assignment") || p.includes("essay") || p.includes("homework") || p.includes("course") || p.includes("syllabus")) {
+    formatId = "OT-01";
+    formatLabel = "Assignment";
+  }
+
+  let fieldDomain = "Interdisciplinary Scholarly Research";
+  let proposedTitle = "Systematic Investigation and Empirical Evidence Synthesis";
+  let researchGap = "Absence of consolidated multi-source benchmarks and verified provenance in current literature.";
+
+  if (p.includes("crispr") || p.includes("gene") || p.includes("base edit") || p.includes("dna") || p.includes("cas9")) {
+    fieldDomain = "Biotechnology & Genome Engineering";
+    proposedTitle = "High-Fidelity Base Editing and Off-Target Reduction in Mammalian Models: A Systematic Review";
+    researchGap = "Quantitation discrepancies in off-target translocations and long-term epigenetic durability across non-viral vs AAV delivery modalities.";
+  } else if (p.includes("transformer") || p.includes("neural") || p.includes("llm") || p.includes("latency") || p.includes("reasoning") || p.includes("ai")) {
+    fieldDomain = "Machine Learning & Computational Linguistics";
+    proposedTitle = "Empirical Latency and Memory Optimization in Deep Transformer Architectures: A Comparative Benchmark";
+    researchGap = "Unquantified performance trade-offs between speculative decoding throughput and reasoning fidelity under memory-constrained GPU environments.";
+  } else if (p.includes("solar") || p.includes("energy") || p.includes("microgrid") || p.includes("climate") || p.includes("renewable")) {
+    fieldDomain = "Sustainable Energy Systems & Electrical Engineering";
+    proposedTitle = "Resilience and Decentralized Dispatch in Islanded Renewable Microgrids: A Multi-Agent System Architecture";
+    researchGap = "Dynamic stability degradation and transient frequency oscillations during high intermittent renewable penetration.";
+  } else if (p.includes("clinical") || p.includes("trial") || p.includes("oncology") || p.includes("cancer") || p.includes("pharma")) {
+    fieldDomain = "Clinical Oncology & Translational Medicine";
+    proposedTitle = "Comparative Efficacy and Surrogate Biomarker Endpoints in Phase II Clinical Trials: Evidence-Based Appraisal";
+    researchGap = "Heterogeneity in primary endpoint definitions and correlation to overall survival outcomes across accelerated regulatory pathways.";
+  } else {
+    const cleaned = prompt.replace(/[^\w\s]/gi, "").trim();
+    const words = cleaned.split(/\s+/).slice(0, 7).join(" ");
+    if (words.length > 5) {
+      proposedTitle = `Critical Analysis of ${words.charAt(0).toUpperCase() + words.slice(1)}: Methodological Synthesis & Empirical Scoping`;
+      researchGap = `Fragmented cross-institutional literature lacking unified methodological protocols and structured provenance.`;
+    }
+  }
+
+  const phases = [
+    {
+      name: "Phase I: Problem Formulation & Provenance Grounding",
+      description: "Anchor key hypotheses, query peer-reviewed repositories (PubMed, arXiv, IEEE), and ingest verified citations into Knowledge Vault.",
+    },
+    {
+      name: "Phase II: Evidence Extraction & Comparative Synthesis",
+      description: "Extract quantitative metrics, construct comparative literature matrices, and synthesize opposing scientific viewpoints.",
+    },
+    {
+      name: "Phase III: Scholarly Drafting & Editorial Board Audit",
+      description: "Generate publication-grade prose audited by Citation Auditor, Methodologist, and Voice & Tone Architect against target journal standards.",
+    },
+  ];
+
+  const greeting = `I've analyzed your research topic${attachedFile ? ` and reference file ("${attachedFile}")` : ""}. Here is an optimal academic execution plan configured for our multi-agent editorial board:`;
+
+  return {
+    greeting,
+    blueprint: {
+      formatId,
+      formatLabel,
+      proposedTitle,
+      fieldDomain,
+      researchGap,
+      phases,
+      recommendedCitations: formatId === "OT-10" ? 35 : formatId === "OT-19" ? 25 : formatId === "OT-22" ? 15 : 20,
+    },
+  };
+}
 
 /**
  * Desk's entry surface: the signed-in user's own projects — transformed into
@@ -185,6 +348,20 @@ export default function ProjectListScreen({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
 
+  // Conversational Chatbot State
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isChatActive, setIsChatActive] = useState(false);
+  const [isChatThinking, setIsChatThinking] = useState(false);
+  const [vaultGroundingActive, setVaultGroundingActive] = useState(true);
+  const [copiedBlueprintId, setCopiedBlueprintId] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setAiPrompt(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+  };
+
   async function handleCreate(outputTypeId: string) {
     if (creating) return;
     setCreating(true);
@@ -197,6 +374,109 @@ export default function ProjectListScreen({
       setError((e as Error).message);
       setCreating(false);
       setCreatingFormatId(null);
+    }
+  }
+
+  async function handleCreateWithBlueprint(formatId: string, blueprint: ChatBlueprint, userPrompt: string) {
+    if (creating) return;
+    setCreating(true);
+    setCreatingFormatId(formatId);
+    setError(null);
+    try {
+      const project = await createProject(formatId);
+      try {
+        await saveIntakeAnswers(project.projectId, {
+          title: blueprint.proposedTitle,
+          topic: blueprint.proposedTitle,
+          problem_statement: blueprint.researchGap,
+          initial_prompt: userPrompt,
+        });
+      } catch (err) {
+        console.warn("Intake prefill non-blocking:", err);
+      }
+      onOpen(project.projectId);
+    } catch (e) {
+      setError((e as Error).message);
+      setCreating(false);
+      setCreatingFormatId(null);
+    }
+  }
+
+  function handleSendMessage(textToSend?: string) {
+    const query = (textToSend !== undefined ? textToSend : aiPrompt).trim();
+    if (!query && !selectedPromptFormat) return;
+
+    const currentFile = attachedFileName;
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
+      sender: "user",
+      text: query || `Initialize workspace for ${selectedPromptFormat}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      attachedFile: currentFile,
+    };
+
+    setChatMessages((prev) => [...prev, userMsg]);
+    setIsChatActive(true);
+    setIsChatThinking(true);
+    setAiPrompt("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+
+    setTimeout(() => {
+      const isFollowUp = chatMessages.length > 0;
+      let assistantMsg: ChatMessage;
+
+      if (!isFollowUp) {
+        const generated = generateScholarResponse(query, selectedPromptFormat, currentFile);
+        assistantMsg = {
+          id: `assistant-${Date.now()}`,
+          sender: "assistant",
+          text: generated.greeting,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          blueprint: generated.blueprint,
+        };
+      } else {
+        const lastBlueprint = [...chatMessages].reverse().find((m) => m.blueprint)?.blueprint;
+        const targetFormat = selectedPromptFormat || lastBlueprint?.formatId || "OT-10";
+        const generated = generateScholarResponse(query, targetFormat, currentFile);
+
+        assistantMsg = {
+          id: `assistant-${Date.now()}`,
+          sender: "assistant",
+          text: `Refined research focus based on your direction: "${query}". Updated the methodological blueprint and evidence scope:`,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          blueprint: {
+            ...generated.blueprint,
+            formatId: targetFormat,
+            formatLabel: FORMAT_TILES.find((t) => t.id === targetFormat)?.label || "Journal Article",
+            researchGap: `Focus area: ${query}. Addressing: ${generated.blueprint.researchGap}`,
+          },
+        };
+      }
+
+      setChatMessages((prev) => [...prev, assistantMsg]);
+      setIsChatThinking(false);
+    }, 450);
+  }
+
+  function copyBlueprint(blueprint: ChatBlueprint, msgId: string) {
+    const text = `SCHOLAR CORE RESEARCH BLUEPRINT
+Format: ${blueprint.formatLabel} (${blueprint.formatId})
+Title: ${blueprint.proposedTitle}
+Domain: ${blueprint.fieldDomain}
+Research Gap: ${blueprint.researchGap}
+
+EXECUTION ROADMAP:
+${blueprint.phases.map((p, i) => `${i + 1}. ${p.name}\n   ${p.description}`).join("\n")}
+
+Recommended Scope: ~${blueprint.recommendedCitations} peer-reviewed references`;
+
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopiedBlueprintId(msgId);
+        setTimeout(() => setCopiedBlueprintId(null), 2000);
+      }).catch(() => {});
     }
   }
 
@@ -569,118 +849,437 @@ export default function ProjectListScreen({
             />
           ) : (
             <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-8">
-              {/* Workspace Header & Interactive AI Prompt Box */}
+              {/* Flagship Chatbot & Prompt Container */}
               <div className="w-full flex flex-col items-start text-left">
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-50 text-left mb-2.5 font-sans">
-                  What would you like to write today?
-                </h1>
-                <div className="w-full rounded-2xl bg-white dark:bg-[#171717] border border-slate-200 dark:border-neutral-800 shadow-xs transition-all duration-200 focus-within:ring-4 focus-within:ring-slate-100 dark:focus-within:ring-neutral-800/60 focus-within:border-slate-300 dark:focus-within:border-neutral-700 p-3 sm:p-3.5 flex flex-col gap-3 font-sans">
-                  <input
-                    type="text"
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && (aiPrompt.trim() || selectedPromptFormat) && !creating) {
-                        e.preventDefault();
-                        handleCreate(selectedPromptFormat || "OT-10");
-                      }
-                    }}
-                    placeholder="Start a literature review, brainstorm an outline, or drop a syllabus here..."
-                    className="w-full bg-transparent px-2 py-1 text-base font-medium text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none"
-                  />
-
-                  <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100 dark:border-neutral-800/80">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        className="hidden"
-                        accept=".pdf,.txt,.docx,.md"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setAttachedFileName(file.name);
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        title="Attach reference PDF or outline"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                        </svg>
-                        {attachedFileName ? (
-                          <span className="text-[11px] font-medium text-slate-700 dark:text-slate-200 max-w-[120px] truncate bg-slate-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            {attachedFileName}
-                            <span
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                setAttachedFileName(null);
-                                if (fileInputRef.current) fileInputRef.current.value = "";
-                              }}
-                              className="text-slate-400 hover:text-red-500 font-bold ml-1 cursor-pointer"
-                            >
-                              ×
+                {/* Active Chatbot Window */}
+                {isChatActive ? (
+                  <div className="w-full rounded-2xl sm:rounded-3xl bg-white dark:bg-[#18181A] border border-slate-200 dark:border-neutral-800 shadow-md p-4 sm:p-6 flex flex-col gap-4 font-sans">
+                    {/* Chat Header */}
+                    <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-neutral-800">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-amber-500 flex items-center justify-center text-white shadow-xs">
+                          <span className="text-base">✨</span>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-base font-bold text-slate-900 dark:text-white">Scholar Core Copilot</h2>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Multi-Agent Board Active
                             </span>
-                          </span>
-                        ) : (
-                          <span className="hidden sm:inline text-xs text-slate-500 dark:text-neutral-400">Attach</span>
-                        )}
-                      </button>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-neutral-400">
+                            Orchestrating literature synthesis, methodology validation & publication blueprints
+                          </p>
+                        </div>
+                      </div>
 
-                      <div className="relative">
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => setQuickWorkspaceOpen(!quickWorkspaceOpen)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200/80 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
+                          onClick={() => {
+                            setChatMessages([]);
+                            setIsChatActive(false);
+                            setAiPrompt("");
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
                         >
-                          <span className="text-slate-400 font-bold">+</span>
-                          <span>{selectedPromptFormat ? FORMAT_TILES.find((t) => t.id === selectedPromptFormat)?.label : "Select Workspace"}</span>
-                          <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
+                          <span className="font-bold">+</span>
+                          <span>New Chat</span>
                         </button>
 
-                        {quickWorkspaceOpen && (
-                          <div className="absolute left-0 top-full mt-1.5 z-30 w-52 rounded-xl bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-neutral-700 shadow-lg py-1">
-                            {FORMAT_TILES.map((tile) => (
-                              <button
-                                key={tile.id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedPromptFormat(tile.id);
-                                  setQuickWorkspaceOpen(false);
-                                }}
-                                className="w-full px-3 py-2 text-xs text-left font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-center justify-between cursor-pointer"
-                              >
-                                <span>{tile.label}</span>
-                                {selectedPromptFormat === tile.id && (
-                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓</span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setIsChatActive(false)}
+                          className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Minimize
+                        </button>
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleCreate(selectedPromptFormat || "OT-10")}
-                      disabled={creating || (!aiPrompt.trim() && !selectedPromptFormat)}
-                      aria-label="Submit prompt"
-                      title="Start Workspace"
-                      className="w-8 h-8 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center hover:opacity-90 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-xs cursor-pointer flex-shrink-0"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                      </svg>
-                    </button>
+                    {/* Message Thread */}
+                    <div className="flex flex-col gap-4 max-h-[500px] overflow-y-auto pr-1">
+                      {chatMessages.map((msg) => (
+                        <div key={msg.id} className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}>
+                          {msg.sender === "user" ? (
+                            <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-br-xs px-4 py-3 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs text-sm font-sans leading-relaxed">
+                              {msg.attachedFile && (
+                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/15 text-white/90 text-xs mb-1.5">
+                                  <span>📎</span>
+                                  <span className="truncate max-w-[180px]">{msg.attachedFile}</span>
+                                </div>
+                              )}
+                              <p>{msg.text}</p>
+                              <span className="text-[10px] text-slate-400 block text-right mt-1">{msg.timestamp}</span>
+                            </div>
+                          ) : (
+                            <div className="w-full flex items-start gap-3">
+                              <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-slate-300 flex-shrink-0 mt-0.5 text-xs">
+                                ✨
+                              </div>
+                              <div className="flex-1 flex flex-col gap-3">
+                                <div className="rounded-2xl rounded-tl-xs px-4 py-3.5 bg-slate-50 dark:bg-[#202022] border border-slate-200/80 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs text-sm font-sans leading-relaxed">
+                                  <p>{msg.text}</p>
+
+                                  {/* Blueprint Card */}
+                                  {msg.blueprint && (
+                                    <div className="mt-3.5 p-4 rounded-xl bg-white dark:bg-[#18181A] border border-slate-200 dark:border-neutral-700/80 shadow-xs flex flex-col gap-3">
+                                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-neutral-800">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider">
+                                            Recommended Blueprint:
+                                          </span>
+                                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80">
+                                            {msg.blueprint.formatLabel} ({msg.blueprint.formatId})
+                                          </span>
+                                        </div>
+                                        <span className="text-xs text-slate-500 dark:text-neutral-400 font-medium">
+                                          {msg.blueprint.fieldDomain}
+                                        </span>
+                                      </div>
+
+                                      <div>
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight mb-1">
+                                          "{msg.blueprint.proposedTitle}"
+                                        </h4>
+                                        <p className="text-xs text-slate-600 dark:text-neutral-300 leading-relaxed">
+                                          <strong className="text-slate-900 dark:text-white font-semibold">Core Focus: </strong>
+                                          {msg.blueprint.researchGap}
+                                        </p>
+                                      </div>
+
+                                      {/* Phases Roadmap */}
+                                      <div className="space-y-1.5 pt-1">
+                                        {msg.blueprint.phases.map((ph, idx) => (
+                                          <div key={idx} className="flex items-start gap-2 text-xs">
+                                            <span className="w-4 h-4 rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">
+                                              {idx + 1}
+                                            </span>
+                                            <div>
+                                              <span className="font-semibold text-slate-900 dark:text-slate-100">{ph.name}: </span>
+                                              <span className="text-slate-600 dark:text-neutral-400">{ph.description}</span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+
+                                      {/* Launch & Copy Actions */}
+                                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-neutral-800">
+                                        <div className="text-[11px] text-slate-500 dark:text-neutral-400 flex items-center gap-1.5">
+                                          <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                          </svg>
+                                          <span>Targeting ~{msg.blueprint.recommendedCitations} peer-reviewed references</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => copyBlueprint(msg.blueprint!, msg.id)}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-800 border border-slate-200 dark:border-neutral-700 transition-colors cursor-pointer"
+                                          >
+                                            {copiedBlueprintId === msg.id ? "Copied! ✓" : "Copy Blueprint"}
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleCreateWithBlueprint(msg.blueprint!.formatId, msg.blueprint!, msg.text)}
+                                            disabled={creating}
+                                            className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                          >
+                                            {creating && creatingFormatId === msg.blueprint.formatId ? (
+                                              <>
+                                                <svg className="animate-spin -ml-0.5 mr-1 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                                </svg>
+                                                <span>Booting Workspace...</span>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <span>🚀</span>
+                                                <span>Initialize {msg.blueprint.formatLabel}</span>
+                                              </>
+                                            )}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <span className="text-[10px] text-slate-400 block text-right mt-1">{msg.timestamp}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Thinking indicator */}
+                      {isChatThinking && (
+                        <div className="flex items-start gap-3">
+                          <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-slate-300 flex-shrink-0 text-xs animate-pulse">
+                            ✨
+                          </div>
+                          <div className="rounded-2xl rounded-tl-xs px-4 py-3 bg-slate-50 dark:bg-[#202022] border border-slate-200/80 dark:border-neutral-800 text-slate-600 dark:text-neutral-400 text-xs flex items-center gap-2 font-medium">
+                            <div className="flex gap-1">
+                              <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-neutral-500 animate-bounce" />
+                              <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-neutral-500 animate-bounce [animation-delay:0.2s]" />
+                              <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-neutral-500 animate-bounce [animation-delay:0.4s]" />
+                            </div>
+                            <span>Scholar Core Orchestrator is analyzing research intent & literature constraints...</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sticky Follow-up Input */}
+                    <div className="pt-3 border-t border-slate-100 dark:border-neutral-800 flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={aiPrompt}
+                          onChange={(e) => setAiPrompt(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && aiPrompt.trim() && !isChatThinking) {
+                              e.preventDefault();
+                              handleSendMessage();
+                            }
+                          }}
+                          placeholder="Reply to Scholar Core, refine methodology, or ask a question..."
+                          className="flex-1 bg-slate-50 dark:bg-[#121212] border border-slate-200 dark:border-neutral-700/80 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-neutral-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage()}
+                          disabled={!aiPrompt.trim() || isChatThinking}
+                          className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                        >
+                          <span>Send</span>
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* Quick Follow-up Chips */}
+                      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
+                        <span className="text-[11px] text-slate-400 dark:text-neutral-500 whitespace-nowrap">Suggested:</span>
+                        {[
+                          "Make it more empirical & quantitative",
+                          "Add comparative literature matrix",
+                          "Target Nature Biotechnology guidelines",
+                          "Structure for Research Proposal instead",
+                        ].map((suggestion, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSendMessage(suggestion)}
+                            className="text-[11px] px-2.5 py-1 rounded-full bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 text-slate-600 dark:text-slate-300 whitespace-nowrap transition-colors cursor-pointer"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* Idle Flagship Chatbot Input Card */
+                  <div className="w-full flex flex-col items-start text-left">
+                    {chatMessages.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsChatActive(true)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 mb-3 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                        <span>Resume Active Chat: "{chatMessages[0]?.text.slice(0, 35)}..."</span>
+                        <span>→</span>
+                      </button>
+                    )}
+
+                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-50 text-left mb-1 font-sans">
+                      What would you like to write today?
+                    </h1>
+                    <p className="text-sm text-slate-500 dark:text-neutral-400 mb-3.5 font-sans">
+                      Ask Scholar Core to formulate a research plan, review literature, or initialize an academic workspace.
+                    </p>
+
+                    {/* Chatbot Prompt Container */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl bg-white dark:bg-[#18181A] border border-slate-200/90 dark:border-neutral-800 shadow-sm hover:shadow-md transition-all duration-200 focus-within:ring-2 focus-within:ring-slate-900/10 dark:focus-within:ring-neutral-700/60 focus-within:border-slate-300 dark:focus-within:border-neutral-700 p-3.5 sm:p-4 flex flex-col justify-between min-h-[120px] gap-2.5 font-sans relative">
+                      {/* Auto-growing Textarea */}
+                      <textarea
+                        ref={textareaRef}
+                        value={aiPrompt}
+                        onChange={handleTextareaInput}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            if ((aiPrompt.trim() || selectedPromptFormat) && !creating) {
+                              handleSendMessage();
+                            }
+                          }
+                        }}
+                        rows={2}
+                        placeholder="Start a literature review, brainstorm an outline, or drop a syllabus here..."
+                        className="w-full bg-transparent px-1 text-sm sm:text-base font-medium text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none resize-none leading-relaxed"
+                      />
+
+                      {/* Attached File Indicator */}
+                      {attachedFileName && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-slate-200 text-xs w-fit">
+                          <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span className="font-medium truncate max-w-[200px]">{attachedFileName}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttachedFileName(null);
+                              if (fileInputRef.current) fileInputRef.current.value = "";
+                            }}
+                            className="text-slate-400 hover:text-red-500 font-bold ml-1 cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Action Toolbar */}
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-neutral-800/80">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept=".pdf,.txt,.docx,.md"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) setAttachedFileName(file.name);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            title="Attach reference PDF or notes"
+                            className="p-1.5 sm:px-2 sm:py-1 rounded-lg text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                            <span className="hidden sm:inline">Attach</span>
+                          </button>
+
+                          <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-slate-600 dark:text-neutral-300 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60">
+                            <span className="text-amber-500">✨</span>
+                            <span>Scholar 3.7</span>
+                          </span>
+
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setQuickWorkspaceOpen(!quickWorkspaceOpen)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200/80 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
+                            >
+                              <span className="text-slate-400 font-bold">+</span>
+                              <span>{selectedPromptFormat ? FORMAT_TILES.find((t) => t.id === selectedPromptFormat)?.label : "Auto-Detect Format"}</span>
+                              <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+
+                            {quickWorkspaceOpen && (
+                              <div className="absolute left-0 bottom-full mb-1.5 z-30 w-56 rounded-xl bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-neutral-700 shadow-xl py-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPromptFormat(null);
+                                    setQuickWorkspaceOpen(false);
+                                  }}
+                                  className="w-full px-3 py-2 text-xs text-left font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-center justify-between cursor-pointer"
+                                >
+                                  <span>Auto-Detect Format</span>
+                                  {!selectedPromptFormat && <span className="text-emerald-600 font-bold">✓</span>}
+                                </button>
+                                {FORMAT_TILES.map((tile) => (
+                                  <button
+                                    key={tile.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedPromptFormat(tile.id);
+                                      setQuickWorkspaceOpen(false);
+                                    }}
+                                    className="w-full px-3 py-2 text-xs text-left font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-center justify-between cursor-pointer"
+                                  >
+                                    <span>{tile.label}</span>
+                                    {selectedPromptFormat === tile.id && (
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓</span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setVaultGroundingActive(!vaultGroundingActive)}
+                            title="Toggle Knowledge Vault grounding"
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                              vaultGroundingActive
+                                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60"
+                                : "bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400"
+                            }`}
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                            <span className="hidden sm:inline">Vault Grounding</span>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="hidden sm:inline text-[11px] text-slate-400 dark:text-neutral-500">⏎ to send</span>
+                          <button
+                            type="button"
+                            onClick={() => handleSendMessage()}
+                            disabled={creating || (!aiPrompt.trim() && !selectedPromptFormat)}
+                            aria-label="Submit prompt"
+                            title="Send to Scholar AI"
+                            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all duration-200 flex-shrink-0 cursor-pointer ${
+                              aiPrompt.trim() || selectedPromptFormat
+                                ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm hover:scale-105 active:scale-95"
+                                : "bg-slate-100 dark:bg-neutral-800 text-slate-300 dark:text-neutral-600 cursor-not-allowed"
+                            }`}
+                          >
+                            <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Starter Prompt Chips */}
+                    <div className="w-full flex items-center gap-2 overflow-x-auto py-2.5 no-scrollbar">
+                      {STARTER_PROMPT_CHIPS.map((chip, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setSelectedPromptFormat(chip.formatId);
+                            handleSendMessage(chip.query);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-neutral-800 shadow-2xs hover:border-slate-300 dark:hover:border-neutral-700 hover:bg-slate-50 dark:hover:bg-neutral-800 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                        >
+                          <span>{chip.icon}</span>
+                          <span>{chip.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Tactile Apple-Style Template Cards Grid */}
@@ -1122,37 +1721,6 @@ function getFormatTileTheme(id: string) {
   }
 }
 
-/** Curated 4 essential academic formats */
-const FORMAT_TILES = [
-  {
-    id: "OT-01",
-    label: "Assignment",
-    tag: "Coursework & Essays",
-    description: "Dedicated 8–phase thinking, evidence board & grounded drafting.",
-    budget: "800 – 4,000 words",
-  },
-  {
-    id: "OT-10",
-    label: "Journal Article",
-    tag: "Peer-Reviewed Papers",
-    description: "25–stage empirical research pipeline with multi-agent peer review.",
-    budget: "4,000 – 10,000 words",
-  },
-  {
-    id: "OT-19",
-    label: "Research Proposal",
-    tag: "Grants & Funding",
-    description: "Competitive grant applications with strict agency rubric alignment.",
-    budget: "3,000 – 15,000 words",
-  },
-  {
-    id: "OT-22",
-    label: "Presentation",
-    tag: "Slides & Keynotes",
-    description: "Conference slide decks, oral defense scripts & visual narratives.",
-    budget: "10 – 35 slides",
-  },
-];
 
 /** Modern wireframe icon for academic formats */
 function FormatIcon({ id, className = "w-4 h-4" }: { id: string; className?: string }) {

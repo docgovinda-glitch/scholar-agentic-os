@@ -14,11 +14,13 @@ const createProject = vi.fn();
 const listOutputTypes = vi.fn();
 const listProjects = vi.fn();
 const deleteProject = vi.fn();
+const saveIntakeAnswers = vi.fn();
 vi.mock("../api", () => ({
   createProject: (...a: unknown[]) => createProject(...a),
   listOutputTypes: (...a: unknown[]) => listOutputTypes(...a),
   listProjects: (...a: unknown[]) => listProjects(...a),
   deleteProject: (...a: unknown[]) => deleteProject(...a),
+  saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
 }));
 vi.mock("../../services/supabaseClient", () => ({
   getSupabaseClient: () => ({ auth: { signOut: vi.fn() } }),
@@ -309,6 +311,79 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     const expandBtn = screen.getByRole("button", { name: "Expand sidebar" });
     fireEvent.click(expandBtn);
     expect(aside).toHaveClass("w-[260px]");
+  });
+});
+
+describe("conversational AI chatbot & interactive research blueprint launchpad", () => {
+  it("renders the flagship chatbot prompt box, starter chips, and controls", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
+    const textarea = screen.getByPlaceholderText(/Start a literature review, brainstorm an outline, or drop a syllabus here/i);
+    expect(textarea).toBeInTheDocument();
+
+    // Starter chips
+    expect(screen.getByText("CRISPR Base Editing Review")).toBeInTheDocument();
+    expect(screen.getByText("LLM Reasoning Benchmark")).toBeInTheDocument();
+    expect(screen.getByText("Clean Energy Microgrid Proposal")).toBeInTheDocument();
+    expect(screen.getByText("Clinical Trial Slide Deck")).toBeInTheDocument();
+
+    // Toolbar controls
+    expect(screen.getByRole("button", { name: /Attach/i })).toBeInTheDocument();
+    expect(screen.getByText("Auto-Detect Format")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Vault Grounding/i })).toBeInTheDocument();
+  });
+
+  it("activates chatbot on starter chip click, generates blueprint, and supports project initialization", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    createProject.mockResolvedValue({ projectId: "proj-crispr" });
+    const onOpen = vi.fn();
+
+    render(<ProjectListScreen onOpen={onOpen} userEmail={null} />);
+
+    // Click CRISPR starter chip
+    const chip = await screen.findByText("CRISPR Base Editing Review");
+    fireEvent.click(chip);
+
+    // Chatbot window activates
+    expect(await screen.findByText("Scholar Core Copilot")).toBeInTheDocument();
+    expect(screen.getByText(/Multi-Agent Board Active/i)).toBeInTheDocument();
+
+    // Blueprint card appears after async generation
+    expect(await screen.findByText(/Biotechnology & Genome Engineering/i, {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByText(/High-Fidelity Base Editing and Off-Target Reduction/i)).toBeInTheDocument();
+
+    // Initialize button
+    const initBtn = screen.getByRole("button", { name: /Initialize Journal Article/i });
+    expect(initBtn).toBeInTheDocument();
+
+    fireEvent.click(initBtn);
+    expect(createProject).toHaveBeenCalledWith("OT-10");
+  });
+
+  it("supports minimize and resume of ongoing chat session", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    const chip = await screen.findByText("Clinical Trial Slide Deck");
+    fireEvent.click(chip);
+
+    expect(await screen.findByText("Scholar Core Copilot")).toBeInTheDocument();
+    expect(await screen.findByText(/Clinical Oncology & Translational Medicine/i, {}, { timeout: 3000 })).toBeInTheDocument();
+
+    // Click Minimize
+    const minBtn = screen.getByRole("button", { name: "Minimize" });
+    fireEvent.click(minBtn);
+
+    // Chat minimized, resume banner visible
+    expect(screen.queryByText("Scholar Core Copilot")).not.toBeInTheDocument();
+    const resumeBtn = screen.getByRole("button", { name: /Resume Active Chat/i });
+    expect(resumeBtn).toBeInTheDocument();
+
+    // Click Resume
+    fireEvent.click(resumeBtn);
+    expect(screen.getByText("Scholar Core Copilot")).toBeInTheDocument();
   });
 });
 
