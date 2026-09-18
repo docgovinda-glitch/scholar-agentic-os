@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-18
 
+### Added
+- **Hero & Input Area, Template Cards, Empty State & Sidebar Contrast Refinements (`ProjectListScreen.tsx`)**:
+  - **Interactive Hero Prompt Container**: Converted the static prompt box into an interactive action bar featuring an attachment paperclip button with file indicator, quick-tag workspace dropdown menu (`+ Select Workspace`), and an inline submit/enter arrow button with active gradient states. Tightened headline-to-input vertical distance (`mb-2.5`) with enhanced typography contrast, `border-slate-200`, and subtle ambient elevation (`shadow-xs`).
+  - **Upgraded Workspace Template Cards**: Added interactive lift (`hover:-translate-y-1`), soft tinted rounded-square icon badges (warm amber, blue, indigo, emerald), subtle top-right launchpad arrow-up-right icons (`↗`), and strict min-height parity (`min-h-[185px]`) across both the dashboard and format selector modals.
+  - **Streamlined Empty State**: Eliminated the redundant black `+ New Project` button in the empty state to remove visual competition with the primary sidebar CTA. Rendered a subtle dotted outline skeleton of project cards, compacted vertical padding (`py-9`), and introduced secondary action buttons (`Browse Templates` and `Import from Zotero / PDF`).
+  - **Left Sidebar & Architectural Hierarchy**: Visually anchored the left sidebar with a crisp 1px border (`border-r border-slate-200/80`), subtle tinted surface tone (`bg-[#F8F9FA] dark:bg-[#121212]`), an active indicator pill for the selected "Projects" view, and scaled the Scholar Core brand logo icon to 32px (`size="md"`).
+
 ### Changed
 - **Curated 4 Academic Workspace Cards & Responsive Alignment (`ProjectListScreen.tsx`)**:
   - **Removed Thesis / Dissertation from UI**: Cleanly removed `OT-09` from primary workspace format cards (`FORMAT_TILES`) and filter tabs, focusing on the 4 core formats: *Assignment*, *Journal Article*, *Research Proposal*, and *Presentation*. Full thesis workspace codebase (`ThesisWorkspace.tsx`), route handlers (`OT-09`/`OT-07`), and data models remain fully intact.

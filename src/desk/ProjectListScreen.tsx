@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createProject, listOutputTypes, listProjects, deleteProject } from "./api";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
@@ -178,7 +178,12 @@ export default function ProjectListScreen({
     return map;
   }, [types]);
 
+  const [selectedFormat, setSelectedFormat] = useState<string>("all");
   const [creatingFormatId, setCreatingFormatId] = useState<string | null>(null);
+  const [quickWorkspaceOpen, setQuickWorkspaceOpen] = useState(false);
+  const [selectedPromptFormat, setSelectedPromptFormat] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
 
   async function handleCreate(outputTypeId: string) {
     if (creating) return;
@@ -291,7 +296,7 @@ export default function ProjectListScreen({
 
       {/* Left Sidebar (Navigation Pane) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-[var(--border-subtle)] bg-[var(--bg-sidebar)] flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-50 md:relative md:z-30 h-full flex flex-col justify-between border-r border-slate-200/80 dark:border-neutral-800 bg-[#F8F9FA] dark:bg-[#121212] flex-shrink-0 select-none transition-all duration-300 ease-in-out ${
           mobileMenuOpen
             ? "translate-x-0 w-[260px] shadow-2xl"
             : "-translate-x-full md:translate-x-0 " + (isSidebarOpen ? "w-[260px]" : "w-0 border-r-0 overflow-hidden")
@@ -300,16 +305,16 @@ export default function ProjectListScreen({
         {/* Top Section */}
         <div className="flex flex-col flex-shrink-0 w-[260px]">
           {/* Logo & Close/Collapse Header */}
-          <div className="p-4 pb-3 flex items-center justify-between border-b border-[var(--border-subtle)]">
+          <div className="p-4 pb-3 flex items-center justify-between border-b border-slate-200/80 dark:border-neutral-800">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-[var(--bg-button-primary)] text-[var(--text-button)] flex items-center justify-center flex-shrink-0 shadow-xs">
-                <ScholarCoreLogo size="sm" className="text-[var(--text-button)]" />
+              <div className="w-9 h-9 rounded-xl bg-[var(--bg-button-primary)] text-[var(--text-button)] flex items-center justify-center flex-shrink-0 shadow-xs">
+                <ScholarCoreLogo size="md" className="text-[var(--text-button)]" />
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-extrabold text-sm tracking-tight text-[var(--text-primary)] leading-none truncate font-sans">
+              <div className="flex flex-col min-w-0 justify-center">
+                <span className="font-extrabold text-sm tracking-tight text-[var(--text-primary)] leading-tight truncate font-sans">
                   Scholar Core
                 </span>
-                <span className="text-[10px] font-medium text-[var(--text-secondary)] mt-1 tracking-normal font-sans">
+                <span className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5 tracking-normal font-sans">
                   Workspace
                 </span>
               </div>
@@ -360,9 +365,32 @@ export default function ProjectListScreen({
 
         {/* Middle Section (Nav Links) */}
         <div className="flex-1 overflow-y-auto scholar-scrollbar py-2 px-3 flex flex-col gap-1 w-[260px]">
-          <div className="px-2 pt-2 pb-1 text-[10px] font-semibold tracking-wider uppercase text-[var(--text-secondary)]/70 font-sans">
+          <div className="px-2 pt-2 pb-1 text-[10px] font-semibold tracking-wider uppercase text-slate-400 dark:text-neutral-500 font-sans">
             Platform
           </div>
+
+          {/* Active Projects Item with Active Indicator Pill */}
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setChoosing(false);
+            }}
+            aria-label="Projects"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all cursor-pointer text-left w-full group font-sans ${
+              !choosing
+                ? "bg-slate-200/70 dark:bg-neutral-800 text-slate-900 dark:text-white font-bold shadow-2xs"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5"
+            }`}
+          >
+            <svg className={`w-4 h-4 flex-shrink-0 transition-colors ${!choosing ? "text-slate-900 dark:text-white" : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <span className="flex-1">Projects</span>
+            {!choosing && (
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-900 dark:bg-slate-100" />
+            )}
+          </button>
 
           {onOpenVault && (
             <button
@@ -540,25 +568,119 @@ export default function ProjectListScreen({
               onCancel={() => setChoosing(false)}
             />
           ) : (
-            <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-10">
-              {/* Workspace Header & AI Prompt Bar */}
+            <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-8">
+              {/* Workspace Header & Interactive AI Prompt Box */}
               <div className="w-full flex flex-col items-start text-left">
-                <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] text-left mb-4">
+                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-50 text-left mb-2.5 font-sans">
                   What would you like to write today?
                 </h1>
-                <input
-                  type="text"
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && aiPrompt.trim() && !creating) {
-                      e.preventDefault();
-                      handleCreate("OT-10");
-                    }
-                  }}
-                  placeholder="Start a literature review, brainstorm an outline, or drop a syllabus here..."
-                  className="w-full px-6 py-5 rounded-2xl bg-white dark:bg-[#171717] border border-gray-200 dark:border-neutral-800 shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-gray-100 dark:focus:ring-neutral-800 text-base font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
-                />
+                <div className="w-full rounded-2xl bg-white dark:bg-[#171717] border border-slate-200 dark:border-neutral-800 shadow-xs transition-all duration-200 focus-within:ring-4 focus-within:ring-slate-100 dark:focus-within:ring-neutral-800/60 focus-within:border-slate-300 dark:focus-within:border-neutral-700 p-3 sm:p-3.5 flex flex-col gap-3 font-sans">
+                  <input
+                    type="text"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (aiPrompt.trim() || selectedPromptFormat) && !creating) {
+                        e.preventDefault();
+                        handleCreate(selectedPromptFormat || "OT-10");
+                      }
+                    }}
+                    placeholder="Start a literature review, brainstorm an outline, or drop a syllabus here..."
+                    className="w-full bg-transparent px-2 py-1 text-base font-medium text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none"
+                  />
+
+                  <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100 dark:border-neutral-800/80">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept=".pdf,.txt,.docx,.md"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setAttachedFileName(file.name);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        title="Attach reference PDF or outline"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        {attachedFileName ? (
+                          <span className="text-[11px] font-medium text-slate-700 dark:text-slate-200 max-w-[120px] truncate bg-slate-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            {attachedFileName}
+                            <span
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                setAttachedFileName(null);
+                                if (fileInputRef.current) fileInputRef.current.value = "";
+                              }}
+                              className="text-slate-400 hover:text-red-500 font-bold ml-1 cursor-pointer"
+                            >
+                              ×
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="hidden sm:inline text-xs text-slate-500 dark:text-neutral-400">Attach</span>
+                        )}
+                      </button>
+
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setQuickWorkspaceOpen(!quickWorkspaceOpen)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200/80 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
+                        >
+                          <span className="text-slate-400 font-bold">+</span>
+                          <span>{selectedPromptFormat ? FORMAT_TILES.find((t) => t.id === selectedPromptFormat)?.label : "Select Workspace"}</span>
+                          <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {quickWorkspaceOpen && (
+                          <div className="absolute left-0 top-full mt-1.5 z-30 w-52 rounded-xl bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-neutral-700 shadow-lg py-1">
+                            {FORMAT_TILES.map((tile) => (
+                              <button
+                                key={tile.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPromptFormat(tile.id);
+                                  setQuickWorkspaceOpen(false);
+                                }}
+                                className="w-full px-3 py-2 text-xs text-left font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-center justify-between cursor-pointer"
+                              >
+                                <span>{tile.label}</span>
+                                {selectedPromptFormat === tile.id && (
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCreate(selectedPromptFormat || "OT-10")}
+                      disabled={creating || (!aiPrompt.trim() && !selectedPromptFormat)}
+                      aria-label="Submit prompt"
+                      title="Start Workspace"
+                      className="w-8 h-8 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center hover:opacity-90 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-xs cursor-pointer flex-shrink-0"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Tactile Apple-Style Template Cards Grid */}
@@ -567,13 +689,14 @@ export default function ProjectListScreen({
                   {FORMAT_TILES.map((tile) => {
                     const isBootingThis = creatingFormatId === tile.id;
                     const isOtherBooting = creating && !isBootingThis;
+                    const tileTheme = getFormatTileTheme(tile.id);
                     return (
                       <button
                         key={tile.id}
                         type="button"
                         onClick={() => !creating && handleCreate(tile.id)}
                         disabled={isOtherBooting}
-                        className={`bg-white dark:bg-[#171717] border border-gray-100 dark:border-neutral-800 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full text-left ${
+                        className={`group bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[185px] text-left relative ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
@@ -581,19 +704,28 @@ export default function ProjectListScreen({
                             : ""
                         }`}
                       >
-                        <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-neutral-800/80 text-gray-900 dark:text-gray-100 flex items-center justify-center mb-2">
-                          {isBootingThis ? (
-                            <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <FormatIcon id={tile.id} className="w-5 h-5" />
-                          )}
+                        <div>
+                          <div className="flex items-center justify-between w-full mb-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                              {isBootingThis ? (
+                                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <FormatIcon id={tile.id} className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-neutral-600 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
+                              <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
+                              </svg>
+                            </div>
+                          </div>
+                          <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5 leading-tight">
+                            {tile.label}
+                          </h3>
+                          <p className="text-sm font-normal text-[var(--text-secondary)] leading-snug">
+                            {tile.description}
+                          </p>
                         </div>
-                        <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5 leading-tight">
-                          {tile.label}
-                        </h3>
-                        <p className="text-sm font-normal text-[var(--text-secondary)] leading-snug">
-                          {tile.description}
-                        </p>
                       </button>
                     );
                   })}
@@ -720,7 +852,7 @@ export default function ProjectListScreen({
                     </div>
                   )
                 ) : projects.length === 0 ? (
-                  <EmptyState onStart={() => setChoosing(true)} />
+                  <EmptyState onStart={() => setChoosing(true)} onOpenVault={onOpenVault} />
                 ) : filteredProjects.length === 0 ? (
                   <div className="p-12 text-center rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] shadow-sm">
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 font-sans">No manuscripts match "{searchQuery}"</p>
@@ -894,27 +1026,100 @@ function ProjectCard({
   );
 }
 
-function EmptyState({ onStart }: { onStart: () => void }) {
+function EmptyState({
+  onStart,
+  onOpenVault,
+}: {
+  onStart: () => void;
+  onOpenVault?: () => void;
+}) {
   return (
-    <div className="rounded-3xl border border-dashed border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] px-6 py-16 text-center flex flex-col items-center shadow-sm font-sans">
-      <div className="w-14 h-14 rounded-2xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center justify-center mb-5 shadow-xs">
-        <ScholarCoreLogo size="md" className="text-white dark:text-gray-900" />
+    <div className="rounded-2xl border border-dashed border-slate-200 dark:border-neutral-800 bg-white/70 dark:bg-[#171717]/70 backdrop-blur-xs px-6 py-9 text-center flex flex-col items-center shadow-xs font-sans">
+      {/* Subtle dotted outline skeleton of a project table / cards */}
+      <div className="w-full max-w-md mb-6 grid grid-cols-2 gap-2.5 opacity-65 pointer-events-none select-none">
+        <div className="rounded-xl border border-dashed border-slate-200 dark:border-neutral-800 p-3 flex flex-col gap-2 bg-slate-50/60 dark:bg-neutral-900/40 text-left">
+          <div className="flex items-center gap-2">
+            <div className="w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-neutral-800" />
+            <div className="h-2.5 w-16 bg-slate-200/80 dark:bg-neutral-800 rounded-sm" />
+          </div>
+          <div className="h-3 w-4/5 bg-slate-200/80 dark:bg-neutral-800 rounded-sm" />
+          <div className="h-2 w-1/2 bg-slate-100 dark:bg-neutral-800/60 rounded-sm" />
+        </div>
+        <div className="rounded-xl border border-dashed border-slate-200 dark:border-neutral-800 p-3 flex flex-col gap-2 bg-slate-50/60 dark:bg-neutral-900/40 text-left">
+          <div className="flex items-center gap-2">
+            <div className="w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-neutral-800" />
+            <div className="h-2.5 w-14 bg-slate-200/80 dark:bg-neutral-800 rounded-sm" />
+          </div>
+          <div className="h-3 w-3/4 bg-slate-200/80 dark:bg-neutral-800 rounded-sm" />
+          <div className="h-2 w-2/5 bg-slate-100 dark:bg-neutral-800/60 rounded-sm" />
+        </div>
       </div>
-      <h3 className="text-2xl font-extrabold text-gray-900 dark:text-gray-100 font-sans mb-2 tracking-tight">
+
+      <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 font-sans mb-1.5 tracking-tight">
         Initialize your first project
       </h3>
-      <p className="max-w-md text-sm text-gray-500 dark:text-gray-400 font-normal mb-6 leading-relaxed font-sans">
-        Choose from curated academic workspaces, connect your Knowledge Vault, and let the multi-agent editorial board assist you.
+      <p className="max-w-md text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-normal mb-6 leading-relaxed font-sans">
+        Select an academic workspace above, browse our research formats, or import prior bibliography sources to begin.
       </p>
-      <button
-        onClick={onStart}
-        className="rounded-full bg-gray-900 dark:bg-gray-100 px-6 py-2.5 text-xs font-medium text-white dark:text-gray-900 hover:opacity-90 flex items-center gap-2 cursor-pointer shadow-sm transition-transform active:scale-95 font-sans"
-      >
-        <span className="font-bold text-sm">+</span>
-        <span>New Project</span>
-      </button>
+
+      {/* Secondary CTAs (avoiding duplicate black + New Project pill) */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <button
+          type="button"
+          onClick={onStart}
+          className="rounded-full bg-white dark:bg-[#1E1E1E] text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-neutral-700 hover:border-slate-400 dark:hover:border-neutral-500 px-5 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-neutral-800 transition-all flex items-center gap-2 cursor-pointer shadow-xs active:scale-95 font-sans"
+        >
+          <svg className="w-3.5 h-3.5 text-slate-500 dark:text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+          <span>Browse Templates</span>
+        </button>
+
+        {onOpenVault && (
+          <button
+            type="button"
+            onClick={onOpenVault}
+            className="rounded-full text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-4 py-2 text-xs font-medium hover:bg-slate-100/70 dark:hover:bg-neutral-800 transition-all flex items-center gap-1.5 cursor-pointer font-sans"
+          >
+            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Import from Zotero / PDF</span>
+          </button>
+        )}
+      </div>
     </div>
   );
+}
+
+function getFormatTileTheme(id: string) {
+  switch (id) {
+    case "OT-01":
+      return {
+        badgeBg: "bg-blue-50/90 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50",
+        hoverBorder: "hover:border-blue-300 dark:hover:border-blue-700/60",
+      };
+    case "OT-10":
+      return {
+        badgeBg: "bg-amber-50/90 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50",
+        hoverBorder: "hover:border-amber-300 dark:hover:border-amber-700/60",
+      };
+    case "OT-19":
+      return {
+        badgeBg: "bg-indigo-50/90 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50",
+        hoverBorder: "hover:border-indigo-300 dark:hover:border-indigo-700/60",
+      };
+    case "OT-22":
+      return {
+        badgeBg: "bg-emerald-50/90 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50",
+        hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-700/60",
+      };
+    default:
+      return {
+        badgeBg: "bg-slate-50 dark:bg-neutral-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-neutral-700",
+        hoverBorder: "hover:border-slate-300 dark:hover:border-neutral-700",
+      };
+  }
 }
 
 /** Curated 4 essential academic formats */
@@ -1062,27 +1267,37 @@ function ChooseOutputType({
           <div className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {FORMAT_TILES.map((tile) => {
               const isSelected = selected === tile.id;
+              const tileTheme = getFormatTileTheme(tile.id);
 
               return (
                 <div
                   key={tile.id}
                   onClick={() => setSelected(tile.id)}
                   onDoubleClick={() => onPick(tile.id)}
-                  className={`bg-white dark:bg-[#171717] border border-gray-100 dark:border-neutral-800 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full text-left ${
+                  className={`group bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[185px] text-left relative ${
                     isSelected
                       ? "ring-2 ring-gray-900 dark:ring-gray-100 border-gray-900 dark:border-gray-100"
                       : ""
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-neutral-800/80 text-gray-900 dark:text-gray-100 flex items-center justify-center mb-2">
-                    <FormatIcon id={tile.id} className="w-5 h-5" />
+                  <div>
+                    <div className="flex items-center justify-between w-full mb-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                        <FormatIcon id={tile.id} className="w-5 h-5" />
+                      </div>
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-neutral-600 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
+                        <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
+                        </svg>
+                      </div>
+                    </div>
+                    <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5 leading-tight">
+                      {tile.label}
+                    </h3>
+                    <p className="text-sm font-normal text-[var(--text-secondary)] leading-snug">
+                      {tile.description}
+                    </p>
                   </div>
-                  <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5 leading-tight">
-                    {tile.label}
-                  </h3>
-                  <p className="text-sm font-normal text-[var(--text-secondary)] leading-snug">
-                    {tile.description}
-                  </p>
                 </div>
               );
             })}
