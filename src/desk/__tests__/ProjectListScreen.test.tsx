@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import { MemoryRouter } from "react-router-dom";
 
 const createProject = vi.fn();
 const listOutputTypes = vi.fn();
@@ -28,6 +29,10 @@ vi.mock("../../services/supabaseClient", () => ({
 
 const { default: ProjectListScreen } = await import("../ProjectListScreen");
 
+function renderScreen(ui: React.ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
+
 const TYPES = [
   { id: "OT-02", label: "Essay", aliases: [], family: "short_form", academicLevels: [], typicalDisciplines: [], available: false },
   { id: "OT-06", label: "Journal Article", aliases: [], family: "publication", academicLevels: [], typicalDisciplines: [], available: true },
@@ -43,7 +48,7 @@ afterEach(() => {
 async function openChooser() {
   listProjects.mockResolvedValue({ items: [] });
   listOutputTypes.mockResolvedValue({ items: TYPES });
-  render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+  renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
   fireEvent.click(await screen.findByText("New Project"));
   await screen.findByLabelText("Target Publication Type");
 }
@@ -96,7 +101,7 @@ describe("the Workshop welcome banner", () => {
   it("shows and consumes the one-time flag when the caller signals onboarding just finished", async () => {
     listProjects.mockResolvedValue({ items: [] });
     const onWelcomeSeen = vi.fn();
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={onWelcomeSeen} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={onWelcomeSeen} />);
 
     expect(await screen.findByText("Welcome to your Scholar Workspace")).toBeInTheDocument();
     expect(onWelcomeSeen).toHaveBeenCalled();
@@ -104,7 +109,7 @@ describe("the Workshop welcome banner", () => {
 
   it("stays visible until dismissed, even though the flag was already consumed", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={vi.fn()} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} showWelcome onWelcomeSeen={vi.fn()} />);
 
     const banner = await screen.findByText("Welcome to your Scholar Workspace");
     expect(banner).toBeInTheDocument();
@@ -115,7 +120,7 @@ describe("the Workshop welcome banner", () => {
 
   it("never shows for a returning user with nothing to welcome them to", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
     await screen.findByText("Initialize your first project");
     expect(screen.queryByText("Welcome to your Scholar Workspace")).not.toBeInTheDocument();
@@ -136,7 +141,7 @@ describe("the search bar & delete confirmation modal", () => {
 
   it("renders the rounded search projects input", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     const searchInput = await screen.findByPlaceholderText("Search projects...");
     expect(searchInput).toBeInTheDocument();
@@ -145,7 +150,7 @@ describe("the search bar & delete confirmation modal", () => {
 
   it("opens custom delete modal with 'Cancel' button and red 'Delete' text option without logo", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     const deleteBtn = await screen.findByRole("button", { name: "Delete Project" });
     fireEvent.click(deleteBtn);
@@ -171,7 +176,7 @@ describe("the search bar & delete confirmation modal", () => {
 
   it("cancels deletion when 'Cancel' is pressed", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     const deleteBtn = await screen.findByRole("button", { name: "Delete Project" });
     fireEvent.click(deleteBtn);
@@ -186,7 +191,7 @@ describe("the search bar & delete confirmation modal", () => {
   it("executes deletion when 'Delete' is pressed", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     deleteProject.mockResolvedValue(undefined);
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
     const deleteBtn = await screen.findByRole("button", { name: "Delete Project" });
     fireEvent.click(deleteBtn);
@@ -205,7 +210,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     const onOpenAiAccess = vi.fn();
     const onOpenAccountSettings = vi.fn();
 
-    const { container } = render(
+    const { container } = renderScreen(
       <ProjectListScreen
         onOpen={vi.fn()}
         userEmail="scholar@research.edu"
@@ -251,7 +256,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
 
   it("supports desktop sidebar collapse and expansion toggle", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    const { container } = render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
     const aside = container.querySelector("aside");
     expect(aside).toHaveClass("w-[260px]");
@@ -274,7 +279,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
 
   it("opens mobile drawer and closes on backdrop overlay tap", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    const { container } = render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
     // Mobile trigger button
     const mobileMenuTrigger = screen.getByRole("button", { name: "Open navigation" });
@@ -291,7 +296,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
 
   it("applies flex-shrink-0 to aside, scholar-scrollbar to main, and supports toggle from top-left main header", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    const { container } = render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
     const aside = container.querySelector("aside");
     const main = container.querySelector("main");
@@ -327,7 +332,7 @@ describe("sidebar active projects & platform navigation", () => {
   it("renders active projects directly in the sidebar and navigates on click", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     const onOpen = vi.fn();
-    const { container } = render(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
+    const { container } = renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
 
     const aside = container.querySelector("aside");
     expect(aside).toBeInTheDocument();
@@ -342,17 +347,14 @@ describe("sidebar active projects & platform navigation", () => {
   });
 });
 
-describe("command center status overview & academic workspace cards", () => {
-  it("renders the 4-card status overview strip and 4 academic workspace cards", async () => {
+describe("landing workspace hero & academic workspace cards", () => {
+  it("renders the hero headline, subtitle, 4 academic workspace cards, and active projects count", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // Header & Overall Status Summary Strip
-    expect(await screen.findByText("Research Command Center")).toBeInTheDocument();
-    expect(screen.getByText("Active Pipeline")).toBeInTheDocument();
-    expect(screen.getByText("Knowledge Vault")).toBeInTheDocument();
-    expect(screen.getByText("AI Engine")).toBeInTheDocument();
-    expect(screen.getByText("Editorial Integrity")).toBeInTheDocument();
+    // Header & Subtitle matching user screenshot
+    expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
+    expect(screen.getByText(/Select an academic format to begin with deterministic quality gates/i)).toBeInTheDocument();
 
     // 4 Academic Workspace Cards
     expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
@@ -360,14 +362,18 @@ describe("command center status overview & academic workspace cards", () => {
     expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
+
+    // Active Projects section
+    expect(screen.getByRole("heading", { name: "Active Projects" })).toBeInTheDocument();
+    expect(screen.getByText("0 of 0")).toBeInTheDocument();
   });
 
-  it("boots academic workspace directly from card click on dashboard", async () => {
+  it("boots academic workspace directly from card click on dashboard when authenticated", async () => {
     listProjects.mockResolvedValue({ items: [] });
     createProject.mockResolvedValue({ projectId: "proj-journal-new" });
     const onOpen = vi.fn();
 
-    render(<ProjectListScreen onOpen={onOpen} userEmail={null} />);
+    renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
 
     // Click Journal Article card directly on dashboard
     const journalHeading = await screen.findByRole("heading", { name: "Journal Article" });
@@ -377,72 +383,85 @@ describe("command center status overview & academic workspace cards", () => {
     fireEvent.click(journalCard!);
     expect(createProject).toHaveBeenCalledWith("OT-10");
   });
+
+  it("opens in-page authentication modal when guest clicks a workspace card", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    // Click Journal Article card as guest
+    const journalHeading = await screen.findByRole("heading", { name: "Journal Article" });
+    const journalCard = journalHeading.closest("button");
+    fireEvent.click(journalCard!);
+
+    // In-page auth modal appears without full-page redirect
+    expect(await screen.findByText(/Sign in to boot your Journal Article workspace/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Account" })).toBeInTheDocument();
+  });
 });
 
 describe("minimal website assistant", () => {
-  it("opens website assistant with clean conversation UI, FAQ suggestions, and minimal text input", async () => {
+  it("renders website assistant at bottom of page with clean conversation UI, FAQ suggestions, and minimal text input", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // Floating Platform Guide button
-    const guideTrigger = (await screen.findAllByRole("button", { name: /Platform Guide/i }))[0];
-    expect(guideTrigger).toBeInTheDocument();
-
-    fireEvent.click(guideTrigger);
-
-    // Dialog opens
-    const dialog = screen.getByRole("dialog", { name: "Scholar Core Website Assistant" });
-    expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByText("Website Assistant")).toBeInTheDocument();
-    expect(within(dialog).getByText(/platform guidance & workflows/i)).toBeInTheDocument();
+    // Assistant container exists directly on the page
+    const assistant = await screen.findByText("Scholar Core Website Assistant");
+    expect(assistant).toBeInTheDocument();
+    expect(screen.getByText(/Ask any question to understand platform navigation/i)).toBeInTheDocument();
 
     // FAQ suggested topic chips
-    expect(within(dialog).getByText("AI Setup & Keys")).toBeInTheDocument();
-    expect(within(dialog).getByText("Knowledge Vault")).toBeInTheDocument();
-    expect(within(dialog).getByText("Create Project")).toBeInTheDocument();
-    expect(within(dialog).getByText("Journal Workflow")).toBeInTheDocument();
+    expect(screen.getByText("How do I set up AI?")).toBeInTheDocument();
+    expect(screen.getByText("What is Knowledge Vault?")).toBeInTheDocument();
+    expect(screen.getByText("How do I create a research project?")).toBeInTheDocument();
+    expect(screen.getByText("Journal Article workflow?")).toBeInTheDocument();
 
     // Minimal input: text input and Send button. NO file upload, NO voice, NO model selector
-    const input = within(dialog).getByPlaceholderText("Ask how to use Scholar Core...");
+    const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
     expect(input).toBeInTheDocument();
-    const sendBtn = within(dialog).getByRole("button", { name: "Send question" });
+    const sendBtn = screen.getByRole("button", { name: "Send question" });
     expect(sendBtn).toBeInTheDocument();
     expect(sendBtn).toBeDisabled();
 
-    expect(within(dialog).queryByRole("button", { name: /Attach/i })).not.toBeInTheDocument();
-    expect(within(dialog).queryByLabelText(/upload/i)).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Attach/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/upload/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 
   it("responds with website guidance when asked how to configure AI", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const guideTrigger = (await screen.findAllByRole("button", { name: /Platform Guide/i }))[0];
-    fireEvent.click(guideTrigger);
-
-    const dialog = screen.getByRole("dialog", { name: "Scholar Core Website Assistant" });
-
-    // Click "AI Setup & Keys" chip
-    const aiChip = within(dialog).getByText("AI Setup & Keys");
+    // Click "How do I set up AI?" chip
+    const aiChip = await screen.findByRole("button", { name: "How do I set up AI?" });
     fireEvent.click(aiChip);
 
     // Assistant provides accurate guidance on AI Access and BYOK
-    expect(await within(dialog).findByText(/To configure AI in Scholar Core/i, {}, { timeout: 2000 })).toBeInTheDocument();
-    expect(within(dialog).getByText(/Bring Your Own Key/i)).toBeInTheDocument();
+    expect(await screen.findByText(/To configure AI in Scholar Core/i, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(screen.getByText(/Bring Your Own Key/i)).toBeInTheDocument();
   });
 
-  it("closes the website assistant when close button is clicked", async () => {
+  it("refuses general writing/coding tasks and directs user to academic workspaces", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const guideTrigger = (await screen.findAllByRole("button", { name: /Platform Guide/i }))[0];
-    fireEvent.click(guideTrigger);
+    const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
+    fireEvent.change(input, { target: { value: "write an essay about biology" } });
 
-    const closeBtn = screen.getByRole("button", { name: "Close Assistant" });
-    fireEvent.click(closeBtn);
+    const sendBtn = screen.getByRole("button", { name: "Send question" });
+    expect(sendBtn).toBeEnabled();
+    fireEvent.click(sendBtn);
 
-    expect(screen.queryByRole("dialog", { name: "Scholar Core Website Assistant" })).not.toBeInTheDocument();
+    expect(await screen.findByText(/I cannot perform general research, writing, coding/i, {}, { timeout: 2000 })).toBeInTheDocument();
+  });
+
+  it("resets conversation when Reset Chat button is clicked", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const resetBtn = await screen.findByRole("button", { name: "Reset Chat" });
+    fireEvent.click(resetBtn);
+
+    expect(screen.getByText(/Hello! I am your Scholar Core Website Assistant/i)).toBeInTheDocument();
   });
 });
 

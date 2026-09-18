@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { createProject, listOutputTypes, listProjects, deleteProject, saveIntakeAnswers } from "./api";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
@@ -6,6 +7,7 @@ import { syncActiveSessionToRegistry } from "../services/auth/multiAccountServic
 import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import UserAccountMenu from "./components/UserAccountMenu";
+import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
 
 /** Curated 4 essential academic formats */
 export const FORMAT_TILES = [
@@ -49,34 +51,80 @@ export interface WebsiteAssistantMessage {
 export const WEBSITE_ASSISTANT_FAQS = [
   {
     question: "How do I set up AI?",
-    shortLabel: "AI Setup & Keys",
+    shortLabel: "How do I set up AI?",
   },
   {
     question: "What is Knowledge Vault?",
-    shortLabel: "Knowledge Vault",
+    shortLabel: "What is Knowledge Vault?",
   },
   {
     question: "How do I create a research project?",
-    shortLabel: "Create Project",
+    shortLabel: "How do I create a research project?",
   },
   {
-    question: "What is the Evidence phase & how do I add sources?",
-    shortLabel: "Evidence & Sources",
+    question: "What is the Evidence phase?",
+    shortLabel: "What is the Evidence phase?",
   },
   {
-    question: "How does the Journal Article workflow work?",
-    shortLabel: "Journal Workflow",
+    question: "How do I add sources?",
+    shortLabel: "How do I add sources?",
   },
   {
     question: "Where can I find my projects?",
-    shortLabel: "Finding Projects",
+    shortLabel: "Where can I find my projects?",
+  },
+  {
+    question: "How does the Journal Article workflow work?",
+    shortLabel: "Journal Article workflow?",
+  },
+  {
+    question: "What is Scholar AI Engine?",
+    shortLabel: "What is Scholar AI Engine?",
+  },
+  {
+    question: "How do I configure an AI provider?",
+    shortLabel: "Configure AI provider?",
   },
 ];
 
 export function answerWebsiteQuestion(query: string): string {
   const q = query.toLowerCase();
 
-  if (q.includes("ai") || q.includes("key") || q.includes("provider") || q.includes("model") || q.includes("engine") || q.includes("byok")) {
+  // Guardrail: Decline out-of-scope general research, coding, writing/rewriting tasks
+  if (
+    q.includes("write an essay") ||
+    q.includes("write me") ||
+    q.includes("rewrite") ||
+    q.includes("paraphrase") ||
+    q.includes("draft a") ||
+    q.includes("generate code") ||
+    q.includes("write code") ||
+    q.includes("search the web") ||
+    q.includes("web search") ||
+    q.includes("google search") ||
+    q.includes("generate image") ||
+    q.includes("draw") ||
+    q.includes("analyze file")
+  ) {
+    return `I am the Scholar Core Website Assistant, designed strictly to help you understand and navigate the Scholar Core platform, its workflows, and features.
+
+I cannot perform general research, writing, coding, or document generation here in the support chat.
+
+👉 To research and draft academic papers:
+1. Choose one of the Academic Workspaces above (Assignment, Journal Article, Research Proposal, or Presentation).
+2. Upload and verify reference literature in the Knowledge Vault.
+3. Configure your models under AI Access.
+4. Your workspace will launch with dedicated AI agent stages, evidentiary matrices, and grounded drafting!`;
+  }
+
+  if (q.includes("engine") || q.includes("scholar ai engine")) {
+    return `The Scholar AI Engine is the platform's multi-tier orchestration intelligence:
+• Autonomous Agent Coordination: Routes tasks to specialized agents (Extraction, Peer Review, Editorial Board, Citation Auditor).
+• Dynamic Multi-Tier Routing: Automatically selects the optimal model tier for the task (e.g., deep reasoning for review, speed for citations).
+• Zero-Leakage Privacy: Your personal API keys are encrypted strictly on your device and are never exposed or shared.`;
+  }
+
+  if (q.includes("ai") || q.includes("key") || q.includes("provider") || q.includes("configure") || q.includes("byok")) {
     return `To configure AI in Scholar Core:
 1. Open "AI Access" from the Platform menu in the left sidebar.
 2. Select your preferred provider tier:
@@ -94,7 +142,7 @@ Once connected, the Multi-Agent Editorial Board automatically routes tasks to yo
 • Every claim made during project drafting is audited by the Citation Auditor against Vault sources to guarantee 100% provenance.`;
   }
 
-  if (q.includes("create") || q.includes("start") || q.includes("new project") || q.includes("format") || q.includes("template")) {
+  if (q.includes("create") || q.includes("start") || q.includes("new project") || q.includes("how do i create")) {
     return `To create a research project:
 1. Click the "+ New Project" button in the left sidebar, or click any card under "Academic Workspaces" on this dashboard.
 2. Choose one of the 4 verified academic formats:
@@ -106,11 +154,11 @@ Once connected, the Multi-Agent Editorial Board automatically routes tasks to yo
   }
 
   if (q.includes("evidence") || q.includes("source") || q.includes("data") || q.includes("add source") || q.includes("grounding")) {
-    return `The Evidence Phase (Stages 7–14 in Journal Article workspaces):
+    return `The Evidence Phase & Adding Sources (Stages 7–14 in Journal Article workspaces):
 • Source Approval: Review candidate literature pulled from your Knowledge Vault, PubMed, or Crossref.
 • Evidentiary Locking: Approved sources form an immutable evidence base for drafting.
 • Data Extraction: The extraction agent isolates key metrics, sample sizes, and empirical findings.
-• You can add sources at any time directly through the Knowledge Vault or within the project workspace.`;
+• You can add sources at any time directly through the Knowledge Vault in the sidebar or within the project workspace by clicking "Add Source".`;
   }
 
   if (q.includes("journal") || q.includes("25") || q.includes("article") || q.includes("workflow") || q.includes("ot-10")) {
@@ -126,6 +174,14 @@ Once connected, the Multi-Agent Editorial Board automatically routes tasks to yo
     return `You can easily access all your projects in two places:
 1. Left Sidebar: The "Active Projects" section lists all your ongoing projects with format badges. Click any project title to open it directly.
 2. Main Dashboard: The "Active Projects" section below gives you search filtering, status badges, and project management controls.`;
+  }
+
+  if (q.includes("feature") || q.includes("what does this feature do") || q.includes("gate") || q.includes("rubric")) {
+    return `Scholar Core features:
+• Quality Gates (G0–G4): Formal sign-offs that ensure research definition, evidence locking, drafting, review, and final export are completed systematically.
+• Citation Auditor: Verifies every sentence and claim against approved evidence items to eliminate hallucinations.
+• Format Specialization: Dedicated environments for Assignments, Journal Articles, Research Proposals, and Presentations.
+• Multi-Account & Theme: Toggle Day/Night modes and switch accounts seamlessly in the sidebar.`;
   }
 
   return `Scholar Core is an agentic operating system designed for academic and scientific research:
@@ -167,6 +223,40 @@ export default function ProjectListScreen({
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // In-Page Auth Modal State
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<"signin" | "signup">("signin");
+  const [authModalMessage, setAuthModalMessage] = useState<string | undefined>(undefined);
+  const [pendingFormatId, setPendingFormatId] = useState<string | undefined>(undefined);
+
+  const openAuth = useCallback((mode: "signin" | "signup" = "signin", message?: string, formatId?: string) => {
+    setAuthModalMode(mode);
+    setAuthModalMessage(message);
+    setPendingFormatId(formatId);
+    setAuthModalOpen(true);
+  }, []);
+
+  const closeAuth = useCallback(() => {
+    setAuthModalOpen(false);
+    setAuthModalMessage(undefined);
+    setPendingFormatId(undefined);
+    if (location.pathname === "/signin" || location.pathname === "/signup" || location.search.includes("auth=")) {
+      navigate("/projects", { replace: true });
+    }
+  }, [location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const auth = params.get("auth");
+    if (location.pathname === "/signin" || auth === "signin" || location.search.includes("login")) {
+      openAuth("signin");
+    } else if (location.pathname === "/signup" || auth === "signup") {
+      openAuth("signup");
+    }
+  }, [location.pathname, location.search, openAuth]);
 
   // Theme toggle state: Sand & Snow Day mode vs True-Dark Night mode
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -218,51 +308,16 @@ export default function ProjectListScreen({
 
   const load = useCallback(() => {
     setError(null);
+    if (!userEmail) {
+      setProjects([]);
+      return;
+    }
     listProjects()
       .then((r) => setProjects(r.items))
       .catch(() => {
-        // Provide sample projects for guest preview
-        setProjects([
-          {
-            projectId: "demo-crispr-01",
-            outputTypeId: "OT-10",
-            answers: {
-              title: "Comparative Analysis of In Vivo Cleavage and Repair Fidelity in Primate Lineages",
-              research_question: "How does base editing compare with SpCas9 double-strand break repair?",
-            },
-            authors: [],
-            intakeCompleteness: 0.85,
-            hasDocument: true,
-            hasJournalRequirements: true,
-            gates: [
-              { gate: "G0", name: "G0", status: "signed_off", outstandingBlocking: [] },
-              { gate: "G1", name: "G1", status: "signed_off", outstandingBlocking: [] },
-              { gate: "G2", name: "G2", status: "signed_off", outstandingBlocking: [] },
-              { gate: "G3", name: "G3", status: "signed_off", outstandingBlocking: [] },
-              { gate: "G4", name: "G4", status: "in_progress", outstandingBlocking: [] },
-            ],
-          },
-          {
-            projectId: "demo-proposal-02",
-            outputTypeId: "OT-19",
-            answers: {
-              title: "Autonomous Multi-Agent Systems in Empirical Drug Discovery Pipelines",
-              research_question: "Evaluation of agentic reasoning architectures for target identification",
-            },
-            authors: [],
-            intakeCompleteness: 0.60,
-            hasDocument: false,
-            hasJournalRequirements: false,
-            gates: [
-              { gate: "G0", name: "G0", status: "signed_off", outstandingBlocking: [] },
-              { gate: "G1", name: "G1", status: "signed_off", outstandingBlocking: [] },
-              { gate: "G2", name: "G2", status: "signed_off", outstandingBlocking: [] },
-              { gate: "G3", name: "G3", status: "in_progress", outstandingBlocking: [] },
-            ],
-          },
-        ]);
+        setProjects([]);
       });
-  }, []);
+  }, [userEmail]);
 
   useEffect(() => {
     load();
@@ -310,7 +365,6 @@ export default function ProjectListScreen({
   const [creatingFormatId, setCreatingFormatId] = useState<string | null>(null);
 
   // Website Assistant State (Help & Guidance Layer)
-  const [isWebsiteGuideOpen, setIsWebsiteGuideOpen] = useState(false);
   const [guideInput, setGuideInput] = useState("");
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([
     {
@@ -322,12 +376,18 @@ export default function ProjectListScreen({
   ]);
   const [isGuideThinking, setIsGuideThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const guideInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    if (isWebsiteGuideOpen && typeof messagesEndRef.current?.scrollIntoView === "function") {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+  const scrollToAssistant = useCallback(() => {
+    setMobileMenuOpen(false);
+    const el = document.getElementById("website-assistant");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+      setTimeout(() => {
+        guideInputRef.current?.focus();
+      }, 300);
     }
-  }, [guideMessages, isGuideThinking, isWebsiteGuideOpen]);
+  }, []);
 
   function handleSendGuideMessage(textToSend?: string) {
     const query = (textToSend !== undefined ? textToSend : guideInput).trim();
@@ -343,7 +403,6 @@ export default function ProjectListScreen({
     setGuideMessages((prev) => [...prev, userMsg]);
     setGuideInput("");
     setIsGuideThinking(true);
-    if (!isWebsiteGuideOpen) setIsWebsiteGuideOpen(true);
 
     setTimeout(() => {
       const answer = answerWebsiteQuestion(query);
@@ -355,10 +414,15 @@ export default function ProjectListScreen({
       };
       setGuideMessages((prev) => [...prev, assistantMsg]);
       setIsGuideThinking(false);
-    }, 250);
+    }, 200);
   }
 
   async function handleCreate(outputTypeId: string) {
+    if (!userEmail) {
+      const tile = FORMAT_TILES.find((t) => t.id === outputTypeId);
+      openAuth("signup", `Sign in or create an account to initialize your ${tile?.label || "research"} workspace.`, outputTypeId);
+      return;
+    }
     if (creating) return;
     setCreating(true);
     setCreatingFormatId(outputTypeId);
@@ -372,6 +436,15 @@ export default function ProjectListScreen({
       setCreatingFormatId(null);
     }
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const newFormat = params.get("newFormat");
+    if (newFormat && userEmail && !creating) {
+      handleCreate(newFormat);
+      navigate("/projects", { replace: true });
+    }
+  }, [location.search, userEmail, creating, navigate]);
 
   const [projectToDelete, setProjectToDelete] = useState<ProjectView | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -526,6 +599,10 @@ export default function ProjectListScreen({
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
+                if (!userEmail) {
+                  openAuth("signin", "Sign in or create an account to start a new research project.");
+                  return;
+                }
                 setChoosing(true);
               }}
               className="w-full py-2.5 px-6 rounded-full text-xs font-medium bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 active:scale-95 transition-transform flex items-center justify-center gap-2 cursor-pointer shadow-sm group font-sans"
@@ -570,6 +647,10 @@ export default function ProjectListScreen({
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
+                if (!userEmail) {
+                  openAuth("signin", "Sign in to access your Knowledge Vault references.");
+                  return;
+                }
                 onOpenVault();
               }}
               aria-label="Open Knowledge Vault"
@@ -587,6 +668,10 @@ export default function ProjectListScreen({
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
+                if (!userEmail) {
+                  openAuth("signin", "Sign in to configure AI provider keys and models.");
+                  return;
+                }
                 onOpenAiAccess();
               }}
               aria-label="Manage AI Access"
@@ -601,10 +686,7 @@ export default function ProjectListScreen({
 
           <button
             type="button"
-            onClick={() => {
-              setMobileMenuOpen(false);
-              setIsWebsiteGuideOpen(true);
-            }}
+            onClick={scrollToAssistant}
             aria-label="Platform Guide"
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-tight text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
           >
@@ -721,6 +803,7 @@ export default function ProjectListScreen({
             onOpenAccountSettings={onOpenAccountSettings}
             onOpenVault={onOpenVault}
             onOpenAiAccess={onOpenAiAccess}
+            onOpenAuth={openAuth}
             dropUp={true}
             variant="sidebar"
           />
@@ -763,7 +846,39 @@ export default function ProjectListScreen({
               </svg>
               {!isSidebarOpen && <span>Open Sidebar</span>}
             </button>
+          </div>
 
+          {/* Top Bar Right: If logged out, render Log In and Sign Up buttons! */}
+          <div className="flex items-center gap-2.5">
+            {!userEmail ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openAuth("signin")}
+                  className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer font-sans"
+                >
+                  Log In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openAuth("signup")}
+                  className="px-4 py-1.5 rounded-full text-xs font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:opacity-90 transition-all cursor-pointer shadow-xs font-sans"
+                >
+                  Sign Up
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={scrollToAssistant}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1C1C1E] border border-slate-200/90 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800 transition-all cursor-pointer shadow-2xs group font-sans"
+              >
+                <span className="w-4 h-4 rounded-full bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-[10px] group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-neutral-900 transition-colors">
+                  ?
+                </span>
+                <span>Platform Guide</span>
+              </button>
+            )}
           </div>
         </div>        {/* Centered Reading Column */}
         <div className="max-w-6xl mx-auto px-6 py-8 w-full flex-1">
@@ -815,147 +930,19 @@ export default function ProjectListScreen({
             />
           ) : (
             <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-8">
-              {/* Overall Status & Summary Section */}
-              <div className="w-full flex flex-col gap-6">
-                {/* Command Center Title & Platform Guide Trigger */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
-                        Research Command Center
-                      </h1>
-                      <span className="hidden sm:inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        System Active
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-normal font-sans leading-relaxed">
-                      Autonomous multi-agent synthesis, zero-hallucination citation provenance, and verified publication pipelines.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsWebsiteGuideOpen(true)}
-                    className="self-start sm:self-auto inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1C1C1E] border border-slate-200/90 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800 hover:border-slate-300 dark:hover:border-neutral-700 transition-all cursor-pointer shadow-2xs group"
-                  >
-                    <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-xs group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-neutral-900 transition-colors">
-                      ?
-                    </span>
-                    <span>Platform Guide</span>
-                  </button>
-                </div>
-
-                {/* 4-Card Status Overview Strip */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Card 1: Active Projects Summary */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 shadow-2xs flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-2">
-                        <span className="font-semibold uppercase tracking-wider text-[10px]">Active Pipeline</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
-                          Pipeline
-                        </span>
-                      </div>
-                      <div className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-sans tracking-tight">
-                        {projects ? `${projects.length} ${projects.length === 1 ? "Manuscript" : "Manuscripts"}` : "Loading..."}
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)] mt-1 leading-snug">
-                        In-progress research drafts & quality gates.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Card 2: Knowledge Vault Grounding */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 shadow-2xs flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-2">
-                        <span className="font-semibold uppercase tracking-wider text-[10px]">Knowledge Vault</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50">
-                          Protected
-                        </span>
-                      </div>
-                      <div className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-sans tracking-tight">
-                        Grounded
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)] mt-1 leading-snug">
-                        Zero-hallucination semantic literature index.
-                      </p>
-                    </div>
-                    {onOpenVault && (
-                      <button
-                        type="button"
-                        onClick={onOpenVault}
-                        className="mt-3 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Open Vault</span>
-                        <span>→</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Card 3: AI Engine Connection */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 shadow-2xs flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-2">
-                        <span className="font-semibold uppercase tracking-wider text-[10px]">AI Engine</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-900/50">
-                          Multi-Tier
-                        </span>
-                      </div>
-                      <div className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-sans tracking-tight">
-                        Connected
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)] mt-1 leading-snug">
-                        Claude, OpenAI, Gemini & Local Ollama.
-                      </p>
-                    </div>
-                    {onOpenAiAccess && (
-                      <button
-                        type="button"
-                        onClick={onOpenAiAccess}
-                        className="mt-3 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Manage Keys</span>
-                        <span>→</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Card 4: Editorial Standards */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 shadow-2xs flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-2">
-                        <span className="font-semibold uppercase tracking-wider text-[10px]">Editorial Integrity</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50">
-                          Audited
-                        </span>
-                      </div>
-                      <div className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-sans tracking-tight">
-                        25 Gates
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)] mt-1 leading-snug">
-                        Deterministic rubric & citation sign-off.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              {/* Hero Headline & Subtitle matching the screenshot */}
+              <div className="w-full text-left pt-1">
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans">
+                  What would you like to write today?
+                </h1>
+                <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-normal font-sans mt-2">
+                  Select an academic format to begin with deterministic quality gates and verifiable evidence grounding.
+                </p>
               </div>
 
-              {/* Academic Workspaces Section */}
-              <div className="w-full flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
-                      Academic Workspaces
-                    </h2>
-                    <p className="text-xs text-[var(--text-secondary)] font-normal font-sans">
-                      Select a format to boot interactive quality gates, evidentiary matrices, and grounded drafting.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {/* 4 Academic Workspace Cards */}
+              <div className="w-full">
+                <div className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {FORMAT_TILES.map((tile) => {
                     const isBootingThis = creatingFormatId === tile.id;
                     const isOtherBooting = creating && !isBootingThis;
@@ -964,9 +951,16 @@ export default function ProjectListScreen({
                       <button
                         key={tile.id}
                         type="button"
-                        onClick={() => !creating && handleCreate(tile.id)}
+                        onClick={() => {
+                          if (creating) return;
+                          if (!userEmail) {
+                            openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+                            return;
+                          }
+                          handleCreate(tile.id);
+                        }}
                         disabled={isOtherBooting}
-                        className={`group bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[200px] text-left relative ${
+                        className={`group bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[210px] text-left relative ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
@@ -1013,16 +1007,14 @@ export default function ProjectListScreen({
 
               {/* Active Projects Section with Live Search & Filter Tabs */}
               <section className="w-full text-left">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-gray-200 dark:border-neutral-800 w-full">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-3 border-b border-gray-200 dark:border-neutral-800 w-full">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mb-5 sm:mb-0">
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                       Active Projects
                     </h2>
-                    {projects && (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border border-gray-200 dark:border-neutral-800 text-[var(--text-secondary)] bg-white dark:bg-[#171717] shadow-sm font-sans mb-5 sm:mb-0">
-                        {filteredProjects.length} of {projects.length}
-                      </span>
-                    )}
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border border-gray-200 dark:border-neutral-800 text-[var(--text-secondary)] bg-white dark:bg-[#171717] shadow-sm font-sans">
+                      {projects ? `${filteredProjects.length} of ${projects.length}` : "0 of 0"}
+                    </span>
                   </div>
 
                   {/* Search Bar */}
@@ -1033,16 +1025,16 @@ export default function ProjectListScreen({
                         placeholder="Search projects..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full !rounded-full !border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] pl-10 pr-9 py-2.5 text-xs font-normal text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] outline-none focus:!ring-2 focus:ring-gray-200 dark:focus:ring-neutral-700 transition-all shadow-sm"
+                        className="w-full !rounded-full !border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] pl-10 pr-9 py-2 text-xs font-normal text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] outline-none focus:!ring-2 focus:ring-gray-200 dark:focus:ring-neutral-700 transition-all shadow-sm"
                       />
-                      <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute left-3.5 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute left-3.5 top-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                       {searchQuery && (
                         <button
                           type="button"
                           onClick={() => setSearchQuery("")}
-                          className="absolute right-3 top-2.5 p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                          className="absolute right-3 top-2 p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                           title="Clear search"
                           aria-label="Clear search"
                         >
@@ -1109,12 +1101,7 @@ export default function ProjectListScreen({
 
                 {projects === null ? (
                   error ? (
-                    <div className="flex flex-col justify-center items-center py-20 text-center border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl p-8 shadow-sm">
-                      <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mb-4">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                      </div>
+                    <div className="flex flex-col justify-center items-center py-16 text-center border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl p-8 shadow-sm">
                       <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 font-sans">Failed to load manuscripts</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mb-4 font-normal leading-relaxed font-sans">{error}</p>
                       <button
@@ -1125,13 +1112,28 @@ export default function ProjectListScreen({
                       </button>
                     </div>
                   ) : (
-                    <div className="flex flex-col justify-center items-center py-24 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl shadow-sm">
+                    <div className="flex flex-col justify-center items-center py-20 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl shadow-sm">
                       <div className="w-8 h-8 border-2 border-gray-900 dark:border-gray-100 border-t-transparent rounded-full animate-spin mb-4" />
                       <span className="text-xs font-medium text-gray-500 dark:text-gray-400 font-sans">Loading manuscripts...</span>
                     </div>
                   )
                 ) : projects.length === 0 ? (
-                  <EmptyState onStart={() => setChoosing(true)} onOpenVault={onOpenVault} />
+                  <EmptyState
+                    onStart={() => {
+                      if (!userEmail) {
+                        openAuth("signin", "Sign in to start a new academic project.");
+                        return;
+                      }
+                      setChoosing(true);
+                    }}
+                    onOpenVault={() => {
+                      if (!userEmail) {
+                        openAuth("signin", "Sign in to access your Knowledge Vault.");
+                        return;
+                      }
+                      onOpenVault?.();
+                    }}
+                  />
                 ) : filteredProjects.length === 0 ? (
                   <div className="p-12 text-center rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] shadow-sm">
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 font-sans">No manuscripts match "{searchQuery}"</p>
@@ -1155,6 +1157,136 @@ export default function ProjectListScreen({
                     ))}
                   </div>
                 )}
+              </section>
+
+              {/* In-Page Website Assistant Section (At the bottom of the page) */}
+              <section
+                id="website-assistant"
+                className="w-full text-left rounded-3xl bg-white dark:bg-[#171717] border border-slate-200/90 dark:border-neutral-800 p-6 sm:p-7 shadow-xs mt-2"
+              >
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100 dark:border-neutral-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center text-sm font-bold shadow-xs">
+                      ?
+                    </div>
+                    <div>
+                      <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-sans tracking-tight">
+                        Scholar Core Website Assistant
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-neutral-400 font-normal">
+                        Ask any question to understand platform navigation, workflows, AI configuration, and the Knowledge Vault.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGuideMessages([
+                        {
+                          id: "reset-assistant",
+                          sender: "assistant",
+                          text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
+                          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                        },
+                      ])
+                    }
+                    className="self-start sm:self-auto px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer border border-slate-200/60 dark:border-neutral-700/60"
+                  >
+                    Reset Chat
+                  </button>
+                </div>
+
+                {/* Suggested Questions Chips */}
+                <div className="pt-4 pb-2">
+                  <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-2">
+                    Common Inquiries:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSendGuideMessage(faq.question)}
+                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-50 hover:bg-slate-100 dark:bg-neutral-800/80 dark:hover:bg-neutral-700 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-neutral-700 transition-all cursor-pointer hover:border-slate-300"
+                      >
+                        {faq.shortLabel}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Conversation / Message History (Flow step 1) */}
+                <div className="my-4 max-h-[360px] min-h-[140px] overflow-y-auto space-y-3 pr-2 scholar-scrollbar">
+                  {guideMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+                    >
+                      {msg.sender === "user" ? (
+                        <div className="max-w-[85%] rounded-2xl rounded-br-xs px-4 py-2.5 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed text-xs">
+                          <p>{msg.text}</p>
+                          <span className="text-[9px] text-slate-400 block text-right mt-1">
+                            {msg.timestamp}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="w-full flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-slate-300 flex-shrink-0 mt-0.5 text-[10px] font-bold">
+                            ?
+                          </div>
+                          <div className="flex-1 rounded-2xl rounded-tl-xs px-4 py-3 bg-slate-50 dark:bg-[#1f1f22] border border-slate-200/80 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed whitespace-pre-wrap text-xs">
+                            <p>{msg.text}</p>
+                            <span className="text-[9px] text-slate-400 dark:text-neutral-500 block text-right mt-1">
+                              {msg.timestamp}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {isGuideThinking && (
+                    <div className="flex items-center gap-2 text-slate-400 dark:text-neutral-500 py-1.5 px-2 text-xs">
+                      <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      <span>Consulting platform documentation...</span>
+                    </div>
+                  )}
+
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Simple Text Input & Send Button (Flow steps 2 & 3: Minimal, no uploads, no tools) */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendGuideMessage();
+                  }}
+                  className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800 flex flex-col gap-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={guideInputRef}
+                      type="text"
+                      placeholder="Ask how to use Scholar Core (e.g., How do I set up AI? What is Knowledge Vault?)..."
+                      value={guideInput}
+                      onChange={(e) => setGuideInput(e.target.value)}
+                      className="flex-1 bg-slate-50 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-full px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-neutral-700 transition-all font-sans"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!guideInput.trim() || isGuideThinking}
+                      aria-label="Send question"
+                      className="px-5 py-2.5 rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer font-sans shadow-xs flex-shrink-0"
+                    >
+                      Send →
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 dark:text-neutral-500 text-center font-sans">
+                    Assisting exclusively with Scholar Core website & platform features.
+                  </p>
+                </form>
               </section>
             </div>
           )}
@@ -1215,166 +1347,14 @@ export default function ProjectListScreen({
         </div>
       )}
 
-      {/* Minimal Floating Website Assistant Trigger Button */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <button
-          type="button"
-          onClick={() => setIsWebsiteGuideOpen((prev) => !prev)}
-          aria-label="Scholar Core Platform Guide"
-          title="Open Scholar Core Platform Guide"
-          className="px-4 py-2.5 rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-semibold text-xs shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer font-sans"
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="w-4 h-4 rounded-full bg-white/20 dark:bg-black/20 flex items-center justify-center text-[11px] font-bold">?</span>
-          <span>Platform Guide</span>
-        </button>
-      </div>
-
-      {/* Minimal Website Assistant Slide-over / Modal Panel */}
-      {isWebsiteGuideOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Scholar Core Website Assistant"
-          className="fixed bottom-20 right-6 z-50 w-[380px] sm:w-[420px] max-h-[580px] h-[540px] rounded-3xl bg-white dark:bg-[#18181A] border border-slate-200 dark:border-neutral-800 shadow-2xl flex flex-col font-sans overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200"
-        >
-          {/* Header */}
-          <div className="p-4 border-b border-slate-100 dark:border-neutral-800 flex items-center justify-between bg-slate-50/50 dark:bg-neutral-900/50">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center text-xs font-bold shadow-xs">
-                ?
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                  Website Assistant
-                </h3>
-                <p className="text-[11px] text-slate-500 dark:text-neutral-400">
-                  Scholar Core platform guidance & workflows
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() =>
-                  setGuideMessages([
-                    {
-                      id: "reset-assistant",
-                      sender: "assistant",
-                      text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
-                      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                    },
-                  ])
-                }
-                title="Clear conversation"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors text-xs cursor-pointer"
-              >
-                Reset
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsWebsiteGuideOpen(false)}
-                aria-label="Close Assistant"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Message Thread */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 scholar-scrollbar text-xs">
-            {/* Quick FAQ Chips */}
-            <div className="pb-1">
-              <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1.5">
-                Suggested Topics:
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSendGuideMessage(faq.question)}
-                    className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 hover:bg-slate-200/80 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-neutral-700/60 transition-colors cursor-pointer"
-                  >
-                    {faq.shortLabel}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {guideMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
-              >
-                {msg.sender === "user" ? (
-                  <div className="max-w-[85%] rounded-2xl rounded-br-xs px-3.5 py-2.5 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed">
-                    <p>{msg.text}</p>
-                    <span className="text-[9px] text-slate-400 block text-right mt-1">
-                      {msg.timestamp}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="w-full flex items-start gap-2.5">
-                    <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-slate-300 flex-shrink-0 mt-0.5 text-[10px] font-bold">
-                      ?
-                    </div>
-                    <div className="flex-1 rounded-2xl rounded-tl-xs px-3.5 py-2.5 bg-slate-50 dark:bg-[#202022] border border-slate-200/80 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed whitespace-pre-wrap">
-                      <p>{msg.text}</p>
-                      <span className="text-[9px] text-slate-400 dark:text-neutral-500 block text-right mt-1">
-                        {msg.timestamp}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {isGuideThinking && (
-              <div className="flex items-center gap-2 text-slate-400 dark:text-neutral-500 py-1 px-2 text-xs">
-                <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                <span>Consulting platform documentation...</span>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Minimal Input Footer: pure text input + Send button. NO uploads, NO voice, NO model picker */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendGuideMessage();
-            }}
-            className="p-3 border-t border-slate-100 dark:border-neutral-800/80 bg-white dark:bg-[#18181A] flex flex-col gap-1.5"
-          >
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Ask how to use Scholar Core..."
-                value={guideInput}
-                onChange={(e) => setGuideInput(e.target.value)}
-                className="flex-1 bg-slate-50 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-full px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-neutral-700 transition-all font-sans"
-              />
-              <button
-                type="submit"
-                disabled={!guideInput.trim() || isGuideThinking}
-                aria-label="Send question"
-                className="px-4 py-2 rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer font-sans shadow-xs flex-shrink-0"
-              >
-                Send →
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-400 dark:text-neutral-500 text-center">
-              Assisting exclusively with Scholar Core website & platform features.
-            </p>
-          </form>
-        </div>
-      )}
+      {/* In-Page Authentication Modal */}
+      <EmbeddedAuthModal
+        isOpen={authModalOpen}
+        onClose={closeAuth}
+        initialMode={authModalMode}
+        initialMessage={authModalMessage}
+        selectedFormatId={pendingFormatId}
+      />
     </div>
   );
 }

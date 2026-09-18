@@ -94,9 +94,20 @@ interface OnboardingContext {
  * used to, before any of /projects, /settings, /vault, /ai-access existed as
  * real destinations.
  */
+function RootOrProjectsRoute() {
+  const session = useDeskSession();
+  if (session.status === "signed-in") {
+    return <Navigate to="/projects" replace />;
+  }
+  return <ProjectsIndexRoute />;
+}
+
 function OnboardingGate() {
   const session = useDeskSession();
-  const userId = session.status === "signed-in" ? session.userId : null;
+  if (session.status !== "signed-in") {
+    return <Outlet />;
+  }
+  const userId = session.userId;
   const aiSetup = useAiSetupStatus(userId);
   // Gated on AI setup being finished so the two stages cannot render at once,
   // and so the Vault query does not run before it is reachable.
@@ -159,7 +170,9 @@ function ProjectsIndexRoute() {
   const navigate = useNavigate();
   const session = useDeskSession();
   const device = useDeviceClass();
-  const { justFinishedOnboarding, clearJustFinishedOnboarding } = useOutletContext<OnboardingContext>();
+  const outletCtx = useOutletContext<OnboardingContext | null>();
+  const justFinishedOnboarding = outletCtx?.justFinishedOnboarding ?? false;
+  const clearJustFinishedOnboarding = outletCtx?.clearJustFinishedOnboarding ?? (() => {});
 
   return (
     <ProjectListScreen
@@ -405,9 +418,9 @@ export default function DeskApp() {
     <LoadingProvider>
       <Suspense fallback={<GlobalLoader />}>
         <Routes>
-          <Route path="/" element={<PublicOnly><LandingRoute /></PublicOnly>} />
-          <Route path="/signin" element={<PublicOnly><SignInRoute /></PublicOnly>} />
-          <Route path="/signup" element={<PublicOnly><SignUpRoute /></PublicOnly>} />
+          <Route path="/" element={<RootOrProjectsRoute />} />
+          <Route path="/signin" element={<RootOrProjectsRoute />} />
+          <Route path="/signup" element={<RootOrProjectsRoute />} />
           <Route path="/signup/check-email" element={<PublicOnly><RegisteredRoute /></PublicOnly>} />
           <Route path="/signup/resend" element={<PublicOnly><ResendVerificationRoute /></PublicOnly>} />
           <Route path="/reset-password" element={<PublicOnly><ForgotRoute /></PublicOnly>} />

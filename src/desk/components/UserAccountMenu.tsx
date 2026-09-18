@@ -16,6 +16,7 @@ export interface UserAccountMenuProps {
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
   onOpenHelp?: () => void;
+  onOpenAuth?: (mode: "signin" | "signup") => void;
   dropUp?: boolean;
   variant?: "bar" | "sidebar";
 }
@@ -27,6 +28,7 @@ export default function UserAccountMenu({
   onOpenVault,
   onOpenAiAccess,
   onOpenHelp,
+  onOpenAuth,
   dropUp = false,
   variant = "bar",
 }: UserAccountMenuProps) {
@@ -101,6 +103,36 @@ export default function UserAccountMenu({
   const displayName = fullName || (username ? `@${username}` : (userEmail ? userEmail.split("@")[0] : "Researcher"));
   const secondaryIdentifier = userEmail || (username ? `@${username}` : "Scholar Profile");
   const initial = (fullName ? fullName.charAt(0) : (userEmail ? userEmail.charAt(0) : "U")).toUpperCase();
+
+  if (!userEmail) {
+    return (
+      <div className="relative w-full">
+        <button
+          type="button"
+          onClick={() => onOpenAuth?.("signin")}
+          aria-label="Sign in"
+          className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl border border-slate-200/80 dark:border-neutral-800 bg-white dark:bg-[#18181A] hover:bg-slate-50 dark:hover:bg-neutral-800 text-[var(--text-primary)] transition-all cursor-pointer text-left shadow-2xs group"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-7 h-7 rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs">
+              ?
+            </span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold tracking-tight text-[var(--text-primary)] truncate leading-tight">
+                Guest Researcher
+              </span>
+              <span className="text-[10px] text-slate-400 dark:text-neutral-500 leading-none mt-0.5 font-normal truncate">
+                Sign In / Register →
+              </span>
+            </div>
+          </div>
+          <svg className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full" ref={menuRef}>
