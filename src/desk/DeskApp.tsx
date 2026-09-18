@@ -36,7 +36,6 @@ const PresentationWorkspace = lazy(() => import("./presentation/PresentationWork
 const ProjectListScreen = lazy(() => import("./ProjectListScreen"));
 const VaultSetupScreen = lazy(() => import("./setup/VaultSetupScreen"));
 const VaultScreen = lazy(() => import("./vault/VaultScreen"));
-const AgentsScreen = lazy(() => import("./agents/AgentsScreen"));
 
 import type { AssignmentStage } from "./assignment/types";
 import { ASSIGNMENT_STAGES } from "./assignment/types";
@@ -169,7 +168,6 @@ function ProjectsIndexRoute() {
       onOpenAccountSettings={() => navigate("/settings", { state: { from: "/projects" } })}
       onOpenVault={() => navigate("/vault", { state: { from: "/projects" } })}
       onOpenAiAccess={() => navigate("/ai-access", { state: { from: "/projects" } })}
-      onOpenAgents={() => navigate("/agents", { state: { from: "/projects" } })}
       showWelcome={justFinishedOnboarding}
       onWelcomeSeen={clearJustFinishedOnboarding}
     />
@@ -391,22 +389,6 @@ function AiAccessRoute() {
   );
 }
 
-function AgentsRoute() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  return (
-    <AgentsScreen
-      onClose={() => {
-        if (location.key !== "default") {
-          navigate(-1);
-        } else {
-          navigate(returnTo(location), { replace: true });
-        }
-      }}
-    />
-  );
-}
-
 /**
  * Root route tree for everything except /admin/* (see main.tsx).
  *
@@ -449,7 +431,7 @@ export default function DeskApp() {
                 <Route path="vault" element={<VaultRoute />} />
                 <Route path="ai-access" element={<AiAccessRoute />} />
                 <Route path="ai-access/:section" element={<AiAccessRoute />} />
-                <Route path="agents" element={<AgentsRoute />} />
+                <Route path="agents" element={<Navigate to="/projects" replace />} />
                 <Route path="*" element={<Navigate to="/projects" replace />} />
               </Route>
             </Route>

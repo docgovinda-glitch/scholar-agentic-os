@@ -197,7 +197,6 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
   it("renders the fixed left sidebar with branding, full-width New Project, and vertical navigation", async () => {
     listProjects.mockResolvedValue({ items: [] });
     const onOpenVault = vi.fn();
-    const onOpenAgents = vi.fn();
     const onOpenAiAccess = vi.fn();
     const onOpenAccountSettings = vi.fn();
 
@@ -206,7 +205,6 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
         onOpen={vi.fn()}
         userEmail="scholar@research.edu"
         onOpenVault={onOpenVault}
-        onOpenAgents={onOpenAgents}
         onOpenAiAccess={onOpenAiAccess}
         onOpenAccountSettings={onOpenAccountSettings}
       />
@@ -229,10 +227,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     fireEvent.click(vaultBtn);
     expect(onOpenVault).toHaveBeenCalled();
 
-    const agentsBtn = within(aside!).getByRole("button", { name: /Editorial Agents/i });
-    expect(agentsBtn).toBeInTheDocument();
-    fireEvent.click(agentsBtn);
-    expect(onOpenAgents).toHaveBeenCalled();
+    expect(within(aside!).queryByRole("button", { name: /Editorial Agents/i })).not.toBeInTheDocument();
 
     const aiAccessBtn = within(aside!).getByRole("button", { name: /AI Access/i });
     expect(aiAccessBtn).toBeInTheDocument();

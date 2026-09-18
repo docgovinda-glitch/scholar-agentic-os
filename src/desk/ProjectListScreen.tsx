@@ -17,7 +17,6 @@ export default function ProjectListScreen({
   onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
-  onOpenAgents,
   showWelcome,
   onWelcomeSeen,
 }: {
@@ -26,7 +25,6 @@ export default function ProjectListScreen({
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
-  onOpenAgents?: () => void;
   showWelcome?: boolean;
   onWelcomeSeen?: () => void;
 }) {
@@ -383,23 +381,6 @@ export default function ProjectListScreen({
             </button>
           )}
 
-          {onOpenAgents && (
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenAgents();
-              }}
-              aria-label="Open Editorial Agents"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-tight text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
-            >
-              <svg className="w-4 h-4 flex-shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              <span>Editorial Agents</span>
-            </button>
-          )}
-
           {onOpenAiAccess && (
             <button
               type="button"
@@ -525,7 +506,7 @@ export default function ProjectListScreen({
                 <div>
                   <p className="text-sm font-bold text-gray-900 dark:text-gray-100 font-sans">Welcome to your Scholar Workspace</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-normal leading-relaxed font-sans">
-                    Select an academic workspace to begin, upload reference PDFs to your Vault, or configure your editorial agents.
+                    Select an academic workspace to begin, or upload reference PDFs to your Vault.
                   </p>
                 </div>
               </div>
