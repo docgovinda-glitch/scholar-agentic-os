@@ -441,7 +441,6 @@ export default function ProjectListScreen({
   }, [types]);
 
   // Website Assistant State (Help & Guidance Layer)
-  const [assistantOpen, setAssistantOpen] = useState(true);
   const [guideInput, setGuideInput] = useState("");
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([
     {
@@ -457,10 +456,13 @@ export default function ProjectListScreen({
 
   const scrollToAssistant = useCallback(() => {
     setMobileMenuOpen(false);
-    setAssistantOpen(true);
+    const el = document.getElementById("website-assistant");
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
     setTimeout(() => {
       guideInputRef.current?.focus();
-    }, 150);
+    }, 250);
   }, []);
 
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -1148,266 +1150,222 @@ export default function ProjectListScreen({
                 )}
               </section>
 
-              {/* Minimal In-Page Guide Strip */}
-              <div className="w-full pt-4 pb-2">
-                <div className="rounded-2xl border border-dashed border-slate-200/90 dark:border-neutral-800/90 bg-slate-50/40 dark:bg-neutral-900/20 px-5 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-                  <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-2xs">
-                      <ScholarCoreLogo size="sm" />
+              {/* Full-Row Gemini / ChatGPT-style Website Assistant */}
+              <section
+                id="website-assistant"
+                aria-label="Scholar Core Website Assistant"
+                className="w-full pt-8 pb-4 flex flex-col gap-3.5"
+              >
+                {/* Header & Reset Button */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center shadow-xs flex-shrink-0">
+                      <ScholarCoreLogo size="md" />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 font-sans">
-                        Need guidance on platform features, AI setup, or Knowledge Vault?
-                      </p>
-                      <p className="text-[11px] text-slate-500 dark:text-neutral-400 font-normal mt-0.5 font-sans">
-                        Open the Scholar Core Platform Guide for instant answers and workflow assistance.
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white font-sans">
+                          Scholar Core Website Assistant
+                        </h2>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 font-sans border border-slate-200/60 dark:border-neutral-700/60">
+                          Guide
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 font-sans">
+                        Ask any question to understand platform navigation, workflows, AI setup, and Knowledge Vault.
                       </p>
                     </div>
                   </div>
+
                   <button
                     type="button"
-                    onClick={() => {
-                      setAssistantOpen(true);
-                      setTimeout(() => guideInputRef.current?.focus(), 150);
-                    }}
-                    className="px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-2xs font-sans flex items-center gap-1.5 flex-shrink-0"
+                    aria-label="Reset Chat"
+                    onClick={() =>
+                      setGuideMessages([
+                        {
+                          id: "reset-assistant",
+                          sender: "assistant",
+                          text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
+                          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                        },
+                      ])
+                    }
+                    className="self-start sm:self-auto px-3.5 py-1 rounded-full text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 border border-slate-200/80 dark:border-neutral-700/80 transition-colors cursor-pointer font-sans shadow-2xs"
                   >
-                    <span>Open Platform Guide</span>
-                    <span>→</span>
+                    Reset Chat
                   </button>
                 </div>
-              </div>
+
+                {/* Conversation Stream (Gemini / ChatGPT style full-width) */}
+                <div className="w-full rounded-2xl border border-slate-200/80 dark:border-neutral-800 bg-white/70 dark:bg-[#151517] p-4 sm:p-5 shadow-2xs max-h-[340px] min-h-[110px] overflow-y-auto scholar-scrollbar space-y-4">
+                  {guideMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+                    >
+                      {msg.sender === "user" ? (
+                        <div className="max-w-[85%] rounded-2xl rounded-tr-xs px-4 py-2.5 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed text-xs sm:text-sm font-medium font-sans">
+                          <p>{msg.text}</p>
+                          <span className="text-[10px] text-slate-400 block text-right mt-1">
+                            {msg.timestamp}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="w-full flex items-start gap-3 group">
+                          <div className="w-7 h-7 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-xs mt-0.5">
+                            <ScholarCoreLogo size="sm" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="rounded-2xl rounded-tl-xs px-4 py-3 bg-slate-50/90 dark:bg-[#1c1c1f] border border-slate-200/70 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed text-xs sm:text-sm font-sans">
+                              <div className="space-y-1.5 whitespace-pre-wrap leading-relaxed">
+                                {msg.text}
+                              </div>
+
+                              {/* Interactive Action Deep-Link Button */}
+                              {msg.action && (
+                                <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-neutral-700/60 flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAssistantAction(msg.action!)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-all cursor-pointer shadow-xs active:scale-98 font-sans"
+                                  >
+                                    <span>{msg.action.label}</span>
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Suggested Follow-ups */}
+                              {msg.followUps && msg.followUps.length > 0 && (
+                                <div className="mt-3 pt-2 border-t border-slate-200/40 dark:border-neutral-700/40">
+                                  <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1.5">
+                                    Suggested:
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {msg.followUps.map((fu, fIdx) => (
+                                      <button
+                                        key={fIdx}
+                                        type="button"
+                                        onClick={() => handleSendGuideMessage(fu)}
+                                        className="px-2.5 py-1 rounded-full text-xs font-medium bg-white hover:bg-slate-100 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-neutral-700 transition-colors cursor-pointer font-sans"
+                                      >
+                                        {fu}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100 dark:border-neutral-800/60">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyMessage(msg.id, msg.text)}
+                                  className="text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors flex items-center gap-1 cursor-pointer font-sans"
+                                  title="Copy response"
+                                >
+                                  {copiedMessageId === msg.id ? (
+                                    <span className="text-emerald-600 font-medium">Copied to clipboard</span>
+                                  ) : (
+                                    <span>Copy response</span>
+                                  )}
+                                </button>
+                                <span className="text-[10px] text-slate-400 dark:text-neutral-500 block font-sans">
+                                  {msg.timestamp}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {isGuideThinking && (
+                    <div className="flex items-start gap-3 py-1">
+                      <div className="w-7 h-7 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-xs animate-pulse">
+                        <ScholarCoreLogo size="sm" />
+                      </div>
+                      <div className="flex-1 py-1 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-600 dark:bg-slate-300 animate-ping" />
+                        <span className="text-xs font-medium text-slate-600 dark:text-neutral-300 animate-pulse font-sans">
+                          Consulting platform knowledge...
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Common Inquiries / Prompt Suggestion Pills (Gemini / ChatGPT style) */}
+                <div className="w-full flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none snap-x">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wider flex-shrink-0 font-sans">
+                    Suggestions:
+                  </span>
+                  {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSendGuideMessage(faq.question)}
+                      className="snap-start flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white hover:bg-slate-50 dark:bg-[#18181b] dark:hover:bg-neutral-800 text-slate-700 hover:text-slate-900 dark:text-neutral-300 dark:hover:text-white border border-slate-200/90 dark:border-neutral-700/80 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95 font-sans"
+                    >
+                      {faq.shortLabel}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Full-Row Gemini / ChatGPT Chat Box Container */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendGuideMessage();
+                  }}
+                  className="w-full flex flex-col rounded-3xl border border-slate-200 dark:border-neutral-700/80 bg-white dark:bg-[#1e1f20] shadow-sm hover:border-slate-300 dark:hover:border-neutral-600 focus-within:border-slate-400 dark:focus-within:border-neutral-500 focus-within:shadow-md transition-all p-3.5 sm:p-4 gap-2.5"
+                >
+                  <div className="relative flex items-center w-full">
+                    <input
+                      ref={guideInputRef}
+                      type="text"
+                      placeholder="Ask how to use Scholar Core (e.g., How do I set up AI? What is Knowledge Vault?)..."
+                      value={guideInput}
+                      onChange={(e) => setGuideInput(e.target.value)}
+                      className="w-full bg-transparent border-none outline-none text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 font-sans min-w-0 pr-2"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-neutral-800/80">
+                    <div className="flex items-center gap-2 text-slate-400 dark:text-neutral-500">
+                      <div className="w-5 h-5 rounded-md bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center shadow-2xs">
+                        <ScholarCoreLogo size="sm" />
+                      </div>
+                      <span className="text-[11px] font-medium font-sans">
+                        Scholar Core Guide
+                      </span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={!guideInput.trim() || isGuideThinking}
+                      aria-label="Send question"
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
+                        guideInput.trim() && !isGuideThinking
+                          ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:scale-105 active:scale-95 shadow-xs"
+                          : "bg-slate-100 dark:bg-neutral-800 text-slate-300 dark:text-neutral-600 cursor-not-allowed opacity-50"
+                      }`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                      </svg>
+                    </button>
+                  </div>
+                </form>
+
+                <p className="text-[11px] text-slate-400 dark:text-neutral-500 text-center font-sans">
+                  Assisting exclusively with Scholar Core website & platform features.
+                </p>
+              </section>
             </div>
           )}
         </div>
       </main>
-
-      {/* Floating Website Assistant Widget (Bottom-Right) */}
-      {!assistantOpen ? (
-        <button
-          type="button"
-          onClick={() => {
-            setAssistantOpen(true);
-            setTimeout(() => guideInputRef.current?.focus(), 150);
-          }}
-          aria-label="Open Scholar Core Guide"
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 border border-slate-700 dark:border-neutral-200 cursor-pointer group font-sans"
-        >
-          <div className="w-5 h-5 flex items-center justify-center">
-            <ScholarCoreLogo size="sm" />
-          </div>
-          <span className="text-xs font-semibold font-sans">Platform Guide</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        </button>
-      ) : (
-        <aside
-          id="website-assistant"
-          aria-label="Scholar Core Website Assistant"
-          className="fixed bottom-5 right-5 z-40 w-[calc(100vw-32px)] sm:w-[380px] max-h-[520px] flex flex-col rounded-2xl bg-white dark:bg-[#161618] border border-slate-200/90 dark:border-neutral-800 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200 font-sans"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 border-b border-slate-100 dark:border-neutral-800 bg-slate-50/50 dark:bg-neutral-900/40">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center shadow-2xs flex-shrink-0">
-                <ScholarCoreLogo size="sm" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-xs font-bold text-slate-900 dark:text-white font-sans truncate">
-                  Scholar Core Website Assistant
-                </h2>
-                <p className="text-[10px] text-slate-400 dark:text-neutral-500 truncate">
-                  Ask any question to understand platform navigation, workflows, AI setup, and Knowledge Vault.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <button
-                type="button"
-                aria-label="Reset Chat"
-                onClick={() =>
-                  setGuideMessages([
-                    {
-                      id: "reset-assistant",
-                      sender: "assistant",
-                      text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
-                      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                    },
-                  ])
-                }
-                className="px-2 py-0.5 rounded-md text-[10px] font-medium text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-neutral-800 transition-colors cursor-pointer border border-slate-200/60 dark:border-neutral-700/60 font-sans"
-              >
-                Reset Chat
-              </button>
-
-              <button
-                type="button"
-                aria-label="Minimize Guide"
-                title="Minimize Guide"
-                onClick={() => setAssistantOpen(false)}
-                className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Inquiries (Horizontal Scroll Track - Only 32px high!) */}
-          <div className="px-3 py-1.5 border-b border-slate-100 dark:border-neutral-800/60 bg-slate-50/30 dark:bg-neutral-900/20 flex items-center gap-1.5 overflow-x-auto scrollbar-none snap-x">
-            <span className="text-[9px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wider flex-shrink-0 font-sans">
-              FAQs:
-            </span>
-            {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleSendGuideMessage(faq.question)}
-                className="snap-start flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white hover:bg-slate-100 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white border border-slate-200 dark:border-neutral-700 transition-all cursor-pointer shadow-2xs active:scale-95 font-sans"
-              >
-                {faq.shortLabel}
-              </button>
-            ))}
-          </div>
-
-          {/* Message Dialogue Area */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2 max-h-[240px] min-h-[100px] scholar-scrollbar">
-            {guideMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
-              >
-                {msg.sender === "user" ? (
-                  <div className="max-w-[85%] rounded-2xl rounded-tr-xs px-3 py-1.5 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed text-xs font-medium font-sans">
-                    <p>{msg.text}</p>
-                    <span className="text-[9px] text-slate-400 block text-right mt-0.5">
-                      {msg.timestamp}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="w-full flex items-start gap-2 group">
-                    <div className="w-5 h-5 rounded-md bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-xs mt-0.5">
-                      <ScholarCoreLogo size="sm" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="rounded-xl rounded-tl-xs px-3 py-2 bg-slate-50 dark:bg-[#1f1f22] border border-slate-200/80 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed text-xs font-sans">
-                        <div className="space-y-1 whitespace-pre-wrap leading-relaxed">
-                          {msg.text}
-                        </div>
-
-                        {/* Interactive Action Deep-Link Button */}
-                        {msg.action && (
-                          <div className="mt-2 pt-1.5 border-t border-slate-200/60 dark:border-neutral-700/60 flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleAssistantAction(msg.action!)}
-                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-all cursor-pointer shadow-xs active:scale-98 font-sans"
-                            >
-                              <span>{msg.action.label}</span>
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Suggested Follow-ups */}
-                        {msg.followUps && msg.followUps.length > 0 && (
-                          <div className="mt-2 pt-1.5 border-t border-slate-200/40 dark:border-neutral-700/40">
-                            <span className="text-[8px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1">
-                              Suggested:
-                            </span>
-                            <div className="flex flex-wrap gap-1">
-                              {msg.followUps.map((fu, fIdx) => (
-                                <button
-                                  key={fIdx}
-                                  type="button"
-                                  onClick={() => handleSendGuideMessage(fu)}
-                                  className="px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-white hover:bg-slate-100 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-neutral-700 transition-colors cursor-pointer font-sans"
-                                >
-                                  {fu}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between mt-1.5 pt-0.5">
-                          <button
-                            type="button"
-                            onClick={() => handleCopyMessage(msg.id, msg.text)}
-                            className="text-[9px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex items-center gap-1 cursor-pointer font-sans"
-                            title="Copy response"
-                          >
-                            {copiedMessageId === msg.id ? (
-                              <span className="text-emerald-500 font-medium">Copied</span>
-                            ) : (
-                              <span>Copy</span>
-                            )}
-                          </button>
-                          <span className="text-[9px] text-slate-400 dark:text-neutral-500 block font-sans">
-                            {msg.timestamp}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {isGuideThinking && (
-              <div className="flex items-start gap-2 py-1">
-                <div className="w-5 h-5 rounded-md bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-xs animate-pulse">
-                  <ScholarCoreLogo size="sm" />
-                </div>
-                <div className="flex-1 py-0.5 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-600 dark:bg-slate-300 animate-ping" />
-                  <span className="text-[11px] font-medium text-slate-600 dark:text-neutral-300 animate-pulse font-sans">
-                    Consulting platform knowledge...
-                  </span>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Capsule Pill Input Bar */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendGuideMessage();
-            }}
-            className="p-2 border-t border-slate-100 dark:border-neutral-800/80 bg-white dark:bg-[#161618]"
-          >
-            <div className="relative flex items-center w-full bg-slate-50 dark:bg-[#101012] border border-slate-200 dark:border-neutral-700/80 rounded-full px-2.5 py-1.5 shadow-2xs hover:border-slate-300 dark:hover:border-neutral-600 focus-within:border-slate-400 transition-all">
-              <input
-                ref={guideInputRef}
-                type="text"
-                placeholder="Ask how to use Scholar Core..."
-                value={guideInput}
-                onChange={(e) => setGuideInput(e.target.value)}
-                className="flex-1 bg-transparent border-none outline-none text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 font-sans min-w-0 pr-1.5"
-              />
-              <button
-                type="submit"
-                disabled={!guideInput.trim() || isGuideThinking}
-                aria-label="Send question"
-                className={`w-6 h-6 rounded-full flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
-                  guideInput.trim() && !isGuideThinking
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:scale-105 active:scale-95 shadow-xs"
-                    : "bg-slate-200/60 dark:bg-neutral-800 text-slate-400 dark:text-neutral-600 cursor-not-allowed opacity-60"
-                }`}
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                </svg>
-              </button>
-            </div>
-            <p className="text-[9px] text-slate-400 dark:text-neutral-500 text-center mt-1 font-sans">
-              Assisting exclusively with Scholar Core website & platform features.
-            </p>
-          </form>
-        </aside>
-      )}
 
       {/* Delete Confirmation Modal Pop-up */}
       {projectToDelete && (

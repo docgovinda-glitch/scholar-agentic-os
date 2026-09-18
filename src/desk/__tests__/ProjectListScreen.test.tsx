@@ -481,22 +481,19 @@ describe("minimal website assistant", () => {
     expect(screen.getByText(/Hello! I am your Scholar Core Website Assistant/i)).toBeInTheDocument();
   });
 
-  it("minimizes floating assistant to compact launcher and re-expands upon click", async () => {
+  it("renders full-row Gemini-style chatbox at the bottom and handles smooth scrolling from Platform Guide button", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // Click Minimize
-    const minimizeBtn = await screen.findByRole("button", { name: "Minimize Guide" });
-    fireEvent.click(minimizeBtn);
+    const guideSection = document.getElementById("website-assistant");
+    expect(guideSection).toBeInTheDocument();
+    expect(guideSection).toHaveClass("w-full");
 
-    // Floating launcher button appears
-    const launcherBtn = await screen.findByRole("button", { name: "Open Scholar Core Guide" });
-    expect(launcherBtn).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Minimize Guide" })).not.toBeInTheDocument();
+    const guideTopBtn = screen.getByRole("button", { name: /Platform Guide/i });
+    fireEvent.click(guideTopBtn);
 
-    // Click launcher to re-expand
-    fireEvent.click(launcherBtn);
-    expect(await screen.findByRole("button", { name: "Minimize Guide" })).toBeInTheDocument();
+    const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
+    expect(input).toBeInTheDocument();
   });
 });
 
