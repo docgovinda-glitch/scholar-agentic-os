@@ -114,8 +114,8 @@ export default function ProjectListScreen({
             ],
           },
           {
-            projectId: "demo-thesis-02",
-            outputTypeId: "OT-09",
+            projectId: "demo-proposal-02",
+            outputTypeId: "OT-19",
             answers: {
               title: "Autonomous Multi-Agent Systems in Empirical Drug Discovery Pipelines",
               research_question: "Evaluation of agentic reasoning architectures for target identification",
@@ -563,7 +563,7 @@ export default function ProjectListScreen({
 
               {/* Tactile Apple-Style Template Cards Grid */}
               <div className="w-full">
-                <div className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                <div className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                   {FORMAT_TILES.map((tile) => {
                     const isBootingThis = creatingFormatId === tile.id;
                     const isOtherBooting = creating && !isBootingThis;
@@ -573,7 +573,7 @@ export default function ProjectListScreen({
                         type="button"
                         onClick={() => !creating && handleCreate(tile.id)}
                         disabled={isOtherBooting}
-                        className={`bg-white dark:bg-[#171717] border border-gray-100 dark:border-neutral-800 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col gap-2 text-left ${
+                        className={`bg-white dark:bg-[#171717] border border-gray-100 dark:border-neutral-800 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full text-left ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
@@ -917,28 +917,21 @@ function EmptyState({ onStart }: { onStart: () => void }) {
   );
 }
 
-/** Curated 5 essential academic formats requested by user */
+/** Curated 4 essential academic formats */
 const FORMAT_TILES = [
   {
     id: "OT-01",
     label: "Assignment",
     tag: "Coursework & Essays",
-    description: "Dedicated 8-phase thinking, evidence board & grounded drafting.",
+    description: "Dedicated 8–phase thinking, evidence board & grounded drafting.",
     budget: "800 – 4,000 words",
   },
   {
     id: "OT-10",
     label: "Journal Article",
     tag: "Peer-Reviewed Papers",
-    description: "25-stage empirical research pipeline with multi-agent peer review.",
+    description: "25–stage empirical research pipeline with multi-agent peer review.",
     budget: "4,000 – 10,000 words",
-  },
-  {
-    id: "OT-09",
-    label: "Thesis / Dissertation",
-    tag: "Milestones & Defense",
-    description: "Comprehensive multi-chapter dissertation and thesis framework.",
-    budget: "10,000 – 80,000 words",
   },
   {
     id: "OT-19",
@@ -1056,15 +1049,17 @@ function ChooseOutputType({
               </option>
             ))}
             {/* Preserve any extra test types */}
-            {types.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
+            {types
+              .filter((t) => t.id !== "OT-09" && !FORMAT_TILES.some((f) => f.id === t.id))
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
           </select>
 
           {/* Interactive Format Tiles Grid */}
-          <div className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {FORMAT_TILES.map((tile) => {
               const isSelected = selected === tile.id;
 
@@ -1073,7 +1068,7 @@ function ChooseOutputType({
                   key={tile.id}
                   onClick={() => setSelected(tile.id)}
                   onDoubleClick={() => onPick(tile.id)}
-                  className={`bg-white dark:bg-[#171717] border border-gray-100 dark:border-neutral-800 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col gap-2 text-left ${
+                  className={`bg-white dark:bg-[#171717] border border-gray-100 dark:border-neutral-800 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full text-left ${
                     isSelected
                       ? "ring-2 ring-gray-900 dark:ring-gray-100 border-gray-900 dark:border-gray-100"
                       : ""

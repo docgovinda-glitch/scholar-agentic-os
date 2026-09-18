@@ -52,8 +52,9 @@ describe("the document-type format selector", () => {
 
     expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Thesis / Dissertation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
   });
 
   it("cannot continue before a format is chosen", async () => {
@@ -82,7 +83,9 @@ describe("the document-type format selector", () => {
 
     expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Thesis / Dissertation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
   });
 });
 

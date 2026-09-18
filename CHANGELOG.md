@@ -5,7 +5,15 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-17
+## [Unreleased] - 2026-09-18
+
+### Changed
+- **Curated 4 Academic Workspace Cards & Responsive Alignment (`ProjectListScreen.tsx`)**:
+  - **Removed Thesis / Dissertation from UI**: Cleanly removed `OT-09` from primary workspace format cards (`FORMAT_TILES`) and filter tabs, focusing on the 4 core formats: *Assignment*, *Journal Article*, *Research Proposal*, and *Presentation*. Full thesis workspace codebase (`ThesisWorkspace.tsx`), route handlers (`OT-09`/`OT-07`), and data models remain fully intact.
+  - **Balanced Responsive Grid Alignment**: Replaced the previous 3-column breakpoint (`lg:grid-cols-3`) with a balanced 4-column responsive grid (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5` with `h-full justify-between`). Renders a seamless 4-across layout on desktop, a clean 2×2 grid on tablets/medium displays, and 1 column on mobile with zero orphaned or empty slots.
+- **Removed `/agents` UI & Redirected Route (`DeskApp.tsx`, `ProjectListScreen.tsx`)**:
+  - Deprecated standalone `AgentsScreen.tsx` and removed the "Editorial Agents" link from the platform navigation sidebar and welcome banner.
+  - Added clean client-side redirect routing `/agents` directly to `/projects`.
 
 ### Added
 - **Workspace Dashboard Airbnb Typography & Input Grid Alignment Overhaul (`ProjectListScreen.tsx`)**:

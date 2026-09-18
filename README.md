@@ -4,9 +4,9 @@
 
 ---
 
-## 🏛️ The 5 Dedicated Academic Workspaces
+## 🏛️ Dedicated Academic Workspaces
 
-Rather than generic forms, each academic format in Scholar Core operates through its own purpose-built workspace tailored to the exact cognitive process of researchers:
+Rather than generic forms, each academic format in Scholar Core operates through its own purpose-built workspace tailored to the exact cognitive process of researchers. The primary UI highlights four curated formats, with deep long-form milestone architectures preserved in the underlying codebase:
 
 1. **📝 Assignment Workspace (`OT-01`)**:
    - **8-Phase Academic Workflow**: *Understand → Plan → Research → Evidence Evaluation → Think/Critique → Structure → Grounded Drafting → Submission Review*.
@@ -16,16 +16,14 @@ Rather than generic forms, each academic format in Scholar Core operates through
    - **25-Stage Empirical Pipeline**: *Topic Selection → Literature Matrix → Claim-Evidence Graph → Methodological Framing → Empirical Generation → Double-Blind Adversarial Peer Review*.
    - Includes 5 specialized reviewer lenses (Methodologist, Domain Specialist, Biostatistician, Synthesizer, Formal Editor).
 
-3. **🎓 Thesis / Dissertation Workspace (`OT-09`)**:
-   - **Multi-Chapter Milestone Framework**: *Proposal & Theoretical Framing → Comprehensive Lit Review → Methodological Design & IRB → Empirical Findings → Critical Discussion & Contributions → Conclusion & Future Trajectory*.
-   - Features an interactive **15-Question Viva Voce / Doctoral Defense Simulator**.
-
-4. **💡 Research Proposal Workspace (`OT-19`)**:
+3. **💡 Research Proposal Workspace (`OT-19`)**:
    - **Competitive Grant Pipeline**: *Funding Agency Rubric Alignment → 1-Page Specific Aims → Significance & Innovation → Research Strategy & Pitfalls → Timeline & Gantt Work Packages → Budget Justification*.
    - Includes a **Study Section Review Simulator (NIH / NSF Scoring Criteria)**.
 
-5. **📊 Academic Presentation Workspace (`OT-22`)**:
+4. **📊 Academic Presentation Workspace (`OT-22`)**:
    - **Visual Narrative & Defense Studio**: *Timing & Constraint Profiler (10m/20m/45m) → Narrative Arc & Hook → Slide Deck Architecture → Word-for-Word Speaker Scripts → Interactive 16:9 Slide Canvas → Marp/PPTX Export → Audience Q&A Anticipator*.
+
+*(Underlying engine also preserves the **🎓 Thesis / Dissertation Workspace (`OT-09`)** with its multi-chapter milestone framework and 15-Question Viva Voce defense simulator).*
 
 ---
 
