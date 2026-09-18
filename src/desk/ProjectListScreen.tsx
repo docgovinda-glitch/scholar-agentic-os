@@ -39,136 +39,103 @@ export const FORMAT_TILES = [
   },
 ];
 
-export interface ChatBlueprint {
-  formatId: string;
-  formatLabel: string;
-  proposedTitle: string;
-  fieldDomain: string;
-  researchGap: string;
-  phases: { name: string; description: string }[];
-  recommendedCitations: number;
-}
-
-export interface ChatMessage {
+export interface WebsiteAssistantMessage {
   id: string;
   sender: "user" | "assistant";
   text: string;
   timestamp: string;
-  attachedFile?: string | null;
-  blueprint?: ChatBlueprint;
 }
 
-export const STARTER_PROMPT_CHIPS = [
+export const WEBSITE_ASSISTANT_FAQS = [
   {
-    icon: "🔬",
-    label: "CRISPR Base Editing Review",
-    query: "Synthesize recent clinical advances in CRISPR base editing and off-target translocation mitigation.",
-    formatId: "OT-10",
+    question: "How do I set up AI?",
+    shortLabel: "AI Setup & Keys",
   },
   {
-    icon: "📝",
-    label: "LLM Reasoning Benchmark",
-    query: "Structure an empirical study benchmarking chain-of-thought latency and reasoning fidelity in dense transformer architectures.",
-    formatId: "OT-10",
+    question: "What is Knowledge Vault?",
+    shortLabel: "Knowledge Vault",
   },
   {
-    icon: "💡",
-    label: "Clean Energy Microgrid Proposal",
-    query: "Draft a research grant proposal for decentralized autonomous control in islanded renewable microgrids.",
-    formatId: "OT-19",
+    question: "How do I create a research project?",
+    shortLabel: "Create Project",
   },
   {
-    icon: "📊",
-    label: "Clinical Trial Slide Deck",
-    query: "Create an academic presentation deck summarizing Phase II oncology biomarker endpoints and patient survival rates.",
-    formatId: "OT-22",
+    question: "What is the Evidence phase & how do I add sources?",
+    shortLabel: "Evidence & Sources",
+  },
+  {
+    question: "How does the Journal Article workflow work?",
+    shortLabel: "Journal Workflow",
+  },
+  {
+    question: "Where can I find my projects?",
+    shortLabel: "Finding Projects",
   },
 ];
 
-export function generateScholarResponse(
-  prompt: string,
-  formatOverride?: string | null,
-  attachedFile?: string | null
-): { greeting: string; blueprint: ChatBlueprint } {
-  const p = prompt.toLowerCase();
+export function answerWebsiteQuestion(query: string): string {
+  const q = query.toLowerCase();
 
-  let formatId = "OT-10";
-  let formatLabel = "Journal Article";
-
-  if (formatOverride) {
-    formatId = formatOverride;
-    const tile = FORMAT_TILES.find((t) => t.id === formatOverride);
-    if (tile) formatLabel = tile.label;
-  } else if (p.includes("proposal") || p.includes("grant") || p.includes("nsf") || p.includes("nih") || p.includes("funding")) {
-    formatId = "OT-19";
-    formatLabel = "Research Proposal";
-  } else if (p.includes("presentation") || p.includes("slides") || p.includes("deck") || p.includes("talk") || p.includes("keynote")) {
-    formatId = "OT-22";
-    formatLabel = "Presentation";
-  } else if (p.includes("assignment") || p.includes("essay") || p.includes("homework") || p.includes("course") || p.includes("syllabus")) {
-    formatId = "OT-01";
-    formatLabel = "Assignment";
+  if (q.includes("ai") || q.includes("key") || q.includes("provider") || q.includes("model") || q.includes("engine") || q.includes("byok")) {
+    return `To configure AI in Scholar Core:
+1. Open "AI Access" from the Platform menu in the left sidebar.
+2. Select your preferred provider tier:
+   • BYOK (Bring Your Own Key): Securely connect Claude, OpenAI, DeepSeek, or Gemini keys directly on your device.
+   • Free Tiers: Use free community model allocations.
+   • Local Studio: Connect local models via Ollama for 100% offline privacy.
+Once connected, the Multi-Agent Editorial Board automatically routes tasks to your active models.`;
   }
 
-  let fieldDomain = "Interdisciplinary Scholarly Research";
-  let proposedTitle = "Systematic Investigation and Empirical Evidence Synthesis";
-  let researchGap = "Absence of consolidated multi-source benchmarks and verified provenance in current literature.";
-
-  if (p.includes("crispr") || p.includes("gene") || p.includes("base edit") || p.includes("dna") || p.includes("cas9")) {
-    fieldDomain = "Biotechnology & Genome Engineering";
-    proposedTitle = "High-Fidelity Base Editing and Off-Target Reduction in Mammalian Models: A Systematic Review";
-    researchGap = "Quantitation discrepancies in off-target translocations and long-term epigenetic durability across non-viral vs AAV delivery modalities.";
-  } else if (p.includes("transformer") || p.includes("neural") || p.includes("llm") || p.includes("latency") || p.includes("reasoning") || p.includes("ai")) {
-    fieldDomain = "Machine Learning & Computational Linguistics";
-    proposedTitle = "Empirical Latency and Memory Optimization in Deep Transformer Architectures: A Comparative Benchmark";
-    researchGap = "Unquantified performance trade-offs between speculative decoding throughput and reasoning fidelity under memory-constrained GPU environments.";
-  } else if (p.includes("solar") || p.includes("energy") || p.includes("microgrid") || p.includes("climate") || p.includes("renewable")) {
-    fieldDomain = "Sustainable Energy Systems & Electrical Engineering";
-    proposedTitle = "Resilience and Decentralized Dispatch in Islanded Renewable Microgrids: A Multi-Agent System Architecture";
-    researchGap = "Dynamic stability degradation and transient frequency oscillations during high intermittent renewable penetration.";
-  } else if (p.includes("clinical") || p.includes("trial") || p.includes("oncology") || p.includes("cancer") || p.includes("pharma")) {
-    fieldDomain = "Clinical Oncology & Translational Medicine";
-    proposedTitle = "Comparative Efficacy and Surrogate Biomarker Endpoints in Phase II Clinical Trials: Evidence-Based Appraisal";
-    researchGap = "Heterogeneity in primary endpoint definitions and correlation to overall survival outcomes across accelerated regulatory pathways.";
-  } else {
-    const cleaned = prompt.replace(/[^\w\s]/gi, "").trim();
-    const words = cleaned.split(/\s+/).slice(0, 7).join(" ");
-    if (words.length > 5) {
-      proposedTitle = `Critical Analysis of ${words.charAt(0).toUpperCase() + words.slice(1)}: Methodological Synthesis & Empirical Scoping`;
-      researchGap = `Fragmented cross-institutional literature lacking unified methodological protocols and structured provenance.`;
-    }
+  if (q.includes("vault") || q.includes("citation") || q.includes("pdf") || q.includes("zotero") || q.includes("reference")) {
+    return `The Knowledge Vault is your secure, private academic repository:
+• Open it via "Platform → Knowledge Vault" in the left sidebar.
+• Ingest your PDF papers, Zotero libraries, syllabi, or datasets.
+• All uploaded literature is semantically indexed on-device or in your private storage.
+• Every claim made during project drafting is audited by the Citation Auditor against Vault sources to guarantee 100% provenance.`;
   }
 
-  const phases = [
-    {
-      name: "Phase I: Problem Formulation & Provenance Grounding",
-      description: "Anchor key hypotheses, query peer-reviewed repositories (PubMed, arXiv, IEEE), and ingest verified citations into Knowledge Vault.",
-    },
-    {
-      name: "Phase II: Evidence Extraction & Comparative Synthesis",
-      description: "Extract quantitative metrics, construct comparative literature matrices, and synthesize opposing scientific viewpoints.",
-    },
-    {
-      name: "Phase III: Scholarly Drafting & Editorial Board Audit",
-      description: "Generate publication-grade prose audited by Citation Auditor, Methodologist, and Voice & Tone Architect against target journal standards.",
-    },
-  ];
+  if (q.includes("create") || q.includes("start") || q.includes("new project") || q.includes("format") || q.includes("template")) {
+    return `To create a research project:
+1. Click the "+ New Project" button in the left sidebar, or click any card under "Academic Workspaces" on this dashboard.
+2. Choose one of the 4 verified academic formats:
+   • Assignment (OT-01): Course essays, structured thinking, and literature synthesis.
+   • Journal Article (OT-10): 25-stage empirical research pipeline with peer review.
+   • Research Proposal (OT-19): Competitive funding and grant applications.
+   • Presentation (OT-22): Conference slides, defense scripts, and keynote summaries.
+3. Your workspace launches immediately with interactive gates and milestones.`;
+  }
 
-  const greeting = `I've analyzed your research topic${attachedFile ? ` and reference file ("${attachedFile}")` : ""}. Here is an optimal academic execution plan configured for our multi-agent editorial board:`;
+  if (q.includes("evidence") || q.includes("source") || q.includes("data") || q.includes("add source") || q.includes("grounding")) {
+    return `The Evidence Phase (Stages 7–14 in Journal Article workspaces):
+• Source Approval: Review candidate literature pulled from your Knowledge Vault, PubMed, or Crossref.
+• Evidentiary Locking: Approved sources form an immutable evidence base for drafting.
+• Data Extraction: The extraction agent isolates key metrics, sample sizes, and empirical findings.
+• You can add sources at any time directly through the Knowledge Vault or within the project workspace.`;
+  }
 
-  return {
-    greeting,
-    blueprint: {
-      formatId,
-      formatLabel,
-      proposedTitle,
-      fieldDomain,
-      researchGap,
-      phases,
-      recommendedCitations: formatId === "OT-10" ? 35 : formatId === "OT-19" ? 25 : formatId === "OT-22" ? 15 : 20,
-    },
-  };
+  if (q.includes("journal") || q.includes("25") || q.includes("article") || q.includes("workflow") || q.includes("ot-10")) {
+    return `The Journal Article workflow (OT-10) is a rigorous 25-stage publication pipeline:
+• Phase I (Stages 1–6): Research domain definition, literature matrix, candidate gap identification, title taxonomy, and title lock.
+• Phase II (Stages 7–14): Evidentiary sourcing, source approvals, evidence analysis, and 4-pillar manual review.
+• Phase III (Stages 15–18): Peer-reviewed drafting, originality checks, and citation provenance audit.
+• Phase IV (Stages 19–21): Multi-agent revision, voice/tone architecture, and author guideline compliance.
+• Phase V (Stages 22–25): Final manuscript editing, export to LaTeX/Word/PDF, and submission packaging.`;
+  }
+
+  if (q.includes("find") || q.includes("where") || q.includes("list") || q.includes("access") || q.includes("project")) {
+    return `You can easily access all your projects in two places:
+1. Left Sidebar: The "Active Projects" section lists all your ongoing projects with format badges. Click any project title to open it directly.
+2. Main Dashboard: The "Active Projects" section below gives you search filtering, status badges, and project management controls.`;
+  }
+
+  return `Scholar Core is an agentic operating system designed for academic and scientific research:
+• Workspaces: Boot publication-ready pipelines for Assignments, Journal Articles, Research Proposals, or Presentations.
+• Knowledge Vault: Connect your reference papers with zero-hallucination provenance audits.
+• AI Access: Bring your own model keys (Claude, OpenAI, Gemini, Local) with multi-tier routing.
+• Navigation: Use the left sidebar to access your Active Projects, Knowledge Vault, and Settings.
+Click any suggestion above or ask a specific question about our features!`;
 }
+
 
 /**
  * Desk's entry surface: the signed-in user's own projects — transformed into
@@ -200,7 +167,6 @@ export default function ProjectListScreen({
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState("");
 
   // Theme toggle state: Sand & Snow Day mode vs True-Dark Night mode
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -341,26 +307,56 @@ export default function ProjectListScreen({
     return map;
   }, [types]);
 
-  const [selectedFormat, setSelectedFormat] = useState<string>("all");
   const [creatingFormatId, setCreatingFormatId] = useState<string | null>(null);
-  const [quickWorkspaceOpen, setQuickWorkspaceOpen] = useState(false);
-  const [selectedPromptFormat, setSelectedPromptFormat] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
 
-  // Conversational Chatbot State
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [isChatActive, setIsChatActive] = useState(false);
-  const [isChatThinking, setIsChatThinking] = useState(false);
-  const [vaultGroundingActive, setVaultGroundingActive] = useState(true);
-  const [copiedBlueprintId, setCopiedBlueprintId] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // Website Assistant State (Help & Guidance Layer)
+  const [isWebsiteGuideOpen, setIsWebsiteGuideOpen] = useState(false);
+  const [guideInput, setGuideInput] = useState("");
+  const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([
+    {
+      id: "initial-assistant",
+      sender: "assistant",
+      text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    },
+  ]);
+  const [isGuideThinking, setIsGuideThinking] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setAiPrompt(e.target.value);
-    e.target.style.height = "auto";
-    e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
-  };
+  useEffect(() => {
+    if (isWebsiteGuideOpen && typeof messagesEndRef.current?.scrollIntoView === "function") {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [guideMessages, isGuideThinking, isWebsiteGuideOpen]);
+
+  function handleSendGuideMessage(textToSend?: string) {
+    const query = (textToSend !== undefined ? textToSend : guideInput).trim();
+    if (!query) return;
+
+    const userMsg: WebsiteAssistantMessage = {
+      id: `user-${Date.now()}`,
+      sender: "user",
+      text: query,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    setGuideMessages((prev) => [...prev, userMsg]);
+    setGuideInput("");
+    setIsGuideThinking(true);
+    if (!isWebsiteGuideOpen) setIsWebsiteGuideOpen(true);
+
+    setTimeout(() => {
+      const answer = answerWebsiteQuestion(query);
+      const assistantMsg: WebsiteAssistantMessage = {
+        id: `assistant-${Date.now()}`,
+        sender: "assistant",
+        text: answer,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      setGuideMessages((prev) => [...prev, assistantMsg]);
+      setIsGuideThinking(false);
+    }, 250);
+  }
 
   async function handleCreate(outputTypeId: string) {
     if (creating) return;
@@ -374,109 +370,6 @@ export default function ProjectListScreen({
       setError((e as Error).message);
       setCreating(false);
       setCreatingFormatId(null);
-    }
-  }
-
-  async function handleCreateWithBlueprint(formatId: string, blueprint: ChatBlueprint, userPrompt: string) {
-    if (creating) return;
-    setCreating(true);
-    setCreatingFormatId(formatId);
-    setError(null);
-    try {
-      const project = await createProject(formatId);
-      try {
-        await saveIntakeAnswers(project.projectId, {
-          title: blueprint.proposedTitle,
-          topic: blueprint.proposedTitle,
-          problem_statement: blueprint.researchGap,
-          initial_prompt: userPrompt,
-        });
-      } catch (err) {
-        console.warn("Intake prefill non-blocking:", err);
-      }
-      onOpen(project.projectId);
-    } catch (e) {
-      setError((e as Error).message);
-      setCreating(false);
-      setCreatingFormatId(null);
-    }
-  }
-
-  function handleSendMessage(textToSend?: string) {
-    const query = (textToSend !== undefined ? textToSend : aiPrompt).trim();
-    if (!query && !selectedPromptFormat) return;
-
-    const currentFile = attachedFileName;
-    const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      sender: "user",
-      text: query || `Initialize workspace for ${selectedPromptFormat}`,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      attachedFile: currentFile,
-    };
-
-    setChatMessages((prev) => [...prev, userMsg]);
-    setIsChatActive(true);
-    setIsChatThinking(true);
-    setAiPrompt("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-
-    setTimeout(() => {
-      const isFollowUp = chatMessages.length > 0;
-      let assistantMsg: ChatMessage;
-
-      if (!isFollowUp) {
-        const generated = generateScholarResponse(query, selectedPromptFormat, currentFile);
-        assistantMsg = {
-          id: `assistant-${Date.now()}`,
-          sender: "assistant",
-          text: generated.greeting,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          blueprint: generated.blueprint,
-        };
-      } else {
-        const lastBlueprint = [...chatMessages].reverse().find((m) => m.blueprint)?.blueprint;
-        const targetFormat = selectedPromptFormat || lastBlueprint?.formatId || "OT-10";
-        const generated = generateScholarResponse(query, targetFormat, currentFile);
-
-        assistantMsg = {
-          id: `assistant-${Date.now()}`,
-          sender: "assistant",
-          text: `Refined research focus based on your direction: "${query}". Updated the methodological blueprint and evidence scope:`,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          blueprint: {
-            ...generated.blueprint,
-            formatId: targetFormat,
-            formatLabel: FORMAT_TILES.find((t) => t.id === targetFormat)?.label || "Journal Article",
-            researchGap: `Focus area: ${query}. Addressing: ${generated.blueprint.researchGap}`,
-          },
-        };
-      }
-
-      setChatMessages((prev) => [...prev, assistantMsg]);
-      setIsChatThinking(false);
-    }, 450);
-  }
-
-  function copyBlueprint(blueprint: ChatBlueprint, msgId: string) {
-    const text = `SCHOLAR CORE RESEARCH BLUEPRINT
-Format: ${blueprint.formatLabel} (${blueprint.formatId})
-Title: ${blueprint.proposedTitle}
-Domain: ${blueprint.fieldDomain}
-Research Gap: ${blueprint.researchGap}
-
-EXECUTION ROADMAP:
-${blueprint.phases.map((p, i) => `${i + 1}. ${p.name}\n   ${p.description}`).join("\n")}
-
-Recommended Scope: ~${blueprint.recommendedCitations} peer-reviewed references`;
-
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(() => {
-        setCopiedBlueprintId(msgId);
-        setTimeout(() => setCopiedBlueprintId(null), 2000);
-      }).catch(() => {});
     }
   }
 
@@ -705,6 +598,79 @@ Recommended Scope: ~${blueprint.recommendedCitations} peer-reviewed references`;
               <span>AI Access</span>
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setIsWebsiteGuideOpen(true);
+            }}
+            aria-label="Platform Guide"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-tight text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
+          >
+            <span className="w-4 h-4 rounded-full border border-current flex items-center justify-center font-bold text-[10px] flex-shrink-0">
+              ?
+            </span>
+            <span>Platform Guide</span>
+          </button>
+
+          {/* Active Projects in Sidebar */}
+          <div className="pt-3 pb-1 border-t border-slate-200/60 dark:border-neutral-800/80 mt-2">
+            <div className="flex items-center justify-between px-2 mb-1.5">
+              <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 dark:text-neutral-500 font-sans">
+                Active Projects
+              </span>
+              {projects && projects.length > 0 && (
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 font-mono">
+                  {projects.length}
+                </span>
+              )}
+            </div>
+
+            {projects === null ? (
+              <div className="px-2 py-2 flex items-center gap-2 text-xs text-slate-400">
+                <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                <span>Loading...</span>
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="px-2 py-2 text-xs text-slate-400 dark:text-neutral-500 italic">
+                No active manuscripts
+              </div>
+            ) : (
+              <div className="flex flex-col gap-0.5 max-h-[260px] overflow-y-auto scholar-scrollbar pr-0.5">
+                {projects.map((p) => {
+                  const title = getProjectTitle(p);
+                  const formatTile = FORMAT_TILES.find((t) => t.id === p.outputTypeId);
+                  return (
+                    <button
+                      key={p.projectId}
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onOpen(p.projectId);
+                      }}
+                      title={title}
+                      className="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs text-left text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer w-full"
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                        p.outputTypeId === "OT-01" ? "bg-blue-500" :
+                        p.outputTypeId === "OT-10" ? "bg-amber-500" :
+                        p.outputTypeId === "OT-19" ? "bg-indigo-500" :
+                        p.outputTypeId === "OT-22" ? "bg-emerald-500" :
+                        "bg-slate-400"
+                      }`} />
+                      <span className="truncate flex-1 font-normal font-sans">
+                        {title}
+                      </span>
+                      <span className="text-[9px] text-slate-400 dark:text-neutral-500 font-medium flex-shrink-0 group-hover:text-slate-600 dark:group-hover:text-neutral-300">
+                        {formatTile?.label.split(" ")[0] || "Draft"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Bottom Section */}
@@ -849,441 +815,146 @@ Recommended Scope: ~${blueprint.recommendedCitations} peer-reviewed references`;
             />
           ) : (
             <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-8">
-              {/* Flagship Chatbot & Prompt Container */}
-              <div className="w-full flex flex-col items-start text-left">
-                {/* Active Chatbot Window */}
-                {isChatActive ? (
-                  <div className="w-full rounded-2xl sm:rounded-3xl bg-white dark:bg-[#18181A] border border-slate-200 dark:border-neutral-800 shadow-md p-4 sm:p-6 flex flex-col gap-4 font-sans">
-                    {/* Chat Header */}
-                    <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-neutral-800">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-amber-500 flex items-center justify-center text-white shadow-xs">
-                          <span className="text-base">✨</span>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h2 className="text-base font-bold text-slate-900 dark:text-white">Scholar Core Copilot</h2>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              Multi-Agent Board Active
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-500 dark:text-neutral-400">
-                            Orchestrating literature synthesis, methodology validation & publication blueprints
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setChatMessages([]);
-                            setIsChatActive(false);
-                            setAiPrompt("");
-                          }}
-                          className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                        >
-                          <span className="font-bold">+</span>
-                          <span>New Chat</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setIsChatActive(false)}
-                          className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer"
-                        >
-                          Minimize
-                        </button>
-                      </div>
+              {/* Overall Status & Summary Section */}
+              <div className="w-full flex flex-col gap-6">
+                {/* Command Center Title & Platform Guide Trigger */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
+                        Research Command Center
+                      </h1>
+                      <span className="hidden sm:inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        System Active
+                      </span>
                     </div>
+                    <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-normal font-sans leading-relaxed">
+                      Autonomous multi-agent synthesis, zero-hallucination citation provenance, and verified publication pipelines.
+                    </p>
+                  </div>
 
-                    {/* Message Thread */}
-                    <div className="flex flex-col gap-4 max-h-[500px] overflow-y-auto pr-1">
-                      {chatMessages.map((msg) => (
-                        <div key={msg.id} className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}>
-                          {msg.sender === "user" ? (
-                            <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-br-xs px-4 py-3 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs text-sm font-sans leading-relaxed">
-                              {msg.attachedFile && (
-                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/15 text-white/90 text-xs mb-1.5">
-                                  <span>📎</span>
-                                  <span className="truncate max-w-[180px]">{msg.attachedFile}</span>
-                                </div>
-                              )}
-                              <p>{msg.text}</p>
-                              <span className="text-[10px] text-slate-400 block text-right mt-1">{msg.timestamp}</span>
-                            </div>
-                          ) : (
-                            <div className="w-full flex items-start gap-3">
-                              <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-slate-300 flex-shrink-0 mt-0.5 text-xs">
-                                ✨
-                              </div>
-                              <div className="flex-1 flex flex-col gap-3">
-                                <div className="rounded-2xl rounded-tl-xs px-4 py-3.5 bg-slate-50 dark:bg-[#202022] border border-slate-200/80 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs text-sm font-sans leading-relaxed">
-                                  <p>{msg.text}</p>
+                  <button
+                    type="button"
+                    onClick={() => setIsWebsiteGuideOpen(true)}
+                    className="self-start sm:self-auto inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1C1C1E] border border-slate-200/90 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800 hover:border-slate-300 dark:hover:border-neutral-700 transition-all cursor-pointer shadow-2xs group"
+                  >
+                    <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-xs group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-neutral-900 transition-colors">
+                      ?
+                    </span>
+                    <span>Platform Guide</span>
+                  </button>
+                </div>
 
-                                  {/* Blueprint Card */}
-                                  {msg.blueprint && (
-                                    <div className="mt-3.5 p-4 rounded-xl bg-white dark:bg-[#18181A] border border-slate-200 dark:border-neutral-700/80 shadow-xs flex flex-col gap-3">
-                                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-neutral-800">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-xs font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider">
-                                            Recommended Blueprint:
-                                          </span>
-                                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80">
-                                            {msg.blueprint.formatLabel} ({msg.blueprint.formatId})
-                                          </span>
-                                        </div>
-                                        <span className="text-xs text-slate-500 dark:text-neutral-400 font-medium">
-                                          {msg.blueprint.fieldDomain}
-                                        </span>
-                                      </div>
-
-                                      <div>
-                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight mb-1">
-                                          "{msg.blueprint.proposedTitle}"
-                                        </h4>
-                                        <p className="text-xs text-slate-600 dark:text-neutral-300 leading-relaxed">
-                                          <strong className="text-slate-900 dark:text-white font-semibold">Core Focus: </strong>
-                                          {msg.blueprint.researchGap}
-                                        </p>
-                                      </div>
-
-                                      {/* Phases Roadmap */}
-                                      <div className="space-y-1.5 pt-1">
-                                        {msg.blueprint.phases.map((ph, idx) => (
-                                          <div key={idx} className="flex items-start gap-2 text-xs">
-                                            <span className="w-4 h-4 rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">
-                                              {idx + 1}
-                                            </span>
-                                            <div>
-                                              <span className="font-semibold text-slate-900 dark:text-slate-100">{ph.name}: </span>
-                                              <span className="text-slate-600 dark:text-neutral-400">{ph.description}</span>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-
-                                      {/* Launch & Copy Actions */}
-                                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-neutral-800">
-                                        <div className="text-[11px] text-slate-500 dark:text-neutral-400 flex items-center gap-1.5">
-                                          <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                          </svg>
-                                          <span>Targeting ~{msg.blueprint.recommendedCitations} peer-reviewed references</span>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => copyBlueprint(msg.blueprint!, msg.id)}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-800 border border-slate-200 dark:border-neutral-700 transition-colors cursor-pointer"
-                                          >
-                                            {copiedBlueprintId === msg.id ? "Copied! ✓" : "Copy Blueprint"}
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => handleCreateWithBlueprint(msg.blueprint!.formatId, msg.blueprint!, msg.text)}
-                                            disabled={creating}
-                                            className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                          >
-                                            {creating && creatingFormatId === msg.blueprint.formatId ? (
-                                              <>
-                                                <svg className="animate-spin -ml-0.5 mr-1 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                                </svg>
-                                                <span>Booting Workspace...</span>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <span>🚀</span>
-                                                <span>Initialize {msg.blueprint.formatLabel}</span>
-                                              </>
-                                            )}
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  <span className="text-[10px] text-slate-400 block text-right mt-1">{msg.timestamp}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-
-                      {/* Thinking indicator */}
-                      {isChatThinking && (
-                        <div className="flex items-start gap-3">
-                          <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-slate-300 flex-shrink-0 text-xs animate-pulse">
-                            ✨
-                          </div>
-                          <div className="rounded-2xl rounded-tl-xs px-4 py-3 bg-slate-50 dark:bg-[#202022] border border-slate-200/80 dark:border-neutral-800 text-slate-600 dark:text-neutral-400 text-xs flex items-center gap-2 font-medium">
-                            <div className="flex gap-1">
-                              <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-neutral-500 animate-bounce" />
-                              <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-neutral-500 animate-bounce [animation-delay:0.2s]" />
-                              <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-neutral-500 animate-bounce [animation-delay:0.4s]" />
-                            </div>
-                            <span>Scholar Core Orchestrator is analyzing research intent & literature constraints...</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Sticky Follow-up Input */}
-                    <div className="pt-3 border-t border-slate-100 dark:border-neutral-800 flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={aiPrompt}
-                          onChange={(e) => setAiPrompt(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && aiPrompt.trim() && !isChatThinking) {
-                              e.preventDefault();
-                              handleSendMessage();
-                            }
-                          }}
-                          placeholder="Reply to Scholar Core, refine methodology, or ask a question..."
-                          className="flex-1 bg-slate-50 dark:bg-[#121212] border border-slate-200 dark:border-neutral-700/80 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:focus:ring-neutral-600"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage()}
-                          disabled={!aiPrompt.trim() || isChatThinking}
-                          className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
-                        >
-                          <span>Send</span>
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                          </svg>
-                        </button>
+                {/* 4-Card Status Overview Strip */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Card 1: Active Projects Summary */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-2">
+                        <span className="font-semibold uppercase tracking-wider text-[10px]">Active Pipeline</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
+                          Pipeline
+                        </span>
                       </div>
-
-                      {/* Quick Follow-up Chips */}
-                      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
-                        <span className="text-[11px] text-slate-400 dark:text-neutral-500 whitespace-nowrap">Suggested:</span>
-                        {[
-                          "Make it more empirical & quantitative",
-                          "Add comparative literature matrix",
-                          "Target Nature Biotechnology guidelines",
-                          "Structure for Research Proposal instead",
-                        ].map((suggestion, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleSendMessage(suggestion)}
-                            className="text-[11px] px-2.5 py-1 rounded-full bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 text-slate-600 dark:text-slate-300 whitespace-nowrap transition-colors cursor-pointer"
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
+                      <div className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-sans tracking-tight">
+                        {projects ? `${projects.length} ${projects.length === 1 ? "Manuscript" : "Manuscripts"}` : "Loading..."}
                       </div>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1 leading-snug">
+                        In-progress research drafts & quality gates.
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  /* Idle Flagship Chatbot Input Card */
-                  <div className="w-full flex flex-col items-start text-left">
-                    {chatMessages.length > 0 && (
+
+                  {/* Card 2: Knowledge Vault Grounding */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-2">
+                        <span className="font-semibold uppercase tracking-wider text-[10px]">Knowledge Vault</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50">
+                          Protected
+                        </span>
+                      </div>
+                      <div className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-sans tracking-tight">
+                        Grounded
+                      </div>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1 leading-snug">
+                        Zero-hallucination semantic literature index.
+                      </p>
+                    </div>
+                    {onOpenVault && (
                       <button
                         type="button"
-                        onClick={() => setIsChatActive(true)}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 mb-3 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer"
+                        onClick={onOpenVault}
+                        className="mt-3 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 cursor-pointer"
                       >
-                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                        <span>Resume Active Chat: "{chatMessages[0]?.text.slice(0, 35)}..."</span>
+                        <span>Open Vault</span>
                         <span>→</span>
                       </button>
                     )}
+                  </div>
 
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-50 text-left mb-1 font-sans">
-                      What would you like to write today?
-                    </h1>
-                    <p className="text-sm text-slate-500 dark:text-neutral-400 mb-3.5 font-sans">
-                      Ask Scholar Core to formulate a research plan, review literature, or initialize an academic workspace.
-                    </p>
-
-                    {/* Chatbot Prompt Container */}
-                    <div className="w-full rounded-2xl sm:rounded-3xl bg-white dark:bg-[#18181A] border border-slate-200/90 dark:border-neutral-800 shadow-sm hover:shadow-md transition-all duration-200 focus-within:ring-2 focus-within:ring-slate-900/10 dark:focus-within:ring-neutral-700/60 focus-within:border-slate-300 dark:focus-within:border-neutral-700 p-3.5 sm:p-4 flex flex-col justify-between min-h-[120px] gap-2.5 font-sans relative">
-                      {/* Auto-growing Textarea */}
-                      <textarea
-                        ref={textareaRef}
-                        value={aiPrompt}
-                        onChange={handleTextareaInput}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            if ((aiPrompt.trim() || selectedPromptFormat) && !creating) {
-                              handleSendMessage();
-                            }
-                          }
-                        }}
-                        rows={2}
-                        placeholder="Start a literature review, brainstorm an outline, or drop a syllabus here..."
-                        className="w-full bg-transparent px-1 text-sm sm:text-base font-medium text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none resize-none leading-relaxed"
-                      />
-
-                      {/* Attached File Indicator */}
-                      {attachedFileName && (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-slate-200 text-xs w-fit">
-                          <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <span className="font-medium truncate max-w-[200px]">{attachedFileName}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAttachedFileName(null);
-                              if (fileInputRef.current) fileInputRef.current.value = "";
-                            }}
-                            className="text-slate-400 hover:text-red-500 font-bold ml-1 cursor-pointer"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Action Toolbar */}
-                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-neutral-800/80">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            accept=".pdf,.txt,.docx,.md"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) setAttachedFileName(file.name);
-                            }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            title="Attach reference PDF or notes"
-                            className="p-1.5 sm:px-2 sm:py-1 rounded-lg text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                            </svg>
-                            <span className="hidden sm:inline">Attach</span>
-                          </button>
-
-                          <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-slate-600 dark:text-neutral-300 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60">
-                            <span className="text-amber-500">✨</span>
-                            <span>Scholar 3.7</span>
-                          </span>
-
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={() => setQuickWorkspaceOpen(!quickWorkspaceOpen)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200/80 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
-                            >
-                              <span className="text-slate-400 font-bold">+</span>
-                              <span>{selectedPromptFormat ? FORMAT_TILES.find((t) => t.id === selectedPromptFormat)?.label : "Auto-Detect Format"}</span>
-                              <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-
-                            {quickWorkspaceOpen && (
-                              <div className="absolute left-0 bottom-full mb-1.5 z-30 w-56 rounded-xl bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-neutral-700 shadow-xl py-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedPromptFormat(null);
-                                    setQuickWorkspaceOpen(false);
-                                  }}
-                                  className="w-full px-3 py-2 text-xs text-left font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-center justify-between cursor-pointer"
-                                >
-                                  <span>Auto-Detect Format</span>
-                                  {!selectedPromptFormat && <span className="text-emerald-600 font-bold">✓</span>}
-                                </button>
-                                {FORMAT_TILES.map((tile) => (
-                                  <button
-                                    key={tile.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedPromptFormat(tile.id);
-                                      setQuickWorkspaceOpen(false);
-                                    }}
-                                    className="w-full px-3 py-2 text-xs text-left font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-center justify-between cursor-pointer"
-                                  >
-                                    <span>{tile.label}</span>
-                                    {selectedPromptFormat === tile.id && (
-                                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓</span>
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => setVaultGroundingActive(!vaultGroundingActive)}
-                            title="Toggle Knowledge Vault grounding"
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                              vaultGroundingActive
-                                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60"
-                                : "bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400"
-                            }`}
-                          >
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                            </svg>
-                            <span className="hidden sm:inline">Vault Grounding</span>
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="hidden sm:inline text-[11px] text-slate-400 dark:text-neutral-500">⏎ to send</span>
-                          <button
-                            type="button"
-                            onClick={() => handleSendMessage()}
-                            disabled={creating || (!aiPrompt.trim() && !selectedPromptFormat)}
-                            aria-label="Submit prompt"
-                            title="Send to Scholar AI"
-                            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all duration-200 flex-shrink-0 cursor-pointer ${
-                              aiPrompt.trim() || selectedPromptFormat
-                                ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm hover:scale-105 active:scale-95"
-                                : "bg-slate-100 dark:bg-neutral-800 text-slate-300 dark:text-neutral-600 cursor-not-allowed"
-                            }`}
-                          >
-                            <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                            </svg>
-                          </button>
-                        </div>
+                  {/* Card 3: AI Engine Connection */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-2">
+                        <span className="font-semibold uppercase tracking-wider text-[10px]">AI Engine</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-900/50">
+                          Multi-Tier
+                        </span>
                       </div>
+                      <div className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-sans tracking-tight">
+                        Connected
+                      </div>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1 leading-snug">
+                        Claude, OpenAI, Gemini & Local Ollama.
+                      </p>
                     </div>
+                    {onOpenAiAccess && (
+                      <button
+                        type="button"
+                        onClick={onOpenAiAccess}
+                        className="mt-3 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Manage Keys</span>
+                        <span>→</span>
+                      </button>
+                    )}
+                  </div>
 
-                    {/* Starter Prompt Chips */}
-                    <div className="w-full flex items-center gap-2 overflow-x-auto py-2.5 no-scrollbar">
-                      {STARTER_PROMPT_CHIPS.map((chip, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setSelectedPromptFormat(chip.formatId);
-                            handleSendMessage(chip.query);
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-neutral-800 shadow-2xs hover:border-slate-300 dark:hover:border-neutral-700 hover:bg-slate-50 dark:hover:bg-neutral-800 transition-all cursor-pointer whitespace-nowrap active:scale-95"
-                        >
-                          <span>{chip.icon}</span>
-                          <span>{chip.label}</span>
-                        </button>
-                      ))}
+                  {/* Card 4: Editorial Standards */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-2">
+                        <span className="font-semibold uppercase tracking-wider text-[10px]">Editorial Integrity</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50">
+                          Audited
+                        </span>
+                      </div>
+                      <div className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-sans tracking-tight">
+                        25 Gates
+                      </div>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1 leading-snug">
+                        Deterministic rubric & citation sign-off.
+                      </p>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* Tactile Apple-Style Template Cards Grid */}
-              <div className="w-full">
+              {/* Academic Workspaces Section */}
+              <div className="w-full flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
+                      Academic Workspaces
+                    </h2>
+                    <p className="text-xs text-[var(--text-secondary)] font-normal font-sans">
+                      Select a format to boot interactive quality gates, evidentiary matrices, and grounded drafting.
+                    </p>
+                  </div>
+                </div>
+
                 <div className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                   {FORMAT_TILES.map((tile) => {
                     const isBootingThis = creatingFormatId === tile.id;
@@ -1295,7 +966,7 @@ Recommended Scope: ~${blueprint.recommendedCitations} peer-reviewed references`;
                         type="button"
                         onClick={() => !creating && handleCreate(tile.id)}
                         disabled={isOtherBooting}
-                        className={`group bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[185px] text-left relative ${
+                        className={`group bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[200px] text-left relative ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
@@ -1318,12 +989,21 @@ Recommended Scope: ~${blueprint.recommendedCitations} peer-reviewed references`;
                               </svg>
                             </div>
                           </div>
+                          <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1">
+                            {tile.tag}
+                          </span>
                           <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5 leading-tight">
                             {tile.label}
                           </h3>
-                          <p className="text-sm font-normal text-[var(--text-secondary)] leading-snug">
+                          <p className="text-xs font-normal text-[var(--text-secondary)] leading-relaxed">
                             {tile.description}
                           </p>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-neutral-800/80 flex items-center justify-between text-[11px] text-slate-400 dark:text-neutral-500">
+                          <span>{tile.budget}</span>
+                          <span className="font-semibold text-slate-700 dark:text-neutral-300 group-hover:translate-x-0.5 transition-transform">
+                            Boot →
+                          </span>
                         </div>
                       </button>
                     );
@@ -1532,6 +1212,167 @@ Recommended Scope: ~${blueprint.recommendedCitations} peer-reviewed references`;
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Minimal Floating Website Assistant Trigger Button */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          type="button"
+          onClick={() => setIsWebsiteGuideOpen((prev) => !prev)}
+          aria-label="Scholar Core Platform Guide"
+          title="Open Scholar Core Platform Guide"
+          className="px-4 py-2.5 rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-semibold text-xs shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer font-sans"
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="w-4 h-4 rounded-full bg-white/20 dark:bg-black/20 flex items-center justify-center text-[11px] font-bold">?</span>
+          <span>Platform Guide</span>
+        </button>
+      </div>
+
+      {/* Minimal Website Assistant Slide-over / Modal Panel */}
+      {isWebsiteGuideOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Scholar Core Website Assistant"
+          className="fixed bottom-20 right-6 z-50 w-[380px] sm:w-[420px] max-h-[580px] h-[540px] rounded-3xl bg-white dark:bg-[#18181A] border border-slate-200 dark:border-neutral-800 shadow-2xl flex flex-col font-sans overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200"
+        >
+          {/* Header */}
+          <div className="p-4 border-b border-slate-100 dark:border-neutral-800 flex items-center justify-between bg-slate-50/50 dark:bg-neutral-900/50">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center text-xs font-bold shadow-xs">
+                ?
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                  Website Assistant
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-neutral-400">
+                  Scholar Core platform guidance & workflows
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setGuideMessages([
+                    {
+                      id: "reset-assistant",
+                      sender: "assistant",
+                      text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
+                      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                    },
+                  ])
+                }
+                title="Clear conversation"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors text-xs cursor-pointer"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsWebsiteGuideOpen(false)}
+                aria-label="Close Assistant"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Message Thread */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 scholar-scrollbar text-xs">
+            {/* Quick FAQ Chips */}
+            <div className="pb-1">
+              <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1.5">
+                Suggested Topics:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSendGuideMessage(faq.question)}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 hover:bg-slate-200/80 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-neutral-700/60 transition-colors cursor-pointer"
+                  >
+                    {faq.shortLabel}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {guideMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+              >
+                {msg.sender === "user" ? (
+                  <div className="max-w-[85%] rounded-2xl rounded-br-xs px-3.5 py-2.5 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed">
+                    <p>{msg.text}</p>
+                    <span className="text-[9px] text-slate-400 block text-right mt-1">
+                      {msg.timestamp}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="w-full flex items-start gap-2.5">
+                    <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-slate-300 flex-shrink-0 mt-0.5 text-[10px] font-bold">
+                      ?
+                    </div>
+                    <div className="flex-1 rounded-2xl rounded-tl-xs px-3.5 py-2.5 bg-slate-50 dark:bg-[#202022] border border-slate-200/80 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed whitespace-pre-wrap">
+                      <p>{msg.text}</p>
+                      <span className="text-[9px] text-slate-400 dark:text-neutral-500 block text-right mt-1">
+                        {msg.timestamp}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {isGuideThinking && (
+              <div className="flex items-center gap-2 text-slate-400 dark:text-neutral-500 py-1 px-2 text-xs">
+                <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                <span>Consulting platform documentation...</span>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Minimal Input Footer: pure text input + Send button. NO uploads, NO voice, NO model picker */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendGuideMessage();
+            }}
+            className="p-3 border-t border-slate-100 dark:border-neutral-800/80 bg-white dark:bg-[#18181A] flex flex-col gap-1.5"
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Ask how to use Scholar Core..."
+                value={guideInput}
+                onChange={(e) => setGuideInput(e.target.value)}
+                className="flex-1 bg-slate-50 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-full px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-neutral-700 transition-all font-sans"
+              />
+              <button
+                type="submit"
+                disabled={!guideInput.trim() || isGuideThinking}
+                aria-label="Send question"
+                className="px-4 py-2 rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer font-sans shadow-xs flex-shrink-0"
+              >
+                Send →
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 dark:text-neutral-500 text-center">
+              Assisting exclusively with Scholar Core website & platform features.
+            </p>
+          </form>
         </div>
       )}
     </div>

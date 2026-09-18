@@ -314,76 +314,135 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
   });
 });
 
-describe("conversational AI chatbot & interactive research blueprint launchpad", () => {
-  it("renders the flagship chatbot prompt box, starter chips, and controls", async () => {
+describe("sidebar active projects & platform navigation", () => {
+  const SAMPLE_PROJECT = {
+    projectId: "proj-crispr-01",
+    outputTypeId: "OT-10",
+    answers: { title: "Comparative Analysis of In Vivo Cleavage" },
+    intakeCompleteness: 0.85,
+    hasDocument: true,
+    gates: [{ gate: "G0", status: "signed_off" }],
+  };
+
+  it("renders active projects directly in the sidebar and navigates on click", async () => {
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    const onOpen = vi.fn();
+    const { container } = render(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
+
+    const aside = container.querySelector("aside");
+    expect(aside).toBeInTheDocument();
+
+    // Active Projects section in sidebar
+    expect(within(aside!).getByText(/Active Projects/i)).toBeInTheDocument();
+    const projectItem = await within(aside!).findByText("Comparative Analysis of In Vivo Cleavage");
+    expect(projectItem).toBeInTheDocument();
+
+    fireEvent.click(projectItem);
+    expect(onOpen).toHaveBeenCalledWith("proj-crispr-01");
+  });
+});
+
+describe("command center status overview & academic workspace cards", () => {
+  it("renders the 4-card status overview strip and 4 academic workspace cards", async () => {
     listProjects.mockResolvedValue({ items: [] });
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
-    expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
-    const textarea = screen.getByPlaceholderText(/Start a literature review, brainstorm an outline, or drop a syllabus here/i);
-    expect(textarea).toBeInTheDocument();
+    // Header & Overall Status Summary Strip
+    expect(await screen.findByText("Research Command Center")).toBeInTheDocument();
+    expect(screen.getByText("Active Pipeline")).toBeInTheDocument();
+    expect(screen.getByText("Knowledge Vault")).toBeInTheDocument();
+    expect(screen.getByText("AI Engine")).toBeInTheDocument();
+    expect(screen.getByText("Editorial Integrity")).toBeInTheDocument();
 
-    // Starter chips
-    expect(screen.getByText("CRISPR Base Editing Review")).toBeInTheDocument();
-    expect(screen.getByText("LLM Reasoning Benchmark")).toBeInTheDocument();
-    expect(screen.getByText("Clean Energy Microgrid Proposal")).toBeInTheDocument();
-    expect(screen.getByText("Clinical Trial Slide Deck")).toBeInTheDocument();
-
-    // Toolbar controls
-    expect(screen.getByRole("button", { name: /Attach/i })).toBeInTheDocument();
-    expect(screen.getByText("Auto-Detect Format")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Vault Grounding/i })).toBeInTheDocument();
+    // 4 Academic Workspace Cards
+    expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
   });
 
-  it("activates chatbot on starter chip click, generates blueprint, and supports project initialization", async () => {
+  it("boots academic workspace directly from card click on dashboard", async () => {
     listProjects.mockResolvedValue({ items: [] });
-    createProject.mockResolvedValue({ projectId: "proj-crispr" });
+    createProject.mockResolvedValue({ projectId: "proj-journal-new" });
     const onOpen = vi.fn();
 
     render(<ProjectListScreen onOpen={onOpen} userEmail={null} />);
 
-    // Click CRISPR starter chip
-    const chip = await screen.findByText("CRISPR Base Editing Review");
-    fireEvent.click(chip);
+    // Click Journal Article card directly on dashboard
+    const journalHeading = await screen.findByRole("heading", { name: "Journal Article" });
+    const journalCard = journalHeading.closest("button");
+    expect(journalCard).toBeInTheDocument();
 
-    // Chatbot window activates
-    expect(await screen.findByText("Scholar Core Copilot")).toBeInTheDocument();
-    expect(screen.getByText(/Multi-Agent Board Active/i)).toBeInTheDocument();
-
-    // Blueprint card appears after async generation
-    expect(await screen.findByText(/Biotechnology & Genome Engineering/i, {}, { timeout: 3000 })).toBeInTheDocument();
-    expect(screen.getByText(/High-Fidelity Base Editing and Off-Target Reduction/i)).toBeInTheDocument();
-
-    // Initialize button
-    const initBtn = screen.getByRole("button", { name: /Initialize Journal Article/i });
-    expect(initBtn).toBeInTheDocument();
-
-    fireEvent.click(initBtn);
+    fireEvent.click(journalCard!);
     expect(createProject).toHaveBeenCalledWith("OT-10");
   });
+});
 
-  it("supports minimize and resume of ongoing chat session", async () => {
+describe("minimal website assistant", () => {
+  it("opens website assistant with clean conversation UI, FAQ suggestions, and minimal text input", async () => {
     listProjects.mockResolvedValue({ items: [] });
     render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
-    const chip = await screen.findByText("Clinical Trial Slide Deck");
-    fireEvent.click(chip);
+    // Floating Platform Guide button
+    const guideTrigger = (await screen.findAllByRole("button", { name: /Platform Guide/i }))[0];
+    expect(guideTrigger).toBeInTheDocument();
 
-    expect(await screen.findByText("Scholar Core Copilot")).toBeInTheDocument();
-    expect(await screen.findByText(/Clinical Oncology & Translational Medicine/i, {}, { timeout: 3000 })).toBeInTheDocument();
+    fireEvent.click(guideTrigger);
 
-    // Click Minimize
-    const minBtn = screen.getByRole("button", { name: "Minimize" });
-    fireEvent.click(minBtn);
+    // Dialog opens
+    const dialog = screen.getByRole("dialog", { name: "Scholar Core Website Assistant" });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText("Website Assistant")).toBeInTheDocument();
+    expect(within(dialog).getByText(/platform guidance & workflows/i)).toBeInTheDocument();
 
-    // Chat minimized, resume banner visible
-    expect(screen.queryByText("Scholar Core Copilot")).not.toBeInTheDocument();
-    const resumeBtn = screen.getByRole("button", { name: /Resume Active Chat/i });
-    expect(resumeBtn).toBeInTheDocument();
+    // FAQ suggested topic chips
+    expect(within(dialog).getByText("AI Setup & Keys")).toBeInTheDocument();
+    expect(within(dialog).getByText("Knowledge Vault")).toBeInTheDocument();
+    expect(within(dialog).getByText("Create Project")).toBeInTheDocument();
+    expect(within(dialog).getByText("Journal Workflow")).toBeInTheDocument();
 
-    // Click Resume
-    fireEvent.click(resumeBtn);
-    expect(screen.getByText("Scholar Core Copilot")).toBeInTheDocument();
+    // Minimal input: text input and Send button. NO file upload, NO voice, NO model selector
+    const input = within(dialog).getByPlaceholderText("Ask how to use Scholar Core...");
+    expect(input).toBeInTheDocument();
+    const sendBtn = within(dialog).getByRole("button", { name: "Send question" });
+    expect(sendBtn).toBeInTheDocument();
+    expect(sendBtn).toBeDisabled();
+
+    expect(within(dialog).queryByRole("button", { name: /Attach/i })).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText(/upload/i)).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("responds with website guidance when asked how to configure AI", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    const guideTrigger = (await screen.findAllByRole("button", { name: /Platform Guide/i }))[0];
+    fireEvent.click(guideTrigger);
+
+    const dialog = screen.getByRole("dialog", { name: "Scholar Core Website Assistant" });
+
+    // Click "AI Setup & Keys" chip
+    const aiChip = within(dialog).getByText("AI Setup & Keys");
+    fireEvent.click(aiChip);
+
+    // Assistant provides accurate guidance on AI Access and BYOK
+    expect(await within(dialog).findByText(/To configure AI in Scholar Core/i, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(within(dialog).getByText(/Bring Your Own Key/i)).toBeInTheDocument();
+  });
+
+  it("closes the website assistant when close button is clicked", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    render(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    const guideTrigger = (await screen.findAllByRole("button", { name: /Platform Guide/i }))[0];
+    fireEvent.click(guideTrigger);
+
+    const closeBtn = screen.getByRole("button", { name: "Close Assistant" });
+    fireEvent.click(closeBtn);
+
+    expect(screen.queryByRole("dialog", { name: "Scholar Core Website Assistant" })).not.toBeInTheDocument();
   });
 });
 
