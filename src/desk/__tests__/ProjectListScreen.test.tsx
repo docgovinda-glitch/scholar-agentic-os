@@ -348,13 +348,13 @@ describe("sidebar active projects & platform navigation", () => {
 });
 
 describe("landing workspace hero & academic workspace cards", () => {
-  it("renders the hero headline, subtitle, 4 academic workspace cards, and active projects count", async () => {
+  it("renders the hero headline, AI prompt bar, 4 academic workspace cards, and active projects count", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // Header & Subtitle matching user screenshot
+    // Header & Prompt Bar matching user specification
     expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
-    expect(screen.getByText(/Select an academic format to begin with deterministic quality gates/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Start a literature review, brainstorm an outline, or drop a syllabus")).toBeInTheDocument();
 
     // 4 Academic Workspace Cards
     expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();

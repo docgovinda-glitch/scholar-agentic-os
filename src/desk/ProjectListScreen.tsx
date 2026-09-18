@@ -221,6 +221,7 @@ export default function ProjectListScreen({
   const [creating, setCreating] = useState(false);
   const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -930,14 +931,28 @@ export default function ProjectListScreen({
             />
           ) : (
             <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-8">
-              {/* Hero Headline & Subtitle matching the screenshot */}
-              <div className="w-full text-left pt-1">
-                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] font-sans">
+              {/* Hero Headline & Prompt Bar matching user specification */}
+              <div className="w-full flex flex-col items-start text-left gap-4 pt-1">
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
                   What would you like to write today?
                 </h1>
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-normal font-sans mt-2">
-                  Select an academic format to begin with deterministic quality gates and verifiable evidence grounding.
-                </p>
+                <input
+                  type="text"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && aiPrompt.trim() && !creating) {
+                      e.preventDefault();
+                      if (!userEmail) {
+                        openAuth("signin", "Sign in to boot your workspace.", "OT-10");
+                        return;
+                      }
+                      handleCreate("OT-10");
+                    }
+                  }}
+                  placeholder="Start a literature review, brainstorm an outline, or drop a syllabus"
+                  className="w-full px-6 py-5 rounded-2xl bg-white dark:bg-[#171717] border border-gray-200 dark:border-neutral-800 shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-gray-100 dark:focus:ring-neutral-800 text-base font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
+                />
               </div>
 
               {/* 4 Academic Workspace Cards */}

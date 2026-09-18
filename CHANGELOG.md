@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-18
 
 ### Added
+- **Workspace Dashboard AI Prompt Bar Synchronization (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
+  - Exact hero section alignment with reference specification: restored the sleek AI prompt bar directly below *"What would you like to write today?"* with placeholder `"Start a literature review, brainstorm an outline, or drop a syllabus"`.
+  - Full keyboard submit support: pressing Enter initializes academic workspace creation or triggers contextual auth for guests.
+  - Remote Supabase database synchronized: verified schemas, migrations, and roles on remote instance `gfjhsijrwodjvkisouzw` using CLI access token.
 - **Direct Landing on Command Center & In-Page Authentication (`DeskApp.tsx`, `DeskAuthGate.tsx`, `ProjectListScreen.tsx`, `UserAccountMenu.tsx`)**:
   - **Direct Landing Without Redirects**: Configured `/`, `/signin`, and `/signup` via `RootOrProjectsRoute` so visitors navigating to `https://scholar.gkshah.com.np/` land directly on the complete academic command center workspace. Preserved guest access to the UI without forcing full-page redirects away to separate auth walls.
   - **Contextual In-Page Auth (`EmbeddedAuthModal`)**: Replaced all full-page sign-in and sign-up redirects with in-page modals supporting Google OAuth, email/password credentials, and registration. Clicking any workspace template card contextually triggers the modal with intent awareness and auto-initializes the selected workspace format upon sign-in (`?newFormat=<formatId>`).
