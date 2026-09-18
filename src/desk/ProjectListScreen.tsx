@@ -1245,11 +1245,11 @@ Keep your response concise, helpful, and academically grounded.`;
               <section
                 id="website-assistant"
                 aria-label="Scholar Core Website Assistant"
-                className="w-full pt-8 pb-4 flex flex-col gap-3.5"
+                className="w-full pt-0 pb-3 flex flex-col gap-3.5"
               >
                 {/* Header & Reset Button */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
-                  <div className="flex items-center gap-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center shadow-xs flex-shrink-0">
                       <ScholarCoreLogo size="md" />
                     </div>
@@ -1281,9 +1281,12 @@ Keep your response concise, helpful, and academically grounded.`;
                         },
                       ])
                     }
-                    className="self-start sm:self-auto px-3.5 py-1 rounded-full text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 border border-slate-200/80 dark:border-neutral-700/80 transition-colors cursor-pointer font-sans shadow-2xs"
+                    className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 border border-slate-200/80 dark:border-neutral-700/80 transition-all cursor-pointer font-sans shadow-2xs"
                   >
-                    Reset Chat
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Reset Chat</span>
                   </button>
                 </div>
 
@@ -1388,21 +1391,22 @@ Keep your response concise, helpful, and academically grounded.`;
                   </div>
                 )}
 
-                {/* Common Inquiries / Prompt Suggestion Pills (Gemini / ChatGPT style) */}
-                <div className="w-full flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none snap-x">
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wider flex-shrink-0 font-sans">
-                    Suggestions:
-                  </span>
-                  {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleSendGuideMessage(faq.question)}
-                      className="snap-start flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white hover:bg-slate-50 dark:bg-[#18181b] dark:hover:bg-neutral-800 text-slate-700 hover:text-slate-900 dark:text-neutral-300 dark:hover:text-white border border-slate-200/90 dark:border-neutral-700/80 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95 font-sans"
-                    >
-                      {faq.shortLabel}
-                    </button>
-                  ))}
+                {/* Common Inquiries / Suggestion Pills with Smooth Horizontal Edge Fade */}
+                <div className="relative w-full overflow-hidden">
+                  <div className="w-full flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none snap-x pr-14 scroll-smooth">
+                    {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSendGuideMessage(faq.question)}
+                        className="snap-start flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white hover:bg-slate-50 dark:bg-[#171717] dark:hover:bg-neutral-800 text-slate-700 hover:text-slate-900 dark:text-neutral-300 dark:hover:text-white border border-gray-200/90 dark:border-neutral-800 shadow-2xs hover:shadow-xs hover:border-slate-300 dark:hover:border-neutral-700 transition-all cursor-pointer active:scale-95 font-sans whitespace-nowrap"
+                      >
+                        {faq.shortLabel}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Subtle right-edge gradient fade mask so chips dissolve cleanly into canvas */}
+                  <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-14 bg-gradient-to-l from-[var(--bg-canvas)] to-transparent" />
                 </div>
 
                 {/* Full-Row Gemini / ChatGPT Chat Box Container */}
@@ -1411,7 +1415,7 @@ Keep your response concise, helpful, and academically grounded.`;
                     e.preventDefault();
                     handleSendGuideMessage();
                   }}
-                  className="w-full flex flex-col rounded-3xl border border-slate-200 dark:border-neutral-700/80 bg-white dark:bg-[#1e1f20] shadow-sm hover:border-slate-300 dark:hover:border-neutral-600 focus-within:border-slate-400 dark:focus-within:border-neutral-500 focus-within:shadow-md transition-all p-3.5 sm:p-4 gap-2.5"
+                  className="w-full flex flex-col rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] shadow-xs hover:border-slate-300 dark:hover:border-neutral-700 focus-within:border-slate-400 dark:focus-within:border-neutral-600 focus-within:ring-2 focus-within:ring-slate-900/5 dark:focus-within:ring-white/5 transition-all p-3.5 sm:p-4 gap-2"
                 >
                   <div className="relative flex items-center w-full">
                     <input
@@ -1420,17 +1424,21 @@ Keep your response concise, helpful, and academically grounded.`;
                       placeholder="Ask how to use Scholar Core (e.g., How do I set up AI? What is Knowledge Vault?)..."
                       value={guideInput}
                       onChange={(e) => setGuideInput(e.target.value)}
-                      className="w-full bg-transparent border-none outline-none text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 font-sans min-w-0 pr-2"
+                      className="w-full bg-transparent border-none outline-none text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 font-sans min-w-0 pr-2 py-1"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-neutral-800/80">
-                    <div className="flex items-center gap-2 text-slate-400 dark:text-neutral-500">
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-neutral-400">
                       <div className="w-5 h-5 rounded-md bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center shadow-2xs">
                         <ScholarCoreLogo size="sm" />
                       </div>
                       <span className="text-[11px] font-medium font-sans">
                         Scholar Core Guide
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        AI Ready
                       </span>
                     </div>
 
@@ -1441,7 +1449,7 @@ Keep your response concise, helpful, and academically grounded.`;
                       className={`w-8 h-8 rounded-full flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
                         guideInput.trim() && !isGuideThinking
                           ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:scale-105 active:scale-95 shadow-xs"
-                          : "bg-slate-100 dark:bg-neutral-800 text-slate-300 dark:text-neutral-600 cursor-not-allowed opacity-50"
+                          : "bg-slate-100 dark:bg-neutral-800 text-slate-400 dark:text-neutral-500 cursor-not-allowed"
                       }`}
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1452,7 +1460,7 @@ Keep your response concise, helpful, and academically grounded.`;
                 </form>
 
                 <p className="text-[11px] text-slate-400 dark:text-neutral-500 text-center font-sans">
-                  Ask anything about Scholar Core or research • Suggestive questions guide platform workflows.
+                  Ask anything about Scholar Core workflows, AI setup, or research guidance.
                 </p>
               </section>
             </div>
@@ -1615,8 +1623,8 @@ function ProjectCard({
 
 function EmptyState() {
   return (
-    <div className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] px-6 py-12 text-center flex flex-col items-center justify-center shadow-xs font-sans">
-      <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-400 dark:text-neutral-500 mb-3">
+    <div className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] px-6 py-8 sm:py-9 text-center flex flex-col items-center justify-center shadow-xs font-sans transition-all">
+      <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-400 dark:text-neutral-500 mb-2.5">
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
