@@ -480,5 +480,23 @@ describe("minimal website assistant", () => {
 
     expect(screen.getByText(/Hello! I am your Scholar Core Website Assistant/i)).toBeInTheDocument();
   });
+
+  it("minimizes floating assistant to compact launcher and re-expands upon click", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // Click Minimize
+    const minimizeBtn = await screen.findByRole("button", { name: "Minimize Guide" });
+    fireEvent.click(minimizeBtn);
+
+    // Floating launcher button appears
+    const launcherBtn = await screen.findByRole("button", { name: "Open Scholar Core Guide" });
+    expect(launcherBtn).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Minimize Guide" })).not.toBeInTheDocument();
+
+    // Click launcher to re-expand
+    fireEvent.click(launcherBtn);
+    expect(await screen.findByRole("button", { name: "Minimize Guide" })).toBeInTheDocument();
+  });
 });
 
