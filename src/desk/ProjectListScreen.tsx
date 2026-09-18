@@ -41,11 +41,66 @@ export const FORMAT_TILES = [
   },
 ];
 
+export interface AssistantAction {
+  type: "ai" | "vault" | "workspaces" | "projects";
+  label: string;
+}
+
 export interface WebsiteAssistantMessage {
   id: string;
   sender: "user" | "assistant";
   text: string;
   timestamp: string;
+  action?: AssistantAction;
+  followUps?: string[];
+}
+
+export function getAssistantActionAndFollowUps(query: string): {
+  action?: AssistantAction;
+  followUps?: string[];
+} {
+  const q = query.toLowerCase();
+  if (
+    q.includes("write an essay") ||
+    q.includes("write me") ||
+    q.includes("rewrite") ||
+    q.includes("paraphrase") ||
+    q.includes("draft a") ||
+    q.includes("generate code") ||
+    q.includes("write code")
+  ) {
+    return {
+      action: { type: "workspaces", label: "Browse Academic Workspaces ↑" },
+      followUps: ["How do I create a research project?", "What is Knowledge Vault?"],
+    };
+  }
+  if (q.includes("ai") || q.includes("key") || q.includes("provider") || q.includes("configure") || q.includes("byok") || q.includes("engine")) {
+    return {
+      action: { type: "ai", label: "Open AI Access Settings ↗" },
+      followUps: ["What is Scholar AI Engine?", "What is Knowledge Vault?", "How do I create a research project?"],
+    };
+  }
+  if (q.includes("vault") || q.includes("citation") || q.includes("pdf") || q.includes("zotero") || q.includes("reference") || q.includes("evidence") || q.includes("source")) {
+    return {
+      action: { type: "vault", label: "Open Knowledge Vault ↗" },
+      followUps: ["How do I add sources?", "What is the Evidence phase?", "How do I set up AI?"],
+    };
+  }
+  if (q.includes("create") || q.includes("start") || q.includes("new project") || q.includes("how do i create") || q.includes("journal") || q.includes("workflow")) {
+    return {
+      action: { type: "workspaces", label: "Browse Academic Workspaces ↑" },
+      followUps: ["Journal Article workflow?", "How do I set up AI?", "Where can I find my projects?"],
+    };
+  }
+  if (q.includes("find") || q.includes("where") || q.includes("list") || q.includes("access") || q.includes("project")) {
+    return {
+      action: { type: "projects", label: "Jump to Active Projects ↓" },
+      followUps: ["How do I create a research project?", "What is Knowledge Vault?"],
+    };
+  }
+  return {
+    followUps: ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
+  };
 }
 
 export const WEBSITE_ASSISTANT_FAQS = [
@@ -411,6 +466,34 @@ export default function ProjectListScreen({
     }
   }, []);
 
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  function handleCopyMessage(id: string, text: string) {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(text);
+        setCopiedMessageId(id);
+        setTimeout(() => setCopiedMessageId(null), 2000);
+      }
+    } catch {
+      // Ignore clipboard write issues
+    }
+  }
+
+  function handleAssistantAction(action: AssistantAction) {
+    if (action.type === "ai") {
+      onOpenAiAccess?.();
+    } else if (action.type === "vault") {
+      onOpenVault?.();
+    } else if (action.type === "workspaces") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (action.type === "projects") {
+      const el = document.getElementById("active-projects-section");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+      else window.scrollTo({ top: 400, behavior: "smooth" });
+    }
+  }
+
   function handleSendGuideMessage(textToSend?: string) {
     const query = (textToSend !== undefined ? textToSend : guideInput).trim();
     if (!query) return;
@@ -428,11 +511,14 @@ export default function ProjectListScreen({
 
     setTimeout(() => {
       const answer = answerWebsiteQuestion(query);
+      const meta = getAssistantActionAndFollowUps(query);
       const assistantMsg: WebsiteAssistantMessage = {
         id: `assistant-${Date.now()}`,
         sender: "assistant",
         text: answer,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        action: meta.action,
+        followUps: meta.followUps,
       };
       setGuideMessages((prev) => [...prev, assistantMsg]);
       setIsGuideThinking(false);
@@ -1175,22 +1261,29 @@ export default function ProjectListScreen({
                 )}
               </section>
 
-              {/* In-Page Website Assistant Section (At the bottom of the page) */}
+              {/* In-Page Website Assistant Section (At the bottom of the page - Gemini Style) */}
               <section
                 id="website-assistant"
-                className="w-full text-left rounded-3xl bg-white dark:bg-[#171717] border border-slate-200/90 dark:border-neutral-800 p-6 sm:p-7 shadow-xs mt-2"
+                className="w-full text-left rounded-3xl bg-white dark:bg-[#161618] border border-slate-200/90 dark:border-neutral-800 p-5 sm:p-7 shadow-xs hover:shadow-sm transition-all duration-300 mt-2"
               >
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100 dark:border-neutral-800">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center text-sm font-bold shadow-xs">
-                      ?
+                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-purple-600 text-white flex items-center justify-center shadow-xs flex-shrink-0">
+                      <svg className="w-5 h-5 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
+                      </svg>
                     </div>
                     <div>
-                      <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-sans tracking-tight">
-                        Scholar Core Website Assistant
-                      </h2>
-                      <p className="text-xs text-slate-500 dark:text-neutral-400 font-normal">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-sans tracking-tight">
+                          Scholar Core Website Assistant
+                        </h2>
+                        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60 font-sans">
+                          Assistant
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-neutral-400 font-normal mt-0.5">
                         Ask any question to understand platform navigation, workflows, AI configuration, and the Knowledge Vault.
                       </p>
                     </div>
@@ -1208,95 +1301,198 @@ export default function ProjectListScreen({
                         },
                       ])
                     }
-                    className="self-start sm:self-auto px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer border border-slate-200/60 dark:border-neutral-700/60"
+                    className="self-start sm:self-auto px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer border border-slate-200/60 dark:border-neutral-700/60 flex items-center gap-1.5 font-sans"
                   >
-                    Reset Chat
+                    <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Reset Chat</span>
                   </button>
                 </div>
 
-                {/* Suggested Questions Chips */}
+                {/* Suggested Questions Chips (Responsive: smooth horizontal scroll on mobile, wrap on tablet/desktop) */}
                 <div className="pt-4 pb-2">
-                  <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-2">
-                    Common Inquiries:
-                  </span>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
+                      </svg>
+                      Common Inquiries:
+                    </span>
+                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 hidden sm:inline">
+                      Click for instant answers
+                    </span>
+                  </div>
+                  <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-none snap-x -mx-1 px-1">
                     {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => handleSendGuideMessage(faq.question)}
-                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-50 hover:bg-slate-100 dark:bg-neutral-800/80 dark:hover:bg-neutral-700 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-neutral-700 transition-all cursor-pointer hover:border-slate-300"
+                        className="snap-start flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium bg-slate-50 hover:bg-indigo-50/80 dark:bg-neutral-800/80 dark:hover:bg-neutral-700 text-slate-700 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-white border border-slate-200/80 dark:border-neutral-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all cursor-pointer shadow-2xs hover:-translate-y-0.5 active:scale-95 flex items-center gap-1.5 font-sans"
                       >
-                        {faq.shortLabel}
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500/60 flex-shrink-0" />
+                        <span>{faq.shortLabel}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Conversation / Message History (Flow step 1) */}
-                <div className="my-4 max-h-[360px] min-h-[140px] overflow-y-auto space-y-3 pr-2 scholar-scrollbar">
+                {/* Conversation / Message History */}
+                <div className="my-4 max-h-[380px] min-h-[140px] overflow-y-auto space-y-4 pr-1 sm:pr-2 scholar-scrollbar">
                   {guideMessages.map((msg) => (
                     <div
                       key={msg.id}
                       className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
                     >
                       {msg.sender === "user" ? (
-                        <div className="max-w-[85%] rounded-2xl rounded-br-xs px-4 py-2.5 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed text-xs">
+                        <div className="max-w-[88%] sm:max-w-[75%] rounded-3xl rounded-tr-xs px-4.5 py-2.5 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed text-xs sm:text-sm font-medium font-sans">
                           <p>{msg.text}</p>
                           <span className="text-[9px] text-slate-400 block text-right mt-1">
                             {msg.timestamp}
                           </span>
                         </div>
                       ) : (
-                        <div className="w-full flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-slate-300 flex-shrink-0 mt-0.5 text-[10px] font-bold">
-                            ?
+                        <div className="w-full flex items-start gap-3 sm:gap-3.5 group">
+                          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-purple-600 flex items-center justify-center text-white shadow-xs flex-shrink-0 mt-0.5">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
+                            </svg>
                           </div>
-                          <div className="flex-1 rounded-2xl rounded-tl-xs px-4 py-3 bg-slate-50 dark:bg-[#1f1f22] border border-slate-200/80 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed whitespace-pre-wrap text-xs">
-                            <p>{msg.text}</p>
-                            <span className="text-[9px] text-slate-400 dark:text-neutral-500 block text-right mt-1">
-                              {msg.timestamp}
-                            </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="rounded-2xl rounded-tl-xs px-4 sm:px-5 py-3.5 bg-slate-50/90 dark:bg-[#1f1f22] border border-slate-200/80 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed text-xs sm:text-sm font-sans">
+                              <div className="space-y-2 whitespace-pre-wrap leading-relaxed">
+                                {msg.text}
+                              </div>
+
+                              {/* Interactive Action Deep-Link Button */}
+                              {msg.action && (
+                                <div className="mt-3.5 pt-3 border-t border-slate-200/60 dark:border-neutral-700/60 flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAssistantAction(msg.action!)}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-all cursor-pointer shadow-xs hover:scale-102 active:scale-98 font-sans"
+                                  >
+                                    <span>{msg.action.label}</span>
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Suggested Contextual Follow-ups (Gemini Style) */}
+                              {msg.followUps && msg.followUps.length > 0 && (
+                                <div className="mt-3 pt-2.5 border-t border-slate-200/40 dark:border-neutral-700/40">
+                                  <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1.5">
+                                    Suggested Follow-ups:
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {msg.followUps.map((fu, fIdx) => (
+                                      <button
+                                        key={fIdx}
+                                        type="button"
+                                        onClick={() => handleSendGuideMessage(fu)}
+                                        className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white hover:bg-indigo-50 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-neutral-700 transition-colors cursor-pointer hover:border-indigo-300 font-sans"
+                                      >
+                                        {fu}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between mt-2.5 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyMessage(msg.id, msg.text)}
+                                  className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex items-center gap-1 cursor-pointer opacity-0 group-hover:opacity-100 font-sans"
+                                  title="Copy response"
+                                >
+                                  {copiedMessageId === msg.id ? (
+                                    <>
+                                      <svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                      <span className="text-emerald-500 font-medium">Copied</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                      </svg>
+                                      <span>Copy</span>
+                                    </>
+                                  )}
+                                </button>
+                                <span className="text-[9px] text-slate-400 dark:text-neutral-500 block font-sans">
+                                  {msg.timestamp}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
                     </div>
                   ))}
 
+                  {/* Gemini Shimmer Thinking State */}
                   {isGuideThinking && (
-                    <div className="flex items-center gap-2 text-slate-400 dark:text-neutral-500 py-1.5 px-2 text-xs">
-                      <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                      <span>Consulting platform documentation...</span>
+                    <div className="flex items-start gap-3 sm:gap-3.5 py-2 animate-in fade-in duration-200">
+                      <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-purple-600 flex items-center justify-center text-white shadow-xs flex-shrink-0 animate-pulse">
+                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.07-7.07l-2.83 2.83M8.76 15.24l-2.83 2.83m12.02 0l-2.83-2.83M8.76 8.76L5.93 5.93" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 py-1.5 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
+                        <span className="text-xs font-semibold bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 bg-clip-text text-transparent animate-pulse font-sans">
+                          Consulting Scholar Core platform knowledge...
+                        </span>
+                      </div>
                     </div>
                   )}
 
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Simple Text Input & Send Button (Flow steps 2 & 3: Minimal, no uploads, no tools) */}
+                {/* Gemini-Style Seamless Pill Input Bar */}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     handleSendGuideMessage();
                   }}
-                  className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800 flex flex-col gap-2"
+                  className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800/80 flex flex-col gap-2"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="relative flex items-center w-full bg-slate-50 dark:bg-[#101012] border border-slate-200 dark:border-neutral-700/80 rounded-full px-3.5 sm:px-5 py-2 sm:py-2.5 shadow-2xs hover:border-slate-300 dark:hover:border-neutral-600 focus-within:border-indigo-500/80 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all">
+                    {/* Gemini Spark Icon */}
+                    <div className="flex items-center justify-center mr-2.5 text-indigo-500 dark:text-indigo-400 flex-shrink-0">
+                      <svg className="w-4.5 h-4.5 sm:w-5 sm:h-5 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
+                      </svg>
+                    </div>
+
+                    {/* Seamless input */}
                     <input
                       ref={guideInputRef}
                       type="text"
                       placeholder="Ask how to use Scholar Core (e.g., How do I set up AI? What is Knowledge Vault?)..."
                       value={guideInput}
                       onChange={(e) => setGuideInput(e.target.value)}
-                      className="flex-1 bg-slate-50 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-full px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-neutral-700 transition-all font-sans"
+                      className="flex-1 bg-transparent border-none outline-none text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 font-sans min-w-0 pr-2"
                     />
+
+                    {/* Integrated Circular Send Button (Just like Gemini) */}
                     <button
                       type="submit"
                       disabled={!guideInput.trim() || isGuideThinking}
                       aria-label="Send question"
-                      className="px-5 py-2.5 rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer font-sans shadow-xs flex-shrink-0"
+                      className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
+                        guideInput.trim() && !isGuideThinking
+                          ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:scale-105 active:scale-95 shadow-xs"
+                          : "bg-slate-200/60 dark:bg-neutral-800 text-slate-400 dark:text-neutral-600 cursor-not-allowed opacity-60"
+                      }`}
                     >
-                      Send →
+                      <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                      </svg>
                     </button>
                   </div>
                   <p className="text-[11px] text-slate-400 dark:text-neutral-500 text-center font-sans">

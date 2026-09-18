@@ -32,9 +32,9 @@ function labelClass(required: boolean): string {
   return `text-sm font-medium text-[color:var(--text-primary)]${required ? " required-mark" : ""}`;
 }
 
-export function AuthShell({ children }: { children: ReactNode }) {
+export function AuthShell({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className="min-h-screen bg-[color:var(--surface-canvas)] px-4 py-10">
+    <div className={className ?? "min-h-screen bg-[color:var(--surface-canvas)] px-4 py-10"}>
       <div className="mx-auto w-full max-w-sm">{children}</div>
     </div>
   );

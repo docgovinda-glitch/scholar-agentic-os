@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-18
 
 ### Added
+- **Gemini-Inspired Responsive Website Assistant & Direct Auth Wiring (`ProjectListScreen.tsx`, `EmbeddedAuthModal.tsx`, `AuthFlow.tsx`, `AuthLayout.tsx`)**:
+  - **Previously Engineered Auth Re-Wiring**: Refactored `EmbeddedAuthModal.tsx` to directly host the previously engineered and battle-tested `SignInScreen`, `SignUpScreen`, `ForgotScreen`, `RegisteredScreen`, and `ResendVerificationScreen` from `AuthFlow.tsx`. Preserved all canonical fields (Full name, Username with live availability checks, Email with live availability checks, Phone with country code selector, User Type, Education Level, Password strength checks, CAPTCHA challenge, and Google OAuth) with zero custom form duplication.
+  - **Gemini-Style Seamless Input Bar**: Replaced disconnected input/button layout with a continuous, seamless capsule pill container featuring an animated 4-point sparkle icon, transparent text field, and an integrated circular submit button (`↑`) on the right that lights up upon typing.
+  - **Actionable Direct Deep-Links & Contextual Follow-ups**: Responses now provide one-click action buttons (`[Open AI Access Settings ↗]`, `[Open Knowledge Vault ↗]`, `[Browse Academic Workspaces ↑]`, `[Jump to Active Projects ↓]`) and dynamic contextual follow-up inquiry chips.
+  - **Gemini Shimmer Wave & Copy Feedback**: Added an iridescent gradient sparkle avatar, animated shimmering wave thinking state, and one-click copy response button with visual confirmation.
+  - **Mobile-Responsive Chips Layout**: Common inquiry chips automatically format as a smooth horizontal scrolling track with snapping on mobile devices (`<640px`) and flex-wrap cleanly on tablet and desktop viewports.
 - **Fix Runtime Crash & Strict CSS Variable Styling (`ProjectListScreen.tsx`)**:
   - Initialized core variables (`aiPrompt`, `setAiPrompt`, `creating`, `userEmail`, `openAuth`, `handleCreate`) at the very top of the component to eliminate runtime initialization crash and black screen issues.
   - Refactored hero prompt `<input>` element to strictly use design system CSS variables (`bg-[var(--surface-card)]`, `border-[var(--border-subtle)]`, `text-[var(--text-primary)]`, `placeholder-[var(--text-secondary)]`) and purged all hardcoded Tailwind `dark:` classes.

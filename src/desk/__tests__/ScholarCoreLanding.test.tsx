@@ -43,9 +43,10 @@ describe("ScholarCoreLanding", () => {
     const initBtn = screen.getByText(/Initialize Assignment →/i);
     fireEvent.click(initBtn);
 
-    // Modal opens with Scholar Core branding and auth form
-    expect(screen.getAllByRole("heading", { name: /Scholar Core/i }).length).toBeGreaterThan(0);
-    expect(screen.getByPlaceholderText(/name@institution\.edu/i)).toBeInTheDocument();
+    // Modal opens in signup mode with Scholar Core branding and previously engineered SignUpScreen
+    expect(screen.getByRole("heading", { name: /Create your account/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Full name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Email/i)).toBeInTheDocument();
   });
 
   it("allows interactive citation verification in live demo", () => {

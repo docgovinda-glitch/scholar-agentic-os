@@ -13,15 +13,19 @@ This document specifies the direct landing page architecture, in-page authentica
    - The primary canvas displays the hero inquiry (*"What would you like to write today?"*), the 4 curated workspace format cards (*Assignment*, *Journal Article*, *Research Proposal*, *Presentation*), and the active project registry (`Active Projects 0 of 0`) with the empty-state card.
 
 2. **In-Page Authentication ("Sign In on This Page Only")**:
-   - Authentication is rendered contextually via `EmbeddedAuthModal` on top of the workspace.
-   - Supports Google One-Tap / OAuth, Email/Password login, new researcher registration, and switching accounts.
+   - Directly re-wires the canonical, production-engineered screens (`SignInScreen`, `SignUpScreen`, `ForgotScreen`, `RegisteredScreen`, `ResendVerificationScreen`) inside `EmbeddedAuthModal` without code or schema duplication.
+   - Preserves all battle-tested functionality: username availability checks, email availability checks, phone country code normalization, user type and education level selectors, password strength validation, Supabase CAPTCHA challenges, and Google OAuth.
    - Preserves researcher context: clicking any workspace format card while unauthenticated triggers the modal with an informative context notice (e.g. *"Sign in to create your Journal Article project"*), automatically launching that workspace format upon successful authentication via `?newFormat=<formatId>`.
 
-3. **Minimal Website Assistant**:
+3. **Gemini-Inspired Responsive Website Assistant**:
    - Positioned at the bottom of the page (`#website-assistant`) to provide strictly bounded guidance on navigating Scholar Core and utilizing its features.
-   - Strictly limited to platform help: AI engine setup & BYOK, Knowledge Vault provenance, creating projects, Evidence phase & sourcing, Journal Article 25-stage pipeline, finding projects, and provider configuration.
-   - Strictly refuses general writing, coding, web search, or document generation with polite redirection to the relevant dedicated workspace.
-   - Minimal conversational UI: Conversation stream → simple text input → Send button. Strictly no attachments, no file uploads, no voice inputs, and no model selectors.
+   - **Gemini-Style Seamless Capsule**: Replaced fragmented inputs with a continuous capsule pill containing an animated sparkle icon, transparent prompt field, and an integrated circular submit button (`↑`) on the right that lights up dynamically upon typing.
+   - **Actionable Direct Deep-Links**: Answers include one-click actions (`[Open AI Access Settings ↗]`, `[Open Knowledge Vault ↗]`, `[Browse Academic Workspaces ↑]`, `[Jump to Active Projects ↓]`).
+   - **Contextual Follow-ups**: Provides dynamic multi-turn suggestion chips beneath responses.
+   - **Gemini Shimmer Wave**: Renders an iridescent gradient sparkle avatar and animated shimmer wave thinking state.
+   - **Responsive & Touch-Friendly**: Chips automatically scroll horizontally with snapping on mobile devices (`<640px`) and flex-wrap on desktop viewports.
+   - One-click copy response button with checkmark feedback.
+   - Strictly limited to platform help; refuses general writing, coding, web search, or document generation with polite redirection to the relevant dedicated workspace.
 
 ---
 

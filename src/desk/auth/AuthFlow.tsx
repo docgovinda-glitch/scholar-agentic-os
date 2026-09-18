@@ -171,12 +171,14 @@ export function VerifyEmailRoute() {
   return <EmailVerificationSuccessScreen email={session.email} onContinue={handleContinue} />;
 }
 
-function SignInScreen({
+export function SignInScreen({
   onRegister,
   onForgot,
+  embedded = false,
 }: {
   onRegister: () => void;
   onForgot: () => void;
+  embedded?: boolean;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -218,7 +220,7 @@ function SignInScreen({
   }
 
   return (
-    <AuthShell>
+    <AuthShell className={embedded ? "w-full" : undefined}>
       <AuthHeading title="Sign in" subtitle="Reach your work." />
       <AuthForm onSubmit={handleSubmit}>
         <Field
@@ -281,7 +283,15 @@ function checkedAgainst(availability: Availability, currentValue: string): Avail
   return availability && availability.checkedValue === currentValue ? availability : null;
 }
 
-function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onBack: () => void }) {
+export function SignUpScreen({
+  onDone,
+  onBack,
+  embedded = false,
+}: {
+  onDone: (email: string) => void;
+  onBack: () => void;
+  embedded?: boolean;
+}) {
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -415,7 +425,7 @@ function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onB
   }
 
   return (
-    <AuthShell>
+    <AuthShell className={embedded ? "w-full" : undefined}>
       <AuthHeading
         title="Create your account"
         subtitle="Verify your email to get started."
@@ -496,7 +506,13 @@ function SignUpScreen({ onDone, onBack }: { onDone: (email: string) => void; onB
   );
 }
 
-function ForgotScreen({ onBack }: { onBack: () => void }) {
+export function ForgotScreen({
+  onBack,
+  embedded = false,
+}: {
+  onBack: () => void;
+  embedded?: boolean;
+}) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -520,7 +536,7 @@ function ForgotScreen({ onBack }: { onBack: () => void }) {
 
   if (sent) {
     return (
-      <AuthShell>
+      <AuthShell className={embedded ? "w-full" : undefined}>
         <AuthHeading title="Check your email" />
         {/* Deliberately does not confirm whether the address has an account:
             that would turn this form into a way to test which emails are
@@ -537,7 +553,7 @@ function ForgotScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <AuthShell>
+    <AuthShell className={embedded ? "w-full" : undefined}>
       <AuthHeading title="Reset your password" subtitle="We will email you a link to set a new one." />
       <AuthForm onSubmit={handleSubmit}>
         <Field id="reset-email" label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" autoFocus />
@@ -615,9 +631,19 @@ function RecoverScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-function RegisteredScreen({ email, onBack, onResend }: { email: string; onBack: () => void; onResend: () => void }) {
+export function RegisteredScreen({
+  email,
+  onBack,
+  onResend,
+  embedded = false,
+}: {
+  email: string;
+  onBack: () => void;
+  onResend: () => void;
+  embedded?: boolean;
+}) {
   return (
-    <AuthShell>
+    <AuthShell className={embedded ? "w-full" : undefined}>
       <AuthHeading title="Account created" />
       <AuthNotice>
         {email ? (
@@ -670,7 +696,15 @@ function EmailVerificationSuccessScreen({ email, onContinue }: { email?: string 
   );
 }
 
-function ResendVerificationScreen({ email, onBack }: { email: string; onBack: () => void }) {
+export function ResendVerificationScreen({
+  email,
+  onBack,
+  embedded = false,
+}: {
+  email: string;
+  onBack: () => void;
+  embedded?: boolean;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -689,7 +723,7 @@ function ResendVerificationScreen({ email, onBack }: { email: string; onBack: ()
   }
 
   return (
-    <AuthShell>
+    <AuthShell className={embedded ? "w-full" : undefined}>
       <AuthHeading title="Resend verification email" subtitle={`Send a new link to ${email}`} />
       {error && (
         <div className="mb-6">

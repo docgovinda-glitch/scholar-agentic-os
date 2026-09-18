@@ -24,7 +24,14 @@ vi.mock("../api", () => ({
   saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
 }));
 vi.mock("../../services/supabaseClient", () => ({
-  getSupabaseClient: () => ({ auth: { signOut: vi.fn() } }),
+  getSupabaseClient: () => ({
+    auth: {
+      signOut: vi.fn(),
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+    },
+  }),
+  isSupabaseConfigured: () => true,
 }));
 
 const { default: ProjectListScreen } = await import("../ProjectListScreen");
@@ -395,7 +402,9 @@ describe("landing workspace hero & academic workspace cards", () => {
 
     // In-page auth modal appears without full-page redirect
     expect(await screen.findByText(/Sign in to boot your Journal Article workspace/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create Account" })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Create an account")).toBeInTheDocument();
   });
 });
 
