@@ -196,7 +196,7 @@ describe("the canonical first-login journey", () => {
     // Skip/Continue header (asserted in test 3/4 below) rather than a
     // separate screen.
     expect(await screen.findByRole("heading", { name: "AI Access" })).toBeInTheDocument();
-    expect(screen.queryByText("Initialize your first project")).not.toBeInTheDocument();
+    expect(screen.queryByText("What would you like to write today?")).not.toBeInTheDocument();
   });
 
   it("2. a returning user whose account already has a connected provider and a Vault goes straight to the workspace", async () => {
@@ -204,7 +204,7 @@ describe("the canonical first-login journey", () => {
     db.user_vaults = { label: "My Knowledge Vault", created_at: "2026-01-01T00:00:00.000Z" };
 
     renderDeskApp();
-    expect(await screen.findByText("Initialize your first project")).toBeInTheDocument();
+    expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "AI Access" })).not.toBeInTheDocument();
     expect(screen.queryByText(/long-term library/i)).not.toBeInTheDocument();
   });
@@ -232,7 +232,7 @@ describe("the canonical first-login journey", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Next →/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
 
-    expect(await screen.findByText("Initialize your first project")).toBeInTheDocument();
+    expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
     expect(await screen.findByText("Welcome to your Scholar Workspace")).toBeInTheDocument();
   });
 
@@ -250,7 +250,7 @@ describe("the canonical first-login journey", () => {
     await screen.findByText("Your Vault is ready");
     fireEvent.click(screen.getByRole("button", { name: "Go to your work" }));
 
-    expect(await screen.findByText("Initialize your first project")).toBeInTheDocument();
+    expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
     expect(await screen.findByText("Welcome to your Scholar Workspace")).toBeInTheDocument();
   });
 
@@ -275,11 +275,11 @@ describe("the canonical first-login journey", () => {
     db.user_vaults = { label: "My Knowledge Vault", created_at: "2026-01-01T00:00:00.000Z" };
 
     const { unmount } = renderDeskApp();
-    await screen.findByText("Initialize your first project");
+    await screen.findByText("What would you like to write today?");
     unmount();
 
     renderDeskApp();
-    expect(await screen.findByText("Initialize your first project")).toBeInTheDocument();
+    expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "AI Access" })).not.toBeInTheDocument();
     expect(screen.queryByText(/long-term library/i)).not.toBeInTheDocument();
   });

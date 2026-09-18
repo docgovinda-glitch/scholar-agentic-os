@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-18
 
-### Added
+### Changed
+- **UI Revisions: Scholar Core Branding, Compact Assistant & Auth Unification (`ProjectListScreen.tsx`, `UserAccountMenu.tsx`)**:
+  - **Logo & Branding Consistency**: Purged all Gemini branding, 4-point sparkle SVGs, and Gemini-specific styling. Replaced with the official Scholar Core animated Veena logo mark (`ScholarCoreLogo.tsx`) across all headers, avatars, and thinking states to preserve application-wide visual identity.
+  - **Compact & Balanced Chat Box**: Re-architected the Website Assistant into a sleek, responsive, and compact container that spans the grid column naturally without dominating screen space or leaving awkward whitespace. Constrained message scroll height (`max-h-[200px] min-h-[70px]`), compacted padding (`p-4 sm:p-5`), streamlined typography and inquiry pills (`text-[11px]`), and integrated a seamless capsule input bar.
+  - **Single Source of Truth for Authentication**: Eliminated duplicate top-right "Log In" / "Sign Up" buttons to establish the bottom-left sidebar user card (`UserAccountMenu`) as the sole source of truth for authentication, guest sign-in, account switching, and registration.
+  - **Projects Workspace Clean-up**: Renamed the section heading to simply "Projects", removed "Browse Templates" and "Import from Zotero/PDF" distractors, introduced a clean minimalist file-browser empty state, and established 1:1 parity between the sidebar Projects folder button and the main workspace listing.
 - **Gemini-Inspired Responsive Website Assistant & Direct Auth Wiring (`ProjectListScreen.tsx`, `EmbeddedAuthModal.tsx`, `AuthFlow.tsx`, `AuthLayout.tsx`)**:
   - **Previously Engineered Auth Re-Wiring**: Refactored `EmbeddedAuthModal.tsx` to directly host the previously engineered and battle-tested `SignInScreen`, `SignUpScreen`, `ForgotScreen`, `RegisteredScreen`, and `ResendVerificationScreen` from `AuthFlow.tsx`. Preserved all canonical fields (Full name, Username with live availability checks, Email with live availability checks, Phone with country code selector, User Type, Education Level, Password strength checks, CAPTCHA challenge, and Google OAuth) with zero custom form duplication.
   - **Gemini-Style Seamless Input Bar**: Replaced disconnected input/button layout with a continuous, seamless capsule pill container featuring an animated 4-point sparkle icon, transparent text field, and an integrated circular submit button (`↑`) on the right that lights up upon typing.

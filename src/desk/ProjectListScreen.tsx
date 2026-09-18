@@ -94,7 +94,7 @@ export function getAssistantActionAndFollowUps(query: string): {
   }
   if (q.includes("find") || q.includes("where") || q.includes("list") || q.includes("access") || q.includes("project")) {
     return {
-      action: { type: "projects", label: "Jump to Active Projects ↓" },
+      action: { type: "projects", label: "Jump to Projects ↓" },
       followUps: ["How do I create a research project?", "What is Knowledge Vault?"],
     };
   }
@@ -227,8 +227,8 @@ Once connected, the Multi-Agent Editorial Board automatically routes tasks to yo
 
   if (q.includes("find") || q.includes("where") || q.includes("list") || q.includes("access") || q.includes("project")) {
     return `You can easily access all your projects in two places:
-1. Left Sidebar: The "Active Projects" section lists all your ongoing projects with format badges. Click any project title to open it directly.
-2. Main Dashboard: The "Active Projects" section below gives you search filtering, status badges, and project management controls.`;
+1. Left Sidebar: Click "Projects" in the left sidebar to jump directly to your projects workspace.
+2. Main Dashboard: The "Projects" workspace below gives you search filtering, format tags, and project management controls.`;
   }
 
   if (q.includes("feature") || q.includes("what does this feature do") || q.includes("gate") || q.includes("rubric")) {
@@ -243,7 +243,7 @@ Once connected, the Multi-Agent Editorial Board automatically routes tasks to yo
 • Workspaces: Boot publication-ready pipelines for Assignments, Journal Articles, Research Proposals, or Presentations.
 • Knowledge Vault: Connect your reference papers with zero-hallucination provenance audits.
 • AI Access: Bring your own model keys (Claude, OpenAI, Gemini, Local) with multi-tier routing.
-• Navigation: Use the left sidebar to access your Active Projects, Knowledge Vault, and Settings.
+• Navigation: Use the left sidebar to access your Projects, Knowledge Vault, and Settings.
 Click any suggestion above or ask a specific question about our features!`;
 }
 
@@ -480,6 +480,12 @@ export default function ProjectListScreen({
     }
   }
 
+  function scrollToProjects() {
+    const el = document.getElementById("projects-section");
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+    else window.scrollTo({ top: 400, behavior: "smooth" });
+  }
+
   function handleAssistantAction(action: AssistantAction) {
     if (action.type === "ai") {
       onOpenAiAccess?.();
@@ -488,9 +494,7 @@ export default function ProjectListScreen({
     } else if (action.type === "workspaces") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else if (action.type === "projects") {
-      const el = document.getElementById("active-projects-section");
-      if (el) el.scrollIntoView({ behavior: "smooth" });
-      else window.scrollTo({ top: 400, behavior: "smooth" });
+      scrollToProjects();
     }
   }
 
@@ -707,12 +711,13 @@ export default function ProjectListScreen({
             Platform
           </div>
 
-          {/* Active Projects Item with Active Indicator Pill */}
+          {/* Projects Nav Item directly opening the Projects workspace */}
           <button
             type="button"
             onClick={() => {
               setMobileMenuOpen(false);
               setChoosing(false);
+              scrollToProjects();
             }}
             aria-label="Projects"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all cursor-pointer text-left w-full group font-sans ${
@@ -725,8 +730,14 @@ export default function ProjectListScreen({
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
             </svg>
             <span className="flex-1">Projects</span>
-            {!choosing && (
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-900 dark:bg-slate-100" />
+            {projects && projects.length > 0 ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-neutral-700 text-slate-600 dark:text-neutral-300 font-mono">
+                {projects.length}
+              </span>
+            ) : (
+              !choosing && (
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-900 dark:bg-slate-100" />
+              )
             )}
           </button>
 
@@ -783,64 +794,6 @@ export default function ProjectListScreen({
             </span>
             <span>Platform Guide</span>
           </button>
-
-          {/* Active Projects in Sidebar */}
-          <div className="pt-3 pb-1 border-t border-slate-200/60 dark:border-neutral-800/80 mt-2">
-            <div className="flex items-center justify-between px-2 mb-1.5">
-              <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 dark:text-neutral-500 font-sans">
-                Active Projects
-              </span>
-              {projects && projects.length > 0 && (
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 font-mono">
-                  {projects.length}
-                </span>
-              )}
-            </div>
-
-            {projects === null ? (
-              <div className="px-2 py-2 flex items-center gap-2 text-xs text-slate-400">
-                <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                <span>Loading...</span>
-              </div>
-            ) : projects.length === 0 ? (
-              <div className="px-2 py-2 text-xs text-slate-400 dark:text-neutral-500 italic">
-                No active manuscripts
-              </div>
-            ) : (
-              <div className="flex flex-col gap-0.5 max-h-[260px] overflow-y-auto scholar-scrollbar pr-0.5">
-                {projects.map((p) => {
-                  const title = getProjectTitle(p);
-                  const formatTile = FORMAT_TILES.find((t) => t.id === p.outputTypeId);
-                  return (
-                    <button
-                      key={p.projectId}
-                      type="button"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        onOpen(p.projectId);
-                      }}
-                      title={title}
-                      className="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs text-left text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer w-full"
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                        p.outputTypeId === "OT-01" ? "bg-blue-500" :
-                        p.outputTypeId === "OT-10" ? "bg-amber-500" :
-                        p.outputTypeId === "OT-19" ? "bg-indigo-500" :
-                        p.outputTypeId === "OT-22" ? "bg-emerald-500" :
-                        "bg-slate-400"
-                      }`} />
-                      <span className="truncate flex-1 font-normal font-sans">
-                        {title}
-                      </span>
-                      <span className="text-[9px] text-slate-400 dark:text-neutral-500 font-medium flex-shrink-0 group-hover:text-slate-600 dark:group-hover:text-neutral-300">
-                        {formatTile?.label.split(" ")[0] || "Draft"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Bottom Section */}
@@ -936,37 +889,18 @@ export default function ProjectListScreen({
             </button>
           </div>
 
-          {/* Top Bar Right: If logged out, render Log In and Sign Up buttons! */}
-          <div className="flex items-center gap-2.5">
-            {!userEmail ? (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => openAuth("signin")}
-                  className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer font-sans"
-                >
-                  Log In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openAuth("signup")}
-                  className="px-4 py-1.5 rounded-full text-xs font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:opacity-90 transition-all cursor-pointer shadow-xs font-sans"
-                >
-                  Sign Up
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={scrollToAssistant}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1C1C1E] border border-slate-200/90 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800 transition-all cursor-pointer shadow-2xs group font-sans"
-              >
-                <span className="w-4 h-4 rounded-full bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-[10px] group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-neutral-900 transition-colors">
-                  ?
-                </span>
-                <span>Platform Guide</span>
-              </button>
-            )}
+          {/* Top Bar Right: Platform Guide Shortcut */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={scrollToAssistant}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1C1C1E] border border-slate-200/90 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800 transition-all cursor-pointer shadow-2xs group font-sans"
+            >
+              <span className="w-4 h-4 rounded-full bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-[10px] group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-neutral-900 transition-colors">
+                ?
+              </span>
+              <span>Platform Guide</span>
+            </button>
           </div>
         </div>        {/* Centered Reading Column */}
         <div className="max-w-6xl mx-auto px-6 py-8 w-full flex-1">
@@ -1107,12 +1041,12 @@ export default function ProjectListScreen({
                 </div>
               </div>
 
-              {/* Active Projects Section with Live Search & Filter Tabs */}
-              <section className="w-full text-left">
+              {/* Projects Section with Live Search & Filter Tabs */}
+              <section id="projects-section" className="w-full text-left scroll-mt-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-3 border-b border-gray-200 dark:border-neutral-800 w-full">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
-                      Active Projects
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
+                      Projects
                     </h2>
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border border-gray-200 dark:border-neutral-800 text-[var(--text-secondary)] bg-white dark:bg-[#171717] shadow-sm font-sans">
                       {projects ? `${filteredProjects.length} of ${projects.length}` : "0 of 0"}
@@ -1204,7 +1138,7 @@ export default function ProjectListScreen({
                 {projects === null ? (
                   error ? (
                     <div className="flex flex-col justify-center items-center py-16 text-center border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl p-8 shadow-sm">
-                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 font-sans">Failed to load manuscripts</p>
+                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 font-sans">Failed to load projects</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mb-4 font-normal leading-relaxed font-sans">{error}</p>
                       <button
                         onClick={load}
@@ -1216,29 +1150,14 @@ export default function ProjectListScreen({
                   ) : (
                     <div className="flex flex-col justify-center items-center py-20 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl shadow-sm">
                       <div className="w-8 h-8 border-2 border-gray-900 dark:border-gray-100 border-t-transparent rounded-full animate-spin mb-4" />
-                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 font-sans">Loading manuscripts...</span>
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 font-sans">Loading projects...</span>
                     </div>
                   )
                 ) : projects.length === 0 ? (
-                  <EmptyState
-                    onStart={() => {
-                      if (!userEmail) {
-                        openAuth("signin", "Sign in to start a new academic project.");
-                        return;
-                      }
-                      setChoosing(true);
-                    }}
-                    onOpenVault={() => {
-                      if (!userEmail) {
-                        openAuth("signin", "Sign in to access your Knowledge Vault.");
-                        return;
-                      }
-                      onOpenVault?.();
-                    }}
-                  />
+                  <EmptyState />
                 ) : filteredProjects.length === 0 ? (
                   <div className="p-12 text-center rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] shadow-sm">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 font-sans">No manuscripts match "{searchQuery}"</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 font-sans">No projects match "{searchQuery}"</p>
                     <button
                       onClick={() => setSearchQuery("")}
                       className="mt-3 text-xs font-medium text-gray-900 dark:text-gray-100 underline cursor-pointer font-sans"
@@ -1261,36 +1180,35 @@ export default function ProjectListScreen({
                 )}
               </section>
 
-              {/* In-Page Website Assistant Section (At the bottom of the page - Gemini Style) */}
+              {/* In-Page Website Assistant Section (Compact, Responsive, Scholar Core Brand) */}
               <section
                 id="website-assistant"
-                className="w-full text-left rounded-3xl bg-white dark:bg-[#161618] border border-slate-200/90 dark:border-neutral-800 p-5 sm:p-7 shadow-xs hover:shadow-sm transition-all duration-300 mt-2"
+                className="w-full text-left rounded-2xl bg-white dark:bg-[#161618] border border-slate-200/90 dark:border-neutral-800 p-4 sm:p-5 shadow-xs hover:shadow-sm transition-all duration-300 mt-4"
               >
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100 dark:border-neutral-800">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-purple-600 text-white flex items-center justify-center shadow-xs flex-shrink-0">
-                      <svg className="w-5 h-5 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
-                      </svg>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-100 dark:border-neutral-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center shadow-xs flex-shrink-0">
+                      <ScholarCoreLogo size="sm" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-sans tracking-tight">
+                        <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white font-sans tracking-tight">
                           Scholar Core Website Assistant
                         </h2>
-                        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60 font-sans">
-                          Assistant
+                        <span className="hidden sm:inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700 font-sans">
+                          Guide
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-neutral-400 font-normal mt-0.5">
-                        Ask any question to understand platform navigation, workflows, AI configuration, and the Knowledge Vault.
+                      <p className="text-[11px] text-slate-500 dark:text-neutral-400 font-normal mt-0.5">
+                        Ask any question to understand platform navigation, workflows, AI setup, and Knowledge Vault.
                       </p>
                     </div>
                   </div>
 
                   <button
                     type="button"
+                    aria-label="Reset Chat"
                     onClick={() =>
                       setGuideMessages([
                         {
@@ -1301,9 +1219,9 @@ export default function ProjectListScreen({
                         },
                       ])
                     }
-                    className="self-start sm:self-auto px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer border border-slate-200/60 dark:border-neutral-700/60 flex items-center gap-1.5 font-sans"
+                    className="self-start sm:self-auto px-2.5 py-1 rounded-full text-[11px] font-medium text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer border border-slate-200/60 dark:border-neutral-700/60 flex items-center gap-1.5 font-sans"
                   >
-                    <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     <span>Reset Chat</span>
@@ -1311,86 +1229,84 @@ export default function ProjectListScreen({
                 </div>
 
                 {/* Suggested Questions Chips (Responsive: smooth horizontal scroll on mobile, wrap on tablet/desktop) */}
-                <div className="pt-4 pb-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
+                <div className="pt-2.5 pb-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                      <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Common Inquiries:
                     </span>
-                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 hidden sm:inline">
+                    <span className="text-[9px] text-slate-400 dark:text-neutral-500 hidden sm:inline">
                       Click for instant answers
                     </span>
                   </div>
-                  <div className="flex sm:flex-wrap items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-none snap-x -mx-1 px-1">
+                  <div className="flex sm:flex-wrap items-center gap-1.5 overflow-x-auto pb-1.5 sm:pb-0 scrollbar-none snap-x -mx-1 px-1">
                     {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => handleSendGuideMessage(faq.question)}
-                        className="snap-start flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium bg-slate-50 hover:bg-indigo-50/80 dark:bg-neutral-800/80 dark:hover:bg-neutral-700 text-slate-700 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-white border border-slate-200/80 dark:border-neutral-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all cursor-pointer shadow-2xs hover:-translate-y-0.5 active:scale-95 flex items-center gap-1.5 font-sans"
+                        className="snap-start flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-50 hover:bg-slate-100 dark:bg-neutral-800/80 dark:hover:bg-neutral-700 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white border border-slate-200/80 dark:border-neutral-700 hover:border-slate-400 dark:hover:border-neutral-500 transition-all cursor-pointer shadow-2xs active:scale-95 flex items-center gap-1 font-sans"
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500/60 flex-shrink-0" />
+                        <span className="w-1 h-1 rounded-full bg-slate-400 flex-shrink-0" />
                         <span>{faq.shortLabel}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Conversation / Message History */}
-                <div className="my-4 max-h-[380px] min-h-[140px] overflow-y-auto space-y-4 pr-1 sm:pr-2 scholar-scrollbar">
+                {/* Conversation / Message History (Compact Height) */}
+                <div className="my-2.5 max-h-[220px] min-h-[70px] overflow-y-auto space-y-2.5 pr-1 sm:pr-2 scholar-scrollbar">
                   {guideMessages.map((msg) => (
                     <div
                       key={msg.id}
                       className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
                     >
                       {msg.sender === "user" ? (
-                        <div className="max-w-[88%] sm:max-w-[75%] rounded-3xl rounded-tr-xs px-4.5 py-2.5 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed text-xs sm:text-sm font-medium font-sans">
+                        <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-xs px-3.5 py-2 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed text-xs font-medium font-sans">
                           <p>{msg.text}</p>
-                          <span className="text-[9px] text-slate-400 block text-right mt-1">
+                          <span className="text-[9px] text-slate-400 block text-right mt-0.5">
                             {msg.timestamp}
                           </span>
                         </div>
                       ) : (
-                        <div className="w-full flex items-start gap-3 sm:gap-3.5 group">
-                          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-purple-600 flex items-center justify-center text-white shadow-xs flex-shrink-0 mt-0.5">
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
-                            </svg>
+                        <div className="w-full flex items-start gap-2.5 group">
+                          <div className="w-6 h-6 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-xs mt-0.5">
+                            <ScholarCoreLogo size="sm" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="rounded-2xl rounded-tl-xs px-4 sm:px-5 py-3.5 bg-slate-50/90 dark:bg-[#1f1f22] border border-slate-200/80 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed text-xs sm:text-sm font-sans">
-                              <div className="space-y-2 whitespace-pre-wrap leading-relaxed">
+                            <div className="rounded-xl rounded-tl-xs px-3.5 py-2.5 bg-slate-50/90 dark:bg-[#1f1f22] border border-slate-200/80 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed text-xs font-sans">
+                              <div className="space-y-1.5 whitespace-pre-wrap leading-relaxed">
                                 {msg.text}
                               </div>
 
                               {/* Interactive Action Deep-Link Button */}
                               {msg.action && (
-                                <div className="mt-3.5 pt-3 border-t border-slate-200/60 dark:border-neutral-700/60 flex items-center gap-2">
+                                <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-neutral-700/60 flex items-center gap-2">
                                   <button
                                     type="button"
                                     onClick={() => handleAssistantAction(msg.action!)}
-                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-all cursor-pointer shadow-xs hover:scale-102 active:scale-98 font-sans"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-all cursor-pointer shadow-xs active:scale-98 font-sans"
                                   >
                                     <span>{msg.action.label}</span>
                                   </button>
                                 </div>
                               )}
 
-                              {/* Suggested Contextual Follow-ups (Gemini Style) */}
+                              {/* Suggested Contextual Follow-ups */}
                               {msg.followUps && msg.followUps.length > 0 && (
-                                <div className="mt-3 pt-2.5 border-t border-slate-200/40 dark:border-neutral-700/40">
-                                  <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1.5">
+                                <div className="mt-2 pt-2 border-t border-slate-200/40 dark:border-neutral-700/40">
+                                  <span className="text-[9px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1">
                                     Suggested Follow-ups:
                                   </span>
-                                  <div className="flex flex-wrap gap-1.5">
+                                  <div className="flex flex-wrap gap-1">
                                     {msg.followUps.map((fu, fIdx) => (
                                       <button
                                         key={fIdx}
                                         type="button"
                                         onClick={() => handleSendGuideMessage(fu)}
-                                        className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white hover:bg-indigo-50 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-neutral-700 transition-colors cursor-pointer hover:border-indigo-300 font-sans"
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-white hover:bg-slate-100 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-neutral-700 transition-colors cursor-pointer font-sans"
                                       >
                                         {fu}
                                       </button>
@@ -1399,23 +1315,23 @@ export default function ProjectListScreen({
                                 </div>
                               )}
 
-                              <div className="flex items-center justify-between mt-2.5 pt-1">
+                              <div className="flex items-center justify-between mt-2 pt-0.5">
                                 <button
                                   type="button"
                                   onClick={() => handleCopyMessage(msg.id, msg.text)}
-                                  className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex items-center gap-1 cursor-pointer opacity-0 group-hover:opacity-100 font-sans"
+                                  className="text-[9px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex items-center gap-1 cursor-pointer opacity-0 group-hover:opacity-100 font-sans"
                                   title="Copy response"
                                 >
                                   {copiedMessageId === msg.id ? (
                                     <>
-                                      <svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <svg className="w-2.5 h-2.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                       </svg>
                                       <span className="text-emerald-500 font-medium">Copied</span>
                                     </>
                                   ) : (
                                     <>
-                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                       </svg>
                                       <span>Copy</span>
@@ -1433,17 +1349,15 @@ export default function ProjectListScreen({
                     </div>
                   ))}
 
-                  {/* Gemini Shimmer Thinking State */}
+                  {/* Thinking State */}
                   {isGuideThinking && (
-                    <div className="flex items-start gap-3 sm:gap-3.5 py-2 animate-in fade-in duration-200">
-                      <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-purple-600 flex items-center justify-center text-white shadow-xs flex-shrink-0 animate-pulse">
-                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.07-7.07l-2.83 2.83M8.76 15.24l-2.83 2.83m12.02 0l-2.83-2.83M8.76 8.76L5.93 5.93" />
-                        </svg>
+                    <div className="flex items-start gap-2.5 py-1.5 animate-in fade-in duration-200">
+                      <div className="w-6 h-6 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-xs animate-pulse">
+                        <ScholarCoreLogo size="sm" />
                       </div>
-                      <div className="flex-1 py-1.5 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
-                        <span className="text-xs font-semibold bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 bg-clip-text text-transparent animate-pulse font-sans">
+                      <div className="flex-1 py-1 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-600 dark:bg-slate-300 animate-ping" />
+                        <span className="text-xs font-medium text-slate-600 dark:text-neutral-300 animate-pulse font-sans">
                           Consulting Scholar Core platform knowledge...
                         </span>
                       </div>
@@ -1453,19 +1367,19 @@ export default function ProjectListScreen({
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Gemini-Style Seamless Pill Input Bar */}
+                {/* Compact Capsule Pill Input Bar */}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     handleSendGuideMessage();
                   }}
-                  className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800/80 flex flex-col gap-2"
+                  className="mt-2 pt-2 border-t border-slate-100 dark:border-neutral-800/80 flex flex-col gap-1.5"
                 >
-                  <div className="relative flex items-center w-full bg-slate-50 dark:bg-[#101012] border border-slate-200 dark:border-neutral-700/80 rounded-full px-3.5 sm:px-5 py-2 sm:py-2.5 shadow-2xs hover:border-slate-300 dark:hover:border-neutral-600 focus-within:border-indigo-500/80 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all">
-                    {/* Gemini Spark Icon */}
-                    <div className="flex items-center justify-center mr-2.5 text-indigo-500 dark:text-indigo-400 flex-shrink-0">
-                      <svg className="w-4.5 h-4.5 sm:w-5 sm:h-5 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
+                  <div className="relative flex items-center w-full bg-slate-50 dark:bg-[#101012] border border-slate-200 dark:border-neutral-700/80 rounded-full px-3 py-1.5 sm:py-2 shadow-2xs hover:border-slate-300 dark:hover:border-neutral-600 focus-within:border-slate-400 dark:focus-within:border-neutral-500 focus-within:ring-2 focus-within:ring-slate-400/10 transition-all">
+                    {/* Chat Question Mark Icon */}
+                    <div className="flex items-center justify-center mr-2 text-slate-400 dark:text-neutral-500 flex-shrink-0">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                       </svg>
                     </div>
 
@@ -1476,26 +1390,26 @@ export default function ProjectListScreen({
                       placeholder="Ask how to use Scholar Core (e.g., How do I set up AI? What is Knowledge Vault?)..."
                       value={guideInput}
                       onChange={(e) => setGuideInput(e.target.value)}
-                      className="flex-1 bg-transparent border-none outline-none text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 font-sans min-w-0 pr-2"
+                      className="flex-1 bg-transparent border-none outline-none text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-500 font-sans min-w-0 pr-2"
                     />
 
-                    {/* Integrated Circular Send Button (Just like Gemini) */}
+                    {/* Integrated Circular Send Button */}
                     <button
                       type="submit"
                       disabled={!guideInput.trim() || isGuideThinking}
                       aria-label="Send question"
-                      className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
                         guideInput.trim() && !isGuideThinking
                           ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:scale-105 active:scale-95 shadow-xs"
                           : "bg-slate-200/60 dark:bg-neutral-800 text-slate-400 dark:text-neutral-600 cursor-not-allowed opacity-60"
                       }`}
                     >
-                      <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
                       </svg>
                     </button>
                   </div>
-                  <p className="text-[11px] text-slate-400 dark:text-neutral-500 text-center font-sans">
+                  <p className="text-[10px] text-slate-400 dark:text-neutral-500 text-center font-sans">
                     Assisting exclusively with Scholar Core website & platform features.
                   </p>
                 </form>
@@ -1658,68 +1572,20 @@ function ProjectCard({
   );
 }
 
-function EmptyState({
-  onStart,
-  onOpenVault,
-}: {
-  onStart: () => void;
-  onOpenVault?: () => void;
-}) {
+function EmptyState() {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 dark:border-neutral-800 bg-white/70 dark:bg-[#171717]/70 backdrop-blur-xs px-6 py-9 text-center flex flex-col items-center shadow-xs font-sans">
-      {/* Subtle dotted outline skeleton of a project table / cards */}
-      <div className="w-full max-w-md mb-6 grid grid-cols-2 gap-2.5 opacity-65 pointer-events-none select-none">
-        <div className="rounded-xl border border-dashed border-slate-200 dark:border-neutral-800 p-3 flex flex-col gap-2 bg-slate-50/60 dark:bg-neutral-900/40 text-left">
-          <div className="flex items-center gap-2">
-            <div className="w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-neutral-800" />
-            <div className="h-2.5 w-16 bg-slate-200/80 dark:bg-neutral-800 rounded-sm" />
-          </div>
-          <div className="h-3 w-4/5 bg-slate-200/80 dark:bg-neutral-800 rounded-sm" />
-          <div className="h-2 w-1/2 bg-slate-100 dark:bg-neutral-800/60 rounded-sm" />
-        </div>
-        <div className="rounded-xl border border-dashed border-slate-200 dark:border-neutral-800 p-3 flex flex-col gap-2 bg-slate-50/60 dark:bg-neutral-900/40 text-left">
-          <div className="flex items-center gap-2">
-            <div className="w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-neutral-800" />
-            <div className="h-2.5 w-14 bg-slate-200/80 dark:bg-neutral-800 rounded-sm" />
-          </div>
-          <div className="h-3 w-3/4 bg-slate-200/80 dark:bg-neutral-800 rounded-sm" />
-          <div className="h-2 w-2/5 bg-slate-100 dark:bg-neutral-800/60 rounded-sm" />
-        </div>
+    <div className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] px-6 py-12 text-center flex flex-col items-center justify-center shadow-xs font-sans">
+      <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-400 dark:text-neutral-500 mb-3">
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+        </svg>
       </div>
-
-      <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 font-sans mb-1.5 tracking-tight">
-        Initialize your first project
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 font-sans tracking-tight">
+        No projects yet
       </h3>
-      <p className="max-w-md text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-normal mb-6 leading-relaxed font-sans">
-        Select an academic workspace above, browse our research formats, or import prior bibliography sources to begin.
+      <p className="text-xs text-gray-500 dark:text-gray-400 font-normal mt-1 max-w-sm leading-relaxed font-sans">
+        Select an academic workspace above to start your first project.
       </p>
-
-      {/* Secondary CTAs (avoiding duplicate black + New Project pill) */}
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={onStart}
-          className="rounded-full bg-white dark:bg-[#1E1E1E] text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-neutral-700 hover:border-slate-400 dark:hover:border-neutral-500 px-5 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-neutral-800 transition-all flex items-center gap-2 cursor-pointer shadow-xs active:scale-95 font-sans"
-        >
-          <svg className="w-3.5 h-3.5 text-slate-500 dark:text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-          <span>Browse Templates</span>
-        </button>
-
-        {onOpenVault && (
-          <button
-            type="button"
-            onClick={onOpenVault}
-            className="rounded-full text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-4 py-2 text-xs font-medium hover:bg-slate-100/70 dark:hover:bg-neutral-800 transition-all flex items-center gap-1.5 cursor-pointer font-sans"
-          >
-            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span>Import from Zotero / PDF</span>
-          </button>
-        )}
-      </div>
     </div>
   );
 }

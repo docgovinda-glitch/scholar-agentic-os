@@ -129,7 +129,7 @@ describe("the Workshop welcome banner", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
-    await screen.findByText("Initialize your first project");
+    await screen.findByText("No projects yet");
     expect(screen.queryByText("Welcome to your Scholar Workspace")).not.toBeInTheDocument();
   });
 });
@@ -326,7 +326,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
   });
 });
 
-describe("sidebar active projects & platform navigation", () => {
+describe("sidebar projects & platform navigation", () => {
   const SAMPLE_PROJECT = {
     projectId: "proj-crispr-01",
     outputTypeId: "OT-10",
@@ -336,7 +336,7 @@ describe("sidebar active projects & platform navigation", () => {
     gates: [{ gate: "G0", status: "signed_off" }],
   };
 
-  it("renders active projects directly in the sidebar and navigates on click", async () => {
+  it("aligns sidebar projects button with main workspace and opens project from main listing", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     const onOpen = vi.fn();
     const { container } = renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
@@ -344,18 +344,22 @@ describe("sidebar active projects & platform navigation", () => {
     const aside = container.querySelector("aside");
     expect(aside).toBeInTheDocument();
 
-    // Active Projects section in sidebar
-    expect(within(aside!).getByText(/Active Projects/i)).toBeInTheDocument();
-    const projectItem = await within(aside!).findByText("Comparative Analysis of In Vivo Cleavage");
-    expect(projectItem).toBeInTheDocument();
+    // Projects folder button in sidebar with count badge
+    const projectsBtn = within(aside!).getByRole("button", { name: "Projects" });
+    expect(projectsBtn).toBeInTheDocument();
+    expect(await within(projectsBtn).findByText("1")).toBeInTheDocument();
 
-    fireEvent.click(projectItem);
+    // Project card in main Projects workspace
+    const projectTitle = await screen.findByText("Comparative Analysis of In Vivo Cleavage");
+    expect(projectTitle).toBeInTheDocument();
+
+    fireEvent.click(projectTitle);
     expect(onOpen).toHaveBeenCalledWith("proj-crispr-01");
   });
 });
 
 describe("landing workspace hero & academic workspace cards", () => {
-  it("renders the hero headline, AI prompt bar, 4 academic workspace cards, and active projects count", async () => {
+  it("renders the hero headline, AI prompt bar, 4 academic workspace cards, and projects count", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
@@ -370,9 +374,12 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
 
-    // Active Projects section
-    expect(screen.getByRole("heading", { name: "Active Projects" })).toBeInTheDocument();
+    // Projects section (renamed from Active Projects)
+    expect(screen.getByRole("heading", { name: "Projects" })).toBeInTheDocument();
     expect(screen.getByText("0 of 0")).toBeInTheDocument();
+    expect(screen.getByText("No projects yet")).toBeInTheDocument();
+    expect(screen.queryByText("Browse Templates")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Import from Zotero/i)).not.toBeInTheDocument();
   });
 
   it("boots academic workspace directly from card click on dashboard when authenticated", async () => {
