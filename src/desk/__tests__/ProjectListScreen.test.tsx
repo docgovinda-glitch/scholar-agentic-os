@@ -348,6 +348,7 @@ describe("sidebar projects & platform navigation", () => {
     const projectsBtn = within(aside!).getByRole("button", { name: "Projects" });
     expect(projectsBtn).toBeInTheDocument();
     expect(await within(projectsBtn).findByText("1")).toBeInTheDocument();
+    expect(within(aside!).queryByText("Platform Guide")).not.toBeInTheDocument();
 
     // Project card in main Projects workspace
     const projectTitle = await screen.findByText("Comparative Analysis of In Vivo Cleavage");
@@ -359,13 +360,13 @@ describe("sidebar projects & platform navigation", () => {
 });
 
 describe("landing workspace hero & academic workspace cards", () => {
-  it("renders the hero headline, AI prompt bar, 4 academic workspace cards, and projects count", async () => {
+  it("renders the hero headline, 4 academic workspace cards, and projects count", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // Header & Prompt Bar matching user specification
+    // Header matching user specification (prompt box removed per user instruction)
     expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Start a literature review, brainstorm an outline, or drop a syllabus")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Start a literature review, brainstorm an outline, or drop a syllabus")).not.toBeInTheDocument();
 
     // 4 Academic Workspace Cards
     expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();

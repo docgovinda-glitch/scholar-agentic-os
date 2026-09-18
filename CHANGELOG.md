@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-18
 
 ### Changed
+- **UI Revisions: Sidebar & Hero Layout Simplification (`ProjectListScreen.tsx`)**:
+  - **Sidebar Clean-up**: Removed the "Platform Guide" button from the left navigation sidebar per user request.
+  - **Hero Input Box Removal**: Removed the prompt input box ("Start a literature review, brainstorm an outline, or drop a syllabus") below "What would you like to write today?", providing a direct, distraction-free pathway to the 4 academic workspace cards.
 - **UI Revisions: Scholar Core Branding, Compact Assistant & Auth Unification (`ProjectListScreen.tsx`, `UserAccountMenu.tsx`)**:
   - **Logo & Branding Consistency**: Purged all Gemini branding, 4-point sparkle SVGs, and Gemini-specific styling. Replaced with the official Scholar Core animated Veena logo mark (`ScholarCoreLogo.tsx`) across all headers, avatars, and thinking states to preserve application-wide visual identity.
   - **Compact & Balanced Chat Box**: Re-architected the Website Assistant into a sleek, responsive, and compact container that spans the grid column naturally without dominating screen space or leaving awkward whitespace. Constrained message scroll height (`max-h-[200px] min-h-[70px]`), compacted padding (`p-4 sm:p-5`), streamlined typography and inquiry pills (`text-[11px]`), and integrated a seamless capsule input bar.
