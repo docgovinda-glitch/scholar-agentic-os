@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { createProject, listOutputTypes, listProjects, deleteProject, saveIntakeAnswers } from "./api";
+import { createProject, listOutputTypes, listProjects, deleteProject, saveIntakeAnswers, executeAgenticLLM } from "./api";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
 import { syncActiveSessionToRegistry } from "../services/auth/multiAccountService";
@@ -42,7 +42,7 @@ export const FORMAT_TILES = [
 ];
 
 export interface AssistantAction {
-  type: "ai" | "vault" | "workspaces" | "projects";
+  type: "ai" | "ai-access" | "vault" | "workspaces" | "projects";
   label: string;
 }
 
@@ -141,6 +141,48 @@ export const WEBSITE_ASSISTANT_FAQS = [
     shortLabel: "Configure AI provider?",
   },
 ];
+
+export function isPlatformQuery(query: string): boolean {
+  const q = query.toLowerCase().trim();
+  if (!q) return false;
+
+  // Exact matches for FAQ questions or short labels
+  if (WEBSITE_ASSISTANT_FAQS.some((f) => f.question.toLowerCase() === q || f.shortLabel.toLowerCase() === q)) {
+    return true;
+  }
+
+  // Common platform feature keywords
+  const keywords = [
+    "how do i set up ai",
+    "configure ai",
+    "ai provider",
+    "byok",
+    "bring your own key",
+    "knowledge vault",
+    "how do i create a research project",
+    "create project",
+    "new project",
+    "evidence phase",
+    "add source",
+    "adding sources",
+    "where can i find my projects",
+    "find my projects",
+    "journal article workflow",
+    "what is scholar ai engine",
+    "scholar ai engine",
+    "scholar core",
+    "what does this feature do",
+    "quality gate",
+    "citation auditor",
+    "academic workspace",
+    "ot-01",
+    "ot-10",
+    "ot-19",
+    "ot-22",
+  ];
+
+  return keywords.some((kw) => q.includes(kw));
+}
 
 export function answerWebsiteQuestion(query: string): string {
   const q = query.toLowerCase();
@@ -442,14 +484,7 @@ export default function ProjectListScreen({
 
   // Website Assistant State (Help & Guidance Layer)
   const [guideInput, setGuideInput] = useState("");
-  const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([
-    {
-      id: "initial-assistant",
-      sender: "assistant",
-      text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    },
-  ]);
+  const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([]);
   const [isGuideThinking, setIsGuideThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const guideInputRef = useRef<HTMLInputElement | null>(null);
@@ -486,7 +521,7 @@ export default function ProjectListScreen({
   }
 
   function handleAssistantAction(action: AssistantAction) {
-    if (action.type === "ai") {
+    if (action.type === "ai" || action.type === "ai-access") {
       onOpenAiAccess?.();
     } else if (action.type === "vault") {
       onOpenVault?.();
@@ -497,7 +532,7 @@ export default function ProjectListScreen({
     }
   }
 
-  function handleSendGuideMessage(textToSend?: string) {
+  async function handleSendGuideMessage(textToSend?: string) {
     const query = (textToSend !== undefined ? textToSend : guideInput).trim();
     if (!query) return;
 
@@ -512,20 +547,76 @@ export default function ProjectListScreen({
     setGuideInput("");
     setIsGuideThinking(true);
 
-    setTimeout(() => {
+    try {
+      if (isPlatformQuery(query)) {
+        // Fast, deterministic platform answer
+        const answer = answerWebsiteQuestion(query);
+        const meta = getAssistantActionAndFollowUps(query);
+        const assistantMsg: WebsiteAssistantMessage = {
+          id: `assistant-${Date.now()}`,
+          sender: "assistant",
+          text: answer,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          action: meta.action,
+          followUps: meta.followUps,
+        };
+        setGuideMessages((prev) => [...prev, assistantMsg]);
+      } else {
+        // General query: answer using the AI already setup by the user!
+        let aiText = "";
+        try {
+          const systemPrompt = `You are Scholar Core Assistant, an intelligent academic companion built into Scholar Core.
+Answer the user's question accurately, with rigorous intellectual clarity and scholarly depth.
+Keep your response concise, helpful, and academically grounded.`;
+
+          aiText = await executeAgenticLLM(systemPrompt, query, "chat");
+        } catch (llmErr) {
+          // If no provider configured or call threw
+          aiText = "";
+        }
+
+        if (aiText && aiText.trim()) {
+          const assistantMsg: WebsiteAssistantMessage = {
+            id: `assistant-${Date.now()}`,
+            sender: "assistant",
+            text: aiText.trim(),
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            followUps: ["How do I create a research project?", "What is Knowledge Vault?", "How do I set up AI?"],
+          };
+          setGuideMessages((prev) => [...prev, assistantMsg]);
+        } else {
+          // Graceful guidance when no live AI provider is connected
+          const answer = answerWebsiteQuestion(query);
+          const meta = getAssistantActionAndFollowUps(query);
+          const assistantMsg: WebsiteAssistantMessage = {
+            id: `assistant-${Date.now()}`,
+            sender: "assistant",
+            text: answer,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            action: meta.action || { type: "ai-access", label: "Configure AI Provider in AI Access ↗" },
+            followUps: meta.followUps || ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
+          };
+          setGuideMessages((prev) => [...prev, assistantMsg]);
+        }
+      }
+    } catch (e) {
+      console.error("Website Assistant error:", e);
       const answer = answerWebsiteQuestion(query);
       const meta = getAssistantActionAndFollowUps(query);
-      const assistantMsg: WebsiteAssistantMessage = {
-        id: `assistant-${Date.now()}`,
-        sender: "assistant",
-        text: answer,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        action: meta.action,
-        followUps: meta.followUps,
-      };
-      setGuideMessages((prev) => [...prev, assistantMsg]);
+      setGuideMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${Date.now()}`,
+          sender: "assistant",
+          text: answer,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          action: meta.action,
+          followUps: meta.followUps,
+        },
+      ]);
+    } finally {
       setIsGuideThinking(false);
-    }, 200);
+    }
   }
 
   useEffect(() => {
@@ -1196,104 +1287,106 @@ export default function ProjectListScreen({
                   </button>
                 </div>
 
-                {/* Conversation Stream (Gemini / ChatGPT style full-width) */}
-                <div className="w-full rounded-2xl border border-slate-200/80 dark:border-neutral-800 bg-white/70 dark:bg-[#151517] p-4 sm:p-5 shadow-2xs max-h-[340px] min-h-[110px] overflow-y-auto scholar-scrollbar space-y-4">
-                  {guideMessages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
-                    >
-                      {msg.sender === "user" ? (
-                        <div className="max-w-[85%] rounded-2xl rounded-tr-xs px-4 py-2.5 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed text-xs sm:text-sm font-medium font-sans">
-                          <p>{msg.text}</p>
-                          <span className="text-[10px] text-slate-400 block text-right mt-1">
-                            {msg.timestamp}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="w-full flex items-start gap-3 group">
-                          <div className="w-7 h-7 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-xs mt-0.5">
-                            <ScholarCoreLogo size="sm" />
+                {/* Active Conversation Stream (Rendered seamlessly when active) */}
+                {guideMessages.length > 0 && (
+                  <div className="w-full space-y-4 max-h-[380px] overflow-y-auto scholar-scrollbar py-2 pr-1 animate-in fade-in duration-200">
+                    {guideMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+                      >
+                        {msg.sender === "user" ? (
+                          <div className="max-w-[85%] rounded-2xl rounded-tr-xs px-4 py-2.5 bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs leading-relaxed text-xs sm:text-sm font-medium font-sans">
+                            <p>{msg.text}</p>
+                            <span className="text-[10px] text-slate-400 block text-right mt-1">
+                              {msg.timestamp}
+                            </span>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="rounded-2xl rounded-tl-xs px-4 py-3 bg-slate-50/90 dark:bg-[#1c1c1f] border border-slate-200/70 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed text-xs sm:text-sm font-sans">
-                              <div className="space-y-1.5 whitespace-pre-wrap leading-relaxed">
-                                {msg.text}
-                              </div>
+                        ) : (
+                          <div className="w-full flex items-start gap-3 group">
+                            <div className="w-7 h-7 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-xs mt-0.5">
+                              <ScholarCoreLogo size="sm" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="rounded-2xl rounded-tl-xs px-4 py-3 bg-slate-50/90 dark:bg-[#1c1c1f] border border-slate-200/70 dark:border-neutral-800 text-slate-900 dark:text-slate-100 shadow-2xs leading-relaxed text-xs sm:text-sm font-sans">
+                                <div className="space-y-1.5 whitespace-pre-wrap leading-relaxed">
+                                  {msg.text}
+                                </div>
 
-                              {/* Interactive Action Deep-Link Button */}
-                              {msg.action && (
-                                <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-neutral-700/60 flex items-center gap-2">
+                                {/* Interactive Action Deep-Link Button */}
+                                {msg.action && (
+                                  <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-neutral-700/60 flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAssistantAction(msg.action!)}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-all cursor-pointer shadow-xs active:scale-98 font-sans"
+                                    >
+                                      <span>{msg.action.label}</span>
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Suggested Follow-ups */}
+                                {msg.followUps && msg.followUps.length > 0 && (
+                                  <div className="mt-3 pt-2 border-t border-slate-200/40 dark:border-neutral-700/40">
+                                    <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1.5">
+                                      Suggested:
+                                    </span>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {msg.followUps.map((fu, fIdx) => (
+                                        <button
+                                          key={fIdx}
+                                          type="button"
+                                          onClick={() => handleSendGuideMessage(fu)}
+                                          className="px-2.5 py-1 rounded-full text-xs font-medium bg-white hover:bg-slate-100 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-neutral-700 transition-colors cursor-pointer font-sans"
+                                        >
+                                          {fu}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100 dark:border-neutral-800/60">
                                   <button
                                     type="button"
-                                    onClick={() => handleAssistantAction(msg.action!)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-all cursor-pointer shadow-xs active:scale-98 font-sans"
+                                    onClick={() => handleCopyMessage(msg.id, msg.text)}
+                                    className="text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors flex items-center gap-1 cursor-pointer font-sans"
+                                    title="Copy response"
                                   >
-                                    <span>{msg.action.label}</span>
+                                    {copiedMessageId === msg.id ? (
+                                      <span className="text-emerald-600 font-medium">Copied to clipboard</span>
+                                    ) : (
+                                      <span>Copy response</span>
+                                    )}
                                   </button>
-                                </div>
-                              )}
-
-                              {/* Suggested Follow-ups */}
-                              {msg.followUps && msg.followUps.length > 0 && (
-                                <div className="mt-3 pt-2 border-t border-slate-200/40 dark:border-neutral-700/40">
-                                  <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1.5">
-                                    Suggested:
+                                  <span className="text-[10px] text-slate-400 dark:text-neutral-500 block font-sans">
+                                    {msg.timestamp}
                                   </span>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {msg.followUps.map((fu, fIdx) => (
-                                      <button
-                                        key={fIdx}
-                                        type="button"
-                                        onClick={() => handleSendGuideMessage(fu)}
-                                        className="px-2.5 py-1 rounded-full text-xs font-medium bg-white hover:bg-slate-100 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-neutral-700 transition-colors cursor-pointer font-sans"
-                                      >
-                                        {fu}
-                                      </button>
-                                    ))}
-                                  </div>
                                 </div>
-                              )}
-
-                              <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100 dark:border-neutral-800/60">
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyMessage(msg.id, msg.text)}
-                                  className="text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors flex items-center gap-1 cursor-pointer font-sans"
-                                  title="Copy response"
-                                >
-                                  {copiedMessageId === msg.id ? (
-                                    <span className="text-emerald-600 font-medium">Copied to clipboard</span>
-                                  ) : (
-                                    <span>Copy response</span>
-                                  )}
-                                </button>
-                                <span className="text-[10px] text-slate-400 dark:text-neutral-500 block font-sans">
-                                  {msg.timestamp}
-                                </span>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    ))}
 
-                  {isGuideThinking && (
-                    <div className="flex items-start gap-3 py-1">
-                      <div className="w-7 h-7 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-xs animate-pulse">
-                        <ScholarCoreLogo size="sm" />
+                    {isGuideThinking && (
+                      <div className="flex items-start gap-3 py-1">
+                        <div className="w-7 h-7 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center flex-shrink-0 shadow-xs animate-pulse">
+                          <ScholarCoreLogo size="sm" />
+                        </div>
+                        <div className="flex-1 py-1 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-slate-600 dark:bg-slate-300 animate-ping" />
+                          <span className="text-xs font-medium text-slate-600 dark:text-neutral-300 animate-pulse font-sans">
+                            Thinking with Scholar Core AI...
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex-1 py-1 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-slate-600 dark:bg-slate-300 animate-ping" />
-                        <span className="text-xs font-medium text-slate-600 dark:text-neutral-300 animate-pulse font-sans">
-                          Consulting platform knowledge...
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                )}
 
                 {/* Common Inquiries / Prompt Suggestion Pills (Gemini / ChatGPT style) */}
                 <div className="w-full flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none snap-x">
@@ -1359,7 +1452,7 @@ export default function ProjectListScreen({
                 </form>
 
                 <p className="text-[11px] text-slate-400 dark:text-neutral-500 text-center font-sans">
-                  Assisting exclusively with Scholar Core website & platform features.
+                  Ask anything about Scholar Core or research • Suggestive questions guide platform workflows.
                 </p>
               </section>
             </div>

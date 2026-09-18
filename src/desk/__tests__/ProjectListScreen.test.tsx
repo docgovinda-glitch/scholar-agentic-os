@@ -16,12 +16,14 @@ const listOutputTypes = vi.fn();
 const listProjects = vi.fn();
 const deleteProject = vi.fn();
 const saveIntakeAnswers = vi.fn();
+const executeAgenticLLM = vi.fn();
 vi.mock("../api", () => ({
   createProject: (...a: unknown[]) => createProject(...a),
   listOutputTypes: (...a: unknown[]) => listOutputTypes(...a),
   listProjects: (...a: unknown[]) => listProjects(...a),
   deleteProject: (...a: unknown[]) => deleteProject(...a),
   saveIntakeAnswers: (...a: unknown[]) => saveIntakeAnswers(...a),
+  executeAgenticLLM: (...a: unknown[]) => executeAgenticLLM(...a),
 }));
 vi.mock("../../services/supabaseClient", () => ({
   getSupabaseClient: () => ({
@@ -494,6 +496,26 @@ describe("minimal website assistant", () => {
 
     const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
     expect(input).toBeInTheDocument();
+  });
+
+  it("answers general inquiries using connected AI while keeping suggestive questions useful for the platform", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    executeAgenticLLM.mockResolvedValueOnce("Quantum coherence in biological systems facilitates near-unity energy transfer efficiency.");
+
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // Platform questions are always visible as suggestions
+    expect(screen.getByText("How do I set up AI?")).toBeInTheDocument();
+    expect(screen.getByText("What is Knowledge Vault?")).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
+    fireEvent.change(input, { target: { value: "Explain quantum coherence in biological systems" } });
+
+    const sendBtn = screen.getByRole("button", { name: "Send question" });
+    fireEvent.click(sendBtn);
+
+    expect(await screen.findByText(/Quantum coherence in biological systems facilitates/i, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(executeAgenticLLM).toHaveBeenCalled();
   });
 });
 
