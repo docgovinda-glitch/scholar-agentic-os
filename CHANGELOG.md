@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-18
 
 ### Added
+- **Fix Runtime Crash & Strict CSS Variable Styling (`ProjectListScreen.tsx`)**:
+  - Initialized core variables (`aiPrompt`, `setAiPrompt`, `creating`, `userEmail`, `openAuth`, `handleCreate`) at the very top of the component to eliminate runtime initialization crash and black screen issues.
+  - Refactored hero prompt `<input>` element to strictly use design system CSS variables (`bg-[var(--surface-card)]`, `border-[var(--border-subtle)]`, `text-[var(--text-primary)]`, `placeholder-[var(--text-secondary)]`) and purged all hardcoded Tailwind `dark:` classes.
 - **Workspace Dashboard AI Prompt Bar Synchronization (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
   - Exact hero section alignment with reference specification: restored the sleek AI prompt bar directly below *"What would you like to write today?"* with placeholder `"Start a literature review, brainstorm an outline, or drop a syllabus"`.
   - Full keyboard submit support: pressing Enter initializes academic workspace creation or triggers contextual auth for guests.

@@ -199,7 +199,7 @@ Click any suggestion above or ask a specific question about our features!`;
  */
 export default function ProjectListScreen({
   onOpen,
-  userEmail,
+  userEmail = null,
   onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
@@ -214,18 +214,13 @@ export default function ProjectListScreen({
   showWelcome?: boolean;
   onWelcomeSeen?: () => void;
 }) {
-  const [projects, setProjects] = useState<ProjectView[] | null>(null);
-  const [types, setTypes] = useState<OutputTypeSummary[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [choosing, setChoosing] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
-  const [searchQuery, setSearchQuery] = useState("");
+  // Core Hero & Workspace State (Initialized at the top of component)
   const [aiPrompt, setAiPrompt] = useState("");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [creatingFormatId, setCreatingFormatId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // In-Page Auth Modal State
+  // In-Page Auth Modal State & Handlers
   const location = useLocation();
   const navigate = useNavigate();
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -248,6 +243,34 @@ export default function ProjectListScreen({
       navigate("/projects", { replace: true });
     }
   }, [location.pathname, location.search, navigate]);
+
+  const handleCreate = useCallback(async (outputTypeId: string) => {
+    if (!userEmail) {
+      const tile = FORMAT_TILES.find((t) => t.id === outputTypeId);
+      openAuth("signup", `Sign in or create an account to initialize your ${tile?.label || "research"} workspace.`, outputTypeId);
+      return;
+    }
+    if (creating) return;
+    setCreating(true);
+    setCreatingFormatId(outputTypeId);
+    setError(null);
+    try {
+      const project = await createProject(outputTypeId);
+      onOpen(project.projectId);
+    } catch (e) {
+      setError((e as Error).message);
+      setCreating(false);
+      setCreatingFormatId(null);
+    }
+  }, [userEmail, creating, openAuth, onOpen]);
+
+  const [projects, setProjects] = useState<ProjectView[] | null>(null);
+  const [types, setTypes] = useState<OutputTypeSummary[] | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -363,8 +386,6 @@ export default function ProjectListScreen({
     return map;
   }, [types]);
 
-  const [creatingFormatId, setCreatingFormatId] = useState<string | null>(null);
-
   // Website Assistant State (Help & Guidance Layer)
   const [guideInput, setGuideInput] = useState("");
   const [guideMessages, setGuideMessages] = useState<WebsiteAssistantMessage[]>([
@@ -416,26 +437,6 @@ export default function ProjectListScreen({
       setGuideMessages((prev) => [...prev, assistantMsg]);
       setIsGuideThinking(false);
     }, 200);
-  }
-
-  async function handleCreate(outputTypeId: string) {
-    if (!userEmail) {
-      const tile = FORMAT_TILES.find((t) => t.id === outputTypeId);
-      openAuth("signup", `Sign in or create an account to initialize your ${tile?.label || "research"} workspace.`, outputTypeId);
-      return;
-    }
-    if (creating) return;
-    setCreating(true);
-    setCreatingFormatId(outputTypeId);
-    setError(null);
-    try {
-      const project = await createProject(outputTypeId);
-      onOpen(project.projectId);
-    } catch (e) {
-      setError((e as Error).message);
-      setCreating(false);
-      setCreatingFormatId(null);
-    }
   }
 
   useEffect(() => {
@@ -951,7 +952,7 @@ export default function ProjectListScreen({
                     }
                   }}
                   placeholder="Start a literature review, brainstorm an outline, or drop a syllabus"
-                  className="w-full px-6 py-5 rounded-2xl bg-white dark:bg-[#171717] border border-gray-200 dark:border-neutral-800 shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-gray-100 dark:focus:ring-neutral-800 text-base font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
+                  className="w-full px-6 py-5 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-xs transition-all focus:outline-none focus:ring-2 focus:ring-[var(--border-subtle)] text-base font-medium text-[var(--text-primary)] placeholder-[var(--text-secondary)] placeholder:text-[var(--text-secondary)]"
                 />
               </div>
 
