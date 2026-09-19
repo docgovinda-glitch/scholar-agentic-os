@@ -5,6 +5,13 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-09-19
+
+### Fixed
+- **React 19 Hook Order Mismatch & Blank Screen Elimination (`DeskApp.tsx`, `ErrorBoundary.tsx`, `main.tsx`)**:
+  - **Fatal Hook Count Mismatch (Minified React Error #310)**: Resolved fatal runtime crash where `OnboardingGate` conditionally returned before invoking `useAiSetupStatus`, `useVaultSetupStatus`, and `useState(false)`. For authenticated visitors where `useDeskSession()` starts in `"loading"` and resolves to `"signed-in"`, the number of hooks differed across renders, causing React 19 to unmount the entire DOM tree inside `#root`. Moved all hooks unconditionally to the top of `OnboardingGate` with safe nullable inputs (`userId = session.status === "signed-in" ? session.userId : null`).
+  - **Top-Level ErrorBoundary**: Implemented a comprehensive `ErrorBoundary` in `src/components/ErrorBoundary.tsx` wrapping the application root in `src/main.tsx`. Features automatic retry with cache busting for stale PWA chunks (`Failed to fetch dynamically imported module`), graceful recovery controls ("Reload Workspace" / "Clear Cache & Restart"), and branded Scholar Core fallback UI to completely eliminate blank screen failures.
+
 ## [Unreleased] - 2026-09-18
 
 ### Changed

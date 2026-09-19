@@ -104,10 +104,7 @@ function RootOrProjectsRoute() {
 
 function OnboardingGate() {
   const session = useDeskSession();
-  if (session.status !== "signed-in") {
-    return <Outlet />;
-  }
-  const userId = session.userId;
+  const userId = session.status === "signed-in" ? session.userId : null;
   const aiSetup = useAiSetupStatus(userId);
   // Gated on AI setup being finished so the two stages cannot render at once,
   // and so the Vault query does not run before it is reachable.
@@ -121,6 +118,10 @@ function OnboardingGate() {
    * "offer" branch at all, so this never fires for them.
    */
   const [justFinishedOnboarding, setJustFinishedOnboarding] = useState(false);
+
+  if (session.status !== "signed-in") {
+    return <Outlet />;
+  }
 
   if (aiSetup.status === "checking") {
     return (

@@ -52,26 +52,30 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   }
 }
 
+import ErrorBoundary from './components/ErrorBoundary.tsx';
+
 const AdminApp = lazy(() => import('./admin/AdminApp.tsx'));
 
 const root = createRoot(document.getElementById('root')!);
 
 root.render(
   <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        {/* fallback={null}: matches the prior behavior exactly — nothing
-            rendered until the lazy chunk resolves, not a spinner. */}
-        <Route
-          path="/admin/*"
-          element={
-            <Suspense fallback={null}>
-              <AdminApp />
-            </Suspense>
-          }
-        />
-        <Route path="/*" element={<DeskApp />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          {/* fallback={null}: matches the prior behavior exactly — nothing
+              rendered until the lazy chunk resolves, not a spinner. */}
+          <Route
+            path="/admin/*"
+            element={
+              <Suspense fallback={null}>
+                <AdminApp />
+              </Suspense>
+            }
+          />
+          <Route path="/*" element={<DeskApp />} />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 );
