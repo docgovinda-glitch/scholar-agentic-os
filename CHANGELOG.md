@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-19
 
+### Added
+- **Try Moodie Dashboard Layout & AI Support Assistant (`src/trymoodie/MoodieDashboard.tsx`)**:
+  - Implemented single-page wellness and ergonomic dashboard with integrated AI support sidebar for Try Moodie (`trymoodie.com`) following strict 5-phase SDLC architecture.
+  - Smooth flex layout with collapsible `flex-1` main canvas and fixed-width `w-96` right-anchored slide-in sidebar.
+  - Global utility header featuring a pill-shaped "Share" button (`Lock` icon) and circular multi-color Gemini-style sparkle AI toggle button.
+  - "Wellness Guide" sidebar with horizontal recommendation pill carousel ("Order Status", "Ergonomic Setup Guide", "Return Policy"), scrollable chat history canvas, and bottom floating pill input with `Plus`, borderless/ringless input, and circular `ArrowUp` submit button.
+
 ### Changed
 - **Sleek Minimal Dashboard & Hero Heading Removal (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`, `DeskApp.test.tsx`, `OnboardingJourney.test.tsx`)**:
   - Removed the hero heading *"What would you like to write today?"* and prompt input box entirely per user instruction.
@@ -16,9 +23,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The hero header now transitions directly into the 4 Academic Workspace Cards (Assignment, Journal Article, Research Proposal, Presentation) without any input distraction.
 
 ### Fixed
+- **PWA Service Worker Precache Elimination & Instant Live Updates (`vite.config.ts`, `server.ts`)**:
+  - Removed `vite-plugin-pwa` precaching which hijacked navigation requests with stale cached bundles.
+  - Added automated `/sw.js` self-destruct route that unregisters existing service workers, clears client cache storage, and forces a clean reload across client devices.
+  - Configured explicit `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0` headers on all HTML responses from the production Express server (`server.ts`).
 - **React 19 Hook Order Mismatch & Blank Screen Elimination (`DeskApp.tsx`, `ErrorBoundary.tsx`, `main.tsx`)**:
   - **Fatal Hook Count Mismatch (Minified React Error #310)**: Resolved fatal runtime crash where `OnboardingGate` conditionally returned before invoking `useAiSetupStatus`, `useVaultSetupStatus`, and `useState(false)`. For authenticated visitors where `useDeskSession()` starts in `"loading"` and resolves to `"signed-in"`, the number of hooks differed across renders, causing React 19 to unmount the entire DOM tree inside `#root`. Moved all hooks unconditionally to the top of `OnboardingGate` with safe nullable inputs (`userId = session.status === "signed-in" ? session.userId : null`).
   - **Top-Level ErrorBoundary**: Implemented a comprehensive `ErrorBoundary` in `src/components/ErrorBoundary.tsx` wrapping the application root in `src/main.tsx`. Features automatic retry with cache busting for stale PWA chunks (`Failed to fetch dynamically imported module`), graceful recovery controls ("Reload Workspace" / "Clear Cache & Restart"), and branded Scholar Core fallback UI to completely eliminate blank screen failures.
+
+### Database
+- **Remote Supabase Database Synchronization (`supabase db push`)**:
+  - Pushed and verified all migrations, tables, RLS policies, and roles against remote Supabase project `gfjhsijrwodjvkisouzw` using CLI access token. Confirmed database state is completely up to date.
 
 ## [Unreleased] - 2026-09-18
 
