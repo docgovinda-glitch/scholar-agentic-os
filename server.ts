@@ -441,9 +441,48 @@ async function startServer() {
   } else {
     // Serve production build files
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    // Single page application support
+
+    // Force-unregister any lingering Service Workers and prevent client asset freezing
+    app.get(["/sw.js", "/registerSW.js"], (req, res) => {
+      res.setHeader("Content-Type", "application/javascript");
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      res.send(`
+        self.addEventListener('install', () => { self.skipWaiting(); });
+        self.addEventListener('activate', (e) => {
+          e.waitUntil(
+            Promise.all([
+              self.registration.unregister(),
+              caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))),
+              self.clients.claim()
+            ]).then(() => {
+              return self.clients.matchAll({ type: 'window' });
+            }).then((clients) => {
+              clients.forEach((c) => { if ('navigate' in c) c.navigate(c.url); });
+            })
+          );
+        });
+      `);
+    });
+
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".html") || filePath.endsWith("sw.js") || filePath.endsWith("registerSW.js")) {
+          res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+          res.setHeader("Pragma", "no-cache");
+          res.setHeader("Expires", "0");
+        } else if (filePath.includes("/assets/")) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      }
+    }));
+
+    // Single page application support with strict no-cache to guarantee fresh deployments
     app.get("*", (req, res) => {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
