@@ -10,32 +10,6 @@ import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
 import { Plus, ArrowUp, X, RotateCcw } from "lucide-react";
 
-/**
- * 4-Pointed Multi-Color Gradient Sparkle Icon (Google Gemini style from user reference image)
- */
-function GeminiSparkleIcon({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-    >
-      <defs>
-        <linearGradient id="gemini-star-gradient-desk" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#38BDF8" />
-          <stop offset="35%" stopColor="#6366F1" />
-          <stop offset="70%" stopColor="#A855F7" />
-          <stop offset="100%" stopColor="#EC4899" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M12 2C12.4 7.5 16.5 11.6 22 12C16.5 12.4 12.4 16.5 12 22C11.6 16.5 7.5 12.4 2 12C7.5 11.6 11.6 7.5 12 2Z"
-        fill="url(#gemini-star-gradient-desk)"
-      />
-    </svg>
-  );
-}
 
 /** Curated 4 essential academic formats */
 export const FORMAT_TILES = [
@@ -995,19 +969,19 @@ Keep your response concise, helpful, and academically grounded.`;
 
           {/* Top Bar Right: AI Assistant Toggle */}
           <div className="flex items-center gap-2.5">
-            {/* AI Assistant Toggle Button (Circular button with Gemini sparkle icon) */}
+            {/* AI Assistant Toggle Button (Circular button with Scholar Core's own logo) */}
             <button
               type="button"
               onClick={() => setIsAiSidebarOpen((prev) => !prev)}
-              className={`p-2.5 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border ${
+              className={`w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border ${
                 isAiSidebarOpen
-                  ? "bg-blue-50 dark:bg-blue-950/40 border-blue-300 text-blue-600 shadow-inner"
-                  : "bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-neutral-800 border-gray-200/90 dark:border-neutral-800 text-gray-700 dark:text-gray-200"
+                  ? "bg-blue-50 dark:bg-blue-950/40 border-blue-300 shadow-inner ring-2 ring-blue-400/30"
+                  : "bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-neutral-800 border-gray-200/90 dark:border-neutral-800"
               }`}
               title={isAiSidebarOpen ? "Close Scholar Assistant" : "Open Scholar Assistant"}
               aria-label="Toggle Scholar Core AI Assistant"
             >
-              <GeminiSparkleIcon className="w-4.5 h-4.5" />
+              <ScholarCoreLogo size="sm" withText={false} />
             </button>
           </div>
         </div>        {/* Centered Reading Column */}
@@ -1330,7 +1304,9 @@ Keep your response concise, helpful, and academically grounded.`;
                   <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-gray-400">
                     {msg.sender === "assistant" ? (
                       <>
-                        <GeminiSparkleIcon className="w-3 h-3" />
+                        <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
+                          <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
+                        </div>
                         <span className="font-medium text-gray-600 dark:text-neutral-300">Scholar Core</span>
                       </>
                     ) : (
@@ -1367,7 +1343,9 @@ Keep your response concise, helpful, and academically grounded.`;
 
               {isGuideThinking && (
                 <div className="flex items-center gap-2 text-xs text-gray-400 p-2">
-                  <GeminiSparkleIcon className="w-3.5 h-3.5 animate-spin" />
+                  <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
+                  </div>
                   <span>Scholar Core is synthesizing response...</span>
                 </div>
               )}

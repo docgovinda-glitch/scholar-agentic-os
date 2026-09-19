@@ -18,34 +18,6 @@ import {
   FolderOpen,
 } from "lucide-react";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
-
-/**
- * 4-Pointed Multi-Color Gradient Sparkle Icon (Gemini style from user reference image)
- */
-function GeminiSparkleIcon({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-    >
-      <defs>
-        <linearGradient id="scholar-gemini-gradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#38BDF8" /> {/* Sky Blue */}
-          <stop offset="35%" stopColor="#6366F1" /> {/* Indigo */}
-          <stop offset="70%" stopColor="#A855F7" /> {/* Purple */}
-          <stop offset="100%" stopColor="#EC4899" /> {/* Magenta */}
-        </linearGradient>
-      </defs>
-      <path
-        d="M12 2C12.4 7.5 16.5 11.6 22 12C16.5 12.4 12.4 16.5 12 22C11.6 16.5 7.5 12.4 2 12C7.5 11.6 11.6 7.5 12 2Z"
-        fill="url(#scholar-gemini-gradient)"
-      />
-    </svg>
-  );
-}
-
 interface Message {
   id: string;
   sender: "assistant" | "user";
@@ -180,11 +152,11 @@ export default function ScholarAgenticDashboard() {
             </div>
 
 
-            {/* AI Toggle Button (Circular button with Gemini-style sparkle icon) */}
+            {/* AI Toggle Button (Circular button with Scholar Core logo) */}
             <button
               type="button"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className={`p-2.5 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border ${
+              className={`w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border ${
                 isSidebarOpen
                   ? "bg-blue-50 border-blue-200 text-blue-600 shadow-inner"
                   : "bg-white hover:bg-gray-50 border-gray-200 text-gray-700"
@@ -192,7 +164,7 @@ export default function ScholarAgenticDashboard() {
               title={isSidebarOpen ? "Close Scholar Assistant" : "Open Scholar Assistant"}
               aria-label="Toggle Scholar Core AI Assistant"
             >
-              <GeminiSparkleIcon className="w-4.5 h-4.5" />
+              <ScholarCoreLogo size="sm" withText={false} />
             </button>
           </div>
         </header>
@@ -419,7 +391,9 @@ export default function ScholarAgenticDashboard() {
                   <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-gray-400">
                     {msg.sender === "assistant" ? (
                       <>
-                        <GeminiSparkleIcon className="w-3 h-3" />
+                        <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
+                          <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
+                        </div>
                         <span className="font-medium text-gray-600">Scholar Core</span>
                       </>
                     ) : (
@@ -480,7 +454,9 @@ export default function ScholarAgenticDashboard() {
 
               {isTyping && (
                 <div className="flex items-center gap-2 text-xs text-gray-400 p-2">
-                  <GeminiSparkleIcon className="w-3.5 h-3.5 animate-spin" />
+                  <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <ScholarCoreLogo size="sm" withText={false} className="scale-75 origin-center" />
+                  </div>
                   <span>Scholar Core is synthesizing response...</span>
                 </div>
               )}
