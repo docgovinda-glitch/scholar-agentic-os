@@ -8,6 +8,34 @@ import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
+import { Lock, Plus, ArrowUp, X, ChevronDown, RotateCcw } from "lucide-react";
+
+/**
+ * 4-Pointed Multi-Color Gradient Sparkle Icon (Google Gemini style from user reference image)
+ */
+function GeminiSparkleIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <defs>
+        <linearGradient id="gemini-star-gradient-desk" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#38BDF8" />
+          <stop offset="35%" stopColor="#6366F1" />
+          <stop offset="70%" stopColor="#A855F7" />
+          <stop offset="100%" stopColor="#EC4899" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M12 2C12.4 7.5 16.5 11.6 22 12C16.5 12.4 12.4 16.5 12 22C11.6 16.5 7.5 12.4 2 12C7.5 11.6 11.6 7.5 12 2Z"
+        fill="url(#gemini-star-gradient-desk)"
+      />
+    </svg>
+  );
+}
 
 /** Curated 4 essential academic formats */
 export const FORMAT_TILES = [
@@ -366,6 +394,8 @@ export default function ProjectListScreen({
   const [welcomeVisible, setWelcomeVisible] = useState(() => showWelcome ?? false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -491,10 +521,7 @@ export default function ProjectListScreen({
 
   const scrollToAssistant = useCallback(() => {
     setMobileMenuOpen(false);
-    const el = document.getElementById("website-assistant");
-    if (el && typeof el.scrollIntoView === "function") {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    setIsAiSidebarOpen(true);
     setTimeout(() => {
       guideInputRef.current?.focus();
     }, 250);
@@ -929,8 +956,8 @@ Keep your response concise, helpful, and academically grounded.`;
         </div>
       </aside>
 
-      {/* Main Content Area (Right Pane) */}
-      <main className="flex-1 h-full overflow-y-auto bg-[var(--bg-canvas)] text-[var(--text-primary)] scholar-scrollbar relative flex flex-col">
+      {/* Main Content Area (Center Pane) */}
+      <main className="flex-1 h-full overflow-y-auto bg-[var(--bg-canvas)] text-[var(--text-primary)] scholar-scrollbar relative flex flex-col transition-all duration-300 ease-in-out">
         {/* Sticky Top Bar for Sidebar Toggle on Desktop & Mobile */}
         <div className="sticky top-0 z-20 px-6 py-3 flex items-center justify-between bg-[var(--bg-canvas)]/85 backdrop-blur-md border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-3">
@@ -967,17 +994,37 @@ Keep your response concise, helpful, and academically grounded.`;
             </button>
           </div>
 
-          {/* Top Bar Right: Platform Guide Shortcut */}
-          <div className="flex items-center gap-2">
+          {/* Top Bar Right: Share Button & AI Assistant Toggle */}
+          <div className="flex items-center gap-2.5">
+            {/* Share Button (Pill-shaped, light blue, Lock icon, "Share" text) */}
             <button
               type="button"
-              onClick={scrollToAssistant}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1C1C1E] border border-slate-200/90 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800 transition-all cursor-pointer shadow-2xs group font-sans"
+              onClick={() => {
+                navigator.clipboard.writeText("https://scholar.gkshah.com.np");
+                setCopiedShareLink(true);
+                setTimeout(() => setCopiedShareLink(false), 2000);
+              }}
+              className="bg-blue-100 hover:bg-blue-200/90 text-blue-900 rounded-full px-4 py-2 flex items-center gap-2 font-medium text-sm transition-colors shadow-xs cursor-pointer"
+              title="Share Workspace Link"
             >
-              <span className="w-4 h-4 rounded-full bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-[10px] group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-neutral-900 transition-colors">
-                ?
-              </span>
-              <span>Platform Guide</span>
+              <Lock className="w-4 h-4 text-blue-900" />
+              <span>{copiedShareLink ? "Copied!" : "Share"}</span>
+              <ChevronDown className="w-3 h-3 text-blue-800 opacity-60 ml-0.5" />
+            </button>
+
+            {/* AI Assistant Toggle Button (Circular button with Gemini sparkle icon) */}
+            <button
+              type="button"
+              onClick={() => setIsAiSidebarOpen((prev) => !prev)}
+              className={`p-2.5 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border ${
+                isAiSidebarOpen
+                  ? "bg-blue-50 dark:bg-blue-950/40 border-blue-300 text-blue-600 shadow-inner"
+                  : "bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-neutral-800 border-gray-200/90 dark:border-neutral-800 text-gray-700 dark:text-gray-200"
+              }`}
+              title={isAiSidebarOpen ? "Close Scholar Assistant" : "Open Scholar Assistant"}
+              aria-label="Toggle Scholar Core AI Assistant"
+            >
+              <GeminiSparkleIcon className="w-4.5 h-4.5" />
             </button>
           </div>
         </div>        {/* Centered Reading Column */}
@@ -1460,6 +1507,182 @@ Keep your response concise, helpful, and academically grounded.`;
           )}
         </div>
       </main>
+
+      {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (w-96) */}
+      <aside
+        className={`h-full bg-white dark:bg-[#151515] shadow-[-4px_0_24px_rgba(0,0,0,0.06)] border-l border-slate-200/80 dark:border-neutral-800 flex flex-col transition-all duration-300 ease-in-out shrink-0 z-30 ${
+          isAiSidebarOpen ? "w-96 translate-x-0" : "w-0 translate-x-full overflow-hidden border-none"
+        }`}
+        aria-hidden={!isAiSidebarOpen}
+      >
+        {isAiSidebarOpen && (
+          <div className="h-full flex flex-col w-96">
+            {/* Sidebar Header */}
+            <header className="p-5 border-b border-gray-100 dark:border-neutral-800 flex items-center justify-between shrink-0 bg-white dark:bg-[#151515]">
+              <div className="flex items-center gap-2.5">
+                <ScholarCoreLogo size="sm" withText={false} />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+                      Scholar Core Assistant
+                    </h2>
+                    <span className="text-[10px] bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded-full font-medium border border-sky-100 dark:border-sky-900/50">
+                      Guide
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-neutral-400">
+                    Platform navigation, workflows & AI setup
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAiSidebarOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                title="Close Assistant"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </header>
+
+            {/* Horizontally Scrolling Pill Row (Module 3.3) */}
+            <div className="overflow-x-auto scrollbar-hide flex gap-2 px-5 py-3 border-b border-gray-100/80 dark:border-neutral-800/80 shrink-0 bg-slate-50/50 dark:bg-neutral-900/30">
+              {WEBSITE_ASSISTANT_FAQS.map((faq, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleSendGuideMessage(faq.question)}
+                  className="rounded-full bg-white dark:bg-neutral-800 border border-gray-200/80 dark:border-neutral-700 text-gray-700 dark:text-neutral-200 px-3 py-1.5 text-xs whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-700 hover:border-gray-300 transition-colors shadow-2xs shrink-0"
+                >
+                  {faq.shortLabel}
+                </button>
+              ))}
+            </div>
+
+            {/* Chat Canvas (flex-1 overflow-y-auto) */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm scholar-scrollbar">
+              {guideMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+                >
+                  <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-gray-400">
+                    {msg.sender === "assistant" ? (
+                      <>
+                        <GeminiSparkleIcon className="w-3 h-3" />
+                        <span className="font-medium text-gray-600 dark:text-neutral-300">Scholar Core</span>
+                      </>
+                    ) : (
+                      <span>You</span>
+                    )}
+                    <span>•</span>
+                    <span>{msg.timestamp}</span>
+                  </div>
+
+                  <div
+                    className={`rounded-2xl px-4 py-3 max-w-[88%] leading-relaxed ${
+                      msg.sender === "user"
+                        ? "bg-slate-900 text-white dark:bg-neutral-800 dark:text-slate-100 shadow-xs rounded-tr-xs"
+                        : "bg-gray-50 dark:bg-neutral-800/80 border border-gray-100 dark:border-neutral-700/60 text-gray-800 dark:text-neutral-200 rounded-tl-xs shadow-2xs"
+                    }`}
+                  >
+                    {msg.text}
+
+                    {/* Quick Action Deep-Links */}
+                    {msg.action && (
+                      <div className="mt-3 pt-2.5 border-t border-gray-200/60 dark:border-neutral-700/60">
+                        <button
+                          type="button"
+                          onClick={() => handleAssistantAction(msg.action!)}
+                          className="inline-flex items-center gap-1 text-[11px] bg-white dark:bg-neutral-700 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2.5 py-1 rounded-md hover:bg-blue-50 dark:hover:bg-neutral-600 transition font-medium cursor-pointer"
+                        >
+                          <span>{msg.action.label}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {isGuideThinking && (
+                <div className="flex items-center gap-2 text-xs text-gray-400 p-2">
+                  <GeminiSparkleIcon className="w-3.5 h-3.5 animate-spin" />
+                  <span>Scholar Core is synthesizing response...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Pinned Floating Input Component (Module 3.4) */}
+            <div className="p-4 bg-white/95 dark:bg-[#151515]/95 backdrop-blur-md border-t border-gray-100 dark:border-neutral-800 shrink-0">
+              <div className="flex items-center justify-between px-2 mb-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-neutral-400">
+                  <ScholarCoreLogo size="sm" withText={false} />
+                  <span>Scholar Core Guide</span>
+                  <span className="text-green-500 font-bold">• AI Ready</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setGuideMessages([
+                      {
+                        id: "reset-assistant",
+                        sender: "assistant",
+                        text: "Hello! I am your Scholar Core Website Assistant. Ask me anything about how to navigate the platform, configure AI, manage your Knowledge Vault, or create research projects.",
+                        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                      },
+                    ])
+                  }
+                  className="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center gap-1 cursor-pointer"
+                  title="Reset conversation"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset</span>
+                </button>
+              </div>
+
+              {/* Input Wrapper Pill */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendGuideMessage();
+                }}
+                className="flex items-center gap-2.5 rounded-full bg-white dark:bg-neutral-800 px-4 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-gray-200 dark:border-neutral-700 focus-within:border-blue-300 focus-within:shadow-[0_4px_24px_rgba(59,130,246,0.12)] transition-all"
+              >
+                <button
+                  type="button"
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition cursor-pointer p-1"
+                  title="Attach reference source"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+
+                <input
+                  type="text"
+                  value={guideInput}
+                  onChange={(e) => setGuideInput(e.target.value)}
+                  placeholder="Ask how to use Scholar Core..."
+                  className="flex-1 bg-transparent focus:outline-none ring-0 border-none text-xs sm:text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400"
+                />
+
+                <button
+                  type="submit"
+                  disabled={!guideInput.trim() || isGuideThinking}
+                  className={`rounded-full p-2 flex items-center justify-center transition ${
+                    guideInput.trim() && !isGuideThinking
+                      ? "bg-black text-white dark:bg-white dark:text-black hover:opacity-80 cursor-pointer"
+                      : "bg-gray-100 dark:bg-neutral-700 text-gray-400 cursor-not-allowed"
+                  }`}
+                  title="Send message"
+                  aria-label="Send message"
+                >
+                  <ArrowUp className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </aside>
 
       {/* Delete Confirmation Modal Pop-up */}
       {projectToDelete && (

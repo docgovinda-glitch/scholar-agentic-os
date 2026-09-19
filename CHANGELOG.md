@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - "Scholar Core Assistant" sidebar with horizontal recommendation pill carousel ("How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?", "What is the Evidence phase?", "How do I add sources?", "Where can I find my projects?"), scrollable chat history canvas with quick action deep-links, and bottom floating pill input with `Plus`, borderless/ringless input, and circular `ArrowUp` submit button.
 
 ### Changed
+- **Live AI Assistant Slide-In Sidebar & Share Utility Header (`ProjectListScreen.tsx`)**:
+  - Integrated the AI Assistant slide-in right sidebar directly into the active live dashboard route (`https://scholar.gkshah.com.np/projects`).
+  - Added the top-right utility cluster featuring the light-blue pill `Share` button with `Lock` icon (with instant clipboard link copy) and circular `Sparkles` toggle button with the multi-color Gemini gradient star icon.
+  - Clicking the toggle smoothly expands the `w-96` right sidebar while the `flex-1` main workspace transitions smoothly without layout jank.
+  - Sidebar features the horizontal FAQ chip carousel, interactive chat canvas, and pinned floating pill input with `Plus`, borderless input, and circular `ArrowUp` submit button.
 - **Global Brand Name Removal & Canonical Domain Binding (`scholar.gkshah.com.np`, `ScholarAgenticDashboard.tsx`)**:
   - Performed a global search-and-destroy audit across the entire repository to purge all third-party brand references ("Try Moodie", "trymoodie.com", "trymoodie").
   - Formally bound the official website name and domain `scholar.gkshah.com.np` into the global utility header, document metadata, welcome dialogues, and one-click clipboard share controls.
