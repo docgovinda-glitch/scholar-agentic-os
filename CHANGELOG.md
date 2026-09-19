@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Live AI Assistant Slide-In Sidebar & Share Utility Header (`ProjectListScreen.tsx`)**:
   - Integrated the AI Assistant slide-in right sidebar directly into the active live dashboard route (`https://scholar.gkshah.com.np/projects`).
   - Added the top-right utility cluster featuring the light-blue pill `Share` button with `Lock` icon (with instant clipboard link copy) and circular `Sparkles` toggle button with the multi-color Gemini gradient star icon.
+  - Removed the redundant inline bottom chatbox to achieve a clean, breathable, uncluttered, and relaxing workspace, making the slide-in drawer the single dedicated AI assistant experience.
   - Clicking the toggle smoothly expands the `w-96` right sidebar while the `flex-1` main workspace transitions smoothly without layout jank.
   - Sidebar features the horizontal FAQ chip carousel, interactive chat canvas, and pinned floating pill input with `Plus`, borderless input, and circular `ArrowUp` submit button.
 - **Global Brand Name Removal & Canonical Domain Binding (`scholar.gkshah.com.np`, `ScholarAgenticDashboard.tsx`)**:

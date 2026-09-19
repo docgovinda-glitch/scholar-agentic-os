@@ -419,36 +419,37 @@ describe("landing workspace hero & academic workspace cards", () => {
 });
 
 describe("minimal website assistant", () => {
-  it("renders website assistant at bottom of page with clean conversation UI, FAQ suggestions, and minimal text input", async () => {
+  it("renders slide-in AI assistant sidebar with clean conversation UI, FAQ suggestions, and input", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // Assistant container exists directly on the page
-    const assistant = await screen.findByText("Scholar Core Website Assistant");
+    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    fireEvent.click(toggleBtn);
+
+    // Assistant container exists in the slide-in sidebar
+    const assistant = await screen.findByText("Scholar Core Assistant");
     expect(assistant).toBeInTheDocument();
-    expect(screen.getByText(/Ask any question to understand platform navigation/i)).toBeInTheDocument();
+    expect(screen.getByText(/Platform navigation, workflows & AI setup/i)).toBeInTheDocument();
 
     // FAQ suggested topic chips
     expect(screen.getByText("How do I set up AI?")).toBeInTheDocument();
     expect(screen.getByText("What is Knowledge Vault?")).toBeInTheDocument();
     expect(screen.getByText("How do I create a research project?")).toBeInTheDocument();
-    expect(screen.getByText("Journal Article workflow?")).toBeInTheDocument();
 
-    // Minimal input: text input and Send button. NO file upload, NO voice, NO model selector
+    // Clean pill-shaped input and Send button
     const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
     expect(input).toBeInTheDocument();
     const sendBtn = screen.getByRole("button", { name: "Send question" });
     expect(sendBtn).toBeInTheDocument();
     expect(sendBtn).toBeDisabled();
-
-    expect(screen.queryByRole("button", { name: /Attach/i })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/upload/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 
   it("responds with website guidance when asked how to configure AI", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    fireEvent.click(toggleBtn);
 
     // Click "How do I set up AI?" chip
     const aiChip = await screen.findByRole("button", { name: "How do I set up AI?" });
@@ -462,6 +463,9 @@ describe("minimal website assistant", () => {
   it("refuses general writing/coding tasks and directs user to academic workspaces", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
     fireEvent.change(input, { target: { value: "write an essay about biology" } });
@@ -477,22 +481,21 @@ describe("minimal website assistant", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
+    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    fireEvent.click(toggleBtn);
+
     const resetBtn = await screen.findByRole("button", { name: "Reset Chat" });
     fireEvent.click(resetBtn);
 
     expect(screen.getByText(/Hello! I am your Scholar Core Website Assistant/i)).toBeInTheDocument();
   });
 
-  it("renders full-row Gemini-style chatbox at the bottom and handles smooth scrolling from Platform Guide button", async () => {
+  it("renders slide-in AI assistant sidebar on toggle", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const guideSection = document.getElementById("website-assistant");
-    expect(guideSection).toBeInTheDocument();
-    expect(guideSection).toHaveClass("w-full");
-
-    const guideTopBtn = screen.getByRole("button", { name: /Platform Guide/i });
-    fireEvent.click(guideTopBtn);
+    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    fireEvent.click(toggleBtn);
 
     const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
     expect(input).toBeInTheDocument();
@@ -504,7 +507,10 @@ describe("minimal website assistant", () => {
 
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // Platform questions are always visible as suggestions
+    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    fireEvent.click(toggleBtn);
+
+    // Platform questions are visible as suggestions
     expect(screen.getByText("How do I set up AI?")).toBeInTheDocument();
     expect(screen.getByText("What is Knowledge Vault?")).toBeInTheDocument();
 
