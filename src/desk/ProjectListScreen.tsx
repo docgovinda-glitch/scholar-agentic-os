@@ -1030,15 +1030,8 @@ Keep your response concise, helpful, and academically grounded.`;
             />
           ) : (
             <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-8">
-              {/* Header section - Input bar removed per user specification */}
-              <header className="w-full flex flex-col items-start text-left pt-1">
-                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
-                  What would you like to write today?
-                </h1>
-              </header>
-
               {/* 4 Academic Workspace Cards */}
-              <div className="w-full">
+              <div className="w-full pt-1">
                 <div className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {FORMAT_TILES.map((tile) => {
                     const isBootingThis = creatingFormatId === tile.id;

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-19
 
 ### Changed
+- **Sleek Minimal Dashboard & Hero Heading Removal (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`, `DeskApp.test.tsx`, `OnboardingJourney.test.tsx`)**:
+  - Removed the hero heading *"What would you like to write today?"* and prompt input box entirely per user instruction.
+  - The dashboard now opens with an immediate, minimal focus directly on the 4 Academic Workspace Cards (Assignment, Journal Article, Research Proposal, Presentation), followed by the Projects section and Scholar Core Website Assistant.
 - **Hero Input Box Removal for Direct Transition into Academic Workspace Cards (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
   - Removed the hero input box ("Start a literature review, brainstorm an outline, or drop a syllabus") below *"What would you like to write today?"* per user instruction.
   - The hero header now transitions directly into the 4 Academic Workspace Cards (Assignment, Journal Article, Research Proposal, Presentation) without any input distraction.

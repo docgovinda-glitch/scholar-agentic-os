@@ -366,21 +366,21 @@ describe("landing workspace hero & academic workspace cards", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // Header matching user specification (input bar removed for direct transition to cards)
-    expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
+    // Minimal dashboard: transitions directly into the 4 Academic Workspace Cards
+    expect(screen.queryByText("What would you like to write today?")).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Start a literature review, brainstorm an outline, or drop a syllabus")).not.toBeInTheDocument();
 
     // 4 Academic Workspace Cards
-    expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Assignment" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
 
     // Projects section (renamed from Active Projects)
-    expect(screen.getByRole("heading", { name: "Projects" })).toBeInTheDocument();
-    expect(screen.getByText("0 of 0")).toBeInTheDocument();
-    expect(screen.getByText("No projects yet")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
+    expect(await screen.findByText("0 of 0")).toBeInTheDocument();
+    expect(await screen.findByText("No projects yet")).toBeInTheDocument();
     expect(screen.queryByText("Browse Templates")).not.toBeInTheDocument();
     expect(screen.queryByText(/Import from Zotero/i)).not.toBeInTheDocument();
   });

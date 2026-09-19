@@ -349,7 +349,7 @@ describe("Desk — account settings", () => {
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
   });
 
   it("opens from within a project and returns to it, not to the list", async () => {
@@ -396,7 +396,7 @@ describe("Desk — AI Access", () => {
     expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
   });
 
   it("reflects the active section in the URL, so Back steps back through sections instead of leaving AI Access entirely", async () => {
