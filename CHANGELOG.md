@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-19
 
+### Changed
+- **Hero Input Box Removal for Direct Transition into Academic Workspace Cards (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
+  - Removed the hero input box ("Start a literature review, brainstorm an outline, or drop a syllabus") below *"What would you like to write today?"* per user instruction.
+  - The hero header now transitions directly into the 4 Academic Workspace Cards (Assignment, Journal Article, Research Proposal, Presentation) without any input distraction.
+
 ### Fixed
 - **React 19 Hook Order Mismatch & Blank Screen Elimination (`DeskApp.tsx`, `ErrorBoundary.tsx`, `main.tsx`)**:
   - **Fatal Hook Count Mismatch (Minified React Error #310)**: Resolved fatal runtime crash where `OnboardingGate` conditionally returned before invoking `useAiSetupStatus`, `useVaultSetupStatus`, and `useState(false)`. For authenticated visitors where `useDeskSession()` starts in `"loading"` and resolves to `"signed-in"`, the number of hooks differed across renders, causing React 19 to unmount the entire DOM tree inside `#root`. Moved all hooks unconditionally to the top of `OnboardingGate` with safe nullable inputs (`userId = session.status === "signed-in" ? session.userId : null`).

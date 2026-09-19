@@ -312,7 +312,6 @@ export default function ProjectListScreen({
   onWelcomeSeen?: () => void;
 }) {
   // Core Workspace State (Initialized at the top of component)
-  const [aiPrompt, setAiPrompt] = useState("");
   const [creating, setCreating] = useState(false);
   const [creatingFormatId, setCreatingFormatId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1031,29 +1030,12 @@ Keep your response concise, helpful, and academically grounded.`;
             />
           ) : (
             <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-8">
-              {/* Hero Headline & Prompt Bar matching user specification */}
-              <div className="w-full flex flex-col items-start text-left gap-4 pt-1">
+              {/* Header section - Input bar removed per user specification */}
+              <header className="w-full flex flex-col items-start text-left pt-1">
                 <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
                   What would you like to write today?
                 </h1>
-                <input
-                  type="text"
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && aiPrompt.trim() && !creating) {
-                      e.preventDefault();
-                      if (!userEmail) {
-                        openAuth("signin", "Sign in to boot your workspace.", "OT-10");
-                        return;
-                      }
-                      handleCreate("OT-10");
-                    }
-                  }}
-                  placeholder="Start a literature review, brainstorm an outline, or drop a syllabus"
-                  className="w-full px-6 py-5 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-xs transition-all focus:outline-none focus:ring-2 focus:ring-[var(--border-subtle)] text-base font-medium text-[var(--text-primary)] placeholder-[var(--text-secondary)] placeholder:text-[var(--text-secondary)]"
-                />
-              </div>
+              </header>
 
               {/* 4 Academic Workspace Cards */}
               <div className="w-full">
