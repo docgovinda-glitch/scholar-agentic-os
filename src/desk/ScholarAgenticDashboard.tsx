@@ -59,7 +59,7 @@ const INITIAL_MESSAGES: Message[] = [
   {
     id: "1",
     sender: "assistant",
-    text: "Welcome to Scholar Agentic OS. I'm your Scholar Core Guide. Ask any question to understand platform navigation, workflows, AI setup, and Knowledge Vault.",
+    text: "Welcome to Scholar Agentic OS (scholar.gkshah.com.np). I'm your Scholar Core Guide. Ask any question to understand platform navigation, workflows, AI setup, and Knowledge Vault.",
     timestamp: "10:30 AM",
     quickActions: [
       { label: "Configure AI Access", action: "How do I set up AI?" },
@@ -167,7 +167,7 @@ export default function ScholarAgenticDashboard() {
           <div className="flex items-center gap-3">
             <ScholarCoreLogo size="sm" withText={true} />
             <span className="text-xs bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-full font-medium">
-              Academic OS
+              scholar.gkshah.com.np
             </span>
           </div>
 
@@ -183,7 +183,10 @@ export default function ScholarAgenticDashboard() {
             {/* Share Button (Pill shaped light blue button with Lock icon) */}
             <button
               type="button"
-              onClick={() => alert("Share link copied to clipboard.")}
+              onClick={() => {
+                navigator.clipboard.writeText("https://scholar.gkshah.com.np");
+                alert("Copied https://scholar.gkshah.com.np to clipboard.");
+              }}
               className="bg-blue-100 hover:bg-blue-200/80 text-blue-900 rounded-full px-4 py-2 flex items-center gap-2 font-medium text-sm transition-colors shadow-xs cursor-pointer"
               title="Share Research Workspace"
             >
@@ -241,7 +244,7 @@ export default function ScholarAgenticDashboard() {
               <div>
                 <header className="mb-8 pb-6 border-b border-gray-100">
                   <div className="text-xs font-semibold text-blue-600 tracking-wider uppercase mb-1">
-                    Scholar Agentic OS • Resource Allocation
+                    Scholar Agentic OS (scholar.gkshah.com.np) • Resource Allocation
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
                     Pricing Strategy & Empirical Unit Economics

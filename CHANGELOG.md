@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - "Scholar Core Assistant" sidebar with horizontal recommendation pill carousel ("How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?", "What is the Evidence phase?", "How do I add sources?", "Where can I find my projects?"), scrollable chat history canvas with quick action deep-links, and bottom floating pill input with `Plus`, borderless/ringless input, and circular `ArrowUp` submit button.
 
 ### Changed
+- **Global Brand Name Removal & Canonical Domain Binding (`scholar.gkshah.com.np`, `ScholarAgenticDashboard.tsx`)**:
+  - Performed a global search-and-destroy audit across the entire repository to purge all third-party brand references ("Try Moodie", "trymoodie.com", "trymoodie").
+  - Formally bound the official website name and domain `scholar.gkshah.com.np` into the global utility header, document metadata, welcome dialogues, and one-click clipboard share controls.
+  - Verified zero lingering instances via whole-repo regex audit and validated clean compilation (`tsc --noEmit`) and production bundling (`npm run build`).
 - **Sleek Minimal Dashboard & Hero Heading Removal (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`, `DeskApp.test.tsx`, `OnboardingJourney.test.tsx`)**:
   - Removed the hero heading *"What would you like to write today?"* and prompt input box entirely per user instruction.
   - The dashboard now opens with an immediate, minimal focus directly on the 4 Academic Workspace Cards (Assignment, Journal Article, Research Proposal, Presentation), followed by the Projects section and Scholar Core Website Assistant.
