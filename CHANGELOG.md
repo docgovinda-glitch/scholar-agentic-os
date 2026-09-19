@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-18
 
 ### Changed
+- **Hero Prompt Bar Restoration & Live Production Synchronization (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
+  - Restored the hero prompt `<input>` element below "What would you like to write today?" strictly styled with CSS variables (`bg-[var(--surface-card)]`, `border-[var(--border-subtle)]`, `text-[var(--text-primary)]`, `placeholder-[var(--text-secondary)]`) without hardcoded Tailwind `dark:` classes.
+  - Fully initialized `aiPrompt` and `setAiPrompt` at the top of `ProjectListScreen` alongside `creating`, `userEmail`, `openAuth`, and `handleCreate`.
+  - Fixed `executeAgenticLLM` invocation taskType from `"chat"` to `"simple"` resolving TypeScript compilation.
+  - Synchronized and verified against production deployment at `https://scholar.gkshah.com.np/projects`.
 - **UI Revisions: Sidebar & Hero Layout Simplification (`ProjectListScreen.tsx`)**:
   - **Sidebar Clean-up**: Removed the "Platform Guide" button from the left navigation sidebar per user request.
   - **Hero Input Box Removal**: Removed the prompt input box ("Start a literature review, brainstorm an outline, or drop a syllabus") below "What would you like to write today?", providing a direct, distraction-free pathway to the 4 academic workspace cards.

@@ -366,9 +366,9 @@ describe("landing workspace hero & academic workspace cards", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // Header matching user specification (prompt box removed per user instruction)
+    // Header matching user specification (prompt box restored with strict CSS variables per user instruction)
     expect(await screen.findByText("What would you like to write today?")).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText("Start a literature review, brainstorm an outline, or drop a syllabus")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Start a literature review, brainstorm an outline, or drop a syllabus")).toBeInTheDocument();
 
     // 4 Academic Workspace Cards
     expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
