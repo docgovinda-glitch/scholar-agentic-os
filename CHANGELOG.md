@@ -16,9 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - "Scholar Core Assistant" sidebar with horizontal recommendation pill carousel ("How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?", "What is the Evidence phase?", "How do I add sources?", "Where can I find my projects?"), scrollable chat history canvas with quick action deep-links, and bottom floating pill input with `Plus`, borderless/ringless input, and circular `ArrowUp` submit button.
 
 ### Changed
-- **Live AI Assistant Slide-In Sidebar & Share Utility Header (`ProjectListScreen.tsx`)**:
+- **Live AI Assistant Slide-In Sidebar & Share Button Removal (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`)**:
   - Integrated the AI Assistant slide-in right sidebar directly into the active live dashboard route (`https://scholar.gkshah.com.np/projects`).
-  - Added the top-right utility cluster featuring the light-blue pill `Share` button with `Lock` icon (with instant clipboard link copy) and circular `Sparkles` toggle button with the multi-color Gemini gradient star icon.
+  - Removed the Share button (`Lock` icon pill) from the top-right header per user instruction, keeping the header clean and dedicated solely to the circular `Sparkles` AI Assistant toggle.
   - Removed the redundant inline bottom chatbox to achieve a clean, breathable, uncluttered, and relaxing workspace, making the slide-in drawer the single dedicated AI assistant experience.
   - Clicking the toggle smoothly expands the `w-96` right sidebar while the `flex-1` main workspace transitions smoothly without layout jank.
   - Sidebar features the horizontal FAQ chip carousel, interactive chat canvas, and pinned floating pill input with `Plus`, borderless input, and circular `ArrowUp` submit button.

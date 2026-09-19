@@ -8,7 +8,7 @@ import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
-import { Lock, Plus, ArrowUp, X, ChevronDown, RotateCcw } from "lucide-react";
+import { Plus, ArrowUp, X, RotateCcw } from "lucide-react";
 
 /**
  * 4-Pointed Multi-Color Gradient Sparkle Icon (Google Gemini style from user reference image)
@@ -395,7 +395,6 @@ export default function ProjectListScreen({
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
-  const [copiedShareLink, setCopiedShareLink] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -994,24 +993,8 @@ Keep your response concise, helpful, and academically grounded.`;
             </button>
           </div>
 
-          {/* Top Bar Right: Share Button & AI Assistant Toggle */}
+          {/* Top Bar Right: AI Assistant Toggle */}
           <div className="flex items-center gap-2.5">
-            {/* Share Button (Pill-shaped, light blue, Lock icon, "Share" text) */}
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText("https://scholar.gkshah.com.np");
-                setCopiedShareLink(true);
-                setTimeout(() => setCopiedShareLink(false), 2000);
-              }}
-              className="bg-blue-100 hover:bg-blue-200/90 text-blue-900 rounded-full px-4 py-2 flex items-center gap-2 font-medium text-sm transition-colors shadow-xs cursor-pointer"
-              title="Share Workspace Link"
-            >
-              <Lock className="w-4 h-4 text-blue-900" />
-              <span>{copiedShareLink ? "Copied!" : "Share"}</span>
-              <ChevronDown className="w-3 h-3 text-blue-800 opacity-60 ml-0.5" />
-            </button>
-
             {/* AI Assistant Toggle Button (Circular button with Gemini sparkle icon) */}
             <button
               type="button"

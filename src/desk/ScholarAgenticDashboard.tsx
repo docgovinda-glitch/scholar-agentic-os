@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Lock,
   Sparkles,
   Plus,
   ArrowUp,
@@ -180,20 +179,6 @@ export default function ScholarAgenticDashboard() {
               <ChevronDown className="w-3 h-3 text-gray-400" />
             </div>
 
-            {/* Share Button (Pill shaped light blue button with Lock icon) */}
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText("https://scholar.gkshah.com.np");
-                alert("Copied https://scholar.gkshah.com.np to clipboard.");
-              }}
-              className="bg-blue-100 hover:bg-blue-200/80 text-blue-900 rounded-full px-4 py-2 flex items-center gap-2 font-medium text-sm transition-colors shadow-xs cursor-pointer"
-              title="Share Research Workspace"
-            >
-              <Lock className="w-4 h-4 text-blue-900" />
-              <span>Share</span>
-              <ChevronDown className="w-3 h-3 text-blue-800 opacity-60 ml-0.5" />
-            </button>
 
             {/* AI Toggle Button (Circular button with Gemini-style sparkle icon) */}
             <button
