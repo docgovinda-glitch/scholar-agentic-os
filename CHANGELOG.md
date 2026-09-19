@@ -8,11 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-19
 
 ### Added
-- **Try Moodie Dashboard Layout & AI Support Assistant (`src/trymoodie/MoodieDashboard.tsx`)**:
-  - Implemented single-page wellness and ergonomic dashboard with integrated AI support sidebar for Try Moodie (`trymoodie.com`) following strict 5-phase SDLC architecture.
-  - Smooth flex layout with collapsible `flex-1` main canvas and fixed-width `w-96` right-anchored slide-in sidebar.
+- **Scholar Agentic OS Dashboard & Integrated AI Assistant (`src/desk/ScholarAgenticDashboard.tsx`)**:
+  - Implemented single-page scientific dashboard with integrated AI assistant sidebar for Scholar Agentic OS following strict 5-phase SDLC architecture and user reference specifications.
+  - Smooth flex layout with collapsible `flex-1` main research canvas and fixed-width `w-96` right-anchored slide-in sidebar without layout jank.
   - Global utility header featuring a pill-shaped "Share" button (`Lock` icon) and circular multi-color Gemini-style sparkle AI toggle button.
-  - "Wellness Guide" sidebar with horizontal recommendation pill carousel ("Order Status", "Ergonomic Setup Guide", "Return Policy"), scrollable chat history canvas, and bottom floating pill input with `Plus`, borderless/ringless input, and circular `ArrowUp` submit button.
+  - Empirical research document canvas with left document tabs, unit economics / resource allocation budget table matching user reference, and inline floating AI prompt pill (`Plus`, `SlidersHorizontal`, text input with `Tab` badge, and circular submit button).
+  - "Scholar Core Assistant" sidebar with horizontal recommendation pill carousel ("How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?", "What is the Evidence phase?", "How do I add sources?", "Where can I find my projects?"), scrollable chat history canvas with quick action deep-links, and bottom floating pill input with `Plus`, borderless/ringless input, and circular `ArrowUp` submit button.
 
 ### Changed
 - **Sleek Minimal Dashboard & Hero Heading Removal (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`, `DeskApp.test.tsx`, `OnboardingJourney.test.tsx`)**:
