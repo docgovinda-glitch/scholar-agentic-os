@@ -152,20 +152,17 @@ export default function ScholarAgenticDashboard() {
             </div>
 
 
-            {/* AI Toggle Button (Circular button with Scholar Core logo) */}
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className={`w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border ${
-                isSidebarOpen
-                  ? "bg-blue-50 border-blue-200 text-blue-600 shadow-inner"
-                  : "bg-white hover:bg-gray-50 border-gray-200 text-gray-700"
-              }`}
-              title={isSidebarOpen ? "Close Scholar Assistant" : "Open Scholar Assistant"}
-              aria-label="Toggle Scholar Core AI Assistant"
-            >
-              <ScholarCoreLogo size="sm" withText={false} />
-            </button>
+            {/* AI Assistant Toggle Button (Circular button with Scholar Core logo, hidden when sidebar is open) */}
+            {!isSidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white hover:bg-gray-50 border-gray-200 text-gray-700 animate-in fade-in zoom-in-95 duration-150"
+                aria-label="Toggle Scholar Core AI Assistant"
+              >
+                <ScholarCoreLogo size="sm" withText={false} />
+              </button>
+            )}
           </div>
         </header>
 
@@ -362,6 +359,7 @@ export default function ScholarAgenticDashboard() {
                 onClick={() => setIsSidebarOpen(false)}
                 className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition cursor-pointer"
                 title="Close Assistant"
+                aria-label="Close Assistant"
               >
                 <X className="w-4 h-4" />
               </button>

@@ -523,5 +523,27 @@ describe("minimal website assistant", () => {
     expect(await screen.findByText(/Quantum coherence in biological systems facilitates/i, {}, { timeout: 2000 })).toBeInTheDocument();
     expect(executeAgenticLLM).toHaveBeenCalled();
   });
+
+  it("renders custom Scholar Core Assistant logo without tooltip, hides button when sidebar opens, and restores it on close", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // 1. Initially closed: toggle button is visible in top navigation and has NO title/tooltip
+    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    expect(toggleBtn).toBeInTheDocument();
+    expect(toggleBtn).not.toHaveAttribute("title");
+
+    // 2. Open assistant: button triggers the sidebar to slide open
+    fireEvent.click(toggleBtn);
+    expect(await screen.findByText("Scholar Core Assistant")).toBeInTheDocument();
+
+    // 3. Conditional rendering: toggle button completely disappears from top navigation
+    expect(screen.queryByRole("button", { name: /Toggle Scholar Core AI Assistant/i })).not.toBeInTheDocument();
+
+    // 4. Close assistant: toggle button reappears in top navigation
+    const closeBtn = screen.getByRole("button", { name: "Close Assistant" });
+    fireEvent.click(closeBtn);
+    expect(screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i })).toBeInTheDocument();
+  });
 });
 

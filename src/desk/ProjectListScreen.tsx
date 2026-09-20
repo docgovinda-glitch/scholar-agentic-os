@@ -969,20 +969,17 @@ Keep your response concise, helpful, and academically grounded.`;
 
           {/* Top Bar Right: AI Assistant Toggle */}
           <div className="flex items-center gap-2.5">
-            {/* AI Assistant Toggle Button (Circular button with Scholar Core's own logo) */}
-            <button
-              type="button"
-              onClick={() => setIsAiSidebarOpen((prev) => !prev)}
-              className={`w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border ${
-                isAiSidebarOpen
-                  ? "bg-blue-50 dark:bg-blue-950/40 border-blue-300 shadow-inner ring-2 ring-blue-400/30"
-                  : "bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-neutral-800 border-gray-200/90 dark:border-neutral-800"
-              }`}
-              title={isAiSidebarOpen ? "Close Scholar Assistant" : "Open Scholar Assistant"}
-              aria-label="Toggle Scholar Core AI Assistant"
-            >
-              <ScholarCoreLogo size="sm" withText={false} />
-            </button>
+            {/* AI Assistant Toggle Button (Circular button with Scholar Core logo, hidden when sidebar is open) */}
+            {!isAiSidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setIsAiSidebarOpen(true)}
+                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-neutral-800 border-gray-200/90 dark:border-neutral-800 animate-in fade-in zoom-in-95 duration-150"
+                aria-label="Toggle Scholar Core AI Assistant"
+              >
+                <ScholarCoreLogo size="sm" withText={false} />
+              </button>
+            )}
           </div>
         </div>        {/* Centered Reading Column */}
         <div className="max-w-6xl mx-auto px-6 py-8 w-full flex-1">
@@ -1275,6 +1272,7 @@ Keep your response concise, helpful, and academically grounded.`;
                 onClick={() => setIsAiSidebarOpen(false)}
                 className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 transition cursor-pointer"
                 title="Close Assistant"
+                aria-label="Close Assistant"
               >
                 <X className="w-4 h-4" />
               </button>

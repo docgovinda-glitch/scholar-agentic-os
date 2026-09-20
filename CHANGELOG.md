@@ -5,7 +5,16 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-19
+## [Unreleased] - 2026-09-20
+
+### Changed
+- **Top Navigation Scholar Core Assistant Logo Toggle & Conditional Hiding (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `ProjectListScreen.test.tsx`)**:
+  - Replaced legacy/advisor icon and tooltips with the custom Scholar Core swirling star logo (`ScholarCoreLogo`) in the top navigation bar.
+  - Completely removed all hover tooltip and `title` text attributes ("Advisor Center", "Open Scholar Assistant") to keep navigation clean and uncluttered.
+  - Conditionally rendered the toggle button so it ONLY appears when the Assistant sidebar is closed (`{!isAiSidebarOpen && ...}` / `{!isSidebarOpen && ...}`).
+  - When the sidebar is open, the star logo toggle is completely unmounted from the top navigation to eliminate visual clutter.
+  - Closing the sidebar via the `X` ("Close Assistant") button smoothly restores the star logo button in the top navigation.
+  - Added comprehensive unit tests in `ProjectListScreen.test.tsx` verifying full lifecycle: rendering without tooltip, opening sidebar, hiding from navigation, and restoring on close.
 
 ### Added
 - **Scholar Agentic OS Dashboard & Integrated AI Assistant (`src/desk/ScholarAgenticDashboard.tsx`)**:
