@@ -73,10 +73,25 @@ To ensure maximum usability across diverse screen resolutions (including 13-inch
 
 ---
 
-## 6. Verification & Testing
+## 6. Top Navigation Scholar Core Assistant Toggle Specification
+
+The top utility navigation across the dashboard (`ProjectListScreen.tsx` and `ScholarAgenticDashboard.tsx`) provides seamless access to the right-hand Scholar Core Assistant drawer:
+
+- **Custom Logo Integration**: Features the custom animated swirling star logo (`<ScholarCoreLogo size="sm" withText={false} />`) styled within a circular pill container (`w-10 h-10 rounded-full`).
+- **Zero Tooltips / Decluttering**: All `title` attributes and hover tooltips (such as "Advisor Center" or "Open Scholar Assistant") are completely removed to maintain a serene, distraction-free reading atmosphere.
+- **Conditional Visibility ("Hide on Open")**:
+  - The toggle button is conditionally wrapped in `{!isAiSidebarOpen && ( <button ... /> )}` / `{!isSidebarOpen && ( <button ... /> )}`.
+  - When the assistant sidebar is closed, the button is clearly visible in the top-right header.
+  - When clicked, the right sidebar smoothly slides out, and the toggle button **completely unmounts from the top navigation** to eliminate visual clutter.
+  - Clicking the `X` button (`aria-label="Close Assistant"`) in the drawer header closes the sidebar and restores the toggle button in the top navigation.
+
+---
+
+## 7. Verification & Testing
 
 All components and workflows are covered by comprehensive unit tests:
 - `AccountSettingsScreen.test.tsx`: 22 tests covering identity immutability, dial-code sanitization, tab switching, password validation, and sticky save actions.
 - `UserAccountMenu.test.tsx`: 5 tests validating profile display, menu options, consolidated multi-account actions, and pricing absence in the minimal dropdown.
-- `ProjectListScreen.test.tsx`: 15 tests verifying sidebar layout, responsive navigation, and footer settings integration.
-- Full suite passing: 212 test files, 2,397 tests passing with 0 failures.
+- `ProjectListScreen.test.tsx`: 26 tests verifying sidebar layout, responsive navigation, footer settings integration, and the Scholar Core Assistant toggle lifecycle (rendering without tooltip, opening sidebar, hiding from navigation, and restoring on close).
+- Full suite passing: 212 test files, 2,398 tests passing with 0 failures.
+
