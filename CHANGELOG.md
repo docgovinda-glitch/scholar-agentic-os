@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-20
 
 ### Changed
+- **ChatGPT/Gemini-Style Left Sidebar Navigation Overhaul (`ProjectListScreen.tsx`, `vite.config.ts`, `src/index.css`)**:
+  - **Top Actions (Phase 1)**: Preserved full-width primary `+ New Project` button at top and added a real-time `Search projects...` input with `Search` icon immediately below it.
+  - **Core Workspace Links (Phase 2)**: Removed uppercase "PLATFORM" heading; streamlined Library links (`Projects`, `Knowledge Vault`, `AI Access`, `Ask Scholar`) with uniform `lucide-react` icons (`Folder`, `Database`, `Sliders`, `MessageSquare`), hover states, and smooth click handlers.
+  - **Dynamic Recents List (Phase 3)**: Added subtle uppercase tracking header (`Recents`) followed by an overflow-y auto scrollable list container with `.custom-scrollbar` and clean text truncation. Seamlessly binds active projects or fallback items with immediate workspace navigation.
+  - **Cache-Busting Rollup Output (Phase 4)**: Configured explicit hashed output naming (`assets/[name]-[hash].js` / `.css`) in `vite.config.ts` to ensure immediate browser cache invalidation upon deployment.
+
 - **Top Navigation Lightbulb Assistant Toggle & Conditional Hide-on-Open (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `ProjectListScreen.test.tsx`)**:
   - Replaced the swirling star logo in the top navigation bar with a clean, minimalist `Lightbulb` icon from `lucide-react`.
   - Styled with premium circular container (`w-10 h-10 rounded-full`, subtle border, responsive amber/neutral hover effects).

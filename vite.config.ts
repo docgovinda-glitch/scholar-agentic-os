@@ -25,6 +25,9 @@ export default defineConfig(() => {
       chunkSizeWarningLimit: 1500,
       rollupOptions: {
         output: {
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]',
           manualChunks: {
             react: ['react', 'react-dom', 'react-router-dom'],
             tiptap: ['@tiptap/core', '@tiptap/react', '@tiptap/starter-kit', '@tiptap/extension-placeholder'],

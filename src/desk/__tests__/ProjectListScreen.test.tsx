@@ -7,7 +7,7 @@
 // <select> has no equivalent to "click this card to create it".
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -152,8 +152,14 @@ describe("the search bar & delete confirmation modal", () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const searchInput = await screen.findByPlaceholderText("Search projects...");
-    expect(searchInput).toBeInTheDocument();
+    await waitFor(() => {
+      const searchInputs = screen.getAllByPlaceholderText("Search projects...");
+      expect(searchInputs.length).toBeGreaterThan(1);
+    });
+
+    const searchInputs = screen.getAllByPlaceholderText("Search projects...");
+    const searchInput = searchInputs.find((el) => el.className.includes("!rounded-full"));
+    expect(searchInput).toBeDefined();
     expect(searchInput).toHaveClass("!rounded-full");
   });
 
@@ -234,11 +240,13 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     expect(aside).toBeInTheDocument();
     expect(aside).toHaveClass("flex-shrink-0");
 
-    // Top Section: branding and full-width "+ New Project" button
+    // Top Section: branding, full-width "+ New Project" button, and search input
     expect(within(aside!).getByText("Scholar Core")).toBeInTheDocument();
     const sidebarNewBtn = within(aside!).getByRole("button", { name: /\+.*New Project/i });
     expect(sidebarNewBtn).toBeInTheDocument();
     expect(sidebarNewBtn).toHaveClass("w-full");
+    const sidebarSearch = within(aside!).getByPlaceholderText("Search projects...");
+    expect(sidebarSearch).toBeInTheDocument();
 
     // Middle Section: wireframe nav links
     const vaultBtn = within(aside!).getByRole("button", { name: /Knowledge Vault/i });
@@ -252,6 +260,13 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     expect(aiAccessBtn).toBeInTheDocument();
     fireEvent.click(aiAccessBtn);
     expect(onOpenAiAccess).toHaveBeenCalled();
+
+    const askScholarBtn = within(aside!).getByRole("button", { name: /Ask Scholar/i });
+    expect(askScholarBtn).toBeInTheDocument();
+
+    // Recents section
+    expect(within(aside!).getByRole("heading", { name: "Recents" })).toBeInTheDocument();
+    expect(within(aside!).getByText("Contextual Loading Prompt")).toBeInTheDocument();
 
     // Bottom Section: Settings accessible as standalone item in sidebar above user profile block
     const settingsBtn = within(aside!).getByRole("button", { name: /^Settings$/i });
@@ -353,7 +368,8 @@ describe("sidebar projects & platform navigation", () => {
     expect(within(aside!).queryByText("Platform Guide")).not.toBeInTheDocument();
 
     // Project card in main Projects workspace
-    const projectTitle = await screen.findByText("Comparative Analysis of In Vivo Cleavage");
+    const main = container.querySelector("main");
+    const projectTitle = await within(main!).findByText("Comparative Analysis of In Vivo Cleavage");
     expect(projectTitle).toBeInTheDocument();
 
     fireEvent.click(projectTitle);

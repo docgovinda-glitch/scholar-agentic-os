@@ -8,7 +8,7 @@ import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
-import { Plus, ArrowUp, X, RotateCcw, Lightbulb } from "lucide-react";
+import { Plus, ArrowUp, X, RotateCcw, Lightbulb, Search, Folder, Database, Sliders, MessageSquare } from "lucide-react";
 
 
 /** Curated 4 essential academic formats */
@@ -429,6 +429,43 @@ export default function ProjectListScreen({
     if (showWelcome) onWelcomeSeen?.();
   }, []);
 
+  const fallbackRecentItems: Array<{ id: string; title: string; projectId?: string }> = useMemo(
+    () => [
+      { id: "recent-1", title: "Contextual Loading Prompt" },
+      { id: "recent-2", title: "Ethics Essay" },
+      { id: "recent-3", title: "Literature Review" },
+      { id: "recent-4", title: "Citation Provenance Audit" },
+      { id: "recent-5", title: "Academic Proposal Draft" },
+      { id: "recent-6", title: "Comparative Analysis of In Vivo Cleavage" },
+    ],
+    []
+  );
+
+  const recentProjectsList = useMemo(() => {
+    if (projects && projects.length > 0) {
+      let filtered = projects;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        filtered = projects.filter((p) => {
+          const t = (p.answers?.title || "").toLowerCase();
+          return t.includes(q);
+        });
+      }
+      if (filtered.length > 0) {
+        return filtered.map((p) => ({
+          id: p.projectId,
+          projectId: p.projectId,
+          title: p.answers?.title?.trim() || "Untitled Project",
+        }));
+      }
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return fallbackRecentItems.filter((i) => i.title.toLowerCase().includes(q));
+    }
+    return fallbackRecentItems;
+  }, [projects, searchQuery, fallbackRecentItems]);
+
   const load = useCallback(() => {
     setError(null);
     if (!userEmail) {
@@ -775,8 +812,8 @@ Keep your response concise, helpful, and academically grounded.`;
             </button>
           </div>
 
-          {/* Primary + New Project Button (Full width of sidebar) */}
-          <div className="px-3 pt-3 pb-1">
+          {/* Primary + New Project Button & Search Field (Phase 1) */}
+          <div className="px-3 pt-3">
             <button
               type="button"
               onClick={() => {
@@ -787,91 +824,131 @@ Keep your response concise, helpful, and academically grounded.`;
                 }
                 setChoosing(true);
               }}
-              className="w-full py-2.5 px-6 rounded-full text-xs font-medium bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 active:scale-95 transition-transform flex items-center justify-center gap-2 cursor-pointer shadow-sm group font-sans"
+              className="w-full py-2.5 px-6 rounded-full text-xs font-medium bg-[var(--bg-button-primary)] text-[var(--text-button)] hover:opacity-90 active:scale-95 transition-transform flex items-center justify-center gap-2 cursor-pointer shadow-sm group font-sans mb-3"
             >
               <span className="text-base font-bold leading-none">+</span>
               <span>New Project</span>
             </button>
+
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search projects..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent border border-gray-200 dark:border-neutral-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100 dark:focus:ring-neutral-700 transition-all"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Middle Section (Nav Links) */}
-        <div className="flex-1 overflow-y-auto scholar-scrollbar py-2 px-3 flex flex-col gap-1 w-[260px]">
-          <div className="px-2 pt-2 pb-1 text-[10px] font-semibold tracking-wider uppercase text-slate-400 dark:text-neutral-500 font-sans">
-            Platform
+        {/* Middle Section: Core Workspace Links & Recents Scrollable List */}
+        <div className="flex-1 overflow-hidden px-3 flex flex-col w-[260px] min-h-0">
+          {/* Phase 2: Core Workspace Links (The Library) */}
+          <div className="space-y-1">
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setChoosing(false);
+                scrollToProjects();
+              }}
+              aria-label="Projects"
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
+                !choosing
+                  ? "bg-gray-100 dark:bg-neutral-800 text-slate-900 dark:text-white font-semibold"
+                  : "text-gray-700 dark:text-gray-300"
+              }`}
+            >
+              <Folder className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
+              <span className="flex-1">Projects</span>
+              {projects && projects.length > 0 ? (
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-neutral-700 text-slate-600 dark:text-neutral-300 font-mono">
+                  {projects.length}
+                </span>
+              ) : null}
+            </button>
+
+            {onOpenVault && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (!userEmail) {
+                    openAuth("signin", "Sign in to access your Knowledge Vault references.");
+                    return;
+                  }
+                  onOpenVault();
+                }}
+                aria-label="Open Knowledge Vault"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
+              >
+                <Database className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
+                <span>Knowledge Vault</span>
+              </button>
+            )}
+
+            {onOpenAiAccess && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (!userEmail) {
+                    openAuth("signin", "Sign in to configure AI provider keys and models.");
+                    return;
+                  }
+                  onOpenAiAccess();
+                }}
+                aria-label="Manage AI Access"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
+              >
+                <Sliders className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
+                <span>AI Access</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setIsAiSidebarOpen(true);
+              }}
+              aria-label="Ask Scholar"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
+            >
+              <MessageSquare className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
+              <span>Ask Scholar</span>
+            </button>
           </div>
 
-          {/* Projects Nav Item directly opening the Projects workspace */}
-          <button
-            type="button"
-            onClick={() => {
-              setMobileMenuOpen(false);
-              setChoosing(false);
-              scrollToProjects();
-            }}
-            aria-label="Projects"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all cursor-pointer text-left w-full group font-sans ${
-              !choosing
-                ? "bg-slate-200/70 dark:bg-neutral-800 text-slate-900 dark:text-white font-bold shadow-2xs"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5"
-            }`}
-          >
-            <svg className={`w-4 h-4 flex-shrink-0 transition-colors ${!choosing ? "text-slate-900 dark:text-white" : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
-            <span className="flex-1">Projects</span>
-            {projects && projects.length > 0 ? (
-              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-neutral-700 text-slate-600 dark:text-neutral-300 font-mono">
-                {projects.length}
-              </span>
-            ) : (
-              !choosing && (
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-900 dark:bg-slate-100" />
-              )
-            )}
-          </button>
+          {/* Phase 3: Recents Header */}
+          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-6 mb-2 px-3">
+            Recents
+          </h3>
 
-          {onOpenVault && (
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                if (!userEmail) {
-                  openAuth("signin", "Sign in to access your Knowledge Vault references.");
-                  return;
-                }
-                onOpenVault();
-              }}
-              aria-label="Open Knowledge Vault"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-tight text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
-            >
-              <svg className="w-4 h-4 flex-shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <span>Knowledge Vault</span>
-            </button>
-          )}
-
-          {onOpenAiAccess && (
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                if (!userEmail) {
-                  openAuth("signin", "Sign in to configure AI provider keys and models.");
-                  return;
-                }
-                onOpenAiAccess();
-              }}
-              aria-label="Manage AI Access"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-tight text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 transition-colors cursor-pointer text-left w-full group font-sans"
-            >
-              <svg className="w-4 h-4 flex-shrink-0 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
-              <span>AI Access</span>
-            </button>
-          )}
+          {/* Phase 3: Recents List (Scrollable Area) */}
+          <div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar pb-3 min-h-0">
+            {recentProjectsList.map((item) => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setMobileMenuOpen(false);
+                  if (item.projectId) {
+                    onOpen(item.projectId);
+                  } else {
+                    scrollToProjects();
+                  }
+                }}
+                title={item.title}
+                className="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm text-gray-700 dark:text-gray-300 truncate transition-colors"
+              >
+                {item.title}
+              </a>
+            ))}
+          </div>
         </div>
 
         {/* Bottom Section */}

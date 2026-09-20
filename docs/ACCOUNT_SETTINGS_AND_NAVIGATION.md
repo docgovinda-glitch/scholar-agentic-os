@@ -92,11 +92,59 @@ The top utility navigation across the dashboard (`ProjectListScreen.tsx` and `Sc
 
 ---
 
-## 7. Verification & Testing
+## 7. Left Sidebar Navigation Specification (ChatGPT / Gemini Style)
+
+The primary left sidebar navigation (`ProjectListScreen.tsx`) mirrors the dynamic, focused user experience of modern AI interfaces (ChatGPT and Gemini):
+
+```mermaid
+graph TD
+    Sidebar[Main Left Sidebar w-260] --> TopActions[Phase 1: Top Actions]
+    Sidebar --> Library[Phase 2: Core Workspace Links]
+    Sidebar --> Recents[Phase 3: Dynamic Recents List]
+    Sidebar --> BottomActions[User Profile & Settings]
+
+    TopActions --> NewProjectBtn[+ New Project Button full-width]
+    TopActions --> SearchInput[Search projects... with Search icon]
+
+    Library --> ProjectsLink[📁 Projects with count badge]
+    Library --> VaultLink[🗄️ Knowledge Vault]
+    Library --> AiAccessLink[🎛️ AI Access]
+    Library --> AskScholarLink[💬 Ask Scholar]
+
+    Recents --> RecentsHeading[RECENTS section tracking-wider]
+    Recents --> RecentsScroll[Scrollable Area with custom-scrollbar]
+    RecentsScroll --> RecentItems[Real Projects / Curated Fallbacks truncate]
+
+    BottomActions --> SettingsBtn[⚙️ Settings]
+    BottomActions --> ThemeToggle[Theme Switcher Day/Night]
+    BottomActions --> UserMenu[UserAccountMenu]
+```
+
+- **Top Actions (Phase 1)**:
+  - Preserves the prominent full-width `+ New Project` button at the top.
+  - Sits an integrated real-time search field immediately below: `<div className="relative mb-4"><Search ... /><input type="text" placeholder="Search projects..." ... /></div>`.
+  - Tied directly to `searchQuery` state, filtering both the main workspace and recent projects.
+- **Core Workspace Links (Phase 2 - The Library)**:
+  - Uppercase "PLATFORM" heading is removed for a cleaner, distraction-free aesthetic.
+  - High-fidelity links for `Projects`, `Knowledge Vault`, `AI Access`, and `Ask Scholar`.
+  - Uses `lucide-react` icons (`Folder`, `Database`, `Sliders`, `MessageSquare`) with standardized `px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm font-medium` states.
+  - "Ask Scholar" link directly triggers the slide-out AI assistant drawer.
+- **Recents Scrollable Area (Phase 3)**:
+  - Subtle uppercase header: `<h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-6 mb-2 px-3">Recents</h3>`.
+  - Scrollable container: `<div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar">`.
+  - Dynamically binds recent user projects when available, or seamlessly renders clean academic defaults ("Contextual Loading Prompt", "Ethics Essay", "Literature Review", "Citation Provenance Audit", "Academic Proposal Draft").
+  - Clean text truncation (`truncate`) with smooth hover and click handlers.
+- **Cache-Busting & Asset Invalidation (Phase 4)**:
+  - Rollup bundle output configured with unique content hashes (`assets/[name]-[hash].js` and `.css`) to bust aggressive browser cache.
+
+---
+
+## 8. Verification & Testing
 
 All components and workflows are covered by comprehensive unit tests:
 - `AccountSettingsScreen.test.tsx`: 22 tests covering identity immutability, dial-code sanitization, tab switching, password validation, and sticky save actions.
 - `UserAccountMenu.test.tsx`: 5 tests validating profile display, menu options, consolidated multi-account actions, and pricing absence in the minimal dropdown.
-- `ProjectListScreen.test.tsx`: 26 tests verifying sidebar layout, responsive navigation, footer settings integration, and the Scholar Core Assistant toggle lifecycle (rendering without tooltip, opening sidebar, hiding from navigation, and restoring on close).
-- Full suite passing: 212 test files, 2,398 tests passing with 0 failures.
+- `ProjectListScreen.test.tsx`: 26 tests verifying sidebar layout, responsive navigation, top actions with search, recents list rendering, footer settings integration, and the Scholar Core Assistant toggle lifecycle.
+- Full suite passing: 26/26 tests in `ProjectListScreen.test.tsx`, TypeScript compilation clean (`tsc --noEmit` exit 0), and production build passing (`npm run build`).
+
 
