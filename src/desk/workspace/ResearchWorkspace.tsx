@@ -126,7 +126,25 @@ function ResearchWorkspaceInner({
                 </svg>
               </button>
             )}
-            <ScholarCoreLogo size="sm" withText className="hidden md:flex text-[color:var(--text-primary)]" />
+            <div
+              onClick={() => {
+                if (onClose) onClose();
+                else if (typeof window !== "undefined") window.location.href = "/";
+              }}
+              className="hidden md:flex cursor-pointer transition-opacity duration-200 hover:opacity-70"
+              title="Scholar Core Home"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (onClose) onClose();
+                  else if (typeof window !== "undefined") window.location.href = "/";
+                }
+              }}
+            >
+              <ScholarCoreLogo size="sm" withText className="text-[color:var(--text-primary)]" />
+            </div>
             <div className="hidden md:block w-px h-5 bg-[color:var(--border-subtle)] mx-1" />
             <div className="min-w-0">
               <h1 className="text-sm font-bold text-[color:var(--text-primary)] truncate">

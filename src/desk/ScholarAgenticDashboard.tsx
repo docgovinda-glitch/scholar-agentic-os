@@ -19,6 +19,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
+import { Link } from "react-router-dom";
 interface Message {
   id: string;
   sender: "assistant" | "user";
@@ -137,7 +138,14 @@ export default function ScholarAgenticDashboard() {
         {/* Module 3.1: Global Utility Header */}
         <header className="sticky top-0 z-30 flex items-center justify-between px-8 py-3.5 bg-slate-50/90 backdrop-blur-md border-b border-gray-200/60">
           <div className="flex items-center gap-3">
-            <ScholarCoreLogo size="sm" withText={true} />
+            <Link
+              to="/"
+              className="cursor-pointer transition-opacity duration-200 hover:opacity-70 inline-flex items-center"
+              title="Scholar Core Home"
+              aria-label="Scholar Core Home"
+            >
+              <ScholarCoreLogo size="sm" withText={true} />
+            </Link>
             <span className="text-xs bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-full font-medium">
               scholar.gkshah.com.np
             </span>

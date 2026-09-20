@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-20
 
 ### Changed
+- **Gemini-Style Sidebar Recents with 3-Dots Popover Options Menu & Typography Refinement (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
+  - **Sidebar Cleanup**: Removed redundant top "Projects" folder button from sidebar navigation to avoid duplicate navigation controls with the main canvas.
+  - **Typography Downscaling**: Scaled typography down to Airbnb-inspired `text-[13px] font-medium antialiased` for crisp scannability; styled Recents section header to `text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3 mt-5`.
+  - **Group-Hover 3-Dots Interaction**: Added `group` wrapper with `MoreVertical` button featuring strict hover visibility (`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-gray-200 dark:hover:bg-[#303134] text-gray-500`).
+  - **Floating Popover Options Menu**: Implemented floating dropdown (`absolute z-50 shadow-xl rounded-xl bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-neutral-800 p-1 min-w-[180px]`) featuring Share (`Share2`), Pin (`Pin`), Rename (`Pencil`), Add to Project (`FolderPlus`), and Delete (`Trash2`, styled red).
+  - **Interaction Polish**: Configured click-outside and Escape key dismissal, dynamic bottom-up flip when near scroll boundary to prevent viewport clipping, and deep integration with project rename and delete confirmation workflows.
+  - **Quality Gates**: Verified with zero TypeScript errors (`tsc --noEmit`), 100% test pass across all suites (66/66 tests), and production bundle generation.
+
+- **Clickable "Scholar Core" Brand Logo & Navigation Routing (`Header.tsx`, `ScholarAgenticDashboard.tsx`, `AssignmentWorkspace.tsx`, `ResearchWorkspace.tsx`, `PresentationWorkspace.tsx`, `ThesisWorkspace.tsx`, `ProposalWorkspace.tsx`, `ProjectListScreen.tsx`)**:
+  - Made the Scholar Core brand logo and typography interactive across all top navigation bars and workspaces.
+  - Wrapped the swirling star icon and typography in a routing element (`<Link to="/">` / interactive container) with `cursor-pointer transition-opacity duration-200 hover:opacity-70`.
+  - Routes users directly back to the main home/dashboard workspace (`/projects` or root) when clicked.
+  - Verified with full TypeScript typecheck (`tsc --noEmit`), full workspace test suite (44/44 tests), and production bundling.
+
 - **ChatGPT/Gemini-Style Left Sidebar Navigation Overhaul (`ProjectListScreen.tsx`, `vite.config.ts`, `src/index.css`)**:
   - **Top Actions (Phase 1)**: Preserved full-width primary `+ New Project` button at top and added a real-time `Search projects...` input with `Search` icon immediately below it.
   - **Core Workspace Links (Phase 2)**: Removed uppercase "PLATFORM" heading; streamlined Library links (`Projects`, `Knowledge Vault`, `AI Access`, `Ask Scholar`) with uniform `lucide-react` icons (`Folder`, `Database`, `Sliders`, `MessageSquare`), hover states, and smooth click handlers.

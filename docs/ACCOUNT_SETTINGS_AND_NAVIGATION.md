@@ -98,43 +98,54 @@ The primary left sidebar navigation (`ProjectListScreen.tsx`) mirrors the dynami
 
 ```mermaid
 graph TD
-    Sidebar[Main Left Sidebar w-260] --> TopActions[Phase 1: Top Actions]
-    Sidebar --> Library[Phase 2: Core Workspace Links]
-    Sidebar --> Recents[Phase 3: Dynamic Recents List]
+    Sidebar[Main Left Sidebar w-260] --> HeaderBrand[Clickable Brand Logo & Workspace Title]
+    Sidebar --> TopActions[Top Actions: + New Project & Search]
+    Sidebar --> Library[Core Workspace Links: Vault, AI Access, Ask Scholar]
+    Sidebar --> Recents[Dynamic Recents with Gemini Hover & 3-Dots Menu]
     Sidebar --> BottomActions[User Profile & Settings]
 
+    HeaderBrand --> HomeRoute[Routes to / on click with hover:opacity-70]
     TopActions --> NewProjectBtn[+ New Project Button full-width]
     TopActions --> SearchInput[Search projects... with Search icon]
 
-    Library --> ProjectsLink[📁 Projects with count badge]
     Library --> VaultLink[🗄️ Knowledge Vault]
     Library --> AiAccessLink[🎛️ AI Access]
     Library --> AskScholarLink[💬 Ask Scholar]
 
-    Recents --> RecentsHeading[RECENTS section tracking-wider]
+    Recents --> RecentsHeading[RECENTS text-11px tracking-wider]
     Recents --> RecentsScroll[Scrollable Area with custom-scrollbar]
-    RecentsScroll --> RecentItems[Real Projects / Curated Fallbacks truncate]
+    RecentsScroll --> RecentItem[Recent Item: group-hover 3-dots More button]
+    RecentItem --> PopoverMenu[Floating Popover Menu: Share, Pin, Rename, Add to Project, Delete]
 
     BottomActions --> SettingsBtn[⚙️ Settings]
     BottomActions --> ThemeToggle[Theme Switcher Day/Night]
     BottomActions --> UserMenu[UserAccountMenu]
 ```
 
-- **Top Actions (Phase 1)**:
+- **Clickable Header Logo**:
+  - The "Scholar Core" brand icon and text in the sidebar and top navigation bars are wrapped in a link (`<Link to="/">`) or interactive container with `cursor-pointer transition-opacity duration-200 hover:opacity-70`, routing users smoothly to `/` (home dashboard).
+- **Top Actions**:
   - Preserves the prominent full-width `+ New Project` button at the top.
   - Sits an integrated real-time search field immediately below: `<div className="relative mb-4"><Search ... /><input type="text" placeholder="Search projects..." ... /></div>`.
   - Tied directly to `searchQuery` state, filtering both the main workspace and recent projects.
-- **Core Workspace Links (Phase 2 - The Library)**:
-  - Uppercase "PLATFORM" heading is removed for a cleaner, distraction-free aesthetic.
-  - High-fidelity links for `Projects`, `Knowledge Vault`, `AI Access`, and `Ask Scholar`.
-  - Uses `lucide-react` icons (`Folder`, `Database`, `Sliders`, `MessageSquare`) with standardized `px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm font-medium` states.
+- **Core Workspace Links (The Library)**:
+  - Redundant top "Projects" folder button removed to avoid duplicate navigation controls with the main canvas.
+  - High-fidelity links for `Knowledge Vault`, `AI Access`, and `Ask Scholar` with `lucide-react` icons and Airbnb-inspired `text-[13px] font-medium antialiased`.
   - "Ask Scholar" link directly triggers the slide-out AI assistant drawer.
-- **Recents Scrollable Area (Phase 3)**:
-  - Subtle uppercase header: `<h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-6 mb-2 px-3">Recents</h3>`.
-  - Scrollable container: `<div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar">`.
-  - Dynamically binds recent user projects when available, or seamlessly renders clean academic defaults ("Contextual Loading Prompt", "Ethics Essay", "Literature Review", "Citation Provenance Audit", "Academic Proposal Draft").
-  - Clean text truncation (`truncate`) with smooth hover and click handlers.
-- **Cache-Busting & Asset Invalidation (Phase 4)**:
+- **Recents Scrollable Area & Gemini-Style 3-Dots Popover**:
+  - Section header styled to `text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3 mt-5`.
+  - List items wrapped in `group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#202124] transition-colors cursor-pointer text-[13px] font-medium text-gray-700 dark:text-gray-200 antialiased`.
+  - Item title text truncated cleanly: `<span className="truncate pr-2">{item.title}</span>`.
+  - More button with `MoreVertical` icon is hidden by default and revealed on hover (`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-gray-200 dark:hover:bg-[#303134] text-gray-500`).
+  - Floating popover menu (`absolute z-50 shadow-xl rounded-xl bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-neutral-800 p-1 min-w-[180px]`) featuring:
+    1. **Share** (`Share2`): Copies project link to clipboard.
+    2. **Pin** (`Pin`): Toggles pinned status for quick access.
+    3. **Rename** (`Pencil`): Prompts user and syncs new title to project intake.
+    4. **Add to Project** (`FolderPlus`): Navigates directly into the target project workspace.
+    5. **Delete** (`Trash2`): Prompts project deletion confirmation modal with styled red accents (`text-red-500 dark:text-red-400`).
+  - Outside-click and Escape key event listeners automatically close the popover.
+  - Dynamically flips upwards (`bottom-full mb-1`) when near the bottom boundary of the scroll view to prevent viewport clipping.
+- **Cache-Busting & Asset Invalidation**:
   - Rollup bundle output configured with unique content hashes (`assets/[name]-[hash].js` and `.css`) to bust aggressive browser cache.
 
 ---
@@ -144,7 +155,7 @@ graph TD
 All components and workflows are covered by comprehensive unit tests:
 - `AccountSettingsScreen.test.tsx`: 22 tests covering identity immutability, dial-code sanitization, tab switching, password validation, and sticky save actions.
 - `UserAccountMenu.test.tsx`: 5 tests validating profile display, menu options, consolidated multi-account actions, and pricing absence in the minimal dropdown.
-- `ProjectListScreen.test.tsx`: 26 tests verifying sidebar layout, responsive navigation, top actions with search, recents list rendering, footer settings integration, and the Scholar Core Assistant toggle lifecycle.
-- Full suite passing: 26/26 tests in `ProjectListScreen.test.tsx`, TypeScript compilation clean (`tsc --noEmit` exit 0), and production build passing (`npm run build`).
+- `ProjectListScreen.test.tsx`: 26 tests verifying sidebar layout, responsive navigation, top actions with search, recents list rendering with Gemini-style 3-dots popover options, footer settings integration, and the Scholar Core Assistant toggle lifecycle.
+- Full suite passing: 26/26 tests in `ProjectListScreen.test.tsx`, 40/40 tests across other workspace suites (66/66 total tests passing), TypeScript compilation clean (`tsc --noEmit` exit 0), and production build passing (`npm run build`).
 
 

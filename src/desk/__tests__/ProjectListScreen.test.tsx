@@ -353,7 +353,7 @@ describe("sidebar projects & platform navigation", () => {
     gates: [{ gate: "G0", status: "signed_off" }],
   };
 
-  it("aligns sidebar projects button with main workspace and opens project from main listing", async () => {
+  it("removes redundant sidebar projects button and supports Gemini-style Recents with 3-dots popover menu", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     const onOpen = vi.fn();
     const { container } = renderScreen(<ProjectListScreen onOpen={onOpen} userEmail="scholar@research.edu" />);
@@ -361,11 +361,25 @@ describe("sidebar projects & platform navigation", () => {
     const aside = container.querySelector("aside");
     expect(aside).toBeInTheDocument();
 
-    // Projects folder button in sidebar with count badge
-    const projectsBtn = within(aside!).getByRole("button", { name: "Projects" });
-    expect(projectsBtn).toBeInTheDocument();
-    expect(await within(projectsBtn).findByText("1")).toBeInTheDocument();
+    // Redundant Projects folder button is removed from sidebar
+    expect(within(aside!).queryByRole("button", { name: "Projects" })).not.toBeInTheDocument();
     expect(within(aside!).queryByText("Platform Guide")).not.toBeInTheDocument();
+
+    // Recents section header and project in Recents list
+    expect(within(aside!).getByRole("heading", { name: "Recents" })).toBeInTheDocument();
+    expect(within(aside!).getByText("Comparative Analysis of In Vivo Cleavage")).toBeInTheDocument();
+
+    // 3-dots More button opens options menu
+    const moreBtn = within(aside!).getAllByRole("button", { name: "More options" })[0];
+    expect(moreBtn).toBeInTheDocument();
+    fireEvent.click(moreBtn);
+
+    // Verify popover menu items
+    expect(within(aside!).getByRole("button", { name: /Share/i })).toBeInTheDocument();
+    expect(within(aside!).getByRole("button", { name: /Pin/i })).toBeInTheDocument();
+    expect(within(aside!).getByRole("button", { name: /Rename/i })).toBeInTheDocument();
+    expect(within(aside!).getByRole("button", { name: /Add to Project/i })).toBeInTheDocument();
+    expect(within(aside!).getByRole("button", { name: /Delete/i })).toBeInTheDocument();
 
     // Project card in main Projects workspace
     const main = container.querySelector("main");

@@ -1,5 +1,6 @@
 import type { ProjectView } from "../types";
 import ScholarCoreLogo from "../../components/ScholarCoreLogo";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import GlobalSearchModal from "./GlobalSearchModal";
 import UserAccountMenu from "../components/UserAccountMenu";
@@ -40,21 +41,21 @@ export default function Header({
   return (
     <>
     <header className="flex h-12 items-center gap-3 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 text-sm">
-      {onClose ? (
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-[var(--radius-sm)] px-1.5 py-1 font-semibold text-[color:var(--text-primary)] transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] cursor-pointer flex items-center gap-2"
-        >
-          <ScholarCoreLogo size="sm" className="text-[color:var(--text-primary)]" />
-          <span className="hidden sm:inline text-xs">SCHOLAR CORE</span>
-        </button>
-      ) : (
-        <div className="flex items-center gap-2">
-          <ScholarCoreLogo size="sm" className="text-[color:var(--text-primary)]" />
-          <span className="hidden sm:inline font-semibold text-[color:var(--text-primary)] text-xs">SCHOLAR CORE</span>
-        </div>
-      )}
+      <Link
+        to="/"
+        onClick={(e) => {
+          if (onClose) {
+            e.preventDefault();
+            onClose();
+          }
+        }}
+        className="cursor-pointer transition-opacity duration-200 hover:opacity-70 flex items-center gap-2 rounded-[var(--radius-sm)] px-1.5 py-1 font-semibold text-[color:var(--text-primary)]"
+        title="Scholar Core Home"
+        aria-label="Scholar Core Home"
+      >
+        <ScholarCoreLogo size="sm" className="text-[color:var(--text-primary)]" />
+        <span className="hidden sm:inline font-semibold text-[color:var(--text-primary)] text-xs">SCHOLAR CORE</span>
+      </Link>
 
       {onToggleRail && (
         <button

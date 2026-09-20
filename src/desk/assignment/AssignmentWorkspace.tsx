@@ -122,7 +122,25 @@ function AssignmentWorkspaceInner({
               </button>
             )}
 
-            <ScholarCoreLogo size="sm" withText className="hidden sm:flex text-[color:var(--text-primary)]" />
+            <div
+              onClick={() => {
+                if (onClose) onClose();
+                else if (typeof window !== "undefined") window.location.href = "/";
+              }}
+              className="hidden sm:flex cursor-pointer transition-opacity duration-200 hover:opacity-70"
+              title="Scholar Core Home"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (onClose) onClose();
+                  else if (typeof window !== "undefined") window.location.href = "/";
+                }
+              }}
+            >
+              <ScholarCoreLogo size="sm" withText className="text-[color:var(--text-primary)]" />
+            </div>
 
             <div className="h-4 w-px bg-[color:var(--border-subtle)] hidden sm:block" />
 

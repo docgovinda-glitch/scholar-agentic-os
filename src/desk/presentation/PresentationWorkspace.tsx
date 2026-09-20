@@ -198,7 +198,23 @@ export default function PresentationWorkspace({
               ←
             </button>
           )}
-          <div className="w-8 h-8 rounded-lg bg-[color:var(--accent)] text-white flex items-center justify-center">
+          <div
+            onClick={() => {
+              if (onClose) onClose();
+              else if (typeof window !== "undefined") window.location.href = "/";
+            }}
+            className="w-8 h-8 rounded-lg bg-[color:var(--accent)] text-white flex items-center justify-center cursor-pointer transition-opacity duration-200 hover:opacity-70"
+            title="Scholar Core Home"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                if (onClose) onClose();
+                else if (typeof window !== "undefined") window.location.href = "/";
+              }
+            }}
+          >
             <ScholarCoreLogo size="sm" />
           </div>
           <div>

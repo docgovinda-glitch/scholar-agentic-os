@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createProject, listOutputTypes, listProjects, deleteProject, saveIntakeAnswers, executeAgenticLLM } from "./api";
 import { getSupabaseClient } from "../services/supabaseClient";
 import { hasVaultPassphraseOnThisDevice } from "../services/userVault";
@@ -8,7 +8,23 @@ import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
-import { Plus, ArrowUp, X, RotateCcw, Lightbulb, Search, Folder, Database, Sliders, MessageSquare } from "lucide-react";
+import {
+  Plus,
+  ArrowUp,
+  X,
+  RotateCcw,
+  Lightbulb,
+  Search,
+  Database,
+  Sliders,
+  MessageSquare,
+  MoreVertical,
+  Share2,
+  Pin,
+  Pencil,
+  FolderPlus,
+  Trash2,
+} from "lucide-react";
 
 
 /** Curated 4 essential academic formats */
@@ -674,6 +690,88 @@ Keep your response concise, helpful, and academically grounded.`;
     setProjectToDelete(project);
   }
 
+  const [activeRecentMenuId, setActiveRecentMenuId] = useState<string | null>(null);
+  const [pinnedRecentIds, setPinnedRecentIds] = useState<string[]>([]);
+  const recentMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (recentMenuRef.current && !recentMenuRef.current.contains(e.target as Node)) {
+        setActiveRecentMenuId(null);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setActiveRecentMenuId(null);
+      }
+    }
+    if (activeRecentMenuId) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [activeRecentMenuId]);
+
+  function handleRecentAction(
+    action: "share" | "pin" | "rename" | "add-to-project" | "delete",
+    item: { id: string; projectId?: string; title: string }
+  ) {
+    setActiveRecentMenuId(null);
+
+    if (action === "share") {
+      const shareUrl = `${window.location.origin}${item.projectId ? `/projects?id=${encodeURIComponent(item.projectId)}` : "/"}`;
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(shareUrl).catch(() => {});
+      }
+    } else if (action === "pin") {
+      setPinnedRecentIds((prev) =>
+        prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
+      );
+    } else if (action === "rename") {
+      const newTitle = window.prompt("Rename research project:", item.title);
+      if (newTitle && newTitle.trim() && newTitle.trim() !== item.title && item.projectId) {
+        const trimmed = newTitle.trim();
+        saveIntakeAnswers(item.projectId, { title: trimmed })
+          .then(() => {
+            setProjects((curr) =>
+              curr
+                ? curr.map((p) =>
+                    p.projectId === item.projectId
+                      ? { ...p, answers: { ...p.answers, title: trimmed } }
+                      : p
+                  )
+                : []
+            );
+          })
+          .catch(() => {});
+      }
+    } else if (action === "add-to-project") {
+      if (item.projectId) {
+        onOpen(item.projectId);
+      } else {
+        scrollToProjects();
+      }
+    } else if (action === "delete") {
+      if (item.projectId) {
+        const found = projects?.find((p) => p.projectId === item.projectId);
+        if (found) {
+          setProjectToDelete(found);
+        } else {
+          setProjectToDelete({
+            projectId: item.projectId,
+            outputTypeId: "OT-01",
+            answers: { title: item.title },
+            intakeCompleteness: 0,
+            hasDocument: false,
+          } as unknown as ProjectView);
+        }
+      }
+    }
+  }
+
   async function handleConfirmDelete() {
     if (!projectToDelete || deletingId) return;
     const targetId = projectToDelete.projectId;
@@ -771,7 +869,17 @@ Keep your response concise, helpful, and academically grounded.`;
         <div className="flex flex-col flex-shrink-0 w-[260px]">
           {/* Logo & Close/Collapse Header */}
           <div className="p-4 pb-3 flex items-center justify-between border-b border-slate-200/80 dark:border-neutral-800">
-            <div className="flex items-center gap-2.5 min-w-0">
+            <Link
+              to="/"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setChoosing(false);
+                scrollToProjects();
+              }}
+              className="flex items-center gap-2.5 min-w-0 cursor-pointer transition-opacity duration-200 hover:opacity-70 text-left"
+              title="Scholar Core Home"
+              aria-label="Scholar Core Home"
+            >
               <div className="w-9 h-9 rounded-xl bg-[var(--bg-button-primary)] text-[var(--text-button)] flex items-center justify-center flex-shrink-0 shadow-xs">
                 <ScholarCoreLogo size="md" className="text-[var(--text-button)]" />
               </div>
@@ -783,7 +891,7 @@ Keep your response concise, helpful, and academically grounded.`;
                   Workspace
                 </span>
               </div>
-            </div>
+            </Link>
 
             {/* Desktop Collapse Icon */}
             <button
@@ -844,32 +952,9 @@ Keep your response concise, helpful, and academically grounded.`;
         </div>
 
         {/* Middle Section: Core Workspace Links & Recents Scrollable List */}
-        <div className="flex-1 overflow-hidden px-3 flex flex-col w-[260px] min-h-0">
+        <div className="flex-1 overflow-hidden px-3 flex flex-col w-[260px] min-h-0 antialiased">
           {/* Phase 2: Core Workspace Links (The Library) */}
           <div className="space-y-1">
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setChoosing(false);
-                scrollToProjects();
-              }}
-              aria-label="Projects"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
-                !choosing
-                  ? "bg-gray-100 dark:bg-neutral-800 text-slate-900 dark:text-white font-semibold"
-                  : "text-gray-700 dark:text-gray-300"
-              }`}
-            >
-              <Folder className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
-              <span className="flex-1">Projects</span>
-              {projects && projects.length > 0 ? (
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-neutral-700 text-slate-600 dark:text-neutral-300 font-mono">
-                  {projects.length}
-                </span>
-              ) : null}
-            </button>
-
             {onOpenVault && (
               <button
                 type="button"
@@ -882,7 +967,7 @@ Keep your response concise, helpful, and academically grounded.`;
                   onOpenVault();
                 }}
                 aria-label="Open Knowledge Vault"
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-[13px] font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
               >
                 <Database className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
                 <span>Knowledge Vault</span>
@@ -901,7 +986,7 @@ Keep your response concise, helpful, and academically grounded.`;
                   onOpenAiAccess();
                 }}
                 aria-label="Manage AI Access"
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-[13px] font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
               >
                 <Sliders className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
                 <span>AI Access</span>
@@ -915,39 +1000,113 @@ Keep your response concise, helpful, and academically grounded.`;
                 setIsAiSidebarOpen(true);
               }}
               aria-label="Ask Scholar"
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-[13px] font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
             >
               <MessageSquare className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
               <span>Ask Scholar</span>
             </button>
           </div>
 
-          {/* Phase 3: Recents Header */}
-          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-6 mb-2 px-3">
+          {/* Phase 1: Recents Header */}
+          <h3 className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3 mt-5">
             Recents
           </h3>
 
-          {/* Phase 3: Recents List (Scrollable Area) */}
+          {/* Phase 2 & 3: Recents List (Scrollable Area) */}
           <div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar pb-3 min-h-0">
-            {recentProjectsList.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setMobileMenuOpen(false);
-                  if (item.projectId) {
-                    onOpen(item.projectId);
-                  } else {
-                    scrollToProjects();
-                  }
-                }}
-                title={item.title}
-                className="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-sm text-gray-700 dark:text-gray-300 truncate transition-colors"
-              >
-                {item.title}
-              </a>
-            ))}
+            {recentProjectsList.map((item, index) => {
+              const isMenuOpen = activeRecentMenuId === item.id;
+              const isNearBottom = index >= Math.max(recentProjectsList.length - 2, 2);
+              const isPinned = pinnedRecentIds.includes(item.id);
+
+              return (
+                <div key={item.id} className="relative">
+                  <div
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (item.projectId) {
+                        onOpen(item.projectId);
+                      } else {
+                        scrollToProjects();
+                      }
+                    }}
+                    className="group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#202124] transition-colors cursor-pointer text-[13px] font-medium text-gray-700 dark:text-gray-200 antialiased"
+                    title={item.title}
+                  >
+                    <span className="truncate pr-2 flex items-center gap-1.5 min-w-0">
+                      {isPinned && <Pin className="w-3 h-3 text-amber-500 rotate-45 flex-shrink-0" />}
+                      <span className="truncate">{item.title}</span>
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="More options"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setActiveRecentMenuId((prev) => (prev === item.id ? null : item.id));
+                      }}
+                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-gray-200 dark:hover:bg-[#303134] text-gray-500 flex-shrink-0 ${
+                        isMenuOpen ? "!opacity-100" : ""
+                      }`}
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Popover Options Menu */}
+                  {isMenuOpen && (
+                    <div
+                      ref={recentMenuRef}
+                      className={`absolute ${
+                        isNearBottom ? "bottom-full mb-1" : "top-full mt-1"
+                      } right-0 z-50 shadow-xl rounded-xl bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-neutral-800 p-1 min-w-[180px] animate-in fade-in duration-150`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleRecentAction("share", item)}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                      >
+                        <Share2 className="w-4 h-4 flex-shrink-0" />
+                        <span>Share</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRecentAction("pin", item)}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                      >
+                        <Pin className="w-4 h-4 flex-shrink-0" />
+                        <span>{isPinned ? "Unpin" : "Pin"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRecentAction("rename", item)}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                      >
+                        <Pencil className="w-4 h-4 flex-shrink-0" />
+                        <span>Rename</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRecentAction("add-to-project", item)}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                      >
+                        <FolderPlus className="w-4 h-4 flex-shrink-0" />
+                        <span>Add to Project</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRecentAction("delete", item)}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer text-left"
+                      >
+                        <Trash2 className="w-4 h-4 flex-shrink-0" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
