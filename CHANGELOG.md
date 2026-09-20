@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-20
 
+### Added
+- **ChatGPT-style AI Prompt Bar Below Template Cards (`ProjectListScreen.tsx`)**:
+  - **Phase 1 (Alignment)**: Inserted a `w-full mt-10` container directly below the 4 academic workspace template cards grid, ensuring pixel-perfect left and right edge alignment with the `max-w-6xl` grid container.
+  - **Phase 2 (Pill Aesthetics)**: Implemented a responsive pill-shaped input bar using `rounded-full bg-white dark:bg-[#1C1C1E] border border-gray-200/90 dark:border-white/10 shadow-sm sm:shadow-md` with `focus-within` border and shadow elevation transitions.
+  - **Phase 3 (Node Structure)**: Three-node layout matching ChatGPT/Gemini conventions:
+    - **Left node**: Circular `Plus` attachment button (`w-8 h-8 rounded-full`) with hover state.
+    - **Center node**: Flexible transparent `<input>` with placeholder `"Ask Scholar or search projects..."`, no focus ring, wired to existing `guideInput` / `setGuideInput` state.
+    - **Right node**: Solid circular `ArrowUp` submit button that activates (dark/light pill) when text is present and shows an `animate-spin` spinner while `isGuideThinking` is true.
+  - **Phase 4 (Integration)**: Submitting (Enter or click) opens the AI sidebar (`setIsAiSidebarOpen(true)`), dispatches `handleSendGuideMessage()`, then shifts focus to the sidebar input (`guideInputRef`) 300ms later for continued conversation.
+  - **Phase 5 (Verification)**: TypeScript clean (`tsc --noEmit`), 28/28 tests passing, production build successful. Pushed to `origin/main` and `origin/claude/code-master-prompt-fxl7wf`.
+
 ### Changed
 - **Workspace Template Cards Dark Mode Color Palette Overhaul (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
   - **Phase 1 (Base Card Contrast)**: Elevated dark mode background of academic workspace template cards (Assignment, Journal Article, Research Proposal, Presentation) from harsh dark to a comfortable, soft elevated dark grey (`dark:bg-[#1C1C1E]`), paired with softened subtle borders (`dark:border-white/5`), preventing eye strain during night research sessions.
