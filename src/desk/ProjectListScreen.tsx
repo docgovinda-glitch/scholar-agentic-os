@@ -1400,6 +1400,69 @@ Keep your response concise, helpful, and academically grounded.`;
                 </div>
               </div>
 
+              {/* ChatGPT-style AI Prompt Bar — flush with 4-card grid width */}
+              <div className="w-full mt-10">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (guideInput.trim()) {
+                      setIsAiSidebarOpen(true);
+                      handleSendGuideMessage();
+                      setTimeout(() => guideInputRef.current?.focus(), 300);
+                    }
+                  }}
+                  className="flex items-center gap-3 w-full rounded-full bg-white dark:bg-[#1C1C1E] border border-gray-200/90 dark:border-white/10 shadow-sm sm:shadow-md px-4 py-3 transition-all duration-200 focus-within:shadow-md focus-within:border-gray-300 dark:focus-within:border-white/20"
+                >
+                  {/* Left: Attachment / Plus button */}
+                  <button
+                    type="button"
+                    title="Attach file"
+                    aria-label="Attach file"
+                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 dark:text-neutral-500 hover:text-gray-600 dark:hover:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+
+                  {/* Center: Transparent flexible input */}
+                  <input
+                    type="text"
+                    value={guideInput}
+                    onChange={(e) => setGuideInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (guideInput.trim()) {
+                          setIsAiSidebarOpen(true);
+                          handleSendGuideMessage();
+                          setTimeout(() => guideInputRef.current?.focus(), 300);
+                        }
+                      }
+                    }}
+                    placeholder="Ask Scholar or search projects..."
+                    className="flex-1 bg-transparent text-sm font-normal text-[var(--text-primary)] placeholder:text-gray-400 dark:placeholder:text-neutral-500 outline-none border-none ring-0 focus:ring-0 focus:outline-none min-w-0"
+                  />
+
+                  {/* Right: Solid circular submit button */}
+                  <button
+                    type="submit"
+                    title="Send"
+                    aria-label="Send message"
+                    disabled={!guideInput.trim() || isGuideThinking}
+                    className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
+                      guideInput.trim() && !isGuideThinking
+                        ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-200 shadow-sm"
+                        : "bg-gray-100 dark:bg-neutral-800 text-gray-400 dark:text-neutral-500 cursor-not-allowed"
+                    }`}
+                  >
+                    {isGuideThinking ? (
+                      <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                    )}
+                  </button>
+                </form>
+              </div>
+
               {/* Projects Section with Live Search & Filter Tabs */}
               <section id="projects-section" className="w-full text-left scroll-mt-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-3 border-b border-gray-200 dark:border-neutral-800 w-full">
@@ -1700,6 +1763,7 @@ Keep your response concise, helpful, and academically grounded.`;
                 </button>
 
                 <input
+                  ref={guideInputRef}
                   type="text"
                   value={guideInput}
                   onChange={(e) => setGuideInput(e.target.value)}
