@@ -175,6 +175,14 @@ graph TD
 - **Seamless Central Routing**:
   - View switching strictly utilizes React Router (`<Link>`, `navigate`) or local state (`setActiveView(...)`), eliminating full HTML page reloads and avoiding native `<a href="...">` anchors.
 
+- **Workspace Template Cards Dark Mode Color Palette Overhaul**:
+  - **Elevated Contrast & Soft Dark Greys**: Replaced harsh, high-contrast dark values with a soft, elevated dark grey (`dark:bg-[#1C1C1E]`), paired with softened subtle borders (`dark:border-white/5`), preventing eye strain during night research sessions.
+  - **Muted, Eye-Comfortable Accents (No Saturated Glare)**:
+    - **Assignment**: Retained crisp, readable soft blue (`dark:text-blue-400`, `dark:bg-blue-500/10`, `dark:border-blue-500/20`).
+    - **Journal Article**: Muted glare to an elegant amber / soft gold (`dark:text-amber-400/90`, `dark:bg-amber-500/10`, `dark:border-amber-500/20`).
+    - **Research Proposal**: Replaced garish purple with a soothing pastel indigo / lavender palette (`dark:text-indigo-400/90`, `dark:bg-indigo-500/10`, `dark:border-indigo-500/20`).
+    - **Presentation**: Brightened dark contrast into a luminous, soft mint / teal pop (`dark:text-teal-300/90`, `dark:bg-teal-500/10`, `dark:border-teal-500/20`).
+
 ---
 
 ## 8. Verification & Testing
@@ -182,9 +190,10 @@ graph TD
 All components and workflows are covered by comprehensive unit tests:
 - `AccountSettingsScreen.test.tsx`: 22 tests covering identity immutability, dial-code sanitization, tab switching, password validation, and sticky save actions.
 - `UserAccountMenu.test.tsx`: 5 tests validating profile display, menu options, consolidated multi-account actions, and pricing absence in the minimal dropdown.
-- `ProjectListScreen.test.tsx`: 27 tests verifying persistent sidebar layout, responsive navigation, top actions with search, recents list rendering with Gemini-style 3-dots popover options, footer settings integration, bidirectional Scholar Core Assistant toggle lifecycle, and the "Ask Scholar" hover tooltip.
+- `ProjectListScreen.test.tsx`: 28 tests verifying persistent sidebar layout, responsive navigation, top actions with search, recents list rendering with Gemini-style 3-dots popover options, footer settings integration, bidirectional Scholar Core Assistant toggle lifecycle, "Ask Scholar" hover tooltip, and dark mode template card contrast/accents.
 - `DeskApp.test.tsx`: 14 tests validating persistent shell routing across `/projects`, `/settings`, `/vault`, and `/ai-access`.
-- Full test pass: 41/41 tests passing across dashboard suites, TypeScript compilation clean (`tsc --noEmit` exit 0), and production build passing (`npm run build`).
+- Full test pass: 42/42 tests passing across dashboard suites, TypeScript compilation clean (`tsc --noEmit` exit 0), and production build passing (`npm run build`).
+
 
 
 

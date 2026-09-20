@@ -1355,7 +1355,7 @@ Keep your response concise, helpful, and academically grounded.`;
                           handleCreate(tile.id);
                         }}
                         disabled={isOtherBooting}
-                        className={`group bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[210px] text-left relative ${
+                        className={`group bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-white/5 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[210px] text-left relative ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
@@ -1372,13 +1372,13 @@ Keep your response concise, helpful, and academically grounded.`;
                                 <FormatIcon id={tile.id} className="w-5 h-5" />
                               )}
                             </div>
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-neutral-600 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-neutral-500 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
                               <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
                               </svg>
                             </div>
                           </div>
-                          <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-wider block mb-1">
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider block mb-1 ${tileTheme.accentText}`}>
                             {tile.tag}
                           </span>
                           <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5 leading-tight">
@@ -1388,7 +1388,7 @@ Keep your response concise, helpful, and academically grounded.`;
                             {tile.description}
                           </p>
                         </div>
-                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-neutral-800/80 flex items-center justify-between text-[11px] text-slate-400 dark:text-neutral-500">
+                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[11px] text-slate-400 dark:text-neutral-400">
                           <span>{tile.budget}</span>
                           <span className="font-semibold text-slate-700 dark:text-neutral-300 group-hover:translate-x-0.5 transition-transform">
                             Boot →
@@ -1901,27 +1901,32 @@ function getFormatTileTheme(id: string) {
   switch (id) {
     case "OT-01":
       return {
-        badgeBg: "bg-blue-50/90 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50",
-        hoverBorder: "hover:border-blue-300 dark:hover:border-blue-700/60",
+        badgeBg: "bg-blue-50/90 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20",
+        accentText: "text-blue-600 dark:text-blue-400",
+        hoverBorder: "hover:border-blue-300 dark:hover:border-blue-500/40",
       };
     case "OT-10":
       return {
-        badgeBg: "bg-amber-50/90 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50",
-        hoverBorder: "hover:border-amber-300 dark:hover:border-amber-700/60",
+        badgeBg: "bg-amber-50/90 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400/90 border border-amber-100 dark:border-amber-500/20",
+        accentText: "text-amber-600 dark:text-amber-400/90",
+        hoverBorder: "hover:border-amber-300 dark:hover:border-amber-500/40",
       };
     case "OT-19":
       return {
-        badgeBg: "bg-indigo-50/90 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50",
-        hoverBorder: "hover:border-indigo-300 dark:hover:border-indigo-700/60",
+        badgeBg: "bg-indigo-50/90 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400/90 border border-indigo-100 dark:border-indigo-500/20",
+        accentText: "text-indigo-600 dark:text-indigo-400/90",
+        hoverBorder: "hover:border-indigo-300 dark:hover:border-indigo-500/40",
       };
     case "OT-22":
       return {
-        badgeBg: "bg-emerald-50/90 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50",
-        hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-700/60",
+        badgeBg: "bg-teal-50/90 text-teal-600 dark:bg-teal-500/10 dark:text-teal-300/90 border border-teal-100 dark:border-teal-500/20",
+        accentText: "text-teal-600 dark:text-teal-300/90",
+        hoverBorder: "hover:border-teal-300 dark:hover:border-teal-500/40",
       };
     default:
       return {
-        badgeBg: "bg-slate-50 dark:bg-neutral-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-neutral-700",
+        badgeBg: "bg-slate-50 dark:bg-neutral-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/5",
+        accentText: "text-slate-500 dark:text-neutral-400",
         hoverBorder: "hover:border-slate-300 dark:hover:border-neutral-700",
       };
   }
@@ -2048,7 +2053,7 @@ function ChooseOutputType({
                   key={tile.id}
                   onClick={() => setSelected(tile.id)}
                   onDoubleClick={() => onPick(tile.id)}
-                  className={`group bg-white dark:bg-[#171717] border border-slate-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[185px] text-left relative ${
+                  className={`group bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-white/5 ${tileTheme.hoverBorder} rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[185px] text-left relative ${
                     isSelected
                       ? "ring-2 ring-gray-900 dark:ring-gray-100 border-gray-900 dark:border-gray-100"
                       : ""
@@ -2059,12 +2064,15 @@ function ChooseOutputType({
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
                         <FormatIcon id={tile.id} className="w-5 h-5" />
                       </div>
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-neutral-600 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-neutral-500 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
                         <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
                         </svg>
                       </div>
                     </div>
+                    <span className={`text-[10px] font-semibold uppercase tracking-wider block mb-1 ${tileTheme.accentText}`}>
+                      {tile.tag}
+                    </span>
                     <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5 leading-tight">
                       {tile.label}
                     </h3>

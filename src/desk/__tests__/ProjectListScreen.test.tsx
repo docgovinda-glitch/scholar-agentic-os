@@ -447,6 +447,39 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(within(dialog).getByRole("button", { name: "Sign in" })).toBeInTheDocument();
     expect(within(dialog).getByText("Create an account")).toBeInTheDocument();
   });
+
+  it("applies soft dark mode background, softened borders, and fine-tuned muted accent colors to workspace template cards", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const assignmentHeading = await screen.findByRole("heading", { name: "Assignment" });
+    const assignmentCard = assignmentHeading.closest("button")!;
+    expect(assignmentCard.className).toContain("dark:bg-[#1C1C1E]");
+    expect(assignmentCard.className).toContain("dark:border-white/5");
+    expect(assignmentCard.innerHTML).toContain("dark:text-blue-400");
+    expect(assignmentCard.innerHTML).toContain("dark:bg-blue-500/10");
+
+    const journalHeading = screen.getByRole("heading", { name: "Journal Article" });
+    const journalCard = journalHeading.closest("button")!;
+    expect(journalCard.className).toContain("dark:bg-[#1C1C1E]");
+    expect(journalCard.className).toContain("dark:border-white/5");
+    expect(journalCard.innerHTML).toContain("dark:text-amber-400/90");
+    expect(journalCard.innerHTML).toContain("dark:bg-amber-500/10");
+
+    const proposalHeading = screen.getByRole("heading", { name: "Research Proposal" });
+    const proposalCard = proposalHeading.closest("button")!;
+    expect(proposalCard.className).toContain("dark:bg-[#1C1C1E]");
+    expect(proposalCard.className).toContain("dark:border-white/5");
+    expect(proposalCard.innerHTML).toContain("dark:text-indigo-400/90");
+    expect(proposalCard.innerHTML).toContain("dark:bg-indigo-500/10");
+
+    const presentationHeading = screen.getByRole("heading", { name: "Presentation" });
+    const presentationCard = presentationHeading.closest("button")!;
+    expect(presentationCard.className).toContain("dark:bg-[#1C1C1E]");
+    expect(presentationCard.className).toContain("dark:border-white/5");
+    expect(presentationCard.innerHTML).toContain("dark:text-teal-300/90");
+    expect(presentationCard.innerHTML).toContain("dark:bg-teal-500/10");
+  });
 });
 
 describe("minimal website assistant", () => {

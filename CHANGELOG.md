@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-20
 
 ### Changed
+- **Workspace Template Cards Dark Mode Color Palette Overhaul (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
+  - **Phase 1 (Base Card Contrast)**: Elevated dark mode background of academic workspace template cards (Assignment, Journal Article, Research Proposal, Presentation) from harsh dark to a comfortable, soft elevated dark grey (`dark:bg-[#1C1C1E]`), paired with softened subtle borders (`dark:border-white/5`), preventing eye strain during night research sessions.
+  - **Phase 2 (Fine-Tuned Accent Colors & Glare Reduction)**: Replaced high-saturation glare with harmonious, eye-comfortable accents:
+    - **Assignment**: Retained crisp, readable soft blue (`dark:text-blue-400`, `dark:bg-blue-500/10`, `dark:border-blue-500/20`).
+    - **Journal Article**: Muted glare to an elegant amber / soft gold (`dark:text-amber-400/90`, `dark:bg-amber-500/10`, `dark:border-amber-500/20`).
+    - **Research Proposal**: Replaced garish purple with a soothing pastel indigo / lavender palette (`dark:text-indigo-400/90`, `dark:bg-indigo-500/10`, `dark:border-indigo-500/20`).
+    - **Presentation**: Brightened dark contrast into a luminous, soft mint / teal pop (`dark:text-teal-300/90`, `dark:bg-teal-500/10`, `dark:border-teal-500/20`).
+  - **Phase 3 (Testing & Verification)**: Added unit test assertions in `ProjectListScreen.test.tsx` verifying card elevation classes, border softness, and accent text/pill tokens for each format card; verified with 42/42 tests passing and successful production build.
+
 - **Sidebar Render Flash Fix, Gemini-Style Search & Lightbulb "Ask Scholar" Tooltip (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `ProjectListScreen.test.tsx`)**:
   - **Phase 1 (1-Second Flash Fix)**: Resolved the initial page-load render flash by introducing a mounted state check (`isMounted`), ensuring dynamic Recents items only mount once client hydration is complete.
   - **Phase 2 (Gemini-Style Search)**: Overhauled sidebar Search to function as a dedicated, standalone clickable input (`relative group cursor-text`) styled with `lucide-react`'s `Search` icon, text-sm styling, and event isolation (`stopPropagation`) so it never triggers accordion or dropdown toggles.
