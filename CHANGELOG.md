@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-20
 
 ### Changed
+- **Humanized AI Assistant Sidebar UX Copy (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `ProjectListScreen.test.tsx`)**:
+  - Replaced rigid "Scholar Core Assistant" sidebar header with welcoming and intuitive "Ask Scholar", matching Apple and Airbnb design philosophy.
+  - Replaced technical subtitle "Platform navigation, workflows & AI setup" with warm, conversational greeting: "How can I help you with your research today?".
+  - Updated input field placeholder from "Ask how to use Scholar Core..." to expansive, multi-modal prompt: "Ask anything, search projects, or type a command...".
+  - Updated bottom status indicator from "Scholar Core Guide" to "Ask Scholar" (paired with green • AI Ready indicator).
+  - Maintained complete visual layout stability, theme responsiveness (light and dark mode), and accessibility contracts.
+
 - **Top Navigation Scholar Core Assistant Logo Toggle & Conditional Hiding (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `ProjectListScreen.test.tsx`)**:
   - Replaced legacy/advisor icon and tooltips with the custom Scholar Core swirling star logo (`ScholarCoreLogo`) in the top navigation bar.
   - Completely removed all hover tooltip and `title` text attributes ("Advisor Center", "Open Scholar Assistant") to keep navigation clean and uncluttered.

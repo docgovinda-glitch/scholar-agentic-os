@@ -73,10 +73,15 @@ To ensure maximum usability across diverse screen resolutions (including 13-inch
 
 ---
 
-## 6. Top Navigation Scholar Core Assistant Toggle Specification
+## 6. Top Navigation & "Ask Scholar" Assistant Drawer Specification
 
-The top utility navigation across the dashboard (`ProjectListScreen.tsx` and `ScholarAgenticDashboard.tsx`) provides seamless access to the right-hand Scholar Core Assistant drawer:
+The top utility navigation across the dashboard (`ProjectListScreen.tsx` and `ScholarAgenticDashboard.tsx`) provides seamless access to the right-hand **Ask Scholar** assistant drawer:
 
+- **Humanized Brand & UX Copy**:
+  - **Header**: "Ask Scholar" (replacing legacy "Scholar Core Assistant").
+  - **Subtitle / Greeting**: "How can I help you with your research today?" (replacing technical "Platform navigation, workflows & AI setup").
+  - **Input Prompt**: "Ask anything, search projects, or type a command..." (expanded multi-modal search and agentic command capability).
+  - **Bottom Status**: "Ask Scholar" paired with green `• AI Ready` indicator.
 - **Custom Logo Integration**: Features the custom animated swirling star logo (`<ScholarCoreLogo size="sm" withText={false} />`) styled within a circular pill container (`w-10 h-10 rounded-full`).
 - **Zero Tooltips / Decluttering**: All `title` attributes and hover tooltips (such as "Advisor Center" or "Open Scholar Assistant") are completely removed to maintain a serene, distraction-free reading atmosphere.
 - **Conditional Visibility ("Hide on Open")**:

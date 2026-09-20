@@ -426,10 +426,11 @@ describe("minimal website assistant", () => {
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
 
-    // Assistant container exists in the slide-in sidebar
-    const assistant = await screen.findByText("Scholar Core Assistant");
-    expect(assistant).toBeInTheDocument();
-    expect(screen.getByText(/Platform navigation, workflows & AI setup/i)).toBeInTheDocument();
+    // Assistant container exists in the slide-in sidebar with humanized header & greeting
+    const assistantHeading = await screen.findByRole("heading", { name: "Ask Scholar" });
+    expect(assistantHeading).toBeInTheDocument();
+    expect(screen.getByText(/How can I help you with your research today\?/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Ask Scholar").length).toBeGreaterThanOrEqual(2); // Header and bottom status bar
 
     // FAQ suggested topic chips
     expect(screen.getByText("How do I set up AI?")).toBeInTheDocument();
@@ -437,7 +438,7 @@ describe("minimal website assistant", () => {
     expect(screen.getByText("How do I create a research project?")).toBeInTheDocument();
 
     // Clean pill-shaped input and Send button
-    const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
+    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
     expect(input).toBeInTheDocument();
     const sendBtn = screen.getByRole("button", { name: "Send question" });
     expect(sendBtn).toBeInTheDocument();
@@ -467,7 +468,7 @@ describe("minimal website assistant", () => {
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
 
-    const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
+    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
     fireEvent.change(input, { target: { value: "write an essay about biology" } });
 
     const sendBtn = screen.getByRole("button", { name: "Send question" });
@@ -497,7 +498,7 @@ describe("minimal website assistant", () => {
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     fireEvent.click(toggleBtn);
 
-    const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
+    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
     expect(input).toBeInTheDocument();
   });
 
@@ -514,7 +515,7 @@ describe("minimal website assistant", () => {
     expect(screen.getByText("How do I set up AI?")).toBeInTheDocument();
     expect(screen.getByText("What is Knowledge Vault?")).toBeInTheDocument();
 
-    const input = screen.getByPlaceholderText(/Ask how to use Scholar Core/i);
+    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
     fireEvent.change(input, { target: { value: "Explain quantum coherence in biological systems" } });
 
     const sendBtn = screen.getByRole("button", { name: "Send question" });
@@ -535,7 +536,7 @@ describe("minimal website assistant", () => {
 
     // 2. Open assistant: button triggers the sidebar to slide open
     fireEvent.click(toggleBtn);
-    expect(await screen.findByText("Scholar Core Assistant")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Ask Scholar" })).toBeInTheDocument();
 
     // 3. Conditional rendering: toggle button completely disappears from top navigation
     expect(screen.queryByRole("button", { name: /Toggle Scholar Core AI Assistant/i })).not.toBeInTheDocument();

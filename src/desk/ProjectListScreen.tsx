@@ -1255,14 +1255,14 @@ Keep your response concise, helpful, and academically grounded.`;
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
-                      Scholar Core Assistant
+                      Ask Scholar
                     </h2>
                     <span className="text-[10px] bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded-full font-medium border border-sky-100 dark:border-sky-900/50">
                       Guide
                     </span>
                   </div>
                   <p className="text-[11px] text-gray-500 dark:text-neutral-400">
-                    Platform navigation, workflows & AI setup
+                    How can I help you with your research today?
                   </p>
                 </div>
               </div>
@@ -1354,7 +1354,7 @@ Keep your response concise, helpful, and academically grounded.`;
               <div className="flex items-center justify-between px-2 mb-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-neutral-400">
                   <ScholarCoreLogo size="sm" withText={false} />
-                  <span>Scholar Core Guide</span>
+                  <span>Ask Scholar</span>
                   <span className="text-green-500 font-bold">• AI Ready</span>
                 </div>
                 <button
@@ -1398,7 +1398,7 @@ Keep your response concise, helpful, and academically grounded.`;
                   type="text"
                   value={guideInput}
                   onChange={(e) => setGuideInput(e.target.value)}
-                  placeholder="Ask how to use Scholar Core..."
+                  placeholder="Ask anything, search projects, or type a command..."
                   className="flex-1 bg-transparent focus:outline-none ring-0 border-none text-xs sm:text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400"
                 />
 

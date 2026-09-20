@@ -342,14 +342,14 @@ export default function ScholarAgenticDashboard() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-base font-bold text-gray-900 tracking-tight">
-                      Scholar Core Assistant
+                      Ask Scholar
                     </h2>
                     <span className="text-[10px] bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded-full font-medium border border-sky-100">
                       Guide
                     </span>
                   </div>
                   <p className="text-[11px] text-gray-500">
-                    Platform navigation, workflows & AI setup
+                    How can I help you with your research today?
                   </p>
                 </div>
               </div>
@@ -469,7 +469,7 @@ export default function ScholarAgenticDashboard() {
               <div className="flex items-center justify-between px-2 mb-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
                   <ScholarCoreLogo size="sm" withText={false} />
-                  <span>Scholar Core Guide</span>
+                  <span>Ask Scholar</span>
                   <span className="text-green-500 font-bold">• AI Ready</span>
                 </div>
                 <button
@@ -503,7 +503,7 @@ export default function ScholarAgenticDashboard() {
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Ask how to use Scholar Core (e.g., How do I set up AI?)..."
+                  placeholder="Ask anything, search projects, or type a command..."
                   className="flex-1 bg-transparent focus:outline-none text-gray-700 placeholder-gray-400 text-xs sm:text-sm border-none ring-0 outline-none"
                 />
 
