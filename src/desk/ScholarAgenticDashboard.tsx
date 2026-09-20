@@ -78,7 +78,12 @@ export default function ScholarAgenticDashboard() {
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [inlinePrompt, setInlinePrompt] = useState<string>("Make the main argument more clear...");
+  const [isMounted, setIsMounted] = useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Auto-scroll chat canvas on new messages
   useEffect(() => {
@@ -205,14 +210,15 @@ export default function ScholarAgenticDashboard() {
               <span>New Project</span>
             </button>
 
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <div className="relative group cursor-text mb-4">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all"
+                onClick={(e) => e.stopPropagation()}
+                className="w-full bg-transparent border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100 transition-all cursor-text text-gray-800 placeholder-gray-400"
               />
             </div>
           </div>
@@ -270,7 +276,7 @@ export default function ScholarAgenticDashboard() {
 
           {/* Recents List */}
           <div className="space-y-1 px-3">
-            {recentList.map((item) => {
+            {isMounted && recentList.map((item) => {
               const isPinned = pinnedRecentIds.includes(item.id);
               const isMenuOpen = activeRecentMenuId === item.id;
               return (
@@ -410,6 +416,7 @@ export default function ScholarAgenticDashboard() {
               <button
                 type="button"
                 onClick={() => setIsSidebarOpen((prev) => !prev)}
+                title="Ask Scholar"
                 className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white hover:bg-gray-50 border-gray-200 text-amber-500 hover:text-amber-600 animate-in fade-in zoom-in-95 duration-150"
                 aria-label="Toggle Scholar Core AI Assistant"
               >

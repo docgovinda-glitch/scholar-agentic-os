@@ -556,14 +556,14 @@ describe("minimal website assistant", () => {
     expect(executeAgenticLLM).toHaveBeenCalled();
   });
 
-  it("renders minimalist Lightbulb icon without tooltip, hides button when sidebar opens, and restores it on close", async () => {
+  it("renders minimalist Lightbulb icon with Ask Scholar tooltip, hides button when sidebar opens, and restores it on close", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    // 1. Initially closed: toggle button is visible in top navigation and has NO title/tooltip
+    // 1. Initially closed: toggle button is visible in top navigation and has title="Ask Scholar" tooltip
     const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
     expect(toggleBtn).toBeInTheDocument();
-    expect(toggleBtn).not.toHaveAttribute("title");
+    expect(toggleBtn).toHaveAttribute("title", "Ask Scholar");
 
     // 2. Open assistant: button triggers the sidebar to slide open
     fireEvent.click(toggleBtn);

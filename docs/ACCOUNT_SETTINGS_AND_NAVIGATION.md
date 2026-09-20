@@ -145,6 +145,18 @@ graph TD
     5. **Delete** (`Trash2`): Prompts project deletion confirmation modal with styled red accents (`text-red-500 dark:text-red-400`).
   - Outside-click and Escape key event listeners automatically close the popover.
   - Dynamically flips upwards (`bottom-full mb-1`) when near the bottom boundary of the scroll view to prevent viewport clipping.
+- **Initial Render Flash Fix (`isMounted`)**:
+  - Eliminates the 1-second hydration flash of unwanted dynamic elements by deferring client-rendered lists (like Recents) until after initial layout mounting:
+    ```tsx
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => setIsMounted(true), []);
+    // In JSX:
+    {isMounted && recentProjectsList.map(...)}
+    ```
+- **Gemini-Style Dedicated Sidebar Search**:
+  - Completely decoupled from list toggles or dropdowns. Implemented as a standalone, clickable input with search magnifier icon (`relative group cursor-text`), styled with focus rings and `e.stopPropagation()` so typing never triggers accordion or navigation actions.
+- **"Ask Scholar" Lightbulb Hover Tooltip**:
+  - Added a clean, minimalist native tooltip (`title="Ask Scholar"`) directly onto the top navigation Lightbulb button, providing instant clarity without visual clutter.
 - **Persistent Shell Architecture**:
   - Root dashboard layout strictly follows a fixed shell layout:
     ```tsx
@@ -170,9 +182,9 @@ graph TD
 All components and workflows are covered by comprehensive unit tests:
 - `AccountSettingsScreen.test.tsx`: 22 tests covering identity immutability, dial-code sanitization, tab switching, password validation, and sticky save actions.
 - `UserAccountMenu.test.tsx`: 5 tests validating profile display, menu options, consolidated multi-account actions, and pricing absence in the minimal dropdown.
-- `ProjectListScreen.test.tsx`: 26 tests verifying persistent sidebar layout, responsive navigation, top actions with search, recents list rendering with Gemini-style 3-dots popover options, footer settings integration, and the bidirectional Scholar Core Assistant toggle lifecycle.
+- `ProjectListScreen.test.tsx`: 27 tests verifying persistent sidebar layout, responsive navigation, top actions with search, recents list rendering with Gemini-style 3-dots popover options, footer settings integration, bidirectional Scholar Core Assistant toggle lifecycle, and the "Ask Scholar" hover tooltip.
 - `DeskApp.test.tsx`: 14 tests validating persistent shell routing across `/projects`, `/settings`, `/vault`, and `/ai-access`.
-- Full test pass: 2,571/2,571 tests across all 236 test files passing, TypeScript compilation clean (`tsc --noEmit` exit 0), and production build passing (`npm run build`).
+- Full test pass: 41/41 tests passing across dashboard suites, TypeScript compilation clean (`tsc --noEmit` exit 0), and production build passing (`npm run build`).
 
 
 

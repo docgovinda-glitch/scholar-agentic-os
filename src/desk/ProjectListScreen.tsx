@@ -342,6 +342,11 @@ export default function ProjectListScreen({
   onAiAccessSectionChange?: (next: SectionId) => void;
 }) {
   const [activeView, setActiveView] = useState<DashboardView>(() => initialView ?? "projects");
+  const [isMounted, setIsMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (initialView) {
@@ -967,14 +972,15 @@ Keep your response concise, helpful, and academically grounded.`;
               <span>New Project</span>
             </button>
 
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <div className="relative group cursor-text mb-4">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border border-gray-200 dark:border-neutral-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100 dark:focus:ring-neutral-700 transition-all"
+                onClick={(e) => e.stopPropagation()}
+                className="w-full bg-transparent border border-gray-200 dark:border-neutral-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100 dark:focus:ring-neutral-700 transition-all cursor-text text-[var(--text-primary)] placeholder-gray-400"
               />
             </div>
           </div>
@@ -1054,7 +1060,7 @@ Keep your response concise, helpful, and academically grounded.`;
 
           {/* Phase 2 & 3: Recents List (Scrollable Area) */}
           <div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar pb-3 min-h-0">
-            {recentProjectsList.map((item, index) => {
+            {isMounted && recentProjectsList.map((item, index) => {
               const isMenuOpen = activeRecentMenuId === item.id;
               const isNearBottom = index >= Math.max(recentProjectsList.length - 2, 2);
               const isPinned = pinnedRecentIds.includes(item.id);
@@ -1251,6 +1257,7 @@ Keep your response concise, helpful, and academically grounded.`;
               <button
                 type="button"
                 onClick={() => setIsAiSidebarOpen((prev) => !prev)}
+                title="Ask Scholar"
                 className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-neutral-800 border-gray-200/90 dark:border-neutral-800 text-amber-500/90 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 animate-in fade-in zoom-in-95 duration-150"
                 aria-label="Toggle Scholar Core AI Assistant"
               >

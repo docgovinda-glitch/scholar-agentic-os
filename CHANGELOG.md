@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-20
 
 ### Changed
+- **Sidebar Render Flash Fix, Gemini-Style Search & Lightbulb "Ask Scholar" Tooltip (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `ProjectListScreen.test.tsx`)**:
+  - **Phase 1 (1-Second Flash Fix)**: Resolved the initial page-load render flash by introducing a mounted state check (`isMounted`), ensuring dynamic Recents items only mount once client hydration is complete.
+  - **Phase 2 (Gemini-Style Search)**: Overhauled sidebar Search to function as a dedicated, standalone clickable input (`relative group cursor-text`) styled with `lucide-react`'s `Search` icon, text-sm styling, and event isolation (`stopPropagation`) so it never triggers accordion or dropdown toggles.
+  - **Phase 3 ("Ask Scholar" Tooltip)**: Added a clean, minimalist native hover tooltip (`title="Ask Scholar"`) to the top navigation Lightbulb assistant trigger button across all views.
+  - **Phase 4 (Integrity & Testing)**: Validated with clean TypeScript compilation (`tsc --noEmit`), 100% test pass (41/41 tests across `ProjectListScreen.test.tsx` and `DeskApp.test.tsx`), and successful production build (`npm run build`).
+
 - **Persistent Shell Architecture & Bidirectional "Ask Scholar" Sidebar Toggle (`ScholarAgenticDashboard.tsx`, `ProjectListScreen.tsx`, `DeskApp.tsx`, `ProjectListScreen.test.tsx`)**:
   - **Phase 1: Bidirectional Toggle**: Updated "Ask Scholar" button in the left sidebar to toggle state both open and closed on click (`onClick={() => setIsSidebarOpen(prev => !prev)}` / `onClick={() => setIsAiSidebarOpen(prev => !prev)}`), matching desktop and mobile toggle interactions.
   - **Phase 2: Persistent Shell Architecture**: Refactored the dashboard layout to strictly enforce a fixed shell pattern (`flex h-screen w-full overflow-hidden bg-slate-50` with `<LeftSidebar />`, central dynamic `<main className="flex-1 overflow-y-auto relative">`, and `<RightAssistantSidebar />`). Left and right sidebars remain permanently mounted across navigation between core views (Projects, Knowledge Vault, AI Access).
