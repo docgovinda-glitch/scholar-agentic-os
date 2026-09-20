@@ -577,5 +577,28 @@ describe("minimal website assistant", () => {
     fireEvent.click(closeBtn);
     expect(screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i })).toBeInTheDocument();
   });
+
+  it("toggles the Ask Scholar assistant sidebar both open and closed on click from left sidebar navigation", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // 1. Find Ask Scholar button in left sidebar
+    const askScholarBtn = screen.getByRole("button", { name: /^Ask Scholar$/i });
+    expect(askScholarBtn).toBeInTheDocument();
+
+    // 2. Click once to open
+    fireEvent.click(askScholarBtn);
+    expect(await screen.findByRole("heading", { name: "Ask Scholar" })).toBeInTheDocument();
+
+    // 3. Click again to close (bidirectional toggle fix)
+    fireEvent.click(askScholarBtn);
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Ask Scholar" })).not.toBeInTheDocument();
+    });
+
+    // 4. Click once more to reopen
+    fireEvent.click(askScholarBtn);
+    expect(await screen.findByRole("heading", { name: "Ask Scholar" })).toBeInTheDocument();
+  });
 });
 
