@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-20
 
 ### Changed
+- **Persistent Shell Architecture & Bidirectional "Ask Scholar" Sidebar Toggle (`ScholarAgenticDashboard.tsx`, `ProjectListScreen.tsx`, `DeskApp.tsx`, `ProjectListScreen.test.tsx`)**:
+  - **Phase 1: Bidirectional Toggle**: Updated "Ask Scholar" button in the left sidebar to toggle state both open and closed on click (`onClick={() => setIsSidebarOpen(prev => !prev)}` / `onClick={() => setIsAiSidebarOpen(prev => !prev)}`), matching desktop and mobile toggle interactions.
+  - **Phase 2: Persistent Shell Architecture**: Refactored the dashboard layout to strictly enforce a fixed shell pattern (`flex h-screen w-full overflow-hidden bg-slate-50` with `<LeftSidebar />`, central dynamic `<main className="flex-1 overflow-y-auto relative">`, and `<RightAssistantSidebar />`). Left and right sidebars remain permanently mounted across navigation between core views (Projects, Knowledge Vault, AI Access).
+  - **Phase 3: Seamless Central Routing**: Verified and implemented view switching using React Router `<Link>`, navigation hooks, and `activeView` state switching (`"projects" | "vault" | "ai-access"`). Eliminated native `<a href="...">` page reloads.
+  - **Phase 4: Forced Build & Test Integrity**: Zero TypeScript errors (`npx tsc --noEmit`), full test pass across all project test suites (40/40 tests in `ProjectListScreen.test.tsx` and `DeskApp.test.tsx`), and successful production build (`npm run build`).
+
 - **Gemini-Style Sidebar Recents with 3-Dots Popover Options Menu & Typography Refinement (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
   - **Sidebar Cleanup**: Removed redundant top "Projects" folder button from sidebar navigation to avoid duplicate navigation controls with the main canvas.
   - **Typography Downscaling**: Scaled typography down to Airbnb-inspired `text-[13px] font-medium antialiased` for crisp scannability; styled Recents section header to `text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3 mt-5`.

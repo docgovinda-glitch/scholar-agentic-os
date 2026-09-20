@@ -8,6 +8,8 @@ import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
+import VaultScreen from "./vault/VaultScreen";
+import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
 import {
   Plus,
   ArrowUp,
@@ -308,6 +310,8 @@ Click any suggestion above or ask a specific question about our features!`;
 }
 
 
+export type DashboardView = "projects" | "vault" | "ai-access";
+
 /**
  * Desk's entry surface: the signed-in user's own projects — transformed into
  * the SCHOLAR CORE Research Command Center.
@@ -315,20 +319,36 @@ Click any suggestion above or ask a specific question about our features!`;
 export default function ProjectListScreen({
   onOpen,
   userEmail = null,
+  userId = null,
   onOpenAccountSettings,
   onOpenVault,
   onOpenAiAccess,
   showWelcome,
   onWelcomeSeen,
+  initialView = "projects",
+  aiAccessSection,
+  onAiAccessSectionChange,
 }: {
   onOpen: (projectId: string) => void;
   userEmail: string | null;
+  userId?: string | null;
   onOpenAccountSettings?: () => void;
   onOpenVault?: () => void;
   onOpenAiAccess?: () => void;
   showWelcome?: boolean;
   onWelcomeSeen?: () => void;
+  initialView?: DashboardView;
+  aiAccessSection?: SectionId;
+  onAiAccessSectionChange?: (next: SectionId) => void;
 }) {
+  const [activeView, setActiveView] = useState<DashboardView>(() => initialView ?? "projects");
+
+  useEffect(() => {
+    if (initialView) {
+      setActiveView(initialView);
+    }
+  }, [initialView]);
+
   // Core Workspace State (Initialized at the top of component)
   const [creating, setCreating] = useState(false);
   const [creatingFormatId, setCreatingFormatId] = useState<string | null>(null);
@@ -357,6 +377,13 @@ export default function ProjectListScreen({
       navigate("/projects", { replace: true });
     }
   }, [location.pathname, location.search, navigate]);
+
+  const handleCloseCentralView = useCallback(() => {
+    if (location.pathname !== "/projects") {
+      navigate("/projects");
+    }
+    setActiveView("projects");
+  }, [location.pathname, navigate]);
 
   const handleCreate = useCallback(async (outputTypeId: string) => {
     if (!userEmail) {
@@ -874,6 +901,7 @@ Keep your response concise, helpful, and academically grounded.`;
               onClick={() => {
                 setMobileMenuOpen(false);
                 setChoosing(false);
+                setActiveView("projects");
                 scrollToProjects();
               }}
               className="flex items-center gap-2.5 min-w-0 cursor-pointer transition-opacity duration-200 hover:opacity-70 text-left"
@@ -926,6 +954,7 @@ Keep your response concise, helpful, and academically grounded.`;
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
+                setActiveView("projects");
                 if (!userEmail) {
                   openAuth("signin", "Sign in or create an account to start a new research project.");
                   return;
@@ -955,52 +984,63 @@ Keep your response concise, helpful, and academically grounded.`;
         <div className="flex-1 overflow-hidden px-3 flex flex-col w-[260px] min-h-0 antialiased">
           {/* Phase 2: Core Workspace Links (The Library) */}
           <div className="space-y-1">
-            {onOpenVault && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  if (!userEmail) {
-                    openAuth("signin", "Sign in to access your Knowledge Vault references.");
-                    return;
-                  }
-                  onOpenVault();
-                }}
-                aria-label="Open Knowledge Vault"
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-[13px] font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
-              >
-                <Database className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
-                <span>Knowledge Vault</span>
-              </button>
-            )}
-
-            {onOpenAiAccess && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  if (!userEmail) {
-                    openAuth("signin", "Sign in to configure AI provider keys and models.");
-                    return;
-                  }
-                  onOpenAiAccess();
-                }}
-                aria-label="Manage AI Access"
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-[13px] font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
-              >
-                <Sliders className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
-                <span>AI Access</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (!userEmail) {
+                  openAuth("signin", "Sign in to access your Knowledge Vault references.");
+                  return;
+                }
+                setActiveView("vault");
+                onOpenVault?.();
+              }}
+              aria-label="Knowledge Vault"
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
+                activeView === "vault"
+                  ? "bg-gray-200/80 dark:bg-neutral-800 text-gray-900 dark:text-white font-semibold"
+                  : "hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-300"
+              }`}
+            >
+              <Database className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
+              <span>Knowledge Vault</span>
+            </button>
 
             <button
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
-                setIsAiSidebarOpen(true);
+                if (!userEmail) {
+                  openAuth("signin", "Sign in to configure AI provider keys and models.");
+                  return;
+                }
+                setActiveView("ai-access");
+                onOpenAiAccess?.();
+              }}
+              aria-label="Manage AI Access"
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
+                activeView === "ai-access"
+                  ? "bg-gray-200/80 dark:bg-neutral-800 text-gray-900 dark:text-white font-semibold"
+                  : "hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-300"
+              }`}
+            >
+              <Sliders className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
+              <span>AI Access</span>
+            </button>
+
+            {/* Phase 1: Ask Scholar toggle button allowing opening and closing on click */}
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setIsAiSidebarOpen((prev) => !prev);
               }}
               aria-label="Ask Scholar"
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 text-[13px] font-medium text-gray-700 dark:text-gray-300 transition-colors cursor-pointer text-left w-full group font-sans"
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
+                isAiSidebarOpen
+                  ? "bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 font-semibold"
+                  : "hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-300"
+              }`}
             >
               <MessageSquare className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 flex-shrink-0" />
               <span>Ask Scholar</span>
@@ -1024,6 +1064,7 @@ Keep your response concise, helpful, and academically grounded.`;
                   <div
                     onClick={() => {
                       setMobileMenuOpen(false);
+                      setActiveView("projects");
                       if (item.projectId) {
                         onOpen(item.projectId);
                       } else {
@@ -1209,7 +1250,7 @@ Keep your response concise, helpful, and academically grounded.`;
             {!isAiSidebarOpen && (
               <button
                 type="button"
-                onClick={() => setIsAiSidebarOpen(true)}
+                onClick={() => setIsAiSidebarOpen((prev) => !prev)}
                 className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-neutral-800 border-gray-200/90 dark:border-neutral-800 text-amber-500/90 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 animate-in fade-in zoom-in-95 duration-150"
                 aria-label="Toggle Scholar Core AI Assistant"
               >
@@ -1217,8 +1258,28 @@ Keep your response concise, helpful, and academically grounded.`;
               </button>
             )}
           </div>
-        </div>        {/* Centered Reading Column */}
-        <div className="max-w-6xl mx-auto px-6 py-8 w-full flex-1">
+        </div>
+
+        {/* Dynamic Central Content (Knowledge Vault, AI Access, or Projects reading column) */}
+        {activeView === "vault" ? (
+          <div className="flex-1 overflow-y-auto w-full relative">
+            <VaultScreen
+              userId={userId || "local-user"}
+              onClose={handleCloseCentralView}
+              onOpenProject={(pId) => onOpen(pId)}
+            />
+          </div>
+        ) : activeView === "ai-access" ? (
+          <div className="flex-1 overflow-y-auto w-full relative">
+            <AiAccessPage
+              onClose={handleCloseCentralView}
+              section={aiAccessSection}
+              onSectionChange={onAiAccessSectionChange}
+            />
+          </div>
+        ) : (
+          /* Centered Reading Column */
+          <div className="max-w-6xl mx-auto px-6 py-8 w-full flex-1">
           {/* Onboarding welcome banner */}
           {welcomeVisible && (
             <div
@@ -1473,6 +1534,7 @@ Keep your response concise, helpful, and academically grounded.`;
             </div>
           )}
         </div>
+      )}
       </main>
 
       {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (w-96) */}

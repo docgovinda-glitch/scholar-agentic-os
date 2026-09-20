@@ -144,10 +144,10 @@ export async function clearVaultPassphraseVerifier(): Promise<void> {
  * ---------------------------------------------------------------------- */
 
 export async function loadVault(): Promise<VaultRecord | null> {
-  if (!isSupabaseConfigured()) return null;
   const supabase = getSupabaseClient();
+  if (!supabase?.auth || typeof supabase.auth.getUser !== "function") return null;
   const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return null;
+  if (!userData?.user) return null;
 
   const { data, error } = await supabase
     .from("user_vaults")

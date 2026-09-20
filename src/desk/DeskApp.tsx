@@ -177,8 +177,10 @@ function ProjectsIndexRoute() {
 
   return (
     <ProjectListScreen
-      onOpen={(id) => navigate(`/projects/${id}`)}
+      initialView="projects"
+      userId={session.status === "signed-in" ? session.userId : null}
       userEmail={session.status === "signed-in" ? session.email : null}
+      onOpen={(id) => navigate(`/projects/${id}`)}
       onOpenAccountSettings={() => navigate("/settings", { state: { from: "/projects" } })}
       onOpenVault={() => navigate("/vault", { state: { from: "/projects" } })}
       onOpenAiAccess={() => navigate("/ai-access", { state: { from: "/projects" } })}
@@ -373,10 +375,14 @@ function VaultRoute() {
   const session = useDeskSession();
   if (session.status !== "signed-in") return null;
   return (
-    <VaultScreen
+    <ProjectListScreen
+      initialView="vault"
       userId={session.userId}
-      onClose={() => navigate(returnTo(location))}
-      onOpenProject={(projectId) => navigate(`/project/${projectId}`)}
+      userEmail={session.email}
+      onOpen={(id) => navigate(`/projects/${id}`)}
+      onOpenAccountSettings={() => navigate("/settings", { state: { from: "/vault" } })}
+      onOpenVault={() => {}}
+      onOpenAiAccess={() => navigate("/ai-access", { state: { from: "/vault" } })}
     />
   );
 }
@@ -392,13 +398,20 @@ function VaultRoute() {
 function AiAccessRoute() {
   const navigate = useNavigate();
   const location = useLocation();
+  const session = useDeskSession();
   const { section } = useParams<{ section?: string }>();
   const activeSection = normalizeSectionId(section);
   return (
-    <AiAccessPage
-      onClose={() => navigate(returnTo(location))}
-      section={activeSection}
-      onSectionChange={(next) => navigate(next === "overview" ? "/ai-access" : `/ai-access/${next}`)}
+    <ProjectListScreen
+      initialView="ai-access"
+      userId={session.status === "signed-in" ? session.userId : null}
+      userEmail={session.status === "signed-in" ? session.email : null}
+      aiAccessSection={activeSection}
+      onAiAccessSectionChange={(next) => navigate(next === "overview" ? "/ai-access" : `/ai-access/${next}`)}
+      onOpen={(id) => navigate(`/projects/${id}`)}
+      onOpenAccountSettings={() => navigate("/settings", { state: { from: location.pathname } })}
+      onOpenVault={() => navigate("/vault", { state: { from: location.pathname } })}
+      onOpenAiAccess={() => {}}
     />
   );
 }

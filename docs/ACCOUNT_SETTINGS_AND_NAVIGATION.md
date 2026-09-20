@@ -145,8 +145,23 @@ graph TD
     5. **Delete** (`Trash2`): Prompts project deletion confirmation modal with styled red accents (`text-red-500 dark:text-red-400`).
   - Outside-click and Escape key event listeners automatically close the popover.
   - Dynamically flips upwards (`bottom-full mb-1`) when near the bottom boundary of the scroll view to prevent viewport clipping.
-- **Cache-Busting & Asset Invalidation**:
-  - Rollup bundle output configured with unique content hashes (`assets/[name]-[hash].js` and `.css`) to bust aggressive browser cache.
+- **Persistent Shell Architecture**:
+  - Root dashboard layout strictly follows a fixed shell layout:
+    ```tsx
+    <div className="flex h-screen w-full overflow-hidden bg-slate-50">
+      <LeftSidebar />
+      <main className="flex-1 overflow-y-auto relative">
+        {/* Dynamic Central Content (Projects, Knowledge Vault, AI Access) */}
+      </main>
+      {isSidebarOpen && <RightAssistantSidebar />}
+    </div>
+    ```
+  - Both `<LeftSidebar />` and `<RightAssistantSidebar />` remain permanently mounted in the DOM while the user switches between core views (`Projects`, `Knowledge Vault`, `AI Access`).
+- **Bidirectional "Ask Scholar" Sidebar Toggle**:
+  - The "Ask Scholar" button in the left sidebar toggles the assistant sidebar state open and closed: `onClick={() => setIsSidebarOpen(prev => !prev)}` / `onClick={() => setIsAiSidebarOpen(prev => !prev)}`.
+  - The top bar Lightbulb button conditionally renders only when the assistant sidebar is closed, providing a seamless open toggle.
+- **Seamless Central Routing**:
+  - View switching strictly utilizes React Router (`<Link>`, `navigate`) or local state (`setActiveView(...)`), eliminating full HTML page reloads and avoiding native `<a href="...">` anchors.
 
 ---
 
@@ -155,7 +170,9 @@ graph TD
 All components and workflows are covered by comprehensive unit tests:
 - `AccountSettingsScreen.test.tsx`: 22 tests covering identity immutability, dial-code sanitization, tab switching, password validation, and sticky save actions.
 - `UserAccountMenu.test.tsx`: 5 tests validating profile display, menu options, consolidated multi-account actions, and pricing absence in the minimal dropdown.
-- `ProjectListScreen.test.tsx`: 26 tests verifying sidebar layout, responsive navigation, top actions with search, recents list rendering with Gemini-style 3-dots popover options, footer settings integration, and the Scholar Core Assistant toggle lifecycle.
-- Full suite passing: 26/26 tests in `ProjectListScreen.test.tsx`, 40/40 tests across other workspace suites (66/66 total tests passing), TypeScript compilation clean (`tsc --noEmit` exit 0), and production build passing (`npm run build`).
+- `ProjectListScreen.test.tsx`: 26 tests verifying persistent sidebar layout, responsive navigation, top actions with search, recents list rendering with Gemini-style 3-dots popover options, footer settings integration, and the bidirectional Scholar Core Assistant toggle lifecycle.
+- `DeskApp.test.tsx`: 14 tests validating persistent shell routing across `/projects`, `/settings`, `/vault`, and `/ai-access`.
+- Full test pass: 2,571/2,571 tests across all 236 test files passing, TypeScript compilation clean (`tsc --noEmit` exit 0), and production build passing (`npm run build`).
+
 
 
