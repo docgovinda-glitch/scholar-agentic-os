@@ -8,7 +8,7 @@ import type { OutputTypeSummary, ProjectView } from "./types";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
-import { Plus, ArrowUp, X, RotateCcw } from "lucide-react";
+import { Plus, ArrowUp, X, RotateCcw, Lightbulb } from "lucide-react";
 
 
 /** Curated 4 essential academic formats */
@@ -969,15 +969,15 @@ Keep your response concise, helpful, and academically grounded.`;
 
           {/* Top Bar Right: AI Assistant Toggle */}
           <div className="flex items-center gap-2.5">
-            {/* AI Assistant Toggle Button (Circular button with Scholar Core logo, hidden when sidebar is open) */}
+            {/* AI Assistant Toggle Button (Clean minimalist Lightbulb icon, hidden when sidebar is open) */}
             {!isAiSidebarOpen && (
               <button
                 type="button"
                 onClick={() => setIsAiSidebarOpen(true)}
-                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-neutral-800 border-gray-200/90 dark:border-neutral-800 animate-in fade-in zoom-in-95 duration-150"
+                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-neutral-800 border-gray-200/90 dark:border-neutral-800 text-amber-500/90 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 animate-in fade-in zoom-in-95 duration-150"
                 aria-label="Toggle Scholar Core AI Assistant"
               >
-                <ScholarCoreLogo size="sm" withText={false} />
+                <Lightbulb className="w-5 h-5 stroke-[1.8]" />
               </button>
             )}
           </div>

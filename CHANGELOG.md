@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-20
 
 ### Changed
+- **Top Navigation Lightbulb Assistant Toggle & Conditional Hide-on-Open (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `ProjectListScreen.test.tsx`)**:
+  - Replaced the swirling star logo in the top navigation bar with a clean, minimalist `Lightbulb` icon from `lucide-react`.
+  - Styled with premium circular container (`w-10 h-10 rounded-full`, subtle border, responsive amber/neutral hover effects).
+  - Strictly enforced conditional rendering (`{!isAiSidebarOpen && ...}` / `{!isSidebarOpen && ...}`) so the Lightbulb button vanishes completely from the DOM when the sidebar is open.
+  - Reopens seamlessly when the Assistant drawer is closed.
+  - Verified with clean TypeScript compilation (`tsc --noEmit`), full unit test pass (26/26 tests), and production bundling.
+
 - **Humanized AI Assistant Sidebar UX Copy (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `ProjectListScreen.test.tsx`)**:
   - Replaced rigid "Scholar Core Assistant" sidebar header with welcoming and intuitive "Ask Scholar", matching Apple and Airbnb design philosophy.
   - Replaced technical subtitle "Platform navigation, workflows & AI setup" with warm, conversational greeting: "How can I help you with your research today?".

@@ -16,6 +16,7 @@ import {
   ExternalLink,
   BookOpen,
   FolderOpen,
+  Lightbulb,
 } from "lucide-react";
 import ScholarCoreLogo from "../components/ScholarCoreLogo";
 interface Message {
@@ -152,15 +153,15 @@ export default function ScholarAgenticDashboard() {
             </div>
 
 
-            {/* AI Assistant Toggle Button (Circular button with Scholar Core logo, hidden when sidebar is open) */}
+            {/* AI Assistant Toggle Button (Clean minimalist Lightbulb icon, hidden when sidebar is open) */}
             {!isSidebarOpen && (
               <button
                 type="button"
                 onClick={() => setIsSidebarOpen(true)}
-                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white hover:bg-gray-50 border-gray-200 text-gray-700 animate-in fade-in zoom-in-95 duration-150"
+                className="w-10 h-10 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs border bg-white hover:bg-gray-50 border-gray-200 text-amber-500 hover:text-amber-600 animate-in fade-in zoom-in-95 duration-150"
                 aria-label="Toggle Scholar Core AI Assistant"
               >
-                <ScholarCoreLogo size="sm" withText={false} />
+                <Lightbulb className="w-5 h-5 stroke-[1.8]" />
               </button>
             )}
           </div>

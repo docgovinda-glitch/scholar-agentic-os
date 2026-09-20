@@ -525,7 +525,7 @@ describe("minimal website assistant", () => {
     expect(executeAgenticLLM).toHaveBeenCalled();
   });
 
-  it("renders custom Scholar Core Assistant logo without tooltip, hides button when sidebar opens, and restores it on close", async () => {
+  it("renders minimalist Lightbulb icon without tooltip, hides button when sidebar opens, and restores it on close", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 

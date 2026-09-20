@@ -82,7 +82,7 @@ The top utility navigation across the dashboard (`ProjectListScreen.tsx` and `Sc
   - **Subtitle / Greeting**: "How can I help you with your research today?" (replacing technical "Platform navigation, workflows & AI setup").
   - **Input Prompt**: "Ask anything, search projects, or type a command..." (expanded multi-modal search and agentic command capability).
   - **Bottom Status**: "Ask Scholar" paired with green `• AI Ready` indicator.
-- **Custom Logo Integration**: Features the custom animated swirling star logo (`<ScholarCoreLogo size="sm" withText={false} />`) styled within a circular pill container (`w-10 h-10 rounded-full`).
+- **Lightbulb Icon Integration**: Features a clean, minimalist `Lightbulb` icon from `lucide-react` styled within a circular container (`w-10 h-10 rounded-full`, subtle border, responsive amber/neutral hover effects).
 - **Zero Tooltips / Decluttering**: All `title` attributes and hover tooltips (such as "Advisor Center" or "Open Scholar Assistant") are completely removed to maintain a serene, distraction-free reading atmosphere.
 - **Conditional Visibility ("Hide on Open")**:
   - The toggle button is conditionally wrapped in `{!isAiSidebarOpen && ( <button ... /> )}` / `{!isSidebarOpen && ( <button ... /> )}`.
