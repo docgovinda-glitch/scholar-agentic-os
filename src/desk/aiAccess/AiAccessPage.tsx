@@ -519,9 +519,27 @@ function ProvidersSection({
   // Hardware Profiler for Local Runners
   const [hardware, setHardware] = useState<HardwareProfile | null>(null);
   const [detecting, setDetecting] = useState(false);
+  const [localDetected, setLocalDetected] = useState<{ runnerId: string; name: string; modelCount: number } | null>(null);
 
   useEffect(() => {
     void loadHardwareProfile().then(setHardware);
+    let cancelled = false;
+    async function checkLocal() {
+      try {
+        const res = await fetch("http://127.0.0.1:11434/api/tags", { signal: AbortSignal.timeout(1500) });
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          const count = Array.isArray(data?.models) ? data.models.length : 0;
+          setLocalDetected({ runnerId: "ollama", name: "Ollama", modelCount: count });
+        }
+      } catch {
+        /* Not active locally or CORS-restricted */
+      }
+    }
+    void checkLocal();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function detect() {
@@ -541,6 +559,26 @@ function ProvidersSection({
         title="Providers"
         blurb="Connect local runners or cloud providers. Minimal cards display only essentials with unified connection setup."
       />
+
+      {/* Auto-detected Local Runner Banner */}
+      {localDetected && (
+        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-800 dark:text-emerald-300 shadow-sm">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <div className="truncate">
+              <span className="font-bold">{localDetected.name} is running on this device!</span>
+              <span className="ml-1.5 opacity-80">({localDetected.modelCount} local model{localDetected.modelCount === 1 ? "" : "s"} ready)</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpen(localDetected.runnerId)}
+            className="px-3 py-1.5 rounded-[var(--radius-sm)] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-colors cursor-pointer shrink-0"
+          >
+            Configure Local AI →
+          </button>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -601,46 +639,54 @@ function ProvidersSection({
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {displayedItems.map((provider) => (
-            <button
-              key={provider.id}
-              type="button"
-              onClick={() => onOpen(provider.id)}
-              className="group flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3.5 text-left transition-all hover:border-[color:var(--border-strong)] hover:shadow-2xs focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-solid)] cursor-pointer"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span
-                  aria-hidden
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[color:var(--surface-canvas)] text-lg shadow-2xs"
-                  style={provider.color ? { color: provider.color } : undefined}
-                >
-                  {provider.icon}
-                </span>
-                <span className="truncate text-sm font-medium text-[color:var(--text-primary)] group-hover:text-[color:var(--accent-solid)] transition-colors">
-                  {provider.name}
-                </span>
-              </div>
-              <div className="shrink-0 flex items-center gap-1.5">
-                {provider.connected ? (
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]">
-                    Connected
-                  </span>
-                ) : (
+          {displayedItems.map((provider) => {
+            const isDefault = access.settings.provider === provider.id;
+            return (
+              <button
+                key={provider.id}
+                type="button"
+                onClick={() => onOpen(provider.id)}
+                className="group flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-3.5 text-left transition-all hover:border-[color:var(--border-strong)] hover:shadow-2xs focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-solid)] cursor-pointer"
+              >
+                <div className="flex items-center gap-3 min-w-0">
                   <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border ${
-                      provider.tierBadge === "Free"
-                        ? "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"
-                        : provider.tierBadge === "Local"
-                        ? "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"
-                        : "border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
-                    }`}
+                    aria-hidden
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[color:var(--surface-canvas)] text-lg shadow-2xs"
+                    style={provider.color ? { color: provider.color } : undefined}
                   >
-                    {provider.tierBadge}
+                    {provider.icon}
                   </span>
-                )}
-              </div>
-            </button>
-          ))}
+                  <span className="truncate text-sm font-medium text-[color:var(--text-primary)] group-hover:text-[color:var(--accent-solid)] transition-colors">
+                    {provider.name}
+                  </span>
+                </div>
+                <div className="shrink-0 flex items-center gap-1.5">
+                  {isDefault && provider.connected && (
+                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 shadow-2xs">
+                      ★ Primary
+                    </span>
+                  )}
+                  {provider.connected ? (
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border border-[color:var(--state-success)] bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)]">
+                      Connected
+                    </span>
+                  ) : (
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border ${
+                        provider.tierBadge === "Free"
+                          ? "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"
+                          : provider.tierBadge === "Local"
+                          ? "border-[color:var(--border-subtle)] bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)]"
+                          : "border-[color:var(--state-warning)] bg-[color:var(--state-warning-subtle)] text-[color:var(--state-warning)]"
+                      }`}
+                    >
+                      {provider.tierBadge}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -1032,6 +1078,61 @@ function PreferencesSection({
             ))}
           </ul>
         )}
+      </section>
+
+      {/* Agentic Task Routing Matrix */}
+      <section className="rounded-[var(--radius-md)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-5 space-y-3 shadow-2xs">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold tracking-tight text-[color:var(--text-primary)]">
+              Agentic Task Routing Matrix
+            </h3>
+            <p className="mt-0.5 text-xs text-[color:var(--text-muted)]">
+              How Scholar Core's autonomous editorial agents map tasks across your connected AI tiers.
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-[color:var(--accent-solid)] border border-[color:var(--border-subtle)] px-2 py-0.5 rounded-full bg-[color:var(--surface-inset)]">
+            Auto-Orchestrated
+          </span>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3 pt-1">
+          <div className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] p-3 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400">
+              <span>🧠 Deep Reasoning</span>
+            </div>
+            <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
+              Peer Review, G1 Gap Synthesis, Quality Gates, and Editorial Board.
+            </p>
+            <div className="text-[11px] font-mono font-medium text-[color:var(--text-primary)] pt-1">
+              → {access.settings.provider ? `${access.settings.provider} (Primary)` : "DeepSeek-R1 / Claude"}
+            </div>
+          </div>
+
+          <div className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] p-3 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+              <span>⚡ Fast Execution</span>
+            </div>
+            <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
+              Evidentiary Extraction, Intake Processing, Outline Generation, Citation Extraction.
+            </p>
+            <div className="text-[11px] font-mono font-medium text-[color:var(--text-primary)] pt-1">
+              → {fallback ? `${fallback} (Fast)` : "Groq / Flash / Local"}
+            </div>
+          </div>
+
+          <div className="rounded-[var(--radius-sm)] border border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)] p-3 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+              <span>📚 Embeddings & Vault</span>
+            </div>
+            <p className="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
+              Semantic Search, Document Intelligence, Vector Indexing, Evidence Retrieval.
+            </p>
+            <div className="text-[11px] font-mono font-medium text-[color:var(--text-primary)] pt-1">
+              → Gemini Embeddings / Local Vector
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* 3. Privacy & Security Section with Tooltip */}

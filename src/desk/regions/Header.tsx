@@ -98,9 +98,11 @@ export default function Header({
           <button
             type="button"
             onClick={onOpenAiAccess}
-            className="rounded-[var(--radius-sm)] px-1 py-0.5 transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] cursor-pointer"
+            className="flex items-center gap-1.5 rounded-[var(--radius-sm)] px-2 py-0.5 transition-colors duration-[var(--motion-fast)] border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer"
+            title="AI Access configuration"
           >
-            AI Access
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>AI Access</span>
           </button>
         )}
         {onOpenAccountSettings ? (

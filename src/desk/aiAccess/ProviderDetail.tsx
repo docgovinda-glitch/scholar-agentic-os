@@ -61,6 +61,51 @@ export default function ProviderDetail({
   const [diagnosticsRunning, setDiagnosticsRunning] = useState(false);
   const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
 
+  const [pingRunning, setPingRunning] = useState(false);
+  const [pingResult, setPingResult] = useState<{ ok: boolean; latencyMs?: number; message?: string } | null>(null);
+
+  async function handleTestPing() {
+    setPingRunning(true);
+    setPingResult(null);
+    const start = Date.now();
+    try {
+      const key = apiKey.trim() || (await readProviderKey(spec.id));
+      if (!key && spec.freeTier === "paid") {
+        setPingResult({
+          ok: false,
+          latencyMs: 0,
+          message: "Please enter an API key to test connection.",
+        });
+        return;
+      }
+      const report = await runProviderDiagnostics(spec.id, key || "", model, baseUrl.trim() || undefined);
+      const latencyMs = Date.now() - start;
+      const isPass = report.overallStatus === "healthy" || report.overallStatus === "degraded";
+      if (isPass) {
+        setPingResult({
+          ok: true,
+          latencyMs,
+          message: `Responsive in ${latencyMs}ms • Model: ${model || "Default"} • Health: ${report.overallStatus}`,
+        });
+      } else {
+        const failStep = report.steps.find((s) => s.status === "fail");
+        setPingResult({
+          ok: false,
+          latencyMs,
+          message: failStep ? `${failStep.name}: ${failStep.details}` : (report.error || "Connection test failed."),
+        });
+      }
+    } catch (e: any) {
+      setPingResult({
+        ok: false,
+        latencyMs: Date.now() - start,
+        message: e.message || "Failed to reach provider endpoint.",
+      });
+    } finally {
+      setPingRunning(false);
+    }
+  }
+
   // Combine catalog models with dynamically discovered models
   const effectiveModels: ModelSpec[] = [...models];
   for (const dm of discoveredModels) {
@@ -317,14 +362,22 @@ export default function ProviderDetail({
             <input type="checkbox" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />
             Make this my default provider
           </label>
-          <div className="flex items-center gap-3 mt-3">
+          <div className="flex flex-wrap items-center gap-3 mt-3">
             <button
               type="button"
               onClick={() => void handleConnect()}
               disabled={busy || !apiKey.trim()}
-              className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] disabled:opacity-60"
+              className="rounded-[var(--radius-md)] bg-[color:var(--accent-solid)] px-4 py-2 text-sm font-semibold text-[color:var(--text-inverse)] disabled:opacity-60 cursor-pointer"
             >
               {busy ? "Testing…" : view.connected ? "Test and update" : "Test and connect"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleTestPing()}
+              disabled={pingRunning || (!view.connected && !apiKey.trim())}
+              className="rounded-[var(--radius-md)] border border-emerald-600/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-3 py-2 text-sm font-medium disabled:opacity-50 cursor-pointer flex items-center gap-1.5 transition-colors"
+            >
+              <span>{pingRunning ? "Pinging…" : "⚡ Quick Ping Test"}</span>
             </button>
             <button
               type="button"
@@ -335,7 +388,24 @@ export default function ProviderDetail({
               {diagnosticsRunning ? "Running Diagnostics…" : "Run Full Diagnostics"}
             </button>
           </div>
-          <p className="mt-1 text-xs text-[color:var(--text-muted)]">
+          {pingResult && (
+            <div className={`mt-3 rounded-[var(--radius-sm)] border p-2.5 text-xs font-mono flex items-center justify-between gap-2 ${
+              pingResult.ok
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+            }`}>
+              <div className="flex items-center gap-2">
+                <span>{pingResult.ok ? "⚡" : "❌"}</span>
+                <span>{pingResult.message}</span>
+              </div>
+              {pingResult.latencyMs !== undefined && pingResult.latencyMs > 0 && (
+                <span className="shrink-0 px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 text-[11px]">
+                  {pingResult.latencyMs}ms
+                </span>
+              )}
+            </div>
+          )}
+          <p className="mt-1.5 text-xs text-[color:var(--text-muted)]">
             We send one request to {spec.name} to check the key works before saving it. Nothing is saved if it fails.
           </p>
         </Step>

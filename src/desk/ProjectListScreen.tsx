@@ -27,6 +27,8 @@ import {
   FolderPlus,
   Trash2,
 } from "lucide-react";
+import { getCloudProvider } from "../config/providerCatalog";
+import { loadUserAiSettings } from "../services/userAiSettings";
 
 
 /** Curated 4 essential academic formats */
@@ -60,6 +62,44 @@ export const FORMAT_TILES = [
     budget: "10 – 35 slides",
   },
 ];
+
+export const STAGE_BREAKDOWNS: Record<string, { phases: string[]; highlights: string }> = {
+  "OT-01": {
+    highlights: "Rigorous coursework workflow with syllabus alignment and citation provenance audit.",
+    phases: [
+      "Phase I: Assignment Scope & Rubric Analysis",
+      "Phase II: Knowledge Vault Evidence Ingestion",
+      "Phase III: Grounded Multi-Section Drafting",
+      "Phase IV: Citation Auditor & Defense Script",
+    ],
+  },
+  "OT-10": {
+    highlights: "Full 25-stage peer-reviewed pipeline for high-impact journal submissions.",
+    phases: [
+      "Phase I (Stages 1–6): Domain Mapping & Gap Lock",
+      "Phase II (Stages 7–14): Evidentiary Matrix & Vault Audit",
+      "Phase III (Stages 15–18): Peer-Reviewed Agentic Drafting",
+      "Phase IV (Stages 19–21): Academic Voice & Guideline Fit",
+      "Phase V (Stages 22–25): LaTeX/PDF Export & Sign-Off",
+    ],
+  },
+  "OT-19": {
+    highlights: "Competitive grant and doctoral funding proposal generation pipeline.",
+    phases: [
+      "Phase I: Specific Aims & Novelty Justification",
+      "Phase II: Methodological Feasibility & Data Plan",
+      "Phase III: Milestone Timelines & Budget Defense",
+    ],
+  },
+  "OT-22": {
+    highlights: "Keynote presentation and conference defense slide deck architecture.",
+    phases: [
+      "Phase I: Core Thesis & Narrative Arc",
+      "Phase II: Slide Progression & Evidence Visuals",
+      "Phase III: Speaker Notes & Anticipated Defense Q&A",
+    ],
+  },
+};
 
 export interface AssistantAction {
   type: "ai" | "ai-access" | "vault" | "workspaces" | "projects" | "auth";
@@ -161,6 +201,59 @@ export const WEBSITE_ASSISTANT_FAQS = [
     shortLabel: "Configure AI provider?",
   },
 ];
+
+export function renderFormattedGuideText(text: string) {
+  if (!text) return null;
+
+  const lines = text.split("\n");
+
+  return (
+    <div className="space-y-2 whitespace-pre-wrap text-[13px] leading-relaxed text-inherit">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+
+        if (!trimmed) {
+          return <div key={idx} className="h-1" />;
+        }
+
+        const isBullet = trimmed.startsWith("•") || trimmed.startsWith("- ") || trimmed.startsWith("* ");
+        const bulletText = isBullet ? trimmed.replace(/^[•\-*]\s*/, "") : trimmed;
+
+        const parts = bulletText.split(/(\*\*[^*]+\*\*)/g);
+        const parsedContent = parts.map((part, pIdx) => {
+          if (part.startsWith("**") && part.endsWith("**")) {
+            return (
+              <strong key={pIdx} className="font-semibold text-slate-900 dark:text-white">
+                {part.slice(2, -2)}
+              </strong>
+            );
+          }
+          return part;
+        });
+
+        if (isBullet) {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1">
+              <span className="text-slate-400 dark:text-neutral-500 font-bold shrink-0 leading-relaxed">•</span>
+              <span className="flex-1 min-w-0">{parsedContent}</span>
+            </div>
+          );
+        }
+
+        const isHeader = trimmed.endsWith(":") || trimmed.startsWith("👉") || /^[0-9]+\./.test(trimmed);
+
+        return (
+          <p
+            key={idx}
+            className={isHeader ? "font-medium text-slate-900 dark:text-neutral-100 pt-0.5" : "text-inherit"}
+          >
+            {parsedContent}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
 
 export function isPlatformQuery(query: string): boolean {
   const q = query.toLowerCase().trim();
@@ -516,6 +609,25 @@ export default function ProjectListScreen({
     }));
   }, [userEmail, projects, searchQuery]);
 
+  const [activeProviderLabel, setActiveProviderLabel] = useState<string>("Ready");
+  const [previewFormatId, setPreviewFormatId] = useState<string | null>(null);
+  const [isPromptSuggestionsOpen, setIsPromptSuggestionsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!userEmail) {
+      setActiveProviderLabel("Guest");
+      return;
+    }
+    void loadUserAiSettings()
+      .then((settings) => {
+        const spec = getCloudProvider(settings.provider);
+        setActiveProviderLabel(spec?.name || settings.provider || "BYOK");
+      })
+      .catch(() => {
+        setActiveProviderLabel("BYOK");
+      });
+  }, [userEmail]);
+
   const load = useCallback(() => {
     setError(null);
     if (!userEmail) {
@@ -578,6 +690,18 @@ export default function ProjectListScreen({
   const [isGuideThinking, setIsGuideThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const guideInputRef = useRef<HTMLInputElement | null>(null);
+
+  const promptMatchingProjects = useMemo(() => {
+    if (!projects || !guideInput.trim()) return [];
+    const q = guideInput.toLowerCase().trim();
+    return projects
+      .filter((p) => {
+        const title = (p.answers?.title || "").toLowerCase();
+        const outputType = (p.outputTypeId || "").toLowerCase();
+        return title.includes(q) || outputType.includes(q);
+      })
+      .slice(0, 3);
+  }, [projects, guideInput]);
 
   const scrollToAssistant = useCallback(() => {
     setMobileMenuOpen(false);
@@ -1275,8 +1399,35 @@ Keep your response concise, helpful, and academically grounded.`;
             </button>
           </div>
 
-          {/* Top Bar Right: AI Assistant Toggle */}
+          {/* Top Bar Right: AI Assistant Toggle & Active Provider Status */}
           <div className="flex items-center gap-2.5">
+            {/* Active AI Status Pill */}
+            {userEmail ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenAiAccess) onOpenAiAccess();
+                  else setActiveView("ai-access");
+                }}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer shadow-2xs"
+                title="AI Access Settings • Click to configure"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Active AI: {activeProviderLabel}</span>
+                <span className="text-[10px] opacity-70">↗</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openAuth("signin", "Sign in to configure your personal AI provider.")}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-slate-600 dark:text-neutral-300 hover:bg-slate-50 dark:hover:bg-neutral-800 cursor-pointer shadow-2xs"
+                title="Sign in to access AI"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                <span>Guest Mode (AI Off)</span>
+              </button>
+            )}
+
             {/* AI Assistant Toggle Button (Clean minimalist Lightbulb icon, hidden when sidebar is open) */}
             {!isAiSidebarOpen && (
               <button
@@ -1401,10 +1552,31 @@ Keep your response concise, helpful, and academically grounded.`;
                                 <FormatIcon id={tile.id} className="w-5 h-5" />
                               )}
                             </div>
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-neutral-500 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
-                              <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
-                              </svg>
+                            <div className="flex items-center gap-1">
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.stopPropagation();
+                                    setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
+                                  }
+                                }}
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer text-xs font-serif italic font-bold"
+                                title="View methodology & stages blueprint"
+                                aria-label={`View stages blueprint for ${tile.label}`}
+                              >
+                                i
+                              </span>
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-neutral-500 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
+                                <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
+                                </svg>
+                              </div>
                             </div>
                           </div>
                           <span className={`text-[10px] font-semibold uppercase tracking-wider block mb-1 truncate ${tileTheme.accentText}`}>
@@ -1423,6 +1595,60 @@ Keep your response concise, helpful, and academically grounded.`;
                             Boot →
                           </span>
                         </div>
+
+                        {/* Interactive Stages & Methodology Blueprint Overlay */}
+                        {previewFormatId === tile.id && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute inset-0 bg-white dark:bg-[#1C1C1E] rounded-2xl p-4 z-20 flex flex-col justify-between border border-slate-300 dark:border-white/20 shadow-xl animate-in fade-in zoom-in-95 duration-150 text-left"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <span className={`text-[11px] font-bold uppercase tracking-wider ${tileTheme.accentText}`}>
+                                  {tile.label} • Blueprint
+                                </span>
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => setPreviewFormatId(null)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") setPreviewFormatId(null);
+                                  }}
+                                  className="w-5 h-5 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
+                                  aria-label="Close preview"
+                                >
+                                  ✕
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-gray-500 dark:text-neutral-400 mb-2 leading-tight">
+                                {STAGE_BREAKDOWNS[tile.id]?.highlights}
+                              </p>
+                              <div className="space-y-1">
+                                {STAGE_BREAKDOWNS[tile.id]?.phases.map((ph, phIdx) => (
+                                  <div key={phIdx} className="text-[11px] font-medium text-slate-700 dark:text-neutral-200 flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                                    <span className="truncate">{ph}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="pt-2 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
+                              <span className="text-[10px] text-slate-400">{tile.budget}</span>
+                              <span
+                                onClick={() => {
+                                  if (!userEmail) {
+                                    openAuth("signin", `Sign in to boot your ${tile.label} workspace.`, tile.id);
+                                    return;
+                                  }
+                                  handleCreate(tile.id);
+                                }}
+                                className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                              >
+                                Boot Workspace →
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -1430,11 +1656,12 @@ Keep your response concise, helpful, and academically grounded.`;
               </div>
 
               {/* ChatGPT-style AI Prompt Bar — flush with 4-card grid width */}
-              <div className="w-full mt-10">
+              <div className="w-full mt-10 relative">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (guideInput.trim()) {
+                      setIsPromptSuggestionsOpen(false);
                       setIsAiSidebarOpen(true);
                       handleSendGuideMessage();
                       setTimeout(() => guideInputRef.current?.focus(), 300);
@@ -1456,11 +1683,21 @@ Keep your response concise, helpful, and academically grounded.`;
                   <input
                     type="text"
                     value={guideInput}
-                    onChange={(e) => setGuideInput(e.target.value)}
+                    onChange={(e) => {
+                      setGuideInput(e.target.value);
+                      setIsPromptSuggestionsOpen(true);
+                    }}
+                    onFocus={() => {
+                      if (guideInput.trim().length >= 2) setIsPromptSuggestionsOpen(true);
+                    }}
                     onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setIsPromptSuggestionsOpen(false);
+                      }
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
                         if (guideInput.trim()) {
+                          setIsPromptSuggestionsOpen(false);
                           setIsAiSidebarOpen(true);
                           handleSendGuideMessage();
                           setTimeout(() => guideInputRef.current?.focus(), 300);
@@ -1490,6 +1727,64 @@ Keep your response concise, helpful, and academically grounded.`;
                     )}
                   </button>
                 </form>
+
+                {/* Instant Suggestions & Matching Projects Popover */}
+                {guideInput.trim().length >= 2 && isPromptSuggestionsOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-neutral-800 rounded-2xl shadow-xl z-30 p-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                    {/* Matching Projects */}
+                    {promptMatchingProjects.length > 0 && (
+                      <div className="mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-neutral-500 px-3 py-1 block">
+                          Matching Projects ({promptMatchingProjects.length})
+                        </span>
+                        {promptMatchingProjects.map((p) => (
+                          <button
+                            key={p.projectId}
+                            type="button"
+                            onClick={() => {
+                              setIsPromptSuggestionsOpen(false);
+                              onOpen(p.projectId);
+                            }}
+                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-6 h-6 rounded-lg bg-gray-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
+                                <FormatIcon id={p.outputTypeId} className="w-3.5 h-3.5" />
+                              </span>
+                              <span className="text-xs font-medium text-gray-800 dark:text-neutral-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                {p.answers?.title || "Untitled Project"}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-gray-400 group-hover:text-gray-600 dark:group-hover:text-neutral-300 shrink-0 font-medium">
+                              Open →
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Platform Action Suggestions */}
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-neutral-500 px-3 py-1 block">
+                        Ask & Actions
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPromptSuggestionsOpen(false);
+                          setIsAiSidebarOpen(true);
+                          handleSendGuideMessage();
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                      >
+                        <span className="text-xs text-gray-700 dark:text-neutral-300 truncate">
+                          Ask Scholar: <strong className="text-gray-900 dark:text-white font-medium">"{guideInput}"</strong>
+                        </span>
+                        <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium shrink-0 ml-2">Submit ↗</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Projects Section with Live Search & Filter Tabs */}
@@ -1718,7 +2013,9 @@ Keep your response concise, helpful, and academically grounded.`;
                         : "bg-gray-50 dark:bg-neutral-800/80 border border-gray-100 dark:border-neutral-700/60 text-gray-800 dark:text-neutral-200 rounded-tl-xs shadow-2xs"
                     }`}
                   >
-                    {msg.text}
+                    {msg.sender === "assistant" ? renderFormattedGuideText(msg.text) : (
+                      <div className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.text}</div>
+                    )}
 
                     {/* Quick Action Deep-Links */}
                     {msg.action && (

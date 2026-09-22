@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-22
 
+### Added
+- **Instant "Test Connection & Ping" in Provider Setup (`ProviderDetail.tsx`)**:
+  - Added roundtrip latency benchmarking tool (`handleTestPing`) with live timing (`performance.now()`).
+  - Measures API responsiveness in milliseconds and verifies model reachability (`✓ Responsive in 184ms • Health: optimal`) before saving API credentials.
+- **1-Click Local Runner Auto-Detect for Ollama & LM Studio (`AiAccessPage.tsx`)**:
+  - Implemented background probing of local endpoints (`http://127.0.0.1:11434/api/tags`) on mount.
+  - Automatically discovers running local models with zero configuration and renders a 1-click *"Configure Local AI →"* banner for free, zero-latency, private offline intelligence.
+- **Visual "★ Primary / Default" Provider Badge (`AiAccessPage.tsx`)**:
+  - Displayed a prominent `★ Primary` badge alongside `Connected` status for the active default provider matching `access.settings.provider`.
+- **Live Active AI Status Pill in Top Header (`Header.tsx`, `ProjectListScreen.tsx`)**:
+  - Dynamic status indicator in the top navbar showing active provider (`Active AI: [ProviderName] ↗` with pulsing green dot for authenticated sessions, and `Guest Mode (AI Off)` for unauthenticated visitors) with 1-click jump to AI Access configuration.
+- **Instant Search Suggestions Dropdown on ChatGPT Prompt Bar (`ProjectListScreen.tsx`)**:
+  - Added floating popover menu below prompt bar displaying matching user projects (`promptMatchingProjects`) and quick action suggestions as user types, enabling direct 1-click project navigation.
+- **Interactive Stage Breakdown Blueprint on Workspace Cards (`ProjectListScreen.tsx`)**:
+  - Added interactive `(i)` info trigger on each academic format card (Assignment, Journal Article, Research Proposal, Presentation) revealing the complete 4-stage academic lifecycle blueprint and deliverables.
+- **Agentic Model Assignment Matrix in AI Access Preferences (`AiAccessPage.tsx`)**:
+  - Visual 3-card auto-orchestration architecture mapping Deep Reasoning (Peer Review), Fast Execution (Real-time Extraction), and Embeddings (Vault Retrieval) based on the active provider.
+- **Rich Markdown & Line Breaks in Ask Scholar Support Chat (`ProjectListScreen.tsx`)**:
+  - Implemented `renderFormattedGuideText()` parser rendering paragraphs, bullet points, headers, and bold formatting with proper line height and spacing.
+
 ### Security & Governance
 - **Strict No-LLM Policy in Guest Mode & Server-Side Fallback Prevention (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
   - **Guest Mode Policy**: Enforced that unauthenticated visitors (`!userEmail`) only receive platform guidance deterministically from the local rule-based knowledge engine without invoking any LLM or server-side fallback (`GEMINI_API_KEY` on Render).
