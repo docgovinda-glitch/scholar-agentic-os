@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-22
 
 ### Added
+- **Seamless Borderless Prompt Bar & Typing Area (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `src/index.css`)**:
+  - Completely removed internal black capsule borders, outlines, and focus rings from the prompt input elements, leaving a clean, seamless, modern typing experience inside the outer capsule.
+  - Added dedicated `.prompt-bare-input` class and updated base layer input rules in `src/index.css` to exempt borderless inputs.
 - **Google Sign-In & Supabase Auth Troubleshooting Guide (`docs/TROUBLESHOOTING_GSI_AND_AUTH.md`)**:
   - Documented root cause analysis and resolution for `[GSI_LOGGER]: An unknown error occurred. m=transform_layer_library:88`.
   - Detailed Google Cloud Console OAuth 2.0 Client ID setup: Authorized JavaScript origins configuration and Supabase callback redirect URI mapping (`https://gfjhsijrwodjvkisouzw.supabase.co/auth/v1/callback`).

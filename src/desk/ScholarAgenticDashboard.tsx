@@ -935,7 +935,8 @@ export default function ScholarAgenticDashboard() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder="Ask anything, search projects, or type a command..."
-                  className="flex-1 bg-transparent focus:outline-none text-gray-700 placeholder-gray-400 text-xs sm:text-sm border-none ring-0 outline-none"
+                  style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
+                  className="flex-1 bg-transparent border-0 border-none focus:outline-none text-gray-700 placeholder-gray-400 text-xs sm:text-sm ring-0 focus:ring-0 outline-none shadow-none focus:shadow-none prompt-bare-input"
                 />
 
                 <button

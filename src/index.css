@@ -424,16 +424,16 @@ h1, h2, h3, h4, h5, h6 {
    Scoped with :not() escape hatches, as before, so components that
    deliberately render a bare/transparent input are not overridden. */
 @layer base {
-  input[type="text"]:not(.border-0):not(.bg-transparent),
-  input[type="date"]:not(.border-0):not(.bg-transparent),
-  input[type="email"]:not(.border-0):not(.bg-transparent),
-  input[type="password"]:not(.border-0):not(.bg-transparent),
-  input[type="search"]:not(.border-0):not(.bg-transparent),
-  input[type="number"]:not(.border-0):not(.bg-transparent),
-  input[type="tel"]:not(.border-0):not(.bg-transparent),
-  input[type="url"]:not(.border-0):not(.bg-transparent),
-  select:not(.border-0):not(.bg-transparent),
-  textarea:not(.border-0):not(.bg-transparent) {
+  input[type="text"]:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input),
+  input[type="date"]:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input),
+  input[type="email"]:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input),
+  input[type="password"]:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input),
+  input[type="search"]:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input),
+  input[type="number"]:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input),
+  input[type="tel"]:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input),
+  input[type="url"]:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input),
+  select:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input),
+  textarea:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input) {
     background-color: var(--surface-raised);
     border: 1px solid var(--border-control); /* 3:1 — WCAG 1.4.11 */
     color: var(--text-primary);
@@ -442,13 +442,29 @@ h1, h2, h3, h4, h5, h6 {
                 box-shadow var(--motion-base) var(--motion-ease);
   }
 
-  input:not(.border-0):not(.bg-transparent):focus,
-  select:not(.border-0):not(.bg-transparent):focus,
-  textarea:not(.border-0):not(.bg-transparent):focus {
+  input:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus,
+  select:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus,
+  textarea:not(.border-0):not(.border-none):not(.bg-transparent):not([class*="border-none"]):not([class*="border-0"]):not(.prompt-bare-input):focus {
     border-color: var(--accent);
     outline: none;
     box-shadow: 0 0 0 3px var(--accent-subtle);
   }
+}
+
+/* Ensure prompt bar and bare inputs stay completely borderless and seamless */
+.prompt-bare-input {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+.prompt-bare-input:focus,
+.prompt-bare-input:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 ::placeholder {
