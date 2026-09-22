@@ -210,11 +210,10 @@ export function SignInScreen({
       const result = await signInWithGoogle();
       if (!result.success) {
         setError(result.error ?? "Could not sign in with Google.");
-        setGoogleBusy(false);
       }
-      // If success, the browser will redirect to Google, so we leave busy=true
     } catch (e) {
       setError((e as Error).message);
+    } finally {
       setGoogleBusy(false);
     }
   }
@@ -361,10 +360,10 @@ export function SignUpScreen({
       const result = await signInWithGoogle();
       if (!result.success) {
         setError(result.error ?? "Could not sign in with Google.");
-        setGoogleBusy(false);
       }
     } catch (e) {
       setError((e as Error).message);
+    } finally {
       setGoogleBusy(false);
     }
   }

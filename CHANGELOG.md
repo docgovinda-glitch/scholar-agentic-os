@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-22
 
 ### Added
+- **Institutional Firewall Immunity: Supabase Streaming Reverse Proxy (`server/routes/supabaseProxy.ts`, `server.ts`, `supabaseClient.ts`)**:
+  - Implemented unbuffered streaming reverse proxy at `/api/supabase/*` forwarding requests to the upstream Supabase project.
+  - Client-side `@supabase/supabase-js` transparently routes via same-origin `/api/supabase` in production, completely eliminating direct browser calls to `*.supabase.co`.
+  - Permanently bypasses enterprise and campus firewalls (Sophos, Fortinet, Cyberoam) that block developer cloud categories, completely eliminating `NET::ERR_CERT_AUTHORITY_INVALID` SSL interception errors.
+  - Automatically rewrites redirect `Location` headers and forwards essential headers (`apikey`, `authorization`, `prefer`, `range`) with zero memory buffering.
+- **Google Identity Services (GIS) & ID-Token Authentication (`supabaseAuthService.ts`, `server.ts`)**:
+  - Added native Google Identity Services (GIS) integration using `signInWithIdToken` to authenticate directly with Google ID tokens.
+  - Prevents full-page browser redirects to `supabase.co`, executing the authentication popup cleanly within Google's native domain and exchanging the token via the same-origin proxy.
+  - Gracefully falls back to standard OAuth redirect if third-party cookies or scripts are blocked.
+  - Configured Helmet Content Security Policy (CSP) to allow `https://accounts.google.com` for scripts, iframes, and connect endpoints.
 - **Instant "Test Connection & Ping" in Provider Setup (`ProviderDetail.tsx`)**:
   - Added roundtrip latency benchmarking tool (`handleTestPing`) with live timing (`performance.now()`).
   - Measures API responsiveness in milliseconds and verifies model reachability (`✓ Responsive in 184ms • Health: optimal`) before saving API credentials.

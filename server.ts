@@ -32,7 +32,7 @@ import {
   type CloudProviderSpec,
 } from "./src/config/providerCatalog.ts";
 import { LOCAL_RUNNERS } from "./src/config/localRunnerCatalog.ts";
-import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes } from "./server/routes/index.ts";
+import { registerHealthRoutes, registerAdminRoutes, registerAuthRoutes, registerAIRoutes, registerStudioRoutes, registerProjectRoutes, registerAiAccessRoutes, registerSearchRoutes, registerVaultRoutes, registerSupabaseProxy } from "./server/routes/index.ts";
 
 dotenv.config();
 
@@ -193,7 +193,10 @@ const localRunnerSources = Array.from(
 // hash here cannot pass CI silently.
 const INLINE_THEME_SCRIPT_CSP_HASH = "'sha256-fdWiXG9IH9DkiQztgeK3IRvKYOa43XqS9lf0tqCnU6E='";
 
-const supabaseOrigin = process.env.VITE_SUPABASE_URL ? new URL(process.env.VITE_SUPABASE_URL).origin : undefined;
+const rawSupabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseOrigin = rawSupabaseUrl && rawSupabaseUrl.startsWith("http")
+  ? new URL(rawSupabaseUrl).origin
+  : undefined;
 app.use(
   helmet({
     contentSecurityPolicy: process.env.NODE_ENV === "production" ? {
@@ -215,15 +218,17 @@ app.use(
           "https://challenges.cloudflare.com",
           "https://fonts.googleapis.com",
           "https://fonts.gstatic.com",
+          "https://accounts.google.com",
         ],
         // CaptchaWidget (src/desk/auth/CaptchaWidget.tsx) injects Cloudflare
         // Turnstile's script tag at runtime and Turnstile renders its
         // challenge in an iframe — both are blocked by helmet's default
         // `'self'`-only script-src/frame-src without these two additions.
+        // Google Identity Services (GIS) requires https://accounts.google.com for script and iframe.
         // The hash source allows exactly index.html's one inline script —
         // see INLINE_THEME_SCRIPT_CSP_HASH above.
-        "script-src": ["'self'", "https://challenges.cloudflare.com", INLINE_THEME_SCRIPT_CSP_HASH],
-        "frame-src": ["'self'", "https://challenges.cloudflare.com"],
+        "script-src": ["'self'", "https://challenges.cloudflare.com", "https://accounts.google.com", INLINE_THEME_SCRIPT_CSP_HASH],
+        "frame-src": ["'self'", "https://challenges.cloudflare.com", "https://accounts.google.com"],
         "form-action": ["'self'", ...(supabaseOrigin ? [supabaseOrigin] : [])],
       },
     } : false,
@@ -346,6 +351,10 @@ function selectGeminiKey(clientKey?: string): string {
 // larger plan is an env-var change and not a code change. At 25 MB of JSON
 // the real ceiling is roughly an 18 MB file once base64's ~33% expansion is
 // accounted for, which covers ordinary article and thesis PDFs.
+// Register Supabase streaming reverse proxy BEFORE body parsers to ensure
+// raw, unbuffered streaming for database, auth, and storage endpoints.
+registerSupabaseProxy(app);
+
 const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 25;
 const BODY_LIMIT = `${MAX_UPLOAD_MB}mb`;
 app.use(express.json({ limit: BODY_LIMIT }));

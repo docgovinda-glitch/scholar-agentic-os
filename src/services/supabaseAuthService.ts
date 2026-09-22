@@ -736,20 +736,53 @@ export function clearPendingGoogleSignIn(): void {
   localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY);
 }
 
+const GOOGLE_CLIENT_ID =
+  (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ||
+  "321279128437-m3pm3b0qk9kli39mv2em8t5fq2io841p.apps.googleusercontent.com";
+
+let gisScriptLoading: Promise<void> | null = null;
+
+export function loadGoogleGsiScript(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if ((window as any).google?.accounts?.id) return Promise.resolve();
+  if (gisScriptLoading) return gisScriptLoading;
+
+  gisScriptLoading = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Google Sign-In script"));
+    document.head.appendChild(script);
+  });
+
+  return gisScriptLoading;
+}
+
 /**
- * Starts Supabase's own Google OAuth redirect flow. Replaces the old
- * client-side Google Identity Services implementation entirely — there is
- * no VITE_GOOGLE_CLIENT_ID, no window.google.accounts.oauth2 token client,
- * and no manual userinfo fetch anymore. Supabase (already configured with
- * the Google provider in the dashboard) handles the full redirect
- * round-trip and establishes the session itself; this call only kicks
- * that off. The browser navigates away on success, so callers generally
- * don't need to do anything with a resolved promise — only the rejection
- * path (Supabase itself failing to even start the redirect) is
- * meaningful here.
+ * Directly exchanges a Google ID Token with Supabase using signInWithIdToken.
+ * This flow executes entirely within the browser and proxy without redirecting
+ * away to *.supabase.co, making it completely immune to institutional firewall blocks.
  */
-export async function signInWithGoogle(redirectPath: string = ""): Promise<ServiceResult> {
+export async function signInWithGoogleIdToken(idToken: string): Promise<ServiceResult> {
   const supabase = getSupabaseClient();
+  localStorage.setItem(GOOGLE_OAUTH_PENDING_KEY, "1");
+  const { data, error } = await supabase.auth.signInWithIdToken({
+    provider: "google",
+    token: idToken,
+  });
+  if (error) {
+    localStorage.removeItem(GOOGLE_OAUTH_PENDING_KEY);
+    return { success: false, error: error.message };
+  }
+  return { success: true };
+}
+
+async function fallbackToOAuth(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  redirectPath: string
+): Promise<ServiceResult> {
   localStorage.setItem(GOOGLE_OAUTH_PENDING_KEY, "1");
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -762,6 +795,67 @@ export async function signInWithGoogle(redirectPath: string = ""): Promise<Servi
   });
   if (error) return { success: false, error: error.message };
   return { success: true };
+}
+
+/**
+ * Starts Google Sign-In.
+ * First attempts native Google Identity Services (GIS) One-Tap / popup prompt with
+ * signInWithIdToken so the browser never navigates away to *.supabase.co (bypassing
+ * institutional firewall blocks).
+ * If GIS prompt is unavailable or dismissed, falls back seamlessly to standard
+ * Supabase OAuth redirect.
+ */
+export async function signInWithGoogle(redirectPath: string = ""): Promise<ServiceResult> {
+  const supabase = getSupabaseClient();
+
+  // Try Google Identity Services (GIS) One-Tap / prompt first
+  if (typeof window !== "undefined") {
+    try {
+      await loadGoogleGsiScript();
+      if ((window as any).google?.accounts?.id) {
+        return await new Promise<ServiceResult>((resolve) => {
+          let finished = false;
+
+          (window as any).google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: async (response: { credential?: string }) => {
+              if (response.credential && !finished) {
+                finished = true;
+                const result = await signInWithGoogleIdToken(response.credential);
+                resolve(result);
+              }
+            },
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+
+          (window as any).google.accounts.id.prompt((notification: any) => {
+            if (
+              !finished &&
+              (notification.isNotDisplayed?.() ||
+                notification.isSkippedMoment?.() ||
+                notification.isDismissedMoment?.())
+            ) {
+              finished = true;
+              fallbackToOAuth(supabase, redirectPath).then(resolve);
+            }
+          });
+
+          // Timeout safety: if prompt is ignored, fall back to OAuth after 3.5s
+          setTimeout(() => {
+            if (!finished) {
+              finished = true;
+              fallbackToOAuth(supabase, redirectPath).then(resolve);
+            }
+          }, 3500);
+        });
+      }
+    } catch {
+      // GIS failed to load (e.g. adblocker); proceed to standard OAuth redirect
+    }
+  }
+
+  return fallbackToOAuth(supabase, redirectPath);
 }
 
 /**
