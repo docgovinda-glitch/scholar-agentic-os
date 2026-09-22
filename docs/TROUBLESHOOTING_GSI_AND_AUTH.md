@@ -85,3 +85,10 @@ npx supabase db push --db-url "$DATABASE_URL"
 
 ### Option C: Via Supabase SQL Editor
 You can also copy the SQL from any pending migration file in `supabase/migrations/` and execute it directly in the [Supabase SQL Editor](https://supabase.com/dashboard/project/gfjhsijrwodjvkisouzw/sql/new).
+
+---
+
+## 4. Current Status (Verified)
+
+- **Database Migrations:** All 25 migrations from `20260811000000_code_review_fixes.sql` through `20260908000000_source_library_metadata_and_integrity.sql` are active and fully synchronized in the live Supabase project `scholarAgent` (`gfjhsijrwodjvkisouzw`).
+- **Google Sign-In Fallback:** Live in `main` branch ([`feae205`](https://github.com/docgovinda-glitch/scholar-agentic-os/commit/feae205)), ensuring OAuth redirects through Supabase if Google Identity Services iframe is blocked or origin is unlisted.
