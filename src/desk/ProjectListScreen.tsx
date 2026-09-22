@@ -1849,9 +1849,9 @@ Keep your response concise, helpful, and academically grounded.`;
                     }
                   }
                 }}
-                placeholder="Ask Scholar or search projects..."
+                placeholder="Draft a Research Proposal, analyze data, or search projects..."
                 style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                className="flex-1 bg-transparent text-sm font-normal text-[var(--text-primary)] placeholder:text-gray-400 dark:placeholder:text-neutral-500 border-0 border-none outline-none ring-0 focus:ring-0 focus:outline-none min-w-0 shadow-none focus:shadow-none prompt-bare-input"
+                className="flex-1 bg-transparent text-sm font-normal text-[var(--text-primary)] placeholder:text-gray-400 dark:placeholder:text-neutral-500 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none prompt-bare-input"
               />
 
               {/* Right: Solid circular submit button */}
@@ -2104,7 +2104,7 @@ Keep your response concise, helpful, and academically grounded.`;
                   onChange={(e) => setGuideInput(e.target.value)}
                   placeholder="Ask anything, search projects, or type a command..."
                   style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                  className="flex-1 bg-transparent border-0 border-none focus:outline-none ring-0 focus:ring-0 text-xs sm:text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 shadow-none focus:shadow-none prompt-bare-input"
+                  className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-xs sm:text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 shadow-none focus:shadow-none prompt-bare-input"
                 />
 
                 <button

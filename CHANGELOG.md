@@ -14,9 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Comprehensive Responsive Layout & Touch Targets**: Upgraded all 25 stages to uniform responsive spacing (`px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4`), flex-wrap header action docks, smooth horizontal scroll bars on Grounding Ribbons, and accessible $\ge 32$px touch targets on mobile/tablet viewports.
   - **End-to-End Verification**: Achieved 100% test pass rate across the full workspace suite (**183 of 183 tests passed across 26 test files**) and 0 TypeScript compilation errors.
   - **Remote Database Sync**: Verified all 25 Supabase migrations against remote production project `scholarAgent` (`gfjhsijrwodjvkisouzw`), confirming zero drift and complete synchronization.
-- **Seamless Borderless Prompt Bar & Typing Area (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `src/index.css`)**:
-  - Completely removed internal black capsule borders, outlines, and focus rings from the prompt input elements, leaving a clean, seamless, modern typing experience inside the outer capsule.
-  - Added dedicated `.prompt-bare-input` class and updated base layer input rules in `src/index.css` to exempt borderless inputs.
+- **Seamless Borderless Prompt Bar & Capability Demonstrating Placeholder (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `src/index.css`)**:
+  - Stripped all `border`, `border-black`, `border-0`, `ring`, and `ring-0` classes from prompt bar `<input>` elements.
+  - Enforced clean focus states with explicit Tailwind classes: `outline-none`, `border-none`, `focus:outline-none`, and `focus:ring-0` so no browser focus rings appear.
+  - Guaranteed transparency with `bg-transparent` and inline style overrides (`style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}`) seamlessly blending the input into the parent pill container.
+  - Updated placeholder to actively demonstrate agentic capabilities: `"Draft a Research Proposal, analyze data, or search projects..."`.
 - **Google Sign-In & Supabase Auth Troubleshooting Guide (`docs/TROUBLESHOOTING_GSI_AND_AUTH.md`)**:
   - Documented root cause analysis and resolution for `[GSI_LOGGER]: An unknown error occurred. m=transform_layer_library:88` and blank screen hangs at `accounts.google.com/gsi/transform`.
   - Detailed Google Cloud Console OAuth 2.0 Client ID setup: Authorized JavaScript origins configuration and Supabase callback redirect URI mapping (`https://gfjhsijrwodjvkisouzw.supabase.co/auth/v1/callback`).
