@@ -199,6 +199,11 @@ const supabaseOrigin = rawSupabaseUrl && rawSupabaseUrl.startsWith("http")
   : undefined;
 app.use(
   helmet({
+    // same-origin-allow-popups is required for Google Identity Services (GIS) popups.
+    // Helmet's default "same-origin" severs window.opener with accounts.google.com,
+    // causing the GIS popup to hang indefinitely on accounts.google.com/gsi/transform.
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: process.env.NODE_ENV === "production" ? {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),

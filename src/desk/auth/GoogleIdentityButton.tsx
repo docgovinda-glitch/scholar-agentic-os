@@ -28,17 +28,22 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
   async function handleOAuthFallback() {
     setBusy(true);
-    onError?.("");
+    onErrorRef.current?.("");
     try {
       const res = await signInWithGoogle();
       if (!res.success) {
-        onError?.(res.error || "Could not start Google sign in.");
+        onErrorRef.current?.(res.error || "Could not start Google sign in.");
         setBusy(false);
       }
     } catch (e: any) {
-      onError?.(e?.message || "Could not start Google sign in.");
+      onErrorRef.current?.(e?.message || "Could not start Google sign in.");
       setBusy(false);
     }
   }
@@ -56,7 +61,7 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
           client_id: GOOGLE_CLIENT_ID,
           callback: async (response: { credential?: string }) => {
             if (!response.credential) {
-              onError?.("No credential returned from Google.");
+              onErrorRef.current?.("No credential returned from Google.");
               return;
             }
 
@@ -64,18 +69,19 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
             try {
               const res = await signInWithGoogleIdToken(response.credential);
               if (res.success) {
-                onSuccess?.();
+                onSuccessRef.current?.();
               } else {
-                onError?.(res.error || "Google authentication failed.");
+                onErrorRef.current?.(res.error || "Google authentication failed.");
               }
             } catch (err: any) {
-              onError?.(err?.message || "Google authentication failed.");
+              onErrorRef.current?.(err?.message || "Google authentication failed.");
             } finally {
               setBusy(false);
             }
           },
           auto_select: false,
           cancel_on_tap_outside: true,
+          itp_support: true,
         });
 
         // Clear container and render Google standard button directly into containerRef
@@ -114,7 +120,7 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
     return () => {
       cancelled = true;
     };
-  }, [onSuccess, onError]);
+  }, []);
 
   // If GIS script failed or Google rejected rendering the button due to origins/cookies,
   // display the resilient standard Google Sign-In button that routes via Supabase OAuth redirect.

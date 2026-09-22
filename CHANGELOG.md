@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Ensures Google authentication runs strictly within Google's native popup and authenticates via `signInWithIdToken` through the same-origin `/api/supabase` proxy.
   - Completely prevents browser redirects to `gfjhsijrwodjvkisouzw.supabase.co/auth/v1/callback`, rendering authentication 100% immune to campus and institutional firewall blocks (`NET::ERR_CERT_AUTHORITY_INVALID`).
   - Configured Helmet Content Security Policy (CSP) to allow `https://accounts.google.com` for scripts, iframes, and connect endpoints.
+  - Configured `crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }` in Helmet so the popup can communicate back with `window.opener`, eliminating the blank/unresponsive `accounts.google.com/gsi/transform` window.
 - **Instant "Test Connection & Ping" in Provider Setup (`ProviderDetail.tsx`)**:
   - Added roundtrip latency benchmarking tool (`handleTestPing`) with live timing (`performance.now()`).
   - Measures API responsiveness in milliseconds and verifies model reachability (`✓ Responsive in 184ms • Health: optimal`) before saving API credentials.

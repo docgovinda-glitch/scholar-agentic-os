@@ -180,6 +180,7 @@ export function SignInScreen({
   onForgot: () => void;
   embedded?: boolean;
 }) {
+  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -201,7 +202,6 @@ export function SignInScreen({
       setBusy(false);
     }
   }
-
 
   return (
     <AuthShell className={embedded ? "w-full" : undefined}>
@@ -243,7 +243,7 @@ export function SignInScreen({
         <AuthDivider />
       </div>
       <div className="mt-4">
-        <GoogleIdentityButton onError={(msg) => setError(msg)} />
+        <GoogleIdentityButton onSuccess={() => navigate("/desk")} onError={(msg) => setError(msg)} />
       </div>
       <div className="mt-6 flex flex-col items-start gap-2">
         <AuthLink onClick={onForgot}>Forgot your password?</AuthLink>
@@ -276,6 +276,7 @@ export function SignUpScreen({
   onBack: () => void;
   embedded?: boolean;
 }) {
+  const navigate = useNavigate();
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -465,7 +466,7 @@ export function SignUpScreen({
         <AuthDivider />
       </div>
       <div className="mt-4">
-        <GoogleIdentityButton onError={(msg) => setError(msg)} />
+        <GoogleIdentityButton onSuccess={() => navigate("/desk")} onError={(msg) => setError(msg)} />
       </div>
 
       <div className="mt-6">
