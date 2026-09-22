@@ -45,6 +45,9 @@ vi.mock("../../services/supabaseAuthService", () => ({
   checkUsernameAvailable: (...a: unknown[]) => checkUsernameAvailable(...a),
   checkEmailAvailable: (...a: unknown[]) => checkEmailAvailable(...a),
   checkPhoneAvailable: (...a: unknown[]) => checkPhoneAvailable(...a),
+  loadGoogleGsiScript: vi.fn(() => Promise.resolve()),
+  signInWithGoogleIdToken: vi.fn(() => Promise.resolve({ success: true })),
+  signInWithGoogle: vi.fn(() => Promise.resolve({ success: true })),
 }));
 
 const { RequireAuth, PublicOnly, RequireRecovery } = await import("../DeskAuthGate");

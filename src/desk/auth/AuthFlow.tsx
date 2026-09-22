@@ -27,8 +27,8 @@ import {
   SelectField,
   SubmitButton,
   AuthDivider,
-  GoogleSignInButton,
 } from "./AuthLayout";
+import GoogleIdentityButton from "./GoogleIdentityButton";
 import {
   EMPTY_SIGN_UP,
   SIGN_UP_FIELDS,
@@ -184,7 +184,6 @@ export function SignInScreen({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [googleBusy, setGoogleBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent) {
@@ -203,20 +202,6 @@ export function SignInScreen({
     }
   }
 
-  async function handleGoogleSignIn() {
-    setGoogleBusy(true);
-    setError(null);
-    try {
-      const result = await signInWithGoogle();
-      if (!result.success) {
-        setError(result.error ?? "Could not sign in with Google.");
-      }
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setGoogleBusy(false);
-    }
-  }
 
   return (
     <AuthShell className={embedded ? "w-full" : undefined}>
@@ -249,7 +234,7 @@ export function SignInScreen({
         */}
         <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
-        <SubmitButton busy={busy} busyLabel="Signing in…" disabled={!username.trim() || !password || googleBusy}>
+        <SubmitButton busy={busy} busyLabel="Signing in…" disabled={!username.trim() || !password}>
           Sign in
         </SubmitButton>
       </AuthForm>
@@ -258,7 +243,7 @@ export function SignInScreen({
         <AuthDivider />
       </div>
       <div className="mt-4">
-        <GoogleSignInButton onClick={handleGoogleSignIn} busy={googleBusy} />
+        <GoogleIdentityButton onError={(msg) => setError(msg)} />
       </div>
       <div className="mt-6 flex flex-col items-start gap-2">
         <AuthLink onClick={onForgot}>Forgot your password?</AuthLink>
@@ -294,7 +279,6 @@ export function SignUpScreen({
   const [fields, setFields] = useState<SignUpFields>(EMPTY_SIGN_UP);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [googleBusy, setGoogleBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [usernameAvailability, setUsernameAvailability] = useState<Availability>(null);
   const [emailAvailability, setEmailAvailability] = useState<Availability>(null);
@@ -353,20 +337,6 @@ export function SignUpScreen({
       : null) ??
     (captchaRequired && !captchaToken ? "Complete the CAPTCHA challenge." : null);
 
-  async function handleGoogleSignIn() {
-    setGoogleBusy(true);
-    setError(null);
-    try {
-      const result = await signInWithGoogle();
-      if (!result.success) {
-        setError(result.error ?? "Could not sign in with Google.");
-      }
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setGoogleBusy(false);
-    }
-  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -486,7 +456,7 @@ export function SignUpScreen({
         />
         <CaptchaWidget onTokenReady={setCaptchaToken} />
         {error && <AuthError>{error}</AuthError>}
-        <SubmitButton busy={busy} busyLabel="Creating account…" disabled={problem !== null || googleBusy}>
+        <SubmitButton busy={busy} busyLabel="Creating account…" disabled={problem !== null}>
           Create account
         </SubmitButton>
       </AuthForm>
@@ -495,7 +465,7 @@ export function SignUpScreen({
         <AuthDivider />
       </div>
       <div className="mt-4">
-        <GoogleSignInButton onClick={handleGoogleSignIn} busy={googleBusy} />
+        <GoogleIdentityButton onError={(msg) => setError(msg)} />
       </div>
 
       <div className="mt-6">
