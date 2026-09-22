@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { loadGoogleGsiScript, signInWithGoogleIdToken } from "../../services/supabaseAuthService";
+import { loadGoogleGsiScript, signInWithGoogleIdToken, signInWithGoogle } from "../../services/supabaseAuthService";
+import { GoogleSignInButton } from "./AuthLayout";
 
 const GOOGLE_CLIENT_ID =
   (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ||
@@ -16,12 +17,31 @@ interface GoogleIdentityButtonProps {
  * Uses `google.accounts.id.renderButton` to trigger Google's native popup,
  * authenticating directly via `signInWithIdToken` without ever navigating
  * the browser to `*.supabase.co` (preventing institutional firewall blocks).
+ *
+ * Resilient fallback: If Google's GSI rejects the current origin (e.g. [GSI_LOGGER] error
+ * due to missing Authorized JavaScript origins in Google Cloud Console or third-party cookie blocks),
+ * it seamlessly falls back to standard Supabase OAuth redirect via GoogleSignInButton.
  */
 export default function GoogleIdentityButton({ onSuccess, onError, disabled }: GoogleIdentityButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [gsiLoaded, setGsiLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState(false);
+
+  async function handleOAuthFallback() {
+    setBusy(true);
+    onError?.("");
+    try {
+      const res = await signInWithGoogle();
+      if (!res.success) {
+        onError?.(res.error || "Could not start Google sign in.");
+        setBusy(false);
+      }
+    } catch (e: any) {
+      onError?.(e?.message || "Could not start Google sign in.");
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +93,18 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
         }
 
         setGsiLoaded(true);
+
+        // Verification check: If Google fails to render the iframe inside containerRef
+        // (common when Authorized JavaScript origins is missing in Google Cloud Console or cookies blocked),
+        // fallback smoothly to our standard GoogleSignInButton after 1.5s so the user is never stuck.
+        setTimeout(() => {
+          if (!cancelled && containerRef.current) {
+            const hasIframe = containerRef.current.querySelector("iframe");
+            if (!hasIframe) {
+              setLoadError(true);
+            }
+          }
+        }, 1500);
       })
       .catch((err) => {
         console.warn("[GoogleIdentityButton] GIS script failed to load:", err);
@@ -84,6 +116,16 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
     };
   }, [onSuccess, onError]);
 
+  // If GIS script failed or Google rejected rendering the button due to origins/cookies,
+  // display the resilient standard Google Sign-In button that routes via Supabase OAuth redirect.
+  if (loadError) {
+    return (
+      <div className="flex w-full flex-col items-center justify-center">
+        <GoogleSignInButton onClick={handleOAuthFallback} busy={busy} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full flex-col items-center justify-center">
       {/* Container where Google renders its iframe button. Must remain mounted in DOM. */}
@@ -94,17 +136,10 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
       />
 
       {/* Loading placeholder while GIS script is downloading */}
-      {!gsiLoaded && !loadError && (
+      {!gsiLoaded && (
         <div className="flex w-full items-center justify-center gap-3 rounded-[var(--radius-md)] border border-[color:var(--border)] bg-transparent px-4 py-2.5 text-sm font-medium text-[color:var(--text-muted)]">
           <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
           <span>Loading Google Sign-In…</span>
-        </div>
-      )}
-
-      {/* Fallback notification if GIS script failed to load (e.g. adblocker) */}
-      {loadError && (
-        <div className="rounded-[var(--radius-md)] border border-[color:var(--border)] bg-[color:var(--surface-sunken)] p-3 text-center text-xs text-[color:var(--text-muted)]">
-          Google Sign-In is unavailable. Please sign in with your email and password below.
         </div>
       )}
 
