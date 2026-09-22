@@ -62,7 +62,7 @@ export const FORMAT_TILES = [
 ];
 
 export interface AssistantAction {
-  type: "ai" | "ai-access" | "vault" | "workspaces" | "projects";
+  type: "ai" | "ai-access" | "vault" | "workspaces" | "projects" | "auth";
   label: string;
 }
 
@@ -171,6 +171,25 @@ export function isPlatformQuery(query: string): boolean {
     return true;
   }
 
+  // Refusal guardrails: general drafting, essay writing, coding, image gen in navigation chat
+  if (
+    q.includes("write an essay") ||
+    q.includes("write me") ||
+    q.includes("rewrite") ||
+    q.includes("paraphrase") ||
+    q.includes("draft a") ||
+    q.includes("generate code") ||
+    q.includes("write code") ||
+    q.includes("search the web") ||
+    q.includes("web search") ||
+    q.includes("google search") ||
+    q.includes("generate image") ||
+    q.includes("draw") ||
+    q.includes("analyze file")
+  ) {
+    return true;
+  }
+
   // Common platform feature keywords
   const keywords = [
     "how do i set up ai",
@@ -195,6 +214,7 @@ export function isPlatformQuery(query: string): boolean {
     "quality gate",
     "citation auditor",
     "academic workspace",
+    "academic workspaces",
     "ot-01",
     "ot-10",
     "ot-19",
@@ -477,42 +497,24 @@ export default function ProjectListScreen({
     if (showWelcome) onWelcomeSeen?.();
   }, []);
 
-  const fallbackRecentItems: Array<{ id: string; title: string; projectId?: string }> = useMemo(
-    () => [
-      { id: "recent-1", title: "Contextual Loading Prompt" },
-      { id: "recent-2", title: "Ethics Essay" },
-      { id: "recent-3", title: "Literature Review" },
-      { id: "recent-4", title: "Citation Provenance Audit" },
-      { id: "recent-5", title: "Academic Proposal Draft" },
-      { id: "recent-6", title: "Comparative Analysis of In Vivo Cleavage" },
-    ],
-    []
-  );
-
   const recentProjectsList = useMemo(() => {
-    if (projects && projects.length > 0) {
-      let filtered = projects;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        filtered = projects.filter((p) => {
-          const t = (p.answers?.title || "").toLowerCase();
-          return t.includes(q);
-        });
-      }
-      if (filtered.length > 0) {
-        return filtered.map((p) => ({
-          id: p.projectId,
-          projectId: p.projectId,
-          title: p.answers?.title?.trim() || "Untitled Project",
-        }));
-      }
+    if (!userEmail || !projects || projects.length === 0) {
+      return [];
     }
+    let filtered = projects;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      return fallbackRecentItems.filter((i) => i.title.toLowerCase().includes(q));
+      filtered = projects.filter((p) => {
+        const t = (p.answers?.title || "").toLowerCase();
+        return t.includes(q);
+      });
     }
-    return fallbackRecentItems;
-  }, [projects, searchQuery, fallbackRecentItems]);
+    return filtered.map((p) => ({
+      id: p.projectId,
+      projectId: p.projectId,
+      title: p.answers?.title?.trim() || "Untitled Project",
+    }));
+  }, [userEmail, projects, searchQuery]);
 
   const load = useCallback(() => {
     setError(null);
@@ -614,6 +616,8 @@ export default function ProjectListScreen({
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else if (action.type === "projects") {
       scrollToProjects();
+    } else if (action.type === "auth") {
+      openAuth("signin", "Sign in or register to explore AI-powered research inquiries.");
     }
   }
 
@@ -646,8 +650,21 @@ export default function ProjectListScreen({
           followUps: meta.followUps,
         };
         setGuideMessages((prev) => [...prev, assistantMsg]);
+      } else if (!userEmail) {
+        // Guest mode (Not logged in):
+        // Strict policy: Do not call any server-side or client LLM without login.
+        // Answer only questions that don't require an LLM.
+        const assistantMsg: WebsiteAssistantMessage = {
+          id: `assistant-${Date.now()}`,
+          sender: "assistant",
+          text: "Open-ended scholarly inquiries require signing in to Scholar Core. Please log in and configure your AI provider in AI Access to ask general research questions.\n\nWhile browsing as a guest, Ask Scholar can assist with platform guidance, workspace formats, Knowledge Vault provenance, and AI configuration.",
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          action: { type: "auth", label: "Sign In / Register to Use AI ↗" },
+          followUps: ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
+        };
+        setGuideMessages((prev) => [...prev, assistantMsg]);
       } else {
-        // General query: answer using the AI already setup by the user!
+        // Authenticated user: answer using the AI already setup by the user in AI Access
         let aiText = "";
         try {
           const systemPrompt = `You are Scholar Core Assistant, an intelligent academic companion built into Scholar Core.
@@ -670,16 +687,14 @@ Keep your response concise, helpful, and academically grounded.`;
           };
           setGuideMessages((prev) => [...prev, assistantMsg]);
         } else {
-          // Graceful guidance when no live AI provider is connected
-          const answer = answerWebsiteQuestion(query);
-          const meta = getAssistantActionAndFollowUps(query);
+          // Logged in, but no live AI provider is connected in AI Access
           const assistantMsg: WebsiteAssistantMessage = {
             id: `assistant-${Date.now()}`,
             sender: "assistant",
-            text: answer,
+            text: "No AI provider is currently connected in AI Access. To ask open-ended research questions, please configure your AI provider (e.g. Claude, OpenAI, Gemini, DeepSeek, or Local AI) in AI Access.",
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            action: meta.action || { type: "ai-access", label: "Configure AI Provider in AI Access ↗" },
-            followUps: meta.followUps || ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
+            action: { type: "ai-access", label: "Configure AI Provider in AI Access ↗" },
+            followUps: ["How do I set up AI?", "What is Knowledge Vault?", "How do I create a research project?"],
           };
           setGuideMessages((prev) => [...prev, assistantMsg]);
         }
@@ -1039,7 +1054,13 @@ Keep your response concise, helpful, and academically grounded.`;
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
-                setIsAiSidebarOpen((prev) => !prev);
+                setIsAiSidebarOpen((prev) => {
+                  const next = !prev;
+                  if (next && typeof window !== "undefined" && window.innerWidth < 1280) {
+                    setIsSidebarOpen(false);
+                  }
+                  return next;
+                });
               }}
               aria-label="Ask Scholar"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer text-left w-full group font-sans ${
@@ -1053,108 +1074,112 @@ Keep your response concise, helpful, and academically grounded.`;
             </button>
           </div>
 
-          {/* Phase 1: Recents Header */}
-          <h3 className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3 mt-5">
-            Recents
-          </h3>
+          {/* Recents Section: Render only when logged in and active projects exist */}
+          {userEmail && recentProjectsList.length > 0 && (
+            <>
+              <h3 className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3 mt-5">
+                Recents
+              </h3>
 
-          {/* Phase 2 & 3: Recents List (Scrollable Area) */}
-          <div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar pb-3 min-h-0">
-            {isMounted && recentProjectsList.map((item, index) => {
-              const isMenuOpen = activeRecentMenuId === item.id;
-              const isNearBottom = index >= Math.max(recentProjectsList.length - 2, 2);
-              const isPinned = pinnedRecentIds.includes(item.id);
+              {/* Recents List (Scrollable Area) */}
+              <div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar pb-3 min-h-0">
+                {isMounted && recentProjectsList.map((item, index) => {
+                  const isMenuOpen = activeRecentMenuId === item.id;
+                  const isNearBottom = index >= Math.max(recentProjectsList.length - 2, 2);
+                  const isPinned = pinnedRecentIds.includes(item.id);
 
-              return (
-                <div key={item.id} className="relative">
-                  <div
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      setActiveView("projects");
-                      if (item.projectId) {
-                        onOpen(item.projectId);
-                      } else {
-                        scrollToProjects();
-                      }
-                    }}
-                    className="group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#202124] transition-colors cursor-pointer text-[13px] font-medium text-gray-700 dark:text-gray-200 antialiased"
-                    title={item.title}
-                  >
-                    <span className="truncate pr-2 flex items-center gap-1.5 min-w-0">
-                      {isPinned && <Pin className="w-3 h-3 text-amber-500 rotate-45 flex-shrink-0" />}
-                      <span className="truncate">{item.title}</span>
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="More options"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setActiveRecentMenuId((prev) => (prev === item.id ? null : item.id));
-                      }}
-                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-gray-200 dark:hover:bg-[#303134] text-gray-500 flex-shrink-0 ${
-                        isMenuOpen ? "!opacity-100" : ""
-                      }`}
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                  </div>
+                  return (
+                    <div key={item.id} className="relative">
+                      <div
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          setActiveView("projects");
+                          if (item.projectId) {
+                            onOpen(item.projectId);
+                          } else {
+                            scrollToProjects();
+                          }
+                        }}
+                        className="group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#202124] transition-colors cursor-pointer text-[13px] font-medium text-gray-700 dark:text-gray-200 antialiased"
+                        title={item.title}
+                      >
+                        <span className="truncate pr-2 flex items-center gap-1.5 min-w-0">
+                          {isPinned && <Pin className="w-3 h-3 text-amber-500 rotate-45 flex-shrink-0" />}
+                          <span className="truncate">{item.title}</span>
+                        </span>
+                        <button
+                          type="button"
+                          aria-label="More options"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveRecentMenuId((prev) => (prev === item.id ? null : item.id));
+                          }}
+                          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-gray-200 dark:hover:bg-[#303134] text-gray-500 flex-shrink-0 ${
+                            isMenuOpen ? "!opacity-100" : ""
+                          }`}
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                      </div>
 
-                  {/* Popover Options Menu */}
-                  {isMenuOpen && (
-                    <div
-                      ref={recentMenuRef}
-                      className={`absolute ${
-                        isNearBottom ? "bottom-full mb-1" : "top-full mt-1"
-                      } right-0 z-50 shadow-xl rounded-xl bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-neutral-800 p-1 min-w-[180px] animate-in fade-in duration-150`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleRecentAction("share", item)}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
-                      >
-                        <Share2 className="w-4 h-4 flex-shrink-0" />
-                        <span>Share</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRecentAction("pin", item)}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
-                      >
-                        <Pin className="w-4 h-4 flex-shrink-0" />
-                        <span>{isPinned ? "Unpin" : "Pin"}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRecentAction("rename", item)}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
-                      >
-                        <Pencil className="w-4 h-4 flex-shrink-0" />
-                        <span>Rename</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRecentAction("add-to-project", item)}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
-                      >
-                        <FolderPlus className="w-4 h-4 flex-shrink-0" />
-                        <span>Add to Project</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRecentAction("delete", item)}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer text-left"
-                      >
-                        <Trash2 className="w-4 h-4 flex-shrink-0" />
-                        <span>Delete</span>
-                      </button>
+                      {/* Popover Options Menu */}
+                      {isMenuOpen && (
+                        <div
+                          ref={recentMenuRef}
+                          className={`absolute ${
+                            isNearBottom ? "bottom-full mb-1" : "top-full mt-1"
+                          } right-0 z-50 shadow-xl rounded-xl bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-neutral-800 p-1 min-w-[180px] animate-in fade-in duration-150`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleRecentAction("share", item)}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                          >
+                            <Share2 className="w-4 h-4 flex-shrink-0" />
+                            <span>Share</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRecentAction("pin", item)}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                          >
+                            <Pin className="w-4 h-4 flex-shrink-0" />
+                            <span>{isPinned ? "Unpin" : "Pin"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRecentAction("rename", item)}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                          >
+                            <Pencil className="w-4 h-4 flex-shrink-0" />
+                            <span>Rename</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRecentAction("add-to-project", item)}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] cursor-pointer text-left"
+                          >
+                            <FolderPlus className="w-4 h-4 flex-shrink-0" />
+                            <span>Add to Project</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRecentAction("delete", item)}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer text-left"
+                          >
+                            <Trash2 className="w-4 h-4 flex-shrink-0" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Bottom Section */}
@@ -1337,7 +1362,11 @@ Keep your response concise, helpful, and academically grounded.`;
             <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left gap-8">
               {/* 4 Academic Workspace Cards */}
               <div className="w-full pt-1">
-                <div className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className={`grid w-full gap-4 transition-all duration-300 ${
+                  isAiSidebarOpen
+                    ? "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4"
+                    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                }`}>
                   {FORMAT_TILES.map((tile) => {
                     const isBootingThis = creatingFormatId === tile.id;
                     const isOtherBooting = creating && !isBootingThis;
@@ -1355,7 +1384,7 @@ Keep your response concise, helpful, and academically grounded.`;
                           handleCreate(tile.id);
                         }}
                         disabled={isOtherBooting}
-                        className={`group bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-white/5 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[210px] text-left relative ${
+                        className={`group bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-white/5 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[190px] text-left relative ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
@@ -1378,7 +1407,7 @@ Keep your response concise, helpful, and academically grounded.`;
                               </svg>
                             </div>
                           </div>
-                          <span className={`text-[10px] font-semibold uppercase tracking-wider block mb-1 ${tileTheme.accentText}`}>
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider block mb-1 truncate ${tileTheme.accentText}`}>
                             {tile.tag}
                           </span>
                           <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5 leading-tight">
@@ -1388,9 +1417,9 @@ Keep your response concise, helpful, and academically grounded.`;
                             {tile.description}
                           </p>
                         </div>
-                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[11px] text-slate-400 dark:text-neutral-400">
-                          <span>{tile.budget}</span>
-                          <span className="font-semibold text-slate-700 dark:text-neutral-300 group-hover:translate-x-0.5 transition-transform">
+                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between gap-2 text-[11px] text-slate-400 dark:text-neutral-400">
+                          <span className="truncate">{tile.budget}</span>
+                          <span className="font-semibold text-slate-700 dark:text-neutral-300 group-hover:translate-x-0.5 transition-transform flex-shrink-0 whitespace-nowrap">
                             Boot →
                           </span>
                         </div>
@@ -1610,12 +1639,12 @@ Keep your response concise, helpful, and academically grounded.`;
       {/* Secondary View (Right Panel): Module 3.2 AI Assistant Sidebar (w-96) */}
       <aside
         className={`h-full bg-white dark:bg-[#151515] shadow-[-4px_0_24px_rgba(0,0,0,0.06)] border-l border-slate-200/80 dark:border-neutral-800 flex flex-col transition-all duration-300 ease-in-out shrink-0 z-30 ${
-          isAiSidebarOpen ? "w-96 translate-x-0" : "w-0 translate-x-full overflow-hidden border-none"
+          isAiSidebarOpen ? "w-full sm:w-96 max-w-[calc(100vw-2rem)] translate-x-0" : "w-0 translate-x-full overflow-hidden border-none"
         }`}
         aria-hidden={!isAiSidebarOpen}
       >
         {isAiSidebarOpen && (
-          <div className="h-full flex flex-col w-96">
+          <div className="h-full flex flex-col w-full sm:w-96">
             {/* Sidebar Header */}
             <header className="p-5 border-b border-gray-100 dark:border-neutral-800 flex items-center justify-between shrink-0 bg-white dark:bg-[#151515]">
               <div className="flex items-center gap-2.5">
@@ -1723,7 +1752,11 @@ Keep your response concise, helpful, and academically grounded.`;
                 <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-neutral-400">
                   <ScholarCoreLogo size="sm" withText={false} />
                   <span>Ask Scholar</span>
-                  <span className="text-green-500 font-bold">• AI Ready</span>
+                  {userEmail ? (
+                    <span className="text-green-500 font-bold">• AI Ready</span>
+                  ) : (
+                    <span className="text-sky-600 dark:text-sky-400 font-medium">• Platform Guide</span>
+                  )}
                 </div>
                 <button
                   type="button"

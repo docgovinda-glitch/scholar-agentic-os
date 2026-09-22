@@ -50,6 +50,15 @@ const TYPES = [
   { id: "OT-10", label: "Review Article", aliases: [], family: "publication", academicLevels: [], typicalDisciplines: [], available: false },
 ];
 
+const SAMPLE_PROJECT = {
+  projectId: "proj-crispr-01",
+  outputTypeId: "OT-10",
+  answers: { title: "Comparative Analysis of In Vivo Cleavage" },
+  intakeCompleteness: 0.85,
+  hasDocument: true,
+  gates: [{ gate: "G0", status: "signed_off" }],
+};
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -226,6 +235,7 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     const onOpenAiAccess = vi.fn();
     const onOpenAccountSettings = vi.fn();
 
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     const { container } = renderScreen(
       <ProjectListScreen
         onOpen={vi.fn()}
@@ -265,9 +275,9 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
     const askScholarBtn = within(aside!).getByRole("button", { name: /Ask Scholar/i });
     expect(askScholarBtn).toBeInTheDocument();
 
-    // Recents section
-    expect(within(aside!).getByRole("heading", { name: "Recents" })).toBeInTheDocument();
-    expect(within(aside!).getByText("Contextual Loading Prompt")).toBeInTheDocument();
+    // Recents section contains real user projects
+    expect(await within(aside!).findByRole("heading", { name: "Recents" })).toBeInTheDocument();
+    expect(await within(aside!).findByText("Comparative Analysis of In Vivo Cleavage")).toBeInTheDocument();
 
     // Bottom Section: Settings accessible as standalone item in sidebar above user profile block
     const settingsBtn = within(aside!).getByRole("button", { name: /^Settings$/i });
@@ -282,8 +292,10 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
   it("supports desktop sidebar collapse and expansion toggle", async () => {
     listProjects.mockResolvedValue({ items: [] });
     const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
-
     const aside = container.querySelector("aside");
+    expect(aside).toBeInTheDocument();
+    // In guest mode with no projects, recents section must not be displayed
+    expect(within(aside!).queryByRole("heading", { name: "Recents" })).not.toBeInTheDocument();
     expect(aside).toHaveClass("w-[260px]");
 
     // Click collapse icon inside sidebar
@@ -345,15 +357,6 @@ describe("dual-pane AI agent interface & navigation sidebar", () => {
 });
 
 describe("sidebar projects & platform navigation", () => {
-  const SAMPLE_PROJECT = {
-    projectId: "proj-crispr-01",
-    outputTypeId: "OT-10",
-    answers: { title: "Comparative Analysis of In Vivo Cleavage" },
-    intakeCompleteness: 0.85,
-    hasDocument: true,
-    gates: [{ gate: "G0", status: "signed_off" }],
-  };
-
   it("removes redundant sidebar projects button and supports Gemini-style Recents with 3-dots popover menu", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     const onOpen = vi.fn();
@@ -367,8 +370,8 @@ describe("sidebar projects & platform navigation", () => {
     expect(within(aside!).queryByText("Platform Guide")).not.toBeInTheDocument();
 
     // Recents section header and project in Recents list
-    expect(within(aside!).getByRole("heading", { name: "Recents" })).toBeInTheDocument();
-    expect(within(aside!).getByText("Comparative Analysis of In Vivo Cleavage")).toBeInTheDocument();
+    expect(await within(aside!).findByRole("heading", { name: "Recents" })).toBeInTheDocument();
+    expect(await within(aside!).findByText("Comparative Analysis of In Vivo Cleavage")).toBeInTheDocument();
 
     // 3-dots More button opens options menu
     const moreBtn = within(aside!).getAllByRole("button", { name: "More options" })[0];
@@ -587,6 +590,24 @@ describe("minimal website assistant", () => {
 
     expect(await screen.findByText(/Quantum coherence in biological systems facilitates/i, {}, { timeout: 2000 })).toBeInTheDocument();
     expect(executeAgenticLLM).toHaveBeenCalled();
+  });
+
+  it("does not call LLM for general inquiries in guest mode, prompting to sign in instead", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
+
+    const toggleBtn = screen.getByRole("button", { name: /Toggle Scholar Core AI Assistant/i });
+    fireEvent.click(toggleBtn);
+
+    const input = screen.getByPlaceholderText(/Ask anything, search projects, or type a command/i);
+    fireEvent.change(input, { target: { value: "What is cat?" } });
+
+    const sendBtn = screen.getByRole("button", { name: "Send question" });
+    fireEvent.click(sendBtn);
+
+    expect(await screen.findByText(/Open-ended scholarly inquiries require signing in to Scholar Core/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sign In \/ Register to Use AI/i })).toBeInTheDocument();
+    expect(executeAgenticLLM).not.toHaveBeenCalled();
   });
 
   it("renders minimalist Lightbulb icon with Ask Scholar tooltip, hides button when sidebar opens, and restores it on close", async () => {

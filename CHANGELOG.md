@@ -5,7 +5,28 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-20
+## [Unreleased] - 2026-09-22
+
+### Security & Governance
+- **Strict No-LLM Policy in Guest Mode & Server-Side Fallback Prevention (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
+  - **Guest Mode Policy**: Enforced that unauthenticated visitors (`!userEmail`) only receive platform guidance deterministically from the local rule-based knowledge engine without invoking any LLM or server-side fallback (`GEMINI_API_KEY` on Render).
+  - **Open-Ended Inquiries**: Bypasses LLM execution completely when in guest mode for queries requiring an LLM (e.g., *"What is cat?"*); prompts visitors to log in with an interactive `[Sign In / Register to Use AI ↗]` button that triggers the authentication modal.
+  - **Authenticated AI Routing**: Preserved AI inquiries for signed-in users using their configured BYOK credentials in AI Access (`executeAgenticLLM`).
+  - **Support Chat Guardrails**: Guardrail refusals prevent general essay writing or code generation in the support panel, directing users to dedicated academic workspaces.
+  - **Drawer Status Indicator**: Displays `• Platform Guide` for guests and `• AI Ready` for authenticated sessions.
+
+### Fixed
+- **Sidebar Recents Hidden in Guest Mode (`ProjectListScreen.tsx`, `ProjectListScreen.test.tsx`)**:
+  - Removed dummy/mock project entries (`Contextual Loading Prompt`, `Ethics Essay`, etc.) from the sidebar `RECENTS` list.
+  - Guarded the `RECENTS` section to render strictly when an authenticated user (`userEmail`) has genuine projects (`recentProjectsList.length > 0`).
+
+### UI & Layout
+- **Academic Workspace Cards Layout & Responsive Breathing Room (`ProjectListScreen.tsx`)**:
+  - Dynamic responsive grid transition: Replaced static 4-column row with dynamic layout (`isAiSidebarOpen ? "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"`), gracefully transitioning to a 2x2 grid on standard desktop displays when Ask Scholar opens to prevent card squishing.
+  - Preserved stage budget and button integrity with `truncate` and `flex-shrink-0 whitespace-nowrap` on `Boot →`.
+  - Added responsive viewport constraints to the Ask Scholar drawer (`w-full sm:w-96 max-w-[calc(100vw-2rem)]`) and auto-collapsed the left sidebar on viewports `< 1280px` when opening Ask Scholar.
+
+## [2026-09-20]
 
 ### Added
 - **ChatGPT-style AI Prompt Bar Below Template Cards (`ProjectListScreen.tsx`)**:
