@@ -349,24 +349,24 @@ export default function SourceApprovalStage({
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)] font-sans">
       {/* 1. Header Bar */}
-      <div className="p-6 border-b border-[color:var(--border-subtle)] flex flex-wrap gap-4 justify-between items-center bg-[color:var(--surface-raised)] z-10 shadow-sm relative">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] shrink-0">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-b border-[color:var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between bg-[color:var(--surface-raised)] z-10 gap-3 sm:gap-4 shadow-2xs relative">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] shrink-0">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={def.icon} />
             </svg>
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-[color:var(--accent)] bg-[color:var(--accent-subtle)] px-2 py-0.5 rounded border border-[color:var(--accent-border)]">
                 Phase II: Evidence Extraction
               </span>
               <span className="text-xs text-[color:var(--text-muted)] font-mono">Stage {def.number} of 25</span>
             </div>
-            <h2 className="text-2xl font-bold text-[color:var(--text-primary)] tracking-tight">
+            <h2 className="text-lg sm:text-xl font-bold text-[color:var(--text-primary)] tracking-tight">
               {def.label}
             </h2>
-            <p className="text-sm text-[color:var(--text-secondary)] mt-0.5">
+            <p className="text-xs text-[color:var(--text-secondary)] mt-0.5 line-clamp-1 sm:line-clamp-none">
               {isVault
                 ? "Verify and authorize primary sources from your Knowledge Vault before evidence extraction."
                 : "Evaluate and approve external discovered literature before evidence synthesis."}
@@ -375,20 +375,20 @@ export default function SourceApprovalStage({
         </div>
 
         {/* Anti-Fabrication Security Shield */}
-        <div className="flex items-center gap-3 bg-[color:var(--surface-sunken)] px-4 py-2 rounded-xl border border-[color:var(--border-subtle)] text-xs">
-          <div className="w-8 h-8 rounded-lg bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)] flex items-center justify-center font-bold">
+        <div className="flex items-center gap-2.5 sm:gap-3 bg-[color:var(--surface-sunken)] px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-[color:var(--border-subtle)] text-xs shrink-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[color:var(--state-success-subtle)] text-[color:var(--state-success)] flex items-center justify-center font-bold text-sm">
             🛡️
           </div>
           <div>
-            <div className="font-bold text-[color:var(--text-primary)]">Anti-Fabrication Guard</div>
-            <div className="text-[color:var(--text-secondary)]">Only approved citations reach the draft</div>
+            <div className="font-bold text-[color:var(--text-primary)] text-[11px] sm:text-xs">Anti-Fabrication Guard</div>
+            <div className="text-[color:var(--text-secondary)] text-[10px] sm:text-[11px]">Only approved citations reach the draft</div>
           </div>
         </div>
       </div>
 
       {/* Success Notification Toast */}
       {successToast && (
-        <div className="bg-[color:var(--state-success-subtle)] border-b border-[color:var(--state-success)] px-6 py-2.5 text-xs font-semibold text-[color:var(--state-success)] flex items-center justify-between animate-fade-in">
+        <div className="bg-[color:var(--state-success-subtle)] border-b border-[color:var(--state-success)] px-4 sm:px-6 py-2.5 text-xs font-semibold text-[color:var(--state-success)] flex items-center justify-between animate-fade-in">
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -400,7 +400,7 @@ export default function SourceApprovalStage({
       )}
 
       {/* 2. Grounding Foundation Ribbon */}
-      <div className="px-6 py-3 bg-[color:var(--surface-sunken)] border-b border-[color:var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="px-4 sm:px-6 lg:px-8 py-2.5 bg-[color:var(--surface-sunken)] border-b border-[color:var(--border-subtle)] flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 text-xs">
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-mono uppercase font-bold text-[color:var(--accent)] shrink-0 bg-[color:var(--accent-subtle)] px-2 py-0.5 rounded border border-[color:var(--accent-border)]">
             Grounding Anchor

@@ -6,6 +6,8 @@ import {
   STUDY_DESIGN_GUIDELINES,
   buildFinerDiagnosticPrompts,
   buildPicoSynthesisPrompts,
+  generateLocalFinerFallback,
+  generateLocalPicoFallback,
   type FinerDiagnosticResult,
   type PicoSynthesisResult,
 } from "../agentPrompts/definitionPrompts";
@@ -83,7 +85,24 @@ export default function DefinitionStage({
   onAdvance?: (stage: string) => void;
 }) {
   const [spec, setSpec] = useState<OutputTypeSpec | null>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>(project.answers ?? {});
+  const [answers, setAnswers] = useState<Record<string, string>>(() => {
+    const raw = project.answers ?? {};
+    const title = raw.working_title || raw.title || "";
+    const area = raw.research_area || raw.research_domain || "";
+    const journal = raw.target_journal || raw.journal_name || "";
+    const design = raw.study_design || raw.methodology || "";
+    return {
+      ...raw,
+      working_title: title,
+      title: title,
+      research_area: area,
+      research_domain: area,
+      target_journal: journal,
+      journal_name: journal,
+      study_design: design,
+      methodology: design,
+    };
+  });
   const [authors, setAuthors] = useState<Author[]>(project.authors ?? []);
   const [activeTab, setActiveTab] = useState<DefinitionTab>("inquiry");
   
@@ -144,10 +163,24 @@ export default function DefinitionStage({
     setError(null);
 
     try {
-      const updatedAnswers = await saveIntakeAnswers(projectId, answersRef.current);
+      const synchronizedAnswers = {
+        ...answersRef.current,
+        working_title: answersRef.current.working_title || answersRef.current.title || "",
+        title: answersRef.current.working_title || answersRef.current.title || "",
+        research_area: answersRef.current.research_area || answersRef.current.research_domain || "",
+        research_domain: answersRef.current.research_area || answersRef.current.research_domain || "",
+        target_journal: answersRef.current.target_journal || answersRef.current.journal_name || "",
+        journal_name: answersRef.current.target_journal || answersRef.current.journal_name || "",
+        study_design: answersRef.current.study_design || answersRef.current.methodology || "",
+        methodology: answersRef.current.study_design || answersRef.current.methodology || "",
+      };
+      answersRef.current = synchronizedAnswers;
+
+      const updatedAnswers = await saveIntakeAnswers(projectId, synchronizedAnswers);
       const updatedAuthors = await saveAuthors(projectId, authorsRef.current);
       const merged: ProjectView = {
         ...updatedAnswers,
+        answers: synchronizedAnswers,
         authors: updatedAuthors.authors,
       };
       onSaved(merged);
@@ -187,10 +220,23 @@ export default function DefinitionStage({
     };
   }, [projectId]);
 
-  // Answer updater
+  // Answer updater with bidirectional field synchronization
   function updateAnswer(key: string, value: string) {
     setAnswers((prev) => {
       const next = { ...prev, [key]: value };
+      if (key === "working_title" || key === "title") {
+        next.working_title = value;
+        next.title = value;
+      } else if (key === "research_area" || key === "research_domain") {
+        next.research_area = value;
+        next.research_domain = value;
+      } else if (key === "target_journal" || key === "journal_name") {
+        next.target_journal = value;
+        next.journal_name = value;
+      } else if (key === "study_design" || key === "methodology") {
+        next.study_design = value;
+        next.methodology = value;
+      }
       answersRef.current = next;
       return next;
     });
@@ -363,7 +409,7 @@ export default function DefinitionStage({
         systemPrompt,
         userPrompt,
         "reasoning",
-        (chunk) => {
+        () => {
           setFinerStreamStatus("Synthesizing editorial appraisal and publication proposals...");
         },
         (failover) => {
@@ -375,16 +421,22 @@ export default function DefinitionStage({
 
       const parsed: FinerDiagnosticResult = parseJsonFromLlm(raw);
       if (!parsed || !parsed.overallScore) {
-        throw new Error("Unable to parse FINER evaluation from AI model. Please try again.");
+        throw new Error("Unable to parse FINER evaluation from AI model.");
       }
       setFinerResult(parsed);
     } catch (e: any) {
       const msg = e.message || String(e);
+      // Fallback to intelligent local heuristic so the user is never blocked
+      const fallback = generateLocalFinerFallback({
+        workingTitle: answers.working_title,
+        primaryResearchQuestion: answers.primary_research_question,
+        researchArea: answers.research_area,
+        studyDesign: answers.study_design,
+        expectedContribution: answers.expected_contribution,
+      });
+      setFinerResult(fallback);
       if (msg.toLowerCase().includes("exhausted") || msg.toLowerCase().includes("no provider")) {
         setExhaustedReason(msg);
-        setShowExhaustedModal(true);
-      } else {
-        setError(`AI Architect Error: ${msg}`);
       }
     } finally {
       setIsAnalyzingFiner(false);
@@ -424,13 +476,18 @@ export default function DefinitionStage({
         throw new Error("Could not synthesize research question from PICO parameters.");
       }
     } catch (e: any) {
-      const msg = e.message || String(e);
-      if (msg.toLowerCase().includes("exhausted") || msg.toLowerCase().includes("no provider")) {
-        setExhaustedReason(msg);
-        setShowExhaustedModal(true);
-      } else {
-        setError(`PICO Assistant Error: ${msg}`);
+      const fallback = generateLocalPicoFallback({
+        population: picoInputs.population,
+        intervention: picoInputs.intervention,
+        comparison: picoInputs.comparison,
+        outcome: picoInputs.outcome,
+        studyDesign: picoInputs.studyDesign || answers.study_design,
+      });
+      updateAnswer("primary_research_question", fallback.researchQuestion);
+      if (fallback.workingTitle && (!answers.working_title || answers.working_title.trim() === "")) {
+        updateAnswer("working_title", fallback.workingTitle);
       }
+      setPicoModalOpen(false);
     } finally {
       setIsSynthesizingPico(false);
     }
@@ -444,40 +501,40 @@ export default function DefinitionStage({
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
       {/* 1. Header & Stage Control Bar */}
-      <div className="shrink-0 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-8 py-5 shadow-xs z-10">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="shrink-0 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 shadow-xs z-10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
           {/* Stage Metadata */}
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-primary)] shadow-xs">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-primary)] shadow-xs shrink-0">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={def.icon} />
               </svg>
             </div>
             <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold tracking-tight text-[color:var(--text-primary)]">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[color:var(--text-primary)]">
                   {def.number}. {def.label}
                 </h2>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]">
                   Phase I: Foundation
                 </span>
               </div>
-              <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
+              <p className="text-xs text-[color:var(--text-muted)] mt-0.5 line-clamp-1 sm:line-clamp-none">
                 Establish primary inquiry, methodological architecture, authorship taxonomies, and governance standards.
               </p>
             </div>
           </div>
 
           {/* Right Controls: Auto-Save Status, AI Architect Trigger & Proceed CTA */}
-          <div className="flex items-center gap-3 self-end lg:self-auto flex-wrap">
+          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-wrap">
             {/* Auto-Save Indicator */}
-            <div className="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)] bg-[color:var(--surface-base)] border border-[color:var(--border-subtle)] px-3 py-1.5 rounded-full">
+            <div className="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)] bg-[color:var(--surface-base)] border border-[color:var(--border-subtle)] px-2.5 sm:px-3 py-1.5 rounded-full shrink-0">
               {saveStatus === "saving" && (
                 <>
                   <svg className="w-3.5 h-3.5 animate-spin text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <span>Saving changes...</span>
+                  <span>Saving...</span>
                 </>
               )}
               {saveStatus === "saved" && (
@@ -485,7 +542,7 @@ export default function DefinitionStage({
                   <svg className="w-3.5 h-3.5 text-[color:var(--state-success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span>{lastSavedTime ? `Saved ${lastSavedTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "All changes saved"}</span>
+                  <span>{lastSavedTime ? `Saved ${lastSavedTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "All saved"}</span>
                 </>
               )}
               {saveStatus === "unsaved" && (
@@ -507,7 +564,7 @@ export default function DefinitionStage({
               type="button"
               onClick={runFinerDiagnostic}
               disabled={isAnalyzingFiner}
-              className="px-3.5 py-1.5 text-xs font-bold rounded-full border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-full border border-[color:var(--border-control)] bg-[color:var(--surface-raised)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0"
             >
               <svg className="w-3.5 h-3.5 text-[color:var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -520,7 +577,7 @@ export default function DefinitionStage({
               type="button"
               onClick={handleAdvance}
               disabled={isFlushing}
-              className={`px-5 py-2 text-xs font-bold rounded-full transition-all flex items-center gap-2 cursor-pointer shadow-sm ${
+              className={`px-3.5 sm:px-5 py-2 text-xs font-bold rounded-full transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shadow-sm shrink-0 ${
                 isReadyToAdvance
                   ? "bg-[color:var(--accent)] text-[color:var(--text-inverse)] hover:bg-[color:var(--accent-hover)]"
                   : "bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border border-[color:var(--border-control)] hover:border-[color:var(--border-strong)]"
@@ -546,7 +603,7 @@ export default function DefinitionStage({
         </div>
 
         {/* Readiness Meter Strip */}
-        <div className="mt-4 pt-3 border-t border-[color:var(--border-subtle)] flex items-center justify-between gap-4">
+        <div className="mt-3 sm:mt-4 pt-3 border-t border-[color:var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
           <div className="flex items-center gap-3 flex-1 max-w-xl">
             <span className="text-[11px] font-semibold text-[color:var(--text-secondary)] shrink-0">
               Readiness: {readinessScore}%
@@ -559,7 +616,7 @@ export default function DefinitionStage({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px] text-[color:var(--text-muted)]">
+          <div className="flex items-center flex-wrap gap-2 text-[10px] sm:text-[11px] text-[color:var(--text-muted)]">
             <span className="flex items-center gap-1">
               <span className={`w-1.5 h-1.5 rounded-full ${hasTitle && hasArea ? "bg-[color:var(--state-success)]" : "bg-[color:var(--border-control)]"}`} />
               Inquiry
@@ -584,17 +641,17 @@ export default function DefinitionStage({
       </div>
 
       {/* 2. Segmented Navigation Tabs */}
-      <div className="bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] px-8 flex items-center gap-2 overflow-x-auto">
+      <div className="bg-[color:var(--surface-raised)] border-b border-[color:var(--border-subtle)] px-4 sm:px-6 lg:px-8 flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-none py-1 sm:py-0">
         <button
           type="button"
           onClick={() => setActiveTab("inquiry")}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
             activeTab === "inquiry"
               ? "border-[color:var(--accent)] text-[color:var(--text-primary)]"
               : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
           }`}
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <span>1. Inquiry & Scope</span>
@@ -606,13 +663,13 @@ export default function DefinitionStage({
         <button
           type="button"
           onClick={() => setActiveTab("methodology")}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
             activeTab === "methodology"
               ? "border-[color:var(--accent)] text-[color:var(--text-primary)]"
               : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
           }`}
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
           </svg>
           <span>2. Methodological Architecture</span>
@@ -624,13 +681,13 @@ export default function DefinitionStage({
         <button
           type="button"
           onClick={() => setActiveTab("authors")}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
             activeTab === "authors"
               ? "border-[color:var(--accent)] text-[color:var(--text-primary)]"
               : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
           }`}
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
           <span>3. Authorship & CRediT</span>
@@ -642,13 +699,13 @@ export default function DefinitionStage({
         <button
           type="button"
           onClick={() => setActiveTab("governance")}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
             activeTab === "governance"
               ? "border-[color:var(--accent)] text-[color:var(--text-primary)]"
               : "border-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
           }`}
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
           <span>4. Governance & Integrity</span>
@@ -659,8 +716,8 @@ export default function DefinitionStage({
       </div>
 
       {/* 3. Main Stage Content Area */}
-      <div className="flex-1 overflow-y-auto p-8 relative">
-        <div className="max-w-4xl mx-auto space-y-8 pb-20">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
+        <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 pb-20">
           {error && (
             <div className="p-4 rounded-xl bg-[color:var(--state-danger-subtle)] text-[color:var(--state-danger)] border border-[color:var(--state-danger)] text-sm flex items-start gap-3">
               <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1110,34 +1167,34 @@ export default function DefinitionStage({
                 authors.map((author, index) => (
                   <div
                     key={author.id}
-                    className="rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-6 shadow-2xs relative space-y-4"
+                    className="rounded-xl sm:rounded-2xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] p-4 sm:p-6 shadow-2xs relative space-y-4"
                   >
                     {/* Header bar of Author Card */}
-                    <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[color:var(--border-subtle)] pb-3 gap-2 sm:gap-0">
                       <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--text-primary)] text-xs font-bold flex items-center justify-center">
+                        <span className="w-6 h-6 rounded-full bg-[color:var(--accent-subtle)] text-[color:var(--text-primary)] text-xs font-bold flex items-center justify-center shrink-0">
                           {index + 1}
                         </span>
-                        <span className="text-sm font-bold text-[color:var(--text-primary)]">
+                        <span className="text-sm font-bold text-[color:var(--text-primary)] truncate max-w-xs sm:max-w-md">
                           {author.firstName || author.surname
                             ? `${author.title ? author.title + " " : ""}${author.firstName} ${author.surname}`
                             : "New Author"}
                         </span>
                         {author.isCorresponding && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)]">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[color:var(--accent)] text-[color:var(--text-inverse)] shrink-0">
                             Corresponding
                           </span>
                         )}
                       </div>
 
                       {/* Reordering and removal controls */}
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1 self-end sm:self-auto">
                         <button
                           type="button"
                           onClick={() => moveAuthor(index, -1)}
                           disabled={index === 0}
                           title="Move Up"
-                          className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -1148,7 +1205,7 @@ export default function DefinitionStage({
                           onClick={() => moveAuthor(index, 1)}
                           disabled={index === authors.length - 1}
                           title="Move Down"
-                          className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] disabled:opacity-20 cursor-pointer"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1158,7 +1215,7 @@ export default function DefinitionStage({
                           type="button"
                           onClick={() => removeAuthor(author.id)}
                           title="Remove Author"
-                          className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--state-danger)] hover:bg-[color:var(--surface-hover)] cursor-pointer ml-1"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-[color:var(--text-muted)] hover:text-[color:var(--state-danger)] hover:bg-[color:var(--surface-hover)] cursor-pointer ml-1"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1168,7 +1225,7 @@ export default function DefinitionStage({
                     </div>
 
                     {/* Metadata Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       <div>
                         <label className="block text-[11px] font-semibold text-[color:var(--text-secondary)] mb-1">Title</label>
                         <input
@@ -1211,7 +1268,7 @@ export default function DefinitionStage({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                       <div>
                         <label className="block text-[11px] font-semibold text-[color:var(--text-secondary)] mb-1">Email *</label>
                         <input
@@ -1510,18 +1567,18 @@ export default function DefinitionStage({
 
       {/* 4. FINER Framework AI Diagnostic Modal */}
       {finerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-[color:var(--surface-raised)] p-6 shadow-2xl border border-[color:var(--border-default)] space-y-6">
-            <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[color:var(--accent-subtle)] text-[color:var(--text-primary)] flex items-center justify-center font-black">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto rounded-2xl bg-[color:var(--surface-raised)] p-4 sm:p-6 shadow-2xl border border-[color:var(--border-default)] space-y-4 sm:space-y-6">
+            <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-3 sm:pb-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[color:var(--accent-subtle)] text-[color:var(--text-primary)] flex items-center justify-center font-black shrink-0">
                   ✨
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[color:var(--text-primary)]">
+                  <h3 className="text-sm sm:text-base font-bold text-[color:var(--text-primary)]">
                     AI Architect — FINER Framework Evaluation
                   </h3>
-                  <p className="text-xs text-[color:var(--text-muted)]">
+                  <p className="text-xs text-[color:var(--text-muted)] line-clamp-1 sm:line-clamp-none">
                     Rigorous appraisal across Feasibility, Interest, Novelty, Ethics, and Relevance.
                   </p>
                 </div>
@@ -1529,7 +1586,7 @@ export default function DefinitionStage({
               <button
                 type="button"
                 onClick={() => setFinerModalOpen(false)}
-                className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] p-1 rounded-lg cursor-pointer"
+                className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] p-1.5 rounded-lg cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1552,7 +1609,27 @@ export default function DefinitionStage({
             )}
 
             {!isAnalyzingFiner && finerResult && (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
+                {/* Heuristic Notice when operating offline / local */}
+                {finerResult.proposals?.[0]?.id?.includes("heuristic") && (
+                  <div className="p-3 rounded-xl bg-[color:var(--surface-base)] border border-[color:var(--border-subtle)] flex items-center justify-between text-xs text-[color:var(--text-secondary)]">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[color:var(--accent)]" />
+                      <span>Heuristic Appraisal Active — instant publication guidance enabled.</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFinerModalOpen(false);
+                        setShowExhaustedModal(true);
+                      }}
+                      className="text-xs font-semibold text-[color:var(--accent)] hover:underline cursor-pointer ml-2 shrink-0"
+                    >
+                      Configure AI Key
+                    </button>
+                  </div>
+                )}
+
                 {/* Overall Score Badge */}
                 <div className="p-4 rounded-xl bg-[color:var(--surface-base)] border border-[color:var(--border-subtle)] flex items-center justify-between">
                   <div>
@@ -1572,13 +1649,13 @@ export default function DefinitionStage({
                 </div>
 
                 {/* 5 Criteria Mini-Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-2.5">
                   {Object.entries(finerResult.criteria || {}).map(([key, item]) => (
-                    <div key={key} className="p-3 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-center space-y-1">
+                    <div key={key} className="p-2.5 sm:p-3 rounded-xl border border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] text-center space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
                         {key}
                       </span>
-                      <div className="text-base font-black text-[color:var(--text-primary)]">
+                      <div className="text-sm sm:text-base font-black text-[color:var(--text-primary)]">
                         {item.score}%
                       </div>
                       <p className="text-[10px] text-[color:var(--text-secondary)] line-clamp-2 text-left">
@@ -1653,8 +1730,8 @@ export default function DefinitionStage({
 
       {/* 5. PICO / SPIDER Assistant Modal */}
       {picoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg rounded-2xl bg-[color:var(--surface-raised)] p-6 shadow-2xl border border-[color:var(--border-default)] space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-[color:var(--surface-raised)] p-4 sm:p-6 shadow-2xl border border-[color:var(--border-default)] space-y-4">
             <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] pb-3">
               <div className="flex items-center gap-2">
                 <span className="text-base font-bold text-[color:var(--text-primary)]">

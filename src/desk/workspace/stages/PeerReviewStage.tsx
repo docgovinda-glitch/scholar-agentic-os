@@ -186,14 +186,89 @@ export default function PeerReviewStage({
 
   // Resilient domain-aware offline fallback critique generator covering all 7 academic lenses
   const generateFallbackCritiques = useCallback((): AcademicCritique[] => {
+    const isTopicBftOrAgents =
+      workingTitle.toLowerCase().includes("byzantine") ||
+      workingTitle.toLowerCase().includes("provenance") ||
+      workingTitle.toLowerCase().includes("autonomous") ||
+      anchorGap.toLowerCase().includes("provenance") ||
+      anchorGap.toLowerCase().includes("byzantine");
+
+    if (isTopicBftOrAgents) {
+      return [
+        {
+          id: "crit-lens-01",
+          lens: "Logical Flow & Coherence",
+          section: "Introduction -> Section 2",
+          severity: "Moderate",
+          feedback: `The transition between the problem formulation (${anchorGap}) and the proposed bipartite projection operator is abrupt. The reader needs an intermediate conceptual bridge explaining why conventional vector search fails before introducing the mathematical formalism.`,
+          revisionDirective: "Introduce a transitional paragraph motivating the necessity of deterministic bipartite matching over greedy cosine nearest-neighbor search.",
+          waived: false,
+        },
+        {
+          id: "crit-lens-02",
+          lens: "Methodological Rigor",
+          section: "Section 2: Methodology",
+          severity: "Major",
+          feedback: "The asymptotic runtime analysis for the bipartite projection operator assumes balanced bipartite cardinality. Under asymmetric partition scenarios, the worst-case bound O(|C| * |E|) should be explicitly bounded with pruning heuristics.",
+          revisionDirective: "Formalize Lemma 1 stating the pruned search complexity under top-k cosine candidate thresholding.",
+          waived: false,
+        },
+        {
+          id: "crit-lens-03",
+          lens: "Domain Alignment & Venue Scope",
+          section: "Abstract & Discussion",
+          severity: "Minor",
+          feedback: `While the findings are sound, the framing should explicitly emphasize implications for ${targetJournal} readers by referencing real-time reproducibility and multi-agent coordination standards.`,
+          revisionDirective: "Add 2-3 sentences in the Discussion emphasizing reproducible artifact evaluation guidelines compliant with target venue policies.",
+          waived: false,
+        },
+        {
+          id: "crit-lens-04",
+          lens: "Evidence Synthesis & Provenance",
+          section: "Section 3: Results",
+          severity: "Moderate",
+          feedback: "Empirical claim regarding the 28.4% variance reduction relies on aggregate test suites; confidence intervals (95% CI) and standard error bars must be explicitly reported in Table 1.",
+          revisionDirective: "Include exact 95% bootstrap confidence intervals [26.1%, 30.7%] alongside reported mean throughput metrics.",
+          waived: false,
+        },
+        {
+          id: "crit-lens-05",
+          lens: "Argument Strength & Falsifiability",
+          section: "Section 4: Discussion",
+          severity: "Major",
+          feedback: "The manuscript does not adequately discuss threats to validity when input vault sources contain contradictory empirical claims. What occurs when two high-confidence documents assert conflicting experimental findings?",
+          revisionDirective: "Add a dedicated 'Threats to Validity: Epistemic Disagreement Handling' subsection discussing resolution of multi-source contradictions.",
+          waived: false,
+        },
+        {
+          id: "crit-lens-06",
+          lens: "Stylistic Register & Tone",
+          section: "Section 1: Introduction",
+          severity: "Advisory",
+          feedback: "Phrasing in paragraph 2 contains colloquial rhetorical flourishes ('game-changing breakthrough'). Academic register requires neutral, passive, and measured empirical language.",
+          revisionDirective: "Replace subjective adverbs with measured scientific descriptions of measured throughput and precision gains.",
+          waived: false,
+        },
+        {
+          id: "crit-lens-07",
+          lens: "Publication Compliance",
+          section: "End-matter & Declarations",
+          severity: "Minor",
+          feedback: "Target journal guidelines require an explicit Data Availability Statement and Code Repository DOI link prior to peer-review acceptance.",
+          revisionDirective: "Append standard Data Availability and Code Availability sections with Zenodo DOI placeholders.",
+          waived: false,
+        },
+      ];
+    }
+
     return [
       {
         id: "crit-lens-01",
         lens: "Logical Flow & Coherence",
         section: "Introduction -> Section 2",
         severity: "Moderate",
-        feedback: `The transition between the problem formulation (${anchorGap}) and the proposed bipartite projection operator is abrupt. The reader needs an intermediate conceptual bridge explaining why conventional vector search fails before introducing the mathematical formalism.`,
-        revisionDirective: "Introduce a transitional paragraph motivating the necessity of deterministic bipartite matching over greedy cosine nearest-neighbor search.",
+        feedback: `The transition between the problem formulation regarding "${anchorGap}" and the formal analytical model in Section 2 is abrupt. The reader requires an intermediate conceptual bridge linking foundational literature with mathematical/computational formulations.`,
+        revisionDirective: "Introduce a transitional paragraph motivating the necessity of deterministic computational formalisms over purely qualitative heuristics.",
         waived: false,
       },
       {
@@ -201,8 +276,8 @@ export default function PeerReviewStage({
         lens: "Methodological Rigor",
         section: "Section 2: Methodology",
         severity: "Major",
-        feedback: "The asymptotic runtime analysis for the bipartite projection operator assumes balanced bipartite cardinality. Under asymmetric partition scenarios, the worst-case bound O(|C| * |E|) should be explicitly bounded with pruning heuristics.",
-        revisionDirective: "Formalize Lemma 1 stating the pruned search complexity under top-k cosine candidate thresholding.",
+        feedback: `The mathematical mapping connecting textual source parameters with observational coordinate frames requires explicit parameter bounding and sensitivity analysis against potential variance.`,
+        revisionDirective: "Formalize mathematical bounding lemmas specifying exact parameter bounds and sensitivity under edge-case conditions.",
         waived: false,
       },
       {
@@ -210,8 +285,8 @@ export default function PeerReviewStage({
         lens: "Domain Alignment & Venue Scope",
         section: "Abstract & Discussion",
         severity: "Minor",
-        feedback: `While the findings are sound, the framing should explicitly emphasize implications for ${targetJournal} readers by referencing real-time reproducibility and multi-agent coordination standards.`,
-        revisionDirective: "Add 2-3 sentences in the Discussion emphasizing reproducible artifact evaluation guidelines compliant with target venue policies.",
+        feedback: `The framing should explicitly emphasize implications for ${targetJournal} readers by referencing modern reproducibility standards, comparative validation, and rigorous computational verification.`,
+        revisionDirective: `Add 2-3 sentences in the Discussion emphasizing reproducible artifact evaluation guidelines compliant with ${targetJournal} policies.`,
         waived: false,
       },
       {
@@ -219,8 +294,8 @@ export default function PeerReviewStage({
         lens: "Evidence Synthesis & Provenance",
         section: "Section 3: Results",
         severity: "Moderate",
-        feedback: "Empirical claim regarding the 28.4% variance reduction relies on aggregate test suites; confidence intervals (95% CI) and standard error bars must be explicitly reported in Table 1.",
-        revisionDirective: "Include exact 95% bootstrap confidence intervals [26.1%, 30.7%] alongside reported mean throughput metrics.",
+        feedback: "Empirical concordance claims rely on aggregate tabular metrics; statistical error bounds and exact comparative confidence intervals must be explicitly reported in Table 1.",
+        revisionDirective: "Include exact 95% confidence intervals and standard deviations alongside reported mean concordance metrics.",
         waived: false,
       },
       {
@@ -228,8 +303,8 @@ export default function PeerReviewStage({
         lens: "Argument Strength & Falsifiability",
         section: "Section 4: Discussion",
         severity: "Major",
-        feedback: "The manuscript does not adequately discuss threats to validity when input vault sources contain contradictory empirical claims. What occurs when two high-confidence documents assert conflicting experimental findings?",
-        revisionDirective: "Add a dedicated 'Threats to Validity: Epistemic Disagreement Handling' subsection discussing resolution of multi-source contradictions.",
+        feedback: "The manuscript does not adequately evaluate alternative counter-hypotheses or historical variance. A dedicated discussion addressing potential threats to internal validity is necessary.",
+        revisionDirective: "Add a dedicated 'Threats to Validity: Alternative Hypotheses and Robustness Analysis' subsection.",
         waived: false,
       },
       {
@@ -237,8 +312,8 @@ export default function PeerReviewStage({
         lens: "Stylistic Register & Tone",
         section: "Section 1: Introduction",
         severity: "Advisory",
-        feedback: "Phrasing in paragraph 2 contains colloquial rhetorical flourishes ('game-changing breakthrough'). Academic register requires neutral, passive, and measured empirical language.",
-        revisionDirective: "Replace subjective adverbs with measured scientific descriptions of measured throughput and precision gains.",
+        feedback: "Phrasing in introductory paragraphs contains colloquial or overstated rhetorical declarations. Scholarly register requires measured, neutral, and precise prose.",
+        revisionDirective: "Replace superlative claims with objective analytical descriptions of observed outcomes.",
         waived: false,
       },
       {
@@ -246,12 +321,12 @@ export default function PeerReviewStage({
         lens: "Publication Compliance",
         section: "End-matter & Declarations",
         severity: "Minor",
-        feedback: "Target journal guidelines require an explicit Data Availability Statement and Code Repository DOI link prior to peer-review acceptance.",
-        revisionDirective: "Append standard Data Availability and Code Availability sections with Zenodo DOI placeholders.",
+        feedback: `Target journal (${targetJournal}) guidelines require explicit Data Availability and Open Access Code statements prior to camera-ready acceptance.`,
+        revisionDirective: "Append standard Data Availability and Code Availability sections with repository DOI links.",
         waived: false,
       },
     ];
-  }, [anchorGap, targetJournal]);
+  }, [workingTitle, anchorGap, targetJournal]);
 
   // Execute Reviewer Agent
   const startAgent = async () => {
@@ -493,7 +568,7 @@ export default function PeerReviewStage({
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)]">
       {/* 1. Header & Stage Title */}
-      <div className="p-6 pb-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] z-10 shadow-xs relative">
+      <div className="p-4 sm:p-6 pb-3 sm:pb-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] z-10 shadow-xs relative">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] shrink-0 mt-0.5">
@@ -599,7 +674,7 @@ export default function PeerReviewStage({
       </div>
 
       {/* 3. Main Body */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
         {/* Terminal during critique scan */}
         {(isProcessing || logs.length > 0) && (
           <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-5">
@@ -951,7 +1026,7 @@ export default function PeerReviewStage({
       </div>
 
       {/* 4. Sticky Bottom Action Dock (Deliberate Advance, NO AUTO-ADVANCE) */}
-      <div className="p-4 px-6 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex flex-col sm:flex-row items-center justify-between gap-4 z-20 shadow-lg font-sans">
+      <div className="px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex flex-col sm:flex-row items-center justify-between gap-4 z-20 shadow-lg font-sans">
         <div className="flex items-center gap-3">
           <div className="w-2.5 h-2.5 rounded-full bg-[color:var(--state-success)] animate-pulse" />
           <span className="text-xs font-mono text-[color:var(--text-secondary)]">

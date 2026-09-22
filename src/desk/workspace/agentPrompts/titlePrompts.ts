@@ -122,3 +122,54 @@ Refinement Goal: ${instruction}`;
 
   return { systemPrompt, userPrompt };
 }
+
+export function generateLocalTitleFallback(options: TitlePromptOptions): TitleItem[] {
+  const answers = options.projectAnswers || {};
+  const workingTitle = answers.working_title || answers.title || "Advanced Empirical Investigation";
+  const anchorGap = answers.selected_gap_title || answers.anchor_gap_title || answers.selected_gap || "";
+
+  // Extract core domain concepts
+  const sourceText = `${workingTitle} ${anchorGap}`.replace(/[^\w\s-]/g, " ").trim();
+  const words = sourceText
+    .split(/\s+/)
+    .filter((w) => w.length > 3 && !/^(with|from|that|this|into|over|under|using|towards|between|across|about|after|before)$/i.test(w));
+
+  const kw1 = words[0] || "Foundational Systems";
+  const kw2 = words[1] || "Empirical Models";
+  const kw3 = words[2] || "Theoretical Boundaries";
+
+  return [
+    {
+      id: `title-fallback-${Date.now()}-1`,
+      title_text: `${kw1} and ${kw2}: An Empirical Architecture for ${kw3}`,
+      subtitle_text: "Bridging Methodological Constraints Across Heterogeneous Domains",
+      archetype: "compound",
+      rationale: "Classic colon-structured compound title optimizing citation discovery and semantic clarity.",
+      status: "proposed",
+    },
+    {
+      id: `title-fallback-${Date.now()}-2`,
+      title_text: `Adaptive Synthesis of ${kw1} Overcomes Verification Barriers in ${kw2}`,
+      subtitle_text: null,
+      archetype: "declarative",
+      rationale: "Declarative, result-forward title maximizing impact across interdisciplinary editorial boards.",
+      status: "proposed",
+    },
+    {
+      id: `title-fallback-${Date.now()}-3`,
+      title_text: `A Mechanized Framework for Scalable ${kw1} and Verifiable ${kw2}`,
+      subtitle_text: null,
+      archetype: "methodological",
+      rationale: "Methodology-first formulation highlighting operational rigor and benchmark reproducibility.",
+      status: "proposed",
+    },
+    {
+      id: `title-fallback-${Date.now()}-4`,
+      title_text: `Can ${kw1} Guarantee Consistency Across Asymmetric Stress Regimes?`,
+      subtitle_text: "Empirical Evidence and Boundary Limits",
+      archetype: "inquisitive",
+      rationale: "Inquisitive title framing that directly challenges unexamined assumptions in the literature.",
+      status: "proposed",
+    },
+  ];
+}

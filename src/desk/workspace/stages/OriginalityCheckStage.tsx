@@ -441,7 +441,7 @@ export default function OriginalityCheckStage({
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)]">
       {/* 1. Header & Stage Title */}
-      <div className="p-6 pb-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] z-10 shadow-xs relative">
+      <div className="px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] z-10 shadow-xs relative">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] shrink-0 mt-0.5">
@@ -894,7 +894,7 @@ export default function OriginalityCheckStage({
       </div>
 
       {/* 4. Sticky Bottom Action Dock (Deliberate Advance, NO AUTO-ADVANCE) */}
-      <div className="p-4 px-6 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex flex-col sm:flex-row items-center justify-between gap-4 z-20 shadow-lg">
+      <div className="px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] flex flex-wrap items-center justify-between gap-4 z-20 shadow-lg">
         <div className="flex items-center gap-3">
           <div className="w-2.5 h-2.5 rounded-full bg-[color:var(--state-success)] animate-pulse" />
           <span className="text-xs font-mono text-[color:var(--text-secondary)]">

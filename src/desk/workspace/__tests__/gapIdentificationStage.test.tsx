@@ -254,4 +254,35 @@ describe("Stage 3: Gap Identification (GapIdentificationStage)", () => {
 
     expect(onAdvanceMock).toHaveBeenCalledWith("gap_selection");
   });
+
+  it("falls back to local heuristic synthesis when executeAgenticLLM throws", async () => {
+    (api.executeAgenticLLM as any).mockRejectedValue(new Error("AI quota exhausted or offline"));
+
+    render(
+      <GapIdentificationStage
+        stage="gap_identification"
+        projectId="proj-gap-101"
+        project={mockProjectEmpty}
+        onAdvance={vi.fn()}
+      />
+    );
+
+    const runBtn = screen.getByRole("button", { name: /Run Gap Identification/i });
+    fireEvent.click(runBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /Run Gap Identification/i })).not.toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText(/Candidate Research Gaps/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Empirical Gap/i)).toBeInTheDocument();
+
+    expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
+      "proj-gap-101",
+      expect.objectContaining({
+        identified_gaps: expect.any(String),
+        current_stage: "gap_identification",
+      })
+    );
+  });
 });

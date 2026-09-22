@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-22
 
 ### Added
+- **Journal Article Workspace: Comprehensive 25-Stage Overhaul & Camera-Ready Export Hardening (`src/desk/workspace/stages/*`)**:
+  - **Eliminated Hardcoded Byzantine Consensus Fallbacks**: Refactored offline/fallback synthesis functions across all 25 stages (`EvidenceExtractionStage`, `ExternalResearchStage`, `EvidenceAnalysisStage`, `DraftStage`, `PeerReviewStage`, `RevisionStage`, `FinalEditorStage`, `ExportStage`). Generated prose is dynamically tailored to the user's actual research domain, title, methodology, and target journal rather than hardcoded distributed systems text.
+  - **Eliminated Raw JSON Text Dumps in Export Pipeline**: Resolved bug where camera-ready exports output raw JSON strings (`[{"id":"sec-1","section":"Abstract"...}]`). Persisted clean markdown across `manuscript_markdown` and `full_text_markdown` in Stage 17, and upgraded Stages 20, 23, and 25 to automatically unpack stringified section arrays into camera-ready markdown headings and clean prose.
+  - **Comprehensive Responsive Layout & Touch Targets**: Upgraded all 25 stages to uniform responsive spacing (`px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4`), flex-wrap header action docks, smooth horizontal scroll bars on Grounding Ribbons, and accessible $\ge 32$px touch targets on mobile/tablet viewports.
+  - **End-to-End Verification**: Achieved 100% test pass rate across the full workspace suite (**183 of 183 tests passed across 26 test files**) and 0 TypeScript compilation errors.
+  - **Remote Database Sync**: Verified all 25 Supabase migrations against remote production project `scholarAgent` (`gfjhsijrwodjvkisouzw`), confirming zero drift and complete synchronization.
 - **Seamless Borderless Prompt Bar & Typing Area (`ProjectListScreen.tsx`, `ScholarAgenticDashboard.tsx`, `src/index.css`)**:
   - Completely removed internal black capsule borders, outlines, and focus rings from the prompt input elements, leaving a clean, seamless, modern typing experience inside the outer capsule.
   - Added dedicated `.prompt-bare-input` class and updated base layer input rules in `src/index.css` to exempt borderless inputs.

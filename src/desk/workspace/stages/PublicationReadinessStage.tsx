@@ -81,8 +81,23 @@ export default function PublicationReadinessStage({
 
   // Derived Manuscript draft and word count
   const manuscriptText = useMemo(() => {
+    if (project?.answers?.manuscript_markdown && typeof project.answers.manuscript_markdown === "string") {
+      return project.answers.manuscript_markdown;
+    }
+    if (project?.answers?.full_text_markdown && typeof project.answers.full_text_markdown === "string") {
+      return project.answers.full_text_markdown;
+    }
     if (project?.answers?.assembled_draft) {
-      return project.answers.assembled_draft;
+      try {
+        const parsed = JSON.parse(project.answers.assembled_draft);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((s: any) => `${s.section || s.section_name || ""}\n${s.content || ""}`).join("\n\n");
+        }
+      } catch {
+        if (!project.answers.assembled_draft.trim().startsWith("[")) {
+          return project.answers.assembled_draft;
+        }
+      }
     }
     const raw = project?.answers?.manuscript_draft;
     if (raw) {
@@ -378,7 +393,7 @@ export default function PublicationReadinessStage({
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)]">
       {/* 1. Header & Stage Title */}
-      <div className="p-6 pb-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] z-10 shadow-xs relative">
+      <div className="p-4 sm:p-6 pb-3 sm:pb-4 border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] z-10 shadow-xs relative">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] shrink-0 mt-0.5">
@@ -477,7 +492,7 @@ export default function PublicationReadinessStage({
       </div>
 
       {/* 3. Main Workspace Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
         {/* Error banner */}
         {error && (
           <div className="p-4 rounded-xl bg-[color:var(--state-danger-subtle)] border border-[color:var(--state-danger)] text-[color:var(--state-danger)] text-sm flex items-center justify-between font-sans">
@@ -783,7 +798,7 @@ export default function PublicationReadinessStage({
 
       {/* 4. Sticky Bottom Action Dock */}
       {results && !isProcessing && (
-        <div className="p-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+        <div className="px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-t border-[color:var(--border-subtle)] bg-[color:var(--surface-raised)] z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
           <div className="flex items-center gap-3">
             <span className="w-3 h-3 rounded-full bg-[color:var(--state-success)]"></span>
             <div className="text-xs font-sans">

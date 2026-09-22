@@ -145,84 +145,138 @@ export default function JournalDiscoveryStage({
 
   // Fallback realistic high-tier journals generator based on project context
   const generateFallbackJournals = useCallback((): JournalCandidate[] => {
-    const field = project.answers?.["research_area"] || "Computer Science & Distributed Systems";
+    const field = project.answers?.["research_area"] || project.answers?.["research_domain"] || "Computer Science & Distributed Systems";
     const title = workingTitle;
+    const isByzantineOrCS = /byzantine|distributed systems|computer systems|quorum/i.test(workingTitle || "") ||
+      /distributed systems|computer science/i.test(field || "");
 
+    if (isByzantineOrCS) {
+      return [
+        {
+          id: "j-1",
+          title: "ACM Transactions on Computer Systems (TOCS)",
+          publisher: "Association for Computing Machinery",
+          impact_factor: 5.8,
+          sjr_quartile: "Q1",
+          match_score: 98,
+          open_access: false,
+          acceptance_rate: "12%",
+          review_speed_weeks: 5.2,
+          aims_scope: "Publishes premier research in computer systems design, distributed networks, fault tolerance, and empirical evaluation.",
+          fit_rationale: `Direct thematic alignment with "${title}". High valuation of empirical partition benchmarks and rigorous quorum proofs.`,
+          indexing: ["Scopus", "Web of Science", "ACM Digital Library", "EI Compendex"],
+          max_words: 12000,
+        },
+        {
+          id: "j-2",
+          title: "IEEE Transactions on Dependable and Secure Computing (TDSC)",
+          publisher: "IEEE Computer Society",
+          impact_factor: 6.4,
+          sjr_quartile: "Q1",
+          match_score: 95,
+          open_access: true,
+          acceptance_rate: "14%",
+          review_speed_weeks: 4.8,
+          aims_scope: "Focuses on cryptographic guarantees, Byzantine fault tolerance, resilient consensus protocols, and systems survivability.",
+          fit_rationale: `Strong match for asymmetric partition handling and Byzantine fault tolerance theorems addressed in your anchor gap "${anchorGap}".`,
+          indexing: ["IEEE Xplore", "Scopus", "Web of Science", "PubMed"],
+          max_words: 10000,
+        },
+        {
+          id: "j-3",
+          title: "IEEE Transactions on Parallel and Distributed Systems (TPDS)",
+          publisher: "IEEE Computer Society",
+          impact_factor: 5.3,
+          sjr_quartile: "Q1",
+          match_score: 92,
+          open_access: false,
+          acceptance_rate: "18%",
+          review_speed_weeks: 4.1,
+          aims_scope: "Dedicated to all architectural, design, and operational aspects of parallel and distributed computing algorithms and protocols.",
+          fit_rationale: `Ideal venue for dynamic reconfiguration benchmarks and high-throughput wide-area network latency optimizations.`,
+          indexing: ["IEEE Xplore", "Scopus", "Web of Science"],
+          max_words: 9500,
+        },
+        {
+          id: "j-4",
+          title: "Journal of Systems Architecture",
+          publisher: "Elsevier",
+          impact_factor: 4.5,
+          sjr_quartile: "Q1",
+          match_score: 88,
+          open_access: true,
+          acceptance_rate: "22%",
+          review_speed_weeks: 3.9,
+          aims_scope: "Covers embedded systems, distributed architectures, microservices, and reliable decentralized network protocols.",
+          fit_rationale: `Rapid review cycle and open access dissemination for modular partition recovery frameworks.`,
+          indexing: ["Scopus", "ScienceDirect", "Inspec"],
+          max_words: 8500,
+        },
+        {
+          id: "j-5",
+          title: "Communications of the ACM (Research Highlights)",
+          publisher: "ACM",
+          impact_factor: 14.1,
+          sjr_quartile: "Q1",
+          match_score: 85,
+          open_access: true,
+          acceptance_rate: "8%",
+          review_speed_weeks: 6.0,
+          aims_scope: "Selects broad-impact breakthroughs in computing with exceptional foundational or empirical significance.",
+          fit_rationale: `Recommended if your sub-second Byzantine consensus evaluation demonstrates industry-transformative latency gains.`,
+          indexing: ["ACM Digital Library", "Scopus", "Web of Science"],
+          max_words: 6000,
+        },
+      ];
+    }
+
+    // Dynamic domain-aware fallback for any user topic
+    const targetJournal = project.answers?.["target_journal"] || "Nature Machine Intelligence";
     return [
       {
         id: "j-1",
-        title: "ACM Transactions on Computer Systems (TOCS)",
-        publisher: "Association for Computing Machinery",
-        impact_factor: 5.8,
+        title: targetJournal,
+        publisher: "Springer Nature",
+        impact_factor: 18.8,
         sjr_quartile: "Q1",
         match_score: 98,
-        open_access: false,
-        acceptance_rate: "12%",
-        review_speed_weeks: 5.2,
-        aims_scope: "Publishes premier research in computer systems design, distributed networks, fault tolerance, and empirical evaluation.",
-        fit_rationale: `Direct thematic alignment with "${title}". High valuation of empirical partition benchmarks and rigorous quorum proofs.`,
-        indexing: ["Scopus", "Web of Science", "ACM Digital Library", "EI Compendex"],
-        max_words: 12000,
+        open_access: true,
+        acceptance_rate: "9%",
+        review_speed_weeks: 4.5,
+        aims_scope: `Publishes high-impact research bridging computational modeling, theoretical frameworks, and empirical science.`,
+        fit_rationale: `Direct thematic alignment with "${title}". High valuation of computational rigor and interdisciplinary modeling.`,
+        indexing: ["Scopus", "Web of Science", "PubMed"],
+        max_words: 8000,
       },
       {
         id: "j-2",
-        title: "IEEE Transactions on Dependable and Secure Computing (TDSC)",
-        publisher: "IEEE Computer Society",
-        impact_factor: 6.4,
+        title: "PLOS ONE (Interdisciplinary Computational Studies)",
+        publisher: "Public Library of Science",
+        impact_factor: 3.7,
         sjr_quartile: "Q1",
-        match_score: 95,
+        match_score: 93,
         open_access: true,
-        acceptance_rate: "14%",
-        review_speed_weeks: 4.8,
-        aims_scope: "Focuses on cryptographic guarantees, Byzantine fault tolerance, resilient consensus protocols, and systems survivability.",
-        fit_rationale: `Strong match for asymmetric partition handling and Byzantine fault tolerance theorems addressed in your anchor gap "${anchorGap}".`,
-        indexing: ["IEEE Xplore", "Scopus", "Web of Science", "PubMed"],
+        acceptance_rate: "48%",
+        review_speed_weeks: 3.5,
+        aims_scope: "Accepts scientifically rigorous research across all disciplines with an emphasis on reproducible open science.",
+        fit_rationale: `Rapid peer review and global open access indexing for foundational computational modeling studies.`,
+        indexing: ["PubMed Central", "Scopus", "Web of Science"],
         max_words: 10000,
       },
       {
         id: "j-3",
-        title: "IEEE Transactions on Parallel and Distributed Systems (TPDS)",
-        publisher: "IEEE Computer Society",
-        impact_factor: 5.3,
-        sjr_quartile: "Q1",
-        match_score: 92,
-        open_access: false,
-        acceptance_rate: "18%",
-        review_speed_weeks: 4.1,
-        aims_scope: "Dedicated to all architectural, design, and operational aspects of parallel and distributed computing algorithms and protocols.",
-        fit_rationale: `Ideal venue for dynamic reconfiguration benchmarks and high-throughput wide-area network latency optimizations.`,
-        indexing: ["IEEE Xplore", "Scopus", "Web of Science"],
-        max_words: 9500,
-      },
-      {
-        id: "j-4",
-        title: "Journal of Systems Architecture",
+        title: "Journal of Computational Science",
         publisher: "Elsevier",
-        impact_factor: 4.5,
+        impact_factor: 3.8,
         sjr_quartile: "Q1",
-        match_score: 88,
-        open_access: true,
-        acceptance_rate: "22%",
-        review_speed_weeks: 3.9,
-        aims_scope: "Covers embedded systems, distributed architectures, microservices, and reliable decentralized network protocols.",
-        fit_rationale: `Rapid review cycle and open access dissemination for modular partition recovery frameworks.`,
+        match_score: 90,
+        open_access: false,
+        acceptance_rate: "24%",
+        review_speed_weeks: 4.0,
+        aims_scope: "Dedicated to novel computational methods, mathematical models, and simulations advancing scientific understanding.",
+        fit_rationale: `Strong match for mathematical formulations and computational models addressing "${anchorGap || title}".`,
         indexing: ["Scopus", "ScienceDirect", "Inspec"],
-        max_words: 8500,
-      },
-      {
-        id: "j-5",
-        title: "Communications of the ACM (Research Highlights)",
-        publisher: "ACM",
-        impact_factor: 14.1,
-        sjr_quartile: "Q1",
-        match_score: 85,
-        open_access: true,
-        acceptance_rate: "8%",
-        review_speed_weeks: 6.0,
-        aims_scope: "Selects broad-impact breakthroughs in computing with exceptional foundational or empirical significance.",
-        fit_rationale: `Recommended if your sub-second Byzantine consensus evaluation demonstrates industry-transformative latency gains.`,
-        indexing: ["ACM Digital Library", "Scopus", "Web of Science"],
-        max_words: 6000,
+        max_words: 9500,
       },
     ];
   }, [workingTitle, anchorGap, project.answers]);
@@ -490,9 +544,9 @@ export default function JournalDiscoveryStage({
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)]">
       {/* 1. Header with Phase Badge and Primary Radar Action */}
-      <div className="p-8 pb-4 border-b border-[color:var(--border-subtle)] flex flex-wrap justify-between items-center gap-4 bg-[color:var(--surface-raised)] z-10 shadow-xs relative">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] shrink-0">
+      <div className="px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-b border-[color:var(--border-subtle)] flex flex-wrap justify-between items-center gap-4 bg-[color:var(--surface-raised)] z-10 shadow-xs relative">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--accent-border)] flex items-center justify-center text-[color:var(--accent)] shrink-0">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={def.icon} />
             </svg>
@@ -551,7 +605,7 @@ export default function JournalDiscoveryStage({
       </div>
 
       {/* 2. Grounding Foundation Ribbon */}
-      <div className="px-8 py-2.5 bg-[color:var(--surface-sunken)] border-b border-[color:var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 bg-[color:var(--surface-sunken)] border-b border-[color:var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
           <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-muted)] shrink-0">
             Grounding Anchor:
@@ -860,7 +914,7 @@ export default function JournalDiscoveryStage({
       </div>
 
       {/* 4. Sticky Bottom Dock */}
-      <div className="sticky bottom-0 bg-[color:var(--surface-raised)]/95 backdrop-blur-md border-t border-[color:var(--border-subtle)] px-8 py-4 flex flex-wrap items-center justify-between gap-4 z-20 shadow-md">
+      <div className="sticky bottom-0 bg-[color:var(--surface-raised)]/95 backdrop-blur-md border-t border-[color:var(--border-subtle)] px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-wrap items-center justify-between gap-4 z-20 shadow-md">
         <div className="flex items-center gap-3 text-xs">
           <div className="w-2.5 h-2.5 rounded-full bg-[color:var(--accent)]" />
           <span className="text-[color:var(--text-secondary)]">

@@ -213,4 +213,47 @@ describe("Stage 2: Literature Discovery (LiteratureStage)", () => {
 
     expect(onAdvance).toHaveBeenCalledWith("gap_identification");
   });
+
+  it("falls back to local heuristic synthesis when executeAgenticLLM throws or fails", async () => {
+    (api.executeAgenticLLM as any).mockRejectedValue(new Error("AI service unavailable or quota exceeded"));
+
+    const emptyProject: ProjectView = {
+      projectId: "proj-lit-empty",
+      outputTypeId: "OT-10",
+      answers: {
+        working_title: "Integrating Rta and Rashi in Computational Astronomy",
+        research_area: "Computational Astronomy & Archaeoastronomy",
+      },
+      authors: [],
+      intakeCompleteness: 1,
+      hasDocument: false,
+      hasJournalRequirements: false,
+      gates: [],
+    };
+
+    render(
+      <LiteratureStage
+        stage="literature"
+        projectId="proj-lit-empty"
+        project={emptyProject}
+        onAdvance={vi.fn()}
+      />
+    );
+
+    // Initial state shows zero papers found, start discovery button
+    const discoverBtn = screen.getByRole("button", { name: /Start Literature Discovery/i });
+    fireEvent.click(discoverBtn);
+
+    // Wait for fallback papers to be generated and displayed
+    await waitFor(() => {
+      expect(screen.getByText(/Architectural Principles and Empirical Benchmarks/i)).toBeInTheDocument();
+    });
+
+    expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
+      "proj-lit-empty",
+      expect.objectContaining({
+        discovered_literature: expect.any(String),
+      })
+    );
+  });
 });

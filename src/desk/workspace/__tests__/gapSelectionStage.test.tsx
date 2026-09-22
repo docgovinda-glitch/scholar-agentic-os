@@ -106,6 +106,33 @@ describe("Stage 4: Gap Selection (GapSelectionStage)", () => {
     expect(onAdvanceMock).toHaveBeenCalledWith("gap_identification");
   });
 
+  it("allows auto-synthesizing candidate gaps directly from Stage 4 empty state", async () => {
+    render(
+      <GapSelectionStage
+        stage="gap_selection"
+        projectId="proj-sel-101"
+        project={mockProjectEmpty}
+        onAdvance={vi.fn()}
+      />
+    );
+
+    const autoBtn = screen.getByRole("button", { name: /Auto-Synthesize Gaps/i });
+    fireEvent.click(autoBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/No Research Gaps Identified Yet/i)).not.toBeInTheDocument();
+      expect(screen.getAllByText(/PRIMARY ANCHOR/i).length).toBeGreaterThanOrEqual(1);
+    });
+
+    expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
+      "proj-sel-101",
+      expect.objectContaining({
+        current_stage: "gap_selection",
+        selected_gap: expect.any(String),
+      })
+    );
+  });
+
   it("renders discovered gap cards with titles, scores, and typologies", () => {
     render(
       <GapSelectionStage

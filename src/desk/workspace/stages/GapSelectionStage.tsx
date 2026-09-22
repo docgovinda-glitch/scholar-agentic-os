@@ -4,7 +4,7 @@ import type { ResearchStage } from "../types";
 import { STAGE_MAP } from "../types";
 import { saveIntakeAnswers } from "../../api";
 import { useOptionalResearchWorkspace } from "../ResearchContext";
-import type { GapItem } from "../agentPrompts/gapPrompts";
+import { generateLocalGapFallback, type GapItem } from "../agentPrompts/gapPrompts";
 
 export default function GapSelectionStage({
   stage,
@@ -232,33 +232,69 @@ export default function GapSelectionStage({
     return gaps?.filter((g) => selectedGapIds.includes(g.id) && g.id !== anchorGapId) || [];
   }, [gaps, selectedGapIds, anchorGapId]);
 
+  const handleSynthesizeFallbackGaps = async () => {
+    const workingTitle =
+      project?.answers?.["working_title"] ||
+      project?.answers?.["title"] ||
+      "Untitled Research";
+    const researchArea =
+      project?.answers?.["research_area"] ||
+      project?.answers?.["research_domain"] ||
+      "the field";
+
+    const fallback = generateLocalGapFallback({
+      workingTitle,
+      researchArea,
+      projectAnswers: project?.answers || {},
+    });
+    setGaps(fallback);
+    const initialId = fallback[0]?.id || "";
+    setSelectedGapIds(initialId ? [initialId] : []);
+    setAnchorGapId(initialId);
+
+    try {
+      const updated = await saveIntakeAnswers(projectId, {
+        identified_gaps: JSON.stringify(fallback),
+        selected_gaps: JSON.stringify(initialId ? [initialId] : []),
+        selected_gap: initialId,
+        anchor_gap_id: initialId,
+        selected_gap_title: fallback[0]?.title || "",
+        selected_gap_type: fallback[0]?.gap_type || "empirical",
+        current_stage: "gap_selection",
+      });
+      setProject(updated);
+    } catch (err) {
+      console.warn("[GapSelectionStage] Failed to persist generated fallback gaps:", err);
+    }
+  };
+
   if (!def) return <div className="p-8 text-[color:var(--text-muted)]">Unknown stage</div>;
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
       {/* 1. Header & Stage Control Bar */}
-      <div className="shrink-0 p-6 pb-4 border-b border-[color:var(--border-subtle)] flex flex-wrap justify-between items-center bg-[color:var(--surface-raised)] z-10 gap-4 shadow-2xs">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-primary)] font-black shadow-xs">
+      <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-b border-[color:var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between bg-[color:var(--surface-raised)] z-10 gap-3 sm:gap-4 shadow-2xs">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-primary)] font-black shadow-xs shrink-0">
             04
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-xl font-bold tracking-tight text-[color:var(--text-primary)]">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[color:var(--text-primary)]">
                 {def.number}. {def.label}
               </h2>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]">
                 Phase I: Foundation
               </span>
             </div>
-            <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
+            <p className="text-xs text-[color:var(--text-muted)] mt-0.5 line-clamp-1 sm:line-clamp-none">
               Designate your primary anchor gap and secondary research dimensions to steer title and methodology generation.
             </p>
           </div>
         </div>
 
         {/* Global Header Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-wrap">
           <span className="text-xs font-semibold text-[color:var(--text-secondary)]">
             <span className="text-[color:var(--accent)] font-bold">{selectedGapIds.length}</span> {selectedGapIds.length === 1 ? "Gap" : "Gaps"} Selected
           </span>
@@ -267,7 +303,7 @@ export default function GapSelectionStage({
             type="button"
             onClick={handleSaveAndProceed}
             disabled={isSaving || selectedGapIds.length === 0}
-            className="px-5 py-2 rounded-full bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-xs hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="px-4 sm:px-5 py-2 rounded-full bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-xs hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
           >
             <span>{isSaving ? "Saving..." : "Proceed to Title Suggestions"}</span>
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -278,7 +314,7 @@ export default function GapSelectionStage({
       </div>
 
       {/* 2. Main Scrollable Container */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Error Alert */}
           {error && (
@@ -296,7 +332,7 @@ export default function GapSelectionStage({
 
           {/* Empty State when no gaps are discovered yet */}
           {(!gaps || gaps.length === 0) && (
-            <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl p-10 text-center shadow-sm space-y-4 my-8">
+            <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl p-6 sm:p-10 text-center shadow-sm space-y-4 my-8">
               <div className="w-14 h-14 rounded-2xl bg-[color:var(--accent-subtle)] border border-[color:var(--border-subtle)] text-[color:var(--text-primary)] flex items-center justify-center mx-auto text-2xl font-black shadow-xs">
                 🔍
               </div>
@@ -304,15 +340,23 @@ export default function GapSelectionStage({
                 No Research Gaps Identified Yet
               </h3>
               <p className="text-xs text-[color:var(--text-secondary)] max-w-md mx-auto leading-relaxed">
-                Stage 4 requires candidate gaps identified in Stage 3. Return to Gap Identification to scan your literature corpus and detect high-impact voids.
+                Stage 4 requires candidate gaps identified in Stage 3. Return to Gap Identification to scan your literature corpus, or auto-synthesize domain-grounded candidate gaps right now.
               </p>
-              <div className="pt-2">
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
                 <button
                   type="button"
                   onClick={() => onAdvance?.("gap_identification")}
-                  className="px-6 py-2.5 bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-bold rounded-full transition-all shadow-md cursor-pointer"
+                  className="px-5 py-2.5 bg-[color:var(--surface-raised)] border border-[color:var(--border-control)] hover:bg-[color:var(--surface-hover)] text-[color:var(--text-primary)] text-xs font-bold rounded-full transition-all shadow-xs cursor-pointer"
                 >
                   ← Go to Stage 3: Gap Identification
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSynthesizeFallbackGaps}
+                  className="px-6 py-2.5 bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-inverse)] text-xs font-bold rounded-full transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>✦</span>
+                  <span>Auto-Synthesize Gaps</span>
                 </button>
               </div>
             </div>

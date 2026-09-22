@@ -191,4 +191,87 @@ describe("Stage 1: Research Definition (DefinitionStage)", () => {
       expect(onAdvance).not.toHaveBeenCalled();
     });
   });
+
+  it("synchronizes working_title with title and research_area with research_domain upon save", async () => {
+    const onAdvance = vi.fn();
+    const onSaved = vi.fn();
+
+    render(
+      <DefinitionStage
+        projectId="proj-definition-101"
+        project={mockProject}
+        onSaved={onSaved}
+        onAdvance={onAdvance}
+      />
+    );
+
+    const proceedBtn = screen.getByText(/Proceed to Literature Discovery/i);
+    fireEvent.click(proceedBtn);
+
+    await waitFor(() => {
+      expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
+        "proj-definition-101",
+        expect.objectContaining({
+          working_title: "Multi-Agent Coordination in Distributed Edge Systems",
+          title: "Multi-Agent Coordination in Distributed Edge Systems",
+          research_area: "Distributed Systems & Machine Learning",
+          research_domain: "Distributed Systems & Machine Learning",
+        })
+      );
+    });
+  });
+
+  it("provides intelligent local heuristic when FINER diagnostic is triggered and AI throws", async () => {
+    (api.executeAgenticLLM as any).mockRejectedValue(new Error("AI quota exhausted or offline"));
+
+    render(
+      <DefinitionStage
+        projectId="proj-definition-101"
+        project={mockProject}
+        onSaved={vi.fn()}
+        onAdvance={vi.fn()}
+      />
+    );
+
+    const finerBtn = screen.getByRole("button", { name: /AI Architect & FINER/i });
+    fireEvent.click(finerBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Composite FINER Score/i)).toBeInTheDocument();
+      expect(screen.getByText(/Heuristic Appraisal Active/i)).toBeInTheDocument();
+      expect(screen.getByText(/Publication-Grade Refinement Proposals/i)).toBeInTheDocument();
+    });
+  });
+
+  it("synthesizes PICO parameters into research question using heuristic fallback when AI throws", async () => {
+    (api.executeAgenticLLM as any).mockRejectedValue(new Error("AI offline"));
+
+    render(
+      <DefinitionStage
+        projectId="proj-definition-101"
+        project={mockProject}
+        onSaved={vi.fn()}
+        onAdvance={vi.fn()}
+      />
+    );
+
+    const picoBtn = screen.getByRole("button", { name: /🎯 PICO Assistant/i });
+    fireEvent.click(picoBtn);
+
+    const popInput = screen.getByPlaceholderText(/Adult ICU patients/i);
+    const intInput = screen.getByPlaceholderText(/Early prone positioning/i);
+    const outInput = screen.getByPlaceholderText(/28-day all-cause mortality/i);
+
+    fireEvent.change(popInput, { target: { value: "Distributed edge nodes" } });
+    fireEvent.change(intInput, { target: { value: "Adaptive gossip clustering" } });
+    fireEvent.change(outInput, { target: { value: "Consensus latency" } });
+
+    const compileBtn = screen.getByRole("button", { name: /Compile Question & Title/i });
+    fireEvent.click(compileBtn);
+
+    await waitFor(() => {
+      const prqTextarea = screen.getByPlaceholderText(/To what extent does active claim-evidence grounding/i) as HTMLTextAreaElement;
+      expect(prqTextarea.value).toContain("Adaptive gossip clustering");
+    });
+  });
 });

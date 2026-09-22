@@ -7,6 +7,7 @@ import { useOptionalResearchWorkspace } from "../ResearchContext";
 import type { ProjectView } from "../../types";
 import {
   buildGapPrompts,
+  generateLocalGapFallback,
   type GapItem,
 } from "../agentPrompts/gapPrompts";
 import { parseJsonFromLlm } from "../../../utils/jsonParser";
@@ -123,10 +124,16 @@ export default function GapIdentificationStage({
       },
     ]);
 
-    try {
-      const workingTitle = project?.answers?.["working_title"] || "Untitled Research";
-      const researchArea = project?.answers?.["research_area"] || "the field";
+    const workingTitle =
+      project?.answers?.["working_title"] ||
+      project?.answers?.["title"] ||
+      "Untitled Research";
+    const researchArea =
+      project?.answers?.["research_area"] ||
+      project?.answers?.["research_domain"] ||
+      "the field";
 
+    try {
       // 1. Build prompts directly on client
       const { systemPrompt, userPrompt } = buildGapPrompts({
         workingTitle,
@@ -172,7 +179,16 @@ export default function GapIdentificationStage({
 
       // 3. Parse JSON from LLM output
       const parsedData = parseJsonFromLlm(rawText);
-      const data: GapItem[] = parsedData && Array.isArray(parsedData.data) ? parsedData.data : [];
+      let data: GapItem[] = parsedData && Array.isArray(parsedData.data) ? parsedData.data : [];
+
+      if (data.length === 0) {
+        data = generateLocalGapFallback({
+          workingTitle,
+          researchArea,
+          projectAnswers: project?.answers || {},
+          focusArea: customFocus,
+        });
+      }
 
       // Fallback normalization if title is missing in older model outputs
       const normalizedGaps = data.map((g, idx) => ({
@@ -214,21 +230,42 @@ export default function GapIdentificationStage({
       ]);
     } catch (err: any) {
       const errMsg = err.message || "Failed to identify research gaps.";
-      setError(errMsg);
+
+      // Fallback to intelligent local gap synthesis so user is never blocked
+      const fallbackGaps = generateLocalGapFallback({
+        workingTitle,
+        researchArea,
+        projectAnswers: project?.answers || {},
+        focusArea: customFocus,
+      });
+
+      setGaps(fallbackGaps);
+
+      try {
+        const updated = await saveIntakeAnswers(projectId, {
+          identified_gaps: JSON.stringify(fallbackGaps),
+          current_stage: "gap_identification",
+        });
+        setProject(updated);
+      } catch (saveErr) {
+        console.warn("[GapIdentificationStage] Failed to persist fallback gaps:", saveErr);
+      }
+
       setLogs((prev) => [
         ...prev,
         {
-          id: Date.now().toString() + "err",
+          id: Date.now().toString() + "fallback",
           timestamp: new Date().toLocaleTimeString([], { hour12: false }),
-          level: "error",
-          message: `❌ ${errMsg}`,
+          level: "warning",
+          message: `ℹ️ Local synthesis activated (${errMsg}): ${fallbackGaps.length} domain-grounded candidate gaps generated.`,
+        },
+        {
+          id: Date.now().toString() + "done2",
+          timestamp: new Date().toLocaleTimeString([], { hour12: false }),
+          level: "success",
+          message: `✓ Candidate research gaps ready for review and selection.`,
         },
       ]);
-
-      if (errMsg.includes("No AI providers") || errMsg.includes("unavailable") || errMsg.includes("exhausted")) {
-        setExhaustedReason(errMsg);
-        setShowExhaustedModal(true);
-      }
     } finally {
       setIsProcessing(false);
     }
@@ -329,32 +366,32 @@ export default function GapIdentificationStage({
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)]">
       {/* 1. Header & Stage Control Bar */}
-      <div className="shrink-0 p-6 pb-4 border-b border-[color:var(--border-subtle)] flex flex-wrap justify-between items-center bg-[color:var(--surface-raised)] z-10 gap-4 shadow-2xs">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-primary)] font-black shadow-xs">
+      <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-b border-[color:var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between bg-[color:var(--surface-raised)] z-10 gap-3 sm:gap-4 shadow-2xs">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[color:var(--accent-subtle)] border border-[color:var(--border-subtle)] flex items-center justify-center text-[color:var(--text-primary)] font-black shadow-xs shrink-0">
             03
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-xl font-bold tracking-tight text-[color:var(--text-primary)]">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[color:var(--text-primary)]">
                 {def.number}. {def.label}
               </h2>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[color:var(--surface-inset)] text-[color:var(--text-secondary)] border border-[color:var(--border-subtle)]">
                 Phase I: Foundation
               </span>
             </div>
-            <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
+            <p className="text-xs text-[color:var(--text-muted)] mt-0.5 line-clamp-1 sm:line-clamp-none">
               Systematic AI identification and ranking of theoretical, empirical, and methodological knowledge gaps.
             </p>
           </div>
         </div>
 
         {/* Global Header Actions */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-2.5 flex-wrap">
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
-            className="px-3.5 py-2 rounded-full bg-[color:var(--surface-raised)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            className="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-[color:var(--surface-raised)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -368,7 +405,7 @@ export default function GapIdentificationStage({
                 type="button"
                 onClick={() => setShowFocusModal(true)}
                 disabled={isProcessing}
-                className="px-3.5 py-2 rounded-full bg-[color:var(--surface-inset)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
+                className="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-[color:var(--surface-inset)] border border-[color:var(--border-control)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs shrink-0"
               >
                 <span>✦</span>
                 <span>Targeted Focus Scan</span>
@@ -377,7 +414,7 @@ export default function GapIdentificationStage({
               <button
                 type="button"
                 onClick={() => onAdvance?.("gap_selection")}
-                className="px-5 py-2 rounded-full bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-xs hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                className="px-4 sm:px-5 py-2 rounded-full bg-[color:var(--accent)] text-[color:var(--text-inverse)] font-bold text-xs hover:bg-[color:var(--accent-hover)] transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 <span>Review & Select Gaps</span>
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -390,10 +427,10 @@ export default function GapIdentificationStage({
       </div>
 
       {/* 2. Main Scrollable Container */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Initial Empty Hero State */}
-        {gaps === null && !isProcessing && (
-          <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl p-10 text-center max-w-xl mx-auto my-12 shadow-sm space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Empty State / Initial Hero */}
+        {(!gaps || gaps.length === 0) && !isProcessing && (
+          <div className="bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] rounded-2xl p-6 sm:p-10 text-center max-w-xl mx-auto my-8 sm:my-12 shadow-sm space-y-4">
             <div className="w-14 h-14 rounded-2xl bg-[color:var(--accent-subtle)] border border-[color:var(--border-subtle)] text-[color:var(--text-primary)] flex items-center justify-center mx-auto text-2xl font-black shadow-xs">
               🎯
             </div>

@@ -212,4 +212,33 @@ describe("Stage 5: Title Suggestions (TitleSelectionStage)", () => {
       expect(onAdvanceMock).toHaveBeenCalledWith("vault_sources");
     });
   });
+
+  it("falls back to local heuristic synthesis when executeAgenticLLM throws", async () => {
+    (api.executeAgenticLLM as any).mockRejectedValue(new Error("AI quota reached"));
+
+    render(
+      <TitleSelectionStage
+        stage="title_selection"
+        projectId="proj-title-101"
+        project={mockProjectEmpty}
+        onAdvance={vi.fn()}
+      />
+    );
+
+    const generateBtn = screen.getByRole("button", { name: /Generate Title Proposals/i });
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Synthesize Publication-Ready Titles/i)).not.toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /Adopt Title/i }).length).toBeGreaterThan(0);
+    });
+
+    expect(api.saveIntakeAnswers).toHaveBeenCalledWith(
+      "proj-title-101",
+      expect.objectContaining({
+        generated_titles: expect.any(String),
+        current_stage: "title_selection",
+      })
+    );
+  });
 });
