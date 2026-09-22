@@ -86,14 +86,14 @@ If you recently migrated from older client-side Google Identity Services code:
 
 ---
 
-## 3. Pushing Database Migrations to Supabase
+## 4. Pushing Database Migrations to Supabase
 
 The repository contains 25 database migrations under `supabase/migrations/`. To apply them to your live Supabase project (`gfjhsijrwodjvkisouzw`):
 
 ### Option A: Via Supabase Personal Access Token (Recommended)
 1. Go to [Supabase Account Access Tokens](https://supabase.com/dashboard/account/tokens).
 2. Click **Generate new token**, name it (e.g. `scholar-cli`), and copy the token.
-3. Provide the token to Antigravity / run:
+3. Provide the token or run:
    ```bash
    npx supabase login --token <YOUR_SUPABASE_ACCESS_TOKEN>
    npx supabase db push
@@ -114,7 +114,8 @@ You can also copy the SQL from any pending migration file in `supabase/migration
 
 ---
 
-## 4. Current Status (Verified)
+## 5. Current Status (Verified & Synchronized)
 
-- **Database Migrations:** All 25 migrations from `20260811000000_code_review_fixes.sql` through `20260908000000_source_library_metadata_and_integrity.sql` are active and fully synchronized in the live Supabase project `scholarAgent` (`gfjhsijrwodjvkisouzw`).
-- **Google Sign-In Fallback:** Live in `main` branch ([`feae205`](https://github.com/docgovinda-glitch/scholar-agentic-os/commit/feae205)), ensuring OAuth redirects through Supabase if Google Identity Services iframe is blocked or origin is unlisted.
+- **Database Migrations:** All 25 migrations (`20260811000000_code_review_fixes.sql` through `20260908000000_source_library_metadata_and_integrity.sql`) have been pushed and verified on the remote Supabase database (`scholarAgent` / `gfjhsijrwodjvkisouzw`). Output: `{"upToDate":true,"dryRun":false,"migrations":[],"message":"Remote database is up to date."}`.
+- **Google Identity Services & Helmet COOP Fix:** Live in `main` branch ([`81bd620`](https://github.com/docgovinda-glitch/scholar-agentic-os/commit/81bd620)), configuring `crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }` to prevent popup freeze at `accounts.google.com/gsi/transform`.
+- **Google Sign-In Fallback:** Live in `src/desk/auth/GoogleIdentityButton.tsx`, providing instant redirect sign-in via Supabase OAuth if popups, third-party cookies, or cross-window messaging are blocked by browser privacy extensions.
