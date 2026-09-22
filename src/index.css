@@ -187,7 +187,7 @@
     color-scheme: dark;
 
     /* NIGHT MODE (ChatGPT Style) */
-    --bg-sidebar: #000000;      /* Pure black */
+    --bg-sidebar: #141414;      /* Elevated soft charcoal gray */
     --bg-canvas: #171717;       /* Deep neutral gray */
     --bg-card: #212121;         /* Slightly lighter gray for elevated elements */
     --bg-button-primary: #FFFFFF; 
@@ -203,11 +203,11 @@
     --theme-fg: var(--text-primary);
     --theme-border: var(--border-subtle);
 
-    /* Surfaces — Pure neutral blacks & grays, ZERO navy/blue */
+    /* Surfaces — Pure neutral grays, ZERO navy/blue */
     --surface-canvas:  #171717; /* Deep neutral gray (ChatGPT canvas) */
     --surface-raised:  #212121; /* Slightly lighter gray (ChatGPT elevated cards) */
     --surface-inset:   #1A1A1A; /* Inset wells */
-    --surface-sunken:  #000000; /* Pure black */
+    --surface-sunken:  #141414; /* Elevated soft charcoal gray */
     --surface-hover:   #2A2A2A; /* Subtle hover */
 
     --border-subtle:   #333333;
@@ -250,7 +250,7 @@
   color-scheme: dark;
 
   /* NIGHT MODE (ChatGPT Style) */
-  --bg-sidebar: #000000;      /* Pure black */
+  --bg-sidebar: #141414;      /* Elevated soft charcoal gray */
   --bg-canvas: #171717;       /* Deep neutral gray */
   --bg-card: #212121;         /* Slightly lighter gray for elevated elements */
   --bg-button-primary: #FFFFFF; 
@@ -266,11 +266,11 @@
   --theme-fg: var(--text-primary);
   --theme-border: var(--border-subtle);
 
-  /* Surfaces — Pure neutral blacks & grays, ZERO navy/blue */
+  /* Surfaces — Pure neutral grays, ZERO navy/blue */
   --surface-canvas:  #171717; /* Deep neutral gray (ChatGPT canvas) */
   --surface-raised:  #212121; /* Slightly lighter gray (ChatGPT elevated cards) */
   --surface-inset:   #1A1A1A; /* Inset wells */
-  --surface-sunken:  #000000; /* Pure black */
+  --surface-sunken:  #141414; /* Elevated soft charcoal gray */
   --surface-hover:   #2A2A2A; /* Subtle hover */
 
   --border-subtle:   #333333;

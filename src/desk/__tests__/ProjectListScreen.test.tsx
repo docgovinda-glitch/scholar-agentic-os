@@ -141,7 +141,7 @@ describe("the Workshop welcome banner", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
-    await screen.findByText("No projects yet");
+    await screen.findByRole("heading", { name: "Assignment" });
     expect(screen.queryByText("Welcome to your Scholar Workspace")).not.toBeInTheDocument();
   });
 });
@@ -158,26 +158,27 @@ describe("the search bar & delete confirmation modal", () => {
     updatedAt: new Date().toISOString(),
   };
 
-  it("renders the rounded search projects input", async () => {
+  it("renders the sidebar search input and transparent AI prompt bar without duplicate search on dashboard", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    await waitFor(() => {
-      const searchInputs = screen.getAllByPlaceholderText("Search projects...");
-      expect(searchInputs.length).toBeGreaterThan(1);
-    });
+    // Sidebar search input
+    expect(screen.getByPlaceholderText("Search projects...")).toBeInTheDocument();
 
-    const searchInputs = screen.getAllByPlaceholderText("Search projects...");
-    const searchInput = searchInputs.find((el) => el.className.includes("!rounded-full"));
-    expect(searchInput).toBeDefined();
-    expect(searchInput).toHaveClass("!rounded-full");
+    // Consolidated transparent AI prompt bar on main dashboard
+    const promptInput = screen.getByPlaceholderText(/Draft a Research Proposal, analyze data, or search projects.../i);
+    expect(promptInput).toBeInTheDocument();
+    expect(promptInput).toHaveClass("bg-transparent");
   });
 
   it("opens custom delete modal with 'Cancel' button and red 'Delete' text option without logo", async () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const deleteBtn = await screen.findByRole("button", { name: "Delete Project" });
+    const moreBtn = await screen.findByRole("button", { name: "More options" });
+    fireEvent.click(moreBtn);
+
+    const deleteBtn = screen.getByRole("button", { name: /^Delete$/i });
     fireEvent.click(deleteBtn);
 
     // Modal pops up
@@ -203,7 +204,10 @@ describe("the search bar & delete confirmation modal", () => {
     listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const deleteBtn = await screen.findByRole("button", { name: "Delete Project" });
+    const moreBtn = await screen.findByRole("button", { name: "More options" });
+    fireEvent.click(moreBtn);
+
+    const deleteBtn = screen.getByRole("button", { name: /^Delete$/i });
     fireEvent.click(deleteBtn);
 
     const cancelBtn = screen.getByRole("button", { name: "Cancel" });
@@ -218,7 +222,10 @@ describe("the search bar & delete confirmation modal", () => {
     deleteProject.mockResolvedValue(undefined);
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const deleteBtn = await screen.findByRole("button", { name: "Delete Project" });
+    const moreBtn = await screen.findByRole("button", { name: "More options" });
+    fireEvent.click(moreBtn);
+
+    const deleteBtn = screen.getByRole("button", { name: /^Delete$/i });
     fireEvent.click(deleteBtn);
 
     const confirmDeleteBtn = screen.getByRole("button", { name: "Delete" });
@@ -385,18 +392,17 @@ describe("sidebar projects & platform navigation", () => {
     expect(within(aside!).getByRole("button", { name: /Add to Project/i })).toBeInTheDocument();
     expect(within(aside!).getByRole("button", { name: /Delete/i })).toBeInTheDocument();
 
-    // Project card in main Projects workspace
-    const main = container.querySelector("main");
-    const projectTitle = await within(main!).findByText("Comparative Analysis of In Vivo Cleavage");
-    expect(projectTitle).toBeInTheDocument();
+    // Recents item in sidebar allows direct workspace navigation
+    const recentItem = await within(aside!).findByText("Comparative Analysis of In Vivo Cleavage");
+    expect(recentItem).toBeInTheDocument();
 
-    fireEvent.click(projectTitle);
+    fireEvent.click(recentItem);
     expect(onOpen).toHaveBeenCalledWith("proj-crispr-01");
   });
 });
 
 describe("landing workspace hero & academic workspace cards", () => {
-  it("renders the hero headline, 4 academic workspace cards, and projects count", async () => {
+  it("renders the 4 academic workspace cards and consolidated prompt bar while purging projects list", async () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
@@ -411,10 +417,14 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
 
-    // Projects section (renamed from Active Projects)
-    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
-    expect(await screen.findByText("0 of 0")).toBeInTheDocument();
-    expect(await screen.findByText("No projects yet")).toBeInTheDocument();
+    // Consolidated transparent AI prompt bar immediately below cards
+    const promptBar = screen.getByPlaceholderText(/Draft a Research Proposal, analyze data, or search projects.../i);
+    expect(promptBar).toBeInTheDocument();
+
+    // Projects section, secondary search, and progress cards are purged from main canvas
+    expect(screen.queryByRole("heading", { name: "Projects" })).not.toBeInTheDocument();
+    expect(screen.queryByText("0 of 0")).not.toBeInTheDocument();
+    expect(screen.queryByText("No projects yet")).not.toBeInTheDocument();
     expect(screen.queryByText("Browse Templates")).not.toBeInTheDocument();
     expect(screen.queryByText(/Import from Zotero/i)).not.toBeInTheDocument();
   });

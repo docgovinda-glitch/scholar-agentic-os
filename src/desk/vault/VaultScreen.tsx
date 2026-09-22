@@ -13,15 +13,18 @@ import {
 } from "../../services/vaultContents";
 import VaultSetupScreen from "../setup/VaultSetupScreen";
 import SourceLibraryScreen from "./SourceLibraryScreen";
+import KnowledgeVault from "./KnowledgeVault";
 
 type VaultPresence = null | "none" | "this-device" | "synced";
 
 export default function VaultScreen({
   userId,
+  initialTab = "sources",
   onClose,
   onOpenProject,
 }: {
   userId: string;
+  initialTab?: "projects" | "sources" | "settings";
   onClose: () => void;
   onOpenProject?: (projectId: string) => void;
 }) {
@@ -154,8 +157,9 @@ export default function VaultScreen({
   }
 
   return (
-    <SourceLibraryScreen
+    <KnowledgeVault
       userId={userId}
+      initialTab={initialTab}
       onClose={onClose}
       onOpenProject={onOpenProject}
       onLock={() => {

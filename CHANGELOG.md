@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-22
 
 ### Added
+- **Progressive Disclosure Main Dashboard Refactor (`src/desk/ProjectListScreen.tsx`)**:
+  - **Purged Main Dashboard Canvas**: Stripped the redundant project list, secondary "Search projects..." input, filter pills, and bottom progress-tracking cards from the main screen (`/` route) to eliminate visual clutter and functional redundancy.
+  - **Consolidated Frictionless Main View**: Standardized the dashboard (`/` route) to display ONLY the top-aligned grid of four academic workspace template cards (Journal Article, Assignment, Research Proposal, Thesis) and the transparent AI prompt bar immediately below it. Left the space below the prompt bar completely clear, creating a focused, distraction-free stage for research, analysis, and writing.
+  - **Accessible Screen Reader Semantics**: Preserved accessible semantic headings (`<h2 className="sr-only">Projects</h2>`) ensuring seamless keyboard and screen reader navigation.
+- **Migrated Project Management & Tracking to Knowledge Vault (`src/desk/vault/KnowledgeVault.tsx`, `src/desk/vault/VaultScreen.tsx`)**:
+  - **Comprehensive Knowledge Vault Workspace**: Created `KnowledgeVault.tsx` consolidating project management, source provenance, and cloud drive settings in a unified tabbed interface accessible via the left sidebar.
+  - **Project Management Suite**: Migrated the detailed Projects data table, real-time live search input, format filter pills (All, Journal Article, Assignment, Research Proposal, Presentation, Thesis), and milestone tracking metrics ribbon (Active Projects, Quality Gates verified, and Overall Progress Average bar).
+  - **Pinterest-Red Delete Confirmation Modal**: Added safe project deletion dialog with accessible modal semantics (`role="dialog"`), destructive confirmation safeguards, and `#E60023` styling.
+  - **Seamless Vault Integration**: Wired `KnowledgeVault` as the default unlocked view in `VaultScreen.tsx` with full support for `initialTab="projects"` and direct workspace opening (`onOpenProject`).
+- **Elevated Soft Greys Dark Mode Aesthetics (`src/index.css`, `src/desk/vault/KnowledgeVault.tsx`)**:
+  - Refined theme tokens to use warm, elevated soft dark greys (`#171717` `--bg-canvas`, `#1C1C1E` / `#212121` `--bg-card`, `#141414` `--bg-sidebar`), strictly avoiding harsh pure black (`#000000`).
 - **Journal Article Workspace: Comprehensive 25-Stage Overhaul & Camera-Ready Export Hardening (`src/desk/workspace/stages/*`)**:
   - **Eliminated Hardcoded Byzantine Consensus Fallbacks**: Refactored offline/fallback synthesis functions across all 25 stages (`EvidenceExtractionStage`, `ExternalResearchStage`, `EvidenceAnalysisStage`, `DraftStage`, `PeerReviewStage`, `RevisionStage`, `FinalEditorStage`, `ExportStage`). Generated prose is dynamically tailored to the user's actual research domain, title, methodology, and target journal rather than hardcoded distributed systems text.
   - **Eliminated Raw JSON Text Dumps in Export Pipeline**: Resolved bug where camera-ready exports output raw JSON strings (`[{"id":"sec-1","section":"Abstract"...}]`). Persisted clean markdown across `manuscript_markdown` and `full_text_markdown` in Stage 17, and upgraded Stages 20, 23, and 25 to automatically unpack stringified section arrays into camera-ready markdown headings and clean prose.

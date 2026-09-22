@@ -132,10 +132,15 @@ afterEach(() => {
 
 describe("Desk — project list", () => {
   it("shows the empty state when the user has no projects yet", async () => {
-    mockFetchSequence([{ url: /\/api\/projects$/, body: { items: [] } }]);
+    mockFetchSequence([
+      { url: /\/api\/projects$/, body: { items: [] } },
+      { url: /\/api\/atlas\/output-types$/, body: { items: [] } },
+    ]);
 
     renderDeskApp();
 
+    // The main canvas is purged of project lists; accessing Knowledge Vault from sidebar shows empty state
+    fireEvent.click(await screen.findByRole("button", { name: /Knowledge Vault/i }));
     expect(await screen.findByText("No projects yet")).toBeInTheDocument();
   });
 
@@ -150,9 +155,12 @@ describe("Desk — project list", () => {
 
     renderDeskApp();
 
-    expect(await screen.findByText(/Pipeline Completeness|Workflow Completion/)).toBeInTheDocument();
-    expect(screen.getByText("50%")).toBeInTheDocument();
-    fireEvent.click(screen.getAllByText("OT-06")[0]);
+    // Access project management via Knowledge Vault in the left sidebar
+    fireEvent.click(await screen.findByRole("button", { name: /Knowledge Vault/i }));
+
+    expect(await screen.findByText(/Workflow Completion/)).toBeInTheDocument();
+    expect((await screen.findAllByText("50%"))[0]).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open Workspace" }));
 
     // The shell opens on Intake while G0 is outstanding — that is the first
     // real task, and it gates every later gate.
@@ -349,7 +357,7 @@ describe("Desk — account settings", () => {
     expect(await screen.findByRole("heading", { name: "Account Settings" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
   });
 
   it("opens from within a project and returns to it, not to the list", async () => {
@@ -396,7 +404,7 @@ describe("Desk — AI Access", () => {
     expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
   });
 
   it("reflects the active section in the URL, so Back steps back through sections instead of leaving AI Access entirely", async () => {

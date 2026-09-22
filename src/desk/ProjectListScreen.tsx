@@ -9,6 +9,7 @@ import ScholarCoreLogo from "../components/ScholarCoreLogo";
 import UserAccountMenu from "./components/UserAccountMenu";
 import EmbeddedAuthModal from "./auth/EmbeddedAuthModal";
 import VaultScreen from "./vault/VaultScreen";
+import KnowledgeVault from "./vault/KnowledgeVault";
 import AiAccessPage, { type SectionId } from "./aiAccess/AiAccessPage";
 import {
   Plus,
@@ -855,12 +856,6 @@ Keep your response concise, helpful, and academically grounded.`;
   const [projectToDelete, setProjectToDelete] = useState<ProjectView | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  function promptDelete(project: ProjectView, e: React.MouseEvent) {
-    e.stopPropagation();
-    e.preventDefault();
-    setProjectToDelete(project);
-  }
-
   const [activeRecentMenuId, setActiveRecentMenuId] = useState<string | null>(null);
   const [pinnedRecentIds, setPinnedRecentIds] = useState<string[]>([]);
   const recentMenuRef = useRef<HTMLDivElement>(null);
@@ -996,26 +991,6 @@ Keep your response concise, helpful, and academically grounded.`;
     if (!confirmed) return;
     getSupabaseClient().auth.signOut();
   }
-
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
-
-  // Filtered projects
-  const filteredProjects = useMemo(() => {
-    if (!projects) return [];
-    let list = projects;
-
-    if (selectedTypeFilter !== "all") {
-      list = list.filter((p) => p.outputTypeId === selectedTypeFilter);
-    }
-
-    if (!searchQuery.trim()) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter((p) => {
-      const title = p.answers?.title || p.answers?.research_question || "";
-      const label = typeMap.get(p.outputTypeId)?.label || p.outputTypeId;
-      return title.toLowerCase().includes(q) || label.toLowerCase().includes(q) || p.outputTypeId.toLowerCase().includes(q);
-    });
-  }, [projects, selectedTypeFilter, searchQuery, typeMap]);
 
   return (
     <div className="h-screen w-full flex overflow-hidden bg-[var(--bg-canvas)] text-[var(--text-primary)] font-sans selection:bg-[var(--text-primary)] selection:text-[var(--bg-canvas)]">
@@ -1446,8 +1421,9 @@ Keep your response concise, helpful, and academically grounded.`;
         {/* Dynamic Central Content (Knowledge Vault, AI Access, or Projects reading column) */}
         {activeView === "vault" ? (
           <div className="flex-1 overflow-y-auto w-full relative">
-            <VaultScreen
+            <KnowledgeVault
               userId={userId || "local-user"}
+              initialTab="projects"
               onClose={handleCloseCentralView}
               onOpenProject={(pId) => onOpen(pId)}
             />
@@ -1655,191 +1631,10 @@ Keep your response concise, helpful, and academically grounded.`;
                 </div>
               </div>
 
-              {/* Projects Section with Live Search & Filter Tabs */}
-              <section id="projects-section" className="w-full text-left scroll-mt-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-3 border-b border-gray-200 dark:border-neutral-800 w-full">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
-                      Projects
-                    </h2>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border border-gray-200 dark:border-neutral-800 text-[var(--text-secondary)] bg-white dark:bg-[#171717] shadow-sm font-sans">
-                      {projects ? `${filteredProjects.length} of ${projects.length}` : "0 of 0"}
-                    </span>
-                  </div>
-
-                  {/* Search Bar */}
-                  {projects && projects.length > 0 && (
-                    <div className="relative w-full sm:w-80">
-                      <input
-                        type="text"
-                        placeholder="Search projects..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full !rounded-full !border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] pl-10 pr-9 py-2 text-xs font-normal text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] outline-none focus:!ring-2 focus:ring-gray-200 dark:focus:ring-neutral-700 transition-all shadow-sm"
-                      />
-                      <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute left-3.5 top-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      {searchQuery && (
-                        <button
-                          type="button"
-                          onClick={() => setSearchQuery("")}
-                          className="absolute right-3 top-2 p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-                          title="Clear search"
-                          aria-label="Clear search"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Format Filter Tabs */}
-                {projects && projects.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 mb-6">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTypeFilter("all")}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 border font-sans ${
-                        selectedTypeFilter === "all"
-                          ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100 shadow-xs"
-                          : "bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-neutral-800 shadow-sm"
-                      }`}
-                    >
-                      <span>All</span>
-                      <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded-full ${
-                        selectedTypeFilter === "all" ? "bg-white/20 dark:bg-black/20 text-white dark:text-gray-900" : "bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-gray-400"
-                      }`}>
-                        {projects.length}
-                      </span>
-                    </button>
-
-                    {FORMAT_TILES.map((tile) => {
-                      const count = projects.filter((p) => p.outputTypeId === tile.id).length;
-                      const isActive = selectedTypeFilter === tile.id;
-
-                      return (
-                        <button
-                          key={tile.id}
-                          type="button"
-                          onClick={() => setSelectedTypeFilter(tile.id)}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 border font-sans ${
-                            isActive
-                              ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100 shadow-xs"
-                              : "bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-neutral-800 shadow-sm"
-                          }`}
-                        >
-                          <span className="w-3.5 h-3.5 flex items-center justify-center">
-                            <FormatIcon id={tile.id} className="w-3.5 h-3.5" />
-                          </span>
-                          <span>{tile.label}</span>
-                          {count > 0 && (
-                            <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded-full ${
-                              isActive ? "bg-white/20 dark:bg-black/20 text-white dark:text-gray-900" : "bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-gray-400"
-                            }`}>
-                              {count}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {projects === null ? (
-                  error ? (
-                    <div className="flex flex-col justify-center items-center py-16 text-center border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl p-8 shadow-sm">
-                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 font-sans">Failed to load projects</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mb-4 font-normal leading-relaxed font-sans">{error}</p>
-                      <button
-                        onClick={load}
-                        className="px-6 py-2.5 rounded-full bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs font-medium hover:opacity-90 transition-transform active:scale-95 cursor-pointer shadow-xs font-sans"
-                      >
-                        Retry Connection
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col justify-center items-center py-20 border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] rounded-2xl shadow-sm">
-                      <div className="w-8 h-8 border-2 border-gray-900 dark:border-gray-100 border-t-transparent rounded-full animate-spin mb-4" />
-                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 font-sans">Loading projects...</span>
-                    </div>
-                  )
-                ) : projects.length === 0 ? (
-                  <EmptyState />
-                ) : filteredProjects.length === 0 ? (
-                  <div className="p-12 text-center rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] shadow-sm">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 font-sans">No projects match "{searchQuery}"</p>
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="mt-3 text-xs font-medium text-gray-900 dark:text-gray-100 underline cursor-pointer font-sans"
-                    >
-                      Clear search filter
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {filteredProjects.map((p) => (
-                      <ProjectCard
-                        key={p.projectId}
-                        project={p}
-                        typeSummary={typeMap.get(p.outputTypeId)}
-                        onOpen={() => onOpen(p.projectId)}
-                        onDelete={(e) => promptDelete(p, e)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Floating Bottom AI Prompt Bar — Parallel to Settings & User Information */}
-      {activeView === "projects" && (
-        <div className="sticky bottom-0 z-20 w-full px-6 py-4 bg-gradient-to-t from-[var(--bg-canvas)] via-[var(--bg-canvas)]/95 to-transparent pointer-events-none">
-          <div className="max-w-3xl mx-auto pointer-events-auto relative">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (guideInput.trim()) {
-                  setIsPromptSuggestionsOpen(false);
-                  setIsAiSidebarOpen(true);
-                  handleSendGuideMessage();
-                  setTimeout(() => guideInputRef.current?.focus(), 300);
-                }
-              }}
-              className="flex items-center gap-3 w-full rounded-full bg-white dark:bg-[#1C1C1E] border border-gray-200/90 dark:border-white/10 shadow-lg px-4 py-3 transition-all duration-200 focus-within:shadow-xl focus-within:border-gray-300 dark:focus-within:border-white/20"
-            >
-              {/* Left: Attachment / Plus button */}
-              <button
-                type="button"
-                title="Attach file"
-                aria-label="Attach file"
-                className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 dark:text-neutral-500 hover:text-gray-600 dark:hover:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-
-              {/* Center: Transparent flexible input */}
-              <input
-                type="text"
-                value={guideInput}
-                onChange={(e) => {
-                  setGuideInput(e.target.value);
-                  setIsPromptSuggestionsOpen(true);
-                }}
-                onFocus={() => {
-                  if (guideInput.trim().length >= 2) setIsPromptSuggestionsOpen(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setIsPromptSuggestionsOpen(false);
-                  }
-                  if (e.key === "Enter" && !e.shiftKey) {
+              {/* Main AI Prompt Bar — Consolidated immediately below 4 template cards */}
+              <div className="w-full max-w-3xl mx-auto pt-2 relative">
+                <form
+                  onSubmit={(e) => {
                     e.preventDefault();
                     if (guideInput.trim()) {
                       setIsPromptSuggestionsOpen(false);
@@ -1847,91 +1642,129 @@ Keep your response concise, helpful, and academically grounded.`;
                       handleSendGuideMessage();
                       setTimeout(() => guideInputRef.current?.focus(), 300);
                     }
-                  }
-                }}
-                placeholder="Draft a Research Proposal, analyze data, or search projects..."
-                style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
-                className="flex-1 bg-transparent text-sm font-normal text-[var(--text-primary)] placeholder:text-gray-400 dark:placeholder:text-neutral-500 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none prompt-bare-input"
-              />
+                  }}
+                  className="flex items-center gap-3 w-full rounded-full bg-white dark:bg-[#1C1C1E] border border-gray-200/90 dark:border-white/10 shadow-lg px-4 py-3 transition-all duration-200 focus-within:shadow-xl focus-within:border-gray-300 dark:focus-within:border-white/20"
+                >
+                  {/* Left: Attachment / Plus button */}
+                  <button
+                    type="button"
+                    title="Attach file"
+                    aria-label="Attach file"
+                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 dark:text-neutral-500 hover:text-gray-600 dark:hover:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
 
-              {/* Right: Solid circular submit button */}
-              <button
-                type="submit"
-                title="Send"
-                aria-label="Send message"
-                disabled={!guideInput.trim() || isGuideThinking}
-                className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
-                  guideInput.trim() && !isGuideThinking
-                    ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-200 shadow-sm"
-                    : "bg-gray-100 dark:bg-neutral-800 text-gray-400 dark:text-neutral-500 cursor-not-allowed"
-                }`}
-              >
-                {isGuideThinking ? (
-                  <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <ArrowUp className="w-4 h-4 stroke-[2.5]" />
-                )}
-              </button>
-            </form>
+                  {/* Center: Transparent flexible input */}
+                  <input
+                    type="text"
+                    value={guideInput}
+                    onChange={(e) => {
+                      setGuideInput(e.target.value);
+                      setIsPromptSuggestionsOpen(true);
+                    }}
+                    onFocus={() => {
+                      if (guideInput.trim().length >= 2) setIsPromptSuggestionsOpen(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setIsPromptSuggestionsOpen(false);
+                      }
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (guideInput.trim()) {
+                          setIsPromptSuggestionsOpen(false);
+                          setIsAiSidebarOpen(true);
+                          handleSendGuideMessage();
+                          setTimeout(() => guideInputRef.current?.focus(), 300);
+                        }
+                      }
+                    }}
+                    placeholder="Draft a Research Proposal, analyze data, or search projects..."
+                    style={{ border: "none", outline: "none", boxShadow: "none", background: "transparent" }}
+                    className="flex-1 bg-transparent text-sm font-normal text-[var(--text-primary)] placeholder:text-gray-400 dark:placeholder:text-neutral-500 border-none outline-none focus:outline-none focus:ring-0 min-w-0 shadow-none focus:shadow-none prompt-bare-input"
+                  />
 
-            {/* Instant Suggestions & Matching Projects Popover — Opening UPWARDS */}
-            {guideInput.trim().length >= 2 && isPromptSuggestionsOpen && (
-              <div className="absolute left-0 right-0 bottom-full mb-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-neutral-800 rounded-2xl shadow-2xl z-30 p-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-80 overflow-y-auto">
-                {/* Matching Projects */}
-                {promptMatchingProjects.length > 0 && (
-                  <div className="mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-neutral-500 px-3 py-1 block">
-                      Matching Projects ({promptMatchingProjects.length})
-                    </span>
-                    {promptMatchingProjects.map((p) => (
+                  {/* Right: Solid circular submit button */}
+                  <button
+                    type="submit"
+                    title="Send"
+                    aria-label="Send message"
+                    disabled={!guideInput.trim() || isGuideThinking}
+                    className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
+                      guideInput.trim() && !isGuideThinking
+                        ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-200 shadow-sm"
+                        : "bg-gray-100 dark:bg-neutral-800 text-gray-400 dark:text-neutral-500 cursor-not-allowed"
+                    }`}
+                  >
+                    {isGuideThinking ? (
+                      <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                    )}
+                  </button>
+                </form>
+
+                {/* Instant Suggestions & Matching Projects Popover */}
+                {guideInput.trim().length >= 2 && isPromptSuggestionsOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-neutral-800 rounded-2xl shadow-2xl z-30 p-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 max-h-80 overflow-y-auto">
+                    {/* Matching Projects */}
+                    {promptMatchingProjects.length > 0 && (
+                      <div className="mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-neutral-500 px-3 py-1 block">
+                          Matching Projects ({promptMatchingProjects.length})
+                        </span>
+                        {promptMatchingProjects.map((p) => (
+                          <button
+                            key={p.projectId}
+                            type="button"
+                            onClick={() => {
+                              setIsPromptSuggestionsOpen(false);
+                              onOpen(p.projectId);
+                            }}
+                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-6 h-6 rounded-lg bg-gray-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
+                                <FormatIcon id={p.outputTypeId} className="w-3.5 h-3.5" />
+                              </span>
+                              <span className="text-xs font-medium text-gray-800 dark:text-neutral-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                {p.answers?.title || "Untitled Project"}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-gray-400 group-hover:text-gray-600 dark:group-hover:text-neutral-300 shrink-0 font-medium">
+                              Open →
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Platform Action Suggestions */}
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-neutral-500 px-3 py-1 block">
+                        Ask & Actions
+                      </span>
                       <button
-                        key={p.projectId}
                         type="button"
                         onClick={() => {
                           setIsPromptSuggestionsOpen(false);
-                          onOpen(p.projectId);
+                          setIsAiSidebarOpen(true);
+                          handleSendGuideMessage();
                         }}
-                        className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer group"
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="w-6 h-6 rounded-lg bg-gray-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
-                            <FormatIcon id={p.outputTypeId} className="w-3.5 h-3.5" />
-                          </span>
-                          <span className="text-xs font-medium text-gray-800 dark:text-neutral-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                            {p.answers?.title || "Untitled Project"}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-gray-400 group-hover:text-gray-600 dark:group-hover:text-neutral-300 shrink-0 font-medium">
-                          Open →
+                        <span className="text-xs text-gray-700 dark:text-neutral-300 truncate">
+                          Ask Scholar: <strong className="text-gray-900 dark:text-white font-medium">"{guideInput}"</strong>
                         </span>
+                        <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium shrink-0 ml-2">Submit ↗</span>
                       </button>
-                    ))}
+                    </div>
                   </div>
                 )}
-
-                {/* Platform Action Suggestions */}
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-neutral-500 px-3 py-1 block">
-                    Ask & Actions
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPromptSuggestionsOpen(false);
-                      setIsAiSidebarOpen(true);
-                      handleSendGuideMessage();
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-                  >
-                    <span className="text-xs text-gray-700 dark:text-neutral-300 truncate">
-                      Ask Scholar: <strong className="text-gray-900 dark:text-white font-medium">"{guideInput}"</strong>
-                    </span>
-                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium shrink-0 ml-2">Submit ↗</span>
-                  </button>
-                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
       </main>
@@ -2192,110 +2025,6 @@ Keep your response concise, helpful, and academically grounded.`;
   );
 }
 
-function ProjectCard({
-  project,
-  typeSummary,
-  onOpen,
-  onDelete,
-}: {
-  project: ProjectView;
-  typeSummary?: OutputTypeSummary;
-  onOpen: () => void;
-  onDelete?: (e: React.MouseEvent) => void;
-}) {
-  const percent = Math.round((project.intakeCompleteness || 0) * 100);
-  const signedOff = project.gates?.filter((g) => g.status === "signed_off").length || 0;
-  const totalGates = project.gates?.length || 5;
-
-  // Title resolution
-  const displayTitle =
-    project.answers?.title?.trim() ||
-    project.answers?.research_question?.trim() ||
-    project.answers?.topic?.trim() ||
-    typeSummary?.label ||
-    project.outputTypeId;
-
-  const typeLabel = typeSummary?.label || project.outputTypeId;
-
-  return (
-    <div className="relative group font-sans">
-      <button
-        onClick={onOpen}
-        className="w-full text-left p-6 rounded-2xl border border-gray-100 dark:border-neutral-800 bg-white dark:bg-[#171717] shadow-sm hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 hover:border-gray-300 dark:hover:border-neutral-700 transition-all duration-200 flex flex-col justify-between cursor-pointer min-h-[220px]"
-      >
-        <div>
-          {/* Card Top Metadata */}
-          <div className="flex items-center justify-start gap-2 mb-3 pr-20">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-neutral-800/80 border border-gray-200 dark:border-neutral-700">
-              {typeLabel}
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-neutral-800/80 border border-gray-200 dark:border-neutral-700">
-              {project.hasDocument ? "Drafting stage" : "Evidence intake"}
-            </span>
-          </div>
-
-          {/* Project Title */}
-          <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 font-sans leading-snug line-clamp-2 mb-2">
-            {displayTitle}
-          </h3>
-
-          <p className="text-xs text-gray-500 dark:text-gray-400 font-normal leading-relaxed font-sans">
-            {signedOff} of {totalGates} quality gates verified
-          </p>
-        </div>
-
-        {/* Bottom Technical Progress Indicator */}
-        <div className="mt-5 pt-4 border-t border-gray-100 dark:border-neutral-800 w-full">
-          <div className="flex justify-between text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-            <span>Workflow Completion</span>
-            <span className="font-semibold text-gray-900 dark:text-gray-100">{percent}%</span>
-          </div>
-          <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-neutral-800 overflow-hidden">
-            <div
-              className="h-full bg-gray-900 dark:bg-gray-100 rounded-full transition-all duration-300"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-        </div>
-      </button>
-
-      {/* Delete button */}
-      {onDelete && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            onDelete(e);
-          }}
-          className="absolute top-5 right-5 z-20 px-3 py-1 rounded-full text-xs font-bold text-[#E60023] hover:text-[#AD081B] bg-[#FFEBEF] dark:bg-[#E60023]/15 hover:bg-[#FFD6DE] dark:hover:bg-[#E60023]/25 border border-[#E60023]/20 transition-all cursor-pointer shadow-2xs font-sans"
-          title="Delete Project"
-          aria-label="Delete Project"
-        >
-          Delete
-        </button>
-      )}
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="rounded-2xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#171717] px-6 py-8 sm:py-9 text-center flex flex-col items-center justify-center shadow-xs font-sans transition-all">
-      <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-400 dark:text-neutral-500 mb-2.5">
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-        </svg>
-      </div>
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 font-sans tracking-tight">
-        No projects yet
-      </h3>
-      <p className="text-xs text-gray-500 dark:text-gray-400 font-normal mt-1 max-w-sm leading-relaxed font-sans">
-        Select an academic workspace above to start your first project.
-      </p>
-    </div>
-  );
-}
 
 function getFormatTileTheme(id: string) {
   switch (id) {
