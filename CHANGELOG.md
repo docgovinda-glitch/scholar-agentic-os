@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-22
 
 ### Added
+- **Google Sign-In & Supabase Auth Troubleshooting Guide (`docs/TROUBLESHOOTING_GSI_AND_AUTH.md`)**:
+  - Documented root cause analysis and resolution for `[GSI_LOGGER]: An unknown error occurred. m=transform_layer_library:88`.
+  - Detailed Google Cloud Console OAuth 2.0 Client ID setup: Authorized JavaScript origins configuration and Supabase callback redirect URI mapping (`https://gfjhsijrwodjvkisouzw.supabase.co/auth/v1/callback`).
+  - Added instructions for Supabase project migration execution (`npx supabase db push`) using Supabase Personal Access Tokens or direct PostgreSQL connection string.
+  - Linked troubleshooting walkthrough directly from `docs/GOOGLE_AUTH_AND_ONBOARDING.md`.
 - **Institutional Firewall Immunity: Supabase Streaming Reverse Proxy (`server/routes/supabaseProxy.ts`, `server.ts`, `supabaseClient.ts`)**:
   - Implemented unbuffered streaming reverse proxy at `/api/supabase/*` forwarding requests to the upstream Supabase project.
   - Client-side `@supabase/supabase-js` transparently routes via same-origin `/api/supabase` in production, completely eliminating direct browser calls to `*.supabase.co`.
@@ -57,9 +62,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added responsive viewport constraints to the Ask Scholar drawer (`w-full sm:w-96 max-w-[calc(100vw-2rem)]`) and auto-collapsed the left sidebar on viewports `< 1280px` when opening Ask Scholar.
 
 ## [2026-09-20]
-
-### Added
-- **ChatGPT-style AI Prompt Bar Below Template Cards (`ProjectListScreen.tsx`)**:
   - **Phase 1 (Alignment)**: Inserted a `w-full mt-10` container directly below the 4 academic workspace template cards grid, ensuring pixel-perfect left and right edge alignment with the `max-w-6xl` grid container.
   - **Phase 2 (Pill Aesthetics)**: Implemented a responsive pill-shaped input bar using `rounded-full bg-white dark:bg-[#1C1C1E] border border-gray-200/90 dark:border-white/10 shadow-sm sm:shadow-md` with `focus-within` border and shadow elevation transitions.
   - **Phase 3 (Node Structure)**: Three-node layout matching ChatGPT/Gemini conventions:

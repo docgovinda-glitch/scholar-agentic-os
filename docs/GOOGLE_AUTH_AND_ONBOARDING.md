@@ -43,3 +43,8 @@ This route renders the `OnboardingScreen`, a dedicated form specifically for col
 Supabase is configured with **Manual Linking** (`security_manual_linking_enabled: true`) and **Automatic Identity Linking**.
 This means if an existing user who previously registered with `user@example.com` via password clicks "Continue with Google", Supabase will securely link the Google identity to their existing account rather than throwing an error or creating a duplicate profile. 
 Because their profile is already complete, they will bypass the `/onboarding` route entirely.
+
+## Troubleshooting
+
+For resolution of console errors like `[GSI_LOGGER]: An unknown error occurred. m=transform_layer_library:88` or Google Cloud Console origin/redirect mismatches, refer to [TROUBLESHOOTING_GSI_AND_AUTH.md](file:///Users/aadityasah/Documents/Scholar%20Project/scholar-agentic-os/docs/TROUBLESHOOTING_GSI_AND_AUTH.md).
+
