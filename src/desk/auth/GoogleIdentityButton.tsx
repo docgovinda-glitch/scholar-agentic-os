@@ -59,6 +59,8 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
 
         google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
+          ux_mode: "popup",
+          context: "signin",
           callback: async (response: { credential?: string }) => {
             if (!response.credential) {
               onErrorRef.current?.("No credential returned from Google.");
@@ -147,6 +149,16 @@ export default function GoogleIdentityButton({ onSuccess, onError, disabled }: G
           <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0" />
           <span>Loading Google Sign-In…</span>
         </div>
+      )}
+
+      {gsiLoaded && !busy && (
+        <button
+          type="button"
+          onClick={handleOAuthFallback}
+          className="mt-2 text-xs text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] transition-colors underline cursor-pointer"
+        >
+          Having trouble with popup? Use redirect sign-in →
+        </button>
       )}
 
       {busy && (

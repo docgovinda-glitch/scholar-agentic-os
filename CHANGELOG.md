@@ -18,10 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Completely removed internal black capsule borders, outlines, and focus rings from the prompt input elements, leaving a clean, seamless, modern typing experience inside the outer capsule.
   - Added dedicated `.prompt-bare-input` class and updated base layer input rules in `src/index.css` to exempt borderless inputs.
 - **Google Sign-In & Supabase Auth Troubleshooting Guide (`docs/TROUBLESHOOTING_GSI_AND_AUTH.md`)**:
-  - Documented root cause analysis and resolution for `[GSI_LOGGER]: An unknown error occurred. m=transform_layer_library:88`.
+  - Documented root cause analysis and resolution for `[GSI_LOGGER]: An unknown error occurred. m=transform_layer_library:88` and blank screen hangs at `accounts.google.com/gsi/transform`.
   - Detailed Google Cloud Console OAuth 2.0 Client ID setup: Authorized JavaScript origins configuration and Supabase callback redirect URI mapping (`https://gfjhsijrwodjvkisouzw.supabase.co/auth/v1/callback`).
   - Added instructions for Supabase project migration execution (`npx supabase db push`) using Supabase Personal Access Tokens or direct PostgreSQL connection string.
   - Linked troubleshooting walkthrough directly from `docs/GOOGLE_AUTH_AND_ONBOARDING.md`.
+- **Google OAuth Popup COOP Fix & Direct Redirect Fallback (`server.ts`, `GoogleIdentityButton.tsx`)**:
+  - Configured Helmet with `crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }` in `server.ts` to preserve `window.opener` across Google Identity Services popups, eliminating blank screen hangs at `accounts.google.com/gsi/transform`.
+  - Added direct redirect fallback action link to `GoogleIdentityButton.tsx` (`Having trouble with popup? Use redirect sign-in →`) routing via standard Supabase OAuth redirect if popups or postMessage are blocked by browser extensions.
 - **Institutional Firewall Immunity: Supabase Streaming Reverse Proxy (`server/routes/supabaseProxy.ts`, `server.ts`, `supabaseClient.ts`)**:
   - Implemented unbuffered streaming reverse proxy at `/api/supabase/*` forwarding requests to the upstream Supabase project.
   - Client-side `@supabase/supabase-js` transparently routes via same-origin `/api/supabase` in production, completely eliminating direct browser calls to `*.supabase.co`.

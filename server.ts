@@ -197,6 +197,14 @@ const rawSupabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseOrigin = rawSupabaseUrl && rawSupabaseUrl.startsWith("http")
   ? new URL(rawSupabaseUrl).origin
   : undefined;
+// crossOriginOpenerPolicy fix (2026-09-22):
+// Helmet's default `Cross-Origin-Opener-Policy: same-origin` severs `window.opener`
+// for any cross-origin popup (including Google Identity Services popups at
+// accounts.google.com). When `window.opener` is null, Google's
+// `https://accounts.google.com/gsi/transform` endpoint cannot postMessage the ID
+// token back to the parent window and hangs indefinitely on a blank white screen.
+// `same-origin-allow-popups` retains the opener reference for popups opened by this
+// application, enabling Google Sign-In popup communication to complete and close cleanly.
 app.use(
   helmet({
     // same-origin-allow-popups is required for Google Identity Services (GIS) popups.
