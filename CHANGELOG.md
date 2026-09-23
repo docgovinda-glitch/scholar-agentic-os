@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-23
 
 ### Added
+- **Recessed Sidebar RECENTS Typography & Color Hierarchy Refactor (`src/desk/ProjectListScreen.tsx`, `src/desk/ScholarAgenticDashboard.tsx`)**:
+  - **Ultra-Subtle RECENTS Header**: Refactored the section header to `text-xs font-semibold tracking-wider text-neutral-500 uppercase mt-8 mb-2 px-3`, eliminating bright white and heavy typography to keep the sidebar visually secondary to the main canvas.
+  - **Crisp Airbnb-Style Scaling & Muted Default State**: Set project items to `text-[13px] font-medium text-neutral-400 antialiased` for clean, understated legibility.
+  - **Dynamic Subtle Hover State**: Enhanced user interactivity with `hover:bg-white/5 hover:text-neutral-200 transition-colors duration-200`.
+  - **Muted Leading Iconography**: Added/aligned leading document icons (`FileText`) using `text-neutral-500` turning to `text-neutral-300` on hover (`group-hover:text-neutral-300 transition-colors duration-200`).
 - **Minimalist AI Prompt Bar Alignment & Dark Mode Canvas Refactor (`src/desk/ProjectListScreen.tsx`)**:
   - **Shared Container Alignment**: Wrapped both the 4-card template grid and prompt bar inside a single shared parent container with `w-full max-w-5xl mx-auto flex flex-col`, guaranteeing the prompt bar is perfectly flushed with the outer edges of the grid.
   - **Flat Minimalist Aesthetics**: Stripped all heavy shadows (`shadow-lg`, `shadow-xl`, `drop-shadow`) from the prompt bar; replaced with a crisp 1px border (`border border-white/10`), subtle inner background (`bg-white/5`), and minimal `shadow-sm`.

@@ -27,6 +27,7 @@ import {
   Pencil,
   FolderPlus,
   Trash2,
+  FileText,
 } from "lucide-react";
 import { getCloudProvider } from "../config/providerCatalog";
 import { loadUserAiSettings } from "../services/userAiSettings";
@@ -1180,7 +1181,7 @@ Keep your response concise, helpful, and academically grounded.`;
           {/* Recents Section: Render only when logged in and active projects exist */}
           {userEmail && recentProjectsList.length > 0 && (
             <>
-              <h3 className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3 mt-5">
+              <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase mt-8 mb-2 px-3">
                 Recents
               </h3>
 
@@ -1203,11 +1204,12 @@ Keep your response concise, helpful, and academically grounded.`;
                             scrollToProjects();
                           }
                         }}
-                        className="group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#202124] transition-colors cursor-pointer text-[13px] font-medium text-gray-700 dark:text-gray-200 antialiased"
+                        className="group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5 hover:text-neutral-200 transition-colors duration-200 cursor-pointer text-[13px] font-medium text-neutral-400 antialiased"
                         title={item.title}
                       >
-                        <span className="truncate pr-2 flex items-center gap-1.5 min-w-0">
-                          {isPinned && <Pin className="w-3 h-3 text-amber-500 rotate-45 flex-shrink-0" />}
+                        <span className="truncate pr-2 flex items-center gap-2 min-w-0">
+                          <FileText className="w-3.5 h-3.5 text-neutral-500 group-hover:text-neutral-300 transition-colors duration-200 flex-shrink-0" />
+                          {isPinned && <Pin className="w-3 h-3 text-amber-500/80 group-hover:text-amber-500 rotate-45 flex-shrink-0 transition-colors duration-200" />}
                           <span className="truncate">{item.title}</span>
                         </span>
                         <button
@@ -1218,7 +1220,7 @@ Keep your response concise, helpful, and academically grounded.`;
                             e.stopPropagation();
                             setActiveRecentMenuId((prev) => (prev === item.id ? null : item.id));
                           }}
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-gray-200 dark:hover:bg-[#303134] text-gray-500 flex-shrink-0 ${
+                          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-white/10 text-neutral-500 hover:text-neutral-300 flex-shrink-0 ${
                             isMenuOpen ? "!opacity-100" : ""
                           }`}
                         >

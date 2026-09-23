@@ -270,7 +270,7 @@ export default function ScholarAgenticDashboard() {
           </div>
 
           {/* Recents Header */}
-          <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 px-3 mt-5">
+          <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase mt-8 mb-2 px-3">
             Recents
           </h3>
 
@@ -283,11 +283,12 @@ export default function ScholarAgenticDashboard() {
                 <div key={item.id} className="relative">
                   <div
                     onClick={() => setActiveView("projects")}
-                    className="group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer text-[13px] font-medium text-gray-700"
+                    className="group flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5 hover:text-neutral-200 transition-colors duration-200 cursor-pointer text-[13px] font-medium text-neutral-400"
                     title={item.title}
                   >
-                    <span className="truncate pr-2 flex items-center gap-1.5 min-w-0">
-                      {isPinned && <Pin className="w-3 h-3 text-amber-500 rotate-45 flex-shrink-0" />}
+                    <span className="truncate pr-2 flex items-center gap-2 min-w-0">
+                      <FileText className="w-3.5 h-3.5 text-neutral-500 group-hover:text-neutral-300 transition-colors duration-200 flex-shrink-0" />
+                      {isPinned && <Pin className="w-3 h-3 text-amber-500/80 group-hover:text-amber-500 rotate-45 flex-shrink-0 transition-colors duration-200" />}
                       <span className="truncate">{item.title}</span>
                     </span>
                     <button
@@ -296,8 +297,8 @@ export default function ScholarAgenticDashboard() {
                         e.stopPropagation();
                         setActiveRecentMenuId(isMenuOpen ? null : item.id);
                       }}
-                      className={`p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-200/80 transition-all ${
-                        isMenuOpen ? "opacity-100 bg-gray-200/80 text-gray-700" : "opacity-0 group-hover:opacity-100"
+                      className={`p-1 rounded-md text-neutral-500 hover:text-neutral-300 hover:bg-white/10 transition-all ${
+                        isMenuOpen ? "opacity-100 bg-white/10 text-neutral-200" : "opacity-0 group-hover:opacity-100"
                       }`}
                       title="Options"
                       aria-label="Options"

@@ -399,6 +399,42 @@ describe("sidebar projects & platform navigation", () => {
     fireEvent.click(recentItem);
     expect(onOpen).toHaveBeenCalledWith("proj-crispr-01");
   });
+
+  it("enforces ultra-subtle RECENTS typography and muted color hierarchy", async () => {
+    listProjects.mockResolvedValue({ items: [SAMPLE_PROJECT] });
+    const { container } = renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const aside = container.querySelector("aside");
+    expect(aside).toBeInTheDocument();
+
+    // 1. Ultra-subtle header styling
+    const header = await within(aside!).findByRole("heading", { name: "Recents" });
+    expect(header.className).toContain("text-xs");
+    expect(header.className).toContain("font-semibold");
+    expect(header.className).toContain("tracking-wider");
+    expect(header.className).toContain("text-neutral-500");
+    expect(header.className).toContain("uppercase");
+    expect(header.className).toContain("mt-8");
+    expect(header.className).toContain("mb-2");
+
+    // 2. Project items Airbnb-style scaling and muted text
+    const titleEl = await within(aside!).findByText("Comparative Analysis of In Vivo Cleavage");
+    const itemContainer = titleEl.closest(".group")!;
+    expect(itemContainer.className).toContain("text-[13px]");
+    expect(itemContainer.className).toContain("text-neutral-400");
+
+    // 3. Subtle hover state
+    expect(itemContainer.className).toContain("hover:bg-white/5");
+    expect(itemContainer.className).toContain("hover:text-neutral-200");
+    expect(itemContainer.className).toContain("transition-colors");
+    expect(itemContainer.className).toContain("duration-200");
+
+    // 4. Leading icon matches text-neutral-500 turning to text-neutral-300 on hover
+    const icon = itemContainer.querySelector("svg");
+    expect(icon).toBeInTheDocument();
+    expect(icon?.getAttribute("class")).toContain("text-neutral-500");
+    expect(icon?.getAttribute("class")).toContain("group-hover:text-neutral-300");
+  });
 });
 
 describe("landing workspace hero & academic workspace cards", () => {
