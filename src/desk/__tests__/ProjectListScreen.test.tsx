@@ -493,6 +493,41 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(presentationCard.innerHTML).toContain("dark:text-teal-300/90");
     expect(presentationCard.innerHTML).toContain("dark:bg-teal-500/10");
   });
+
+  it("enforces shared max-w-5xl container, mt-10 gap, flat border-white/10 styling, w-full input, and dark canvas", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // 1. Dark mode canvas enforcement
+    const mainCanvas = screen.getByRole("main");
+    expect(mainCanvas.className).toContain("bg-[#171717]");
+    expect(mainCanvas.className).not.toContain("bg-[var(--bg-canvas)]");
+
+    // 2. Shared Container Alignment
+    const promptInput = screen.getByPlaceholderText(/Draft a Research Proposal, analyze data, or search projects/i);
+    const promptForm = promptInput.closest("form")!;
+    const promptContainer = promptForm.parentElement!;
+    const sharedParent = promptContainer.parentElement!;
+
+    expect(sharedParent.className).toContain("w-full");
+    expect(sharedParent.className).toContain("max-w-5xl");
+    expect(sharedParent.className).toContain("mx-auto");
+    expect(sharedParent.className).toContain("flex-col");
+
+    // 3. Spacing mt-10
+    expect(promptContainer.className).toContain("mt-10");
+
+    // 4. Shadow & Border Fix on prompt bar
+    expect(promptForm.className).toContain("border-white/10");
+    expect(promptForm.className).toContain("bg-white/5");
+    expect(promptForm.className).toContain("shadow-sm");
+    expect(promptForm.className).not.toContain("shadow-lg");
+    expect(promptForm.className).not.toContain("shadow-xl");
+    expect(promptForm.className).not.toContain("drop-shadow");
+
+    // 5. Input width w-full
+    expect(promptInput.className).toContain("w-full");
+  });
 });
 
 describe("minimal website assistant", () => {

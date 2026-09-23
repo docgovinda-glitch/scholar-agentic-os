@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-09-23
 
 ### Added
+- **Minimalist AI Prompt Bar Alignment & Dark Mode Canvas Refactor (`src/desk/ProjectListScreen.tsx`)**:
+  - **Shared Container Alignment**: Wrapped both the 4-card template grid and prompt bar inside a single shared parent container with `w-full max-w-5xl mx-auto flex flex-col`, guaranteeing the prompt bar is perfectly flushed with the outer edges of the grid.
+  - **Flat Minimalist Aesthetics**: Stripped all heavy shadows (`shadow-lg`, `shadow-xl`, `drop-shadow`) from the prompt bar; replaced with a crisp 1px border (`border border-white/10`), subtle inner background (`bg-white/5`), and minimal `shadow-sm`.
+  - **Precise Vertical Spacing**: Enforced uniform `mt-10` gap between the bottom of the template grid and the top of the prompt bar.
+  - **Dark Mode Canvas Enforcement**: Forced the main `<main>` dashboard canvas and sticky header to use the elevated dark grey background (`bg-[#171717]`), completely stripping beige/off-white background classes.
+  - **Full-Width Interior Input**: Enforced `w-full flex-1` on the input element to span the entire interior of the pill container, anchoring the `+` icon to the far left and the `Submit` arrow to the far right.
 - **Minimalist Frictionless Workspace Header Refactor (`src/desk/assignment/AssignmentWorkspace.tsx`)**:
   - **Clean Left Section**: Removed "Scholar Core" logo, vertical divider, and "UNDERGRADUATE" / "POSTGRADUATE" pill entirely. The left side contains strictly the minimal `<- Back` button (with clean SVG arrow icon) followed by the plain text title.
   - **Purged Right Section**: Removed redundant "Vault" and "AI Access" buttons from the workspace header, routing asset and AI management to the persistent sidebar.
