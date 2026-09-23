@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
 
@@ -108,4 +108,45 @@ describe("Scholar Core Assignment Workspace", () => {
 
     expect(await screen.findByText(/Please provide the assignment question, word count, and citation style to continue/i)).toBeInTheDocument();
   });
+
+  it("renders a minimalist, decluttered workspace header", async () => {
+    const handleClose = vi.fn();
+    render(
+      <AssignmentWorkspace
+        projectId="proj-123"
+        initialStage="understand"
+        onStageChange={vi.fn()}
+        onClose={handleClose}
+      />
+    );
+
+    // 1. Clean Left Section: Back button and plain text title
+    const header = await screen.findByRole("banner");
+    const backBtn = within(header).getByRole("button", { name: /back/i });
+    expect(backBtn).toBeInTheDocument();
+    fireEvent.click(backBtn);
+    expect(handleClose).toHaveBeenCalledTimes(1);
+
+    // Plain text title (from answers or fallback)
+    expect(within(header).getByText("Academic Assignment")).toBeInTheDocument();
+
+    // Verify removed clutter on left: no Scholar Core logo or Undergraduate pill in header
+    expect(within(header).queryByText("SCHOLAR CORE")).not.toBeInTheDocument();
+    expect(within(header).queryByText("Undergraduate")).not.toBeInTheDocument();
+    expect(within(header).queryByText("Postgraduate")).not.toBeInTheDocument();
+
+    // 2. Purged Right Section: No Vault or AI Access buttons in workspace header
+    expect(within(header).queryByRole("button", { name: /vault/i })).not.toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: /ai access/i })).not.toBeInTheDocument();
+
+    // 3. Simplified AI Tutor: minimalist icon button
+    const tutorToggle = within(header).getByRole("button", { name: /toggle ai tutor/i });
+    expect(tutorToggle).toBeInTheDocument();
+    expect(within(header).queryByText("AI Tutor")).not.toBeInTheDocument();
+
+    // 4. Refined Word Count: muted typography
+    expect(within(header).getByText(/Target: 2000w/i)).toBeInTheDocument();
+    expect(within(header).getByText(/0w written/i)).toBeInTheDocument();
+  });
 });
+

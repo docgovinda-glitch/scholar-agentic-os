@@ -76,10 +76,10 @@ describe("the document-type format selector", () => {
   it("renders the curated academic format options", async () => {
     await openChooser();
 
-    expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
   });
 
@@ -107,10 +107,10 @@ describe("the document-type format selector", () => {
   it("shows every format tile enabled and ready to boot", async () => {
     await openChooser();
 
-    expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
   });
 });
@@ -141,7 +141,7 @@ describe("the Workshop welcome banner", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail={null} />);
 
-    await screen.findByRole("heading", { name: "Assignment" });
+    await screen.findByRole("heading", { name: "Coursework & Essays" });
     expect(screen.queryByText("Welcome to your Scholar Workspace")).not.toBeInTheDocument();
   });
 });
@@ -411,10 +411,10 @@ describe("landing workspace hero & academic workspace cards", () => {
     expect(screen.queryByPlaceholderText("Start a literature review, brainstorm an outline, or drop a syllabus")).not.toBeInTheDocument();
 
     // 4 Academic Workspace Cards
-    expect(await screen.findByRole("heading", { name: "Assignment" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Presentation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Thesis / Dissertation" })).not.toBeInTheDocument();
 
     // Consolidated transparent AI prompt bar immediately below cards
@@ -465,31 +465,31 @@ describe("landing workspace hero & academic workspace cards", () => {
     listProjects.mockResolvedValue({ items: [] });
     renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
 
-    const assignmentHeading = await screen.findByRole("heading", { name: "Assignment" });
+    const assignmentHeading = await screen.findByRole("heading", { name: "Coursework & Essays" });
     const assignmentCard = assignmentHeading.closest("button")!;
-    expect(assignmentCard.className).toContain("dark:bg-[#1C1C1E]");
-    expect(assignmentCard.className).toContain("dark:border-white/5");
+    expect(assignmentCard.className).toContain("dark:bg-[#171717]");
+    expect(assignmentCard.className).toContain("dark:border-neutral-800");
     expect(assignmentCard.innerHTML).toContain("dark:text-blue-400");
     expect(assignmentCard.innerHTML).toContain("dark:bg-blue-500/10");
 
     const journalHeading = screen.getByRole("heading", { name: "Journal Article" });
     const journalCard = journalHeading.closest("button")!;
-    expect(journalCard.className).toContain("dark:bg-[#1C1C1E]");
-    expect(journalCard.className).toContain("dark:border-white/5");
+    expect(journalCard.className).toContain("dark:bg-[#171717]");
+    expect(journalCard.className).toContain("dark:border-neutral-800");
     expect(journalCard.innerHTML).toContain("dark:text-amber-400/90");
     expect(journalCard.innerHTML).toContain("dark:bg-amber-500/10");
 
     const proposalHeading = screen.getByRole("heading", { name: "Research Proposal" });
     const proposalCard = proposalHeading.closest("button")!;
-    expect(proposalCard.className).toContain("dark:bg-[#1C1C1E]");
-    expect(proposalCard.className).toContain("dark:border-white/5");
+    expect(proposalCard.className).toContain("dark:bg-[#171717]");
+    expect(proposalCard.className).toContain("dark:border-neutral-800");
     expect(proposalCard.innerHTML).toContain("dark:text-indigo-400/90");
     expect(proposalCard.innerHTML).toContain("dark:bg-indigo-500/10");
 
-    const presentationHeading = screen.getByRole("heading", { name: "Presentation" });
+    const presentationHeading = screen.getByRole("heading", { name: "Slides & Keynotes" });
     const presentationCard = presentationHeading.closest("button")!;
-    expect(presentationCard.className).toContain("dark:bg-[#1C1C1E]");
-    expect(presentationCard.className).toContain("dark:border-white/5");
+    expect(presentationCard.className).toContain("dark:bg-[#171717]");
+    expect(presentationCard.className).toContain("dark:border-neutral-800");
     expect(presentationCard.innerHTML).toContain("dark:text-teal-300/90");
     expect(presentationCard.innerHTML).toContain("dark:bg-teal-500/10");
   });

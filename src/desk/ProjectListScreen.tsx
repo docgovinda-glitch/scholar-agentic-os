@@ -36,30 +36,34 @@ import { loadUserAiSettings } from "../services/userAiSettings";
 export const FORMAT_TILES = [
   {
     id: "OT-01",
-    label: "Assignment",
-    tag: "Coursework & Essays",
-    description: "Dedicated 8–phase thinking, evidence board & grounded drafting.",
+    label: "Coursework & Essays",
+    title: "Coursework & Essays",
+    features: "Zero Hallucination · Verified Citations · Zero Errors",
+    footer: "800 – 4,000 words",
     budget: "800 – 4,000 words",
   },
   {
     id: "OT-10",
     label: "Journal Article",
-    tag: "Peer-Reviewed Papers",
-    description: "25–stage empirical research pipeline with multi-agent peer review.",
+    title: "Journal Article",
+    features: "Zero Hallucination · Verified Citations · Zero Errors",
+    footer: "4,000 – 10,000 words",
     budget: "4,000 – 10,000 words",
   },
   {
     id: "OT-19",
     label: "Research Proposal",
-    tag: "Grants & Funding",
-    description: "Competitive grant applications with strict agency rubric alignment.",
+    title: "Research Proposal",
+    features: "Zero Hallucination · Verified Citations · Zero Errors",
+    footer: "3,000 – 15,000 words",
     budget: "3,000 – 15,000 words",
   },
   {
     id: "OT-22",
-    label: "Presentation",
-    tag: "Slides & Keynotes",
-    description: "Conference slide decks, oral defense scripts & visual narratives.",
+    label: "Slides & Keynotes",
+    title: "Slides & Keynotes",
+    features: "Zero Hallucination · Verified Citations · Zero Errors",
+    footer: "10 – 35 slides",
     budget: "10 – 35 slides",
   },
 ];
@@ -1511,7 +1515,7 @@ Keep your response concise, helpful, and academically grounded.`;
                           handleCreate(tile.id);
                         }}
                         disabled={isOtherBooting}
-                        className={`group bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-white/5 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[190px] text-left relative ${
+                        className={`group bg-white dark:bg-[#171717] border border-gray-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:hover:shadow-neutral-900/50 cursor-pointer flex flex-col justify-between h-full text-left relative ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
@@ -1521,11 +1525,11 @@ Keep your response concise, helpful, and academically grounded.`;
                       >
                         <div>
                           <div className="flex items-center justify-between w-full mb-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
                               {isBootingThis ? (
                                 <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                               ) : (
-                                <FormatIcon id={tile.id} className="w-5 h-5" />
+                                <FormatIcon id={tile.id} className="w-4 h-4" />
                               )}
                             </div>
                             <div className="flex items-center gap-1">
@@ -1542,7 +1546,7 @@ Keep your response concise, helpful, and academically grounded.`;
                                     setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
                                   }
                                 }}
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer text-xs font-serif italic font-bold"
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer text-xs font-serif italic font-bold"
                                 title="View methodology & stages blueprint"
                                 aria-label={`View stages blueprint for ${tile.label}`}
                               >
@@ -1555,19 +1559,16 @@ Keep your response concise, helpful, and academically grounded.`;
                               </div>
                             </div>
                           </div>
-                          <span className={`text-[10px] font-semibold uppercase tracking-wider block mb-1 truncate ${tileTheme.accentText}`}>
-                            {tile.tag}
-                          </span>
-                          <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5 leading-tight">
+                          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-gray-100 leading-snug">
                             {tile.label}
                           </h3>
-                          <p className="text-xs font-normal text-[var(--text-secondary)] leading-relaxed">
-                            {tile.description}
+                          <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-normal truncate mt-1">
+                            {tile.features}
                           </p>
                         </div>
-                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between gap-2 text-[11px] text-slate-400 dark:text-neutral-400">
-                          <span className="truncate">{tile.budget}</span>
-                          <span className="font-semibold text-slate-700 dark:text-neutral-300 group-hover:translate-x-0.5 transition-transform flex-shrink-0 whitespace-nowrap">
+                        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-neutral-800/80 flex items-center justify-between gap-2 text-xs text-gray-400 dark:text-neutral-400 font-sans">
+                          <span className="font-medium text-gray-500 dark:text-neutral-400 truncate">{tile.footer}</span>
+                          <span className="font-semibold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white group-hover:translate-x-0.5 transition-all flex-shrink-0 whitespace-nowrap">
                             Boot →
                           </span>
                         </div>
@@ -1576,7 +1577,7 @@ Keep your response concise, helpful, and academically grounded.`;
                         {previewFormatId === tile.id && (
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute inset-0 bg-white dark:bg-[#1C1C1E] rounded-2xl p-4 z-20 flex flex-col justify-between border border-slate-300 dark:border-white/20 shadow-xl animate-in fade-in zoom-in-95 duration-150 text-left"
+                            className="absolute inset-0 bg-white dark:bg-[#171717] rounded-2xl p-4 z-20 flex flex-col justify-between border border-gray-200 dark:border-neutral-800 shadow-xl animate-in fade-in zoom-in-95 duration-150 text-left"
                           >
                             <div>
                               <div className="flex items-center justify-between mb-2">
@@ -2182,7 +2183,7 @@ function ChooseOutputType({
                   key={tile.id}
                   onClick={() => setSelected(tile.id)}
                   onDoubleClick={() => onPick(tile.id)}
-                  className={`group bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-white/5 ${tileTheme.hoverBorder} rounded-2xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/50 cursor-pointer flex flex-col justify-between h-full min-h-[185px] text-left relative ${
+                  className={`group bg-white dark:bg-[#171717] border border-gray-200/80 dark:border-neutral-800 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer flex flex-col justify-between h-full text-left relative ${
                     isSelected
                       ? "ring-2 ring-gray-900 dark:ring-gray-100 border-gray-900 dark:border-gray-100"
                       : ""
@@ -2190,24 +2191,25 @@ function ChooseOutputType({
                 >
                   <div>
                     <div className="flex items-center justify-between w-full mb-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
-                        <FormatIcon id={tile.id} className="w-5 h-5" />
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                        <FormatIcon id={tile.id} className="w-4 h-4" />
                       </div>
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-300 dark:text-neutral-500 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-gray-400 dark:text-neutral-500 group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
                         <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
                         </svg>
                       </div>
                     </div>
-                    <span className={`text-[10px] font-semibold uppercase tracking-wider block mb-1 ${tileTheme.accentText}`}>
-                      {tile.tag}
-                    </span>
-                    <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)] mb-1.5 leading-tight">
+                    <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-gray-100 leading-snug">
                       {tile.label}
                     </h3>
-                    <p className="text-sm font-normal text-[var(--text-secondary)] leading-snug">
-                      {tile.description}
+                    <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-normal truncate mt-1">
+                      {tile.features}
                     </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-gray-100 dark:border-neutral-800/80 flex items-center justify-between gap-2 text-xs text-gray-400 dark:text-neutral-400 font-sans">
+                    <span className="font-medium text-gray-500 dark:text-neutral-400 truncate">{tile.footer}</span>
+                    <span className="font-semibold text-gray-700 dark:text-gray-300">Select</span>
                   </div>
                 </div>
               );

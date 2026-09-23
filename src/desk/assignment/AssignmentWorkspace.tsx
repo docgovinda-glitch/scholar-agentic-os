@@ -3,8 +3,6 @@ import type { AssignmentStage } from "./types";
 import { AssignmentProvider, useAssignmentWorkspace } from "./AssignmentContext";
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
 import AssignmentAiTutorPanel from "./components/AssignmentAiTutorPanel";
-import ScholarCoreLogo from "../../components/ScholarCoreLogo";
-
 // Stage Components
 import AssignmentUnderstandStage from "./stages/AssignmentUnderstandStage";
 import AssignmentPlanStage from "./stages/AssignmentPlanStage";
@@ -17,9 +15,6 @@ import AssignmentFinalStage from "./stages/AssignmentFinalStage";
 
 function AssignmentWorkspaceInner({
   onClose,
-  onOpenAccountSettings,
-  onOpenVault,
-  onOpenAiAccess,
 }: {
   onClose?: () => void;
   onOpenAccountSettings?: () => void;
@@ -29,8 +24,6 @@ function AssignmentWorkspaceInner({
   const {
     project,
     currentStage,
-    academicLevel,
-    assignmentType,
     targetWordCount,
     currentWordCount,
     isLoading,
@@ -99,102 +92,65 @@ function AssignmentWorkspaceInner({
   return (
     <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] overflow-hidden">
       {/* Workspace Header */}
-      <header className="border-b border-[color:var(--border-subtle)] bg-[color:var(--surface-canvas)]/80 backdrop-blur-md z-20 shrink-0">
-        <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+      <header className="border-b border-white/5 bg-[#171717] z-20 shrink-0">
+        <div className="flex items-center justify-between px-4 h-12 gap-4">
           <div className="flex items-center gap-3 min-w-0">
             {/* Mobile Nav Toggle */}
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="md:hidden p-1.5 rounded-lg text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] cursor-pointer"
+              className="md:hidden p-1 rounded text-neutral-400 hover:text-white cursor-pointer"
+              aria-label="Open navigation"
             >
               ☰
             </button>
 
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                title="Back to projects"
-                className="hidden md:flex shrink-0 rounded-[var(--radius-sm)] p-1.5 text-[color:var(--text-muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] transition-colors cursor-pointer"
-              >
-                ← Back
-              </button>
-            )}
-
-            <div
+            {/* Clean Back Button */}
+            <button
+              type="button"
               onClick={() => {
                 if (onClose) onClose();
                 else if (typeof window !== "undefined") window.location.href = "/";
               }}
-              className="hidden sm:flex cursor-pointer transition-opacity duration-200 hover:opacity-70"
-              title="Scholar Core Home"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  if (onClose) onClose();
-                  else if (typeof window !== "undefined") window.location.href = "/";
-                }
-              }}
+              title="Back"
+              className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition-colors cursor-pointer py-1 shrink-0"
             >
-              <ScholarCoreLogo size="sm" withText className="text-[color:var(--text-primary)]" />
-            </div>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+              <span>Back</span>
+            </button>
 
-            <div className="h-4 w-px bg-[color:var(--border-subtle)] hidden sm:block" />
-
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-bold text-[color:var(--text-primary)] truncate max-w-[200px] md:max-w-xs">
-                {project.answers["assignment_title"] || project.answers["title"] || "Academic Assignment"}
-              </span>
-              <span className="hidden lg:inline-flex text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent)] bg-[color:var(--accent-subtle)] px-2 py-0.5 rounded-full">
-                {academicLevel === "postgraduate" ? "Postgraduate" : "Undergraduate"}
-              </span>
-            </div>
+            {/* Plain Text Title */}
+            <span className="text-xs sm:text-sm font-medium text-neutral-200 truncate">
+              {project.answers["assignment_title"] || project.answers["title"] || "Academic Assignment"}
+            </span>
           </div>
 
-          {/* Quick Header Tools & Word Count */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-[color:var(--text-secondary)] bg-[color:var(--surface-inset)] px-3 py-1 rounded-full border border-[color:var(--border-subtle)]">
+          {/* Right Section: Word Count & Minimalist AI Tutor Icon */}
+          <div className="flex items-center gap-4 shrink-0">
+            {/* Muted borderless word count tracker */}
+            <div className="hidden sm:flex items-center gap-2 text-sm text-neutral-400 tabular-nums">
               <span>Target: {targetWordCount}w</span>
-              <span>•</span>
-              <span className="text-[color:var(--accent)]">{currentWordCount}w written</span>
+              <span className="text-neutral-600 dark:text-neutral-500">•</span>
+              <span className="text-neutral-300">{currentWordCount}w written</span>
             </div>
 
-            {onOpenVault && (
-              <button
-                type="button"
-                onClick={onOpenVault}
-                className="text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] px-2.5 py-1 rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
-              >
-                ☁️ Vault
-              </button>
-            )}
-
-            {onOpenAiAccess && (
-              <button
-                type="button"
-                onClick={onOpenAiAccess}
-                className="text-xs font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] px-2.5 py-1 rounded-[var(--radius-sm)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
-              >
-                ⚙️ AI Access
-              </button>
-            )}
-
-            {/* AI Tutor Toggle */}
+            {/* Minimalist AI Tutor Icon Button */}
             <button
               type="button"
               onClick={() => setTutorPanelOpen(!tutorPanelOpen)}
-              className={`p-1.5 rounded-[var(--radius-md)] text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
                 tutorPanelOpen
-                  ? "bg-[color:var(--accent-subtle)] text-[color:var(--accent)] border border-[color:var(--accent-border)]"
-                  : "bg-[color:var(--surface-raised)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
+                  ? "text-neutral-200 bg-white/10"
+                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5"
               }`}
-              title="Toggle Academic Tutor"
+              title="Toggle AI Tutor"
+              aria-label="Toggle AI Tutor"
             >
-              <span>🎓</span>
-              <span className="hidden md:inline">AI Tutor</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+              </svg>
             </button>
           </div>
         </div>

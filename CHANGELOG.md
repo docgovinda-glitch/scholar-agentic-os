@@ -5,6 +5,20 @@ All notable changes to the Scholar Agentic OS project are documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-09-23
+
+### Added
+- **Minimalist Frictionless Workspace Header Refactor (`src/desk/assignment/AssignmentWorkspace.tsx`)**:
+  - **Clean Left Section**: Removed "Scholar Core" logo, vertical divider, and "UNDERGRADUATE" / "POSTGRADUATE" pill entirely. The left side contains strictly the minimal `<- Back` button (with clean SVG arrow icon) followed by the plain text title.
+  - **Purged Right Section**: Removed redundant "Vault" and "AI Access" buttons from the workspace header, routing asset and AI management to the persistent sidebar.
+  - **Simplified AI Tutor Toggle**: Converted bulky "AI Tutor" button into a single, minimalist icon button with a subtle sparkle SVG and borderless hover state.
+  - **Refined Word Count Typography**: Stripped heavy pill background and borders from the word count tracker, converting it into crisp, muted, borderless typography (`Target: {targetWordCount}w • {currentWordCount}w written`) on the right side.
+  - **Dark Mode Canvas Aesthetics**: Header background precisely matches the elevated canvas grey (`#171717`) with a subtle `border-b border-white/5`.
+- **Refined Dashboard Template Cards (`src/desk/ProjectListScreen.tsx`)**:
+  - Standardized four primary workspace cards with exact titles ("Coursework & Essays", "Journal Article", "Research Proposal", "Slides & Keynotes"), inline dot-separated feature lists ("Zero Hallucination · Verified Citations · Zero Errors"), and clean footer specifications.
+  - Styled cards with elevated `#171717` background and `border-neutral-800`.
+  - Synchronized all unit tests across `AssignmentWorkspace.test.tsx` and `ProjectListScreen.test.tsx`.
+
 ## [Unreleased] - 2026-09-22
 
 ### Added
