@@ -246,7 +246,7 @@
   }
 }
 
-:root[data-theme="dark"] {
+:root[data-theme="dark"], [data-theme="dark"], .dark {
   color-scheme: dark;
 
   /* NIGHT MODE (ChatGPT Style) */

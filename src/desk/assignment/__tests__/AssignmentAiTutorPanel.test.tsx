@@ -85,12 +85,13 @@ describe("Live Socratic AI Tutor & Rubric Grading Estimator Panel", () => {
       </AssignmentProvider>
     );
 
-    expect(await screen.findByText(/Academic Thinking & Writing Tutor/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Socratic Inquiry/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Socratic/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Rubric/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Counter-Args/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Polish/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Socratic Academic Tutor & Rubric Estimator/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Academic Thinking & Writing Tutor/i)).not.toBeInTheDocument();
   });
 
   it("switches modes and updates prompt chips", async () => {

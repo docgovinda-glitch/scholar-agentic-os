@@ -66,22 +66,33 @@ describe("Scholar Core Assignment Workspace", () => {
       />
     );
 
-    // Left Rail: 8 stages
-    expect(await screen.findByText(/Academic Assignment Journey/i)).toBeInTheDocument();
+    // Left Rail: 8 stages strictly begin with navigation items
+    expect(await screen.findByText(/Phase 2/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Phase 1/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Phase 2/i)).toBeInTheDocument();
     expect(screen.getByText(/Phase 4/i)).toBeInTheDocument();
     expect(screen.getByText(/Phase 5/i)).toBeInTheDocument();
     expect(screen.getByText(/Phase 6/i)).toBeInTheDocument();
     expect(screen.getByText(/Phase 8/i)).toBeInTheDocument();
 
-    // Center Stage
-    expect(screen.getByText(/Phase 1: Understand the Assignment/i)).toBeInTheDocument();
+    // Verify left rail purged elements
+    expect(screen.queryByText(/Academic Assignment Journey/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Structured 8-phase research/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Undergraduate Workspace/i)).not.toBeInTheDocument();
+
+    // Center Stage (lazy loaded)
+    expect(await screen.findByText(/Phase 1: Understand the Assignment/i)).toBeInTheDocument();
     expect(screen.getByText(/Target Word Count/i)).toBeInTheDocument();
 
-    // Right AI Tutor Sidebar
-    expect(screen.getByText(/Academic Thinking & Writing Tutor/i)).toBeInTheDocument();
-    expect(screen.getByText(/Word Count Budget Planner/i)).toBeInTheDocument();
+    // Right AI Tutor Sidebar: 4-tab navigation serves as top-most entry point
+    const tutorPanel = await screen.findByRole("complementary");
+    expect(within(tutorPanel).getByRole("button", { name: /socratic/i })).toBeInTheDocument();
+    expect(within(tutorPanel).getByRole("button", { name: /rubric/i })).toBeInTheDocument();
+    expect(within(tutorPanel).getByRole("button", { name: /counter-args/i })).toBeInTheDocument();
+    expect(within(tutorPanel).getByRole("button", { name: /polish/i })).toBeInTheDocument();
+
+    // Verify right sidebar purged header and duplicate word count are not present
+    expect(screen.queryByText(/Academic Thinking & Writing Tutor/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Word Count Budget Planner/i)).not.toBeInTheDocument();
   });
 
   it("enforces mandatory target word count and citation style before analysis", async () => {

@@ -2,9 +2,20 @@ import React, { useState } from "react";
 import type { AssignmentStage } from "./types";
 import { AssignmentProvider, useAssignmentWorkspace } from "./AssignmentContext";
 import AssignmentStageNavigation from "./components/AssignmentStageNavigation";
-import AssignmentAiTutorPanel from "./components/AssignmentAiTutorPanel";
-// Stage Components
-import AssignmentUnderstandStage from "./stages/AssignmentUnderstandStage";
+
+// Aggressive code-splitting with React.lazy
+const SocraticTutor = React.lazy(() =>
+  import("./components/AssignmentAiTutorPanel").then((mod) => ({
+    default: (mod as any).SocraticTutor || mod.default,
+  }))
+);
+
+const AssignmentForm = React.lazy(() =>
+  import("./stages/AssignmentUnderstandStage").then((mod) => ({
+    default: (mod as any).AssignmentForm || mod.default,
+  }))
+);
+
 import AssignmentPlanStage from "./stages/AssignmentPlanStage";
 import AssignmentResearchStage from "./stages/AssignmentResearchStage";
 import AssignmentEvidenceStage from "./stages/AssignmentEvidenceStage";
@@ -12,6 +23,79 @@ import AssignmentThinkStage from "./stages/AssignmentThinkStage";
 import AssignmentStructureStage from "./stages/AssignmentStructureStage";
 import AssignmentDraftStage from "./stages/AssignmentDraftStage";
 import AssignmentFinalStage from "./stages/AssignmentFinalStage";
+
+// Subtle dark-mode skeleton placeholders
+export function PhaseNavSkeleton() {
+  return (
+    <div className="w-full h-full p-4 space-y-4 bg-[#171717] border-r border-white/5 animate-pulse text-neutral-400">
+      <div className="space-y-1.5 pb-3 border-b border-white/5">
+        <div className="h-4 w-28 bg-white/10 rounded" />
+        <div className="h-3 w-40 bg-white/5 rounded" />
+      </div>
+      <div className="space-y-2 pt-1">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-10 w-full bg-white/5 rounded-lg border border-white/5" />
+        ))}
+      </div>
+      <div className="mt-8 pt-4 border-t border-white/5">
+        <div className="h-16 w-full bg-neutral-900/60 rounded-lg border border-white/5" />
+      </div>
+    </div>
+  );
+}
+
+export function MainStageSkeleton() {
+  return (
+    <div className="max-w-4xl mx-auto p-6 space-y-8 animate-pulse text-neutral-400">
+      <div className="border-b border-white/5 pb-4 space-y-2">
+        <div className="h-6 w-60 bg-white/10 rounded" />
+        <div className="h-3.5 w-96 max-w-full bg-white/5 rounded" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-neutral-900/80 p-5 rounded-xl border border-white/5">
+        <div className="md:col-span-2 space-y-2">
+          <div className="h-4 w-48 bg-white/10 rounded" />
+          <div className="h-28 w-full bg-neutral-800/60 rounded-lg border border-white/10" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 w-28 bg-white/10 rounded" />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="h-9 bg-neutral-800/60 rounded-lg border border-white/5" />
+            <div className="h-9 bg-neutral-800/60 rounded-lg border border-white/5" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 w-28 bg-white/10 rounded" />
+          <div className="h-9 bg-neutral-800/60 rounded-lg border border-white/5" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 w-36 bg-white/10 rounded" />
+          <div className="h-9 bg-neutral-800/60 rounded-lg border border-white/5" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 w-40 bg-white/10 rounded" />
+          <div className="h-9 bg-neutral-800/60 rounded-lg border border-white/5" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AiTutorSkeleton() {
+  return (
+    <div className="w-full h-full p-4 space-y-4 bg-[#171717] border-l border-white/5 animate-pulse text-neutral-400">
+      <div className="flex items-center justify-between pb-3 border-b border-white/5">
+        <div className="h-4 w-24 bg-white/10 rounded" />
+        <div className="h-4 w-12 bg-white/5 rounded" />
+      </div>
+      <div className="h-24 w-full bg-neutral-900/80 rounded-xl border border-white/5" />
+      <div className="space-y-2 pt-2">
+        <div className="h-16 w-full bg-neutral-900/60 rounded-lg border border-white/5" />
+        <div className="h-16 w-full bg-neutral-900/60 rounded-lg border border-white/5" />
+      </div>
+    </div>
+  );
+}
 
 function AssignmentWorkspaceInner({
   onClose,
@@ -35,16 +119,16 @@ function AssignmentWorkspaceInner({
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[color:var(--surface-canvas)] p-6 text-center">
-        <div className="w-16 h-16 rounded-full bg-[color:var(--state-danger-subtle)] flex items-center justify-center mb-2">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#171717] p-6 text-center text-neutral-200">
+        <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-2">
           <span className="text-2xl">⚠️</span>
         </div>
-        <p className="max-w-md text-sm text-[color:var(--state-danger)] font-medium">{error}</p>
+        <p className="max-w-md text-sm text-red-400 font-medium">{error}</p>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-[color:var(--border-control)] px-5 py-2.5 text-sm font-medium text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)] transition-colors cursor-pointer"
+            className="rounded-full border border-white/10 px-5 py-2.5 text-sm font-medium text-neutral-200 hover:bg-white/5 transition-colors cursor-pointer"
           >
             Back to projects
           </button>
@@ -53,14 +137,48 @@ function AssignmentWorkspaceInner({
     );
   }
 
+  // Immediate page load renders lightweight structural shell with dark skeletons
   if (isLoading || !project) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[color:var(--surface-canvas)]">
-        <div className="flex items-center gap-3">
-          <div className="w-5 h-5 border-2 border-[color:var(--accent)] border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-[color:var(--text-muted)] font-medium">
-            Loading Scholar Core Assignment Workspace…
-          </span>
+      <div className="dark h-screen flex flex-col bg-[#171717] text-neutral-200 overflow-hidden" data-theme="dark">
+        <header className="border-b border-white/5 bg-[#171717] z-20 shrink-0">
+          <div className="flex items-center justify-between px-4 h-12 gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onClose) onClose();
+                  else if (typeof window !== "undefined") window.location.href = "/";
+                }}
+                title="Back"
+                className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition-colors cursor-pointer py-1 shrink-0"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                <span>Back</span>
+              </button>
+              <div className="h-4 w-36 bg-white/5 rounded animate-pulse" />
+            </div>
+            <div className="flex items-center gap-4 shrink-0">
+              <div className="hidden sm:flex items-center gap-2">
+                <div className="h-3.5 w-24 bg-white/5 rounded animate-pulse" />
+              </div>
+              <div className="w-7 h-7 rounded-lg bg-white/5" />
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 flex overflow-hidden relative bg-[#171717]">
+          <div className="hidden md:block w-64 lg:w-72 shrink-0 h-full overflow-y-auto bg-[#171717] border-r border-white/5">
+            <PhaseNavSkeleton />
+          </div>
+          <main className="flex-1 h-full overflow-y-auto bg-[#171717] text-neutral-200">
+            <MainStageSkeleton />
+          </main>
+          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-[#171717] border-l border-white/5">
+            <AiTutorSkeleton />
+          </div>
         </div>
       </div>
     );
@@ -69,7 +187,7 @@ function AssignmentWorkspaceInner({
   const renderActiveStage = () => {
     switch (currentStage) {
       case "understand":
-        return <AssignmentUnderstandStage />;
+        return <AssignmentForm />;
       case "plan":
         return <AssignmentPlanStage />;
       case "research":
@@ -85,12 +203,12 @@ function AssignmentWorkspaceInner({
       case "final":
         return <AssignmentFinalStage />;
       default:
-        return <AssignmentUnderstandStage />;
+        return <AssignmentForm />;
     }
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[color:var(--surface-canvas)] text-[color:var(--text-primary)] overflow-hidden">
+    <div className="dark h-screen flex flex-col bg-[#171717] text-neutral-200 overflow-hidden" data-theme="dark">
       {/* Workspace Header */}
       <header className="border-b border-white/5 bg-[#171717] z-20 shrink-0">
         <div className="flex items-center justify-between px-4 h-12 gap-4">
@@ -157,16 +275,16 @@ function AssignmentWorkspaceInner({
       </header>
 
       {/* 3-Column Workspace Body */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative bg-[#171717]">
         {/* Left Column: 8-Phase Journey Rail (Desktop) */}
-        <div className="hidden md:block w-64 lg:w-72 shrink-0 h-full overflow-y-auto">
+        <div className="hidden md:block w-64 lg:w-72 shrink-0 h-full overflow-y-auto bg-[#171717] border-r border-white/5">
           <AssignmentStageNavigation />
         </div>
 
         {/* Mobile Slide-out Stage Nav */}
         {mobileNavOpen && (
-          <div className="fixed inset-0 z-50 flex md:hidden bg-black/50 backdrop-blur-xs">
-            <div className="w-4/5 max-w-xs h-full bg-[color:var(--surface-canvas)]">
+          <div className="fixed inset-0 z-50 flex md:hidden bg-black/60 backdrop-blur-xs">
+            <div className="w-4/5 max-w-xs h-full bg-[#171717] border-r border-white/5">
               <AssignmentStageNavigation onSelectStage={() => setMobileNavOpen(false)} />
             </div>
             <div className="flex-1" onClick={() => setMobileNavOpen(false)} />
@@ -174,14 +292,18 @@ function AssignmentWorkspaceInner({
         )}
 
         {/* Center Column: Active Stage Workspace */}
-        <main className="flex-1 h-full overflow-y-auto bg-[color:var(--surface-canvas)]">
-          {renderActiveStage()}
+        <main className="flex-1 h-full overflow-y-auto bg-[#171717] text-neutral-200">
+          <React.Suspense fallback={<MainStageSkeleton />}>
+            {renderActiveStage()}
+          </React.Suspense>
         </main>
 
         {/* Right Column: Contextual AI Tutor & Word Count Panel */}
         {tutorPanelOpen && (
-          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block">
-            <AssignmentAiTutorPanel />
+          <div className="w-80 lg:w-96 shrink-0 h-full overflow-y-auto hidden sm:block bg-[#171717] border-l border-white/5">
+            <React.Suspense fallback={<AiTutorSkeleton />}>
+              <SocraticTutor />
+            </React.Suspense>
           </div>
         )}
       </div>
