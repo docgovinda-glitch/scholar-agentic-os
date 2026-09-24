@@ -296,18 +296,28 @@ router.post("/evidence-extraction", async (req: express.Request<{ id: string }>,
   const context = JSON.stringify(project.answers);
 
   try {
-    const systemPrompt = `You are an expert academic evidence extraction agent.
-Based on the provided research context, extract exactly 4 pieces of strong evidence.
+    const systemPrompt = `You are an expert academic evidence extraction agent conducting Deep Multi-Dimensional Evidence Extraction.
+Analyze the provided research context, approved vault sources, literature corpus, and attached primary datasets.
+Extract 12 to 18 deep, highly granular, publication-grade academic evidence claims.
+For each source and dataset, perform multi-lens deep extraction across:
+1. Empirical Support: Concrete experimental or observational findings with numerical metrics (sample size N, effect size d, p-value, accuracy, throughput, latency).
+2. Benchmark Statistic: Quantitative performance comparisons against state-of-the-art baselines.
+3. Theoretical Proof: Mathematical formulations, formal proof bounds, or underlying causal mechanisms.
+4. Methodological Rationale: Experimental protocol parameters, sampling criteria, testbed setups, or instrumentation controls.
+5. Comparative Baseline: Direct baseline comparisons and trade-offs.
+
 Return ONLY valid JSON in this exact format:
 {
   "data": [
     {
       "id": "ev-xyz",
-      "quote": "...",
-      "source": "...",
+      "quote": "Direct verbatim excerpt or concrete statistical finding",
+      "source": "Author et al. (Year)",
       "claim_type": "Empirical Support",
       "strength": "Strong",
-      "tags": ["...", "..."]
+      "tags": ["Tag1", "Tag2"],
+      "page_or_loc": "Section 4.1, Table 2",
+      "notes": "Deep analytical context and evidentiary implication"
     }
   ]
 }`;
@@ -344,7 +354,11 @@ Return ONLY valid JSON in this exact format:
       console.error("Vectorized RAG failed, falling back to full context", e);
     }
 
-    const finalContext = ragContext ? `Top Matched Vault Sources:\n\n${ragContext}` : `Context: ${context}`;
+    const bodySources = req.body?.sources ? `\n\nApproved Authorized Sources:\n${JSON.stringify(req.body.sources, null, 2)}` : "";
+    const bodyDatasets = req.body?.datasets ? `\n\nAttached Datasets & Telemetry:\n${JSON.stringify(req.body.datasets, null, 2)}` : "";
+    const finalContext = ragContext
+      ? `Top Matched Vault Sources:\n\n${ragContext}${bodySources}${bodyDatasets}`
+      : `Research Project Context: ${context}${bodySources}${bodyDatasets}`;
     const result = await streamOpenRouterJSON(req, res, systemPrompt, finalContext);
     if (!result) return;
     

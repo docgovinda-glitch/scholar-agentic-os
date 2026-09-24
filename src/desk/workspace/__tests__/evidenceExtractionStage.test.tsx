@@ -349,4 +349,56 @@ describe("Stage 10: Evidence Extraction (EvidenceExtractionStage)", () => {
       expect(onAdvance).toHaveBeenCalledWith("external_research");
     });
   });
+
+  it("supports deep typology lens filtering and analytical context notes rendering", async () => {
+    render(
+      <EvidenceExtractionStage
+        stage="evidence_extraction"
+        projectId="proj-ev-101"
+        project={mockProject}
+      />
+    );
+
+    // Initial matrix shows analytical context notes
+    expect(screen.getByText(/Key baseline for throughput analysis/i)).toBeInTheDocument();
+    expect(screen.getByText(/Context for leaderless designs/i)).toBeInTheDocument();
+
+    // Filter by Theoretical Proof lens button
+    const theoryLensBtn = screen.getByRole("button", { name: /Theoretical Proof/i });
+    fireEvent.click(theoryLensBtn);
+
+    // Theoretical Proof should remain visible
+    expect(
+      screen.getByText(/WAN round-trip communication introduces a quadratic overhead/i)
+    ).toBeInTheDocument();
+    // Empirical Support should be filtered out
+    expect(
+      screen.queryByText(/State transitions execute within 12\.4ms under 30% packet loss/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("copies verbatim quotes to clipboard when copy button is clicked", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    render(
+      <EvidenceExtractionStage
+        stage="evidence_extraction"
+        projectId="proj-ev-101"
+        project={mockProject}
+      />
+    );
+
+    const copyBtns = screen.getAllByRole("button", { name: /Copy/i });
+    expect(copyBtns.length).toBeGreaterThan(0);
+    fireEvent.click(copyBtns[0]);
+
+    expect(writeTextMock).toHaveBeenCalled();
+    expect(screen.getByText(/✓ Copied/i)).toBeInTheDocument();
+  });
 });
+
