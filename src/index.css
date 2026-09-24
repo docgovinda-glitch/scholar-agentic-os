@@ -425,9 +425,15 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Smooth Day/Night Theme Transition */
-body, main, aside {
-  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out, border-color 0.3s ease-in-out;
+/* Apply smooth cross-fade only to color properties, never layout geometry */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              color 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition-delay: 0s !important;
 }
 
 /* Headings: the sans face at a heavier weight and tighter tracking.

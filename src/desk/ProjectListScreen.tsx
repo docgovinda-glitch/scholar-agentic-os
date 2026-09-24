@@ -579,7 +579,20 @@ export default function ProjectListScreen({
     return "dark";
   });
 
+  const transitionTimeoutRef = useRef<number | null>(null);
+
   const toggleTheme = useCallback(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.classList.add("theme-transition");
+      if (transitionTimeoutRef.current !== null) {
+        window.clearTimeout(transitionTimeoutRef.current);
+      }
+      transitionTimeoutRef.current = window.setTimeout(() => {
+        document.documentElement.classList.remove("theme-transition");
+        transitionTimeoutRef.current = null;
+      }, 200);
+    }
+
     setTheme((prevTheme) => {
       const nextTheme = prevTheme === "dark" ? "light" : "dark";
       if (typeof document !== "undefined") {
@@ -596,6 +609,14 @@ export default function ProjectListScreen({
       } catch {}
       return nextTheme;
     });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimeoutRef.current !== null) {
+        window.clearTimeout(transitionTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {

@@ -93,11 +93,39 @@ In the sidebar footer (`src/desk/ProjectListScreen.tsx`), the button wrapping th
 </button>
 ```
 
-### 3.2 State Synchronization Logic
-The `toggleTheme` function synchronizes the React state, DOM root attributes, and local storage simultaneously:
+### 3.2 State Synchronization & Apple-Grade Cross-Fade Logic
+To eliminate jarring color flashes, layout lag, and aggressive full-screen flicker, transitions are scoped exclusively to `background-color`, `border-color`, and `color` using a transient `.theme-transition` class on `document.documentElement` during the toggle window (180ms–200ms).
+
+No geometric layout properties (`width`, `height`, `padding`, `margin`, `transform`) are ever transitioned, keeping icon scaling and layout geometry instantaneous and rock-solid:
+
+```css
+/* Scoped transition in src/index.css */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              color 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition-delay: 0s !important;
+}
+```
 
 ```tsx
+const transitionTimeoutRef = useRef<number | null>(null);
+
 const toggleTheme = useCallback(() => {
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.add("theme-transition");
+    if (transitionTimeoutRef.current !== null) {
+      window.clearTimeout(transitionTimeoutRef.current);
+    }
+    transitionTimeoutRef.current = window.setTimeout(() => {
+      document.documentElement.classList.remove("theme-transition");
+      transitionTimeoutRef.current = null;
+    }, 200);
+  }
+
   setTheme((prevTheme) => {
     const nextTheme = prevTheme === "dark" ? "light" : "dark";
     if (typeof document !== "undefined") {

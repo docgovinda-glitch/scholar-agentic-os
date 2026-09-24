@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed & Refactored (Theme Switching & Day/Night Mode Restoration)
 - **Day/Night Mode Toggle Button Restoration & Dynamic Theme Support (`src/desk/ProjectListScreen.tsx`, `index.html`, `server.ts`, `src/index.css`, `src/main.tsx`)**:
   - Restored full interactive theme switching on the sidebar sun/moon button with immediate zero-latency transition between dark mode (`#171717`) and light mode (`#F7F5F0`).
+  - Implemented an Apple-grade, lightweight cross-fade (`180ms cubic-bezier(0.16, 1, 0.3, 1)`) scoped exclusively to `background-color`, `border-color`, and `color` via transient `html.theme-transition` class, completely eliminating full-screen flicker, layout lag, and geometric resizing shifts.
   - Reconnected toggle logic to update `data-theme` attribute, toggle `.dark` CSS class on `document.documentElement`, and persist selection across `scholar-theme` and `theme` in `localStorage`.
   - Replaced static `#171717` styles on `html, body, #root` in `src/index.css` and `index.html` with dynamic CSS design tokens (`var(--surface-canvas)` and `var(--text-primary)`).
   - Maintained CSP SHA-256 integrity in `server.ts` with verified pre-paint theme hydration script in `index.html`.
