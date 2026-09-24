@@ -47,7 +47,9 @@ export const FORMAT_TILES = [
     id: "OT-01",
     label: "Coursework & Essays",
     title: "Coursework & Essays",
-    features: "Zero Hallucination · Verified Citations · Zero Errors",
+    usp: "Marking Rubric Alignment · Argument Synthesis",
+    specs: "800 – 4,000 words",
+    features: "Marking Rubric Alignment · Argument Synthesis",
     footer: "800 – 4,000 words",
     budget: "800 – 4,000 words",
   },
@@ -55,7 +57,9 @@ export const FORMAT_TILES = [
     id: "OT-10",
     label: "Journal Article",
     title: "Journal Article",
-    features: "Zero Hallucination · Verified Citations · Zero Errors",
+    usp: "Peer-Review Standard · IMRaD Methodology",
+    specs: "4,000 – 10,000 words",
+    features: "Peer-Review Standard · IMRaD Methodology",
     footer: "4,000 – 10,000 words",
     budget: "4,000 – 10,000 words",
   },
@@ -63,7 +67,9 @@ export const FORMAT_TILES = [
     id: "OT-19",
     label: "Research Proposal",
     title: "Research Proposal",
-    features: "Zero Hallucination · Verified Citations · Zero Errors",
+    usp: "Literature Gap Analysis · Ethical Frameworks",
+    specs: "3,000 – 15,000 words",
+    features: "Literature Gap Analysis · Ethical Frameworks",
     footer: "3,000 – 15,000 words",
     budget: "3,000 – 15,000 words",
   },
@@ -71,7 +77,9 @@ export const FORMAT_TILES = [
     id: "OT-22",
     label: "Slides & Keynotes",
     title: "Slides & Keynotes",
-    features: "Zero Hallucination · Verified Citations · Zero Errors",
+    usp: "Speaker Notes Scripting · Visual Layouts",
+    specs: "10 – 35 slides",
+    features: "Speaker Notes Scripting · Visual Layouts",
     footer: "10 – 35 slides",
     budget: "10 – 35 slides",
   },
@@ -1609,6 +1617,7 @@ Keep your response concise, helpful, and academically grounded.`;
                     const isBootingThis = creatingFormatId === tile.id;
                     const isOtherBooting = creating && !isBootingThis;
                     const tileTheme = getFormatTileTheme(tile.id);
+                    const uspParts = tile.usp ? tile.usp.split(" · ") : [];
                     return (
                       <button
                         key={tile.id}
@@ -1622,7 +1631,7 @@ Keep your response concise, helpful, and academically grounded.`;
                           handleCreate(tile.id);
                         }}
                         disabled={isOtherBooting}
-                        className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer flex flex-col justify-between h-full text-left relative ${
+                        className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between h-56 text-left relative ${
                           isOtherBooting
                             ? "opacity-50 cursor-not-allowed"
                             : isBootingThis
@@ -1630,43 +1639,61 @@ Keep your response concise, helpful, and academically grounded.`;
                             : ""
                         }`}
                       >
-                        <div>
-                          <div className="flex items-center justify-between w-full mb-3">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
-                              {isBootingThis ? (
-                                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <FormatIcon id={tile.id} className="w-4 h-4" />
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span
-                                role="button"
-                                tabIndex={0}
-                                onClick={(e) => {
+                        {/* Top Row: Icon & Info indicator */}
+                        <div className="flex items-center justify-between w-full">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-2xs ${tileTheme.badgeBg}`}>
+                            {isBootingThis ? (
+                              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <FormatIcon id={tile.id} className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
                                   e.stopPropagation();
                                   setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.stopPropagation();
-                                    setPreviewFormatId(previewFormatId === tile.id ? null : tile.id);
-                                  }
-                                }}
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-serif italic font-bold"
-                                title="View methodology & stages blueprint"
-                                aria-label={`View stages blueprint for ${tile.label}`}
-                              >
-                                i
-                              </span>
-                            </div>
+                                }
+                              }}
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-900/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-serif italic font-bold"
+                              title="View methodology & stages blueprint"
+                              aria-label={`View stages blueprint for ${tile.label}`}
+                            >
+                              i
+                            </span>
                           </div>
-                          <h3 className="text-base font-bold tracking-tight text-neutral-900 dark:text-neutral-100 leading-snug">
+                        </div>
+
+                        {/* Middle Content: Title & Scoped USP */}
+                        <div className="mt-3.5 mb-2 flex-1 flex flex-col justify-center">
+                          <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
                             {tile.label}
                           </h3>
+                          <p className="text-[12px] leading-relaxed font-normal text-neutral-500 dark:text-neutral-400 mt-1.5 line-clamp-2">
+                            {uspParts.length === 2 ? (
+                              <>
+                                <span>{uspParts[0]}</span>
+                                <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>
+                                <span>{uspParts[1]}</span>
+                              </>
+                            ) : (
+                              tile.usp
+                            )}
+                          </p>
                         </div>
-                        <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-white/10 flex items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400 font-sans">
-                          <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">{tile.footer}</span>
+
+                        {/* Bottom Row: Divider & Spec Limit */}
+                        <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2 text-[12px] text-neutral-500 dark:text-neutral-400 font-sans">
+                          <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">
+                            {tile.specs || tile.footer}
+                          </span>
                         </div>
 
                         {/* Interactive Stages & Methodology Blueprint Overlay */}
@@ -2274,13 +2301,14 @@ function ChooseOutputType({
             {FORMAT_TILES.map((tile) => {
               const isSelected = selected === tile.id;
               const tileTheme = getFormatTileTheme(tile.id);
+              const uspParts = tile.usp ? tile.usp.split(" · ") : [];
 
               return (
                 <div
                   key={tile.id}
                   onClick={() => setSelected(tile.id)}
                   onDoubleClick={() => onPick(tile.id)}
-                  className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer flex flex-col justify-between h-full text-left relative ${
+                  className={`group bg-neutral-50/80 dark:bg-white/5 border border-neutral-200 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 ${tileTheme.hoverBorder} rounded-2xl p-5 transition-all duration-150 hover:-translate-y-0.5 shadow-xs hover:shadow cursor-pointer flex flex-col justify-between h-56 text-left relative ${
                     isSelected
                       ? "ring-2 ring-neutral-400 dark:ring-white/30 border-neutral-400 dark:border-white/30"
                       : ""
@@ -2297,12 +2325,23 @@ function ChooseOutputType({
                         </svg>
                       </div>
                     </div>
-                    <h3 className="text-base font-bold tracking-tight text-neutral-900 dark:text-neutral-100 leading-snug">
+                    <h3 className="text-[15px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 leading-snug">
                       {tile.label}
                     </h3>
+                    <p className="text-[12px] leading-relaxed font-normal text-neutral-500 dark:text-neutral-400 mt-1.5 line-clamp-2">
+                      {uspParts.length === 2 ? (
+                        <>
+                          <span>{uspParts[0]}</span>
+                          <span className="mx-1 text-neutral-400 dark:text-neutral-500 opacity-60">·</span>
+                          <span>{uspParts[1]}</span>
+                        </>
+                      ) : (
+                        tile.usp
+                      )}
+                    </p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-white/10 flex items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400 font-sans">
-                    <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">{tile.footer}</span>
+                  <div className="pt-3 border-t border-neutral-100 dark:border-white/5 flex items-center justify-between gap-2 text-[12px] text-neutral-500 dark:text-neutral-400 font-sans">
+                    <span className="font-medium text-neutral-500 dark:text-neutral-400 truncate">{tile.specs || tile.footer}</span>
                     <span className="font-semibold text-neutral-700 dark:text-neutral-300">Select</span>
                   </div>
                 </div>

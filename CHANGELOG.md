@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-24
 
+### Added & Refactored (Distinct Academic Template USPs & Spec Limits)
+- **Distinct Academic Template USPs (`src/desk/ProjectListScreen.tsx`, `src/desk/__tests__/ProjectListScreen.test.tsx`)**:
+  - Integrated tailored, Apple/Airbnb-style 2-part USP micro-copy and clean spec limits across all 4 main dashboard template cards and the format selection modal:
+    1. **Coursework & Essays:** `Marking Rubric Alignment · Argument Synthesis` (`800 – 4,000 words`).
+    2. **Journal Article:** `Peer-Review Standard · IMRaD Methodology` (`4,000 – 10,000 words`).
+    3. **Research Proposal:** `Literature Gap Analysis · Ethical Frameworks` (`3,000 – 15,000 words`).
+    4. **Slides & Keynotes:** `Speaker Notes Scripting · Visual Layouts` (`10 – 35 slides`).
+  - Styled with muted typography (`text-[12px] font-normal text-neutral-500 dark:text-neutral-400`), centered middle-dot separator with subtle opacity (`opacity-60`), and uniform 56-unit height (`h-56`) ensuring clean vertical alignment.
+  - Added unit test suite in `ProjectListScreen.test.tsx` verifying distinct USP copy, spec limits, and middle-dot opacity rendering.
+
 ### Fixed & Enforced (Zombie Project Deletion Glitch & Strict Unique Project Naming)
 - **Database Cascade Deletion (`supabase/migrations/20260924180000_project_cascade_delete.sql`)**:
   - Enforced `ON DELETE CASCADE` across all 13 child foreign keys referencing `public.projects(project_id)` (phases, prompts, assignment briefs, drafts, citations, knowledge assets, research artifacts).

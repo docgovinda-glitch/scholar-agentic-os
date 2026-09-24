@@ -904,6 +904,48 @@ describe("ghost project deletion & strict unique project naming", () => {
   });
 });
 
+describe("distinct academic format USPs & specs", () => {
+  it("renders distinct 2-part USPs and spec limits for all 4 academic formats on the dashboard", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    // 1. Coursework & Essays
+    expect(screen.getByRole("heading", { name: "Coursework & Essays" })).toBeInTheDocument();
+    expect(screen.getByText("Marking Rubric Alignment")).toBeInTheDocument();
+    expect(screen.getByText("Argument Synthesis")).toBeInTheDocument();
+    expect(screen.getByText("800 – 4,000 words")).toBeInTheDocument();
+
+    // 2. Journal Article
+    expect(screen.getByRole("heading", { name: "Journal Article" })).toBeInTheDocument();
+    expect(screen.getByText("Peer-Review Standard")).toBeInTheDocument();
+    expect(screen.getByText("IMRaD Methodology")).toBeInTheDocument();
+    expect(screen.getByText("4,000 – 10,000 words")).toBeInTheDocument();
+
+    // 3. Research Proposal
+    expect(screen.getByRole("heading", { name: "Research Proposal" })).toBeInTheDocument();
+    expect(screen.getByText("Literature Gap Analysis")).toBeInTheDocument();
+    expect(screen.getByText("Ethical Frameworks")).toBeInTheDocument();
+    expect(screen.getByText("3,000 – 15,000 words")).toBeInTheDocument();
+
+    // 4. Slides & Keynotes
+    expect(screen.getByRole("heading", { name: "Slides & Keynotes" })).toBeInTheDocument();
+    expect(screen.getByText("Speaker Notes Scripting")).toBeInTheDocument();
+    expect(screen.getByText("Visual Layouts")).toBeInTheDocument();
+    expect(screen.getByText("10 – 35 slides")).toBeInTheDocument();
+  });
+
+  it("renders centered middle-dot separator with subtle opacity styling", async () => {
+    listProjects.mockResolvedValue({ items: [] });
+    renderScreen(<ProjectListScreen onOpen={vi.fn()} userEmail="scholar@research.edu" />);
+
+    const essayHeading = screen.getByRole("heading", { name: "Coursework & Essays" });
+    const card = essayHeading.closest("button")!;
+    const dot = card.querySelector(".opacity-60");
+    expect(dot).toBeInTheDocument();
+    expect(dot?.textContent).toBe("·");
+  });
+});
+
 
 
 
