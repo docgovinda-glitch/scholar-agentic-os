@@ -66,6 +66,7 @@ still carrying revision-1 assumptions are marked in the index below.
 | [`ACCOUNT_SETTINGS_AND_NAVIGATION.md`](ACCOUNT_SETTINGS_AND_NAVIGATION.md) | **Account Settings**: vertical tabs, deduplication, and multi-user switching | **2** |
 | [`AIRBNB_TYPOGRAPHY_DESIGN_SYSTEM.md`](AIRBNB_TYPOGRAPHY_DESIGN_SYSTEM.md) | **Design System**: typography, soft radii, and navigation layout | **2** |
 | [`DEFERRED_PROJECT_INITIALIZATION_AND_OPTIMISTIC_UI.md`](DEFERRED_PROJECT_INITIALIZATION_AND_OPTIMISTIC_UI.md) | **Deferred Project Init & Optimistic UI**: in-memory draft lifecycle, zero database bloat, and instant recents rename/deletion | **2** |
+| [`DAY_NIGHT_THEME_SYSTEM_SPECIFICATION.md`](DAY_NIGHT_THEME_SYSTEM_SPECIFICATION.md) | **Day/Night Mode & Theme Architecture**: immediate sidebar toggle, pre-paint hydration, CSP hash tracking, and dynamic CSS tokens | **2** |
 | [`LANDING_PAGE_AND_IN_PAGE_AUTH.md`](LANDING_PAGE_AND_IN_PAGE_AUTH.md) | **Direct Landing & In-Page Auth**: command center landing, contextual auth modal, and bottom Website Assistant | **2** |
 
 ### 03 — Workflow
